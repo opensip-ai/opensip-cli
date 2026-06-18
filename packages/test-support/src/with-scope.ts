@@ -30,9 +30,11 @@ import {
   LanguageRegistry,
   RunScope,
   ToolRegistry,
+  isContributionWithDisposer,
   runWithScope,
   runWithScopeSync,
 } from '@opensip-cli/core';
+import { fitnessTool } from '@opensip-cli/fitness';
 
 import type { RunScopeOptions } from '@opensip-cli/core';
 
@@ -46,6 +48,26 @@ export function makeTestScope(opts: RunScopeOptions = {}): RunScope {
     tools: opts.tools ?? new ToolRegistry(),
     ...opts,
   });
+}
+
+/**
+ * Construct a test `RunScope` carrying fitness's contributed subscope (incl. its
+ * per-run `fileCache`), mirroring the production CLI install loop. Use this for
+ * tests that run a fitness `Check.run(...)`: the check resolves its per-run cache
+ * from `currentScope()?.fitness?.fileCache` (no module-singleton fallback —
+ * parallel-tool-invocations Phase 1), so a file-reading check needs a scope that
+ * carries it. Override base fields via `opts` (e.g. a populated `languages`).
+ */
+export function makeFitnessTestScope(opts: RunScopeOptions = {}): RunScope {
+  const scope = makeTestScope(opts);
+  const contribution = fitnessTool.contributeScope?.() ?? {};
+  if (isContributionWithDisposer(contribution)) {
+    Object.assign(scope, contribution.contribution);
+    if (contribution.onDispose) scope.onDispose(contribution.onDispose);
+  } else {
+    Object.assign(scope, contribution);
+  }
+  return scope;
 }
 
 /** Run `fn` inside `scope` and return its result. Thin alias for `runWithScope`. */

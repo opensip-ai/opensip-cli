@@ -18,7 +18,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 
-import { makeTestScope, withScope } from '../with-scope.js';
+import { makeFitnessTestScope, withScope } from '../with-scope.js';
 
 import { buildFixtureManifest } from './manifest.js';
 
@@ -50,9 +50,15 @@ export interface FixtureRun {
 /**
  * Write `fixture` to a fresh temp dir and run `check` against it in-process.
  * Returns only `check`'s own findings. Always cleans up the temp dir.
+ *
+ * Runs inside a scope carrying fitness's per-run `fileCache` (via
+ * {@link makeFitnessTestScope}): `Check.run` resolves the cache from
+ * `currentScope()?.fitness?.fileCache` (no module-singleton fallback —
+ * parallel-tool-invocations Phase 1).
  */
 export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Promise<FixtureRun> {
   const root = await mkdtemp(join(tmpdir(), 'fixcov-'));
+  const scope = makeFitnessTestScope();
   try {
     const written = await Promise.all(
       fixture.files.map(async (file) => {
@@ -67,13 +73,14 @@ export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Pro
     const targetFiles = fixture.targetPaths
       ? fixture.targetPaths.map((p) => join(root, p))
       : written;
-    const result = await withScope(makeTestScope(), () => check.run(root, { targetFiles }));
+    const result = await withScope(scope, () => check.run(root, { targetFiles }));
     const ruleId = `fit:${check.config.slug}`;
     return {
       findings: result.signals.filter((s) => s.ruleId === ruleId),
       total: result.signals.length,
     };
   } finally {
+    scope.dispose();
     await rm(root, { recursive: true, force: true });
   }
 }

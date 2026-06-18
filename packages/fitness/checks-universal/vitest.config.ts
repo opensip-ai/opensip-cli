@@ -6,6 +6,10 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['src/**/*.test.ts'],
+      // Phase 1: enter an ambient RunScope carrying fitness.fileCache (= the
+      // test-only singleton the run tests prewarm) so file-reading checks resolve
+      // a cache (createExecutionContext no longer falls back to a global).
+      setupFiles: ['../../test-support/src/vitest-fitness-checks-setup.ts'],
       // Some checks (e.g. test-convention-consistency) keep sample `*.test.ts`
       // files under `__fixtures__/` as analysis inputs. They must NOT be
       // collected as real tests — exclude the fixture tree from discovery.

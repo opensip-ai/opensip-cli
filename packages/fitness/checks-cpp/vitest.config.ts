@@ -6,6 +6,10 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['src/**/*.test.ts'],
+      // Phase 1: enter an ambient RunScope carrying fitness.fileCache so the
+      // command-mode check's createExecutionContext resolves a cache
+      // (it no longer falls back to a module singleton).
+      setupFiles: ['../../test-support/src/vitest-fitness-checks-setup.ts'],
       coverage: {
         include: ['src/**'],
         exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/index.ts'],

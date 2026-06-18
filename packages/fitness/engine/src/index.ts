@@ -81,6 +81,10 @@ export { execAbortable } from './framework/abortable-exec.js';
 // unit tests that seed/clear the singleton; new production imports are forbidden
 // by the no-module-level-run-state dogfood check (parallel-tool-invocations Phase 3).
 export { fileCache } from './framework/file-cache.js';
+// The FileCache TYPE — used by test-support's scope helpers to type the
+// per-run cache slot (scope.fitness.fileCache). The CLASS value stays internal
+// (production constructs it only inside the tool's contributeScope / recipe service).
+export type { FileCache } from './framework/file-cache.js';
 export { buildImportGraph, findStronglyConnectedComponents } from './framework/import-graph.js';
 export type { ImportGraph } from './framework/import-graph.js';
 

@@ -26,6 +26,9 @@ import { checks } from '../index.js';
 const langRegistry = new LanguageRegistry();
 langRegistry.register(typescriptAdapter);
 const testScope = new RunScope({ languages: langRegistry });
+// Bind the scope cache to the test-only singleton these tests prewarm:
+// check.run resolves currentScope()?.fitness?.fileCache now (Phase 1).
+Object.assign(testScope, { fitness: { fileCache } });
 
 let cwd: string;
 let allFixturePaths: string[] = [];

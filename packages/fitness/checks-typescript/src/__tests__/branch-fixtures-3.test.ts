@@ -47,6 +47,9 @@ beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), 'opensip-cov-bp3-'));
   written = [];
   testScope = new RunScope();
+  // check.run resolves currentScope()?.fitness?.fileCache now (Phase 1); bind it
+  // to the test-only singleton this suite prewarms.
+  Object.assign(testScope, { fitness: { fileCache } });
 });
 
 afterEach(() => {

@@ -15,7 +15,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { makeTestScope, withScope } from '@opensip-cli/test-support';
+import { makeFitnessTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { analyzeSkippedTests, noSkippedTests } from '../checks/testing/no-skipped-tests.js';
@@ -143,7 +143,7 @@ describe('noSkippedTests (wired check)', () => {
   async function findingCount(name: string, content: string): Promise<number> {
     const filePath = join(root, name);
     await writeFile(filePath, content, 'utf8');
-    const result = await withScope(makeTestScope(), () =>
+    const result = await withScope(makeFitnessTestScope(), () =>
       noSkippedTests.run(root, { targetFiles: [filePath] }),
     );
     return result.signals.filter((s) => s.ruleId === 'fit:no-skipped-tests').length;

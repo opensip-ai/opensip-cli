@@ -10,7 +10,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, runWithScope } from '@opensip-cli/core';
+import { makeFitnessTestScope } from '@opensip-cli/test-support';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { noFmtPrint } from '../checks/no-fmt-print.js';
@@ -18,8 +19,10 @@ import { noFmtPrint } from '../checks/no-fmt-print.js';
 // applyContentFilter resolves the file's adapter via `currentScope()?.languages`
 // (default registry global was removed in T1 cleanup). With no adapter
 // registered for `.go`, applyContentFilter falls through to raw content.
-// Wrap the call in an empty scope so dispatch reaches that no-adapter branch.
-const emptyScope = new RunScope({ languages: new LanguageRegistry() });
+// Wrap the call in a scope that also carries fitness.fileCache, since check.run
+// resolves the per-run cache from currentScope()?.fitness?.fileCache now
+// (no module-singleton fallback — parallel-tool-invocations Phase 1).
+const emptyScope = makeFitnessTestScope({ languages: new LanguageRegistry() });
 
 let cwd: string;
 let target: string;
