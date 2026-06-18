@@ -134,6 +134,15 @@ export interface RunShardsInput {
   readonly resolutionMode: ResolutionMode;
   /** Concurrency cap. Default: `max(1, cpus()-1)`. */
   readonly concurrency?: number;
+  /**
+   * Hard wall-clock kill-timeout (ms) after which a hung shard worker is
+   * SIGKILLed with `failureClass: 'timeout'` (M3). Defaults to
+   * {@link SHARD_HARD_KILL_TIMEOUT_MS} (10 min) — the conservative production
+   * floor. Exposed as an input ONLY so the timeout path is deterministically
+   * exercisable in tests with a short value (the resilience spec, Q3/M3, will
+   * later make it user-configurable); production never sets it.
+   */
+  readonly hardKillTimeoutMs?: number;
 }
 
 /** A shard whose worker failed — attributable, non-fatal. */
@@ -188,6 +197,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
     concurrency,
   });
 
+  const hardKillTimeoutMs = input.hardKillTimeoutMs ?? SHARD_HARD_KILL_TIMEOUT_MS;
   const outcomes = await runWorkerPool(input.shards, concurrency, (shard) =>
     spawnShardWorker(
       shard,
@@ -195,6 +205,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
       input.cliScript,
       input.resolutionMode,
       input.language,
+      hardKillTimeoutMs,
     ),
   );
 
@@ -332,6 +343,7 @@ function spawnShardWorker(
   cliScript: string,
   resolutionMode: ResolutionMode,
   language?: string,
+  hardKillTimeoutMs: number = SHARD_HARD_KILL_TIMEOUT_MS,
 ): Promise<ShardOutcome> {
   return new Promise((resolvePromise) => {
     const specDir = mkdtempSync(join(tmpdir(), 'graph-shard-'));
@@ -389,7 +401,7 @@ function spawnShardWorker(
     const killTimer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
-    }, SHARD_HARD_KILL_TIMEOUT_MS);
+    }, hardKillTimeoutMs);
     killTimer.unref?.();
     const cleanup = (): void => {
       clearTimeout(killTimer);
@@ -430,7 +442,7 @@ function spawnShardWorker(
           exitCode: code ?? -1,
           stderr:
             stderr +
-            `\ngraph shard worker killed after ${String(SHARD_HARD_KILL_TIMEOUT_MS)}ms hard kill-timeout`,
+            `\ngraph shard worker killed after ${String(hardKillTimeoutMs)}ms hard kill-timeout`,
           failureClass: 'timeout',
         });
         return;
