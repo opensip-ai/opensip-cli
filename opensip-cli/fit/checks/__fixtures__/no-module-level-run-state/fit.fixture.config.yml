@@ -1,0 +1,41 @@
+# Fixture-only fit config for the no-module-level-run-state dogfood check.
+#
+# WHY a separate config: the project `opensip-cli.config.yml` lists
+# `**/__fixtures__/**` in `globalExcludes`, so the real `pnpm fit` gate never
+# scans these deliberately-violating fixtures (the gate stays PASS). This
+# fixture config deliberately leaves `globalExcludes` empty so the fixture tree
+# IS scanned, letting us assert the check fires on the violation fixture and
+# stays silent on every clean fixture.
+#
+# Run from the repo root (so the project-local check is auto-discovered):
+#   node packages/cli/dist/index.js fit \
+#     --check no-module-level-run-state \
+#     --config opensip-cli/fit/checks/__fixtures__/no-module-level-run-state/fit.fixture.config.yml
+#
+# The fixture file paths embed `packages/fitness/engine/src/framework/...` (and a
+# non-engine `packages/cli/src/...` case) so the check's TOOL_ENGINE_PATH guard,
+# EXEMPT_PATH (file-cache.ts / index.ts), and TEST_PATH branches are all exercised
+# against realistic resolved paths. The check reads RAW content and strips
+# strings+comments itself for detection (so the doc-comment fixture's prose
+# mentions don't false-fire) while reading the @allow-module-level-run-state
+# marker from the raw lines (so the allow-marker fixture stays silent).
+#
+# Expected result of the run above: exactly ONE finding — on
+#   violation/.../framework/file-accessor.ts (the value import of `fileCache`) —
+# and ZERO findings on every clean/* fixture.
+
+globalExcludes: []
+
+targets:
+  fixtures:
+    description: no-module-level-run-state fixtures
+    languages: [typescript]
+    concerns: [backend]
+    include:
+      - 'opensip-cli/fit/checks/__fixtures__/no-module-level-run-state/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+
+checkOverrides:
+  no-module-level-run-state: [fixtures]

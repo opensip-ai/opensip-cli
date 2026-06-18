@@ -52,7 +52,7 @@
  * inline `@allow-module-level-run-state <reason>` marker (mirroring
  * `@allow-module-singleton`) so it is reviewable in the diff.
  */
-import { defineCheck } from '@opensip-cli/fitness';
+import { defineCheck, stripStringsAndCommentsPreservingPositions } from '@opensip-cli/fitness';
 
 /**
  * Resolved-path fragment that identifies a tool-engine source file. The check
@@ -102,6 +102,19 @@ const ALLOW_MARKER = '@allow-module-level-run-state';
  * tool-engine file. Exported so the dogfood `__fixtures__` (Phase 4) — and any
  * future unit test — can exercise the detection without the Check framework,
  * matching the `analyzeDirectStdout` / `analyzeNoModuleSingleton` pattern.
+ *
+ * CONTENT MODEL: receives RAW content (`contentFilter: 'raw'`). It strips
+ * strings + comments ITSELF (position-preserving, so line numbers stay exact)
+ * for the import/identifier DETECTION — the tool-engine source carries many
+ * prose mentions of `scope.fitness.fileCache` / `globalFileCache` in JSDoc and
+ * inline comments that must not false-fire. It checks the `@allow-module-level-
+ * run-state` escape-hatch marker against the RAW lines, because that marker
+ * lives in a comment — a check that ran on already-comment-stripped content
+ * (via the framework's `strip-strings-and-comments` filter) would blank the
+ * marker and break the escape hatch. Detecting on stripped code while reading
+ * the marker from raw is the only way to satisfy BOTH: prose tolerance AND a
+ * comment-based, reviewable escape hatch. Mirrors the `raw` + own-stripping
+ * pattern used by `no-tool-owned-session-timing.mjs`.
  */
 export function analyzeNoModuleLevelRunState(content, filePath) {
   const norm = filePath.replaceAll('\\', '/');
@@ -112,14 +125,21 @@ export function analyzeNoModuleLevelRunState(content, filePath) {
   if (EXEMPT_PATH.test(norm) || TEST_PATH.test(norm)) return [];
 
   const violations = [];
+  // RAW lines carry the escape-hatch marker (a comment). The position-preserving
+  // strip blanks strings + comments so the DETECTION regexes never see a prose
+  // mention of `fileCache` / `globalFileCache`, while keeping line numbers exact.
   const lines = content.split('\n');
-  for (const [i, line] of lines.entries()) {
-    // Inline escape hatch on this line or the line directly above.
+  const codeLines = stripStringsAndCommentsPreservingPositions(content).split('\n');
+  for (const [i, codeLine] of codeLines.entries()) {
+    const rawLine = lines[i] ?? '';
+    // Inline escape hatch on this line or the line directly above — read from the
+    // RAW lines (the marker is a comment, blanked in `codeLines`).
     const above = i > 0 ? (lines[i - 1] ?? '') : '';
-    if (line.includes(ALLOW_MARKER) || above.includes(ALLOW_MARKER)) continue;
+    if (rawLine.includes(ALLOW_MARKER) || above.includes(ALLOW_MARKER)) continue;
 
-    const importsValue = !TYPE_IMPORT_RE.test(line) && VALUE_IMPORT_OF_FILECACHE_RE.test(line);
-    const usesGlobalAlias = GLOBAL_FILECACHE_RE.test(line);
+    const importsValue =
+      !TYPE_IMPORT_RE.test(codeLine) && VALUE_IMPORT_OF_FILECACHE_RE.test(codeLine);
+    const usesGlobalAlias = GLOBAL_FILECACHE_RE.test(codeLine);
     if (!importsValue && !usesGlobalAlias) continue;
 
     violations.push({
@@ -152,10 +172,14 @@ export const checks = [
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture', 'scope'],
     fileTypes: ['ts', 'tsx'],
-    // strip-strings so the literal text "fileCache"/"globalFileCache" appearing
-    // inside a doc-comment example or a string does not false-fire; only real
-    // import clauses and identifier uses survive the filter.
-    contentFilter: 'strip-strings',
+    // RAW content: the analyze function does its OWN position-preserving
+    // string+comment strip for the import/identifier DETECTION (so prose
+    // mentions of fileCache/globalFileCache in JSDoc never false-fire) while
+    // reading the `@allow-module-level-run-state` escape-hatch marker from the
+    // raw lines (the marker is a comment — the framework's
+    // 'strip-strings-and-comments' filter would blank it and break the hatch).
+    // See the analyzeNoModuleLevelRunState header for why both passes are needed.
+    contentFilter: 'raw',
     analyze: (content, filePath) => analyzeNoModuleLevelRunState(content, filePath),
   }),
 ];
