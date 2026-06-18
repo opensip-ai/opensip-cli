@@ -16,6 +16,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'architecture-no-run-done-result': ['🎯', 'No Per-Tool Run Done-Result'],
   'package-json-exports-field': ['📦', 'package.json Exports Field'],
   'phantom-dependency-detection': ['📦', 'Phantom Dependency Detection'],
+  'subprocess-correlation-required': ['🔗', 'Subprocess Correlation Required'],
   'tsconfig-extends-validation': ['⚙️', 'tsconfig Extends Validation'],
 });
 
