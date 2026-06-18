@@ -12,7 +12,15 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
-import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-cli/core';
+import {
+  currentScope,
+  currentTraceparent,
+  logger,
+  ValidationError,
+  withSpanAsync,
+  type Signal,
+  type Span,
+} from '@opensip-cli/core';
 
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
@@ -173,6 +181,9 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
       module: 'graph:sharded',
       shardId: failure.shardId,
       exitCode: failure.exitCode,
+      // Complementary to the runner's structured `shard_failed`; enriched with
+      // the failureClass now carried on ShardFailure (Task 1.2) when present.
+      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
       stderr: failure.stderr.slice(0, 500),
     });
   }
@@ -183,6 +194,19 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //     single-program walk: it assembles the per-file occurrences into one
   //     catalog, so its sub-label reports the resulting function count.
   const fragments = [...plan.cached, ...built.fragments];
+  // Structured merge milestone (subprocess-correlation Event Catalog): the
+  // fragment count being merged + the ids of any shards whose worker failed,
+  // stamped with the run/trace ids so it pivots to the same run as the runner's
+  // events. `traceId` is omitted when OTel is off (currentTraceparent → undefined).
+  const mergeTraceId = currentTraceparent();
+  logger.info({
+    evt: 'graph.shard.merge',
+    module: 'graph:sharded',
+    runId: currentScope()?.runId ?? '',
+    ...(mergeTraceId === undefined ? {} : { traceId: mergeTraceId }),
+    fragmentCount: fragments.length,
+    failedShardIds: built.failures.map((f) => f.shardId),
+  });
   // The export linker keys packages by name; build the manifest index once from
   // the resolved shard set (each shard.rootDir holds a package.json) so the
   // boundary resolver can turn a bare specifier into a target package group.
