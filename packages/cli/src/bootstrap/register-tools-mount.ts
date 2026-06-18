@@ -8,6 +8,7 @@ import {
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import { bindToolCliContext } from './bind-tool-context.js';
+import { decorateToolPrimary } from './decorate-tool-primary.js';
 import { BOOTSTRAP_MODULE } from './register-tools-shared.js';
 
 /**
@@ -116,51 +117,82 @@ function hideInternalCommands(registry: ToolRegistry, program: CliProgram): void
  * with no `parent` mount flat onto the root program exactly as before.
  */
 export function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContext): void {
-  if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {
-    const toolCtx = bindToolCliContext(tool, ctx);
-
-    // First pass: mount every flat (no-`parent`) spec onto the root program,
-    // recording each mounted command by name so nested children can resolve
-    // their declared parent. `Tool.commandSpecs` is
-    // `CommandSpec<unknown, ToolCliContext>[]`, which is assignable to the
-    // mounter's `HostCommandSpec` (handler contravariance) — no cast.
-    const mountedByName = new Map<string, CliProgram>();
-    for (const spec of tool.commandSpecs) {
-      if (spec.parent !== undefined) continue;
-      const cmd = mountCommandSpec(program, spec, toolCtx);
-      mountedByName.set(spec.name, cmd);
-    }
-
-    // Second pass: mount each `parent`-nested spec onto its parent's mounted
-    // command (the `<tool> <verb>` grammar). A spec whose declared parent was
-    // not mounted in this tool is surfaced loudly rather than silently dropped.
-    for (const spec of tool.commandSpecs) {
-      if (spec.parent === undefined) continue;
-      const parentCmd = mountedByName.get(spec.parent);
-      if (parentCmd === undefined) {
-        logger.warn({
-          evt: 'cli.tool.unknown_command_parent',
-          module: BOOTSTRAP_MODULE,
-          toolId: tool.metadata.id, // stable
-          toolName: tool.metadata.name ?? tool.metadata.id,
-          detail: `command '${spec.name}' declares parent '${spec.parent}', which is not a flat command on this tool; mounting flat at root instead`,
-        });
-        mountCommandSpec(program, spec, toolCtx);
-        continue;
-      }
-      mountCommandSpec(parentCmd, spec, toolCtx);
-    }
+  if (tool.commandSpecs === undefined || tool.commandSpecs.length === 0) {
+    // No declarative command surface — a mis-declared tool contributes no
+    // commands. Surface it rather than silently mounting nothing.
+    logger.warn({
+      evt: 'cli.tool.no_command_surface',
+      module: BOOTSTRAP_MODULE,
+      toolId: tool.metadata.id, // stable
+      toolName: tool.metadata.name ?? tool.metadata.id,
+      detail: 'tool declares no commandSpecs; no commands mounted',
+    });
     return;
   }
-  // No declarative command surface — a mis-declared tool contributes no commands.
-  // Surface it rather than silently mounting nothing.
-  logger.warn({
-    evt: 'cli.tool.no_command_surface',
-    module: BOOTSTRAP_MODULE,
-    toolId: tool.metadata.id, // stable
-    toolName: tool.metadata.name ?? tool.metadata.id,
-    detail: 'tool declares no commandSpecs; no commands mounted',
-  });
+
+  const toolCtx = bindToolCliContext(tool, ctx);
+  const mountedByName = mountFlatSpecs(program, tool, toolCtx);
+
+  // Host-owned uniform decoration of the tool PRIMARY (the flat run command
+  // whose name === metadata.name): per-tool `--version`, guaranteed
+  // `--cwd`/`--json`/`--config`, and `--quiet`/`--verbose`. Applied ONCE here
+  // in the mount layer (not re-declared per tool) and ONLY to the primary —
+  // never the nested `<tool> <verb>` children or Tier-3 workers. A tool that
+  // declares no primary (its name doesn't match a flat spec) gets no
+  // decoration, exactly as before.
+  const primaryCmd = mountedByName.get(tool.metadata.name);
+  if (primaryCmd !== undefined) decorateToolPrimary(primaryCmd, tool);
+
+  mountNestedSpecs(program, tool, toolCtx, mountedByName);
+}
+
+/**
+ * First pass: mount every flat (no-`parent`) spec onto the root program,
+ * recording each mounted command by name so nested children can resolve their
+ * declared parent. `Tool.commandSpecs` is `CommandSpec<unknown, ToolCliContext>[]`,
+ * which is assignable to the mounter's `HostCommandSpec` (handler contravariance).
+ */
+function mountFlatSpecs(
+  program: CliProgram,
+  tool: Tool,
+  toolCtx: ToolCliContext,
+): Map<string, CliProgram> {
+  const mountedByName = new Map<string, CliProgram>();
+  for (const spec of tool.commandSpecs ?? []) {
+    if (spec.parent !== undefined) continue;
+    mountedByName.set(spec.name, mountCommandSpec(program, spec, toolCtx));
+  }
+  return mountedByName;
+}
+
+/**
+ * Second pass: mount each `parent`-nested spec onto its parent's mounted command
+ * (the `<tool> <verb>` grammar). A spec whose declared parent was not mounted in
+ * this tool is surfaced loudly (and mounted flat at root) rather than silently
+ * dropped.
+ */
+function mountNestedSpecs(
+  program: CliProgram,
+  tool: Tool,
+  toolCtx: ToolCliContext,
+  mountedByName: ReadonlyMap<string, CliProgram>,
+): void {
+  for (const spec of tool.commandSpecs ?? []) {
+    if (spec.parent === undefined) continue;
+    const parentCmd = mountedByName.get(spec.parent);
+    if (parentCmd === undefined) {
+      logger.warn({
+        evt: 'cli.tool.unknown_command_parent',
+        module: BOOTSTRAP_MODULE,
+        toolId: tool.metadata.id, // stable
+        toolName: tool.metadata.name ?? tool.metadata.id,
+        detail: `command '${spec.name}' declares parent '${spec.parent}', which is not a flat command on this tool; mounting flat at root instead`,
+      });
+      mountCommandSpec(program, spec, toolCtx);
+      continue;
+    }
+    mountCommandSpec(parentCmd, spec, toolCtx);
+  }
 }
 
 const DOCS_HELP_FOOTER = '\nDocs: https://opensip.ai/docs/opensip-cli';

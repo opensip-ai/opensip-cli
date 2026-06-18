@@ -35,6 +35,7 @@ import { Command } from 'commander';
 import {
   bootstrapCli,
   installPreActionHook,
+  isRootVersionRequest,
   maybeOpenReport,
   mountToolCommands,
   renderResult,
@@ -60,7 +61,14 @@ const program = new Command('opensip')
   // ADR-0008: per-run opt-out of OpenSIP Cloud signal sync. `--no-cloud` sets
   // `cloud` to false; the pre-action hook reads it via optsWithGlobals().
   .option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run')
-  .version(cliVersion)
+  // NOTE: the root program does NOT register a Commander `.version()` option.
+  // A Commander version option on the root is a GLOBAL option that intercepts
+  // `--version` even after a known subcommand, so `opensip fit --version` would
+  // print the CLI version instead of the tool's. The per-tool `--version`
+  // (decorateToolPrimary) is a subcommand-local Commander version option, and
+  // the bare `opensip --version` (CLI version) is handled by the host argv
+  // pre-scan (`isRootVersionRequest`) below — before Commander parses — so the
+  // two never collide. See decorate-tool-primary.ts and the version phase spec.
   // Route Commander's own parse failures through `parseAsync().catch` →
   // `handleParseError` instead of letting Commander call `process.exit(N)`
   // directly. This restores the project's typed-error → exit-code contract for
@@ -75,6 +83,14 @@ const program = new Command('opensip')
   .exitOverride();
 
 async function main(): Promise<void> {
+  // Bare `opensip --version` / `-V` → the CLI version (host-owned), printed
+  // before any bootstrap. A `--version` AFTER a subcommand is that tool's own
+  // (handled by decorateToolPrimary's subcommand-local version option).
+  if (isRootVersionRequest(process.argv.slice(2))) {
+    process.stdout.write(`${cliVersion}\n`);
+    return;
+  }
+
   // Fresh registries per CLI invocation. Tools read these via
   // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them here.
   const langRegistry = new LanguageRegistry();
@@ -148,7 +164,10 @@ async function main(): Promise<void> {
   // telemetry shutdown flush — consistent with this file's exitCode-over-
   // exit() principle below. Exit code defaults to 0.
   if (process.argv.length <= 2) {
-    printWelcome({ version: program.version() ?? 'dev' });
+    // The root program no longer carries a Commander version option, so read the
+    // CLI version directly from the package (the same value the root `--version`
+    // pre-scan prints) rather than `program.version()`.
+    printWelcome({ version: cliVersion });
     return;
   }
 

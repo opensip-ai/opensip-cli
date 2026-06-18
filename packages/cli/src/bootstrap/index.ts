@@ -57,6 +57,7 @@ export { maybeOpenReport } from './report.js';
 export { installPreActionHook } from './pre-action-hook.js';
 export { buildCommandRegistrationInput } from './build-command-registration-input.js';
 export { buildHostPlanes } from './host-planes.js';
+export { isRootVersionRequest } from './root-version.js';
 
 export interface BootstrapOptions {
   readonly langRegistry: LanguageRegistry;
