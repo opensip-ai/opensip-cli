@@ -55,6 +55,11 @@ const SIM: ToolCommandDescriptor = {
 
 const SIM_RUN_WORKER: ToolCommandDescriptor = {
   name: 'sim-run-worker',
+  // Tier-3 (tool-command-surface-taxonomy): an IPC bootstrap entry point forked
+  // by the live view, never typed by a user. `visibility: 'internal'` is the
+  // machine-readable marker the host hide pass keys on; the `[internal]`
+  // description prefix is the human-readable backup.
+  visibility: 'internal',
   description:
     '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
 };

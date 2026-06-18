@@ -91,18 +91,31 @@ const GRAPH_BASELINE_EXPORT: ToolCommandDescriptor = {
 
 const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
   name: 'graph-shard-worker',
+  // Tier-3 (tool-command-surface-taxonomy): spawned by the sharded build, never
+  // typed by a user. `visibility: 'internal'` is the machine-readable marker the
+  // host hide pass keys on; the `[internal]` prefix is the human-readable backup.
+  visibility: 'internal',
   description:
     '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
 };
 
 const GRAPH_EQUIVALENCE_CHECK: ToolCommandDescriptor = {
   name: 'graph-equivalence-check',
+  // Tier-3 (tool-command-surface-taxonomy): a CI equivalence gate, never typed by
+  // a user. `visibility: 'internal'` is the machine-readable marker the host hide
+  // pass keys on; the `[internal]` prefix is the human-readable backup.
+  visibility: 'internal',
   description:
     '[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)',
 };
 
 const GRAPH_RUN_WORKER: ToolCommandDescriptor = {
   name: 'graph-run-worker',
+  // Tier-3 (tool-command-surface-taxonomy): an IPC bootstrap entry point forked
+  // by the live view, never typed by a user. `visibility: 'internal'` is the
+  // machine-readable marker the host hide pass keys on; the `[internal]` prefix
+  // is the human-readable backup.
+  visibility: 'internal',
   description:
     '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
 };
