@@ -217,10 +217,7 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
       const descriptorInternal = showInternalCommands()
         ? new Set<string>()
         : (ctx.toolInternalCommands ?? INTERNAL_COMMANDS);
-      const internalCommands = new Set<string>([
-        ...descriptorInternal,
-        ...LEGACY_EXPORT_ALIASES,
-      ]);
+      const internalCommands = new Set<string>([...descriptorInternal, ...LEGACY_EXPORT_ALIASES]);
       const inventory = assembleCompletionInventory({
         toolSpecs: ctx.toolCommandSpecs ?? [],
         hostSpecs: host.specs,
