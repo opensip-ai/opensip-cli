@@ -24,7 +24,7 @@
  * apply to it. Only `--help` and shell completion honour the override.
  */
 
-import { type Tool, type ToolRegistry } from '@opensip-cli/core';
+import { type ToolRegistry } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
 
@@ -36,7 +36,7 @@ import { hostEnv } from '../env/host-env-specs.js';
  */
 export function internalCommandNames(registry: ToolRegistry): ReadonlySet<string> {
   const names = new Set<string>();
-  for (const tool of registry.list() as readonly Tool[]) {
+  for (const tool of registry.list()) {
     for (const descriptor of tool.commands) {
       if (descriptor.visibility === 'internal') names.add(descriptor.name);
     }

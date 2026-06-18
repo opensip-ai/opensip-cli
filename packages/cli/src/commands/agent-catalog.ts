@@ -72,6 +72,10 @@ const INTERNAL_COMMAND_NAME_RE = /(?:-run-worker|-shard-worker|-equivalence-chec
  * explicit `tier: 'internal'`). Called at catalog-build time so a regression that
  * pastes an internal command into `entryPoints` fails loudly the first time the
  * catalog is built, not silently at the agent boundary.
+ *
+ * @throws {Error} When an entry point is a Tier-3 internal command — by an
+ *   explicit `tier: 'internal'` or by an internal command-name shape
+ *   (`*-run-worker` / `*-shard-worker` / `*-equivalence-check`).
  */
 function assertNoInternalEntryPoints(
   entryPoints: readonly { readonly command: string; readonly tier?: CommandTier }[],
@@ -109,8 +113,7 @@ export function buildAgentCatalog(): AgentCatalog {
     },
     {
       command: 'sessions list',
-      description:
-        'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
+      description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
       examples: [
         'opensip sessions list --json --summary-only',
         'opensip sessions list --json --tool fit --limit 5',
