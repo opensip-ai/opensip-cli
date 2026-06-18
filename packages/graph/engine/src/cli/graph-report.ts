@@ -54,6 +54,14 @@ export interface LiveGraphOutput {
   readonly signals: readonly Signal[];
   readonly suppressedCount: number;
   readonly reportLines: readonly string[];
+  /**
+   * The catalog's RESOLVED resolution tier (envelope-first-presentation RP-2).
+   * Plain data so it survives the IPC structured-clone. The live done frame
+   * surfaces graph's fast-tier caveat as a muted banner above the per-unit table
+   * — parity with the static `presentationToView` banners, which read the same
+   * `catalog.resolutionMode`. Absent / `exact` ⇒ no banner.
+   */
+  readonly resolutionMode?: 'exact' | 'fast';
 }
 
 /**
@@ -73,10 +81,12 @@ export async function buildLiveGraphOutput(
 ): Promise<LiveGraphOutput> {
   const finalized = await finalizeGraphSignals(input.signals, buildRoot);
   const waivedInput: UnifiedReportInput = { ...input, signals: finalized.signals };
+  const resolutionMode = input.catalog?.resolutionMode;
   return {
     signals: finalized.signals,
     suppressedCount: finalized.suppressedCount,
     reportLines: buildUnifiedReportLines(waivedInput, { includeSummary: false }),
+    ...(resolutionMode === undefined ? {} : { resolutionMode }),
   };
 }
 

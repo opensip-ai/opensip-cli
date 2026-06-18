@@ -43,6 +43,12 @@ export type {
 export { executeGraph, buildUnifiedReportLines } from './cli/graph.js';
 export type { UnifiedReportInput } from './cli/graph.js';
 
+// The graph live done-frame per-unit table node (envelope-first-presentation
+// RP-2). Internal — exported only so the host-side live/static parity proof
+// (`packages/cli/src/ui/__tests__/graph-live-static-parity.test.tsx`) can assert
+// it renders byte-identically to the static `envelopeToTableView` table.
+export { graphDoneTableNode } from './cli/graph-envelope-view.js';
+
 // `CatalogRepo` — the engine's SQLite/Drizzle catalog persistence repo. Used
 // internally by graph (orchestrator cache, `tool.ts` report contribution,
 // `lookup`/`catalog-export`). It was briefly on the public barrel for fitness's
