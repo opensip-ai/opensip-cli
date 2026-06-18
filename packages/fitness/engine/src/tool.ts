@@ -52,6 +52,7 @@ import { readPackageVersion } from '@opensip-cli/core';
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import {
   fitBaselineExportCommandSpec,
+  fitExportCommandSpec,
   fitListCommandSpec,
   fitRecipesCommandSpec,
 } from './cli/fit/fit-aux-command-specs.js';
@@ -110,6 +111,18 @@ const FIT_RECIPES: ToolCommandDescriptor = {
 const FIT_BASELINE_EXPORT: ToolCommandDescriptor = {
   name: 'fit-baseline-export',
   description: 'Export the fit gate baseline (SARIF) from the datastore to a file',
+};
+
+/**
+ * The CANONICAL fitness export command (tool-command-surface-taxonomy Task 2.2).
+ * Nested under the `fit` primary (`parent: 'fit'`) so it reads as `fit export
+ * --format baseline`. The legacy flat-root `fit-baseline-export` descriptor
+ * COEXISTS as a working command, with `legacy_alias_used` telemetry.
+ */
+const FIT_EXPORT: ToolCommandDescriptor = {
+  name: 'export',
+  parent: 'fit',
+  description: 'Export fit artifacts (--format baseline)',
 };
 
 const FIT_RUN_WORKER: ToolCommandDescriptor = {
@@ -181,6 +194,9 @@ const fitCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   fitListCommandSpec,
   fitRecipesCommandSpec,
   fitBaselineExportCommandSpec,
+  // Canonical nested export (Task 2.2) — mounts as `fit export` under the `fit`
+  // primary via the Phase 0 nested-mount capability.
+  fitExportCommandSpec,
   fitRunWorkerCommandSpec,
 ];
 
@@ -265,7 +281,7 @@ export const fitnessTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT, FIT_RUN_WORKER],
+  commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT, FIT_EXPORT, FIT_RUN_WORKER],
   pluginLayout: FIT_PLUGIN_LAYOUT,
   // Release 2.11.0 Phase 4: fitness declares its command surface; the host
   // mounts each spec via mountCommandSpec. The deprecated `register()` fallback

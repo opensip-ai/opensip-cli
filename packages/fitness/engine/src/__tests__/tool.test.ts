@@ -57,6 +57,9 @@ describe('fitnessTool contract conformance', () => {
       'fit-list',
       'fit-recipes',
       'fit-baseline-export',
+      // Canonical nested export (tool-command-surface-taxonomy Task 2.2) —
+      // name 'export', parent 'fit'.
+      'export',
       // [internal] headless run forked by the live view (ADR-0028).
       'fit-run-worker',
     ]);
