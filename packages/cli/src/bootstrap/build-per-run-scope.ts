@@ -350,8 +350,7 @@ function assembleCorrelation(input: AssembleCorrelationInput): {
     input.noCloud !== true &&
     input.effectiveCloud?.sync !== false;
 
-  const repoBaseDir =
-    input.project.scope === 'project' ? input.project.projectRoot : input.cwd;
+  const repoBaseDir = input.project.scope === 'project' ? input.project.projectRoot : input.cwd;
   const repo = cloudActive ? basename(repoBaseDir) || undefined : undefined;
 
   const traceId = currentTraceparent();
