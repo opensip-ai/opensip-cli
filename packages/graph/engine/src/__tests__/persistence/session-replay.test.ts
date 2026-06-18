@@ -46,7 +46,7 @@ function storedSession(payload: unknown, overrides: Partial<StoredSession> = {})
 }
 
 describe('graphReplayFromSession', () => {
-  it('round-trips a stored payload back into a projection envelope + graph-done result', () => {
+  it('round-trips a stored payload back into a projection envelope + run-presentation result', () => {
     const payload = buildGraphSessionPayload([
       sig({
         ruleId: 'graph:god-file',
@@ -70,9 +70,12 @@ describe('graphReplayFromSession', () => {
     expect(located?.code).toEqual({ file: 'a.ts', line: 1, column: 2 });
     expect(located?.suggestion).toBe('split it');
     expect(located?.metadata).toEqual({ fanIn: 12, label: 'big', flagged: true });
-    expect(replay.result.type).toBe('graph-done');
-    expect(replay.result.summary).toEqual({ passed: 1, failed: 1, errors: 1, warnings: 1 });
-    expect(replay.result.durationMs).toBe(99);
+    // The inner replay result is the uniform render-only RunPresentation carrying
+    // the projected envelope (the host renders replay via SessionReplayResult, not
+    // this inner result).
+    expect(replay.result.type).toBe('run-presentation');
+    expect(replay.result.tool).toBe('graph');
+    expect(replay.result.envelope).toBe(replay.envelope);
   });
 
   it('carries recipe onto the envelope when present', () => {

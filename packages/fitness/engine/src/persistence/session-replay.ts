@@ -2,7 +2,7 @@ import { currentScope, extractPayloadVersion, type Signal } from '@opensip-cli/c
 import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
 
 import type {
-  FitDoneResult,
+  RunPresentation,
   SignalEnvelope,
   StoredSession,
   ToolSessionReplay,
@@ -10,17 +10,22 @@ import type {
 } from '@opensip-cli/contracts';
 
 /**
- * Project a stored fit session back into a {@link SignalEnvelope}/{@link FitDoneResult}.
+ * Project a stored fit session back into a {@link SignalEnvelope}/{@link RunPresentation}.
  *
  * The structural decode of the opaque payload is shared across tools
  * (`decodeSessionPayload`); this function owns only fit's projection — the
  * envelope vocabulary (`tool: 'fit'`, recipe label) and the per-finding signal
  * shape (`category: 'quality'`, severity mapping, id prefix).
  *
+ * The replay RENDER path reads only `replay.envelope` + `replay.fidelity` (the
+ * host builds the shared `SessionReplayResult` from those); the inner
+ * `RunPresentation` `result` is a uniform, render-only carrier and is not on the
+ * replay render path.
+ *
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */
-export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<FitDoneResult> {
+export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<RunPresentation> {
   const decoded = decodeSessionPayload(stored.payload, { tool: 'fit' });
 
   // Version-aware handling per payload evolution plan.
@@ -68,13 +73,7 @@ export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<F
   return {
     fidelity: 'projection',
     envelope,
-    result: {
-      type: 'fit-done',
-      label: stored.recipe ? `recipe ${stored.recipe}` : `session ${stored.id}`,
-      cwd: stored.cwd,
-      envelope,
-      configFound: true,
-    },
+    result: { type: 'run-presentation', tool: 'fitness', envelope },
   };
 }
 
