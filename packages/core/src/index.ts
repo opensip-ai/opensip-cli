@@ -381,6 +381,7 @@ export type { EnvVarSpec, EnvDeprecation, EnvReadResult } from './lib/env-regist
 export {
   correlationToEnv,
   correlationFromEnv,
+  liveEngineCorrelation,
   CORRELATION_ENV_SPECS,
   CORRELATION_ENV,
   REPO_OTEL_ATTR,

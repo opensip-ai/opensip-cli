@@ -204,6 +204,27 @@ export const CORRELATION_ENV = Object.freeze({
 const WORKER_KINDS: ReadonlySet<string> = new Set(['shard', 'live-engine', 'external-tool']);
 
 /**
+ * Build the `SubprocessJobDescriptor.correlation` bag for a forked LIVE-ENGINE
+ * worker from the parent run's scope correlation: drop the env-only `runId` (B1 —
+ * it travels via `OPENSIP_RUN_ID`, injected by the transport) and stamp
+ * `workerKind: 'live-engine'`. Returns `undefined` when no parent correlation was
+ * assembled (tests / bare runs) so the descriptor omits the field and the worker
+ * degrades observably.
+ *
+ * One shared definition so the three live-engine fork callers
+ * (`graph-runner.tsx` / `fit-runner.tsx` / `sim-runner.tsx`) stay symmetric to
+ * each other AND to the spawn path's `stripRunId` — no triplicated B1 logic to
+ * drift. Pure: reads only the named fields.
+ */
+export function liveEngineCorrelation(
+  c: RunCorrelation | undefined,
+): Omit<RunCorrelation, 'runId'> | undefined {
+  if (!c) return undefined;
+  const { runId: _runId, ...rest } = c;
+  return { ...rest, workerKind: 'live-engine' };
+}
+
+/**
  * Build the env bag for a subprocess spawn. PURE: it reads only the named
  * {@link RunCorrelation} fields — never `process.env`, never anything keyed
  * `OPENSIP_API_KEY`. Present fields are emitted under their canonical
