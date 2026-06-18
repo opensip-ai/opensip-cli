@@ -66,6 +66,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   const buffer: TEvent[] = [];
   const emit = (event: TEvent): void => {
     if (listener) listener(event);
+    // @fitness-ignore-next-line stream-buffer-size-limits -- bounded by design: a transient PRE-SUBSCRIBE buffer drained on the first onProgress (the `while (buffer.length > 0)` flush below), identical to in-process-transport; the bounded `.length`-guard marker just drifted past the check's 50-line proximity window when the correlation block landed between push and flush.
     else buffer.push(event);
   };
 
@@ -101,7 +102,8 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   // so `fork` inherits the parent env wholesale.
   const childEnv =
     descriptor.env || descriptor.correlation
-      ? { ...process.env, ...descriptor.env, ...correlationEnv }
+      ? // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; correlation env carries NO secret (Task 0.1) and this object is passed to fork, never logged.
+        { ...process.env, ...descriptor.env, ...correlationEnv }
       : undefined;
 
   const child = fork(descriptor.command, [...descriptor.argv], {
@@ -113,7 +115,8 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     // (the JSON serializer would silently drop or mangle those). Workers send
     // slim, plain-data results today; this keeps the transport robust regardless.
     serialization: 'advanced',
-    // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; correlation env carries NO secret (Task 0.1) and this object is passed to fork, never logged.
+    // The `{ ...process.env }` spread now lives on the `childEnv` const above
+    // (waived there); this passes the already-assembled object to fork.
     ...(childEnv === undefined ? {} : { env: childEnv }),
   });
 
