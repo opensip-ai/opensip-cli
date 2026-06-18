@@ -158,7 +158,7 @@ opensip fit --gate-compare                  # CI gate from now on
 
 The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps the current run's signals and stores them through the host-owned baseline plane (`cli.saveBaseline('fitness', envelope)` → the generic `tool_baseline_entries` table, scoped by `tool`, at `<project>/opensip-cli/.runtime/datastore.sqlite`), then exits according to the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save itself happens first, so the baseline survives a failing exit). `--gate-compare` runs the same checks, reads the saved rows back, computes the diff, and exits 1 if any *new* signal appears (the reserved `failOnDegraded` key, default on, toggles hard-fail vs. report-only). There is exactly one baseline per tool per project.
 
-> **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-cli/output` production dependency: the root owns all SARIF egress. `fit-baseline-export` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
+> **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-cli/output` production dependency: the root owns all SARIF egress. `fit export --format baseline` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
 
 Baselines are stored in SQLite, and SARIF is an export format. See
 [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](../10-concepts/05-architecture-gate.md#ci-integration-patterns)
@@ -249,7 +249,7 @@ The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, 
 
 ### The baseline (SQLite, not SARIF)
 
-The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](../../../packages/output/src/format/baseline-diff.ts) in `@opensip-cli/output`. The on-disk CI artifact stays a SARIF document because `fit-baseline-export` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
+The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](../../../packages/output/src/format/baseline-diff.ts) in `@opensip-cli/output`. The on-disk CI artifact stays a SARIF document because `fit export --format baseline` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
 
 ---
 

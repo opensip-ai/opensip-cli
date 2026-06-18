@@ -104,7 +104,7 @@ Source: [`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/
 
 1. Parse global flags (`--debug`, `--quiet`).
 2. Set up the logger and assign a `runId` (`RUN_<ulid>`).
-3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and mount each registered Tool's declared `commandSpecs` via the host's `mountCommandSpec`. The fitness Tool declares `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; the host builds the Commander commands, applies the shared cross-tool flags, and owns the parse → handler → render → `--json` → exit pipeline. The cross-tool `report` command is mounted separately by the CLI because it composes data from every registered Tool.
+3. Walk the per-invocation `ToolRegistry` (populated during bootstrap) and mount each registered Tool's declared `commandSpecs` via the host's `mountCommandSpec`. The fitness Tool declares `fit`, `fit list`, `fit recipes`, and `fit export --format baseline`; the host builds the Commander commands, applies the shared cross-tool flags, and owns the parse → handler → render → `--json` → exit pipeline. The cross-tool `report` command is mounted separately by the CLI because it composes data from every registered Tool.
 4. Hand argv to Commander, which dispatches to the `fit` command spec's handler ([`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.6/packages/fitness/engine/src/tool.ts) assembles the `commandSpecs`; the handler bodies live in the `cli/` spec modules alongside it).
 
 The CLI does not know what `fit` does. It knows a Tool exists, it admitted and
@@ -237,7 +237,7 @@ Source: [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-cli/blob/
 The fitness Tool **returns its `SignalEnvelope`** via `CommandResult`; the CLI composition root dispatches by output mode (ADR-0011 — tools no longer render their own output):
 
 - **`--json`** — the shared `formatSignalJson` formatter (the envelope *is* the JSON), via `cli.emitEnvelope`. No tables, no colors, no spinner. Pure data.
-- **SARIF** (via `--gate-save`/`--gate-compare`/`--report-to`/`fit-baseline-export`) — the shared `formatSignalSarif` formatter, owned by the root (`cli.writeSarif` / `cli.deliverSignals`).
+- **SARIF** (via `--gate-save`/`--gate-compare`/`--report-to`/`fit export --format baseline`) — the shared `formatSignalSarif` formatter, owned by the root (`cli.writeSarif` / `cli.deliverSignals`).
 - **default (Ink)** — `cli.renderLive('fit', args)` mounts a live Ink view that transitions from spinner → results table → summary footer. The fitness Tool doesn't depend on Ink directly; it calls back through `ToolCliContext.renderLive`, which the CLI implements.
 
 After rendering, the report auto-open runs if conditions allow: `--open` was passed (or the user opted into auto-open in their config), output isn't `--json`, and stdout is a TTY. The HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` opens in the user's default browser (a single rolling file overwritten on each generation, not a per-run archive).
