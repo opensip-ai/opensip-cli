@@ -87,6 +87,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'clearParseCache',
   'configureLogger',
   'createRunLogger',
+  'createToolScope',
   'createCapabilityRegistry',
   'createInProcessTransport',
   'createRunLifecycle',

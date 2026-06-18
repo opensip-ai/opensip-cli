@@ -17,7 +17,7 @@ vi.mock('../deliver-envelope.js', () => ({
 }));
 
 // Import after the mock is registered.
-const { createEgressPlane } = await import('../egress-plane.js');
+const { createEgressPlane } = await import('../io-plane.js');
 
 describe('createEgressPlane', () => {
   beforeEach(() => {

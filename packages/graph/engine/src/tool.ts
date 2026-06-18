@@ -20,7 +20,7 @@
  * invocation.
  */
 
-import { defineTool, logger, readPackageVersion } from '@opensip-cli/core';
+import { createToolScope, defineTool, logger, readPackageVersion } from '@opensip-cli/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
 // engine no longer hosts adapter source. First-party adapters live in
@@ -55,7 +55,6 @@ import type { GraphLanguageAdapter } from './lang-adapter/types.js';
 import type {
   CapabilityRegistrar,
   CommandSpec,
-  ScopeContribution,
   Tool,
   ToolCliContext,
   ToolScope,
@@ -101,27 +100,14 @@ const registerGraphAdapter: CapabilityRegistrar = (contribution) => {
   currentAdapterRegistry().register(contribution as GraphLanguageAdapter);
 };
 
-/**
- * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
- * after constructing the scope and before entering it; the kernel installs
- * the returned `graph` slot. Fresh adapter + rule registries per run so
- * concurrent scopes carry independent graph state.
- *
- * Adapter seeding: the fresh adapter registry starts EMPTY. The generic
- * capability loader (§5.3/§4.5) discovers `graph-adapter` packages per run and
- * routes each through {@link registerGraphAdapter} into this scope's registry
- * (driven by the CLI pre-action hook), so `pickAdapter` resolves them — no
- * process-global discovered-adapters holder.
- */
-function contributeScope(): ScopeContribution {
-  return {
-    graph: {
-      adapters: createAdapterRegistry(),
-      rules: createRulesRegistry(),
-      recipes: createRecipeRegistry(),
-    },
-  };
-}
+const graphScope = createToolScope({
+  slot: 'graph',
+  create: () => ({
+    adapters: createAdapterRegistry(),
+    rules: createRulesRegistry(),
+    recipes: createRecipeRegistry(),
+  }),
+});
 
 /**
  * Dashboard-data contribution (audit 2026-05-29, L2). Graph owns its
@@ -185,7 +171,7 @@ export const graphTool: Tool = defineTool({
   commandSpecs: graphCommandSpecs,
   extensionPoints: {
     graphContractVersion: GRAPH_CONTRACT_VERSION,
-    contributeScope,
+    contributeScope: graphScope.contributeScope,
     collectReportData,
     sessionReplay: {
       tool: 'graph',

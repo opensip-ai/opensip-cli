@@ -506,6 +506,7 @@ describe('buildHostCommandInventory', () => {
     expect(inventory.groupSubcommands.plugin).toEqual(['list', 'add', 'remove', 'sync']);
     expect(inventory.groupSubcommands.tools).toEqual([
       'list',
+      'create',
       'validate',
       'install',
       'uninstall',

@@ -73,6 +73,7 @@ export type CommandResult =
   | UninstallDoneResult
   | TextLinesResult
   | ToolsListResult
+  | ToolsCreateResult
   | ToolsValidateResult
   | ToolsInstallResult
   | ToolsUninstallResult
@@ -248,6 +249,17 @@ export interface ToolsListRow {
   readonly status: 'loaded' | 'manifest-only';
   /** True on a GLOBAL row whose tool id is shadowed by a project-local install. */
   readonly shadowed?: boolean;
+}
+
+/** Outcome of `opensip tools create <tool-id>`. */
+export interface ToolsCreateResult {
+  type: 'tools-create';
+  readonly toolId: string;
+  readonly dir: string;
+  readonly files: readonly string[];
+  readonly success: boolean;
+  readonly error?: string;
+  readonly hint?: string;
 }
 
 /** Outcome of `opensip tools list` (ADR-0041). */

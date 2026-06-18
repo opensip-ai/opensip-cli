@@ -56,6 +56,7 @@ export type {
   GraphStatusResult,
   TextLinesResult,
   ToolsListResult,
+  ToolsCreateResult,
   ToolsListRow,
   ToolsValidateResult,
   ToolsValidateSection,
@@ -150,6 +151,7 @@ export {
   COMMON_FLAG_KEYS,
   RAW_STREAM_REASONS,
   applyToolContributeScope,
+  createToolScope,
   resolveToolHooks,
 } from '@opensip-cli/core';
 export { defineRunCommand, defineListCommand, defineAuxExportCommand } from './command-presets.js';

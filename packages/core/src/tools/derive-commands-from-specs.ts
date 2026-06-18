@@ -28,7 +28,7 @@ export function deriveCommandsFromSpecs(
  * Otherwise derives from `commandSpecs`. Empty when neither is available.
  */
 export function resolveToolCommands(tool: Tool): readonly ToolCommandDescriptor[] {
-  if (tool.commands.length > 0) {
+  if (tool.commands !== undefined && tool.commands.length > 0) {
     return tool.commands;
   }
   if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {

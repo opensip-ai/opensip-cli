@@ -47,7 +47,7 @@ function makeTool(name: string, contribution: ScopeContribution): Tool {
       description: `${name} fixture`,
     },
     commands: [{ name, description: `${name} command` }],
-    contributeScope: () => contribution,
+    extensionPoints: { contributeScope: () => contribution },
   };
 }
 

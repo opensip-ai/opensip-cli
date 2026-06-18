@@ -16,7 +16,9 @@ function makeTool(): Tool {
       description: 'fixture',
     },
     commands: [{ name: 'sim', description: 'run simulation' }],
-    sessionReplay: { tool: 'sim', replaySession: vi.fn() },
+    extensionPoints: {
+      sessionReplay: { tool: 'sim', replaySession: vi.fn() },
+    },
   };
 }
 

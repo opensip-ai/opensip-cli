@@ -47,7 +47,7 @@
  * - `cli/fit-modes.ts` owns the dispatch branches (gate/list/recipes/json/live).
  */
 
-import { defineTool, readPackageVersion } from '@opensip-cli/core';
+import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import {
@@ -78,13 +78,7 @@ import './scope-augmentation.js';
 import type { Check } from './framework/check-types.js';
 import type { FitnessRecipe } from './recipes/types.js';
 import type { FitOptions } from '@opensip-cli/contracts';
-import type {
-  CapabilityRegistrar,
-  CommandSpec,
-  ScopeContribution,
-  Tool,
-  ToolCliContext,
-} from '@opensip-cli/core';
+import type { CapabilityRegistrar, CommandSpec, Tool, ToolCliContext } from '@opensip-cli/core';
 
 // =============================================================================
 // LIVE-VIEW SETUP + COMMAND-SPEC ASSEMBLY
@@ -174,22 +168,14 @@ const registerFitRecipe: CapabilityRegistrar = (contribution) => {
   registry.register(recipe, { allowOverwrite: false });
 };
 
-/**
- * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
- * after constructing the scope and before entering it; the kernel installs
- * the returned `fitness` slot. Fresh check + recipe registries (and an empty
- * `ensureChecksLoaded` lifecycle slot) per run so concurrent scopes carry
- * independent fitness state.
- */
-function contributeScope(): ScopeContribution {
-  return {
-    fitness: {
-      checks: createCheckRegistry(),
-      recipes: createRecipeRegistry(),
-      load: createFitnessLoadState(),
-    },
-  };
-}
+const fitnessScope = createToolScope({
+  slot: 'fitness',
+  create: () => ({
+    checks: createCheckRegistry(),
+    recipes: createRecipeRegistry(),
+    load: createFitnessLoadState(),
+  }),
+});
 
 // =============================================================================
 // Per-tool contract version (ADR-0047)
@@ -221,7 +207,7 @@ export const fitnessTool: Tool = defineTool({
   commandSpecs: fitCommandSpecs,
   extensionPoints: {
     fitnessContractVersion: FITNESS_CONTRACT_VERSION,
-    contributeScope,
+    contributeScope: fitnessScope.contributeScope,
     collectReportData: collectFitnessReportData,
     sessionReplay: {
       tool: 'fit',

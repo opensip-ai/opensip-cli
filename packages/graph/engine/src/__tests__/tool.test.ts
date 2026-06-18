@@ -40,7 +40,7 @@ describe('graphTool contract conformance (AC-2)', () => {
 
   it('commands[] is derived from commandSpecs in declaration order', () => {
     const specNames = (graphTool.commandSpecs ?? []).map((s) => s.name);
-    const names = graphTool.commands.map((c) => c.name);
+    const names = (graphTool.commands ?? []).map((c) => c.name);
     expect(names).toEqual(specNames);
     expect(names).toEqual(
       expect.arrayContaining([

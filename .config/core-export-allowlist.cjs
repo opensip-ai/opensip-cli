@@ -274,6 +274,7 @@ const EXPORT_ALLOWLIST = {
   configureLogger: 'run-kernel',
   createRunLifecycle: 'run-kernel',
   createRunLogger: 'run-kernel',
+  createToolScope: 'tool-plugin-contract',
   createRunTimer: 'run-kernel',
   currentLogger: 'run-kernel',
   currentScope: 'run-kernel',

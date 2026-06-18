@@ -881,11 +881,11 @@ export interface Tool {
   readonly contractVersion?: string;
 
   /**
-   * Metadata for every command this tool contributes. Used for --help
-   * listings and conflict detection. Actual handlers are mounted by
-   * the host.
+   * Derived command descriptors for --help and conflict detection. Authors
+   * should omit this when using {@link defineTool} — it is derived from
+   * `commandSpecs` via {@link resolveToolCommands}.
    */
-  readonly commands: readonly ToolCommandDescriptor[];
+  readonly commands?: readonly ToolCommandDescriptor[];
   /**
    * Optional project-local plugin layout. Tools that support
    * user-authored / npm plugins under `<project>/opensip-cli/<domain>/`
@@ -915,147 +915,8 @@ export interface Tool {
    */
   readonly commandSpecs?: readonly CommandSpec<unknown, ToolCliContext>[];
   /**
-   * Optional one-time initialization. Called by the CLI before any of
-   * the tool's commands run. Use it to register sub-packages (check
-   * packs, scenario packs), language adapters, etc.
-   *
-   * The CLI calls initialize() at most once per process. Tools that
-   * need lazy init (e.g. fitness, where ensureChecksLoaded is wired
-   * deep into command handlers) can leave this undefined and run
-   * setup inside their command handlers instead.
-   */
-  readonly initialize?: () => Promise<void>;
-  /**
-   * Optional per-run subscope contribution. Called by the CLI's
-   * pre-action-hook AFTER constructing the per-invocation scope and
-   * BEFORE `enterScope` makes it visible to tool action bodies. Each
-   * registered tool is invoked once per CLI invocation; the kernel
-   * `Object.assign`s the returned contribution onto the scope (D7: tool
-   * subscopes via module augmentation).
-   *
-   * Inversion of control (audit 2026-05-29, M4): the tool RETURNS its
-   * subscope rather than mutating a passed-in `RunScope`. This keeps the
-   * `Tool` contract free of any `RunScope` reference (breaking the
-   * RunScope⟷Tool type cycle) and removes shared-mutable-state from the
-   * extension API.
-   *
-   * Tools augment `ScopeContribution` from their own package:
-   *
-   *   declare module '@opensip-cli/core' {
-   *     interface ScopeContribution {
-   *       simulation?: { scenarios: Registry<RunnableScenario>; ... };
-   *     }
-   *   }
-   *
-   * and return their slot here:
-   *
-   *   contributeScope() {
-   *     return { simulation: { scenarios: new Registry(...), ... } };
-   *   }
-   *
-   * The kernel never inspects the slot — it just installs it. Slots are
-   * optional so a graph-only run carries no `scope.simulation`, and vice
-   * versa. `ScopeContribution` is empty in core; every member arrives via
-   * tool augmentation, and `ToolScope`/`RunScope` extend it for reads.
-   *
-   * Default behavior (when undefined): the tool contributes no subscope.
-   * First-party tools that own per-run registries return namespaced slots
-   * here (fitness returns `fitness`, graph returns `graph`, simulation
-   * returns `simulation`).
-   */
-  readonly contributeScope?: () => ScopeContribution;
-  /**
-   * Optional report-data contribution (audit 2026-05-29, L2). The CLI
-   * is the report composition root: it gathers generic sessions, then
-   * walks the tool registry calling this hook and merges each tool's
-   * contribution into the HTML report input. A tool returns ITS OWN inputs
-   * to the HTML report (fitness: check/recipe catalogs; graph: its
-   * catalog) — keyed by the field names `generateDashboardHtml` consumes.
-   *
-   * Returns an opaque `Record<string, unknown>` so the kernel carries no
-   * tool/report-renderer vocabulary; the CLI `Object.assign`s it onto the
-   * `DashboardInput`. Tools that contribute nothing leave this undefined.
-   * Receives the Tool-facing `ToolScope` (datastore, projectContext, …).
-   */
-  readonly collectReportData?: (
-    scope: ToolScope,
-  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
-  /**
-   * Optional session replay contribution. The CLI owns the generic
-   * `sessions show` command, while each tool owns decoding its opaque
-   * `StoredSession.payload` projection into renderable replay data.
-   *
-   * Core keeps the hook structural (`unknown` return) so it does not depend on
-   * `@opensip-cli/contracts`; the CLI narrows the returned value at the
-   * composition boundary.
-   */
-  readonly sessionReplay?: ToolSessionReplayContribution;
-  /**
-   * Optional namespaced config contribution (launch, ADR-0023). A
-   * tool owning a top-level block (`graph:`/`fitness:`/`simulation:`) declares
-   * its Zod schema here as a `ToolConfigDeclaration` (from
-   * `@opensip-cli/config`). The composition root composes every tool's
-   * `config` into one strict whole-document schema, validates the config file
-   * once before dispatch, and exposes the resolved config back via the scope.
-   * Kernel-side {@link ToolConfigContribution} carrier (core carries no Zod);
-   * the CLI narrows it. Undefined ⇒ no config block.
-   */
-  readonly config?: ToolConfigContribution;
-  /**
-   * Optional capability-domain registrars (launch, §5.3), keyed by
-   * domain id. A tool that DECLARES domains in its manifest
-   * (`ToolPluginManifest.capabilities`) supplies the REAL registrar for each
-   * here. The host registers each manifest domain with a deferred placeholder,
-   * then replaces it via `CapabilityRegistry.setRegistrar` once this module
-   * loads. The registrar registers a routed contribution into the tool's own
-   * registry. Undefined ⇒ no declared domains.
-   */
-  readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
-  /**
-   * Optional fingerprint strategy for the host-owned baseline/ratchet plane
-   * (ADR-0036). Populates `Signal.fingerprint`; the plane treats the result
-   * opaquely. Undefined ⇒ host `defaultFingerprintStrategy`. Stamping happens at
-   * envelope construction: pass the SAME strategy as
-   * `BuildEnvelopeInput.fingerprintStrategy` to `buildSignalEnvelope`
-   * (`@opensip-cli/contracts`), which stamps every signal (host default when
-   * omitted) so a built envelope is gate-ready by construction. This field is
-   * the tool's DECLARATION of that identity for the plane's documentation and
-   * future host consumers; the envelope builder is where it takes effect.
-   * Changing a declared strategy is a deliberate, documented re-capture.
-   */
-  readonly fingerprintStrategy?: FingerprintStrategy;
-  /**
-   * Optional `init`-scaffold contribution (ADR-0038): the example files this tool
-   * writes for a project, given its detected languages. The host writes each
-   * returned file under `userPluginDir(<this tool's pluginLayout.domain>,
-   * file.kind)/file.filename`. Undefined ⇒ this tool scaffolds no examples (e.g.
-   * `graph`). The host owns the directory layout (from `pluginLayout.userSubdirs`)
-   * + the document header + `targets:`; the tool owns the example bytes + ids.
-   */
-  readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
-  /**
-   * The tool's COMPLETE set of stable example ids across EVERY language it can
-   * scaffold — NOT just the languages in any one `ScaffoldContext`. Drives
-   * stale-scaffolded detection (`file-classifier.ts`): a stale
-   * `example-check-python.mjs` left in a now-TS-only project must still be
-   * recognised, which needs the full id universe independent of the project's
-   * currently-detected languages.
-   */
-  readonly stableExampleIds?: () => readonly string[];
-  /**
-   * Optional contribution of the tool's namespaced config block for the
-   * scaffolded `opensip-cli.config.yml` (ADR-0038 Phase 3). Undefined ⇒ the host
-   * renders the block from the tool's `ToolConfigDeclaration` defaults (or omits
-   * it). The host always renders the document header + the `targets:` section.
-   */
-  readonly scaffoldConfigBlock?: () => string;
-
-  /**
-   * Bag for extension points and rarer/future hooks.
-   *
-   * New concerns should go here (see `ToolExtensionPoints` JSDoc) rather than
-   * additional top-level optionals. This is the evolution path for the Tool
-   * contract.
+   * Optional hooks and extension points. All lifecycle hooks live here;
+   * use {@link resolveToolHooks} to read them.
    */
   readonly extensionPoints?: ToolExtensionPoints;
 }

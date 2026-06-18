@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createLivePlane, createLiveViewRegistry } from '../live-plane.js';
+import { createLivePlane, createLiveViewRegistry } from '../io-plane.js';
 import { createRunPlaneFactory, createRunSessionSeam } from '../run-plane.js';
 
 import type { Logger, LiveViewRenderer } from '@opensip-cli/core';

@@ -41,8 +41,8 @@ describe('defineTool', () => {
     });
 
     expect(resolveToolCommandNames(tool)).toEqual(['demo-run', 'demo-list']);
-    expect(tool.commands.map((c) => c.name)).toEqual(['demo-run', 'demo-list']);
+    expect(tool.commands?.map((c) => c.name)).toEqual(['demo-run', 'demo-list']);
     expect(tool.extensionPoints?.initialize).toBeTypeOf('function');
-    expect(tool.contributeScope).toBeUndefined();
+    expect(tool.extensionPoints?.contributeScope).toBeUndefined();
   });
 });

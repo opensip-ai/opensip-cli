@@ -20,8 +20,15 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveCapabilityPreferences } from '@opensip-cli/config';
-import { currentCapabilityRegistry, loadCapabilityDomain, type Tool } from '@opensip-cli/core';
+import { resolveCapabilityPreferences, type CapabilityPreferences } from '@opensip-cli/config';
+import {
+  currentCapabilityRegistry,
+  loadCapabilityDomain,
+  type CapabilityDiscoveryDescriptor,
+  type Tool,
+} from '@opensip-cli/core';
+
+import { BUNDLED_CAPABILITY_PACKS } from './bundled-manifest.js';
 
 /**
  * Resolve the directory the CLI was installed into. BUILT-IN capability packs
@@ -76,9 +83,28 @@ export async function loadOwningToolCapabilities(
   let driven = 0;
   for (const domain of ownedDomains) {
     if (domain.discovery === undefined) continue;
-    const preferences = resolveCapabilityPreferences(domain.discovery, pluginsConfig);
+    const preferences = augmentBundledCapabilityPreferences(
+      domain.discovery,
+      resolveCapabilityPreferences(domain.discovery, pluginsConfig),
+    );
     await loadCapabilityDomain({ registry, domainId: domain.id, projectDir, cliDir, preferences });
     driven++;
   }
   return driven;
+}
+
+/**
+ * Seed manifest-declared built-in packs when config did not supply an explicit
+ * package list. Domains with `explicitListMode: 'augment'` still auto-discover
+ * project-local packs on top of this list.
+ */
+function augmentBundledCapabilityPreferences(
+  descriptor: CapabilityDiscoveryDescriptor,
+  preferences: CapabilityPreferences,
+): CapabilityPreferences {
+  if (preferences.packages !== undefined) return preferences;
+  if (descriptor.discovery.mode !== 'marker') return preferences;
+  const bundled = BUNDLED_CAPABILITY_PACKS[descriptor.discovery.markerKind];
+  if (bundled === undefined || bundled.length === 0) return preferences;
+  return { ...preferences, packages: [...bundled] };
 }

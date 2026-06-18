@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { analyzeHostToolRuntimeImportBoundary } from '../checks/architecture/host-tool-runtime-import-boundary.js';
 import { checks } from '../index.js';
 
-const DISCOVERY_PATH = 'packages/cli/src/bootstrap/register-tools-discovery.ts';
+const DISCOVERY_PATH = 'packages/cli/src/bootstrap/register-tools.ts';
 const ADMISSION_PATH = 'packages/cli/src/bootstrap/admit-tool-package.ts';
 const OTHER_CLI_PATH = 'packages/cli/src/commands/plugin.ts';
 

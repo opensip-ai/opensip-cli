@@ -69,9 +69,11 @@ function makeFixtureTool(
   return {
     metadata: { id, version: '0.0.0', description: 'fixture tool' },
     commands: [{ name: cmdName, description: 'fixture command', aliases: opts.aliases }],
-    initialize: () => {
-      events.push(`initialize:${id}`);
-      return opts.throwOnInit ? Promise.reject(new Error('init boom')) : Promise.resolve();
+    extensionPoints: {
+      initialize: () => {
+        events.push(`initialize:${id}`);
+        return opts.throwOnInit ? Promise.reject(new Error('init boom')) : Promise.resolve();
+      },
     },
     // 3.0.0: the command surface is the declarative commandSpec (register() gone).
     // The handler records the action; the host mounts it + the `--cwd` common flag.

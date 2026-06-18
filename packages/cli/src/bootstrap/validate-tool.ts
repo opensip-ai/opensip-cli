@@ -30,8 +30,6 @@ export function isValidTool(value: unknown): value is Tool {
   if (typeof candidate.metadata !== 'object' || candidate.metadata === null) return false;
   if (typeof (candidate.metadata as { id?: unknown }).id !== 'string') return false;
   // `commands[]` may be omitted when `commandSpecs` is present — defineTool derives it.
-  const hasCommands = Array.isArray(candidate.commands);
-  const commands = hasCommands ? (candidate.commands as Tool['commands']) : [];
   // A tool must expose a command surface: a non-empty declarative `commandSpecs`
   // array (the one command surface, launch — `register()` was removed). A tool
   // with no commandSpecs cannot contribute any command and is rejected.
@@ -40,8 +38,12 @@ export function isValidTool(value: unknown): value is Tool {
     if (!validateCommandSpec(spec)) return false;
   }
   // Explicit commands[] is optional when commandSpecs is non-empty (defineTool derives it).
-  if (!hasCommands || commands.length === 0) {
+  if (!Array.isArray(candidate.commands)) {
     return true;
+  }
+  for (const cmd of candidate.commands) {
+    if (typeof cmd !== 'object' || cmd === null) return false;
+    if (typeof (cmd as { name?: unknown }).name !== 'string') return false;
   }
   return true;
 }

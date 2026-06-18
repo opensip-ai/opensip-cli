@@ -46,10 +46,11 @@ afterEach(() => {
 
 function makeTool(id: string, contribution?: Record<string, unknown>): Tool {
   return {
-    metadata: { id, version: '0.0.0', description: id },
-    commands: [],
-    register: () => undefined,
-    ...(contribution ? { collectReportData: (_scope: ToolScope) => contribution } : {}),
+    metadata: { id, name: id, version: '0.0.0', description: id },
+    commandSpecs: [],
+    ...(contribution
+      ? { extensionPoints: { collectReportData: (_scope: ToolScope) => contribution } }
+      : {}),
   };
 }
 

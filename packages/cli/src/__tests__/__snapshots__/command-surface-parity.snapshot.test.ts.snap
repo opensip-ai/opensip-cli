@@ -1595,6 +1595,42 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "variadic": false,
             },
           ],
+          "name": "create",
+          "options": [
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Overwrite scaffold files when the tool directory already exists",
+              "flags": "--force",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Output structured JSON",
+              "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+          ],
+          "subcommands": [],
+          "synopsis": "Scaffold a minimal project-local Tool under opensip-cli/tools/<id>/",
+          "usage": "[options] <tool-id>",
+        },
+        {
+          "aliases": [],
+          "args": [
+            {
+              "name": "tool-id",
+              "required": true,
+              "variadic": false,
+            },
+          ],
           "name": "data-purge",
           "options": [
             {

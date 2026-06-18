@@ -23,8 +23,7 @@ export interface DefineToolInput {
  * Build a host-ready {@link Tool} from the reduced author input.
  *
  * Hooks live in `extensionPoints` on the returned tool. Top-level hook fields are
- * intentionally omitted so new tools have one bag; {@link resolveToolHooks} still
- * reads legacy top-level fields on older tools during migration.
+ * intentionally omitted — {@link resolveToolHooks} reads the bag exclusively.
  */
 export function defineTool(input: DefineToolInput): Tool {
   const commands = deriveCommandsFromSpecs(input.commandSpecs);

@@ -152,6 +152,7 @@ export {
   ToolRegistry,
   UnknownLiveViewError,
   TOOL_CONTRACT_VERSION,
+  createToolScope,
   defineTool,
   deriveCommandsFromSpecs,
   resolveToolCommands,

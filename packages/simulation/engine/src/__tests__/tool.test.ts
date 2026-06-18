@@ -181,7 +181,7 @@ describe('simulationTool metadata', () => {
   });
 
   it('declares the user-facing sim subcommand (+ the internal worker)', () => {
-    const names = simulationTool.commands.map((c) => c.name);
+    const names = (simulationTool.commands ?? []).map((c) => c.name);
     expect(names).toContain('sim');
     // The internal off-main-process worker (ADR-0028), forked by the live view.
     expect(names).toContain('sim-run-worker');

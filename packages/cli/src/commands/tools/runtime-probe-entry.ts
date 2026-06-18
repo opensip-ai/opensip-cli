@@ -12,6 +12,8 @@
  * stdout. Exit 0 ⇔ report.ok.
  */
 
+import { resolveToolHooks } from '@opensip-cli/core';
+
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
 
 import type { ProbeReport } from './runtime-probe.js';
@@ -29,7 +31,9 @@ if (dir === undefined || dir.length === 0) {
   const slim: ProbeReport = {
     ok: report.ok,
     sections: report.sections,
-    toolConfigNamespace: report.tool?.config?.namespace ?? null,
+    toolConfigNamespace: report.tool
+      ? (resolveToolHooks(report.tool).config?.namespace ?? null)
+      : null,
     toolId: report.tool?.metadata.name ?? report.tool?.metadata.id ?? null,
   };
   process.stdout.write(`${JSON.stringify(slim)}\n`);

@@ -23,12 +23,10 @@ import {
   type Logger,
   type ToolCliContext,
 } from '@opensip-cli/core';
-import { type DataStore } from '@opensip-cli/datastore';
 
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
-import { createEgressPlane } from './bootstrap/egress-plane.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
-import { createLivePlane, type LiveViewRegistry } from './bootstrap/live-plane.js';
+import { createIoPlane, type LiveViewRegistry } from './bootstrap/io-plane.js';
 import { createOutputPlane } from './bootstrap/output-plane.js';
 import {
   createRunActionHooks,
@@ -36,13 +34,10 @@ import {
   createRunSessionSeam,
   type RunActionHooks,
 } from './bootstrap/run-plane.js';
-import { getProjectDatastore, readScope } from './bootstrap/scope-access.js';
+import { createDatastoreResolver, readScope } from './bootstrap/scope-access.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
-
-/** Structured-log `module` tag for this composition-root module. */
-const MODULE_TAG = 'cli:context';
 
 // ---------------------------------------------------------------------------
 // No module-global bootstrap-handoff bag.
@@ -58,7 +53,7 @@ const MODULE_TAG = 'cli:context';
 // ---------------------------------------------------------------------------
 
 // Per-run scope + datastore readers live in `bootstrap/scope-access.ts`; the
-// live-view registry lives in `bootstrap/live-plane.ts`. Both are re-exported
+// live-view registry lives in `bootstrap/io-plane.ts`. Both are re-exported
 // here so existing importers (`main()` + the dynamic-import tests) keep their
 // stable `cli-context.js` entry point while this module focuses on assembly.
 export {
@@ -66,7 +61,7 @@ export {
   getCurrentProjectRoot,
   getOrOpenDatastore,
 } from './bootstrap/scope-access.js';
-export { createLiveViewRegistry, type LiveViewRegistry } from './bootstrap/live-plane.js';
+export { createLiveViewRegistry, type LiveViewRegistry } from './bootstrap/io-plane.js';
 
 export interface BuildToolCliContextOptions {
   readonly render: (result: CommandResult) => Promise<void>;
@@ -96,34 +91,17 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   //  - durable per-tool keyed JSON state (ADR-0042);
   //  - governance / entitlements / audit (H1-H3);
   //  - effectful egress (cloud sync + `--report-to` + SARIF file sink).
-  const baselineSeams = buildBaselineSeams({ getDatastore: getProjectDatastore, logger: log });
-  const stateSeams = buildStateSeams({ getDatastore: getProjectDatastore });
-  const hostPlanes = buildHostPlanes({ getDatastore: getProjectDatastore, logger: log });
-  const egressPlane = createEgressPlane({ setExitCode: outputPlane.setExitCode, logger: log });
+  const projectDatastore = createDatastoreResolver('project-seam', log);
+  const baselineSeams = buildBaselineSeams({ getDatastore: projectDatastore, logger: log });
+  const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
+  const hostPlanes = buildHostPlanes({ getDatastore: projectDatastore, logger: log });
 
   // Host run-lifecycle plane (host-owned-run-timing Phase 1). The FACTORY holds
   // stable deps only — it must NOT start a lifecycle here. The lifecycle is
   // created inside the command action (mount-command-spec calls `beginRun()`
   // after RunScope entry, before the handler) or lazily on first `timing` read.
   const runPlane = createRunPlaneFactory({
-    // Best-effort datastore resolver via the entered scope thunk (no direct /
-    // global access). Returns undefined when no project/datastore is in scope.
-    getDatastore: () => {
-      try {
-        const thunk = readScope().datastore;
-        return thunk ? (thunk() as DataStore) : undefined;
-      } catch (error) {
-        // @swallow-ok no entered scope / no datastore in scope is normal for
-        // non-project commands and tests; degrade to "no datastore" (the run
-        // plane then no-ops). Debug-log for diagnosability.
-        log.debug?.({
-          evt: 'cli.context.datastore_unavailable',
-          module: MODULE_TAG,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return;
-      }
-    },
+    getDatastore: createDatastoreResolver('best-effort', log),
     logger: log,
   });
 
@@ -137,7 +115,13 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // Live plane binds the per-invocation registry (built in `main()`) to the run
   // plane so `renderLive` owns the live run lifecycle: it times the TTY
   // occupancy and persists the renderer's returned `session` contribution.
-  const livePlane = createLivePlane({ liveViews: opts.liveViews, runPlane, runSession });
+  const ioPlane = createIoPlane({
+    setExitCode: outputPlane.setExitCode,
+    logger: log,
+    liveViews: opts.liveViews,
+    runPlane,
+    runSession,
+  });
 
   const ctx: ToolCliContext & RunActionHooks = {
     get scope(): RunScope {
@@ -148,14 +132,14 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
       return readScope();
     },
     render: (result) => opts.render(result as CommandResult),
-    registerLiveView: livePlane.register,
-    renderLive: livePlane.renderLive,
+    registerLiveView: ioPlane.register,
+    renderLive: ioPlane.renderLive,
     maybeOpenReport: opts.maybeOpenReport,
     logger: log,
     setExitCode: outputPlane.setExitCode,
     ...outputPlane.emits, // emitJson / emitEnvelope / emitError / emitRaw
-    deliverSignals: egressPlane.deliverSignals,
-    writeSarif: egressPlane.writeSarif,
+    deliverSignals: ioPlane.deliverSignals,
+    writeSarif: ioPlane.writeSarif,
     // Host baseline/ratchet plane seams (ADR-0036) — persistence + diff + exports.
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,

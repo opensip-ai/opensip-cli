@@ -19,6 +19,7 @@ const POLICY_HELPER = 'hostRuntimeImportPolicyFor';
 
 const ALLOWED_CALLSITE_SUFFIXES = new Set([
   'packages/cli/src/bootstrap/admit-tool-package.ts',
+  'packages/cli/src/bootstrap/register-tools.ts',
   'packages/cli/src/bootstrap/register-tools-discovery.ts',
 ]);
 
@@ -110,7 +111,7 @@ export function analyzeHostToolRuntimeImportBoundary(
             severity: 'error',
             line,
             suggestion:
-              'Route tool runtime loading through admit-tool-package/register-tools-discovery, or the ADR-0054 worker boundary.',
+              'Route tool runtime loading through admit-tool-package/register-tools, or the ADR-0054 worker boundary.',
           });
         } else if (node.arguments.length < 2 || !isPolicyArg(node.arguments[1])) {
           violations.push({

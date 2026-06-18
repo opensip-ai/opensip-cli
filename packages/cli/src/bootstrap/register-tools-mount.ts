@@ -4,7 +4,7 @@ import { logger, type Tool, type ToolCliContext, type ToolRegistry } from '@open
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import { bindToolCliContext } from './bind-tool-context.js';
-import { BOOTSTRAP_MODULE } from './register-tools-shared.js';
+import { BOOTSTRAP_MODULE } from './constants.js';
 
 /**
  * Walk the registry and mount each tool's commands onto `program`. This is

@@ -244,7 +244,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   });
 
   // Also surface the config validation result for the uniform lifecycle view.
-  const toolConfigNamespaces = tools.list().filter((t) => !!t.config).length;
+  const toolConfigNamespaces = tools.list().filter((t) => !!resolveToolHooks(t).config).length;
   scope.diagnostics.event(
     'validate',
     'debug',

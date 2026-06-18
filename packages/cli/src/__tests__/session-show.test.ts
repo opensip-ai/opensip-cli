@@ -66,9 +66,11 @@ function makeReplayRegistry(): SessionReplayRegistry {
       description: 'test',
     },
     commands: [],
-    sessionReplay: {
-      tool: 'fit',
-      replaySession: replayFitSession,
+    extensionPoints: {
+      sessionReplay: {
+        tool: 'fit',
+        replaySession: replayFitSession,
+      },
     },
   } satisfies Tool);
   return SessionReplayRegistry.fromTools(registry);
@@ -123,7 +125,9 @@ function makeSignalReplayRegistry(signals: readonly Signal[]): SessionReplayRegi
       description: 'test',
     },
     commands: [],
-    sessionReplay: { tool: 'fit', replaySession: replayWithSignals(signals) },
+    extensionPoints: {
+      sessionReplay: { tool: 'fit', replaySession: replayWithSignals(signals) },
+    },
   } satisfies Tool);
   return SessionReplayRegistry.fromTools(registry);
 }
@@ -304,10 +308,12 @@ describe('executeSessionShow', () => {
         description: 'test',
       },
       commands: [],
-      sessionReplay: {
-        tool: 'fit',
-        replaySession: () => {
-          throw new Error('corrupt payload');
+      extensionPoints: {
+        sessionReplay: {
+          tool: 'fit',
+          replaySession: () => {
+            throw new Error('corrupt payload');
+          },
         },
       },
     } satisfies Tool);
@@ -386,11 +392,13 @@ describe('executeSessionShow', () => {
         description: 'test',
       },
       commands: [],
-      sessionReplay: {
-        tool: 'fit',
-        replaySession: () => {
-          // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising the non-Error decode branch.
-          throw 'boom-string';
+      extensionPoints: {
+        sessionReplay: {
+          tool: 'fit',
+          replaySession: () => {
+            // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercising the non-Error decode branch.
+            throw 'boom-string';
+          },
         },
       },
     } satisfies Tool);

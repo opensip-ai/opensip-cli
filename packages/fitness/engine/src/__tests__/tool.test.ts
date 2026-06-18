@@ -36,12 +36,12 @@ describe('fitnessTool contract conformance', () => {
   });
 
   it('commands list includes fit, fit-list, fit-recipes', () => {
-    const names = fitnessTool.commands.map((c) => c.name);
+    const names = (fitnessTool.commands ?? []).map((c) => c.name);
     expect(names).toEqual(expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']));
   });
 
   it("does not own the cross-tool 'report' command", () => {
-    const names = fitnessTool.commands.map((c) => c.name);
+    const names = (fitnessTool.commands ?? []).map((c) => c.name);
     expect(names).not.toContain('report');
     expect(names).not.toContain('dashboard');
   });

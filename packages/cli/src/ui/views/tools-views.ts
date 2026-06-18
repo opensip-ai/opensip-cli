@@ -14,6 +14,7 @@ import {
 } from '@opensip-cli/cli-ui';
 
 import type {
+  ToolsCreateResult,
   ToolsDataPurgeResult,
   ToolsInstallResult,
   ToolsListResult,
@@ -105,6 +106,31 @@ function validationView(result: ToolsValidateResult, title = 'Tool validation'):
     SPACER,
     viewTable(VALIDATION_COLUMNS, result.sections.map(validationSectionRow)),
   ];
+  return group(children, 2);
+}
+
+export function viewToolsCreate(result: ToolsCreateResult): ViewNode {
+  if (!result.success) {
+    return group(
+      [
+        line([{ text: '✗', tone: 'error' }, { text: ' Tool scaffold failed' }]),
+        line([{ text: result.error ?? 'unknown error', tone: 'error' }]),
+      ],
+      2,
+    );
+  }
+  const children: ViewNode[] = [
+    line([
+      { text: '✓', tone: 'success' },
+      { text: ' Scaffolded tool ' },
+      { text: result.toolId, tone: 'brand', bold: true },
+    ]),
+    line([{ text: result.dir, dim: true }]),
+    ...result.files.map((file) => line([{ text: `  ${file}`, dim: true }])),
+  ];
+  if (result.hint !== undefined) {
+    children.push(SPACER, line([{ text: result.hint, tone: 'warning' }]));
+  }
   return group(children, 2);
 }
 

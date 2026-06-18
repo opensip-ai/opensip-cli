@@ -52,6 +52,7 @@ import {
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
 import {
+  viewToolsCreate,
   viewToolsDataPurge,
   viewToolsInstall,
   viewToolsList,
@@ -410,6 +411,9 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'tools-list': {
       return viewToolsList(result);
+    }
+    case 'tools-create': {
+      return viewToolsCreate(result);
     }
     case 'tools-validate': {
       return viewToolsValidate(result);

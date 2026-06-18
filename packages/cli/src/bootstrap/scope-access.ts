@@ -142,3 +142,50 @@ export function getProjectDatastore(): DataStore {
     throw error;
   }
 }
+
+/** How a datastore resolver should behave when scope or project context is absent. */
+export type DatastoreResolverMode = 'strict' | 'project-seam' | 'best-effort';
+
+/**
+ * Unified lazy datastore accessor for host planes and the run plane.
+ *
+ * - `strict` — throws when outside a project scope (via `getOrOpenDatastore`).
+ * - `project-seam` — maps outside-project to `ConfigurationError` for documented seams.
+ * - `best-effort` — returns `undefined` when scope or datastore is unavailable.
+ */
+export function createDatastoreResolver(
+  mode: 'strict' | 'project-seam',
+  logger?: Logger,
+): () => DataStore;
+export function createDatastoreResolver(
+  mode: 'best-effort',
+  logger?: Logger,
+): () => DataStore | undefined;
+export function createDatastoreResolver(
+  mode: DatastoreResolverMode,
+  logger: Logger = defaultLogger,
+): () => DataStore | undefined {
+  switch (mode) {
+    case 'strict': {
+      return () => getOrOpenDatastore(logger);
+    }
+    case 'project-seam': {
+      return () => getProjectDatastore();
+    }
+    case 'best-effort': {
+      return () => {
+        try {
+          const thunk = readScope().datastore;
+          return thunk ? (thunk() as DataStore) : undefined;
+        } catch (error) {
+          logger.debug({
+            evt: 'cli.context.datastore_unavailable',
+            module: 'cli:context',
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return;
+        }
+      };
+    }
+  }
+}

@@ -1,7 +1,6 @@
 /**
- * Resolve lifecycle hooks from a {@link Tool}'s `extensionPoints` bag and any
- * legacy top-level fields. Top-level wins when both are set (compat during
- * migration); new tools should use `extensionPoints` only via {@link defineTool}.
+ * Resolve lifecycle hooks from a {@link Tool}'s `extensionPoints` bag.
+ * New tools must use `extensionPoints` only via {@link defineTool}.
  */
 
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
@@ -27,23 +26,20 @@ export interface ResolvedToolHooks {
   readonly scaffoldConfigBlock?: () => string;
 }
 
-/**
- * Merge `tool.extensionPoints` with legacy top-level hook fields.
- * Host code should read hooks exclusively through this resolver.
- */
+/** Read hooks from `tool.extensionPoints`. Host code uses this resolver exclusively. */
 export function resolveToolHooks(tool: Tool): ResolvedToolHooks {
   const bag = tool.extensionPoints;
   return {
-    initialize: tool.initialize ?? bag?.initialize,
-    contributeScope: tool.contributeScope ?? bag?.contributeScope,
-    collectReportData: tool.collectReportData ?? bag?.collectReportData,
-    sessionReplay: tool.sessionReplay ?? bag?.sessionReplay,
-    config: tool.config ?? bag?.config,
-    capabilityRegistrars: tool.capabilityRegistrars ?? bag?.capabilityRegistrars,
-    fingerprintStrategy: tool.fingerprintStrategy ?? bag?.fingerprintStrategy,
-    scaffoldExamples: tool.scaffoldExamples ?? bag?.scaffoldExamples,
-    stableExampleIds: tool.stableExampleIds ?? bag?.stableExampleIds,
-    scaffoldConfigBlock: tool.scaffoldConfigBlock ?? bag?.scaffoldConfigBlock,
+    initialize: bag?.initialize,
+    contributeScope: bag?.contributeScope,
+    collectReportData: bag?.collectReportData,
+    sessionReplay: bag?.sessionReplay,
+    config: bag?.config,
+    capabilityRegistrars: bag?.capabilityRegistrars,
+    fingerprintStrategy: bag?.fingerprintStrategy,
+    scaffoldExamples: bag?.scaffoldExamples,
+    stableExampleIds: bag?.stableExampleIds,
+    scaffoldConfigBlock: bag?.scaffoldConfigBlock,
   };
 }
 

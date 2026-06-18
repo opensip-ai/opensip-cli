@@ -12,7 +12,7 @@
  */
 
 import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/contracts';
-import { defineCommand, defineTool, readPackageVersion } from '@opensip-cli/core';
+import { createToolScope, defineCommand, defineTool, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
@@ -40,7 +40,6 @@ import type { SimulationRecipe } from './recipes/types.js';
 import type {
   CapabilityRegistrar,
   CommandSpec,
-  ScopeContribution,
   Tool,
   ToolCliContext,
   ToolRunCompletion,
@@ -340,22 +339,14 @@ const registerSimRecipe: CapabilityRegistrar = (contribution) => {
   registry.register(recipe, { allowOverwrite: false });
 };
 
-/**
- * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
- * after constructing the scope and before entering it; the kernel installs
- * the returned `simulation` slot. Fresh scenario + recipe registries + a fresh
- * `ensureScenariosLoaded` lifecycle slot per run (audit F1) so concurrent scopes
- * carry independent simulation state.
- */
-function contributeScope(): ScopeContribution {
-  return {
-    simulation: {
-      scenarios: createScenarioRegistry(),
-      recipes: createSimulationRecipeRegistry(),
-      load: createSimulationLoadState(),
-    },
-  };
-}
+const simulationScope = createToolScope({
+  slot: 'simulation',
+  create: () => ({
+    scenarios: createScenarioRegistry(),
+    recipes: createSimulationRecipeRegistry(),
+    load: createSimulationLoadState(),
+  }),
+});
 
 /**
  * Per-tool contract version (ADR-0047).
@@ -375,7 +366,7 @@ export const simulationTool: Tool = defineTool({
   commandSpecs: [simCommand, simRunWorkerCommandSpec],
   extensionPoints: {
     simulationContractVersion: SIMULATION_CONTRACT_VERSION,
-    contributeScope,
+    contributeScope: simulationScope.contributeScope,
     sessionReplay: {
       tool: 'sim',
       replaySession: simReplayFromSession,

@@ -16,6 +16,7 @@ import {
   type ProjectContext,
 } from '@opensip-cli/core';
 
+import { toolsCreate } from './create.js';
 import { toolsDataPurge } from './data-purge.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
@@ -205,6 +206,35 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
   });
 }
 
+function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'create',
+    description: 'Scaffold a minimal project-local Tool under opensip-cli/tools/<id>/',
+    commonFlags: ['json'],
+    args: [{ name: 'tool-id', description: 'Kebab-case tool id (also the subcommand name)' }],
+    options: [
+      {
+        flag: '--force',
+        description: 'Overwrite scaffold files when the tool directory already exists',
+        default: false,
+      },
+    ],
+    scope: 'project',
+    output: COMMAND_RESULT_OUTPUT,
+    handler: (rawOpts) => {
+      const opts = rawOpts as ScopeFilterOpts & { _args: string[]; force?: boolean };
+      const toolId = opts._args[0] ?? '';
+      const result = toolsCreate({
+        toolId,
+        projectRoot: effectiveCwd(opts),
+        force: opts.force,
+      });
+      if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      return Promise.resolve(result);
+    },
+  });
+}
+
 function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'data-purge',
@@ -235,6 +265,7 @@ function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
 export function buildToolsGroupLeaves(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildToolsListSpec(),
+    buildToolsCreateSpec(ctx),
     buildToolsValidateSpec(ctx),
     buildToolsInstallSpec(ctx),
     buildToolsUninstallSpec(ctx),

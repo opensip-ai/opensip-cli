@@ -231,7 +231,9 @@ describe('executePostBailoutBootstrap phase ordering', () => {
     writeFileSync(join(tmp, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
     const tool = {
       ...noopTool('scoped-tool'),
-      contributeScope: () => ({ scopedTool: { ready: true } }),
+      extensionPoints: {
+        contributeScope: () => ({ scopedTool: { ready: true } }),
+      },
     } satisfies Tool;
     const runtime = runtimeWith([tool]);
     const plan = planPreActionBootstrap({

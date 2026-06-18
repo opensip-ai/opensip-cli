@@ -26,15 +26,17 @@ import {
 /** A minimal Tool carrying a config declaration + capability registrars. */
 function makeTool(opts: {
   id: string;
-  config?: Tool['config'];
+  config?: NonNullable<Tool['extensionPoints']>['config'];
   capabilityRegistrars?: Record<string, CapabilityRegistrar>;
 }): Tool {
-  return {
-    metadata: { id: opts.id, version: '0.0.0', description: opts.id },
-    commands: [],
-    register: () => undefined,
+  const extensionPoints = {
     ...(opts.config ? { config: opts.config } : {}),
     ...(opts.capabilityRegistrars ? { capabilityRegistrars: opts.capabilityRegistrars } : {}),
+  };
+  return {
+    metadata: { id: opts.id, name: opts.id, version: '0.0.0', description: opts.id },
+    commandSpecs: [],
+    ...(Object.keys(extensionPoints).length > 0 ? { extensionPoints } : {}),
   };
 }
 
