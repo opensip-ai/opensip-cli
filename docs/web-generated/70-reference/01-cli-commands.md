@@ -45,11 +45,30 @@ names, short aliases, descriptions, and defaults are identical where applied and
 cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for HTML report
 auto-open; `graph` writes report data and uses the separate `report`
 command to open the report. `-v/--verbose` is a uniform "show the detailed
-report body" flag whose output is identical in a TTY and a pipe. The only
-`program`-level Commander options are `--version` and `--no-cloud`:
+report body" flag whose output is identical in a TTY and a pipe.
+
+**Host-guaranteed tool-primary surface.** The host mount layer guarantees a
+uniform baseline on **every** tool primary (`fit`/`graph`/`sim`, and any
+third-party tool's run verb) — a tool need not opt in. Each primary always
+carries `--cwd`, `--json`, `--config`, `--quiet`, `--verbose`, and its own
+`--version`:
+
+- `opensip <tool> --version` prints the **tool's** version (`<verb> <semver>`,
+  e.g. `fit 0.1.6`, plus a `(tool contract v<n>)` marker when the tool declares
+  one). This is distinct from `opensip --version`, which prints the **CLI**
+  version.
+- `--config <path>` (the explicit `opensip-cli.config.yml` override) is now on
+  every tool primary, not just `fit`.
+
+The only `program`-level (root) options are `--version` (the CLI version) and
+`--no-cloud`. The root `--version` is host-owned and must precede any
+subcommand (`opensip --version`); a `--version` **after** a subcommand is that
+tool's own:
 
 | Flag | Effect |
 |---|---|
+| `--version` | At the root (`opensip --version`): the CLI version. After a tool verb (`opensip fit --version`): that tool's version. |
+| `--config <path>` | Path to `opensip-cli.config.yml` (overrides the package.json pointer and default discovery). Guaranteed on every tool primary. |
 | `--debug` | Enable debug-level logging (events of `debug` level appear in stderr and the run log file). |
 | `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. (Where supported.) |
 | `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, and `plugin <subcmd>`. |

@@ -187,6 +187,10 @@ export function buildAgentCatalog(): AgentCatalog {
       'filtersApplied, originalSignalCount, returnedSignalCount appear when --filter is used.',
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',
       'Human-readable output (no --json) uses the same tables/banners as before — unchanged.',
+      // Uniform tool-primary surface (host-guaranteed; decorateToolPrimary).
+      'Every tool primary (fit/graph/sim and any third-party tool) accepts `<tool> --version` ' +
+        '(prints the TOOL version, e.g. `fit 0.1.6`; distinct from `opensip --version`, the CLI), ' +
+        'plus the guaranteed baseline flags --cwd, --json, --config, --quiet, --verbose.',
       'Dogfood gate requires 0 errors + 0 warnings on fit:ci and graph:ci after any change.',
       // Hygiene invariant (host-planes-scope-seams-hygiene Phases 2-4): everything runs inside an
       // entered RunScope; the only sanctioned seams for output, delivery, baselines, toolState,
