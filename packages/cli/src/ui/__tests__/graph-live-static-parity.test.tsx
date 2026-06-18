@@ -138,9 +138,9 @@ describe('graph live/static table parity (envelope-first-presentation RP-2)', ()
     const { lastFrame } = render(<ThemeProvider>{renderToInk(node!)}</ThemeProvider>);
     const ttyLines = deAnsi(lastFrame() ?? '')
       .split('\n')
-      .map((l) => l.replace(/\s+$/, ''))
+      .map((l) => l.trimEnd())
       .filter((l) => l.trim().length > 0);
-    const pipeLines = liveTableLines(envelope).map((l) => l.replace(/\s+$/, ''));
+    const pipeLines = liveTableLines(envelope).map((l) => l.trimEnd());
     expect(ttyLines).toEqual(pipeLines);
   });
 
