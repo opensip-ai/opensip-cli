@@ -17,8 +17,9 @@
 
 import { fileURLToPath } from 'node:url';
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
+import { configureLogger } from '../../lib/logger.js';
 import { liveEngineCorrelation, type RunCorrelation } from '../../lib/run-correlation.js';
 import { RunScope, runWithScope } from '../../lib/run-scope.js';
 import { createSubprocessProgressRun } from '../subprocess-transport.js';
@@ -85,5 +86,118 @@ describe('fork-path correlation (createSubprocessProgressRun)', () => {
     // only whatever OPENSIP_* the parent already had (none, in this test scope).
     expect(childEnv.OPENSIP_RUN_ID).toBeUndefined();
     expect(childEnv.OPENSIP_WORKER_KIND).toBeUndefined();
+  });
+
+  it('preserves PATH/HOME — correlation env is MERGED over the base env, not a replacement (M2)', async () => {
+    const scope = new RunScope({ runId: 'run_parent_fork', correlation: PARENT_CORRELATION });
+    const full = await runWithScope(scope, () => {
+      const run = createSubprocessProgressRun<
+        number,
+        { opensip: Record<string, string>; hasPath: boolean; hasHome: boolean }
+      >({
+        command: FIXTURE,
+        argv: ['env-echo-full'],
+        correlation: liveEngineCorrelation(PARENT_CORRELATION),
+      });
+      return run.result;
+    });
+    // The correlation env rode along...
+    expect(full.opensip.OPENSIP_RUN_ID).toBe('run_parent_fork');
+    expect(full.opensip.OPENSIP_WORKER_KIND).toBe('live-engine');
+    // ...without clobbering the inherited base env (`{ ...process.env, ... }`).
+    expect(full.hasPath).toBe(true);
+    expect(full.hasHome).toBe(true);
+  });
+});
+
+interface CorrelationCheckResult {
+  readonly hadRunId: boolean;
+  readonly mintedFresh: boolean;
+  readonly runId: string;
+}
+
+describe('fork-path missing-correlation degradation (M2)', () => {
+  it('a child with NO correlation warns and proceeds on a FRESH runId — observable, not silent', async () => {
+    // No descriptor correlation AND no parent-scope runId ⇒ the child sees no
+    // OPENSIP_RUN_ID and takes the warn-and-proceed path (mirrors the real
+    // worker's `cli.subprocess.correlation_missing`). The fixture reports it back.
+    const run = createSubprocessProgressRun<number, CorrelationCheckResult>({
+      command: FIXTURE,
+      argv: ['correlation-check'],
+    });
+    const result = await run.result;
+    expect(result.hadRunId).toBe(false);
+    expect(result.mintedFresh).toBe(true);
+    // It proceeded on a fresh runId rather than crashing or hanging.
+    expect(result.runId).toMatch(/^RUN_fresh_/);
+  });
+
+  it('a child WITH an inherited runId does NOT degrade — it adopts the parent run', async () => {
+    const scope = new RunScope({ runId: 'run_parent_fork', correlation: PARENT_CORRELATION });
+    const result = await runWithScope(scope, () => {
+      const run = createSubprocessProgressRun<number, CorrelationCheckResult>({
+        command: FIXTURE,
+        argv: ['correlation-check'],
+        correlation: liveEngineCorrelation(PARENT_CORRELATION),
+      });
+      return run.result;
+    });
+    expect(result.hadRunId).toBe(true);
+    expect(result.mintedFresh).toBe(false);
+    expect(result.runId).toBe('run_parent_fork');
+  });
+});
+
+interface CompleteLog {
+  readonly evt?: string;
+  readonly runId?: string;
+  readonly workerKind?: string;
+}
+
+describe('fork-path no duplicate complete under one runId (GAP b)', () => {
+  const stderrCalls: string[] = [];
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    stderrCalls.length = 0;
+    configureLogger({ debugMode: false, silent: true, runId: '' });
+  });
+
+  it('emits EXACTLY one parent-side cli.subprocess.complete under the inherited runId', async () => {
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+      stderrCalls.push(String(chunk));
+      return true;
+    });
+    // Enable stderr output so the singleton logger's `cli.subprocess.complete`
+    // line is captured (the SAME gate the run-id-log-isolation test uses).
+    configureLogger({ debugMode: true, silent: false, runId: '' });
+
+    const scope = new RunScope({ runId: 'run_parent_fork', correlation: PARENT_CORRELATION });
+    await runWithScope(scope, () => {
+      const run = createSubprocessProgressRun<number, string>({
+        command: FIXTURE,
+        argv: ['emit-and-result'],
+        correlation: liveEngineCorrelation(PARENT_CORRELATION),
+      });
+      return run.result;
+    });
+
+    const completes = stderrCalls
+      .flatMap((c) => c.split('\n'))
+      .filter((line) => line.trim().length > 0)
+      .map((line) => {
+        try {
+          return JSON.parse(line) as CompleteLog;
+        } catch {
+          return {};
+        }
+      })
+      .filter((e) => e.evt === 'cli.subprocess.complete' && e.runId === 'run_parent_fork');
+
+    // GAP b: the PARENT owns the single run-level completion. The child's own
+    // worker-scoped `*.worker.complete` (distinguished by workerKind) is NOT
+    // duplicated here — exactly one parent-side completion under the runId.
+    expect(completes).toHaveLength(1);
+    expect(completes[0]?.workerKind).toBe('live-engine');
   });
 });
