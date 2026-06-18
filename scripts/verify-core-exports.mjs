@@ -20,9 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX_PATH = join(ROOT, 'packages/core/src/index.ts');
 
 function stripComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '');
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
 /** @returns {Set<string>} */
@@ -31,7 +29,11 @@ function extractNamedExports(source) {
   const names = new Set();
   for (const match of stripped.matchAll(/export\s+(?:type\s+)?\{([^}]+)\}/g)) {
     for (const part of match[1].split(',')) {
-      const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+      const name = part
+        .trim()
+        .split(/\s+as\s+/)
+        .pop()
+        ?.trim();
       if (name && /^[A-Za-z_$]/.test(name)) {
         names.add(name);
       }

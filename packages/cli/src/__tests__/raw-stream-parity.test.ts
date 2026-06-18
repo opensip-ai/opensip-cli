@@ -5,15 +5,14 @@
  * inventory authoritative and pins host behavior per reason category.
  */
 
-import { RAW_STREAM_REASONS, defineCommand } from '@opensip-cli/core';
+import { defineCommand, RAW_STREAM_REASONS } from '@opensip-cli/core';
+import { fitnessTool } from '@opensip-cli/fitness';
+import { graphTool } from '@opensip-cli/graph';
+import { simulationTool } from '@opensip-cli/simulation';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
-
-import { fitnessTool } from '@opensip-cli/fitness';
-import { graphTool } from '@opensip-cli/graph';
-import { simulationTool } from '@opensip-cli/simulation';
 
 import type { CommandSpec, RawStreamReason, ToolCliContext } from '@opensip-cli/core';
 
@@ -23,10 +22,7 @@ interface RawStreamEntry {
   readonly reason: RawStreamReason;
 }
 
-function collectRawStreamSpecs(
-  toolName: string,
-  specs: readonly CommandSpec[],
-): RawStreamEntry[] {
+function collectRawStreamSpecs(toolName: string, specs: readonly CommandSpec[]): RawStreamEntry[] {
   const entries: RawStreamEntry[] = [];
   for (const spec of specs) {
     if (spec.output !== 'raw-stream') continue;
@@ -62,10 +58,11 @@ describe('raw-stream inventory (bundled tools)', () => {
     }
   });
 
-  it('worker-ipc commands exist for fit and graph workers', () => {
+  it('worker-ipc commands exist for fit, graph, and sim workers', () => {
     const workerCommands = inventory.filter((e) => e.reason === 'worker-ipc').map((e) => e.command);
     expect(workerCommands).toContain('fit-run-worker');
     expect(workerCommands).toContain('graph-run-worker');
+    expect(workerCommands).toContain('sim-run-worker');
   });
 });
 
@@ -77,8 +74,9 @@ describe('raw-stream host parity', () => {
     const sideEffect = vi.fn();
 
     const ctx = {
-      render: async (r: unknown) => {
+      render: (r: unknown) => {
         rendered.push(r);
+        return Promise.resolve();
       },
       emitEnvelope: (e: unknown) => {
         envelopes.push(e);
@@ -110,5 +108,6 @@ describe('raw-stream host parity', () => {
     expect(sideEffect).toHaveBeenCalledOnce();
     expect(rendered).toEqual([]);
     expect(envelopes).toEqual([]);
+    expect(exitCodes).toEqual([]);
   });
 });

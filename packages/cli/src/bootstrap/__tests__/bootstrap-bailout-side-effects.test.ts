@@ -133,7 +133,7 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
         createRunLogger,
         isScopeEntered: () => true,
         maybeInitializeOwningTool: vi.fn(),
-        loadOwningToolCapabilities: vi.fn(async () => 0),
+        loadOwningToolCapabilities: vi.fn(() => Promise.resolve(0)),
         checkForUpdate: () => undefined,
         startProfiling: () => undefined,
       },

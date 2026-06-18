@@ -9,7 +9,7 @@ import { planGraphExecution, validateGraphCommandFlags } from '../graph-command-
 
 import type { GraphCommandOptions } from '../graph-options.js';
 
-let tmpProject = mkdtempSync(join(tmpdir(), 'graph-plan-'));
+const tmpProject = mkdtempSync(join(tmpdir(), 'graph-plan-'));
 mkdirSync(join(tmpProject, 'src'), { recursive: true });
 mkdirSync(join(tmpProject, 'lib'), { recursive: true });
 
@@ -17,7 +17,7 @@ function baseOpts(over: Partial<GraphCommandOptions> = {}): GraphCommandOptions 
   return {
     cwd: tmpProject,
     ...over,
-  } as GraphCommandOptions;
+  };
 }
 
 describe('validateGraphCommandFlags', () => {
@@ -28,15 +28,15 @@ describe('validateGraphCommandFlags', () => {
   });
 
   it('rejects workspace with positional paths', () => {
-    expect(() =>
-      validateGraphCommandFlags(baseOpts({ workspace: true, paths: ['src'] })),
-    ).toThrow(ConfigurationError);
+    expect(() => validateGraphCommandFlags(baseOpts({ workspace: true, paths: ['src'] }))).toThrow(
+      ConfigurationError,
+    );
   });
 
   it('rejects workspace with gate flags', () => {
-    expect(() =>
-      validateGraphCommandFlags(baseOpts({ workspace: true, gateSave: true })),
-    ).toThrow(ConfigurationError);
+    expect(() => validateGraphCommandFlags(baseOpts({ workspace: true, gateSave: true }))).toThrow(
+      ConfigurationError,
+    );
   });
 });
 
