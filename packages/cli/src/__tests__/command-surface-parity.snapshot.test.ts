@@ -52,6 +52,18 @@
  *    canonical nested `<tool> <verb>` forms (deltas 3 + 4) are the only command
  *    surface; the flat verbs no longer appear at the top level.
  *
+ * 6. Uniform tool-primary surface (tool-command-surface version phase): the host
+ *    mount layer (`decorateToolPrimary`) GUARANTEES the same baseline on EVERY
+ *    tool PRIMARY (`fit` / `graph` / `sim`), so the snapshot now shows:
+ *      - a per-tool `--version` option on each primary (prints the TOOL's
+ *        version, e.g. `fit 0.1.6`; distinct from the CLI `opensip --version`);
+ *      - `--config <path>` on the `graph` and `sim` primaries (it was already on
+ *        `fit`), now guaranteed by the host rather than declared per tool.
+ *    These appear ONLY on the three primaries — never on the nested
+ *    `<tool> <verb>` children or the Tier-3 workers — and the `--cwd`/`--json`/
+ *    `--quiet`/`--verbose` baseline was already present (the host decoration is
+ *    idempotent and adds only what a tool did not declare).
+ *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -222,6 +234,11 @@ function nestedChild(program: Command, parent: string, verb: string): Command | 
   return parentCmd?.commands.find((c) => c.name() === verb);
 }
 
+/** The set of `--long` flag strings a Commander command declares. */
+function longFlagsOf(cmd: Command): ReadonlySet<string> {
+  return new Set(cmd.options.map((o) => o.long).filter((l): l is string => typeof l === 'string'));
+}
+
 /** Assert a command declares `--resolution` with the `exact|fast` choices delta. */
 function assertResolutionChoices(cmd: Command | undefined, name: string): void {
   expect(cmd, `expected a mounted '${name}' command`).toBeDefined();
@@ -320,5 +337,45 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'graph',
     );
     assertResolutionChoices(nestedChild(program, 'graph', 'export'), 'graph export');
+  });
+
+  // Uniform tool-primary surface (decorateToolPrimary): the host guarantees the
+  // same baseline on EVERY tool primary — a per-tool `--version` plus
+  // `--cwd`/`--json`/`--config`/`--quiet`/`--verbose` — and ONLY on the primary.
+  describe('host-guaranteed uniform tool-primary surface', () => {
+    it.each(['fit', 'graph', 'sim'])(
+      '%s primary carries --version + the guaranteed baseline flags',
+      (toolVerb) => {
+        const program = buildFullProgram();
+        const primary = program.commands.find((c) => c.name() === toolVerb);
+        expect(primary, `expected a mounted '${toolVerb}' primary`).toBeDefined();
+        const flags = longFlagsOf(primary!);
+        for (const guaranteed of [
+          '--version',
+          '--cwd',
+          '--json',
+          '--config',
+          '--quiet',
+          '--verbose',
+        ]) {
+          expect(flags, `${toolVerb} primary must carry ${guaranteed}`).toContain(guaranteed);
+        }
+        // The version option help text is the host-owned per-tool string.
+        const version = primary!.options.find((o) => o.long === '--version');
+        expect(version?.description).toBe("Print this tool's version");
+      },
+    );
+
+    it('the guaranteed flags are NOT injected onto nested <tool> <verb> children', () => {
+      const program = buildFullProgram();
+      // `fit list` is a Tier-2 nested child — it must NOT pick up the primary-only
+      // `--version` decoration (only the host adds it, and only to the primary).
+      const fitList = nestedChild(program, 'fit', 'list');
+      expect(fitList, '`fit list` must be mounted').toBeDefined();
+      expect(
+        longFlagsOf(fitList!),
+        '`fit list` must not carry the primary --version',
+      ).not.toContain('--version');
+    });
   });
 });

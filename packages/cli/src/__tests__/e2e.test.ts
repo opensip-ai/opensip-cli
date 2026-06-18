@@ -48,6 +48,25 @@ describe('CLI e2e', () => {
     expect(stdout.trim()).toBe(CLI_PKG_VERSION);
   });
 
+  // Per-tool --version (decorateToolPrimary): `opensip <tool> --version` prints
+  // the TOOL's own version (`<verb> <semver>`), distinct from `opensip
+  // --version` (the CLI). The host guarantees this uniformly on every primary.
+  it.each(['fit', 'graph', 'sim'])('%s --version prints the tool version', (tool) => {
+    const { stdout, exitCode } = cli.run([tool, '--version'], { cwd: FIXTURE });
+    expect(exitCode).toBe(0);
+    // `<verb> <semver>` — the tool name aligns to the command verb (Task 2.4).
+    expect(stdout.trim()).toMatch(new RegExp(`^${tool} \\d+\\.\\d+\\.\\d+`));
+  });
+
+  // The guaranteed baseline flags are present uniformly on every tool primary.
+  it.each(['fit', 'graph', 'sim'])('%s --help lists the guaranteed baseline flags', (tool) => {
+    const { stdout, exitCode } = cli.run([tool, '--help'], { cwd: FIXTURE });
+    expect(exitCode).toBe(0);
+    for (const flag of ['--cwd', '--json', '--config', '--quiet', '--verbose', '--version']) {
+      expect(stdout, `${tool} --help must list ${flag}`).toContain(flag);
+    }
+  });
+
   describe('fit', () => {
     it('runs successfully with --json', () => {
       const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: FIXTURE });
