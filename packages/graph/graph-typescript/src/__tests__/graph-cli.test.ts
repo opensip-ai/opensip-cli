@@ -22,12 +22,16 @@ import { typescriptGraphAdapter } from '../index.js';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 /** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
-interface GraphDoneLike {
+// envelope-first-presentation RP-2: executeGraph now hands a RunPresentation
+// (envelope-backed) to the render seam, not a count-based graph-done result.
+interface RunPresentationLike {
   readonly type: string;
+  readonly tool: string;
   readonly verboseDetail?:
     | { readonly kind: 'lines'; readonly lines: readonly string[] }
     | { readonly kind: 'findings'; readonly groups: readonly unknown[] };
-  readonly summary: { readonly passed: number };
+  readonly envelope: { readonly tool: string; readonly verdict: { readonly passed: boolean } };
+  readonly durationMs?: number;
 }
 
 const FIXTURE_TSCONFIG = JSON.stringify({
@@ -219,7 +223,7 @@ describe('executeGraph', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('default mode produces a graph-done result with summary + footer hint (no detailed body)', async () => {
+  it('default mode produces a RunPresentation with envelope + footer hint (no detailed body)', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
@@ -227,23 +231,27 @@ describe('executeGraph', () => {
     await runExecuteGraph({ cwd: dir }, cli);
     // executeGraph hands a structured result to the render seam; the
     // Ink-vs-plain-text rendering is the CLI's concern (covered there).
-    const done = render.mock.calls[0]?.[0] as GraphDoneLike;
-    expect(done.type).toBe('graph-done');
-    expect(typeof done.summary.passed).toBe('number');
+    const done = render.mock.calls[0]?.[0] as RunPresentationLike;
+    expect(done.type).toBe('run-presentation');
+    expect(done.tool).toBe('graph');
+    // The PASS/FAIL summary derives from the carried envelope verdict.
+    expect(typeof done.envelope.verdict.passed).toBe('boolean');
+    // host-owned display duration (ADR-0051) is threaded so the summary is non-0ms.
+    expect(typeof done.durationMs).toBe('number');
     // Non-verbose: no verbose body; the "Use --verbose…" footer is emitted by
     // the shared resultToView seam (ADR-0021), not carried on the result.
     expect(done.verboseDetail).toBeUndefined();
     expect(exitCodes).toContain(0);
   });
 
-  it('--verbose mode produces a graph-done result with the detailed report body', async () => {
+  it('--verbose mode produces a RunPresentation with the detailed report body', async () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
     const { cli, exitCodes, render } = makeCli();
     await runExecuteGraph({ cwd: dir, verbose: true }, cli);
-    const done = render.mock.calls[0]?.[0] as GraphDoneLike;
-    expect(done.type).toBe('graph-done');
+    const done = render.mock.calls[0]?.[0] as RunPresentationLike;
+    expect(done.type).toBe('run-presentation');
     const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
     expect(body).toContain('== Catalog ==');
     expect(body).toContain('== Findings');
@@ -396,8 +404,8 @@ describe('executeGraph', () => {
     setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
     const { cli, exitCodes, render } = makeCli();
     const outcome = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
-    const done = render.mock.calls[0]?.[0] as GraphDoneLike;
-    expect(done.type).toBe('graph-done');
+    const done = render.mock.calls[0]?.[0] as RunPresentationLike;
+    expect(done.type).toBe('run-presentation');
     expect(outcome?.envelope?.tool).toBe('graph');
     expect(outcome?.envelope?.verdict.passed).toBe(true);
     expect(exitCodes).toContain(0);
