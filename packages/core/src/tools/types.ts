@@ -34,7 +34,7 @@ import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
 import type { Logger } from '../lib/logger.js';
 import type { RunTimer } from '../lib/run-timer.js';
-import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
+import type { ContributeScopeResult, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
 import type { Signal } from '../types/signal.js';
 
@@ -796,7 +796,7 @@ export type LicenseState = Record<string, unknown>;
  */
 export interface ToolExtensionPoints {
   readonly initialize?: () => Promise<void>;
-  readonly contributeScope?: () => ScopeContribution;
+  readonly contributeScope?: () => ContributeScopeResult;
   readonly collectReportData?: (
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
@@ -962,8 +962,18 @@ export interface Tool {
    * First-party tools that own per-run registries return namespaced slots
    * here (fitness returns `fitness`, graph returns `graph`, simulation
    * returns `simulation`).
+   *
+   * Disposer seam (parallel-tool-invocations Phase 1): a tool that owns a
+   * per-run resource needing teardown (e.g. fitness's `FileCache` + its
+   * auto-clear timer) MAY return the {@link ScopeContributionWithDisposer}
+   * wrapper (`{ contribution, onDispose }`) instead of a bare
+   * {@link ScopeContribution}. The kernel install seam installs `contribution`
+   * and registers `onDispose` via `scope.onDispose(...)`, so `RunScope.dispose()`
+   * reclaims the resource WITHOUT core naming any tool type — the disposer is an
+   * opaque `() => void`, and the tool never receives the concrete `RunScope`
+   * (preserving RunScope⟷Tool acyclicity).
    */
-  readonly contributeScope?: () => ScopeContribution;
+  readonly contributeScope?: () => ContributeScopeResult;
   /**
    * Optional report-data contribution (audit 2026-05-29, L2). The CLI
    * is the report composition root: it gathers generic sessions, then

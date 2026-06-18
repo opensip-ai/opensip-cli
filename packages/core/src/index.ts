@@ -310,10 +310,13 @@ export type {
   DataStoreThunk,
   ToolScope,
   ScopeContribution,
+  ScopeContributionWithDisposer,
+  ContributeScopeResult,
   ResolvedToolConfig,
   TargetResolver,
   TargetView,
 } from './lib/scope-types.js';
+export { isContributionWithDisposer } from './lib/scope-types.js';
 
 // Lib — errors + Result pattern
 export {

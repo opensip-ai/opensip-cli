@@ -179,6 +179,15 @@ export class RunScope {
   /** Per-run telemetry scratch space; see {@link RunScopeOptions.telemetry}. */
   readonly telemetry: Record<string, unknown>;
 
+  /**
+   * Tool-registered teardown callbacks, invoked once during {@link dispose}.
+   * Tool-agnostic: a tool releases per-run resources it owns (e.g. fitness
+   * clears its `FileCache` + the auto-clear timer) via {@link onDispose}
+   * WITHOUT core importing any tool type — keeping `dispose()` tool-agnostic
+   * and the layer rule (`core ← contracts ← {fitness,...}`) intact.
+   */
+  private readonly disposers: Array<() => void> = [];
+
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
     this.parseCache = opts.parseCache ?? new LanguageParseCache();
@@ -197,11 +206,35 @@ export class RunScope {
     this.telemetry = opts.telemetry ?? {};
   }
 
-  /** Release per-run resources (caches, recipe-config slot). */
+  /**
+   * Register a callback invoked once during {@link dispose}. Tools use this
+   * to release per-run resources they own (e.g. fitness clears its `FileCache`
+   * + auto-clear timer) WITHOUT core importing any tool type — keeps
+   * `dispose()` tool-agnostic and the layer rule intact. Registered by the
+   * kernel install seam from the disposer a tool RETURNS via `contributeScope`
+   * (the {@link ScopeContributionWithDisposer} wrapper); the recipe service
+   * additionally registers one on ad-hoc scopes that carry no fitness subscope.
+   * Idempotent dispose: callbacks run at most once; `dispose()` clears the list.
+   */
+  onDispose(fn: () => void): void {
+    this.disposers.push(fn);
+  }
+
+  /** Release per-run resources (caches, recipe-config slot, tool disposers). */
   dispose(): void {
     this.parseCache.dispose();
     this.recipeUnitConfig.clear();
-    // FileCache lifecycle is owned by fitness; not on RunScope.
+    // Run every tool-registered disposer (e.g. fitness clears its FileCache +
+    // the auto-clear timer). Defensive: a throwing disposer must not skip the
+    // rest or the parse-cache/recipe-config cleanup above. `splice(0)` empties
+    // the list so dispose() is idempotent (each callback runs at most once).
+    for (const fn of this.disposers.splice(0)) {
+      try {
+        fn();
+      } catch {
+        /* @swallow-ok a disposer failure must not abort teardown */
+      }
+    }
     // datastore close is the consumer's responsibility — RunScope
     // doesn't open it eagerly.
   }
