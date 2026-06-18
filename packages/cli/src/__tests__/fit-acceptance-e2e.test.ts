@@ -110,11 +110,11 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
     expect(outcome.envelope?.tool).toBe('fit');
   });
 
-  it('the check list is identical (fit-list)', () => {
-    const bundled = cli.run(['fit-list', '--json', '--cwd', testDir], {
+  it('the check list is identical (fit list)', () => {
+    const bundled = cli.run(['fit', 'list', '--json', '--cwd', testDir], {
       cwd: testDir,
     });
-    const installed = cli.run(['fit-list', '--json', '--cwd', testDir], {
+    const installed = cli.run(['fit', 'list', '--json', '--cwd', testDir], {
       cwd: testDir,
       env: AS_INSTALLED,
     });

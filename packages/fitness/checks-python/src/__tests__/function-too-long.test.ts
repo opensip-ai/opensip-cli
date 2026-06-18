@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, runWithScope } from '@opensip-cli/core';
+import { makeFitnessTestScope } from '@opensip-cli/test-support';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { analyzeFunctionTooLong, pythonFunctionTooLong } from '../checks/function-too-long.js';
@@ -43,7 +44,7 @@ describe('python-function-too-long', () => {
 // (the pure analyzer above is called directly and never goes through `.run()`).
 // Mirrors run.test.ts: an empty scope drives applyContentFilter's no-adapter path.
 describe('pythonFunctionTooLong.run() execution coverage', () => {
-  const emptyScope = new RunScope({ languages: new LanguageRegistry() });
+  const emptyScope = makeFitnessTestScope({ languages: new LanguageRegistry() });
   let cwd: string;
   let longTarget: string;
   let shortTarget: string;

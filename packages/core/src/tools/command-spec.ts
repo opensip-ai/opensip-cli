@@ -229,6 +229,23 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly description: string;
   /** Alternate names (`'inspect'` for `'analyze'`). */
   readonly aliases?: readonly string[];
+  /**
+   * Command visibility tier. `'public'` (default) commands appear in help,
+   * completion, and agent catalog surfaces. `'internal'` commands stay mounted
+   * and invocable but are hidden from public surfaces unless the host explicitly
+   * reveals them for debugging.
+   */
+  readonly visibility?: 'public' | 'internal';
+  /**
+   * When set, the host mounts this spec as a SUBCOMMAND of the named parent
+   * command (the tool's primary verb, e.g. `'graph'` / `'fit'`) rather than
+   * flat at the root program — the handler-mount mirror of
+   * {@link ToolCommandDescriptor.parent}. Enables the `<tool> <verb>` grammar
+   * (`graph export`, `fit list`): `mountOneTool` mounts the tool's primary
+   * first, then mounts every `parent`-matched child onto it via
+   * `mountCommandSpec(primaryCmd, child, ctx)`. Omitted ⇒ flat root mount.
+   */
+  readonly parent?: string;
   /** The common flags this command exposes, applied via `applyCommonFlags` at mount. */
   readonly commonFlags: readonly CommonFlagKey[];
   /** Tool-specific options. */
@@ -267,6 +284,7 @@ function commandSpecValidationError(value: unknown): Error | undefined {
   const spec = value as {
     readonly name?: unknown;
     readonly description?: unknown;
+    readonly visibility?: unknown;
     readonly commonFlags?: unknown;
     readonly scope?: unknown;
     readonly output?: unknown;
@@ -279,6 +297,16 @@ function commandSpecValidationError(value: unknown): Error | undefined {
   }
   if (typeof spec.description !== 'string' || spec.description.trim() === '') {
     return new Error(`defineCommand: command '${spec.name}' must have a non-empty description.`);
+  }
+  if (
+    spec.visibility !== undefined &&
+    spec.visibility !== 'public' &&
+    spec.visibility !== 'internal'
+  ) {
+    return new Error(
+      `defineCommand: command '${spec.name}' declares unknown visibility '${describeUnknownValue(spec.visibility)}'. ` +
+        'Valid values: public, internal.',
+    );
   }
   if (!Array.isArray(spec.commonFlags)) {
     return new TypeError(

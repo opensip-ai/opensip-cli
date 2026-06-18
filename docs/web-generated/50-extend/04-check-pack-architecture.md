@@ -25,7 +25,7 @@ related-docs:
 ---
 # Check pack architecture
 
-A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `plugin add`, by declaring `opensipTools.kind: "fit-pack"` in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/)) takes care of the rest.
+A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `opensip fit plugin add`, by declaring `opensipTools.kind: "fit-pack"` in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/)) takes care of the rest.
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
@@ -201,8 +201,8 @@ The icon is shown in the results table; the display name is the dashboard label.
 
 The chain:
 
-1. The user runs `opensip plugin add @my-co/checks-internal`.
-2. The CLI's `plugin add` command installs the package into `<project>/opensip-cli/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-cli.config.yml`.
+1. The user runs `opensip fit plugin add @my-co/checks-internal` (the `plugin` group is mounted under the `fit` primary, which binds the domain).
+2. The CLI's `fit plugin add` command installs the package into `<project>/opensip-cli/.runtime/plugins/fit/` and appends `@my-co/checks-internal` to `plugins.fit:` in `opensip-cli.config.yml`.
 3. On the next `opensip fit` run, the fitness Tool's `ensureChecksLoaded()` calls into the discoverer.
 4. The discoverer reads `plugins.fit:`, walks `.runtime/plugins/fit/node_modules/`, finds `@my-co/checks-internal/`, and dynamically imports its main entry.
 5. The pack's `checks` export is registered into the per-run check registry (each check carrying its folded-on display); its optional `recipes` export is co-routed to the recipe domain.
@@ -254,7 +254,7 @@ Peer-depend on `@opensip-cli/fitness` and `@opensip-cli/core` so a project on an
 }
 ```
 
-Publish to npm, install via `plugin add`, ship.
+Publish to npm, install via `opensip fit plugin add`, ship.
 
 For the full walkthrough — boilerplate, testing, publishing — see [`50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/).
 
@@ -313,7 +313,7 @@ src/checks/<category>/
 - `@opensip-cli/checks-python` — `no-bare-except`.
 - Project-local `<project>/opensip-cli/fit/checks/` — three custom checks.
 
-The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit-list` command shows the full inventory: 151 checks across the bundled packs, source-tagged.
+The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit list` command shows the full inventory: 151 checks across the bundled packs, source-tagged.
 
 ---
 

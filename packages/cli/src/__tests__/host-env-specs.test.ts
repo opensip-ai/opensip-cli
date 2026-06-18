@@ -4,12 +4,14 @@
  * CLI infra reads coerce as the migrated sites expect.
  */
 
+import { CORRELATION_ENV_SPECS } from '@opensip-cli/core';
 import { GRAPH_ENV_SPECS } from '@opensip-cli/graph';
 import { afterEach, describe, it, expect } from 'vitest';
 
 import {
   BUNDLED_TOOL_ENV_SPECS,
   CLI_ENV_SPECS,
+  CLI_INFRA_ENV_SPECS,
   PRE_SCOPE_ENV_SPECS,
   describeHostEnv,
   hostEnv,
@@ -83,16 +85,70 @@ describe('hostEnv reads (CLI infra)', () => {
     expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe('https://collector:4318');
   });
 
-  it('CLI_ENV_SPECS covers the infra variables', () => {
-    expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
+  it('CLI_INFRA_ENV_SPECS covers the infra variables', () => {
+    expect(CLI_INFRA_ENV_SPECS.map((s) => s.canonical)).toEqual([
       'OTEL_EXPORTER_OTLP_ENDPOINT',
       'OPENSIP_PROFILING',
       'TRACEPARENT',
       'OPENSIP_NO_UPDATE',
       'NO_UPDATE_NOTIFIER',
+      // tool-command-surface-taxonomy Task 1.5: the Tier-3 internal-command reveal.
+      'OPENSIP_CLI_SHOW_INTERNAL',
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     ]);
+  });
+
+  it('CLI_ENV_SPECS = infra vars + the ten core CORRELATION_ENV_SPECS (spread, never re-declared)', () => {
+    const correlationNames = CORRELATION_ENV_SPECS.map((s) => s.canonical);
+    // The ten subprocess-correlation vars are owned by core; the host SPREADS
+    // them, so CLI_ENV_SPECS = infra ++ exactly the core correlation set.
+    expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
+      ...CLI_INFRA_ENV_SPECS.map((s) => s.canonical),
+      ...correlationNames,
+    ]);
+    // The trailing slice is identity-equal to the core specs — the spread, not a
+    // re-declared literal, is the linkage (no drift).
+    expect(CLI_ENV_SPECS.slice(CLI_INFRA_ENV_SPECS.length)).toEqual([...CORRELATION_ENV_SPECS]);
+    expect(correlationNames).toEqual([
+      'OPENSIP_RUN_ID',
+      'OPENSIP_TOOL',
+      'OPENSIP_PARENT_COMMAND',
+      'OPENSIP_TRACE_ID',
+      'OPENSIP_SHARD_ID',
+      'OPENSIP_WORKER_KIND',
+      'OPENSIP_REPO',
+      'OPENSIP_REPO_ID',
+      'OPENSIP_TENANT_ID',
+      'OPENSIP_CHILD_INVOCATION_ID',
+    ]);
+  });
+
+  it('drift guard — CLI_ENV_SPECS contains EXACTLY the core correlation specs by canonical name (set-equality)', () => {
+    // The complementary, order-independent guarantee to the ordered-array test
+    // above: the correlation subset of CLI_ENV_SPECS is set-EQUAL to the core
+    // CORRELATION_ENV_SPECS — every core correlation name is present, and none is
+    // missing or duplicated. A future hand-added/removed correlation spec — or a
+    // re-declared literal that drifts from core — fails here. Modeled on the
+    // GRAPH_ENV_SPECS superset drift guard above (test code is exempt from the
+    // no-bootstrap-tool-import rule).
+    const cliNames = CLI_ENV_SPECS.map((s) => s.canonical);
+    const coreCorrelationNames = new Set(CORRELATION_ENV_SPECS.map((s) => s.canonical));
+
+    // The correlation subset of the CLI surface = the names that ARE core
+    // correlation names (the infra prefix is excluded by this filter).
+    const cliCorrelationSubset = cliNames.filter((n) => coreCorrelationNames.has(n));
+
+    // No duplicates within the CLI correlation subset (the spread is honest).
+    expect(new Set(cliCorrelationSubset).size).toBe(cliCorrelationSubset.length);
+    // Set-equality: the CLI correlation subset is exactly the core set.
+    expect(new Set(cliCorrelationSubset)).toEqual(coreCorrelationNames);
+    // Coverage from the other direction: every core name appears in the CLI surface.
+    for (const name of coreCorrelationNames) {
+      expect(cliNames, `core correlation spec '${name}' missing from CLI_ENV_SPECS`).toContain(
+        name,
+      );
+    }
   });
 
   it('OPENSIP_CLI_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {

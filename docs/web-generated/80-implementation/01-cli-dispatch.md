@@ -128,6 +128,18 @@ A few of the constraints that pinned the order:
 
 ---
 
+## Concurrent in-process runs
+
+The `RunScope` is bound to the current async context through one `AsyncLocalStorage` instance exported from `@opensip-cli/core`. There are two ways to bind it, with strict roles:
+
+- **`enterScope(scope)` — the Commander single-command path only.** It is called exactly once per CLI invocation, in the pre-action hook, where the action body runs after the hook returns but in the same async chain. `enterScope` is backed by `AsyncLocalStorage.enterWith`, which mutates the single ALS slot for the rest of the async context — so it is safe only when nothing else is running in the process. **Never call `enterScope` while another scope task is in flight.** An always-on re-entrancy guard throws `SystemError` (`SYSTEM.SCOPE.REENTRANT`) if a *different* scope is already current; re-entering the *same* scope (idempotent) and entering when *none* is current are allowed.
+
+- **`runWithScope(scope, fn)` / `runWithScopeSync(scope, fn)` — the concurrency-safe path.** These bind `scope` for the dynamic extent of `fn` via `AsyncLocalStorage.run`, so runs nest cleanly and never collide on the shared slot. **Concurrent in-process work — a SaaS host running several analyses at once, or any `Promise.all` over multiple runs — MUST use `runWithScope` per task and MUST NOT share `enterScope`.** Two overlapping runs each see their own scope for the dynamic extent of their `fn`; the always-on guard means a stray `enterScope` inside one of them fails loudly instead of silently cross-contaminating the other.
+
+Per-run logs stay filterable for free on the same seam: each scope carries a distinct `runId`, and the logger reads `currentScope()?.runId` (wired via `setRunIdProvider(() => currentScope()?.runId)`), so concurrent runs emit non-colliding, per-`runId` log lines.
+
+---
+
 ## CLI-owned commands
 
 Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.6/packages/cli/src/commands/) and are assembled by `mountHostCommands()` as host-owned `CommandSpec`s:
@@ -137,26 +149,28 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `init` | CLI | Scaffolds the project layout. No Tool exists yet to own it. |
 | `configure` | CLI | Manages user-level (`~/.opensip-cli/config.yml`) state. Cross-tool. |
 | `uninstall` | CLI | Removes the user-level dotdir. Cross-tool. |
-| `plugin add/remove/list/sync` | CLI | Manages project-pinned plugins. Cross-tool. |
+| `<tool> plugin add/remove/list/sync` | CLI (host) | Manages a pack-supporting tool's project-pinned extension packs. Mounted UNDER each pack-supporting tool primary (`opensip fit plugin …`, `opensip sim plugin …`) with the domain pre-bound — there is no top-level `opensip plugin`. Whole Tool plugins use `tools …` instead. |
 | `completion` | CLI | Prints a shell-completion script whose subcommands + flags are **derived from the live `CommandSpec`s** at generation time (`assembleCompletionInventory`) — the same specs the runtime mounts, so it can't drift; a flag-parity test enforces it. Discovered third-party tool commands are included (the inventory is sourced from the populated registry). |
 | `report` | CLI | Generates + opens the HTML report, aggregating each tool's contributed report data (composition root). Cross-tool. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. New agent ergonomics (`--summary-only`, `--filter`, `--raw` on show) are also host-owned here. |
 
 Tool-owned commands are mounted from each Tool's declared `commandSpecs` via the
-host's `mountCommandSpec`. The current first-party set: fitness contributes
-`fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`; simulation
-contributes `sim`; graph contributes `graph`, `graph-lookup`,
-`graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (graph has its
-own `defineRule` + recipes, mirroring fitness — ADR-0005), plus the internal
-`graph-shard-worker`, the off-process live-run workers (`fit-run-worker` /
-`sim-run-worker` / `graph-run-worker`, ADR-0028), and the `catalog-export` /
-`sarif-export` export commands (these two are deliberately unprefixed — the
-parent `opensip` engine subprocess port spawns `opensip catalog-export` by that
-exact name, DEC-498). The `report` command is **CLI-owned** (composition
-root), not a fitness command — it walks every tool's `collectReportData`.
-Third-party tools add their own. The host owns the Commander program and mounts
-each Tool's declared `commandSpecs`; the Tool decides what commands and handlers
-it declares.
+host's `mountCommandSpec`, in the canonical nested `<tool> <verb>` grammar. The
+current first-party set: fitness contributes `fit` plus the nested `fit list`,
+`fit recipes`, and `fit export` (`--format baseline`); simulation contributes
+`sim` plus `sim recipes`; graph contributes `graph` plus the nested `graph list`,
+`graph recipes`, `graph lookup`, `graph index`, and `graph export` (`--format
+sarif|catalog|baseline`) (graph has its own `defineRule` + recipes, mirroring
+fitness — ADR-0005), plus the internal `graph-shard-worker` /
+`graph-equivalence-check` and the off-process live-run workers (`fit-run-worker`
+/ `sim-run-worker` / `graph-run-worker`, ADR-0028). The nine legacy flat-root
+aliases (`fit-list`, `graph-lookup`, `catalog-export`, `sarif-export`, …) were
+removed once their deprecation window closed — `graph export --format
+sarif|catalog` is the canonical machine-export surface. The `report` command is
+**CLI-owned** (composition root), not a fitness command — it walks every tool's
+`collectReportData`. Third-party tools add their own. The host owns the Commander
+program and mounts each Tool's declared `commandSpecs`; the Tool decides what
+commands and handlers it declares.
 
 The split is functional, not arbitrary. CLI-owned commands deal with concerns that span every Tool — initialization, plugins, sessions, user config. Tool-owned commands deal with concerns specific to that Tool's domain. A new Tool doesn't need to provide its own `init`; it inherits the CLI's.
 
@@ -255,11 +269,12 @@ For `acme-api` running `opensip fit --gate-compare` from CI on 2026-05-17:
    - Resolves each name in `BUNDLED_TOOL_PACKAGES` (`@opensip-cli/fitness`, `@opensip-cli/simulation`, `@opensip-cli/graph`) on disk, reads its manifest, admits it through `admitTool`, **dynamically imports** the tool runtime, and registers it into `toolRegistry` — the same path an installed tool takes; nothing is statically imported.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
 3. `mountAllToolCommands(toolRegistry, program, ctx)`: for each registered tool,
-   `mountCommandSpec` mounts every entry in the tool's declared `commandSpecs`.
-   fitness's specs mount `fit`, `fit-list`, `fit-recipes`, `fit-baseline-export`;
-   simulation's mount `sim`; graph's mount `graph`, `graph-lookup`,
-   `graph-symbol-index`, `graph-baseline-export`, `graph-recipes` (and its
-   internal/export commands). `commandSpecs` is the only command surface.
+   `mountCommandSpec` mounts every entry in the tool's declared `commandSpecs`,
+   nesting `parent`-bearing specs under their tool primary. fitness's specs mount
+   `fit` + the nested `fit list` / `fit recipes` / `fit export`; simulation's
+   mount `sim` + `sim recipes`; graph's mount `graph` + the nested `graph list` /
+   `graph recipes` / `graph lookup` / `graph index` / `graph export` (and its
+   internal workers). `commandSpecs` is the only command surface.
 4. `mountHostCommands()`: host-owned `CommandSpec`s mount `init`, `report`, `configure`, `uninstall`, `plugin`, `completion`, and `sessions`.
 5. `argv = ['node', 'opensip-cli', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-cli/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).

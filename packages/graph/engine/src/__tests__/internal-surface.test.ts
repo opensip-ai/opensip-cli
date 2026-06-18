@@ -30,6 +30,9 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'decideHeapTargetMb',
   'duplicatedFunctionBodyRule',
   'executeGraph',
+  // envelope-first-presentation RP-2: the graph live done-frame table node,
+  // exported only for the host-side live/static parity proof.
+  'graphDoneTableNode',
   'noSideEffectPathRule',
   'orphanSubtreeRule',
   'runGraph',

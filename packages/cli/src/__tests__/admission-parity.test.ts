@@ -114,11 +114,12 @@ describe('bundled policy parity — registerFirstPartyTools throws iff the repor
   it('the real bundled set admits cleanly through the shared callable', async () => {
     const registry = new ToolRegistry();
     await expect(registerFirstPartyTools(registry)).resolves.toBeUndefined();
+    // Task 2.4: metadata.name == the short command verb (fit/sim/graph).
     expect(
       registry
         .list()
         .map((t) => t.metadata.name ?? t.metadata.id)
         .sort(),
-    ).toEqual(['fitness', 'graph', 'simulation']);
+    ).toEqual(['fit', 'graph', 'sim']);
   });
 });

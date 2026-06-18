@@ -1,8 +1,8 @@
 /**
  * fitnessTool — fitness as a Tool plugin.
  *
- * Owns the `fit`, `fit-list`, `fit-recipes`, and `fit-baseline-export`
- * subcommands. Since release 2.11.0 (Phase 4) the Commander wiring is no longer
+ * Owns the `fit` primary plus its nested `fit list`, `fit recipes`, and
+ * `fit export` subcommands. Since release 2.11.0 (Phase 4) the Commander wiring is no longer
  * hand-rolled: the tool exports declarative {@link CommandSpec}s
  * (`commandSpecs`) and the host's `mountCommandSpec` mounts them
  * (name/description/aliases, the ADR-0021 common flags, each command's options)
@@ -43,23 +43,25 @@
  * -------------
  * - This file owns the command-spec assembly + the tool descriptor.
  * - `cli/fit/fit-command-spec.ts` owns the primary `fit` command spec + handler.
- * - `cli/fit/fit-aux-command-specs.ts` owns the aux command specs.
+ * - `cli/fit/fit-aux-command-specs.ts` owns the nested `fit list` / `fit recipes`
+ *   / `fit export` command specs.
  * - `cli/fit-modes.ts` owns the dispatch branches (gate/list/recipes/json/live).
  */
 
-import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/core';
+import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import {
-  fitBaselineExportCommandSpec,
-  fitListCommandSpec,
-  fitRecipesCommandSpec,
+  fitExportCommandSpec,
+  fitListGroupedCommandSpec,
+  fitRecipesGroupedCommandSpec,
 } from './cli/fit/fit-aux-command-specs.js';
 import { buildFitCommandSpec, FIT_LIVE_VIEW_KEY } from './cli/fit/fit-command-spec.js';
 import { renderFitLive } from './cli/fit-runner.js';
 import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
 import { collectFitnessReportData } from './cli/report-data.js';
 import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
+import { FileCache } from './framework/file-cache.js';
 import {
   createCheckRegistry,
   createFitnessLoadState,
@@ -78,7 +80,13 @@ import './scope-augmentation.js';
 import type { Check } from './framework/check-types.js';
 import type { FitnessRecipe } from './recipes/types.js';
 import type { FitOptions } from '@opensip-cli/contracts';
-import type { CapabilityRegistrar, CommandSpec, Tool, ToolCliContext } from '@opensip-cli/core';
+import type {
+  CapabilityRegistrar,
+  CommandSpec,
+  ContributeScopeResult,
+  Tool,
+  ToolCliContext,
+} from '@opensip-cli/core';
 
 // =============================================================================
 // LIVE-VIEW SETUP + COMMAND-SPEC ASSEMBLY
@@ -135,9 +143,14 @@ function setUpFitLiveView(cli: ToolCliContext): void {
  */
 const fitCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   buildFitCommandSpec(setUpFitLiveView),
-  fitListCommandSpec,
-  fitRecipesCommandSpec,
-  fitBaselineExportCommandSpec,
+  // Grouped Tier-2 children — `fit list` / `fit recipes` nest under the `fit`
+  // primary via the nested-mount capability (the canonical `<tool> <verb>`
+  // grammar; the legacy flat aliases were removed).
+  fitListGroupedCommandSpec,
+  fitRecipesGroupedCommandSpec,
+  // Canonical nested export — mounts as `fit export` under the `fit` primary via
+  // the nested-mount capability.
+  fitExportCommandSpec,
   fitRunWorkerCommandSpec,
 ];
 
@@ -168,14 +181,33 @@ const registerFitRecipe: CapabilityRegistrar = (contribution) => {
   registry.register(recipe, { allowOverwrite: false });
 };
 
-const fitnessScope = createToolScope({
-  slot: 'fitness',
-  create: () => ({
-    checks: createCheckRegistry(),
-    recipes: createRecipeRegistry(),
-    load: createFitnessLoadState(),
-  }),
-});
+/**
+ * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
+ * after constructing the scope and before entering it; the kernel installs
+ * the returned `fitness` slot. Fresh check + recipe registries, an empty
+ * `ensureChecksLoaded` lifecycle slot, and a fresh per-run `FileCache` so
+ * concurrent scopes carry independent fitness state.
+ *
+ * Returns the {@link ScopeContributionWithDisposer} wrapper: the SAME
+ * `fileCache` instance is placed on `scope.fitness.fileCache` and closed over by
+ * the `onDispose` disposer, so `RunScope.dispose()` clears the cache + cancels
+ * its auto-clear timer. The kernel install loop registers the disposer via
+ * `scope.onDispose(...)`; core never names `FileCache` (layering-clean).
+ */
+function contributeScope(): ContributeScopeResult {
+  const fileCache = new FileCache();
+  return {
+    contribution: {
+      fitness: {
+        checks: createCheckRegistry(),
+        recipes: createRecipeRegistry(),
+        load: createFitnessLoadState(),
+        fileCache,
+      },
+    },
+    onDispose: () => fileCache.clear(),
+  };
+}
 
 // =============================================================================
 // Per-tool contract version (ADR-0047)
@@ -199,7 +231,14 @@ export const FITNESS_STABLE_ID = 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224';
 export const fitnessTool: Tool = defineTool({
   metadata: {
     id: FITNESS_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
-    name: 'fitness', // human key (previously the value in `id`)
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`fit`). The config namespace key stays `fitness:` — it keys off the
+    // DECOUPLED `fitnessConfigDeclaration.namespace = 'fitness'` literal, NOT
+    // metadata.name, so existing `fitness:` config blocks keep validating. The
+    // session `tool` column is already `'fit'` (sessionReplay.tool + the session
+    // contributions), so aligning the name REDUCES mismatch. Q6 (flipping the
+    // namespace literal to `fit:`) stays open — no `fit:` config alias is added.
+    name: 'fit', // command verb + human key (was 'fitness')
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
@@ -207,7 +246,7 @@ export const fitnessTool: Tool = defineTool({
   commandSpecs: fitCommandSpecs,
   extensionPoints: {
     fitnessContractVersion: FITNESS_CONTRACT_VERSION,
-    contributeScope: fitnessScope.contributeScope,
+    contributeScope,
     collectReportData: collectFitnessReportData,
     sessionReplay: {
       tool: 'fit',

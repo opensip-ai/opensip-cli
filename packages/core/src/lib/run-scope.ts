@@ -26,10 +26,12 @@ import { noopSignalSink } from '../signals/signal-sink.js';
 import { ToolRegistry } from '../tools/registry.js';
 
 import { DiagnosticsBus } from './diagnostics-bus.js';
+import { SystemError } from './errors.js';
 import { logger as defaultLogger } from './logger.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
+import type { RunCorrelation } from './run-correlation.js';
 import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
@@ -120,6 +122,17 @@ export interface RunScopeOptions {
    * making core import telemetry implementations.
    */
   readonly telemetry?: Record<string, unknown>;
+  /**
+   * Cloud-aware correlation bag for this invocation (subprocess-correlation
+   * spec, B2). Assembled at the bootstrap composition root
+   * (`build-per-run-scope.ts`) from the resolved cloud config — the one place
+   * the resolved cloud identity is in hand. Core stays a kernel: it carries the
+   * pure {@link RunCorrelation} type but never resolves cloud config. Library
+   * code deep in the call tree reads it via `currentScope()?.correlation` and
+   * forwards it into spawned/forked children via `correlationToEnv`. Optional:
+   * tests and bare scopes omit it (`RunScope.correlation` is then `undefined`).
+   */
+  readonly correlation?: RunCorrelation;
 }
 
 /**
@@ -178,6 +191,22 @@ export class RunScope {
   readonly toolProvenance: readonly ToolProvenance[];
   /** Per-run telemetry scratch space; see {@link RunScopeOptions.telemetry}. */
   readonly telemetry: Record<string, unknown>;
+  /**
+   * Cloud-aware correlation bag for this invocation (B2). Assembled once at the
+   * bootstrap composition root and read by library code via
+   * `currentScope()?.correlation`; `undefined` when no caller supplied one
+   * (tests / bare scopes). See {@link RunScopeOptions.correlation}.
+   */
+  readonly correlation: RunCorrelation | undefined;
+
+  /**
+   * Tool-registered teardown callbacks, invoked once during {@link dispose}.
+   * Tool-agnostic: a tool releases per-run resources it owns (e.g. fitness
+   * clears its `FileCache` + the auto-clear timer) via {@link onDispose}
+   * WITHOUT core importing any tool type — keeping `dispose()` tool-agnostic
+   * and the layer rule (`core ← contracts ← {fitness,...}`) intact.
+   */
+  private readonly disposers: (() => void)[] = [];
 
   constructor(opts: RunScopeOptions = {}) {
     this.logger = opts.logger ?? defaultLogger;
@@ -195,13 +224,40 @@ export class RunScope {
     this.toolManifests = opts.toolManifests ?? [];
     this.toolProvenance = opts.toolProvenance ?? [];
     this.telemetry = opts.telemetry ?? {};
+    // No default: `undefined` when no caller supplies one (the test/bare-scope
+    // contract). Production paths assemble it at the composition root (B2).
+    this.correlation = opts.correlation;
   }
 
-  /** Release per-run resources (caches, recipe-config slot). */
+  /**
+   * Register a callback invoked once during {@link dispose}. Tools use this
+   * to release per-run resources they own (e.g. fitness clears its `FileCache`
+   * + auto-clear timer) WITHOUT core importing any tool type — keeps
+   * `dispose()` tool-agnostic and the layer rule intact. Registered by the
+   * kernel install seam from the disposer a tool RETURNS via `contributeScope`
+   * (the {@link ScopeContributionWithDisposer} wrapper); the recipe service
+   * additionally registers one on ad-hoc scopes that carry no fitness subscope.
+   * Idempotent dispose: callbacks run at most once; `dispose()` clears the list.
+   */
+  onDispose(fn: () => void): void {
+    this.disposers.push(fn);
+  }
+
+  /** Release per-run resources (caches, recipe-config slot, tool disposers). */
   dispose(): void {
     this.parseCache.dispose();
     this.recipeUnitConfig.clear();
-    // FileCache lifecycle is owned by fitness; not on RunScope.
+    // Run every tool-registered disposer (e.g. fitness clears its FileCache +
+    // the auto-clear timer). Defensive: a throwing disposer must not skip the
+    // rest or the parse-cache/recipe-config cleanup above. `splice(0)` empties
+    // the list so dispose() is idempotent (each callback runs at most once).
+    for (const fn of this.disposers.splice(0)) {
+      try {
+        fn();
+      } catch {
+        /* @swallow-ok a disposer failure must not abort teardown */
+      }
+    }
     // datastore close is the consumer's responsibility — RunScope
     // doesn't open it eagerly.
   }
@@ -229,10 +285,39 @@ export interface RunScope extends ToolScope {}
 // not to whichever package is reading from it. This solves the
 // two-copies-of-fitness hazard documented at the prior
 // `Symbol.for(globalThis)` site.
+//
+// Concurrency contract — two ways to bind a scope, with strict roles:
+//
+//   • `runWithScope(scope, fn)` / `runWithScopeSync(scope, fn)` —
+//     bind `scope` for the dynamic extent of `fn` via
+//     `AsyncLocalStorage.run`. This is the ONLY safe way to bind a
+//     scope for concurrent or nested in-process work: each task's
+//     scope is isolated to its own `fn`, runs nest cleanly, and two
+//     overlapping runs never collide on the shared slot. SaaS hosts
+//     and any in-process parallelism MUST use this.
+//
+//   • `enterScope(scope)` — the Commander single-command path ONLY:
+//     one entry per CLI invocation, in the pre-action hook. It mutates
+//     the single ALS slot (`enterWith`) for the rest of the async
+//     context, so it is unsafe for concurrent or nested work. NEVER
+//     call `enterScope` while another scope task is in flight; the
+//     always-on guard throws `SYSTEM.SCOPE.REENTRANT` if a *different*
+//     scope is already current.
+//
+// Per-run log isolation rides on the same seam: distinct scopes carry
+// distinct `runId`s, and the logger reads `currentScope()?.runId`
+// (wired below via `setRunIdProvider`), so concurrent runs produce
+// non-colliding, per-run-filterable logs.
 
 const scopeStorage = new AsyncLocalStorage<RunScope>();
 
-/** Run `fn` with `scope` bound as the current scope for everything in its dynamic extent. */
+/**
+ * Run `fn` with `scope` bound as the current scope for everything in its
+ * dynamic extent. Backed by `AsyncLocalStorage.run`, so it nests cleanly
+ * and is the concurrency-safe binding: use this (never a shared
+ * {@link enterScope}) for concurrent or nested in-process work — two
+ * overlapping runs each see their own scope and never collide.
+ */
 export function runWithScope<T>(scope: RunScope, fn: () => Promise<T>): Promise<T> {
   return scopeStorage.run(scope, fn);
 }
@@ -249,11 +334,54 @@ export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
  * hook where the action body runs after the hook returns but in the
  * same async chain: `enterWith` propagates the scope forward without
  * needing to wrap the action invocation, which Commander does not let
- * us do directly. Throws on misuse: an existing scope must NOT be
- * replaced silently (call `runWithScope` for nested scopes).
+ * us do directly.
+ *
+ * `enterScope` is the **Commander single-command path only** — exactly
+ * one entry per CLI invocation, in the pre-action hook. It mutates the
+ * single ALS slot for the rest of the async context, so it is unsafe for
+ * concurrent or nested work.
+ *
+ * Always-on re-entrancy guard: throws `SystemError`
+ * (`SYSTEM.SCOPE.REENTRANT`) if a *different* scope is already current.
+ * Re-entering the **same** scope (idempotent — e.g. a retried pre-action
+ * path) is a no-op and does NOT throw; entering when **none** is current
+ * (the normal single-command path) is allowed. For concurrent or nested
+ * scopes use {@link runWithScope}/{@link runWithScopeSync}, which bind via
+ * `AsyncLocalStorage.run` and nest cleanly without touching the shared slot.
  */
 export function enterScope(scope: RunScope): void {
+  const current = scopeStorage.getStore();
+  if (current !== undefined && current !== scope) {
+    throw new SystemError(
+      'enterScope called while a different scope is already current. ' +
+        'Concurrent or nested work must use runWithScope(scope, fn), not a shared enterScope.',
+      { code: 'SYSTEM.SCOPE.REENTRANT' },
+    );
+  }
   scopeStorage.enterWith(scope);
+}
+
+/**
+ * Clear the ambient scope slot — the symmetric counterpart to {@link enterScope}.
+ * Backed by `AsyncLocalStorage.enterWith(undefined)`, so it resets the single ALS
+ * slot for the rest of the calling async context.
+ *
+ * Host-only, single-command path: the Commander `postAction` hook calls this after
+ * disposing the entered scope, completing the per-command lifecycle (enter in
+ * `preAction` → dispose + exit in `postAction`). Clearing the slot leaves a clean
+ * ALS state for any *subsequent* command run in the same process — so a long-lived
+ * host that drives Commander sequentially (or a test that parses twice) does not
+ * trip the always-on re-entrancy guard on the next `enterScope`. A no-op when no
+ * scope is current. Concurrent/nested work never needs this — {@link runWithScope}
+ * restores the prior slot on its own when its `fn` returns.
+ */
+export function exitScope(): void {
+  // `enterWith(undefined)` clears the slot for this async context. The storage
+  // is typed `AsyncLocalStorage<RunScope>` so `getStore()` stays non-nullable at
+  // read sites; the cast is the one place we exercise the runtime's documented
+  // "store may be undefined" contract to reset the slot.
+  // eslint-disable-next-line unicorn/no-useless-undefined -- the `undefined` is load-bearing: it is the slot-clear value for AsyncLocalStorage.enterWith, not a removable default.
+  (scopeStorage as AsyncLocalStorage<RunScope | undefined>).enterWith(undefined);
 }
 
 /** Read the current scope. Returns undefined when called outside a runWithScope. */

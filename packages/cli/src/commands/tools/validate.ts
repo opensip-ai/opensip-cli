@@ -157,22 +157,27 @@ function skippedRuntimeSections(): ToolsValidateSection[] {
 
 /**
  * Config contract (spec + ADR-0043 family): a manifest that declares config
- * needs a runtime `Tool.config`; a runtime namespace must equal the tool id.
+ * needs a runtime `Tool.config`.
+ *
+ * tool-command-surface-taxonomy Task 2.4 / Q1: the config namespace is
+ * DECOUPLED from the tool id (`metadata.name`). `metadata.name` is the command
+ * verb (`fit`/`sim`), while the config namespace is a hardcoded
+ * `ToolConfigDeclaration.namespace` literal (`fitness`/`simulation`/`graph`).
+ * They are intentionally allowed to differ (the long config key is retained as
+ * the sole valid namespace until Q6 flips the literal), so this section no
+ * longer requires `namespace === toolId` — that coupling was the pre-rename
+ * assumption. The unclaimed-namespace policy (`config-and-capabilities.ts`)
+ * still rejects a user-typed block that no loaded tool claims.
  */
 function configContractSection(
   manifestDeclaresConfig: boolean,
   toolConfigNamespace: string | null,
-  toolId: string | undefined,
+  _toolId: string | undefined,
 ): ToolsValidateSection {
   const diagnostics: string[] = [];
   if (manifestDeclaresConfig && toolConfigNamespace === null) {
     diagnostics.push(
       'manifest declares config but the runtime Tool.config contribution is missing',
-    );
-  }
-  if (toolConfigNamespace !== null && toolConfigNamespace !== toolId) {
-    diagnostics.push(
-      `Tool.config.namespace '${toolConfigNamespace}' does not match the tool id '${toolId ?? ''}'`,
     );
   }
   return section('config-contract', diagnostics.length === 0 ? 'passed' : 'failed', diagnostics);

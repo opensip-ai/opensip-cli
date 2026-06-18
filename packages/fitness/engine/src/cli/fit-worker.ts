@@ -74,6 +74,7 @@ export const fitRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   ToolCliContext
 >({
   name: 'fit-run-worker',
+  visibility: 'internal',
   description:
     '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
   commonFlags: [],

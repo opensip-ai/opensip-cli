@@ -72,6 +72,7 @@ export const simRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   ToolCliContext
 >({
   name: 'sim-run-worker',
+  visibility: 'internal',
   description:
     '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
   commonFlags: [],

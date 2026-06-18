@@ -81,7 +81,7 @@ jobs:
         with: { node-version: 24 }
       - run: curl -fsSL https://opensip.ai/cli/install.sh | bash
       - run: opensip fit --gate-compare
-      - run: opensip fit-baseline-export --out fit.sarif
+      - run: opensip fit export --format baseline --out fit.sarif
         if: always()
       - uses: github/codeql-action/upload-sarif@v3
         if: always()

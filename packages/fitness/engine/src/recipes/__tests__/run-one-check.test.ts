@@ -11,15 +11,31 @@
  * controller, these tests will catch the regression.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { applyToolContributeScope, enterScope, RunScope } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
 import { CheckAbortedError } from '../../framework/execution-context.js';
+import { fitnessTool } from '../../tool.js';
 import { runOneCheck } from '../run-one-check.js';
 
 import type { ProcessorContext } from '../check-result-processor.js';
 import type { FitnessRecipeServiceCallbacks, FitnessRecipeSession } from '../service-types.js';
 import type { FitnessRecipe } from '../types.js';
+
+// `runOneCheck` drives `check.run()`, which builds an ExecutionContext that
+// resolves the per-run cache from `currentScope()?.fitness?.fileCache` (no
+// module-singleton fallback — parallel-tool-invocations Phase 1). Enter a fresh
+// RunScope carrying fitness's subscope so file-reading checks resolve a cache.
+let scope: RunScope;
+beforeEach(() => {
+  scope = new RunScope();
+  applyToolContributeScope(scope, fitnessTool);
+  enterScope(scope);
+});
+afterEach(() => {
+  scope.dispose();
+});
 
 let nextId = 0;
 function uid(): string {

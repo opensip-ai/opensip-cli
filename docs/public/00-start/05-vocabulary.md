@@ -122,7 +122,7 @@ A **plugin** is anything opensip-cli loads at runtime that wasn't compiled into 
 2. **npm-package plugins.** **Tools** are any package whose `package.json` declares `opensipTools.kind === 'tool'`; **check packs** declare `opensipTools.kind === 'fit-pack'` (marker discovery). **Sim packs** are discovered by **name-pattern** (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-cli` plus configured `plugins.packageScopes`. There is no `opensipTools.kind === 'sim-pack'` marker — sim marker discovery was retired in ADR-0029. Capability package preferences are resolved from the already-validated `plugins:` block through each domain's descriptor. See [`packages/core/src/plugins/tool-package-discovery.ts`](../../../packages/core/src/plugins/tool-package-discovery.ts), [`packages/core/src/plugins/capability-discovery.ts`](../../../packages/core/src/plugins/capability-discovery.ts), and [`packages/config/src/capability-preferences.ts`](../../../packages/config/src/capability-preferences.ts).
 3. **Project-pinned tool-domain plugins.** Listed under `plugins.fit:` or `plugins.sim:` in `opensip-cli.config.yml`. When a project-pinned list is present for that domain, only those packages are loaded for the project-local plugin lane. Separate capability pins use `plugins.checkPackages:`, `plugins.scenarioPackages:`, and `plugins.graphAdapters:`. Language adapters are bundled by the CLI and are not project-discovered plugins.
 
-The `opensip plugin` command surface (`add`/`remove`/`list`/`sync`) manages the project-pinned form. See [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
+The per-tool `opensip <tool> plugin` command surface (`add`/`remove`/`list`/`sync`) manages the project-pinned form — mounted under each pack-supporting tool primary (`opensip fit plugin …`, `opensip sim plugin …`), with the domain bound from the tool (no top-level `opensip plugin`, no `--domain` flag). Whole Tool plugins use `opensip tools …`. See [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
 
 ## Session
 
@@ -134,7 +134,7 @@ The runtime dir is gitignored — sessions are local artifacts, not source. The 
 
 ## Gate
 
-A **gate** is the architecture-baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). Use `opensip fit-baseline-export` when CI needs a SARIF file.
+A **gate** is the architecture-baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). Use `opensip fit export --format baseline` when CI needs a SARIF file.
 
 The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts) and [`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
 

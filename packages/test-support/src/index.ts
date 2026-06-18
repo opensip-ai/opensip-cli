@@ -23,7 +23,8 @@
  * they use core's public `RunScope` API directly.
  */
 
-export { makeTestScope, withScope, withScopeSync } from './with-scope.js';
+export { makeTestScope, makeFitnessTestScope, withScope, withScopeSync } from './with-scope.js';
+export { runTwoScopesConcurrently } from './concurrent-scopes.js';
 
 export {
   buildFixtureManifest,

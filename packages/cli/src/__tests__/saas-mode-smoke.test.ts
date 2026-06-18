@@ -115,7 +115,7 @@ function makeArgs(cwd: string): FitOptions {
  * independently-contributed scopes are exactly what proves there is no
  * cross-scope crossover.
  */
-function makeScope(includeGlob: string): RunScope {
+function makeScope(includeGlob = 'src/**/*.ts'): RunScope {
   const scope = new RunScope({
     tools: new ToolRegistry(),
     languages: new LanguageRegistry(),

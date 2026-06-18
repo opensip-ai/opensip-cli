@@ -19,7 +19,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, runWithScope } from '@opensip-cli/core';
+import { makeFitnessTestScope } from '@opensip-cli/test-support';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { noPrintStackTrace } from '../checks/no-printstacktrace.js';
@@ -27,9 +28,10 @@ import { noPrintStackTrace } from '../checks/no-printstacktrace.js';
 // applyContentFilter resolves the file's adapter via `currentScope()?.languages`
 // (the previously-exported `defaultLanguageRegistry` was removed). When no
 // adapter is registered for the extension, applyContentFilter returns raw
-// content — the prior behaviour. Wrap the test body in an empty scope so
-// the dispatch reaches that no-adapter branch instead of throwing.
-const emptyScope = new RunScope({ languages: new LanguageRegistry() });
+// content — the prior behaviour. Wrap the test body in a scope that also carries
+// fitness.fileCache, since check.run resolves the per-run cache from
+// currentScope()?.fitness?.fileCache now (parallel-tool-invocations Phase 1).
+const emptyScope = makeFitnessTestScope({ languages: new LanguageRegistry() });
 
 let cwd: string;
 let target: string;

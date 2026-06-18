@@ -500,13 +500,16 @@ module.exports = {
       comment:
         'contracts holds the SignalEnvelope / CommandResult / exit code TYPES used ' +
         'by every tool. It must not import from any tool, the cli entry ' +
-        'point, language packs, dashboard, or the runtime packages it was ' +
-        'split into (datastore / session-store / output). It depends on ' +
-        'core only (audit 2026-05-29, contracts split).',
+        'point, the cli-ui view-model kit, language packs, dashboard, or the ' +
+        'runtime packages it was split into (datastore / session-store / output). ' +
+        'It depends on core only (audit 2026-05-29, contracts split). The ' +
+        'cli-ui edge is forbidden so render-only types (RunPresentation) cannot ' +
+        'silently start importing UI primitives (envelope-first-presentation, RP-0).',
       from: { path: '^packages/contracts/src/' },
       to: {
         path: [
           '^packages/cli/',
+          '^packages/cli-ui/',
           '^packages/fitness/engine/',
           '^packages/simulation/engine/',
           '^packages/dashboard/',

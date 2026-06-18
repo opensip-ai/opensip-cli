@@ -20,7 +20,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **152 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **154 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
@@ -156,14 +156,15 @@ Language-agnostic; runs against every project.
 
 ---
 
-## TypeScript  *(52 checks)*
+## TypeScript  *(54 checks)*
 
 TypeScript/JavaScript projects; uses TS-AST analysis.
 
-### Architecture  *(11)*
+### Architecture  *(13)*
 
 | Slug | Description |
 |---|---|
+| [`architecture-no-run-done-result`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/no-run-done-result.ts) | Run commands render via the single RunPresentation variant; the contracts surface must not re-introduce a per-tool *DoneResult run type |
 | [`callback-invocation-safe`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/resilience/callback-invocation-safe.ts) | Class-field callbacks invoked from producer code paths (subscribers.forEach, for-of over listeners, etc.) must be wrapped in a safe<Name>(...) helper or try/catch. A throw from one subscriber must not crash the producer or skip subsequent subscribers. |
 | [`circular-import-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/circular-import-detection.ts) | Detects file-level circular import dependencies |
 | [`contracts-schema-consistency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/contracts-schema-consistency.ts) | Validates that contracts use Zod schemas consistently: types derived from schemas via z.infer |
@@ -174,6 +175,7 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 | [`no-bootstrap-tool-import`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/no-bootstrap-tool-import.ts) | The CLI host must not statically import a tool runtime — bundled tools load via the dynamic plugin path (§1 install-source independence) |
 | [`package-json-exports-field`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/package-json-exports-field.ts) | *(no description; see source)* |
 | [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |
+| [`subprocess-correlation-required`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/subprocess-correlation-required.ts) | CLI subprocess spawn/fork sites must forward the RunCorrelation bag (runId via env, other fields via env+spec) so child failures are attributable |
 | [`tsconfig-extends-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/tsconfig-extends-validation.ts) | Ensures all tsconfig.json files extend a shared base and the base file exists |
 
 ### Security  *(4)*

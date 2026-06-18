@@ -50,7 +50,7 @@ export default defineCheck({
 });
 ```
 
-`opensip fit-list` shows it. `opensip fit` runs it against every TypeScript file in matched targets.
+`opensip fit list` shows it. `opensip fit` runs it against every TypeScript file in matched targets.
 
 The id is a UUID v4. Generate one with `node -e "console.log(crypto.randomUUID())"`. It must be stable across renames — no central registry, but the framework uses the id to key baselines, so changing it breaks gates.
 
@@ -83,7 +83,7 @@ export const recipes = [defineRecipe({
 })];
 ```
 
-`opensip fit-recipes` lists it. `opensip fit --recipe quick-smoke` runs it.
+`opensip fit recipes` lists it. `opensip fit --recipe quick-smoke` runs it.
 
 The four selectors: `{ type: 'all' }`, `{ type: 'tags', include: [...] }`, `{ type: 'pattern', include: [...] }`, `{ type: 'explicit', checkIds: [...] }`. See [recipes and checks](../20-fit/01-recipes-and-checks.md).
 

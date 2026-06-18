@@ -58,6 +58,8 @@ function buildScopeWith(tools: readonly Tool[]) {
     project,
     runId: 'RUN_test',
     cwd: project.cwd,
+    parentCommand: 'fit',
+    toolName: 'fitness',
     cliDefaults,
     registries: { languages: new LanguageRegistry(), tools: registry },
     manifests: [],

@@ -26,6 +26,70 @@ describe('buildAgentCatalog', () => {
     );
   });
 
+  // tool-command-surface-taxonomy Task 4.5 — the catalog is grouped by tier and
+  // never surfaces a Tier-3 internal command.
+  describe('command taxonomy — tiered + no Tier-3 leakage', () => {
+    /** The Tier-3 internal command-name shapes that must never be catalogued. */
+    const INTERNAL_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
+
+    it('annotates every entry point with a non-internal taxonomy tier', () => {
+      const c = buildAgentCatalog();
+      for (const e of c.entryPoints) {
+        // Task 1.4 grouped the surface by tier; each entry carries the predictable
+        // Tier-1 (platform) / Tier-2 (tool) shape — and NEVER 'internal'.
+        expect(e.tier, `entry '${e.command}' must declare a tier`).toBeDefined();
+        expect(['platform', 'tool']).toContain(e.tier);
+        expect(e.tier).not.toBe('internal');
+      }
+      // The catalog exposes both tiers (it is genuinely grouped, not all-one-tier).
+      const tiers = new Set(c.entryPoints.map((e) => e.tier));
+      expect(tiers.has('platform')).toBe(true);
+      expect(tiers.has('tool')).toBe(true);
+    });
+
+    it('fit/graph are tool-tier; the host commands are platform-tier', () => {
+      const c = buildAgentCatalog();
+      const tierOf = (command: string) => c.entryPoints.find((e) => e.command === command)?.tier;
+      expect(tierOf('fit')).toBe('tool');
+      expect(tierOf('graph')).toBe('tool');
+      expect(tierOf('sessions list')).toBe('platform');
+      expect(tierOf('sessions show')).toBe('platform');
+      expect(tierOf('agent-catalog')).toBe('platform');
+    });
+
+    it('no entry point or common pattern references an internal command name', () => {
+      const c = buildAgentCatalog();
+      for (const e of c.entryPoints) {
+        expect(INTERNAL_RE.test(e.command), `entry '${e.command}' must not be internal`).toBe(
+          false,
+        );
+        for (const ex of e.examples) {
+          expect(INTERNAL_RE.test(ex), `example '${ex}' must not name an internal command`).toBe(
+            false,
+          );
+        }
+      }
+      for (const p of c.commonPatterns) {
+        expect(INTERNAL_RE.test(p.example), `pattern '${p.example}' must not be internal`).toBe(
+          false,
+        );
+      }
+    });
+
+    it('does not advertise the removed flat export verbs as entry points', () => {
+      const c = buildAgentCatalog();
+      const commands = c.entryPoints.map((e) => e.command);
+      for (const removed of [
+        'sarif-export',
+        'catalog-export',
+        'graph-baseline-export',
+        'fit-baseline-export',
+      ]) {
+        expect(commands, `removed '${removed}' must not be an entry point`).not.toContain(removed);
+      }
+    });
+  });
+
   it('describes the common agent patterns and output shapes', () => {
     const c = buildAgentCatalog();
     expect(c.commonPatterns.length).toBeGreaterThan(0);

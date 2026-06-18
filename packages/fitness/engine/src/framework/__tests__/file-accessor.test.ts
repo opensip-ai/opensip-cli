@@ -26,7 +26,7 @@ describe('createFileAccessor', () => {
     expect(acc.paths).toEqual(['/a.ts', '/b.ts']);
   });
 
-  it('reads file content from disk via fileCache when not preloaded', async () => {
+  it('reads file content from disk when no cache is injected / not preloaded', async () => {
     const path = join(testDir, 'x.ts');
     writeFileSync(path, 'hi');
     const acc = createFileAccessor([path]);
@@ -100,13 +100,16 @@ describe('createFileAccessor', () => {
     expect(acc.cachedCount).toBe(0);
   });
 
-  it('preferentially returns content from the global fileCache when prewarmed', async () => {
+  it('preferentially returns content from the injected fileCache when prewarmed', async () => {
     const path = join(testDir, 'p.ts');
     writeFileSync(path, 'on-disk');
     await fileCache.prewarm(testDir, ['p.ts']);
-    // Mutate disk; accessor should still return prewarmed content
+    // Mutate disk; accessor should still return prewarmed content from the
+    // injected cache. The accessor reads ONLY an injected cache now — no
+    // module-singleton fallback (parallel-tool-invocations Phase 1) — so the
+    // (test-only) module singleton is passed explicitly as options.fileCache.
     writeFileSync(path, 'changed');
-    const acc = createFileAccessor([path]);
+    const acc = createFileAccessor([path], { fileCache });
     expect(await acc.read(path)).toBe('on-disk');
   });
 

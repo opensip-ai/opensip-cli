@@ -1,18 +1,15 @@
 /**
  * Unit coverage for the pure plugin domain-resolution logic: domain
- * enumeration, --domain resolution (inference + rejection of arbitrary
- * strings), and Tool-target detection. The `npm view` network branch of
- * detectPluginKind is exercised indirectly via isToolTarget's explicit
- * --domain shortcuts and a local-path spec (no network).
+ * enumeration and domain resolution (inference + rejection of arbitrary
+ * strings). The pack `plugin` group is mounted under each pack-supporting
+ * tool primary, so the domain is bound from that tool — there is no
+ * `--domain` flag and no Tool-target auto-detection here (whole Tool plugins
+ * are managed by `opensip tools …`).
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import { TOOL_DOMAIN, domainNames, isToolTarget, resolveDomain } from '../domain-resolution.js';
+import { domainNames, resolveDomain } from '../domain-resolution.js';
 
 import type { PluginLayout } from '@opensip-cli/core';
 
@@ -52,45 +49,5 @@ describe('resolveDomain', () => {
 
   it('returns undefined when there are no declared domains and no override', () => {
     expect(resolveDomain(undefined, '@acme/x', [])).toBeUndefined();
-  });
-});
-
-describe('isToolTarget', () => {
-  let dir: string;
-
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'plugin-domain-'));
-  });
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it('is true for an explicit --domain tool', () => {
-    expect(isToolTarget(TOOL_DOMAIN, '@acme/x', dir)).toBe(true);
-  });
-
-  it('is false for an explicit fit/sim --domain (no detection)', () => {
-    expect(isToolTarget('fit', '@acme/x', dir)).toBe(false);
-  });
-
-  it('detects a local-path Tool plugin by its marker when no --domain given', () => {
-    writeFileSync(
-      join(dir, 'package.json'),
-      JSON.stringify({ name: '@acme/audit', opensipTools: { kind: 'tool' } }),
-    );
-    expect(isToolTarget(undefined, '.', dir)).toBe(true);
-  });
-
-  it('is false for a local-path package with a non-tool marker', () => {
-    writeFileSync(
-      join(dir, 'package.json'),
-      JSON.stringify({ name: '@acme/checks', opensipTools: { kind: 'fit-pack' } }),
-    );
-    expect(isToolTarget(undefined, '.', dir)).toBe(false);
-  });
-
-  it('is false for a local-path package with no marker at all', () => {
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/plain' }));
-    expect(isToolTarget(undefined, '.', dir)).toBe(false);
   });
 });

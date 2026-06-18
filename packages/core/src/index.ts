@@ -310,6 +310,7 @@ export {
   runWithScope,
   runWithScopeSync,
   enterScope,
+  exitScope,
   currentScope,
   currentLogger,
 } from './lib/run-scope.js';
@@ -323,10 +324,13 @@ export type {
   DataStoreThunk,
   ToolScope,
   ScopeContribution,
+  ScopeContributionWithDisposer,
+  ContributeScopeResult,
   ResolvedToolConfig,
   TargetResolver,
   TargetView,
 } from './lib/scope-types.js';
+export { isContributionWithDisposer } from './lib/scope-types.js';
 
 // Lib — errors + Result pattern
 export {
@@ -379,6 +383,24 @@ export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 // instance serve the pre-scope readers (theme, graph heap-preflight).
 export { EnvRegistry } from './lib/env-registry.js';
 export type { EnvVarSpec, EnvDeprecation, EnvReadResult } from './lib/env-registry.js';
+
+// Lib — run correlation (subprocess-correlation telemetry spec). The PURE
+// correlation primitive: the `RunCorrelation` field set, the canonical
+// `OPENSIP_*` env names + their docs as the frozen `CORRELATION_ENV_SPECS`
+// table (the single source of truth the CLI host spreads into its env surface),
+// the settled OTel attr constants, and the `correlationToEnv`/`correlationFromEnv`
+// codec. Pure leaf — no `@opensip-cli/config` import (core stays a kernel); the
+// cloud-aware assembly happens at the bootstrap composition root.
+export {
+  correlationToEnv,
+  correlationFromEnv,
+  liveEngineCorrelation,
+  CORRELATION_ENV_SPECS,
+  CORRELATION_ENV,
+  REPO_OTEL_ATTR,
+  TENANT_OTEL_ATTR,
+} from './lib/run-correlation.js';
+export type { RunCorrelation } from './lib/run-correlation.js';
 
 // Lib — run diagnostics (north-star §5.10, launch). The shared,
 // JSON-emittable diagnostics vocabulary carried on a `CommandOutcome`, produced

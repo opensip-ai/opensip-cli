@@ -24,7 +24,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `fit-list`, `fit-recipes`, graph helper commands) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, `plugin`, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, `plugin`, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
 
 ---
 
@@ -45,11 +45,30 @@ names, short aliases, descriptions, and defaults are identical where applied and
 cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for HTML report
 auto-open; `graph` writes report data and uses the separate `report`
 command to open the report. `-v/--verbose` is a uniform "show the detailed
-report body" flag whose output is identical in a TTY and a pipe. The only
-`program`-level Commander options are `--version` and `--no-cloud`:
+report body" flag whose output is identical in a TTY and a pipe.
+
+**Host-guaranteed tool-primary surface.** The host mount layer guarantees a
+uniform baseline on **every** tool primary (`fit`/`graph`/`sim`, and any
+third-party tool's run verb) — a tool need not opt in. Each primary always
+carries `--cwd`, `--json`, `--config`, `--quiet`, `--verbose`, and its own
+`--version`:
+
+- `opensip <tool> --version` prints the **tool's** version (`<verb> <semver>`,
+  e.g. `fit 0.1.6`, plus a `(tool contract v<n>)` marker when the tool declares
+  one). This is distinct from `opensip --version`, which prints the **CLI**
+  version.
+- `--config <path>` (the explicit `opensip-cli.config.yml` override) is now on
+  every tool primary, not just `fit`.
+
+The only `program`-level (root) options are `--version` (the CLI version) and
+`--no-cloud`. The root `--version` is host-owned and must precede any
+subcommand (`opensip --version`); a `--version` **after** a subcommand is that
+tool's own:
 
 | Flag | Effect |
 |---|---|
+| `--version` | At the root (`opensip --version`): the CLI version. After a tool verb (`opensip fit --version`): that tool's version. |
+| `--config <path>` | Path to `opensip-cli.config.yml` (overrides the package.json pointer and default discovery). Guaranteed on every tool primary. |
 | `--debug` | Enable debug-level logging (events of `debug` level appear in stderr and the run log file). |
 | `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. (Where supported.) |
 | `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, and `plugin <subcmd>`. |
@@ -79,7 +98,7 @@ For `graph`, every human-facing mode emits — the default render, `--gate-save`
 `--gate-compare`, and `--report-to`. Two modes do not emit: plain `--json`
 (a machine-artifact stream, also the carrier each `--workspace` child runs under)
 and `--workspace` itself (the parent aggregates per-unit findings for the
-dashboard, not signals). The separate `catalog-export` command is a catalog dump
+dashboard, not signals). The separate `graph export --format catalog` command is a catalog dump
 for the parent ingestor, not a signal-emitting run. Run a whole-project `graph`
 to sync.
 
@@ -233,11 +252,11 @@ opensip graph --list-files --workspace  # the per-unit fan-out set
 | `--exact` | bool | `false` | Use the single-program **exact** build engine instead of the default parallel **sharded** engine. Sharded is the default on shardable (multi-package) repos; both engines resolve cross-package edges through **one shared model** (exact = the 1-shard case), held equivalent by a **directional** equivalence guardrail + a pinned-corpus completeness floor (ADR-0033). `--exact` forces the single-program engine and suits small / single-package repos. A repo that can't shard already uses exact, no flag needed. Engine choice is deterministic and never depends on `isTTY` (a terminal and CI build the same catalog). |
 | `--resolution <mode>` | string | `exact` | Edge resolution tier: `exact` (semantic, uses the type checker) or `fast` (syntactic, no type checker — ~2× faster cold builds at lower edge fidelity). Invalid values fail loudly at the boundary. Note: `--resolution` (edge tier) is orthogonal to `--exact` (build engine). |
 | `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |
-| `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph-recipes`. |
+| `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph recipes`. |
 | `--show <session>` | string | — | Replay a stored graph session (by id, or `latest`) instead of building — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--gate-save` | bool | `false` | Save the current Signal fingerprint set as baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'graph'`; ADR-0036), then exit per graph's fail thresholds — the save happens before the exit. Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression (toggle with the reserved `failOnDegraded` key, default on). |
-| `--sarif <path>` | path | — | Also write this run's findings as a SARIF 2.1.0 file (for GitHub Code Scanning) via the shared `cli.writeSarif` envelope→SARIF seam — the same producer `fit --report-to`/`fit-baseline-export` use. Composes with `--gate-save`: the SARIF is written in the action body after the gate sets its exit code, so the file lands even when the gate fails. Relative paths resolve against `--cwd`. |
+| `--sarif <path>` | path | — | Also write this run's findings as a SARIF 2.1.0 file (for GitHub Code Scanning) via the shared `cli.writeSarif` envelope→SARIF seam — the same producer `fit --report-to`/`fit export --format baseline` use. Composes with `--gate-save`: the SARIF is written in the action body after the gate sets its exit code, so the file lands even when the gate fails. Relative paths resolve against `--cwd`. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `-v, --verbose` | bool | `false` | Expand the done view to show the detailed catalog, findings-by-rule, and entry-point sections (default: one-line summary only). Renders identically in a TTY and a pipe (ADR-0021). |
@@ -263,7 +282,7 @@ opensip graph --workspace
 # → one report session combining TS package results + Cargo member results
 ```
 
-**Session contract.** A single CLI invocation produces a single report session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of report sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. Machine-artifact catalog/SARIF exports live on the dedicated `catalog-export` / `sarif-export` subcommands.
+**Session contract.** A single CLI invocation produces a single report session, regardless of how many positional paths or workspace units the run analyzed. Modes that produce machine-readable artifacts instead of report sessions (`--json`, `--gate-save`, `--gate-compare`, `--report-to`) opt out. Machine-artifact catalog/SARIF exports live on the dedicated `graph export --format catalog` / `graph export --format sarif` commands.
 
 **Adapter selection.** opensip-cli ships first-party graph adapters for TypeScript, Python, Rust, Go, and Java — each is its own publishable npm package under the `@opensip-cli/graph-*` namespace. Default auto-discovery is marker-based and descriptor-driven: `node_modules` is walked for packages whose `package.json` declares `opensipTools.kind: "graph-adapter"` (built-ins resolve from the CLI install tree). You can pin an exact adapter set under `plugins.graphAdapters:` in `opensip-cli.config.yml`; when set, that list replaces auto-discovery. `plugins.autoDiscoverGraphAdapters: false` disables the scan. Marker-file detection (`tsconfig.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`/`build.gradle*`) then chooses which discovered adapter(s) apply to the run; positional paths inherit that decision unless `--language` overrides it.
 
@@ -289,13 +308,13 @@ indexes, and report views consume.
 
 ---
 
-## `graph-lookup` — look up function occurrences by name
+## `graph lookup` — look up function occurrences by name
 
 Tool-owned (graph Tool). Queries the persisted catalog in the project's datastore for every function occurrence whose simple name matches the argument. Useful for "where is `saveBaseline` defined?" probes without re-running the full graph build.
 
 ```
-opensip graph-lookup <name>
-opensip graph-lookup <name> --json
+opensip graph lookup <name>
+opensip graph lookup <name> --json
 ```
 
 | Flag / Argument | Type | Default | Effect |
@@ -307,13 +326,13 @@ The command reads from the catalog stored in `<project>/opensip-cli/.runtime/dat
 
 ---
 
-## `graph-symbol-index` — emit symbol index artifact
+## `graph index` — emit symbol index artifact
 
 Tool-owned (graph Tool). Writes a `symbolindex.json` file built from the persisted catalog: two maps — `name → [{ file, line }, …]` and `file → [name, …]`. Intended for editor tooling and offline cross-reference.
 
 ```
-opensip graph-symbol-index
-opensip graph-symbol-index --out path/to/symbolindex.json
+opensip graph index
+opensip graph index --out path/to/symbolindex.json
 ```
 
 | Flag | Type | Default | Effect |
@@ -325,17 +344,18 @@ Reads from the persisted catalog; run `opensip graph` first to populate it.
 
 ---
 
-## `graph-baseline-export` — export graph gate baseline
+## `graph export --format baseline` — export graph gate baseline
 
-Tool-owned (graph Tool). Exports the stored graph gate baseline (the Signal fingerprint set saved by `graph --gate-save`) from the SQLite datastore to a portable JSON file. Mirrors `fit-baseline-export` for the graph tool.
+Tool-owned (graph Tool). Exports the stored graph gate baseline (the Signal fingerprint set saved by `graph --gate-save`) from the SQLite datastore to a portable JSON file. Mirrors `fit export --format baseline` for the graph tool. (The `catalog` and `sarif` formats of `graph export` are the full-pipeline machine exports documented under [Internal and machine-facing commands](#internal-and-machine-facing-commands).)
 
 ```
-opensip graph-baseline-export --out graph-baseline.json
+opensip graph export --format baseline --out graph-baseline.json
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
-| `--out <path>` | path | — | **Required.** Output file path for the JSON baseline. |
+| `--format <fmt>` | enum | — | **Required.** `baseline` (the gate fingerprint JSON), `catalog`, or `sarif`. |
+| `--out <path>` | path | — | **Required for `--format baseline`.** Output file path for the JSON baseline. |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--json` | bool | `false` | Emit a JSON result envelope on stdout instead of the human-readable summary. |
 
@@ -343,20 +363,20 @@ Exit codes: 0 on success, non-zero with a `result.exitCode` if the baseline is m
 
 ---
 
-## `graph-recipes` — catalog graph recipes
+## `graph recipes` — catalog graph recipes
 
-Tool-owned (graph Tool). Mirrors `fit-recipes` for the graph tool: prints the loaded graph-recipe inventory (a graph recipe is a named subset of the graph rule set). Reuses the shared `ListRecipesResult` contract and renderer.
+Tool-owned (graph Tool). Mirrors `fit recipes` for the graph tool: prints the loaded graph-recipe inventory (a graph recipe is a named subset of the graph rule set). Reuses the shared `ListRecipesResult` contract and renderer.
 
 ```
-opensip graph-recipes
-opensip graph-recipes --json
+opensip graph recipes
+opensip graph recipes --json
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
 
-JSON shape (same `list-recipes` result envelope as `fit-recipes`):
+JSON shape (same `list-recipes` result envelope as `fit recipes`):
 
 ```json
 {
@@ -368,6 +388,21 @@ JSON shape (same `list-recipes` result envelope as `fit-recipes`):
 ```
 
 `checkCount` is a free-form label reused as a rule count — `"all rules"` for an `all` selector, `"<n> rules"` for an explicit selector, `"pattern-based"` otherwise.
+
+---
+
+## `graph list` — catalog graph rules
+
+Tool-owned (graph Tool). Prints the loaded graph-rule inventory (the analog of `fit list`, which lists checks). Reuses the shared `list-checks` result envelope and renderer.
+
+```
+opensip graph list
+opensip graph list --json
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
 
 ---
 
@@ -392,13 +427,13 @@ The report is a single self-contained HTML file at `<project>/opensip-cli/.runti
 
 ---
 
-## `fit-list` — catalog checks
+## `fit list` — catalog checks
 
 Tool-owned. Prints the loaded check inventory: slug, description, tags.
 
 ```
-opensip fit-list
-opensip fit-list --json
+opensip fit list
+opensip fit list --json
 ```
 
 JSON shape:
@@ -411,17 +446,17 @@ JSON shape:
 }
 ```
 
-Useful for scripting (`opensip fit-list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks. `totalCount` is the loaded inventory for the current project, so it increases when project-local checks or installed packs are present.
+Useful for scripting (`opensip fit list --json | jq '.checks[].slug'`) and for verifying that an `opensip fit plugin add` actually registered the new pack's checks. `totalCount` is the loaded inventory for the current project, so it increases when project-local checks or installed packs are present.
 
 ---
 
-## `fit-recipes` — catalog recipes
+## `fit recipes` — catalog recipes
 
 Tool-owned. Prints the loaded recipe inventory.
 
 ```
-opensip fit-recipes
-opensip fit-recipes --json
+opensip fit recipes
+opensip fit recipes --json
 ```
 
 JSON shape:
@@ -441,16 +476,17 @@ JSON shape:
 
 ---
 
-## `fit-baseline-export` — export fit gate baseline as SARIF
+## `fit export --format baseline` — export fit gate baseline as SARIF
 
 Tool-owned (fitness Tool). Exports the stored fit gate baseline (the violation set saved by `fit --gate-save`) from the SQLite datastore to a SARIF file. Used to promote a local baseline into CI or to feed GitHub Code Scanning.
 
 ```
-opensip fit-baseline-export --out fit.sarif
+opensip fit export --format baseline --out fit.sarif
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
+| `--format <fmt>` | enum | — | **Required.** `baseline` — the SARIF-shaped gate baseline. |
 | `--out <path>` | path | — | **Required.** Output file path for the SARIF baseline. |
 | `--cwd <path>` | path | `process.cwd()` | Project root. |
 | `--json` | bool | `false` | Emit a JSON result envelope on stdout instead of the human-readable summary. |
@@ -630,33 +666,36 @@ The `--filter` and `--raw` options (plus `--summary-only` on `list`) were added 
 
 ---
 
-## `plugin add/remove/list/sync` — manage project-pinned plugins
+## `<tool> plugin add/remove/list/sync` — manage a tool's extension packs
 
 CLI-owned: [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
 
+The pack-management `plugin` group is mounted **under each pack-supporting tool primary** — the domain is bound from the tool, so there is **no top-level `opensip plugin`** and **no `--domain` flag**. `fit` and `sim` support packs; `graph` does not (its extensibility is language adapters), so it has no `plugin` group.
+
 ```
-opensip plugin list
-opensip plugin add <pkg>
-opensip plugin add <pkg> --domain <fit|sim|tool>
-opensip plugin add <tool-pkg> --project
-opensip plugin remove <pkg>
-opensip plugin sync
+opensip fit plugin list
+opensip fit plugin add <pkg>
+opensip fit plugin remove <pkg>
+opensip fit plugin sync
+
+opensip sim plugin list
+opensip sim plugin add <pkg>
+opensip sim plugin remove <pkg>
+opensip sim plugin sync
 ```
 
 | Flag | Subcommands | Effect |
 |---|---|---|
-| `--domain <fit\|sim\|tool>` | `add`, `remove`; `fit\|sim` only for `sync` | Override the inferred domain (`add`/`remove`) or scope a sync to one fit/sim domain (`sync`). `tool` selects the full-Tool-plugin path and is not syncable because tool plugins are discovered by marker, not config. |
-| `--project` | `add`, `remove` | For a **tool** plugin, target the project-local host dir (`.runtime/plugins/tool/`) instead of the user-global default. No effect on fit/sim packs (always project-local). |
 | `--cwd <path>` | all | Project root. Default: `process.cwd()`. |
+| `--json` | all | Structured output. |
 
-There are **two plugin shapes** with different install models:
+Extension packs are **project-committed and always project-local**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` (where `<domain>` is the tool the subcommand hangs off of — `fit` or `sim`) **and** appends to `plugins.<domain>:` in `opensip-cli.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse. There is no user-global pack path, so there is no `--project` flag.
 
-- **fit/sim packs** are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-cli.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse.
-- **full Tool plugins** (`kind: "tool"`, whole subcommands) **auto-discover by marker — no config entry**. `add` detects the kind before installing (local `package.json`, or `npm view` for a registry spec) and installs **user-global** to `~/.opensip-cli/plugins/tool/` by default (available in every project), or project-local with `--project`. Force the tool path with `--domain tool` when detection can't reach the registry. Because there's no config record, tool plugins are **not** part of `sync`.
+**`<tool> plugin list`** shows that tool's packs (installed ∩ config-listed) for its own domain only — it does **not** list whole Tool plugins. **`<tool> plugin sync`** installs everything declared under that tool's `plugins.<domain>:` — the post-clone bootstrap.
 
-**`list`** shows fit/sim packs (installed ∩ config-listed) plus every discovered tool plugin (under the `tool` domain). **`sync`** installs everything declared in the config — the post-clone bootstrap (fit/sim only).
+**Whole Tool plugins** (a `kind: "tool"` package contributing a whole subcommand) are installed/uninstalled with the [`tools` command group](./12-tools-command.md) — `opensip tools install <spec>` — NOT here.
 
-**See also:** [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md). For **whole Tool plugins**, prefer the customer-facing [`tools` command group](./12-tools-command.md) — `plugin add --domain tool` remains supported as the lower-level machinery.
+**See also:** [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md).
 
 ---
 
@@ -682,8 +721,8 @@ These commands are mounted through the same `CommandSpec` system but are primari
 
 | Command | Owner | Purpose |
 |---|---|---|
-| `opensip catalog-export` | graph | Emit a graph catalog artifact for parent ingestion. Uses `--catalog-output`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
-| `opensip sarif-export` | graph | Emit graph findings as SARIF for a stored run. Uses `--output-sarif`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
+| `opensip graph export --format catalog` | graph | Emit a graph catalog artifact for parent ingestion. Uses `--catalog-output`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
+| `opensip graph export --format sarif` | graph | Emit graph findings as SARIF for a stored run. Uses `--output-sarif`, tenant/repo/run identity flags, `--cwd`, `--language`, and `--resolution`. |
 | `opensip graph-equivalence-check` | graph | Contributor guardrail for exact vs. sharded graph-engine equivalence. Uses `--cwd`, `--budget`, and `--update-budget`. |
 | `opensip graph-run-worker` | graph | Internal worker for memory-isolated graph runs. |
 | `opensip graph-shard-worker <specPath>` | graph | Internal worker for sharded catalog builds. |

@@ -45,13 +45,12 @@ function plainText(result: CommandResult): string {
 
 const FIXTURES: Readonly<Record<string, CommandResult>> = {
   error: { type: 'error', message: 'boom', suggestion: 'try --help', exitCode: 1 },
-  // ADR-0011 (Phase 4): sim-done is now envelope-derived (one unit row per
-  // scenario), rendered through the shared envelopeToTableView like fit/graph.
-  'sim-done': {
-    type: 'sim-done',
-    recipeName: 'example',
-    cwd: '/x',
-    durationMs: 1500,
+  // ADR-0011 (Phase 4): sim is now envelope-derived (one unit row per scenario),
+  // rendered through the shared envelopeToTableView like fit/graph, via a
+  // RunPresentation (envelope-first-presentation plan).
+  'sim-run': {
+    type: 'run-presentation',
+    tool: 'simulation',
     envelope: buildSignalEnvelope({
       tool: 'sim',
       recipe: 'example',
@@ -66,13 +65,39 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
       runFaulted: false,
     }),
   },
-  'graph-done': {
-    type: 'graph-done',
-    reportLines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'],
-    resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
-    summary: { passed: 1, failed: 1, errors: 0, warnings: 3 },
+  // RP-2: graph renders the envelope-backed RunPresentation — per-unit table +
+  // verdict summary, with the resolution caveat as a muted banner.
+  'graph-run': {
+    type: 'run-presentation',
+    tool: 'graph',
+    banners: ['Resolution: fast (syntactic) — edges are approximate.'],
     durationMs: 1200,
-    footerHints: [{ text: 'Use --verbose for detailed results', bold: ['--verbose'] }],
+    envelope: buildSignalEnvelope({
+      tool: 'graph',
+      runId: 'run-1',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      units: [
+        { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
+        { slug: 'graph.dead-code.orphan-subtree', passed: false, violationCount: 1, durationMs: 0 },
+      ],
+      signals: [
+        {
+          id: 'g1',
+          source: 'graph.dead-code.orphan-subtree',
+          provider: 'opensip-cli',
+          severity: 'medium',
+          category: 'architecture',
+          ruleId: 'graph.dead-code.orphan-subtree',
+          message: 'orphan',
+          filePath: 'src/a.ts',
+          line: 1,
+          metadata: {},
+          createdAt: '2026-06-04T00:00:00.000Z',
+        },
+      ],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
+    }),
   },
   'gate-done': {
     type: 'gate-done',
@@ -82,12 +107,11 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
     type: 'graph-status',
     lines: ['saveBaseline — 1 occurrence(s)', '  saveBaseline (function)', '    src/gate.ts:12:0'],
   },
-  // ADR-0011 Phase 6: fit-done is envelope-derived (one row per check unit,
-  // with the fitness Validated/Ignores columns from UnitResult).
-  'fit-done': {
-    type: 'fit-done',
-    label: 'fit',
-    cwd: '/x',
+  // ADR-0011 Phase 6: fit is envelope-derived (one row per check unit, with the
+  // fitness Validated/Ignores columns from UnitResult), via a RunPresentation.
+  'fit-run': {
+    type: 'run-presentation',
+    tool: 'fitness',
     envelope: buildSignalEnvelope({
       tool: 'fit',
       runId: 'r',

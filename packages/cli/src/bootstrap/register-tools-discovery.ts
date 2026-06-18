@@ -260,6 +260,15 @@ export async function discoverAndRegisterToolPackages(
 ): Promise<void> {
   const discovered = discoverToolPackagesFromAnchors(opts.sources);
 
+  // Stable-UUID collision guard (ADR-0048): a discovered package whose runtime
+  // `metadata.id` (the stable UUID) is already registered is the SAME tool
+  // re-discovered via a stray anchor — e.g. a second copy of `@opensip-cli/*`
+  // in a node_modules ABOVE the project root. The human-name skip alone misses
+  // it when the two copies disagree on `metadata.name` (e.g. one built before
+  // the verb-rename), which would otherwise double-register and trip the
+  // session-replay duplicate guard. UUID is identity; skip on a UUID match.
+  const registeredStableIds = new Set(registry.list().map((t) => t.metadata.id));
+
   for (const pkg of discovered) {
     try {
       const admission = admitInstalledTool(pkg, builtInIds);
@@ -271,6 +280,9 @@ export async function discoverAndRegisterToolPackages(
         continue;
       }
       if (builtInIds.has(load.tool.metadata.name ?? load.tool.metadata.id)) continue;
+      // Stable-UUID collision (see above): the same tool already registered
+      // under a possibly-different human name. Skip the re-discovered copy.
+      if (registeredStableIds.has(load.tool.metadata.id)) continue;
 
       assertManifestMatchesTool(admission.manifest, load.tool);
 

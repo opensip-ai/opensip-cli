@@ -112,27 +112,55 @@ describe('buildCompletionScript — action-less groups (plugin / sessions)', () 
     expect(s).toContain('sessions');
   });
 
-  it('skips a command-flag arm when the command name collides with a group (defensive continue)', () => {
-    // Hand-crafted overlap: `plugin` is BOTH a flag-bearing command and a group.
-    // The group arm wins; the command-flag arm is skipped (the `name in
-    // groupSubcommands` guard) so a group never gets a flag arm too.
+  it('merges a command name that is BOTH a flag-bearing verb and a group (one union arm)', () => {
+    // tool-command-surface-taxonomy Task 2.1/2.2 + Task 0.4: a primary tool verb
+    // (e.g. `graph`/`fit`) is BOTH a flag-bearing command AND a group with nested
+    // `<tool> <verb>` children. The group arm now UNIONs the parent verb's own
+    // flags with its nested-subcommand leaves (so at the second word the user can
+    // type a nested subcommand OR a parent flag). Still exactly ONE arm per name
+    // (no duplicate flag arm). An action-less host group has no own flags, so its
+    // union is just the leaves (unchanged behaviour).
     const inv: CompletionInventory = {
       subcommands: ['fit', 'plugin', 'help'],
       commandFlags: { fit: ['--json'], plugin: ['--json'] },
       groupSubcommands: { plugin: ['list', 'add'] },
     };
     const bash = buildCompletionScript('bash', inv);
-    // Exactly one `plugin)` arm — the group arm, not a flag arm.
+    // Exactly one `plugin)` arm — the merged group arm (leaves + own flags).
     expect(countArmsFor(bash, 'plugin')).toBe(1);
-    expect(bash).toContain('plugin) COMPREPLY=($(compgen -W "list add"');
+    expect(bash).toContain('plugin) COMPREPLY=($(compgen -W "list add --json"');
 
     const zsh = buildCompletionScript('zsh', inv);
     expect(countArmsFor(zsh, 'plugin')).toBe(1);
 
-    // fish: the colliding command flag arm is skipped entirely.
+    // fish: a colliding verb's own flags are still emitted (only the qualified
+    // `${parent} ${name}` nested keys are skipped — they contain a space).
     const fish = buildCompletionScript('fish', inv);
-    expect(fish).not.toContain('__fish_seen_subcommand_from plugin');
+    expect(fish).toContain('__fish_seen_subcommand_from plugin');
     expect(fish).toContain('__fish_seen_subcommand_from fit');
+  });
+});
+
+describe('assembleCompletionInventory — per-tool plugin groups', () => {
+  it('folds `plugin` under the tool verb and the bound leaves under `${toolVerb} plugin`', () => {
+    const inv = assembleCompletionInventory({
+      toolSpecs: [spec('fit', ['cwd', 'json'], ['--recipe'])],
+      hostSpecs: [],
+      groups: [],
+      toolPluginGroups: [
+        {
+          toolVerb: 'fit',
+          leaves: [{ name: 'list' }, { name: 'add' }, { name: 'remove' }, { name: 'sync' }],
+        },
+      ],
+    });
+    // `plugin` is offered as a leaf under the tool verb (so `opensip fit <TAB>`
+    // can complete `… plugin`), and the bound leaves key under `fit plugin`.
+    expect(inv.groupSubcommands.fit).toContain('plugin');
+    expect(inv.groupSubcommands['fit plugin']).toEqual(['list', 'add', 'remove', 'sync']);
+    // No top-level `plugin` group is introduced.
+    expect(inv.subcommands).not.toContain('plugin');
+    expect(inv.groupSubcommands.plugin).toBeUndefined();
   });
 });
 

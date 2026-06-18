@@ -125,6 +125,7 @@ export const graphRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   ToolCliContext
 >({
   name: 'graph-run-worker',
+  visibility: 'internal',
   description:
     '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
   commonFlags: [],

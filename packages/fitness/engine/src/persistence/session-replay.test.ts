@@ -63,7 +63,7 @@ function realPayload() {
 }
 
 describe('fitReplayFromSession', () => {
-  it('round-trips a stored payload back into a projection envelope + result', () => {
+  it('round-trips a stored payload back into a projection envelope + run-presentation result', () => {
     const replay = fitReplayFromSession(storedSession(realPayload()));
 
     expect(replay.fidelity).toBe('projection');
@@ -76,20 +76,22 @@ describe('fitReplayFromSession', () => {
     const located = replay.envelope.signals.find((s) => s.ruleId === 'fit:a');
     expect(located?.code).toEqual({ file: 'src/x.ts', line: 3, column: 5 });
     expect(located?.suggestion).toBe('fix it');
-    expect(replay.result.type).toBe('fit-done');
-    expect(replay.result.configFound).toBe(true);
+    // The inner replay result is the uniform render-only RunPresentation carrying
+    // the projected envelope (the host renders replay via SessionReplayResult, not
+    // this inner result).
+    expect(replay.result.type).toBe('run-presentation');
+    expect(replay.result.tool).toBe('fitness');
+    expect(replay.result.envelope).toBe(replay.envelope);
   });
 
-  it('labels by recipe when present and carries recipe onto the envelope', () => {
+  it('carries the recipe onto the envelope when present', () => {
     const replay = fitReplayFromSession(storedSession(realPayload(), { recipe: 'example' }));
     expect(replay.envelope.recipe).toBe('example');
-    expect(replay.result.label).toBe('recipe example');
   });
 
-  it('labels by session id when no recipe is set', () => {
+  it('leaves the envelope recipe unset when no recipe is stored', () => {
     const replay = fitReplayFromSession(storedSession(realPayload()));
     expect(replay.envelope.recipe).toBeUndefined();
-    expect(replay.result.label).toBe('session FIT_1');
   });
 
   it('preserves a finding with no optional location fields (undefined branches)', () => {

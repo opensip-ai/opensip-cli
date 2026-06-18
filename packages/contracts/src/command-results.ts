@@ -11,54 +11,19 @@
  * (`index.ts`), so consumers still import these from `@opensip-cli/contracts`.
  */
 
+import type { RunPresentation } from './run-presentation.js';
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { ToolProvenance } from '@opensip-cli/core';
 
-// --- Verbose detail currency (ADR-0021) -------------------------------------
-//
-// `--verbose` is an output-currency concern, not a per-tool live-runner concern.
-// A tool's verbose "detail body" is carried as renderer-agnostic data on its
-// *DoneResult and rendered ONCE by the cli `resultToView` seam, so it is
-// identical in a TTY and a pipe. The body is a typed union so tools that have
-// line-oriented detail (graph's catalog/findings/entry-point dump) and tools
-// with per-finding detail (fit/sim, coloured by severity) share one carrier
-// without flattening one into the other.
-
-/** One displayed finding inside a verbose findings group. Display fields only —
- *  no core `Signal` type leaks into contracts. */
-export interface FindingLine {
-  readonly severity: 'error' | 'warning';
-  readonly message: string;
-  /** Source location for display, e.g. `"path/to/file.ts:42"`. */
-  readonly location?: string;
-  readonly suggestion?: string;
-}
-
-/** A verbose findings block — one per unit (check / scenario) that emitted ≥1
- *  finding, or that errored. */
-export interface FindingGroup {
-  /** Display name (pretty), falling back to the unit slug. */
-  readonly title: string;
-  /** Set when the unit itself errored (vs. emitted findings). */
-  readonly error?: string;
-  readonly errorCount: number;
-  readonly warningCount: number;
-  readonly findings: readonly FindingLine[];
-}
-
-/** Renderer-agnostic verbose detail body carried on a migrated `*DoneResult`.
- *  `resultToView` switches on `kind`: `lines` → verbatim text; `findings` → the
- *  coloured findings block (rendered identically in Ink and plain text). */
-export type VerboseDetail =
-  | { readonly kind: 'lines'; readonly lines: readonly string[] }
-  | { readonly kind: 'findings'; readonly groups: readonly FindingGroup[] };
-
 /** Union type for all command results — App.tsx dispatches on result.type */
 export type CommandResult =
-  | FitDoneResult
-  | SimDoneResult
-  | GraphDoneResult
+  // The render-only run-presentation adjunct (envelope-first-presentation plan):
+  // the SINGLE run variant. It replaced the three per-tool fit/sim/graph
+  // done-result interfaces, hard-removed in RP-3. `resultToView` carries exactly
+  // one run case (`run-presentation`); the `architecture-no-run-done-result`
+  // fitness check guards against re-introducing a per-tool done-result here.
+  | RunPresentation
   | GateDoneResult
   | GraphStatusResult
   | ListChecksResult
@@ -113,82 +78,6 @@ export interface ConfigureDoneResult {
   action: 'saved' | 'cancelled';
   /** When `action === 'saved'`, the masked-for-display key (`abcd…wxyz`). */
   maskedKey?: string;
-}
-
-export interface FitDoneResult {
-  type: 'fit-done';
-  label: string;
-  cwd: string;
-  /**
-   * The run's signal envelope (ADR-0011). REQUIRED since Phase 6 (fitness is
-   * migrated): the composition root derives the terminal table (one row per
-   * check `unit`, grouped by `signal.source === checkSlug`) and the
-   * `--json`/cloud/`--report-to` paths FROM this envelope. The fitness-only
-   * `Validated`/`Ignores` columns ride on `envelope.units` as
-   * `filesValidated`/`itemType`/`ignoredCount`.
-   */
-  envelope: SignalEnvelope;
-  reportStatus?: {
-    url: string;
-    findingCount: number;
-    runCount: number;
-    success: boolean;
-    error?: string;
-    chunksTotal?: number;
-    chunksSucceeded?: number;
-  };
-  /** Whether an opensip-cli.config.yml was found in the target directory */
-  configFound?: boolean;
-  /**
-   * Verbose detail body (ADR-0021), present only on `--verbose` runs.
-   * Rendered by the shared `resultToView` seam so the detail is identical
-   * in a TTY and a pipe. Fit populates the `findings` kind.
-   */
-  readonly verboseDetail?: VerboseDetail;
-  /**
-   * User-facing non-fatal warnings collected during the run (plugin load
-   * failures, unknown languages in config, missing check packages, etc.).
-   *
-   * These flow through the result rather than direct stderr writes because
-   * the live-view renderer (Ink) owns the screen and any ambient stderr
-   * write during render desyncs Ink's cursor tracking. Renderers display
-   * these in the summary; non-Ink paths (--json, gate modes) surface them
-   * at their own boundary.
-   */
-  warnings?: readonly string[];
-}
-
-/**
- * Outcome of a `graph <scope>` run on the non-`--json` path. Carries only
- * plain data (no graph types — contracts sits below graph) so `resultToView`
- * can express it as a view-model the render seam emits as Ink or plain text.
- */
-export interface GraphDoneResult {
-  type: 'graph-done';
-  /** Fast-tier approximation caveat, or `undefined` for an exact catalog. */
-  readonly resolutionBanner?: string;
-  /** Counts for the shared one-line PASS/FAIL summary. */
-  readonly summary: {
-    readonly passed: number;
-    readonly failed: number;
-    readonly errors: number;
-    readonly warnings: number;
-  };
-  /**
-   * Duration for the top-level summary line (host-owned-run-timing).
-   * After migration this field will be omitted from the result (the host
-   * timer supplies the value that matches the persisted StoredSession so
-   * CLI summary, sessions list, and report agree). Optional during the
-   * transition; when absent the render layer falls back to the host RunTimer.
-   */
-  readonly durationMs?: number;
-  /**
-   * Verbose detail body (ADR-0021). Graph populates the `lines` kind (its
-   * catalog / findings-by-rule / entry-point dump). Rendered by the shared
-   * `resultToView` seam; the non-verbose footer hints are emitted by the seam
-   * too (the old per-result `reportLines`/`footerHints` were retired here).
-   */
-  readonly verboseDetail?: VerboseDetail;
 }
 
 /**
@@ -335,6 +224,14 @@ export interface ListChecksResult {
   type: 'list-checks';
   checks: { slug: string; description: string; tags: string[] }[];
   totalCount: number;
+  /**
+   * Optional heading for the rendered list (tool-command-surface-taxonomy Task
+   * 3.4). Lets a non-fitness producer reuse the shared `list-checks` shape +
+   * `viewListChecks` renderer with an accurate title (e.g. `graph list` →
+   * "Available Graph Rules"). Omitted ⇒ the renderer's default
+   * "Available Fitness Checks" (the fit-list surface is unchanged).
+   */
+  title?: string;
 }
 
 export interface ListRecipesResult {
@@ -437,33 +334,6 @@ export interface SimNoticeResult {
   cwd: string;
 }
 
-/** Outcome of a `sim --recipe <name>` run. */
-export interface SimDoneResult {
-  type: 'sim-done';
-  recipeName: string;
-  cwd: string;
-  /**
-   * Duration for the top-level summary line (host-owned-run-timing).
-   * See GraphDoneResult.durationMs for rationale; optional in transition.
-   */
-  durationMs?: number;
-  /**
-   * The run's signal envelope (ADR-0011). REQUIRED since Phase 4 (sim is
-   * migrated): the composition root derives the terminal table (one row per
-   * scenario `unit`, grouped by `signal.source === scenarioId`) and the
-   * `--json`/cloud/`--report-to` paths FROM this envelope. The per-scenario
-   * pass/fail summary is recovered from `envelope.units`, so no scenario
-   * summary fields are duplicated on the result.
-   */
-  envelope: SignalEnvelope;
-  /**
-   * Verbose detail body (ADR-0021), present only on `--verbose` runs. Rendered
-   * by the shared `resultToView` seam. Sim populates the `findings` kind
-   * (per-scenario detail).
-   */
-  readonly verboseDetail?: VerboseDetail;
-}
-
 /**
  * Identity of a discovered plugin (exposed by `plugin list`).
  * Mirrors the `DiscoveredPlugin` shape from core, but kept here as a
@@ -490,7 +360,7 @@ export interface SyncEntry {
 /**
  * Discriminated union — one variant per `plugin` subcommand. Each
  * variant has its own top-level `type` literal, matching the rest of
- * `CommandResult` (`'fit-done'`, `'sim-done'`, `'list-checks'`, …).
+ * `CommandResult` (`'run-presentation'`, `'list-checks'`, …).
  * Consumers switch on `result.type` directly; producer/consumer drift
  * surfaces at compile time.
  */

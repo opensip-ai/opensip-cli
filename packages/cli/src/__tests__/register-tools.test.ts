@@ -67,9 +67,10 @@ function makeStubContext(): ToolCliContext {
 }
 
 describe('BUNDLED_TOOLS', () => {
-  it('contains fitness, simulation, and graph (by human name)', () => {
+  it('contains fit, sim, and graph (by human name = command verb)', () => {
+    // Task 2.4: metadata.name == the short command verb (fit/sim/graph).
     const names = BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id);
-    expect(names).toEqual(expect.arrayContaining(['fitness', 'simulation', 'graph']));
+    expect(names).toEqual(expect.arrayContaining(['fit', 'sim', 'graph']));
   });
 });
 
@@ -97,7 +98,7 @@ describe('registerFirstPartyTools', () => {
     await registerFirstPartyTools(registry, provenance);
 
     expect(registry.list().map((t) => t.metadata.name ?? t.metadata.id)).toEqual(
-      expect.arrayContaining(['fitness', 'simulation', 'graph']),
+      expect.arrayContaining(['fit', 'sim', 'graph']),
     );
     expect(provenance).toHaveLength(BUNDLED_TOOLS.length);
     for (const record of provenance) {
@@ -106,9 +107,8 @@ describe('registerFirstPartyTools', () => {
       expect(record.manifestHash.length).toBeGreaterThan(0);
       expect(record.packageName).toMatch(/^@opensip-cli\//);
     }
-    expect(provenance.map((p) => p.id)).toEqual(
-      expect.arrayContaining(['fitness', 'simulation', 'graph']),
-    );
+    // Task 2.4: the manifest `id` (human key) now equals the short verb.
+    expect(provenance.map((p) => p.id)).toEqual(expect.arrayContaining(['fit', 'sim', 'graph']));
   });
 
   it('a bundled fail-closed throws a PluginIncompatibleError (→ exit 5)', () => {

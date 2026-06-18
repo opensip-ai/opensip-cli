@@ -51,6 +51,12 @@ bypasses the registry.
 |---|---|
 | `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
 
+## Command surface
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_CLI_SHOW_INTERNAL` | Set to `1` to reveal internal (Tier-3) commands — the IPC/CI workers `fit-run-worker`, `sim-run-worker`, `graph-run-worker`, `graph-shard-worker`, and the CI gate `graph-equivalence-check` — in `opensip --help` and shell completion. These commands stay directly invocable regardless of this flag; it only un-hides them from those public surfaces. The `agent-catalog` (a curated machine surface) is intentionally NOT affected. |
+
 ## Graph engine
 
 | Variable | Effect |
@@ -62,6 +68,29 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.6/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
+
+## Subprocess correlation
+
+When a tool run spawns child CLI processes (a sharded `graph` run, a forked
+live-engine worker), the host forwards a correlation bag so an operator can
+attribute a child failure to its parent run from JSONL logs alone. These are set
+by the host on the child's environment — you normally never set them by hand. The
+canonical names and docs are owned by `@opensip-cli/core`'s `run-correlation.ts`
+(`CORRELATION_ENV_SPECS`); the CLI env surface spreads that one table. The API key
+(`OPENSIP_API_KEY`) is never part of this set.
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_RUN_ID` | Parent run's correlation id, inherited by a spawned/forked child. Read first at the pre-action hook; a child re-uses its parent's run id, a top-level invocation mints fresh. |
+| `OPENSIP_TOOL` | Owning tool id of the dispatched command (e.g. `graph`, `fit`), forwarded to child workers for log attribution. |
+| `OPENSIP_PARENT_COMMAND` | Top-level command name the run started under (e.g. `graph`, `fit`) — distinguishes a child shard worker from a top-level run. |
+| `OPENSIP_TRACE_ID` | OTel trace id for log↔trace pivot, stamped on every subprocess event when telemetry is on. Omitted when OTel is off. |
+| `OPENSIP_SHARD_ID` | Shard id of a graph shard worker; lets an operator filter a parent run down to a single failing shard. |
+| `OPENSIP_WORKER_KIND` | Subprocess worker kind: `shard`, `live-engine`, or `external-tool`. An unrecognised value coerces to unset. |
+| `OPENSIP_REPO` | Free-form cloud repo join key (cwd or `owner/repo`) — forwarded only when cloud egress is active for the parent run. |
+| `OPENSIP_REPO_ID` | Optional/best-effort resolved repo surrogate (server-side `tenant.repos.id`). Usually absent; prefer `OPENSIP_REPO`. |
+| `OPENSIP_TENANT_ID` | Optional cloud tenant id, forwarded only when locally resolvable. The cloud normally derives tenant from the API key server-side. |
+| `OPENSIP_CHILD_INVOCATION_ID` | Optional per-child uniqueness id, minted only where per-child uniqueness is needed. |
 
 ## Terminal / pre-scope
 

@@ -174,25 +174,31 @@ function registerProbeScenario(): void {
 
 describe('simulationTool metadata', () => {
   it('exposes name (human), id (stable UUID), version, description', () => {
-    expect(simulationTool.metadata.name).toBe('simulation');
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`sim`). The config namespace literal stays `simulation` (decoupled).
+    expect(simulationTool.metadata.name).toBe('sim');
     expect(simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(simulationTool.metadata.version).toBe(PKG.version);
     expect(simulationTool.metadata.description).toContain('simulation');
   });
 
-  it('declares the user-facing sim subcommand (+ the internal worker)', () => {
+  it('declares the user-facing sim subcommand (+ recipes + the internal worker)', () => {
     const names = (simulationTool.commands ?? []).map((c) => c.name);
     expect(names).toContain('sim');
+    // tool-command-surface-taxonomy Task 3.3: the new `sim recipes`
+    // discoverability child (name 'recipes', parent 'sim').
+    expect(names).toContain('recipes');
     // The internal off-main-process worker (ADR-0028), forked by the live view.
     expect(names).toContain('sim-run-worker');
-    expect(simulationTool.commands).toHaveLength(2);
+    expect(simulationTool.commands).toHaveLength(3);
   });
 });
 
 describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
   it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () => {
-    // `sim` + the internal `sim-run-worker` (ADR-0028).
-    expect(simulationTool.commandSpecs).toHaveLength(2);
+    // `sim` + the new `sim recipes` (taxonomy Task 3.3) + the internal
+    // `sim-run-worker` (ADR-0028).
+    expect(simulationTool.commandSpecs).toHaveLength(3);
     // `register` is no longer a Tool member (3.0.0) — its absence is structural,
     // enforced by the type system, not asserted at runtime.
   });
@@ -238,9 +244,11 @@ describe('sim command handler', () => {
     await simSpec().handler({ cwd: process.cwd() }, ctx);
 
     expect(rendered).toHaveLength(1);
-    const result = rendered[0] as { type: string; recipeName?: string };
-    expect(result.type).toBe('sim-done');
-    expect(result.recipeName).toBe('default');
+    // envelope-first-presentation: the handler renders the render-only
+    // RunPresentation; the recipe rides on `envelope.recipe`, not the result.
+    const result = rendered[0] as { type: string; envelope?: { recipe?: string } };
+    expect(result.type).toBe('run-presentation');
+    expect(result.envelope?.recipe).toBe('default');
   });
 
   it('emits the signal envelope through cli.emitEnvelope when --json is passed', async () => {
@@ -249,8 +257,8 @@ describe('sim command handler', () => {
 
     await simSpec().handler({ cwd: process.cwd(), json: true }, ctx);
 
-    // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not the bespoke
-    // SimDoneResult) through the root's emitEnvelope → formatSignalJson.
+    // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not a bespoke
+    // per-tool result) through the root's emitEnvelope → formatSignalJson.
     expect(emitted).toHaveLength(1);
     const payload = emitted[0] as { schemaVersion?: number; tool?: string };
     expect(payload.schemaVersion).toBe(2);
@@ -286,8 +294,13 @@ describe('sim command handler', () => {
     await simSpec().handler({ cwd: process.cwd(), recipe: 'still-nope' }, ctx);
 
     expect(exitCodes).toContain(2);
+    // envelope-first-presentation (plan Assumption 5): an error-before-envelope
+    // run renders the `error` variant — NEVER a `run-presentation`. A
+    // RunPresentation is constructed only when an envelope exists.
+    expect(rendered).toHaveLength(1);
     const errResult = rendered[0] as { type: string; message?: string };
     expect(errResult.type).toBe('error');
+    expect(errResult.type).not.toBe('run-presentation');
     expect(errResult.message).toContain('still-nope');
   });
 });

@@ -8,12 +8,16 @@ import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 import type { Tool, ToolSessionReplayContribution } from './types.js';
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
 import type { RunScope } from '../lib/run-scope.js';
-import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
+import {
+  isContributionWithDisposer,
+  type ContributeScopeResult,
+  type ToolScope,
+} from '../lib/scope-types.js';
 
 /** Every optional hook the host reads, resolved to a single object. */
 export interface ResolvedToolHooks {
   readonly initialize?: () => Promise<void>;
-  readonly contributeScope?: () => ScopeContribution;
+  readonly contributeScope?: () => ContributeScopeResult;
   readonly collectReportData?: (
     scope: ToolScope,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
@@ -50,6 +54,11 @@ export function resolveToolHooks(tool: Tool): ResolvedToolHooks {
 export function applyToolContributeScope(scope: RunScope, tool: Tool): void {
   const contribution = resolveToolHooks(tool).contributeScope?.();
   if (contribution) {
+    if (isContributionWithDisposer(contribution)) {
+      Object.assign(scope, contribution.contribution);
+      if (contribution.onDispose) scope.onDispose(contribution.onDispose);
+      return;
+    }
     Object.assign(scope, contribution);
   }
 }

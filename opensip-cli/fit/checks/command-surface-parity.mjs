@@ -29,12 +29,12 @@
  * parity snapshot test (`command-surface-parity.snapshot.test.ts` in `cli`). This
  * check is the complementary "don't reach back to raw Commander" guard.
  *
- * ALLOW-LIST — the host owns exactly two action-less Commander subcommand GROUP
- * parents (`sessions`, `plugin`) that legitimately stay raw `program.command(name)`
- * shells because a parent with no action body is not a single mountable
- * `CommandSpec` (their LEAVES are specs). That allow-list lives in
- * `packages/cli/src/commands/host-subcommand-groups.ts`
- * (`HOST_SUBCOMMAND_GROUPS`); the value mirrored here is exactly those two.
+ * ALLOW-LIST — the host owns exactly three action-less Commander subcommand GROUP
+ * parents (`sessions`, `plugin`, `tools`) that legitimately stay raw
+ * `program.command(name)` shells because a parent with no action body is not a
+ * single mountable `CommandSpec` (their LEAVES are specs). That allow-list lives
+ * in `packages/cli/src/commands/host-subcommand-groups.ts`
+ * (`HOST_SUBCOMMAND_GROUPS`); the value mirrored here is exactly those three.
  *
  * SCOPE — opensip-cli' own first-party TOOL registration files only
  * (`packages/{fitness,graph,simulation}/engine/src/tool.ts`). The path guard makes
@@ -61,9 +61,9 @@ const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/
  * `packages/cli/src/commands/host-subcommand-groups.ts`. They live under
  * `packages/cli/...`, outside this check's tool-file scope, so they are never
  * inspected — the list is the finite, named justification a reviewer can audit,
- * and the test asserts it stays exactly these two.
+ * and the test asserts it stays exactly these three.
  */
-export const HOST_SUBCOMMAND_GROUP_EXCEPTIONS = ['sessions', 'plugin'];
+export const HOST_SUBCOMMAND_GROUP_EXCEPTIONS = ['sessions', 'plugin', 'tools'];
 
 /**
  * Raw-Commander access patterns a tool file must never contain. Each entry is a

@@ -29,14 +29,13 @@ import { createToolScope, defineTool, logger, readPackageVersion } from '@opensi
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
 import {
-  graphBaselineExportCommandSpec,
-  graphCatalogExportCommandSpec,
   graphEquivalenceCheckCommandSpec,
-  graphLookupCommandSpec,
-  graphRecipesCommandSpec,
-  graphSarifExportCommandSpec,
+  graphExportCommandSpec,
+  graphIndexGroupedCommandSpec,
+  graphListCommandSpec,
+  graphLookupGroupedCommandSpec,
+  graphRecipesGroupedCommandSpec,
   graphShardWorkerCommandSpec,
-  graphSymbolIndexCommandSpec,
 } from './cli/graph/graph-aux-command-specs.js';
 import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
@@ -66,24 +65,27 @@ import type { DataStore } from '@opensip-cli/datastore';
 // =============================================================================
 
 /**
- * graph's declarative command surface (launch Phase 5). The host mounts
- * each spec via `mountCommandSpec`; graph no longer touches Commander. Order is
- * preserved from the former `register()` mount order (graph, graph-lookup,
- * graph-shard-worker, graph-symbol-index, graph-baseline-export, catalog-export,
- * sarif-export, graph-recipes). The primary `graph` spec sets its own live-view
- * renderer up lazily inside its handler's interactive branch (no mount-time
- * `register()` hook in the spec-mounted world).
+ * graph's declarative command surface. The host mounts each spec via
+ * `mountCommandSpec`; graph no longer touches Commander. The primary `graph`
+ * spec sets its own live-view renderer up lazily inside its handler's
+ * interactive branch (no mount-time `register()` hook in the spec-mounted
+ * world). The canonical surface is the nested `<tool> <verb>` grammar — `graph
+ * export` / `graph recipes` / `graph lookup` / `graph index` / `graph list` —
+ * the legacy flat-root aliases were removed.
  */
 const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   graphCommandSpec,
-  graphLookupCommandSpec,
   graphShardWorkerCommandSpec,
   graphRunWorkerCommandSpec,
-  graphSymbolIndexCommandSpec,
-  graphBaselineExportCommandSpec,
-  graphCatalogExportCommandSpec,
-  graphSarifExportCommandSpec,
-  graphRecipesCommandSpec,
+  // Canonical nested export — mounts as `graph export` under the `graph` primary
+  // via the nested-mount capability.
+  graphExportCommandSpec,
+  // Grouped Tier-2 children — `graph recipes` / `graph lookup` / `graph index` /
+  // `graph list` nest under the `graph` primary via the nested-mount capability.
+  graphRecipesGroupedCommandSpec,
+  graphLookupGroupedCommandSpec,
+  graphIndexGroupedCommandSpec,
+  graphListCommandSpec,
   graphEquivalenceCheckCommandSpec,
 ];
 

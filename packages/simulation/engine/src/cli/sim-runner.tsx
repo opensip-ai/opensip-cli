@@ -49,6 +49,7 @@ import {
 import {
   runOffThreadOrInProcess,
   currentScope,
+  liveEngineCorrelation,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -69,10 +70,14 @@ const SIM_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running sc
  *  live view widens the type to read `quiet`. */
 type SimLiveArgs = ToolOptions & { readonly quiet?: boolean; readonly verbose?: boolean };
 
+/**
+ * The minimal shape the live `done` frame reads — the same render carrier the
+ * static path uses (envelope + optional verboseDetail). envelope-first-presentation:
+ * this is `RunPresentation` minus the discriminator; summary duration comes from
+ * the host RunTimingProvider, so no `durationMs` is carried here.
+ */
 interface SimDoneShape {
   readonly envelope: SignalEnvelope;
-  /** Optional — only for internal; summary duration now from host provider (phase 4.3). */
-  readonly durationMs?: number;
   readonly verboseDetail?: VerboseDetail;
 }
 
@@ -144,8 +149,18 @@ export function SimRunner({
     const specDir = mkdtempSync(join(tmpdir(), 'sim-worker-'));
     const specPath = join(specDir, 'spec.json');
     writeFileSync(specPath, JSON.stringify(args), 'utf8');
+    // Forward the parent run's correlation bag (composition root, Phase 0) so the
+    // forked live-engine worker's logs attribute to this run — symmetric to the
+    // spawn-path shard-runner. The transport injects OPENSIP_RUN_ID from
+    // currentScope()?.runId (B1); the descriptor omits runId and marks the
+    // live-engine fork via workerKind.
+    const correlation = liveEngineCorrelation(currentScope()?.correlation);
     const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>({
-      descriptor: { command: process.argv[1] ?? '', argv: ['sim-run-worker', specPath] },
+      descriptor: {
+        command: process.argv[1] ?? '',
+        argv: ['sim-run-worker', specPath],
+        ...(correlation ? { correlation } : {}),
+      },
       inProcess: (emit) => executeSimWithProgress(args, emit),
     });
     setState({ phase: 'running', subscribe: run.onProgress });
@@ -168,11 +183,13 @@ export function SimRunner({
         // `deliverSignals`; the root sets the exit from `envelope.verdict.passed`.
         // Host-owned persistence (host-owned-run-timing Phase 2): surface the
         // contribution; the host persists after the live view exits.
-        if (result.type === 'sim-done') {
+        // envelope-first-presentation: `result` is the render-only RunPresentation —
+        // cwd comes from `args.cwd` (in scope), recipe from `result.envelope.recipe`.
+        if (result.type === 'run-presentation') {
           onSession?.({
             tool: 'sim',
-            cwd: result.cwd,
-            recipe: result.recipeName,
+            cwd: args.cwd,
+            recipe: result.envelope.recipe,
             score: result.envelope.verdict.score,
             passed: result.envelope.verdict.passed,
             payload: buildSimulationSessionPayload(result.envelope),
@@ -183,8 +200,6 @@ export function SimRunner({
           phase: 'done',
           result: {
             envelope: result.envelope,
-            // duration omitted for summary (host provider supplies); keep if present for other internal use
-            ...(result.durationMs === undefined ? {} : { durationMs: result.durationMs }),
             verboseDetail: result.verboseDetail,
           },
         });

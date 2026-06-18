@@ -88,14 +88,14 @@ Use `--workspace` for large monorepos when each workspace unit can be analyzed i
 After a graph run, look up function occurrences by name:
 
 ```bash
-opensip graph-lookup saveBaseline
-opensip graph-lookup saveBaseline --json
+opensip graph lookup saveBaseline
+opensip graph lookup saveBaseline --json
 ```
 
 Emit an editor-friendly symbol index:
 
 ```bash
-opensip graph-symbol-index --out symbolindex.json
+opensip graph index --out symbolindex.json
 ```
 
 Both commands read the persisted catalog. Run `opensip graph` first.
@@ -125,7 +125,7 @@ opensip graph --gate-compare --sarif graph.sarif
 List graph recipes:
 
 ```bash
-opensip graph-recipes
+opensip graph recipes
 ```
 
 Run one:

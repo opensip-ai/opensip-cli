@@ -94,6 +94,15 @@ export interface CliCommandsContext {
    */
   readonly toolCommandSpecs?: readonly SpecLike[];
   /**
+   * Descriptor-driven names of the tools' `visibility: 'internal'` (Tier-3)
+   * commands (tool-command-surface-taxonomy Task 1.3). The `completion` command
+   * filters these from its inventory — the SAME source the `--help` hide pass
+   * keys on — so completion and help never drift. Optional so test harnesses that
+   * don't exercise completion can omit it (completion then falls back to the
+   * static {@link INTERNAL_COMMANDS} set inside `assembleCompletionInventory`).
+   */
+  readonly toolInternalCommands?: ReadonlySet<string>;
+  /**
    * Persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read
    * the datastore (dry-runs, list-style commands, completion) never trigger

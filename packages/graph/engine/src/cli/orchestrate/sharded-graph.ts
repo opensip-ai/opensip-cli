@@ -12,7 +12,15 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
-import { logger, ValidationError, withSpanAsync, type Signal, type Span } from '@opensip-cli/core';
+import {
+  currentLogger,
+  currentScope,
+  currentTraceparent,
+  ValidationError,
+  withSpanAsync,
+  type Signal,
+  type Span,
+} from '@opensip-cli/core';
 
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
@@ -167,12 +175,19 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     concurrency: input.concurrency,
     ...(input.language === undefined ? {} : { language: input.language }),
   });
+  // Per-run logger (ADR-0053): the singleton has no daily-logs file sink, so
+  // these merge-stage JSONL lines (`graph.sharded.shard_failed`/`graph.shard.merge`)
+  // must go through `currentScope().logger` to land in the file the operator greps.
+  const mergeLogger = currentLogger();
   for (const failure of built.failures) {
-    logger.error({
+    mergeLogger.error({
       evt: 'graph.sharded.shard_failed',
       module: 'graph:sharded',
       shardId: failure.shardId,
       exitCode: failure.exitCode,
+      // Complementary to the runner's structured `shard_failed`; enriched with
+      // the failureClass now carried on ShardFailure (Task 1.2) when present.
+      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
       stderr: failure.stderr.slice(0, 500),
     });
   }
@@ -183,6 +198,28 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //     single-program walk: it assembles the per-file occurrences into one
   //     catalog, so its sub-label reports the resulting function count.
   const fragments = [...plan.cached, ...built.fragments];
+  // Structured merge milestone (subprocess-correlation Event Catalog): the
+  // fragment count being merged + the ids of any shards whose worker failed,
+  // stamped with the run/trace ids so it pivots to the same run as the runner's
+  // events. `traceId` is omitted when OTel is off (currentTraceparent → undefined).
+  // `parentCommand` (+ tool/repo) is stamped so the operator's
+  // `runId`/`parentCommand` filter returns the merge line too (GAP e — no
+  // un-attributed shard lines).
+  const mergeCorrelation = currentScope()?.correlation;
+  const mergeTraceId = currentTraceparent() ?? mergeCorrelation?.traceId;
+  mergeLogger.info({
+    evt: 'graph.shard.merge',
+    module: 'graph:sharded',
+    runId: mergeCorrelation?.runId ?? currentScope()?.runId ?? '',
+    ...(mergeCorrelation?.parentCommand === undefined
+      ? {}
+      : { parentCommand: mergeCorrelation.parentCommand }),
+    ...(mergeCorrelation?.tool === undefined ? {} : { tool: mergeCorrelation.tool }),
+    ...(mergeCorrelation?.repo === undefined ? {} : { repo: mergeCorrelation.repo }),
+    ...(mergeTraceId === undefined ? {} : { traceId: mergeTraceId }),
+    fragmentCount: fragments.length,
+    failedShardIds: built.failures.map((f) => f.shardId),
+  });
   // The export linker keys packages by name; build the manifest index once from
   // the resolved shard set (each shard.rootDir holds a package.json) so the
   // boundary resolver can turn a bare specifier into a target package group.
@@ -318,7 +355,7 @@ function persistShardedCatalog(
     // Best-effort write: the freshly-built catalog is returned regardless.
     // replaceAll already logged the underlying error; note the continuation
     // so the swallow isn't silent.
-    logger.debug({
+    currentLogger().debug({
       evt: 'graph.sharded.cache_write_skipped',
       module: 'graph:sharded',
       err: error instanceof Error ? error.message : String(error),

@@ -81,7 +81,14 @@ export class FitnessRecipeService {
   private readonly config: FitnessRecipeServiceConfig;
   private readonly checkRegistry: CheckRegistry;
   private readonly recipeRegistry: FitnessRecipeRegistry;
-  private readonly fileCache: FileCache;
+  /**
+   * Per-run file cache, resolved ONCE at `executeRecipeInScope` entry (NOT in
+   * the constructor — the constructor may run before a scope exists). It is the
+   * SINGLE instance read by prewarm, `execOpts.fileCache`, and the `finally`
+   * `clear()`; resolving it elsewhere (a divergent function-local) would
+   * reintroduce the cache-instance-mismatch bug this phase fixes.
+   */
+  private fileCache!: FileCache;
   private activeSession: FitnessRecipeSession | null = null;
   private abortController?: AbortController;
 
@@ -93,10 +100,12 @@ export class FitnessRecipeService {
     // programmatic callers can inject their own without a scope.
     this.checkRegistry = config?.checkRegistry ?? currentCheckRegistry();
     this.recipeRegistry = config?.recipeRegistry ?? currentRecipeRegistry();
-    // Per-service FileCache instance for SaaS concurrent RunScope isolation.
-    // Global singleton is for tests / non-service paths; each service gets its
-    // own so prewarm/clear in one run does not affect another.
-    this.fileCache = config?.fileCache ?? new FileCache();
+    // NOTE: `this.fileCache` is intentionally NOT assigned here. It is resolved
+    // per-run at `executeRecipeInScope` entry from the scope (the canonical
+    // per-run cache is `scope.fitness.fileCache`); a constructor default would
+    // be an orphan — prewarm/exec resolve a different scope instance while a
+    // ctor instance only ever leaks (the very instance-vs-global split this
+    // phase closes).
   }
 
   private get session(): FitnessRecipeSession {
@@ -167,6 +176,25 @@ export class FitnessRecipeService {
     recipe: FitnessRecipe,
     recipeScope: RunScope,
   ): Promise<FitnessRecipeResult> {
+    // Resolve the per-run cache ONCE — the single instance that prewarm,
+    // execOpts.fileCache, and the `finally` clear() all read. Precedence:
+    // explicit config cache (tests/programmatic) > the scope's canonical
+    // `scope.fitness.fileCache` (production: the CLI install loop already
+    // registered its disposer via contributeScope's onDispose) > an ad-hoc
+    // `new FileCache()` for the pure programmatic path (a scope with no fitness
+    // subscope and no config cache). The ad-hoc fallback is the ONLY case where
+    // nothing else owns teardown, so register its disposer on the scope.
+    const scopeCache = recipeScope.fitness?.fileCache;
+    if (this.config.fileCache) {
+      this.fileCache = this.config.fileCache;
+    } else if (scopeCache) {
+      this.fileCache = scopeCache;
+    } else {
+      const adhocCache = new FileCache();
+      this.fileCache = adhocCache;
+      recipeScope.onDispose(() => adhocCache.clear());
+    }
+
     const sessionId = this.generateSessionId();
     this.activeSession = this.createSession(sessionId, recipe);
 

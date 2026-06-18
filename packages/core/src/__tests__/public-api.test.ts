@@ -55,6 +55,15 @@ const EXPECTED_VALUE_EXPORTS = [
   'stampFingerprints',
   'DEFAULT_FAIL_ON_DEGRADED',
   'resolveFailOnDegraded',
+  // Subprocess-correlation telemetry: the pure correlation primitive (type +
+  // env codec + canonical name table + OTel attr constants).
+  'CORRELATION_ENV',
+  'CORRELATION_ENV_SPECS',
+  'REPO_OTEL_ATTR',
+  'TENANT_OTEL_ATTR',
+  'correlationFromEnv',
+  'correlationToEnv',
+  'liveEngineCorrelation',
   // Upstream barrel export missing from this curated list (modular-monolith
   // boundary commits added it to index.ts but not here); the barrel exports it.
   'RAW_STREAM_REASONS',
@@ -116,6 +125,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'enterScope',
   'err',
   'executePipeline',
+  'exitScope',
   'extractPayloadVersion',
   'extractTimestamp',
   'filterSignalsBySuppressions',
@@ -131,6 +141,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'hasPackageJson',
   'initParseCache',
   'isCapabilityValidator',
+  'isContributionWithDisposer',
   'isErrorSeverity',
   'isErrorSignal',
   'isIdentChar',

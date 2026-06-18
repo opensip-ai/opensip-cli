@@ -31,7 +31,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../../types.js';
-import type { GraphDoneResult, SignalEnvelope } from '@opensip-cli/contracts';
+import type { RunPresentation, SignalEnvelope } from '@opensip-cli/contracts';
 import type { LanguageAdapter, Signal, ToolCliContext, WorkspaceUnit } from '@opensip-cli/core';
 
 function fakeAdapter(projectDir: string): GraphLanguageAdapter {
@@ -260,35 +260,41 @@ describe('executeGraph — human / JSON modes', () => {
     datastore.close();
   });
 
-  it('produces a graph-done result with summary and no verbose body on the default (non-verbose) path', async () => {
+  it('produces a RunPresentation carrying the envelope and host duration on the default (non-verbose) path', async () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    // executeGraph now hands a structured result to the central render
-    // seam; rendering (Ink vs plain text) is the CLI's concern and is
-    // covered there. Here we assert the result graph produced.
-    const done = render.mock.calls[0]?.[0] as GraphDoneResult;
-    expect(done.type).toBe('graph-done');
-    // Default surface: summary counts, no verbose body. The "Use --verbose…"
-    // footer hint is now emitted by the shared resultToView seam (ADR-0021),
-    // not carried on the result — asserted in the cli result-to-view tests.
-    expect(typeof done.summary.passed).toBe('number');
+    // envelope-first-presentation RP-2: executeGraph now hands a RunPresentation
+    // to the central render seam; the per-unit table + PASS/FAIL summary are
+    // derived from the carried envelope (rendering is the CLI's concern, covered
+    // there). Here we assert the result graph produced.
+    const done = render.mock.calls[0]?.[0] as RunPresentation;
+    expect(done.type).toBe('run-presentation');
+    expect(done.tool).toBe('graph');
+    // The envelope is the findings currency — the table/verdict derive from it.
+    expect(done.envelope.tool).toBe('graph');
+    expect(done.envelope.schemaVersion).toBe(2);
+    // host-owned display duration (ADR-0051), threaded so the summary shows the
+    // real wall-clock rather than the unit-sum (graph units carry durationMs:0).
     expect(typeof done.durationMs).toBe('number');
+    // Default surface: no verbose body. The "Use --verbose…" footer hint is
+    // emitted by the shared resultToView seam (ADR-0021), not carried on the
+    // result — asserted in the cli result-to-view / golden tests.
     expect(done.verboseDetail).toBeUndefined();
   });
 
-  it('produces a verbose graph-done result carrying the report body as VerboseDetail', async () => {
+  it('produces a verbose RunPresentation carrying the report body as VerboseDetail', async () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const done = render.mock.calls[0]?.[0] as GraphDoneResult;
-    expect(done.type).toBe('graph-done');
+    const done = render.mock.calls[0]?.[0] as RunPresentation;
+    expect(done.type).toBe('run-presentation');
     expect(done.verboseDetail?.kind).toBe('lines');
     const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
     expect(body).toContain('== Catalog ==');
     expect(body).toContain('== Findings');
     // The trailing "== Summary ==" block is suppressed (includeSummary:
-    // false) — the shared summary line is rendered from done.summary.
+    // false) — the shared summary line is rendered from the envelope verdict.
     expect(body).not.toContain('== Summary ==');
   });
 

@@ -305,7 +305,7 @@ interface FitnessReportingOptions {
 
 These set the *recipe's* default reporting. The CLI flag `--json` overrides whatever the recipe says — the user always wins. The `unified` format is a compact mode for verbose terminal output; `table` is the default human-readable shape.
 
-Recipe-owned file paths are not part of the supported reporting contract. If a recipe object carries a historical `outputPath` field, the CLI ignores it; use shell redirection with `--json`, `--report-to`, or `fit-baseline-export` for file artifacts.
+Recipe-owned file paths are not part of the supported reporting contract. If a recipe object carries a historical `outputPath` field, the CLI ignores it; use shell redirection with `--json`, `--report-to`, or `fit export --format baseline` for file artifacts.
 
 ---
 
@@ -319,7 +319,7 @@ Three sources, loaded in order:
 
 The recipe registry is last-writer-wins. A project-local `default` recipe overrides the built-in one; a pack-shipped recipe with a name conflict overrides whichever was registered first.
 
-`opensip fit-recipes` lists every recipe currently registered, with check counts. `opensip fit --recipes` (the alias) does the same.
+`opensip fit recipes` lists every recipe currently registered, with check counts. `opensip fit --recipes` (the alias) does the same.
 
 ---
 

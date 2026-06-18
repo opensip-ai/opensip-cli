@@ -17,6 +17,8 @@ export function deriveCommandsFromSpecs(
     name: spec.name,
     description: spec.description,
     ...(spec.aliases === undefined ? {} : { aliases: spec.aliases }),
+    ...(spec.visibility === undefined ? {} : { visibility: spec.visibility }),
+    ...(spec.parent === undefined ? {} : { parent: spec.parent }),
     ...(spec.scope === undefined ? {} : { scope: spec.scope }),
   }));
 }

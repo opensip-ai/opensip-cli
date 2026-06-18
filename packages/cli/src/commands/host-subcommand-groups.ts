@@ -1,12 +1,13 @@
-// @fitness-ignore-file file-length-limit -- deliberate single cycle-free leaf module: it houses BOTH host subcommand groups' leaf specs (sessions + plugin) AND the completion inventory together specifically because it must import neither completion.ts nor host-command-specs.ts (see header — splitting would reintroduce the module cycle this file exists to break). Cohesive by design; grew past the 400-line soft limit with the per-leaf CommandSpec builders.
+// @fitness-ignore-file file-length-limit -- deliberate single cycle-free leaf module: it houses BOTH host subcommand groups' leaf specs (sessions + tools) AND the per-tool `plugin` group leaves + the completion inventory together specifically because it must import neither completion.ts nor host-command-specs.ts (see header — splitting would reintroduce the module cycle this file exists to break). Cohesive by design; grew past the 400-line soft limit with the per-leaf CommandSpec builders.
 /**
  * host-subcommand-groups — the action-less Commander subcommand GROUPS
- * (`sessions`, `plugin`) and their leaf {@link CommandSpec}s (launch
- * Phase 6).
+ * (`sessions`, `tools`) and their leaf {@link CommandSpec}s, PLUS the
+ * DOMAIN-BOUND per-tool `plugin` group leaves (launch Phase 6 + the
+ * command-surface-taxonomy "packs under the tool" refinement).
  *
  * Split out of `host-command-specs.ts` for ONE reason: to break a module cycle.
- * The completion-script generator (`completion.ts`) sources its `plugin` /
- * `sessions` sub-subcommand NAME lists from the live leaf specs (single source —
+ * The completion-script generator (`completion.ts`) sources its `sessions` /
+ * `tools` sub-subcommand NAME lists from the live leaf specs (single source —
  * Phase 6 Task 6.2), so it must import the group inventory. The
  * `host-command-specs.ts` module, in turn, imports `printCompletionScript` from
  * `completion.ts` for the `completion` command's handler. Housing the GROUP
@@ -17,7 +18,13 @@
  * a single mountable `CommandSpec`, so it stays a raw `program.command(name)`
  * shell (the FINITE, NAMED documented exceptions for the Phase 7
  * `command-surface-parity` guardrail's allow-list, see {@link HOST_SUBCOMMAND_GROUPS}).
- * Their LEAVES (`sessions list|purge`, `plugin list|add|remove|sync`) ARE specs.
+ * Their LEAVES (`sessions list|purge`, `tools list|install|…`) ARE specs.
+ *
+ * The PACK-management `plugin {add,list,remove,sync}` ops are NO LONGER a
+ * top-level group: they mount as a `plugin` group UNDER each pack-supporting
+ * tool primary (`opensip fit plugin …`, `opensip sim plugin …`) via
+ * `mountToolPluginGroups`, with the domain pre-bound from the tool (no
+ * `--domain` flag). Whole Tool plugins remain `opensip tools …`.
  */
 
 import {
@@ -25,17 +32,20 @@ import {
   defineCommand,
   type CommandScopeRequirement,
   type CommandSpec,
+  type PluginLayout,
   type ProjectContext,
   type ToolShortId,
 } from '@opensip-cli/core';
 
 import { executeClear } from './clear.js';
 import { showHistory } from './history.js';
+import { mountCommandSpec } from './mount-command-spec.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 import { executeSessionShow } from './session-show.js';
 import { buildToolsGroupLeaves } from './tools/index.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { CliProgram } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /** A host command spec — handler receives the {@link CliCommandsContext}. */
@@ -225,8 +235,15 @@ function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
 }
 
 // ---------------------------------------------------------------------------
-// plugin list / add / remove / sync
+// <tool> plugin {list,add,remove,sync} — DOMAIN-BOUND extension-pack ops
 // ---------------------------------------------------------------------------
+//
+// The pack ops are mounted UNDER each pack-supporting tool primary
+// (`opensip fit plugin …`, `opensip sim plugin …`) by `mountToolPluginGroups`,
+// with the `domain` PRE-BOUND from that tool. There is no top-level
+// `opensip plugin` command and no `--domain`/`--type` flag: the tool the
+// subcommand hangs off of IS the domain. Whole Tool plugins are managed by
+// `opensip tools …`, never here.
 
 /** The shared `--cwd <path>` option for the plugin leaves. Its description is
  *  "Project root" (NOT the registry's "Target directory"), so it is declared as
@@ -247,10 +264,20 @@ interface PluginCwdOpts {
   projectContext?: ProjectContext;
 }
 
-function buildPluginListSpec(ctx: CliCommandsContext): HostSpec {
+/** The single-domain layout view passed to the pure plugin commands so a
+ *  bound `<tool> plugin …` op only ever touches its own domain. Resolved from
+ *  the host's contributed `pluginLayouts` (so the domain is a real layout, not
+ *  an arbitrary string); falls back to a minimal layout if the tool's full
+ *  layout is somehow absent. */
+function boundLayouts(ctx: CliCommandsContext, domain: string): readonly PluginLayout[] {
+  const match = ctx.pluginLayouts.find((l) => l.domain === domain);
+  return match ? [match] : [{ domain, userSubdirs: [] }];
+}
+
+function buildPluginListSpec(ctx: CliCommandsContext, domain: string): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'list',
-    description: 'List installed plugins',
+    description: `List installed ${domain} packs`,
     commonFlags: ['json'],
     options: [pluginCwdOption()],
     scope: PROJECT_SCOPE,
@@ -258,34 +285,23 @@ function buildPluginListSpec(ctx: CliCommandsContext): HostSpec {
     handler: (rawOpts) => {
       const opts = rawOpts as PluginCwdOpts;
       // Per-run admitted-tool provenance is on the entered RunScope (stamped by
-      // the bootstrap); read it here and pass it into the pure `pluginList`.
+      // the bootstrap); read it here and pass it into the pure `pluginList`,
+      // scoped to this tool's own domain.
       return pluginList(
         effectiveCwd(opts),
-        ctx.pluginLayouts,
+        boundLayouts(ctx, domain),
         currentScope()?.toolProvenance ?? [],
       );
     },
   });
 }
 
-function buildPluginAddSpec(ctx: CliCommandsContext): HostSpec {
+function buildPluginAddSpec(ctx: CliCommandsContext, domain: string): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'add',
-    description: 'Install a plugin (fit/sim pack → project config; tool → user-global by default)',
+    description: `Install a ${domain} pack and record it in opensip-cli.config.yml`,
     commonFlags: ['json'],
-    options: [
-      {
-        flag: '--domain',
-        value: '<fit|sim|tool>',
-        description: 'Target domain (default: inferred; tool plugins auto-detected by marker)',
-      },
-      {
-        flag: '--project',
-        description: 'For a tool plugin, install project-local (.runtime/) instead of user-global',
-        default: false,
-      },
-      pluginCwdOption(),
-    ],
+    options: [pluginCwdOption()],
     // Empty description: the former `.command('add <package>')` declared the
     // positional inline with no help text, so Commander rendered no "Arguments:"
     // block. Keeping it empty preserves the byte-identical --help.
@@ -293,71 +309,108 @@ function buildPluginAddSpec(ctx: CliCommandsContext): HostSpec {
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as PluginCwdOpts & {
-        domain?: string;
-        project?: boolean;
-        _args: string[];
-      };
+      const opts = rawOpts as PluginCwdOpts & { _args: string[] };
       const packageName = opts._args[0];
-      return pluginAdd(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts, {
-        project: opts.project,
-      });
+      // Domain is bound from the tool primary — no `--domain` flag.
+      return pluginAdd(packageName, effectiveCwd(opts), domain, boundLayouts(ctx, domain));
     },
   });
 }
 
-function buildPluginRemoveSpec(ctx: CliCommandsContext): HostSpec {
+function buildPluginRemoveSpec(ctx: CliCommandsContext, domain: string): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'remove',
-    description: 'Uninstall a plugin (and remove from opensip-cli.config.yml for fit/sim packs)',
+    description: `Uninstall a ${domain} pack and remove it from opensip-cli.config.yml`,
     commonFlags: ['json'],
-    options: [
-      {
-        flag: '--domain',
-        value: '<fit|sim|tool>',
-        description: 'Target domain (default: inferred from package name)',
-      },
-      {
-        flag: '--project',
-        description: 'For a tool plugin, target the project-local install instead of user-global',
-        default: false,
-      },
-      pluginCwdOption(),
-    ],
+    options: [pluginCwdOption()],
     // Empty description — see the plugin-add note above (byte-identical --help).
     args: [{ name: 'package', description: '' }],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as PluginCwdOpts & {
-        domain?: string;
-        project?: boolean;
-        _args: string[];
-      };
+      const opts = rawOpts as PluginCwdOpts & { _args: string[] };
       const packageName = opts._args[0];
-      return pluginRemove(packageName, effectiveCwd(opts), opts.domain, ctx.pluginLayouts, {
-        project: opts.project,
-      });
+      return pluginRemove(packageName, effectiveCwd(opts), domain, boundLayouts(ctx, domain));
     },
   });
 }
 
-function buildPluginSyncSpec(ctx: CliCommandsContext): HostSpec {
+function buildPluginSyncSpec(ctx: CliCommandsContext, domain: string): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'sync',
-    description: 'Install every plugin declared in opensip-cli.config.yml (post-clone bootstrap)',
+    description: `Install every ${domain} pack declared in opensip-cli.config.yml (post-clone bootstrap)`,
     commonFlags: ['json'],
-    options: [
-      { flag: '--domain', value: '<fit|sim>', description: 'Sync only one domain' },
-      pluginCwdOption(),
-    ],
+    options: [pluginCwdOption()],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as PluginCwdOpts & { domain?: string };
-      return pluginSync(effectiveCwd(opts), opts.domain, ctx.pluginLayouts);
+      const opts = rawOpts as PluginCwdOpts;
+      return pluginSync(effectiveCwd(opts), domain, boundLayouts(ctx, domain));
     },
   });
+}
+
+/**
+ * Build the four domain-bound `plugin` leaf specs for ONE pack-supporting tool
+ * (`add`/`list`/`remove`/`sync`, all scoped to `domain`). Shared by the mount
+ * path (`mountToolPluginGroups`), the command-scope index, and the completion
+ * inventory so the three derive the SAME leaves.
+ */
+export function buildToolPluginLeaves(
+  ctx: CliCommandsContext,
+  domain: string,
+): readonly HostSpec[] {
+  return [
+    buildPluginListSpec(ctx, domain),
+    buildPluginAddSpec(ctx, domain),
+    buildPluginRemoveSpec(ctx, domain),
+    buildPluginSyncSpec(ctx, domain),
+  ];
+}
+
+/** One pack-supporting tool's `plugin` group: the tool's primary verb + the
+ *  action-less `plugin` parent + the four domain-bound leaves. */
+export interface ToolPluginGroup {
+  /** The tool primary verb the `plugin` group mounts under (`fit`/`sim`). */
+  readonly toolVerb: string;
+  /** The plugin domain (== `toolVerb` for the pack-supporting tools). */
+  readonly domain: string;
+  readonly description: string;
+  readonly leaves: readonly HostSpec[];
+}
+
+/**
+ * Derive the per-tool `plugin` groups from the host's contributed
+ * `pluginLayouts` — one group per pack-supporting domain (fit/sim). A tool with
+ * no `pluginLayout` (e.g. `graph`) contributes none, so it gets no `plugin`
+ * group. The single source the mount path + scope index + completion all read.
+ */
+export function buildToolPluginGroups(ctx: CliCommandsContext): readonly ToolPluginGroup[] {
+  return ctx.pluginLayouts.map((layout) => ({
+    toolVerb: layout.domain,
+    domain: layout.domain,
+    description: `Manage ${layout.domain} extension packs (add, list, remove, sync)`,
+    leaves: buildToolPluginLeaves(ctx, layout.domain),
+  }));
+}
+
+/**
+ * Mount each per-tool `plugin` group UNDER its pack-supporting tool primary
+ * (`opensip fit plugin …`), domain pre-bound from the tool. The host derives the
+ * groups from the contributed `pluginLayouts` (fit/sim; graph has none, so no
+ * group). The tool primary must already be mounted — it is, because the
+ * composition root mounts tools before the host commands; a domain whose primary
+ * is absent (isolated host-only tests) is skipped (nowhere to hang it).
+ */
+export function mountToolPluginGroups(program: CliProgram, ctx: CliCommandsContext): void {
+  for (const group of buildToolPluginGroups(ctx)) {
+    const primary = program.commands.find((c) => c.name() === group.toolVerb);
+    if (primary === undefined) continue; // no tool primary mounted (host-only tests)
+    const parent = primary.command('plugin').description(group.description);
+    for (const leaf of group.leaves) {
+      mountCommandSpec(parent, leaf, ctx);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +431,7 @@ export interface HostSubcommandGroup {
  * This is the FINITE, NAMED set the Phase 7 `command-surface-parity` guardrail
  * allow-lists as documented host exceptions. Every other host command IS a spec.
  */
-export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['sessions', 'plugin', 'tools'] as const;
+export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['sessions', 'tools'] as const;
 
 /**
  * Build the subcommand-group parents with their leaf specs. The mounter turns
@@ -391,16 +444,6 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
       name: 'sessions',
       description: 'Manage session data',
       leaves: [buildSessionsListSpec(ctx), buildSessionsShowSpec(ctx), buildSessionsPurgeSpec(ctx)],
-    },
-    {
-      name: 'plugin',
-      description: 'Manage project-local plugins (add, list, remove, sync)',
-      leaves: [
-        buildPluginListSpec(ctx),
-        buildPluginAddSpec(ctx),
-        buildPluginRemoveSpec(ctx),
-        buildPluginSyncSpec(ctx),
-      ],
     },
     {
       name: 'tools',

@@ -9,9 +9,8 @@ import * as fs from 'node:fs/promises';
 
 import { ValidationError, applyContentFilter } from '@opensip-cli/core';
 
-import { fileCache } from './file-cache.js';
-
 import type { FileAccessor } from './check-config.js';
+import type { FileCache } from './file-cache.js';
 
 // =============================================================================
 // LRU CACHE
@@ -70,6 +69,17 @@ export interface FileAccessorOptions {
    * BaseCheckConfig.contentFilter for the canonical doc.
    */
   readonly contentFilter?: 'raw' | 'strip-strings' | 'strip-strings-and-comments';
+  /**
+   * Per-run scope cache (`scope.fitness.fileCache`). When present, `read()`
+   * resolves prewarmed content from it before hitting disk — closing the
+   * analyzeAll global-cache miss (parallel-tool-invocations Phase 1). Optional:
+   * the no-scope single-check direct path and isolated unit tests legitimately
+   * have no scope cache and fall through to a disk read. The production
+   * guarantee that the analyzeAll call site passes the scope cache is enforced
+   * at the `createExecutionContext` resolve-or-throw boundary + a call-site test,
+   * not by a required parameter.
+   */
+  readonly fileCache?: FileCache;
 }
 
 const DEFAULT_CACHE_CAPACITY = 100;
@@ -81,6 +91,8 @@ class FileAccessorImpl implements FileAccessor {
   private readonly pathSet: Set<string>;
   private readonly signal?: AbortSignal;
   private readonly contentFilterMode?: FileAccessorOptions['contentFilter'];
+  /** Per-run scope cache; undefined on the no-scope direct path (→ disk read). */
+  private readonly fileCache?: FileCache;
 
   constructor(filePaths: readonly string[], options: FileAccessorOptions = {}) {
     this.paths = filePaths;
@@ -88,6 +100,7 @@ class FileAccessorImpl implements FileAccessor {
     this.cache = new LRUCache(options.cacheCapacity ?? DEFAULT_CACHE_CAPACITY);
     this.signal = options.signal;
     this.contentFilterMode = options.contentFilter;
+    this.fileCache = options.fileCache;
   }
 
   async read(filePath: string): Promise<string> {
@@ -109,8 +122,11 @@ class FileAccessorImpl implements FileAccessor {
       return cached;
     }
 
-    // Try global file cache first (populated by prewarm or previous checks)
-    let content = fileCache.getCached(filePath);
+    // Try the per-run scope cache first (populated by prewarm or previous
+    // checks). On the no-scope direct path no cache is injected, so we fall
+    // straight through to the disk read below (parallel-tool-invocations Phase 1
+    // — the module-singleton read is gone).
+    let content = this.fileCache?.getCached(filePath);
     if (content === undefined) {
       const fileStats = await fs.stat(filePath);
       if (fileStats.size > 10_000_000) {

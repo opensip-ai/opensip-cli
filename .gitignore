@@ -56,7 +56,15 @@ docs/remediation/
 # process, per-domain quality improvement processes, etc.). These were
 # previously committed but are now treated as local-only (like plans/ and
 # remediation artifacts).
-docs/internal/
+# NOTE: ignore the directory *contents* (not the dir itself) so a specific
+# file can be re-included below — git cannot un-ignore a file whose parent
+# directory is excluded.
+docs/internal/*
+# Exception: the subprocess-correlation operator playbook is a committed
+# contributor deliverable (durable on-call runbook, not an ephemeral
+# improvement-process doc) — it is repo-only-but-committed per CLAUDE.md's
+# docs/internal charter. Negate the bulk ignore for just this file.
+!docs/internal/subprocess-correlation-playbook.md
 
 # Claude Code session state
 .claude/scheduled_tasks.lock

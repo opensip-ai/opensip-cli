@@ -47,7 +47,9 @@ export function viewListChecks(result: ListChecksResult): ViewNode {
 
   const children: ViewNode[] = [
     line([
-      { text: 'Available Fitness Checks', bold: true },
+      // Task 3.4: a non-fitness producer (e.g. `graph list`) may supply its own
+      // heading; default to the fitness label so `fit-list` is unchanged.
+      { text: result.title ?? 'Available Fitness Checks', bold: true },
       { text: ` (${result.totalCount} total)`, dim: true },
     ]),
     SPACER,

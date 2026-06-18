@@ -13,7 +13,7 @@ import { SessionReplayRegistry } from '../session-replay-registry.js';
 
 import type {
   CommandResult,
-  FitDoneResult,
+  RunPresentation,
   SignalEnvelope,
   StoredSession,
   ToolSessionReplay,
@@ -103,12 +103,10 @@ function replayWithSignals(
       units: [],
       signals: [...signals],
     };
-    const result: FitDoneResult = {
-      type: 'fit-done',
-      label: `session ${stored.id}`,
-      cwd: stored.cwd,
+    const result: RunPresentation = {
+      type: 'run-presentation',
+      tool: 'fitness',
       envelope,
-      configFound: true,
     };
     return { fidelity: 'projection', envelope, result };
   };

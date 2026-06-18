@@ -248,4 +248,4 @@ export {
   type DiscoveryOptions,
 } from './register-tools-discovery.js';
 
-export { mountAllToolCommands } from './register-tools-mount.js';
+export { mountAllToolCommands, mountOneTool } from './register-tools-mount.js';

@@ -15,7 +15,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { makeTestScope, withScope } from '@opensip-cli/test-support';
+import { makeFitnessTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { graphIgnoreHygiene } from './graph-ignore-hygiene.js';
@@ -37,7 +37,7 @@ afterEach(async () => {
 async function violationTypes(name: string, content: string): Promise<(string | undefined)[]> {
   const filePath = join(root, name);
   await writeFile(filePath, content, 'utf8');
-  const result = await withScope(makeTestScope(), () =>
+  const result = await withScope(makeFitnessTestScope(), () =>
     graphIgnoreHygiene.run(root, { targetFiles: [filePath] }),
   );
   return result.signals.map((s) => s.metadata.type as string | undefined);

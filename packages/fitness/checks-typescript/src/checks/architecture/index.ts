@@ -5,6 +5,8 @@ export * from './host-tool-runtime-import-boundary.js';
 export * from './missing-type-exports.js';
 export * from './module-coupling-fan-out.js';
 export * from './no-bootstrap-tool-import.js';
+export * from './no-run-done-result.js';
 export * from './package-json-exports-field.js';
 export * from './phantom-dependency-detection.js';
+export * from './subprocess-correlation-required.js';
 export * from './tsconfig-extends-validation.js';

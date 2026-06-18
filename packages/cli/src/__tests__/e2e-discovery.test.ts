@@ -64,7 +64,7 @@ describe('Project: header', () => {
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    const { stdout, exitCode } = runCli(['fit-list'], testDir);
+    const { stdout, exitCode } = runCli(['fit', 'list'], testDir);
     expect(exitCode).toBe(0);
     // The default `mini` banner carries the project path inline in its box
     // (the `ℹ Project:` line is suppressed for mini — its box owns the path).
@@ -81,7 +81,7 @@ describe('Project: header', () => {
     );
     const subdir = join(testDir, 'packages', 'api');
     mkdirSync(subdir, { recursive: true });
-    const { stdout, exitCode } = runCli(['fit-list'], subdir);
+    const { stdout, exitCode } = runCli(['fit', 'list'], subdir);
     expect(exitCode).toBe(0);
     expect(stdout).toContain(testDir);
     // The walked-up hint surfaces in the mini box's path line (vs the
@@ -97,13 +97,13 @@ describe('Project: header', () => {
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    const { stdout } = runCli(['fit-list', '--json'], testDir);
+    const { stdout } = runCli(['fit', 'list', '--json'], testDir);
     expect(stdout).not.toContain('ℹ Project:');
   });
 });
 
 describe('phantom-scaffold regression (the original bug)', () => {
-  it('running fit-list from a subdir uses the parent project root', () => {
+  it('running `fit list` from a subdir uses the parent project root', () => {
     writeFileSync(
       join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
@@ -111,7 +111,7 @@ describe('phantom-scaffold regression (the original bug)', () => {
     );
     const subdir = join(testDir, 'packages', 'api');
     mkdirSync(subdir, { recursive: true });
-    runCli(['fit-list'], subdir);
+    runCli(['fit', 'list'], subdir);
     // .runtime/ should appear at the project root, NOT at the subdir.
     expect(existsSync(join(testDir, 'opensip-cli', '.runtime'))).toBe(true);
     expect(existsSync(join(subdir, 'opensip-cli'))).toBe(false);
@@ -120,14 +120,14 @@ describe('phantom-scaffold regression (the original bug)', () => {
 
 describe('no project found', () => {
   it('project-scoped command errors exit 2 with the structured message', () => {
-    const { stderr, exitCode } = runCli(['fit-list'], testDir);
+    const { stderr, exitCode } = runCli(['fit', 'list'], testDir);
     expect(exitCode).toBe(2);
     expect(stderr).toContain('No OpenSIP CLI project found');
     expect(stderr).toContain('opensip init');
   });
 
   it('project-scoped --json emits a structured bootstrap.error outcome on stdout', () => {
-    const { stdout, exitCode } = runCli(['fit-list', '--json'], testDir);
+    const { stdout, exitCode } = runCli(['fit', 'list', '--json'], testDir);
     expect(exitCode).toBe(2);
     // 2.12.0 (§4.7): a pre-handler no-project failure is a structured
     // CommandOutcome (kind 'bootstrap.error'), not a bare `{ error }`.
@@ -211,7 +211,7 @@ describe('schema-version skew', () => {
       'schemaVersion: 99\ntargets: {}\n',
       'utf8',
     );
-    const { stderr, exitCode } = runCli(['fit-list'], testDir);
+    const { stderr, exitCode } = runCli(['fit', 'list'], testDir);
     expect(exitCode).toBe(2);
     expect(stderr).toContain('uses a newer schema than your CLI supports');
     expect(stderr).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
@@ -221,7 +221,7 @@ describe('schema-version skew', () => {
 
   it('config missing schemaVersion works as v1 silently', () => {
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), 'targets: {}\n', 'utf8');
-    const { stderr, exitCode } = runCli(['fit-list'], testDir);
+    const { stderr, exitCode } = runCli(['fit', 'list'], testDir);
     expect(exitCode).toBe(0);
     expect(stderr).not.toContain('newer schema');
   });
@@ -246,13 +246,18 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     );
   }
 
-  it('`plugin add <tool>` installs user-global and the subcommand works in the project', () => {
+  // Whole Tool plugins are installed via `opensip tools install` — NOT the
+  // per-tool `plugin add` (the redundant whole-tool path was retired; `plugin`
+  // is now scoped to a pack-supporting tool's own extension packs). These tests
+  // exercise the canonical `tools` platform path.
+
+  it('`tools install <tool>` installs user-global and the subcommand works in the project', () => {
     writeProject();
     const { home, env } = withFreshHome();
     try {
-      const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
+      const add = runCli(['tools', 'install', FIXTURE_TOOL, '--json'], testDir, env);
       expect(add.exitCode).toBe(0);
-      // 2.12.0: the PluginResult rides under `.data` of the outcome wrapper.
+      // The tools-install result rides under `.data` of the outcome wrapper.
       expect((JSON.parse(add.stdout) as { data: { success?: boolean } }).data.success).toBe(true);
       // Landed in the user-global tool host dir, NOT a fit/sim domain dir,
       // and NO config entry was written (tools auto-discover by marker).
@@ -274,11 +279,11 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     }
   });
 
-  it('`plugin add <tool> --project` installs project-local (.runtime/) only', () => {
+  it('`tools install <tool> --project` installs project-local (.runtime/) only', () => {
     writeProject();
     const { home, env } = withFreshHome();
     try {
-      const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--project', '--json'], testDir, env);
+      const add = runCli(['tools', 'install', FIXTURE_TOOL, '--project', '--json'], testDir, env);
       expect(add.exitCode).toBe(0);
       expect(
         existsSync(
@@ -295,19 +300,15 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     }
   });
 
-  it('`plugin list` reports an installed tool plugin under the `tool` domain', () => {
+  it('`tools list` reports an installed tool plugin', () => {
     writeProject();
     const { home, env } = withFreshHome();
     try {
-      runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
-      const list = runCli(['plugin', 'list', '--json'], testDir, env);
+      runCli(['tools', 'install', FIXTURE_TOOL, '--json'], testDir, env);
+      const list = runCli(['tools', 'list', '--json'], testDir, env);
       expect(list.exitCode).toBe(0);
-      const plugins = (
-        JSON.parse(list.stdout) as { data: { plugins: { domain: string; namespace: string }[] } }
-      ).data.plugins;
-      expect(plugins.some((p) => p.domain === 'tool' && p.namespace.includes('tool-demo'))).toBe(
-        true,
-      );
+      // The installed fixture tool surfaces in the effective tool set.
+      expect(list.stdout).toContain('tool-demo');
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
@@ -336,7 +337,7 @@ describe('no-side-effects', () => {
       'schemaVersion: 99\ntargets: {}\n',
       'utf8',
     );
-    runCli(['fit-list'], testDir);
+    runCli(['fit', 'list'], testDir);
     // pre-action-hook exits 2 BEFORE the side-effect block
     // (configureLogger({ logDir }) + setProjectContextForRun). No
     // .runtime/ tree at all.

@@ -18,7 +18,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { currentTraceparent, logger } from '@opensip-cli/core';
+import {
+  correlationToEnv,
+  currentLogger,
+  currentScope,
+  currentTraceparent,
+} from '@opensip-cli/core';
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
@@ -29,6 +34,99 @@ import type { Shard, ShardBuildResult, ShardWorkerSpec } from './shard-model.js'
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { ResolutionMode } from '../../types.js';
+import type { DiagnosticLevel, DiagnosticsBus, RunCorrelation } from '@opensip-cli/core';
+
+/**
+ * The machine-filterable failure taxonomy for a shard worker, stamped on the
+ * parent's `graph.shard.runner.shard_failed` event (subprocess-correlation
+ * telemetry spec, Failure taxonomy). Every value is LIVE — `timeout` became
+ * emittable with the hard kill-timeout below (M3); there is no dead enum value.
+ *
+ *   - `spawn`         — the child process failed to spawn (`child.on('error')`).
+ *   - `exit_nonzero`  — the child spawned but exited with a non-zero code.
+ *   - `stdout_parse`  — the child exited 0 but its stdout was not valid JSON.
+ *   - `timeout`       — the hard kill-timeout fired and SIGKILLed a hung child.
+ *   - `ipc_error`     — reserved for the fork (live-engine) transport (Phase 2).
+ */
+export type FailureClass = 'spawn' | 'exit_nonzero' | 'stdout_parse' | 'timeout' | 'ipc_error';
+
+/**
+ * A fixed, conservative wall-clock floor (10 minutes) after which a hung shard
+ * worker is SIGKILLed so it is DIAGNOSABLE (`failureClass: 'timeout'`) instead
+ * of stalling `runWorkerPool` — and therefore the whole build — forever. Before
+ * this, `spawnShardWorker` only reacted to `close`/`error`/parse failure, so a
+ * child stuck on a deadlocked parse never settled its `await run(item)`.
+ *
+ * This is deliberately a single named constant, NOT yet user-configurable: the
+ * tunable retry/backoff/per-shard-budget policy is a separate resilience spec
+ * (spec Q3/M3). Keeping it a constant lets that spec make it configurable later
+ * without re-discovering the call site.
+ */
+const SHARD_HARD_KILL_TIMEOUT_MS = 10 * 60_000;
+
+/**
+ * Project a (possibly absent) parent {@link RunCorrelation} onto the flat set of
+ * structured-log fields every `graph.shard.runner.*` event stamps. Centralized
+ * so `start`, `shard_failed`, and `complete` stamp IDENTICALLY and `traceId` is
+ * present on all three whenever OTel is on (GAP d). Absent optionals are omitted
+ * (no empty sentinels).
+ *
+ * `traceId` is derived LIVE here (Task 3.3 / GAP d): the runner runs INSIDE the
+ * sharded-build span (`buildShardedGraph`'s `withSpanAsync`), a child of the
+ * bootstrap-time context the assembled `c.traceId` captured. Preferring the live
+ * `currentTraceparent()` makes every runner event carry the SAME traceparent the
+ * merge stage and worker-spawn sites derive (which already read it live) — so the
+ * value cannot drift between events. Falls back to the bootstrap-stamped
+ * `c.traceId`, then omitted when OTel is off (no active recording span).
+ */
+function correlationLogFields(c: RunCorrelation | undefined): Record<string, string> {
+  if (!c) return {};
+  const fields: Record<string, string> = {
+    runId: c.runId,
+    tool: c.tool,
+    parentCommand: c.parentCommand,
+  };
+  const traceId = currentTraceparent() ?? c.traceId;
+  if (traceId !== undefined) fields.traceId = traceId;
+  if (c.repo !== undefined) fields.repo = c.repo;
+  if (c.repoId !== undefined) fields.repoId = c.repoId;
+  if (c.tenantId !== undefined) fields.tenantId = c.tenantId;
+  return fields;
+}
+
+/**
+ * Project the parent {@link RunCorrelation} onto the subset stamped on the
+ * `subprocess.*` diagnostics milestones, with the LIVE `traceId` (Task 3.3 /
+ * GAP d) so the snapshot's events pivot to the same trace as the JSONL events
+ * (which derive it live via {@link correlationLogFields}). Returns `undefined`
+ * when no parent correlation was assembled (tests / bare runs) so the milestones
+ * are omitted, matching `correlationLogFields` returning `{}`.
+ */
+function diagnosticsMilestoneCorrelation(
+  c: RunCorrelation | undefined,
+): RunCorrelation | undefined {
+  if (c === undefined) return undefined;
+  const traceId = currentTraceparent();
+  return { ...c, ...(traceId === undefined ? {} : { traceId }) };
+}
+
+/**
+ * Synchronously emit one `subprocess.spawn|complete|failed` milestone on the
+ * scope-owned diagnostics bus (ADR-0024, Phase 3) — a `void`, fire-and-forget
+ * sync call; a no-op when the bus or the parent correlation is absent. Collapses
+ * the bus-lookup + correlation-presence guard to a single call so the runner's
+ * hot path stays flat.
+ */
+function emitShardMilestone(
+  diagnostics: DiagnosticsBus | undefined,
+  correlation: RunCorrelation | undefined,
+  level: DiagnosticLevel,
+  message: string,
+  data: Record<string, unknown>,
+): void {
+  if (diagnostics === undefined || correlation === undefined) return;
+  diagnostics.emitSubprocessEvent('load', level, message, correlation, data);
+}
 
 export interface RunShardsInput {
   readonly shards: readonly Shard[];
@@ -41,13 +139,30 @@ export interface RunShardsInput {
   readonly resolutionMode: ResolutionMode;
   /** Concurrency cap. Default: `max(1, cpus()-1)`. */
   readonly concurrency?: number;
+  /**
+   * Hard wall-clock kill-timeout (ms) after which a hung shard worker is
+   * SIGKILLed with `failureClass: 'timeout'` (M3). Defaults to
+   * {@link SHARD_HARD_KILL_TIMEOUT_MS} (10 min) — the conservative production
+   * floor. Exposed as an input ONLY so the timeout path is deterministically
+   * exercisable in tests with a short value (the resilience spec, Q3/M3, will
+   * later make it user-configurable); production never sets it.
+   */
+  readonly hardKillTimeoutMs?: number;
 }
 
-/** A shard whose worker exited non-zero — attributable, non-fatal. */
+/** A shard whose worker failed — attributable, non-fatal. */
 export interface ShardFailure {
   readonly shardId: string;
   readonly exitCode: number;
+  /**
+   * The FULL captured stderr — drives the user-facing message and stays
+   * UNTRUNCATED here (M4). The parent's structured `shard_failed` event caps a
+   * separate `stderrPreview` (~500c) independently, so a long stderr is never
+   * lost from the failure surface.
+   */
   readonly stderr: string;
+  /** Machine-filterable failure taxonomy ({@link FailureClass}); absent on a clean exit. */
+  readonly failureClass?: FailureClass;
 }
 
 export interface RunShardsOutput {
@@ -62,13 +177,37 @@ export interface RunShardsOutput {
  */
 export async function runShardsInParallel(input: RunShardsInput): Promise<RunShardsOutput> {
   const concurrency = Math.max(1, input.concurrency ?? Math.max(1, cpus().length - 1));
-  logger.info({
+  // The parent's correlation bag (assembled at the bootstrap composition root,
+  // Phase 0) — stamped identically on all three runner events so an operator can
+  // pivot from any one to the run/trace.
+  const correlation = currentScope()?.correlation;
+  const correlationFields = correlationLogFields(correlation);
+  // The scope-owned diagnostics bus (ADR-0024): the JSONL logs above are for
+  // `jq` grep; these milestones ride `CommandOutcome.diagnostics.events` for the
+  // structured `--json` snapshot (Phase 3). Both surfaces are required. The
+  // milestone correlation carries the LIVE `traceId` (Task 3.3 / GAP d) so the
+  // snapshot's events pivot to the same trace as the JSONL events.
+  const diagnostics = currentScope()?.diagnostics;
+  const diagnosticsCorrelation = diagnosticsMilestoneCorrelation(correlation);
+  // Emit through the per-run logger (ADR-0053) — the singleton has no file sink,
+  // so the JSONL `graph.shard.runner.*` lines the 2am playbook greps for would be
+  // dropped. `currentLogger()` resolves `currentScope().logger`, the instance the
+  // bootstrap configured with the daily logs file.
+  const runLogger = currentLogger();
+  runLogger.info({
     evt: 'graph.shard.runner.start',
     module: 'graph:shard-runner',
+    ...correlationFields,
+    shards: input.shards.length,
+    concurrency,
+  });
+  // `subprocess.spawn` milestone — the pool is starting N shard workers.
+  emitShardMilestone(diagnostics, diagnosticsCorrelation, 'debug', 'subprocess.spawn', {
     shards: input.shards.length,
     concurrency,
   });
 
+  const hardKillTimeoutMs = input.hardKillTimeoutMs ?? SHARD_HARD_KILL_TIMEOUT_MS;
   const outcomes = await runWorkerPool(input.shards, concurrency, (shard) =>
     spawnShardWorker(
       shard,
@@ -76,6 +215,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
       input.cliScript,
       input.resolutionMode,
       input.language,
+      hardKillTimeoutMs,
     ),
   );
 
@@ -83,17 +223,55 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   const failures: ShardFailure[] = [];
   for (const o of outcomes) {
     if (o.result) fragments.push(o.result);
-    else failures.push({ shardId: o.shardId, exitCode: o.exitCode, stderr: o.stderr });
+    else
+      failures.push({
+        shardId: o.shardId,
+        exitCode: o.exitCode,
+        stderr: o.stderr,
+        ...(o.failureClass ? { failureClass: o.failureClass } : {}),
+      });
   }
   // Deterministic order regardless of completion order.
   fragments.sort((a, b) => Number(a.shardId > b.shardId) - Number(a.shardId < b.shardId));
   failures.sort((a, b) => Number(a.shardId > b.shardId) - Number(a.shardId < b.shardId));
 
-  logger.info({
+  // One structured per-shard event per failure (the runner is the emitter, not
+  // the merge stage). `stderrPreview` is a SEPARATE ~500c cap for the structured
+  // log; the full `failure.stderr` stays untouched on the returned ShardFailure
+  // (M4) so the user-facing message keeps the complete output.
+  for (const failure of failures) {
+    runLogger.error({
+      evt: 'graph.shard.runner.shard_failed',
+      module: 'graph:shard-runner',
+      ...correlationFields,
+      shardId: failure.shardId,
+      exitCode: failure.exitCode,
+      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
+      stderrPreview: failure.stderr.slice(0, 500),
+    });
+    // `subprocess.failed` milestone — one per failed shard, keyed by `shardId`
+    // so a `--json` consumer can filter `events` down to a single shard.
+    emitShardMilestone(diagnostics, diagnosticsCorrelation, 'warn', 'subprocess.failed', {
+      shardId: failure.shardId,
+      exitCode: failure.exitCode,
+      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
+    });
+  }
+
+  runLogger.info({
     evt: 'graph.shard.runner.complete',
     module: 'graph:shard-runner',
+    ...correlationFields,
     built: fragments.length,
     failed: failures.length,
+    failedShardIds: failures.map((f) => f.shardId),
+  });
+  // `subprocess.complete` milestone — the pool drained; carries the same
+  // built/failed/failedShardIds summary as the structured log line.
+  emitShardMilestone(diagnostics, diagnosticsCorrelation, 'debug', 'subprocess.complete', {
+    built: fragments.length,
+    failed: failures.length,
+    failedShardIds: failures.map((f) => f.shardId),
   });
   return { fragments, failures };
 }
@@ -142,9 +320,13 @@ export function planShardWork(
     if (fragment) cached.push(fragment);
     else toBuild.push(shard);
   }
-  logger.info({
+  currentLogger().info({
     evt: 'graph.shard.plan',
     module: 'graph:shard-runner',
+    // Stamp the same correlation bag (incl. `parentCommand`) as the other
+    // `graph.shard.*` lines so an operator's `runId`/`parentCommand` filter
+    // returns this run's plan line too (GAP e — no un-attributed shard lines).
+    ...correlationLogFields(currentScope()?.correlation),
     reused: cached.length,
     rebuild: toBuild.length,
   });
@@ -156,6 +338,17 @@ interface ShardOutcome {
   readonly result?: ShardBuildResult;
   readonly exitCode: number;
   readonly stderr: string;
+  readonly failureClass?: FailureClass;
+}
+
+/**
+ * Strip the env-only `runId` off a correlation bag for the spec JSON: per B1,
+ * `runId` travels via `OPENSIP_RUN_ID` env ONLY and is `Omit`ed from
+ * `ShardWorkerSpec.correlation`. Everything else (tool/parentCommand/traceId/…)
+ * is carried in the spec so the worker can stamp it on spans/logs.
+ */
+function stripRunId({ runId: _runId, ...rest }: RunCorrelation): Omit<RunCorrelation, 'runId'> {
+  return rest;
 }
 
 function spawnShardWorker(
@@ -164,19 +357,32 @@ function spawnShardWorker(
   cliScript: string,
   resolutionMode: ResolutionMode,
   language?: string,
+  hardKillTimeoutMs: number = SHARD_HARD_KILL_TIMEOUT_MS,
 ): Promise<ShardOutcome> {
   return new Promise((resolvePromise) => {
     const specDir = mkdtempSync(join(tmpdir(), 'graph-shard-'));
     const specPath = join(specDir, 'spec.json');
+
+    // Build this shard's correlation from the parent run's bag (Phase 0,
+    // composition root) + this shard's id + workerKind. Absent when no scope
+    // correlation was assembled (tests / bare runs) — the spec then omits the
+    // `correlation` field and the worker degrades observably (M2).
+    const baseCorrelation = currentScope()?.correlation;
+    const correlation: RunCorrelation | undefined = baseCorrelation
+      ? { ...baseCorrelation, shardId: shard.id, workerKind: 'shard' as const }
+      : undefined;
+
     const spec: ShardWorkerSpec = {
       shard,
       projectRoot,
       resolutionMode,
       ...(language ? { language } : {}),
+      // `runId` is env-only (B1) — stripped from the spec; the rest is carried so
+      // the worker stamps tool/parentCommand/traceId/shardId on its spans/logs.
+      ...(correlation ? { correlation: stripRunId(correlation) } : {}),
     };
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
-    const cleanup = (): void => rmSync(specDir, { recursive: true, force: true });
     // Propagate the active trace context (the parent's sharded-build span) to
     // the worker as TRACEPARENT, so the worker's per-stage spans nest under our
     // build trace instead of forming orphan traces. `currentTraceparent()` is
@@ -188,14 +394,34 @@ function spawnShardWorker(
     // shard's own files are built from `shard.rootDir` in the spec, not from
     // cwd — so the shard need not be a project itself. The full parent env is
     // forwarded (the child needs PATH/HOME/OTEL_* etc.) into spawn's env option
-    // only — never logged.
+    // only — never logged. Correlation env (`OPENSIP_*`, incl. OPENSIP_RUN_ID so
+    // the child inherits the parent run, B1) is spread LAST; the `{ ...process.env }`
+    // base already preserves PATH/HOME/OTEL_*, and `correlationToEnv` only adds
+    // `OPENSIP_*` keys (and NEVER the API key, M1), so it can never clobber them (M2).
     const child = spawn(process.execPath, [cliScript, 'graph-shard-worker', specPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
         ...(traceparent ? { TRACEPARENT: traceparent } : {}),
+        ...(correlation ? correlationToEnv(correlation) : {}),
       },
     });
+
+    // Arm the hard kill-timeout (M3): a hung child is SIGKILLed after a fixed
+    // wall-clock floor so `runWorkerPool` settles (with failureClass 'timeout')
+    // instead of hanging forever. `unref()` so a pending timer never keeps the
+    // event loop alive past a clean settle; `cleanup` clears it on EVERY path.
+    let timedOut = false;
+    const killTimer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, hardKillTimeoutMs);
+    killTimer.unref?.();
+    const cleanup = (): void => {
+      clearTimeout(killTimer);
+      rmSync(specDir, { recursive: true, force: true });
+    };
+
     let stdout = '';
     let stderr = '';
     // setEncoding routes chunks through a StringDecoder that buffers
@@ -214,13 +440,34 @@ function spawnShardWorker(
     child.on('error', (err) => {
       /* v8 ignore start */
       cleanup();
-      resolvePromise({ shardId: shard.id, exitCode: -1, stderr: `spawn failed: ${err.message}` });
+      resolvePromise({
+        shardId: shard.id,
+        exitCode: -1,
+        stderr: `spawn failed: ${err.message}`,
+        failureClass: 'spawn',
+      });
       /* v8 ignore stop */
     });
     child.on('close', (code) => {
       cleanup();
+      if (timedOut) {
+        resolvePromise({
+          shardId: shard.id,
+          exitCode: code ?? -1,
+          stderr:
+            stderr +
+            `\ngraph shard worker killed after ${String(hardKillTimeoutMs)}ms hard kill-timeout`,
+          failureClass: 'timeout',
+        });
+        return;
+      }
       if (code !== 0) {
-        resolvePromise({ shardId: shard.id, exitCode: code ?? -1, stderr });
+        resolvePromise({
+          shardId: shard.id,
+          exitCode: code ?? -1,
+          stderr,
+          failureClass: 'exit_nonzero',
+        });
         return;
       }
       try {
@@ -232,6 +479,7 @@ function spawnShardWorker(
           shardId: shard.id,
           exitCode: 1,
           stderr: `unparseable worker output: ${error instanceof Error ? error.message : String(error)}`,
+          failureClass: 'stdout_parse',
         });
         /* v8 ignore stop */
       }

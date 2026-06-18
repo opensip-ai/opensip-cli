@@ -63,7 +63,7 @@ function realPayload() {
 }
 
 describe('simReplayFromSession', () => {
-  it('round-trips a stored payload back into a projection envelope + sim-done result', () => {
+  it('round-trips a stored payload back into a projection envelope + run-presentation result', () => {
     const replay = simReplayFromSession(storedSession(realPayload()));
 
     expect(replay.fidelity).toBe('projection');
@@ -74,21 +74,22 @@ describe('simReplayFromSession', () => {
     const located = replay.envelope.signals.find((s) => s.ruleId === 'sim:latency');
     expect(located?.code).toEqual({ file: 'svc.ts', line: 7, column: 1 });
     expect(located?.suggestion).toBe('add a cache');
-    expect(replay.result.type).toBe('sim-done');
-    expect(replay.result.cwd).toBe('/repo');
-    expect(replay.result.durationMs).toBe(120);
+    // The inner replay result is the uniform render-only RunPresentation carrying
+    // the projected envelope (the host renders replay via SessionReplayResult, not
+    // this inner result).
+    expect(replay.result.type).toBe('run-presentation');
+    expect(replay.result.tool).toBe('simulation');
+    expect(replay.result.envelope).toBe(replay.envelope);
   });
 
-  it('names the recipe when present and carries it onto the envelope', () => {
+  it('carries the recipe onto the envelope when present', () => {
     const replay = simReplayFromSession(storedSession(realPayload(), { recipe: 'example' }));
     expect(replay.envelope.recipe).toBe('example');
-    expect(replay.result.recipeName).toBe('example');
   });
 
-  it("falls back to 'default' recipe name when no recipe is set", () => {
+  it('leaves the envelope recipe unset when no recipe is stored', () => {
     const replay = simReplayFromSession(storedSession(realPayload()));
     expect(replay.envelope.recipe).toBeUndefined();
-    expect(replay.result.recipeName).toBe('default');
   });
 
   it('preserves a finding with no optional location fields', () => {

@@ -191,8 +191,10 @@ export async function runJsonMode(
   // formatter (the root owns stdout). No per-tool re-stringification.
   cli.emitEnvelope(fitResult.envelope);
   // Warnings collected during the run go to stderr so JSON consumers still
-  // see them without contaminating the structured stdout payload.
-  emitWarningsToStderr(fitResult.result);
+  // see them without contaminating the structured stdout payload. They ride on
+  // the executeFit result bundle now (a sibling field), not on the render-only
+  // RunPresentation (envelope-first-presentation plan).
+  emitWarningsToStderr(fitResult);
   // ADR-0011/ADR-0035: the composition root owns effectful egress (cloud +
   // `--report-to`, exit 4) AND the findings exit code (derived from the
   // envelope verdict). Called once, after the JSON is on stdout.
@@ -285,8 +287,9 @@ export async function runGateMode(
   const envelope: SignalEnvelope = fitResult.envelope;
   const completion = fitRunCompletion(args, envelope);
   // Surface non-fatal warnings before the gate output so the user sees them
-  // alongside the run summary. Safe here because gate mode is non-Ink.
-  emitWarningsToStderr(fitResult.result);
+  // alongside the run summary. Safe here because gate mode is non-Ink. Warnings
+  // ride on the result bundle now (sibling field), not the RunPresentation.
+  emitWarningsToStderr(fitResult);
   try {
     if (args.gateSave === true) {
       // @fitness-ignore-next-line async-waterfall-detection -- ordered side-effects: the "Baseline saved" confirmation (and the subsequent deliver) must follow a SUCCESSFUL save (if saveBaseline throws, nothing downstream runs), so these awaits cannot be parallelized.

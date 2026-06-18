@@ -49,9 +49,6 @@ export type {
   ClearDoneResult,
   ConfigureDoneResult,
   UninstallDoneResult,
-  FitDoneResult,
-  SimDoneResult,
-  GraphDoneResult,
   GateDoneResult,
   GraphStatusResult,
   TextLinesResult,
@@ -77,10 +74,17 @@ export type {
   SessionReplayResult,
   HelpResult,
   ErrorResult,
-  VerboseDetail,
-  FindingGroup,
-  FindingLine,
 } from './command-results.js';
+
+// Render-only run-presentation adjunct (envelope-first-presentation plan). The
+// single run variant on `CommandResult`: it carries the SignalEnvelope (the
+// findings currency) plus the render-only bits (verboseDetail, host-owned
+// durationMs, graph's banner caveat). It lives in its own module, so it needs
+// its own re-export. It REPLACED the three per-tool fit/sim/graph done-result
+// interfaces, which were hard-removed in RP-3; the
+// `architecture-no-run-done-result` fitness check guards the surface against
+// re-introducing them.
+export type { RunPresentation } from './run-presentation.js';
 
 // Command outcome — the OUTER currency wrapping every result and error (§5.5,
 // launch). `CommandOutcome<T>` nests the unchanged `SignalEnvelope` under
@@ -178,10 +182,18 @@ export type { ResolvedRecipe, RecipeSource } from './recipe-default.js';
 export { commonFlags, applyCommonFlags, MANDATORY_COMMON_FLAGS } from './cli-flags.js';
 export type { CommonFlagKey, CommonFlagSpec } from './cli-flags.js';
 
-// Verbose-detail builder (ADR-0021) — shared Signal[] → FindingGroup[] mapping
-// for the tools' `verboseDetail` carrier (fit + sim; one source, not per-tool).
+// Verbose-detail currency + builder (ADR-0021). The TYPES (VerboseDetail /
+// FindingGroup / FindingLine) live in ./verbose-detail.ts (their currency home,
+// so command-results and run-presentation can both name them without a cycle);
+// `buildFindingGroups` is the shared Signal[] → FindingGroup[] mapping for the
+// tools' `verboseDetail` carrier (fit + sim; one source, not per-tool).
 export { buildFindingGroups } from './verbose-detail.js';
-export type { FindingGroupUnit } from './verbose-detail.js';
+export type {
+  FindingGroupUnit,
+  VerboseDetail,
+  FindingGroup,
+  FindingLine,
+} from './verbose-detail.js';
 
 // Session persistence type. The cross-tool StoredSession shape stays here
 // as the contract surface; SessionRepo + the sessions schema +

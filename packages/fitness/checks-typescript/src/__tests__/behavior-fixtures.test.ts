@@ -28,6 +28,10 @@ import { checks } from '../index.js';
 const langRegistry = new LanguageRegistry();
 langRegistry.register(typescriptAdapter);
 const testScope = new RunScope({ languages: langRegistry });
+// check.run resolves the per-run cache from currentScope()?.fitness?.fileCache
+// (no module-singleton fallback — parallel-tool-invocations Phase 1). Bind the
+// scope cache to the test-only singleton these tests prewarm below.
+Object.assign(testScope, { fitness: { fileCache } });
 
 let cwd: string;
 let written: string[] = [];

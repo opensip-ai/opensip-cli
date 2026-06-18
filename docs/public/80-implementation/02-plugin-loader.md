@@ -27,8 +27,8 @@ opensip-cli loads four kinds of plugins. Each has its own discovery shape, but t
 > **What you'll understand after this:**
 > - The five discovery shapes (Tool marker; fit-pack marker + augmenting pin; sim-pack `scenarios-*` name pattern + pin; graph-adapter marker + explicit pin; language-adapter direct import) — the middle three now flow through the ONE generic capability substrate (§5.3 / ADR-0029).
 > - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
-> - The on-disk layout the `plugin add/remove/list/sync` commands operate on.
-> - What `plugin sync` does and when CI should run it.
+> - The on-disk layout the `<tool> plugin add/remove/list/sync` commands operate on.
+> - What `<tool> plugin sync` does and when CI should run it.
 
 ---
 
@@ -155,7 +155,7 @@ plugins:
 
 The discoverer walks `.runtime/plugins/<domain>/node_modules/` but **only loads the packages explicitly listed in `plugins.<domain>:`**. Everything else in node_modules (transitive deps, hoisted packages, accidental installs) is ignored.
 
-The explicit list is the contract for arbitrary-scope packs. A transitive devDep can't silently inject checks — the user (or the `plugin add` command) has to add its name to `plugins.<domain>:` for it to load.
+The explicit list is the contract for arbitrary-scope packs. A transitive devDep can't silently inject checks — the user (or the `<tool> plugin add` command) has to add its name to `plugins.<domain>:` for it to load.
 
 ### 3. Marker-based check-pack discovery (fit)
 
@@ -173,7 +173,7 @@ plugins:
 
 No package is privileged — the bundled packs (`@opensip-cli/checks-universal`, `@opensip-cli/checks-typescript`, etc.) carry the marker and are discovered through the same contract as third-party packs. Add a marker-tagged pack to your project's `dependencies`, and it's loaded on the next run with no further wiring.
 
-The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `plugin add/remove/sync`.
+The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `opensip fit plugin add/remove/sync`.
 
 ---
 
@@ -202,55 +202,52 @@ This isn't discovery. It's an explicit static call from `bootstrapCli()`. Why?
 
 ---
 
-## The `plugin` command surface
+## The `<tool> plugin` command surface
 
-CLI-owned commands for managing the npm-package plugin layout. Source: [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
+CLI-owned commands for managing the npm-package extension-pack layout. Source: [`packages/cli/src/commands/plugin.ts`](../../../packages/cli/src/commands/plugin.ts).
+
+The `plugin` group is mounted **under each pack-supporting tool primary** — the domain is bound from the tool, so there is **no top-level `opensip plugin`** and **no `--domain` flag**. `fit` and `sim` support packs; `graph` does not, so it has no `plugin` group. Whole Tool plugins (a `kind: "tool"` package contributing a whole subcommand) are NOT managed here — they install/uninstall with `opensip tools …` (see [`70-reference/12-tools-command.md`](../70-reference/12-tools-command.md)).
 
 ```bash
-opensip plugin list                       # what's installed and what's loaded
-opensip plugin add <pkg>                  # infer fit/sim/tool target from spec
-opensip plugin add <pkg> --domain fit     # project-pinned fit pack
-opensip plugin add <pkg> --domain sim     # project-pinned sim pack
-opensip plugin add <pkg> --domain tool    # user-global Tool plugin by default
-opensip plugin add <pkg> --domain tool --project
-opensip plugin remove <pkg>                # remove fit/sim package + config entry
-opensip plugin remove <pkg> --domain tool  # remove a user-global Tool plugin
-opensip plugin remove <pkg> --domain tool --project
-opensip plugin sync                        # install everything declared in config
+opensip fit plugin list                   # what fit packs are installed and loaded
+opensip fit plugin add <pkg>              # project-pinned fit pack
+opensip fit plugin remove <pkg>           # remove fit pack + config entry
+opensip fit plugin sync                   # install everything declared under plugins.fit
+
+opensip sim plugin list                   # the same, bound to the sim domain
+opensip sim plugin add <pkg>
+opensip sim plugin remove <pkg>
+opensip sim plugin sync
 ```
 
-### `plugin add <pkg>`
+### `<tool> plugin add <pkg>`
 
-For fit/sim packs, two operations happen in one command:
+Two operations happen in one command (the domain is the tool the subcommand hangs off of — `fit` or `sim`):
 
 1. Install `<pkg>` into `<project>/opensip-cli/.runtime/plugins/<domain>/`. The runtime dir's `package.json` is the install host — its `dependencies` block tracks installed plugins.
 2. Append `<pkg>` to `plugins.<domain>:` in `opensip-cli.config.yml`. Idempotent — adding the same name twice is a no-op.
 
-The fit/sim domain is inferred from the package name (`inferDomain` matches the registered domain name as a word, else the first registered plugin domain) unless `--domain` is passed explicitly. `--domain` accepts the registered project-plugin domains plus `tool`; anything else is rejected so a caller can't drive path construction outside the managed host dirs. The package-manager call is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` so package-manager flags cannot become an injection vector.
+The domain is bound from the tool primary, not inferred or flagged. The package-manager call is wrapped in `execFileSync` (no shell, no metacharacter expansion) and the package spec is validated to refuse anything starting with `-` so package-manager flags cannot become an injection vector. Extension packs are always **project-local** — there is no user-global pack path, so there is no `--project` flag.
 
-Tool plugins are the whole-subcommand shape. A package whose marker is detectable as `opensipTools.kind: "tool"` (or one installed with `--domain tool`) goes to the Tool host instead of `plugins.fit` / `plugins.sim`. Tool plugins are user-global by default (`~/.opensip-cli/plugins/tool`) so their command is available in every project; pass `--project` to install into the project-local Tool host (`opensip-cli/.runtime/plugins/tool`). They auto-discover by marker and do not get a config entry, so `plugin sync` does not recreate user-global Tool installs.
+### `<tool> plugin remove <pkg>`
 
-### `plugin remove <pkg>`
+The inverse of add: `npm uninstall <pkg>` from the host directory, then remove the entry from `plugins.<domain>:` in the config. The runtime dir stays — only the package's own `node_modules` entry goes away.
 
-For fit/sim packs, the inverse of add: `npm uninstall <pkg>` from the host directory, then remove the entry from `plugins.<domain>:` in the config. The runtime dir stays — only the package's own `node_modules` entry goes away.
+### `<tool> plugin list`
 
-Tool-plugin removal is explicit: pass `--domain tool` to target the Tool host, with `--project` for the project-local host. There is no Tool config entry to remove.
-
-### `plugin list`
-
-For fit/sim packs, walks `.runtime/plugins/<domain>/node_modules/` and intersects with the config's `plugins.<domain>:` list:
+Walks `.runtime/plugins/<domain>/node_modules/` for the bound domain and intersects with the config's `plugins.<domain>:` list:
 
 - **Installed and loaded** — package present in node_modules AND listed in config. Will be loaded on the next run.
-- **Installed but not loaded** — present but not listed. Either a transitive dep or a `plugin add` that crashed before updating the config.
-- **Listed but not installed** — listed but missing from node_modules. Run `plugin sync`.
+- **Installed but not loaded** — present but not listed. Either a transitive dep or an `add` that crashed before updating the config.
+- **Listed but not installed** — listed but missing from node_modules. Run `<tool> plugin sync`.
 
-For Tool plugins, `plugin list` also scans the user-global and project-local Tool hosts for `opensipTools.kind: "tool"` packages and reports them under the `tool` domain. Project-local Tool installs shadow user-global packages of the same name.
+Whole Tool plugins are NOT listed here — that is `opensip tools list`.
 
-### `plugin sync`
+### `<tool> plugin sync`
 
-Reads `plugins.<domain>:` from the config and installs each fit/sim entry. The bootstrap-after-clone command. CI should run `plugin sync` between checkout and `fit` so PR builds have the same fit/sim plugin set the author tested against.
+Reads `plugins.<domain>:` from the config and installs each entry for the bound domain. The bootstrap-after-clone command. CI should run `opensip fit plugin sync` (and/or `opensip sim plugin sync`) between checkout and `fit` so PR builds have the same pack set the author tested against.
 
-`plugin sync` is also the right command after switching branches if the new branch added or removed fit/sim plugins. The runtime dir is gitignored, so plugin state doesn't follow a branch checkout — `sync` is what makes the runtime match the config. It does not install Tool plugins because Tool plugins are marker-discovered and not listed in project config.
+`<tool> plugin sync` is also the right command after switching branches if the new branch added or removed that tool's packs. The runtime dir is gitignored, so plugin state doesn't follow a branch checkout — `sync` is what makes the runtime match the config.
 
 ---
 
@@ -277,7 +274,7 @@ For `acme-api`:
     fit:
       - '@acme/checks-internal'
   ```
-- `<project>/opensip-cli/.runtime/plugins/fit/node_modules/` carries that package, installed by `plugin add` (or by `plugin sync` after a fresh clone). The first-party `@opensip-cli/checks-*` packs are bundled/marker-discovered; `plugins.fit` is for project-pinned install state managed by `plugin add` / `plugin sync`.
+- `<project>/opensip-cli/.runtime/plugins/fit/node_modules/` carries that package, installed by `opensip fit plugin add` (or by `opensip fit plugin sync` after a fresh clone). The first-party `@opensip-cli/checks-*` packs are bundled/marker-discovered; `plugins.fit` is for project-pinned install state managed by `opensip fit plugin add` / `opensip fit plugin sync`.
 
 CI's pipeline:
 
@@ -285,7 +282,7 @@ CI's pipeline:
 git clone …
 cd acme-api
 curl -fsSL https://opensip.ai/cli/install.sh | bash
-opensip plugin sync           # bootstrap project-pinned plugins
+opensip fit plugin sync       # bootstrap project-pinned fit packs
 opensip fit --gate-compare    # the actual gate
 ```
 

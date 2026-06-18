@@ -127,6 +127,50 @@ export type DataStoreThunk = () => unknown;
 export interface ScopeContribution {}
 
 /**
+ * Wrapper form of a {@link Tool.contributeScope} return that carries a
+ * scope-disposer callback alongside the subscope. A tool that owns a per-run
+ * resource needing teardown (e.g. fitness's `FileCache` + its auto-clear timer)
+ * RETURNS this shape so the kernel install seam registers `onDispose` on
+ * `scope.onDispose(...)` after installing `contribution`.
+ *
+ * This is the layering-clean disposer seam: the disposer is an opaque
+ * `() => void` (core names no `FileCache`/`FitnessSubscope`), and the tool
+ * never receives the concrete `RunScope` (preserving RunScope⟷Tool
+ * acyclicity). The bare-{@link ScopeContribution} form remains valid for tools
+ * with nothing to dispose (graph, simulation).
+ */
+export interface ScopeContributionWithDisposer {
+  /** The tool's subscope slot bag — installed onto the scope via Object.assign. */
+  readonly contribution: ScopeContribution;
+  /**
+   * Optional disposer invoked once when the scope is disposed. Registered by the
+   * kernel install seam via `scope.onDispose(...)`. Opaque to core.
+   */
+  readonly onDispose?: () => void;
+}
+
+/**
+ * The full return type of {@link Tool.contributeScope}: either a bare
+ * {@link ScopeContribution} (the common case — no per-run resource to tear
+ * down) or the {@link ScopeContributionWithDisposer} wrapper that additionally
+ * carries an `onDispose` disposer for the kernel to register.
+ */
+export type ContributeScopeResult = ScopeContribution | ScopeContributionWithDisposer;
+
+/**
+ * Type guard distinguishing the {@link ScopeContributionWithDisposer} wrapper
+ * from a bare {@link ScopeContribution}. The wrapper is identified by its
+ * required `contribution` key; tool subscope slots are namespaced
+ * (`fitness`/`graph`/`simulation`), so `contribution` is an unambiguous
+ * discriminator.
+ */
+export function isContributionWithDisposer(
+  result: ContributeScopeResult,
+): result is ScopeContributionWithDisposer {
+  return 'contribution' in result;
+}
+
+/**
  * The Tool-facing view of the per-invocation scope: everything a tool
  * reads through `ToolCliContext.scope`. Excludes the `tools`
  * `ToolRegistry` on purpose — tools never read it, and naming it here

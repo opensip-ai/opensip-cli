@@ -8,7 +8,7 @@
  * of a parallel allowlist.
  */
 
-import type { HostSubcommandGroup } from './host-subcommand-groups.js';
+import type { HostSubcommandGroup, ToolPluginGroup } from './host-subcommand-groups.js';
 import type { CommandScopeRequirement } from '@opensip-cli/core';
 import type { Command } from 'commander';
 
@@ -18,12 +18,26 @@ export interface CommandScopeSpec {
   readonly name: string;
   readonly aliases?: readonly string[];
   readonly scope: CommandScopeRequirement;
+  /**
+   * When set, this tool command is nested under the named primary verb (the
+   * `<tool> <verb>` grammar — see `CommandSpec.parent`). The index then keys it
+   * under `${parent} ${name}` so `commandPath` resolves `graph export` /
+   * `fit list` rather than a bare `export` / `list`. Omitted ⇒ flat root key.
+   */
+  readonly parent?: string;
 }
 
 export interface CommandScopeIndexInput {
   readonly hostSpecs: readonly CommandScopeSpec[];
   readonly hostGroups: readonly HostSubcommandGroup[];
   readonly toolSpecs: readonly CommandScopeSpec[];
+  /**
+   * The DOMAIN-BOUND per-tool `plugin` groups (mounted under each pack-supporting
+   * tool primary, e.g. `opensip fit plugin list`). Each leaf keys under
+   * `${toolVerb} plugin ${leaf}` so `commandPath` resolves the doubly-nested path.
+   * Optional so callers without tools (isolated tests) can omit it.
+   */
+  readonly toolPluginGroups?: readonly ToolPluginGroup[];
 }
 
 function addSpec(
@@ -40,10 +54,19 @@ function addSpec(
 export function buildCommandScopeIndex(input: CommandScopeIndexInput): CommandScopeIndex {
   const index = new Map<string, CommandScopeRequirement>();
 
-  input.toolSpecs.forEach((spec) => addSpec(index, undefined, spec));
+  // Tool specs key flat by `name`, EXCEPT `parent`-nested specs (the
+  // `<tool> <verb>` grammar, taxonomy Task 0.4), which key under
+  // `${parent} ${name}` so `commandPath` resolves `graph export` / `fit list`.
+  input.toolSpecs.forEach((spec) => addSpec(index, spec.parent, spec));
   input.hostSpecs.forEach((spec) => addSpec(index, undefined, spec));
   input.hostGroups.forEach((group) => {
     group.leaves.forEach((leaf) => addSpec(index, group.name, leaf));
+  });
+  // Per-tool `plugin` group leaves key under the doubly-nested
+  // `${toolVerb} plugin ${leaf}` path (e.g. `fit plugin list`), matching what
+  // `commandPath` resolves for the mounted `opensip fit plugin list`.
+  (input.toolPluginGroups ?? []).forEach((group) => {
+    group.leaves.forEach((leaf) => addSpec(index, `${group.toolVerb} plugin`, leaf));
   });
 
   return index;

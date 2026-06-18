@@ -10,16 +10,16 @@
 
 import * as fs from 'node:fs/promises';
 
-import { SystemError, currentLogger } from '@opensip-cli/core';
+import { SystemError, currentLogger, currentScope } from '@opensip-cli/core';
 
 import { applyGlobalExcludes } from '../targets/index.js';
 
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
-import { fileCache as globalFileCache, type FileCache } from './file-cache.js';
 import { PathMatcher } from './path-matcher.js';
 import { extractSnippet } from './result-builder.js';
 
 import type { ResolvedScope } from './check-config.js';
+import type { FileCache } from './file-cache.js';
 
 /**
  * Check identifier (UUID format).
@@ -106,7 +106,14 @@ export interface RunOptions {
    * `tests/fixtures/`, etc., contrary to user intent.
    */
   readonly globalExcludes?: readonly string[];
-  /** Per-service FileCache instance (for SaaS isolation; falls back to global). */
+  /**
+   * Per-run FileCache instance. On the production path the recipe service passes
+   * the resolved `scope.fitness.fileCache` here. Optional only for the no-scope
+   * direct `run()` / unit-test path; when omitted, `createExecutionContext`
+   * resolves `currentScope()?.fitness?.fileCache` and throws
+   * `SYSTEM.FITNESS.NO_FILE_CACHE` if neither is present on a file-reading path
+   * (no module-singleton fallback — parallel-tool-invocations Phase 1).
+   */
   readonly fileCache?: FileCache;
 }
 
@@ -132,18 +139,21 @@ export interface ExecutionContextConfig {
  * through the substrate `applyGlobalExcludes` (ADR-0037) — the SAME
  * single implementation the scope-resolution path uses, so globalExcludes
  * is single-sourced on both paths (no separate Minimatch path in fitness).
+ *
+ * `fc` is the per-run cache resolved by {@link createExecutionContext}
+ * (`options.fileCache ?? currentScope().fitness.fileCache`) — REQUIRED, no
+ * module-singleton fallback (parallel-tool-invocations Phase 1).
  */
 function createMatchFilesFunction(
   cwd: string,
   matcher: PathMatcher,
+  fc: FileCache,
   targetFiles?: readonly string[],
   globalExcludes?: readonly string[],
-  fileCacheInstance?: FileCache,
 ): (
   patterns?: readonly string[],
   options?: { ignore?: readonly string[] },
 ) => Promise<readonly string[]> {
-  const fc = fileCacheInstance ?? globalFileCache;
   return async (
     patterns?: readonly string[],
     options?: { ignore?: readonly string[] },
@@ -186,7 +196,22 @@ export function createExecutionContext(
   matcher: PathMatcher,
   options?: RunOptions,
 ): ExecutionContext {
-  const fc = options?.fileCache ?? globalFileCache;
+  // Resolve the per-run cache: the explicit option (recipe service passes
+  // `execOpts.fileCache` on the production path) or the entered scope's
+  // canonical `scope.fitness.fileCache`. No module-singleton fallback — a
+  // file-reading production path MUST run inside a scope carrying the fitness
+  // subscope (parallel-tool-invocations Phase 1). The no-scope direct `run()`
+  // path may pass `options.fileCache` explicitly; absent both, file reads throw.
+  const fc = options?.fileCache ?? currentScope()?.fitness?.fileCache;
+  if (!fc) {
+    throw new SystemError(
+      `No per-run FileCache available for check '${config.slug}'. A file-reading ` +
+        `check must run inside a RunScope carrying scope.fitness.fileCache (the CLI ` +
+        `pre-action-hook installs it via the fitness tool's contributeScope), or be ` +
+        `passed an explicit options.fileCache.`,
+      { code: 'SYSTEM.FITNESS.NO_FILE_CACHE' },
+    );
+  }
   return {
     cwd,
     checkId: config.id,
@@ -229,9 +254,9 @@ export function createExecutionContext(
     matchFiles: createMatchFilesFunction(
       cwd,
       matcher,
+      fc,
       options?.targetFiles,
       options?.globalExcludes,
-      fc,
     ),
 
     getMatcher(): PathMatcher {

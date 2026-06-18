@@ -22,8 +22,10 @@ const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')
 };
 
 describe('fitnessTool contract conformance', () => {
-  it("metadata.name is the human key 'fitness'; id is the stable UUID", () => {
-    expect(fitnessTool.metadata.name).toBe('fitness');
+  it("metadata.name is the command verb 'fit'; id is the stable UUID", () => {
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`fit`). The config namespace literal stays `fitness` (decoupled).
+    expect(fitnessTool.metadata.name).toBe('fit');
     expect(fitnessTool.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
   });
 
@@ -35,9 +37,13 @@ describe('fitnessTool contract conformance', () => {
     expect(fitnessTool.metadata.description.length).toBeGreaterThan(0);
   });
 
-  it('commands list includes fit, fit-list, fit-recipes', () => {
+  it('commands list includes fit + the nested list/recipes/export children', () => {
     const names = (fitnessTool.commands ?? []).map((c) => c.name);
-    expect(names).toEqual(expect.arrayContaining(['fit', 'fit-list', 'fit-recipes']));
+    expect(names).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    // The legacy flat-root aliases are gone.
+    expect(names).not.toContain('fit-list');
+    expect(names).not.toContain('fit-recipes');
+    expect(names).not.toContain('fit-baseline-export');
   });
 
   it("does not own the cross-tool 'report' command", () => {
@@ -55,17 +61,21 @@ describe('fitnessTool contract conformance', () => {
     const specNames = (fitnessTool.commandSpecs ?? []).map((s) => s.name);
     expect(specNames).toEqual([
       'fit',
-      'fit-list',
-      'fit-recipes',
-      'fit-baseline-export',
+      // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) —
+      // name 'list' / 'recipes', parent 'fit'.
+      'list',
+      'recipes',
+      // Canonical nested export — name 'export', parent 'fit'.
+      'export',
       // [internal] headless run forked by the live view (ADR-0028).
       'fit-run-worker',
     ]);
   });
 
-  it('fit-list / fit-recipes do not expose pre-GA legacy aliases', () => {
+  it('the nested list/recipes/export children declare no Commander aliases', () => {
     const byName = new Map((fitnessTool.commandSpecs ?? []).map((s) => [s.name, s]));
-    expect(byName.get('fit-list')?.aliases ?? []).toEqual([]);
-    expect(byName.get('fit-recipes')?.aliases ?? []).toEqual([]);
+    expect(byName.get('list')?.aliases ?? []).toEqual([]);
+    expect(byName.get('recipes')?.aliases ?? []).toEqual([]);
+    expect(byName.get('export')?.aliases ?? []).toEqual([]);
   });
 });

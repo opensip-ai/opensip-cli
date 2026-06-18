@@ -143,7 +143,7 @@ export function readHostDependencies(dir: string): Set<string> {
   return new Set(Object.keys(hostPkg?.dependencies ?? {}));
 }
 
-export function extractNameFromSpec(spec: string): string | undefined {
+function extractNameFromSpec(spec: string): string | undefined {
   if (spec.startsWith('/') || spec.startsWith('.') || spec.startsWith('file:')) return undefined;
   if (spec.startsWith('@')) {
     const withoutScope = spec.slice(1);

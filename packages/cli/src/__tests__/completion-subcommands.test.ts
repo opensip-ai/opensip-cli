@@ -24,8 +24,15 @@ import {
   type CompletionInventory,
 } from '../commands/completion.js';
 import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
-import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
+import {
+  buildHostSubcommandGroups,
+  buildToolPluginGroups,
+} from '../commands/host-subcommand-groups.js';
 import { registerCliCommands } from '../commands/index.js';
+import {
+  internalCommandNames,
+  showInternalCommands,
+} from '../commands/internal-command-visibility.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
 
@@ -76,14 +83,19 @@ function makeStubToolContext(): ToolCliContext {
 }
 
 /** A minimal host context for building the host specs we introspect (handlers
- *  are never invoked here — only the static declarations are read). */
+ *  are never invoked here — only the static declarations are read). The pack
+ *  `plugin` groups are derived from `pluginLayouts`, so supply the real fit/sim
+ *  layouts (graph has none) — matching what the composition root threads in. */
 function makeStubHostContext(): CliCommandsContext {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     emitJson: vi.fn(),
     emitError: vi.fn(),
-    pluginLayouts: [],
+    pluginLayouts: [
+      { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+      { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+    ],
     datastore: () => undefined,
   };
 }
@@ -107,6 +119,10 @@ async function buildLiveInventory(): Promise<{
     toolSpecs: registry.list().flatMap((t) => t.commandSpecs ?? []),
     hostSpecs: buildTopLevelHostSpecs(hostCtx),
     groups: buildHostSubcommandGroups(hostCtx),
+    toolPluginGroups: buildToolPluginGroups(hostCtx).map((g) => ({
+      toolVerb: g.toolVerb,
+      leaves: g.leaves.map((l) => ({ name: l.name })),
+    })),
   });
   return { inventory, program, registry };
 }
@@ -133,10 +149,14 @@ describe('completion flag parity', () => {
     for (const spec of toolSpecs) {
       if (INTERNAL_COMMANDS.has(spec.name)) continue;
       const declared = specLongFlags(spec);
+      // A `parent`-nested spec (taxonomy Task 0.4, e.g. `graph export`) keys its
+      // flags under the qualified `${parent} ${name}` path, not the bare name.
+      const parent = (spec as { parent?: string }).parent;
+      const key = parent === undefined ? spec.name : `${parent} ${spec.name}`;
       for (const flag of declared) {
         expect(
-          inventory.commandFlags[spec.name],
-          `expected completion for '${spec.name}' to include '${flag}'`,
+          inventory.commandFlags[key],
+          `expected completion for '${key}' to include '${flag}'`,
         ).toContain(flag);
       }
     }
@@ -166,20 +186,168 @@ describe('completion flag parity', () => {
   });
 });
 
-describe('completion plugin sub-subcommand parity', () => {
-  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', async () => {
+describe('completion plugin sub-subcommand parity (now under each pack-supporting tool)', () => {
+  it('there is NO top-level plugin command; the pack ops mount under fit/sim', async () => {
+    const { program } = await buildLiveInventory();
+    // The retired top-level `plugin` group must not exist; the pack ops live
+    // under each pack-supporting tool primary.
+    expect(program.commands.find((c) => c.name() === 'plugin')).toBeUndefined();
+    for (const toolVerb of ['fit', 'sim']) {
+      const primary = program.commands.find((c) => c.name() === toolVerb);
+      expect(primary, `${toolVerb} primary should be registered`).toBeDefined();
+      const pluginGroup = primary!.commands.find((c) => c.name() === 'plugin');
+      expect(pluginGroup, `${toolVerb} should host a plugin group`).toBeDefined();
+    }
+  });
+
+  it('emitted bash/zsh scripts list the live <tool> plugin subcommands (no install/add drift)', async () => {
     const { inventory, program } = await buildLiveInventory();
-    const pluginCmd = program.commands.find((c) => c.name() === 'plugin');
-    expect(pluginCmd, 'plugin command should be registered').toBeDefined();
-    const liveSubs = (pluginCmd?.commands ?? []).map((c) => c.name()).sort();
+    const fitPlugin = program.commands
+      .find((c) => c.name() === 'fit')!
+      .commands.find((c) => c.name() === 'plugin');
+    expect(fitPlugin, 'fit plugin group should be registered').toBeDefined();
+    const liveSubs = (fitPlugin?.commands ?? []).map((c) => c.name()).sort();
 
     const bash = buildCompletionScript('bash', inventory);
     const zsh = buildCompletionScript('zsh', inventory);
     for (const sub of liveSubs) {
-      expect(bash, `bash completion should list plugin '${sub}'`).toContain(sub);
-      expect(zsh, `zsh completion should list plugin '${sub}'`).toContain(sub);
+      expect(bash, `bash completion should list fit plugin '${sub}'`).toContain(sub);
+      expect(zsh, `zsh completion should list fit plugin '${sub}'`).toContain(sub);
     }
+    // `plugin` is offered as a leaf under each pack-supporting tool verb, and the
+    // bound leaves under `${toolVerb} plugin`.
+    expect(inventory.groupSubcommands.fit).toContain('plugin');
+    expect(inventory.groupSubcommands.sim).toContain('plugin');
+    expect(inventory.groupSubcommands['fit plugin']).toEqual(
+      expect.arrayContaining(['list', 'add', 'remove', 'sync']),
+    );
+    // No top-level `plugin` group in the inventory anymore.
+    expect(inventory.groupSubcommands.plugin).toBeUndefined();
     // The historical drift was `install` (canonical action is `add` post-F7).
-    expect(inventory.groupSubcommands.plugin).not.toContain('install');
+    expect(inventory.groupSubcommands['fit plugin']).not.toContain('install');
+  });
+});
+
+/** The legacy flat-root export aliases that were removed entirely — they must
+ *  not surface anywhere in completion (no command spec declares them). */
+const REMOVED_FLAT_EXPORTS = [
+  'catalog-export',
+  'sarif-export',
+  'graph-baseline-export',
+  'fit-baseline-export',
+];
+
+describe('completion taxonomy — internal excluded, canonical exports advertised (Task 4.3)', () => {
+  /** The five Tier-3 internal command names + the non-`*-worker` equivalence gate. */
+  const INTERNAL_NAMES = [
+    'fit-run-worker',
+    'graph-run-worker',
+    'graph-shard-worker',
+    'graph-equivalence-check',
+    'sim-run-worker',
+  ];
+
+  it('no internal command (workers + graph-equivalence-check) appears in completion subcommands', async () => {
+    const { inventory } = await buildLiveInventory();
+    for (const name of INTERNAL_NAMES) {
+      expect(
+        inventory.subcommands,
+        `internal command '${name}' must not be offered in completion`,
+      ).not.toContain(name);
+      // It must also not leak as a per-command flag key.
+      expect(
+        inventory.commandFlags[name],
+        `'${name}' must have no completion flag set`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('the descriptor-driven internal set covers all five (incl. the Phase 1 graph-equivalence-check leak fix)', async () => {
+    const { registry } = await buildLiveInventory();
+    const internal = internalCommandNames(registry);
+    for (const name of INTERNAL_NAMES) {
+      expect(internal, `descriptor-driven internal set must include '${name}'`).toContain(name);
+    }
+  });
+
+  it('offers the canonical nested `graph export` / `fit export`; the legacy flat verbs are gone', async () => {
+    const { inventory } = await buildLiveInventory();
+    // Canonical nested exports flow into the group map under their tool primary.
+    expect(inventory.groupSubcommands.graph, 'graph must offer the nested `export` leaf').toContain(
+      'export',
+    );
+    expect(inventory.groupSubcommands.fit, 'fit must offer the nested `export` leaf').toContain(
+      'export',
+    );
+    // The nested forms carry their own flag set keyed under `${parent} export`.
+    expect(inventory.commandFlags['graph export']).toBeDefined();
+    expect(inventory.commandFlags['fit export']).toBeDefined();
+    // The removed flat export verbs are NOT offered as subcommands (no spec
+    // declares them anymore).
+    for (const removed of REMOVED_FLAT_EXPORTS) {
+      expect(
+        inventory.subcommands,
+        `removed flat export '${removed}' must not be an offered subcommand`,
+      ).not.toContain(removed);
+    }
+  });
+
+  it('OPENSIP_CLI_SHOW_INTERNAL=1 flips internal commands INTO the offered subcommands', async () => {
+    const { registry } = await buildLiveInventory();
+    const toolSpecs = registry.list().flatMap((t) => t.commandSpecs ?? []);
+    const hostCtx = makeStubHostContext();
+
+    const build = (): CompletionInventory => {
+      // Mirror the live call-site internal-set computation
+      // (host-command-specs.ts): the descriptor-driven internal set is revealed
+      // (emptied) when the env override is on.
+      const internalCommands = showInternalCommands()
+        ? new Set<string>()
+        : internalCommandNames(registry);
+      return assembleCompletionInventory({
+        toolSpecs,
+        hostSpecs: buildTopLevelHostSpecs(hostCtx),
+        groups: buildHostSubcommandGroups(hostCtx),
+        internalCommands,
+      });
+    };
+
+    // Default (override off): internal workers are filtered out.
+    const before = build();
+    for (const name of INTERNAL_NAMES) {
+      expect(before.subcommands, `'${name}' hidden by default`).not.toContain(name);
+    }
+
+    const prev = process.env.OPENSIP_CLI_SHOW_INTERNAL;
+    process.env.OPENSIP_CLI_SHOW_INTERNAL = '1';
+    try {
+      const revealed = build();
+      for (const name of INTERNAL_NAMES) {
+        expect(revealed.subcommands, `'${name}' revealed by the override`).toContain(name);
+      }
+      // The removed flat export verbs never appear — they are gone from the
+      // command surface entirely (not merely filtered).
+      for (const removed of REMOVED_FLAT_EXPORTS) {
+        expect(
+          revealed.subcommands,
+          `removed flat export '${removed}' must never appear`,
+        ).not.toContain(removed);
+      }
+    } finally {
+      if (prev === undefined) delete process.env.OPENSIP_CLI_SHOW_INTERNAL;
+      else process.env.OPENSIP_CLI_SHOW_INTERNAL = prev;
+    }
+  });
+
+  it('the grouped `<tool> <verb>` forms appear under fit / graph / sim', async () => {
+    const { inventory } = await buildLiveInventory();
+    // Task 3.x grouped children, folded into the group map by their parent verb.
+    expect(inventory.groupSubcommands.fit).toEqual(
+      expect.arrayContaining(['list', 'recipes', 'export']),
+    );
+    expect(inventory.groupSubcommands.graph).toEqual(
+      expect.arrayContaining(['recipes', 'lookup', 'index', 'list', 'export']),
+    );
+    expect(inventory.groupSubcommands.sim).toEqual(expect.arrayContaining(['recipes']));
   });
 });

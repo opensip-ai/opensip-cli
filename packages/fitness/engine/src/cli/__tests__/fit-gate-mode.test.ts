@@ -44,7 +44,7 @@ const envelopeWith = (passed: boolean): SignalEnvelope =>
 const fitResult = (passed: boolean): Awaited<ReturnType<typeof executeFit>> => {
   const envelope = envelopeWith(passed);
   return {
-    result: { type: 'fit-done', label: 'gate', cwd: '/x', envelope, configFound: true },
+    result: { type: 'run-presentation', tool: 'fitness', envelope },
     envelope,
   } as unknown as Awaited<ReturnType<typeof executeFit>>;
 };

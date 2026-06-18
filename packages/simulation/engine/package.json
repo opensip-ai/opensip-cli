@@ -38,13 +38,17 @@
   ],
   "opensipTools": {
     "kind": "tool",
-    "id": "simulation",
+    "id": "sim",
     "stableId": "715d32c2-692c-4ed4-985b-a35deaf186aa",
     "apiVersion": 1,
     "commands": [
       {
         "name": "sim",
         "description": "Run simulation scenarios"
+      },
+      {
+        "name": "recipes",
+        "description": "List available simulation recipes"
       },
       {
         "name": "sim-run-worker",

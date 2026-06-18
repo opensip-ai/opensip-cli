@@ -116,7 +116,7 @@ Gitignored (`opensip init` adds the entry to `.gitignore` for you):
 ├── reports/latest.html                           ← single rolling HTML report, overwritten each run
 ├── logs/<YYYY-MM-DD>.jsonl                       ← one log file per local day, all runs append
 └── plugins/
-    ├── fit/node_modules/                         ← project-pinned fit plugins (plugin add/sync)
+    ├── fit/node_modules/                         ← project-pinned fit plugins (fit plugin add/sync)
     └── sim/node_modules/                         ← project-pinned sim plugins
 ```
 

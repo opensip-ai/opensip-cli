@@ -91,13 +91,50 @@ describe('configure wiring', () => {
 });
 
 describe('plugin wiring', () => {
-  it('registers `plugin` with the expected subcommands', () => {
+  // The pack `plugin {add,list,remove,sync}` ops are NO LONGER a top-level
+  // group: they mount UNDER each pack-supporting tool primary (`opensip fit
+  // plugin …`, `opensip sim plugin …`). `mountHostCommands` mounts them only
+  // when the tool primaries already exist on the program (the composition root
+  // mounts tools first). This host-only mount (no tools registered) therefore
+  // exposes NO top-level `plugin` command.
+  it('does NOT register a top-level `plugin` command', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
-    const cmd = findSubcommand(program, 'plugin');
-    expect(cmd).toBeDefined();
-    const subs = cmd!.commands.map((c) => c.name());
-    expect(subs).toEqual(expect.arrayContaining(['list', 'add', 'remove', 'sync']));
+    expect(findSubcommand(program, 'plugin')).toBeUndefined();
+  });
+
+  it('mounts a domain-bound `plugin` group under each pack-supporting tool primary', () => {
+    const { ctx } = makeCtx();
+    // Two pack-supporting layouts (fit/sim) + two stub tool primaries to host
+    // their `plugin` groups, mirroring the real mount order (tools first).
+    const ctxWithLayouts: CliCommandsContext = {
+      ...ctx,
+      pluginLayouts: [
+        { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+        { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+      ],
+    };
+    const program = new Command('opensip');
+    program.command('fit').description('Run fitness checks');
+    program.command('sim').description('Run simulation scenarios');
+    mountHostCommands(program, ctxWithLayouts);
+
+    for (const toolVerb of ['fit', 'sim']) {
+      const primary = findSubcommand(program, toolVerb);
+      expect(primary, `${toolVerb} primary should exist`).toBeDefined();
+      const pluginGroup = primary!.commands.find((c) => c.name() === 'plugin');
+      expect(pluginGroup, `${toolVerb} should host a plugin group`).toBeDefined();
+      const subs = pluginGroup!.commands.map((c) => c.name());
+      expect(subs).toEqual(expect.arrayContaining(['list', 'add', 'remove', 'sync']));
+      // No `--domain`/`--type` flag — the domain is bound from the tool primary.
+      for (const leafName of ['add', 'remove', 'list', 'sync']) {
+        const leaf = pluginGroup!.commands.find((c) => c.name() === leafName);
+        const flags = (leaf?.options ?? []).map((o) => o.long);
+        expect(flags, `${toolVerb} plugin ${leafName} must not carry --domain`).not.toContain(
+          '--domain',
+        );
+      }
+    }
   });
 });
 
@@ -131,8 +168,10 @@ describe('documented subcommand-group exceptions', () => {
   // `command-surface-parity` guardrail allow-lists exactly these. This test
   // locks the list AND asserts every named group is actually a mounted
   // action-less parent (no action handler, has sub-subcommands).
-  it('is exactly [sessions, plugin, tools]', () => {
-    expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual(['plugin', 'sessions', 'tools']);
+  it('is exactly [sessions, tools]', () => {
+    // `plugin` was RETIRED as a top-level group: pack ops now mount under each
+    // pack-supporting tool primary (`opensip fit plugin …`), not at the root.
+    expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual(['sessions', 'tools']);
   });
 
   it('each documented group is a mounted parent with sub-subcommands and no own action', () => {

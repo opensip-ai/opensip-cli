@@ -63,7 +63,7 @@ import {
 import type {
   CommandResult,
   ErrorResult,
-  GraphDoneResult,
+  RunPresentation,
   SessionReplayResult,
   SignalEnvelope,
   VerboseDetail,
@@ -95,45 +95,6 @@ function errorView(result: ErrorResult): ViewNode {
     children.push(line([{ text: `    ${result.suggestion}` }], true));
   }
   return group(children, 2);
-}
-
-/**
- * The graph report: an optional verbose body, an optional fast-tier
- * caveat, the shared summary line, and the shared footer hints. The
- * summary/hints reuse the cli-ui producers, so graph's piped and TTY
- * output match each other and the live view — no hand-maintained
- * plain-text copies (which previously lived in graph-report.ts).
- */
-function graphDoneView(result: GraphDoneResult): ViewNode {
-  const children: ViewNode[] = [];
-  if (result.verboseDetail !== undefined) {
-    children.push(renderVerboseDetail(result.verboseDetail), SPACER);
-  }
-  if (result.resolutionBanner !== undefined) {
-    children.push(line([{ text: result.resolutionBanner, tone: 'muted' }]));
-  }
-  // ADR-0035: the headline verdict is PASS/FAIL. graph-done carries count-based
-  // summary (no envelope verdict on this report path), so derive the verdict from
-  // graph's default policy — fail on any error-rung finding ({failOnErrors:1}).
-  children.push(
-    viewRunSummary({
-      passed: result.summary.errors === 0,
-      errors: result.summary.errors,
-      warnings: result.summary.warnings,
-      durationMs: resolveSummaryDuration(result.durationMs),
-    }),
-  );
-  // Non-verbose run: show the shared "Use --verbose…" hint plus graph's
-  // report hint (ADR-0021 — one source for the verbose-hint string).
-  if (result.verboseDetail === undefined) {
-    children.push(
-      viewFooterHints([
-        VERBOSE_DETAIL_HINT,
-        { text: 'opensip report for HTML report', bold: ['opensip report'] },
-      ]),
-    );
-  }
-  return group(children);
 }
 
 /**
@@ -194,8 +155,8 @@ function assertNever(result: never): never {
 // carries a `SignalEnvelope`, and the terminal table is derived FROM its
 // `units` + `signals` via the shared `formatSignalTableRows` / `Summary`
 // formatters (`@opensip-cli/output`). One row per unit (check / rule /
-// scenario). Replaces the three per-tool, pre-computed `rows`/`reportLines`
-// shapes (the fit/sim/graph `*DoneResult` legacy branches, retired in Phase 7).
+// scenario). Replaced the three per-tool, pre-computed `rows`/`reportLines`
+// shapes (the fit/sim/graph per-tool render branches, retired in Phase 7).
 
 const ENV_COL = {
   status: 7,
@@ -331,10 +292,18 @@ function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
  *
  * When `verboseDetail` is present (a `--verbose` run), its rendered body is
  * prepended above the per-unit table (ADR-0021).
+ *
+ * `durationOverride` is the host-owned display duration (ADR-0051), threaded by
+ * `presentationToView` from `RunPresentation.durationMs`. It WINS over the
+ * envelope unit-sum: tools whose units carry no per-unit duration (graph stamps
+ * `durationMs: 0`) would otherwise render a `0ms` summary. fit/sim units carry
+ * real durations, so they are unaffected when no override is supplied (the
+ * unit-sum fallback stays exact).
  */
 export function envelopeToTableView(
   envelope: SignalEnvelope,
   verboseDetail?: VerboseDetail,
+  durationOverride?: number,
 ): ViewNode {
   const rows = formatSignalTableRows(envelope);
   const summary = formatSignalTableSummary(envelope);
@@ -351,33 +320,51 @@ export function envelopeToTableView(
       passed: envelope.verdict.passed,
       errors: summary.totalErrors,
       warnings: summary.totalWarnings,
-      durationMs: resolveSummaryDuration(summary.durationMs),
+      durationMs: resolveSummaryDuration(durationOverride ?? summary.durationMs),
     }),
   );
+  return group(children);
+}
+
+/**
+ * The single render path for a {@link RunPresentation} (envelope-first-presentation
+ * plan). Renders `p.banners` as muted lines above the table (graph's resolution
+ * caveat), delegates the table+summary to `envelopeToTableView` (threading
+ * `p.durationMs` as the host-owned duration override), and applies the shared
+ * `withVerboseHint` footer when `verboseDetail` is absent — preserving fit/sim's
+ * exact non-verbose footer behavior.
+ *
+ * This is the sole `resultToView` `case 'run-presentation'` target; it superseded
+ * the three per-tool `*DoneResult` render cases (hard-removed in RP-3).
+ */
+export function presentationToView(p: RunPresentation): ViewNode {
+  const children: ViewNode[] = [];
+  if (p.banners !== undefined) {
+    for (const banner of p.banners) {
+      children.push(line([{ text: banner, tone: 'muted' }]));
+    }
+  }
+  const body = withVerboseHint(
+    envelopeToTableView(p.envelope, p.verboseDetail, p.durationMs),
+    p.verboseDetail === undefined,
+  );
+  children.push(body);
   return group(children);
 }
 
 /** Map any CommandResult to its view-model node (total — every variant covered). */
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
-    // fit (Phase 6) and sim (Phase 4) are both envelope-backed: the terminal
-    // table is derived from the envelope (one row per check/scenario unit) and
-    // the optional verbose body + non-verbose "Use --verbose…" hint render
-    // through the one shared seam (ADR-0011/ADR-0021), identically in TTY/pipe.
-    case 'fit-done':
-    case 'sim-done': {
-      return withVerboseHint(
-        envelopeToTableView(result.envelope, result.verboseDetail),
-        result.verboseDetail === undefined,
-      );
+    // The render-only run-presentation adjunct (envelope-first-presentation plan):
+    // the SINGLE run variant. fit/sim/graph all construct this; the table+summary
+    // are derived from the envelope, banners (graph's resolution caveat) render
+    // above, and the shared non-verbose footer below — identically in TTY/pipe.
+    // It replaced the three per-tool `*DoneResult` cases (hard-removed in RP-3).
+    case 'run-presentation': {
+      return presentationToView(result);
     }
     case 'error': {
       return errorView(result);
-    }
-    case 'graph-done': {
-      // graph keeps its own rich report view (it delivers signals via an
-      // explicit `cli.deliverSignals(...)` call, not via a result envelope).
-      return graphDoneView(result);
     }
     case 'gate-done': {
       return linesView(result.lines);

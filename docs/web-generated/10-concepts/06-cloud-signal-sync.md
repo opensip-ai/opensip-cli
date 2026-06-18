@@ -121,7 +121,7 @@ Sync happens at the composition root after a tool returns its envelope (`cli.del
 
 - **`fit`** — delivers after a run completes.
 - **`sim`** — delivers after a run completes. Since ADR-0011 sim emits the envelope, so it gains cloud sync (and `--report-to`) "for free".
-- **`graph`** — delivers on the default render and in `--gate-save`/`--gate-compare` and `--report-to` modes. It does **not** deliver for plain `--json` (a machine-artifact stream, and the carrier each `--workspace` child runs under) or for `--workspace` itself (the parent aggregates per-unit findings for the dashboard, not signals) — `executeGraph` returns `undefined` for those paths, so the root skips delivery. The separate `catalog-export` command is a catalog dump for the parent ingestor, not a signal-emitting run. Run a whole-project `graph` to sync.
+- **`graph`** — delivers on the default render and in `--gate-save`/`--gate-compare` and `--report-to` modes. It does **not** deliver for plain `--json` (a machine-artifact stream, and the carrier each `--workspace` child runs under) or for `--workspace` itself (the parent aggregates per-unit findings for the dashboard, not signals) — `executeGraph` returns `undefined` for those paths, so the root skips delivery. The separate `graph export --format catalog` command is a catalog dump for the parent ingestor, not a signal-emitting run. Run a whole-project `graph` to sync.
 
 ---
 

@@ -1,0 +1,9 @@
+Resolution: fast (syntactic) — edges are approximate; re-run with --resolution exact for semantic precision.
+== Catalog ==
+5 functions across 2 files (cacheHit=false)
+
+Unit                                     | Status  | Errors | Warnings | Duration  
+-----------------------------------------|---------|--------|----------|-----------
+graph.dead-code.orphan-subtree           | PASS    | 0      | 3        | 0ms       
+graph.architecture.cycle                 | PASS    | 0      | 0        | 0ms       
+PASS  (0 Errors, 3 Warnings) | Duration 50ms

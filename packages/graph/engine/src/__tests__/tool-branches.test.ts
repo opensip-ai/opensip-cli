@@ -1,9 +1,9 @@
 /**
  * graphTool — branch coverage for the spec-handler paths the primary
  * tool-register suite doesn't reach: the `--resolution` choices declaration
- * (+ the `fast` path), the graph-shard-worker handler, catalog-export's
- * incremental + changed-file advisory branch, the error handler on a pipeline
- * throw, and the contributeScope / collectReportData hooks.
+ * (+ the `fast` path), the graph-shard-worker handler, `graph export --format
+ * catalog`'s incremental + changed-file advisory branch, the error handler on a
+ * pipeline throw, and the contributeScope / collectReportData hooks.
  *
  * Since release 2.11.0 Phase 5 graph mounts via `commandSpecs`; we drive each
  * spec's handler directly (the host invokes it post-parse), threading
@@ -19,7 +19,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry, currentScope, resolveToolHooks } from '@opensip-cli/core';
+import {
+  enterScope,
+  isContributionWithDisposer,
+  LanguageRegistry,
+  currentScope,
+  resolveToolHooks,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -136,19 +142,22 @@ afterEach(() => {
 
 describe('--resolution declaration', () => {
   it('declares choices exact|fast on every --resolution-bearing command', () => {
-    for (const name of ['graph', 'catalog-export', 'sarif-export']) {
+    // `graph` (the primary) and `graph export` (the canonical export command);
+    // the legacy flat-root catalog-export/sarif-export aliases were removed.
+    for (const name of ['graph', 'export']) {
       const option = (specFor(name).options ?? []).find((o) => o.flag === '--resolution');
       expect(option?.choices).toEqual(['exact', 'fast']);
       expect(option?.default).toBe('exact');
     }
   });
 
-  it('accepts --resolution fast on the sarif-export path', async () => {
+  it('accepts --resolution fast on the `graph export --format sarif` path', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'out.sarif');
     const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('sarif-export')(
+    await handlerFor('export')(
       {
+        format: 'sarif',
         outputSarif: outPath,
         tenantId: 't',
         repoId: 'r',
@@ -210,7 +219,9 @@ describe('graph interactive --exact path honors graph config', () => {
     expect(renderLive).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledTimes(1);
     const [result] = render.mock.calls[0] as [{ type?: string }];
-    expect(result.type).toBe('graph-done');
+    // envelope-first-presentation RP-2: the static render seam now receives a
+    // RunPresentation (envelope-backed) rather than a count-based graph-done.
+    expect(result.type).toBe('run-presentation');
   });
 
   it('a bare default run takes the live view on a TTY (ADR-0032: the live renderer is engine-agnostic — drives the sharded default too)', async () => {
@@ -261,13 +272,14 @@ describe('graph-shard-worker handler', () => {
   });
 });
 
-describe('catalog-export handler branches', () => {
+describe('graph export --format catalog handler branches', () => {
   it('logs the changed-file advisory on the incremental path and still writes the export', async () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const outPath = join(workDir, 'catalog.json');
     const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('catalog-export')(
+    await handlerFor('export')(
       {
+        format: 'catalog',
         catalogOutput: outPath,
         tenantId: 't',
         repoId: 'r',
@@ -288,8 +300,9 @@ describe('catalog-export handler branches', () => {
     // the handler's catch hands to handleGraphError.
     const outPath = join(workDir, 'catalog.json');
     const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('catalog-export')(
+    await handlerFor('export')(
       {
+        format: 'catalog',
         catalogOutput: outPath,
         tenantId: 't',
         repoId: 'r',
@@ -308,7 +321,11 @@ describe('catalog-export handler branches', () => {
 
 describe('contributeScope + collectReportData hooks', () => {
   it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () => {
-    const contribution = resolveToolHooks(graphTool).contributeScope?.() ?? {};
+    const result = resolveToolHooks(graphTool).contributeScope?.() ?? {};
+    // graph returns the bare ScopeContribution form (no per-run resource to
+    // dispose), so the disposer-wrapper guard must be false here.
+    expect(isContributionWithDisposer(result)).toBe(false);
+    const contribution = isContributionWithDisposer(result) ? result.contribution : result;
     expect(contribution.graph).toBeDefined();
     expect(contribution.graph?.adapters).toBeDefined();
     expect(contribution.graph?.rules).toBeDefined();

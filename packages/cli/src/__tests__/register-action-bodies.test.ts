@@ -132,44 +132,63 @@ function topCmd(program: Command, name: string): Command {
   return cmd;
 }
 
-/** Find a sub-subcommand under a group. */
-function subCmd(program: Command, group: string, leaf: string): Command {
-  const child = topCmd(program, group).commands.find((c) => c.name() === leaf);
-  if (!child) throw new Error(`no '${group} ${leaf}'`);
-  return child;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// --- plugin -------------------------------------------------------------------
+// --- <tool> plugin (domain-bound, mounted under the tool primary) --------------
 
-describe('plugin spec — action bodies', () => {
-  it('plugin list: invokes pluginList with effectiveCwd (projectContext wins)', async () => {
+/** The single-domain layout view a bound `<tool> plugin …` leaf passes into the
+ *  pure plugin commands (matching `boundLayouts(ctx, domain)`). */
+const FIT_BOUND_LAYOUTS = [{ domain: 'fit', userSubdirs: ['checks', 'recipes'] }];
+const SIM_BOUND_LAYOUTS = [{ domain: 'sim', userSubdirs: ['scenarios', 'recipes'] }];
+
+/** Mount stub `fit`/`sim` tool primaries, THEN the host commands — so the
+ *  per-tool `plugin` groups mount under those primaries (the real order: tools
+ *  first, then host commands). */
+function mountWithToolPrimaries(ctx: CliCommandsContext): Command {
+  const program = new Command('opensip');
+  program.command('fit').description('Run fitness checks');
+  program.command('sim').description('Run simulation scenarios');
+  mountHostCommands(program, ctx);
+  return program;
+}
+
+/** Find a `<tool> plugin <leaf>` doubly-nested command. */
+function toolPluginCmd(program: Command, toolVerb: string, leaf: string): Command {
+  const primary = topCmd(program, toolVerb);
+  const pluginGroup = primary.commands.find((c) => c.name() === 'plugin');
+  if (!pluginGroup) throw new Error(`no '${toolVerb} plugin' group`);
+  const child = pluginGroup.commands.find((c) => c.name() === leaf);
+  if (!child) throw new Error(`no '${toolVerb} plugin ${leaf}'`);
+  return child;
+}
+
+describe('<tool> plugin spec — action bodies (domain-bound)', () => {
+  it('fit plugin list: invokes pluginList with effectiveCwd + the bound fit layout', async () => {
     const { ctx, rendered } = makeCtx();
-    const program = mount(ctx);
+    const program = mountWithToolPrimaries(ctx);
 
-    // Attach a projectContext on the listCmd to simulate the pre-action
-    // hook's mutation — effectiveCwd should prefer it over --cwd.
-    subCmd(program, 'plugin', 'list').setOptionValue('projectContext', {
+    // Attach a projectContext on the leaf to simulate the pre-action hook's
+    // mutation — effectiveCwd should prefer it over --cwd.
+    toolPluginCmd(program, 'fit', 'list').setOptionValue('projectContext', {
       projectRoot: '/discovered/root',
       scope: 'project',
       walkedUp: 0,
     });
 
-    await program.parseAsync(['plugin', 'list'], { from: 'user' });
+    await program.parseAsync(['fit', 'plugin', 'list'], { from: 'user' });
 
     // The handler reads the per-run admitted-tool provenance off the entered
     // RunScope and passes it as the 3rd arg; no scope is entered in this unit
-    // test, so it is the empty default.
-    expect(pluginList).toHaveBeenCalledWith('/discovered/root', ctx.pluginLayouts, []);
+    // test, so it is the empty default. The layout is the single bound fit one.
+    expect(pluginList).toHaveBeenCalledWith('/discovered/root', FIT_BOUND_LAYOUTS, []);
     expect(rendered).toHaveLength(1);
   });
 
-  it('plugin list --json: short-circuits render and uses effectiveCwd with --cwd fallback', async () => {
+  it('fit plugin list --json: short-circuits render and uses effectiveCwd with --cwd fallback', async () => {
     const { ctx, rendered } = makeCtx();
-    const program = mount(ctx);
+    const program = mountWithToolPrimaries(ctx);
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -177,47 +196,43 @@ describe('plugin spec — action bodies', () => {
       return true;
     });
     try {
-      await program.parseAsync(['plugin', 'list', '--cwd', '/explicit/cwd', '--json'], {
+      await program.parseAsync(['fit', 'plugin', 'list', '--cwd', '/explicit/cwd', '--json'], {
         from: 'user',
       });
     } finally {
       spy.mockRestore();
     }
-    expect(pluginList).toHaveBeenCalledWith('/explicit/cwd', ctx.pluginLayouts, []);
+    expect(pluginList).toHaveBeenCalledWith('/explicit/cwd', FIT_BOUND_LAYOUTS, []);
     expect(rendered).toHaveLength(0);
     expect(writes.join('')).toContain('"action": "list"');
   });
 
-  it('plugin add: forwards the positional arg, --domain, and effectiveCwd', async () => {
+  it('fit plugin add: forwards the positional arg + the bound fit domain (no --domain flag)', async () => {
     const { ctx } = makeCtx();
-    const program = mount(ctx);
+    const program = mountWithToolPrimaries(ctx);
 
-    await program.parseAsync(['plugin', 'add', '@my-co/foo', '--cwd', '/p', '--domain', 'fit'], {
+    await program.parseAsync(['fit', 'plugin', 'add', '@my-co/foo', '--cwd', '/p'], {
       from: 'user',
     });
-    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', ctx.pluginLayouts, {
-      project: false,
-    });
+    expect(pluginAdd).toHaveBeenCalledWith('@my-co/foo', '/p', 'fit', FIT_BOUND_LAYOUTS);
   });
 
-  it('plugin remove: forwards the positional arg, --domain, and effectiveCwd', async () => {
+  it('sim plugin remove: forwards the positional arg + the bound sim domain', async () => {
     const { ctx } = makeCtx();
-    const program = mount(ctx);
+    const program = mountWithToolPrimaries(ctx);
 
-    await program.parseAsync(['plugin', 'remove', '@my-co/foo', '--cwd', '/p', '--domain', 'sim'], {
+    await program.parseAsync(['sim', 'plugin', 'remove', '@my-co/foo', '--cwd', '/p'], {
       from: 'user',
     });
-    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', ctx.pluginLayouts, {
-      project: false,
-    });
+    expect(pluginRemove).toHaveBeenCalledWith('@my-co/foo', '/p', 'sim', SIM_BOUND_LAYOUTS);
   });
 
-  it('plugin sync: forwards --domain and effectiveCwd', async () => {
+  it('fit plugin sync: forwards the bound fit domain and effectiveCwd', async () => {
     const { ctx } = makeCtx();
-    const program = mount(ctx);
+    const program = mountWithToolPrimaries(ctx);
 
-    await program.parseAsync(['plugin', 'sync', '--cwd', '/p'], { from: 'user' });
-    expect(pluginSync).toHaveBeenCalledWith('/p', undefined, ctx.pluginLayouts);
+    await program.parseAsync(['fit', 'plugin', 'sync', '--cwd', '/p'], { from: 'user' });
+    expect(pluginSync).toHaveBeenCalledWith('/p', 'fit', FIT_BOUND_LAYOUTS);
   });
 });
 
@@ -500,10 +515,12 @@ describe('buildHostCommandInventory', () => {
   it('derives the sub-subcommand names from the live leaf specs', () => {
     // Builds the group leaves against the inert INVENTORY_CTX (no handler runs)
     // and reads each leaf's `name` — the single source the completion script
-    // consumes for the `sessions` / `plugin` sub-subcommand lists (Phase 6 6.2).
+    // consumes for the `sessions` / `tools` sub-subcommand lists (Phase 6 6.2).
+    // The retired top-level `plugin` group is GONE; pack ops now mount under
+    // each pack-supporting tool primary (`opensip fit plugin …`).
     const inventory = buildHostCommandInventory();
     expect(inventory.groupSubcommands.sessions).toEqual(['list', 'show', 'purge']);
-    expect(inventory.groupSubcommands.plugin).toEqual(['list', 'add', 'remove', 'sync']);
+    expect(inventory.groupSubcommands.plugin).toBeUndefined();
     expect(inventory.groupSubcommands.tools).toEqual([
       'list',
       'create',
@@ -513,6 +530,6 @@ describe('buildHostCommandInventory', () => {
       'data-purge',
     ]);
     // Exactly the two documented action-less groups — no drift.
-    expect(Object.keys(inventory.groupSubcommands).sort()).toEqual(['plugin', 'sessions', 'tools']);
+    expect(Object.keys(inventory.groupSubcommands).sort()).toEqual(['sessions', 'tools']);
   });
 });

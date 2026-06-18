@@ -29,13 +29,34 @@ export type Shell = 'bash' | 'zsh' | 'fish';
 /**
  * Internal/machine-facing command names never offered in shell completion.
  * These are spawned by the host (sharded build, off-process engine workers,
- * machine exports), never typed by a user. Single source for both the
- * inventory builder and the drift test.
+ * machine exports), never typed by a user.
+ *
+ * This is the STATIC FALLBACK / default for {@link assembleCompletionInventory}'s
+ * `internalCommands` argument. The live path passes a descriptor-driven set
+ * (`visibility: 'internal'` + this fallback), keeping the runtime filter in
+ * lockstep with the `--help` hide pass. The set still backs the completion-drift
+ * test, and matters whenever a caller does not supply the descriptor-derived set.
+ *
+ * Note: the four `*-run-worker` / `*-shard-worker` names AND
+ * `graph-equivalence-check` are the Tier-3 `visibility: 'internal'` commands —
+ * they also flow through the descriptor-driven set. They are listed here so the
+ * static fallback is correct on its own (the historical gap was the missing
+ * `graph-equivalence-check`).
+ */
+/**
+ * Internal/machine-facing command names never offered in shell completion — the
+ * `visibility: 'internal'` Tier-3 commands: `*-run-worker` / `*-shard-worker` and
+ * `graph-equivalence-check` are machine-only IPC/CI bootstrap entry points
+ * (ADR-0028), revealed by `OPENSIP_CLI_SHOW_INTERNAL=1`.
+ *
+ * The legacy flat-root export aliases (`catalog-export` / `sarif-export` /
+ * `graph-baseline-export` / `fit-baseline-export`) were removed entirely, so they
+ * no longer appear in the tool registry and need no completion suppression — the
+ * canonical nested `<tool> export` forms are the only export surface.
  */
 export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'graph-shard-worker',
-  'catalog-export',
-  'sarif-export',
+  'graph-equivalence-check',
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
@@ -52,7 +73,11 @@ export interface CompletionInventory {
   readonly subcommands: readonly string[];
   /** Per-command long-flag list, keyed by command name (and alias). */
   readonly commandFlags: Readonly<Record<string, readonly string[]>>;
-  /** Sub-subcommand names for the action-less groups (`plugin`, `sessions`). */
+  /**
+   * Sub-subcommand names for the action-less groups (`sessions`, `tools`), the
+   * `<tool> <verb>` grammar (`fit export`…), and the per-tool `plugin` groups
+   * (`fit plugin`, keyed under `${toolVerb} plugin`).
+   */
   readonly groupSubcommands: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -62,11 +87,30 @@ export interface SpecLike {
   readonly aliases?: readonly string[];
   readonly commonFlags: readonly CommonFlagKey[];
   readonly options?: readonly { readonly flag: string }[];
+  /**
+   * When set, this tool command is a `<parent> <name>` sub-subcommand (the
+   * `<tool> <verb>` grammar — see `CommandSpec.parent`, taxonomy Task 0.4). The
+   * inventory then offers it as a leaf under `parent` (like a `plugin`/`sessions`
+   * group leaf) and keys its flags under `${parent} ${name}`. Omitted ⇒ a flat
+   * top-level command.
+   */
+  readonly parent?: string;
 }
 
-/** One action-less group (`plugin` / `sessions`) and its leaf command names. */
+/** One action-less group (`sessions` / `tools`) and its leaf command names. */
 export interface GroupLike {
   readonly name: string;
+  readonly leaves: readonly { readonly name: string }[];
+}
+
+/**
+ * One pack-supporting tool's `plugin` group, keyed by the tool verb it mounts
+ * under (`fit`/`sim`). The `plugin` parent is offered as a leaf under that verb
+ * (`opensip fit <TAB>` ⇒ `… plugin`), and the `add|list|remove|sync` leaves are
+ * registered under the `${toolVerb} plugin` path for deeper completion.
+ */
+export interface ToolPluginGroupLike {
+  readonly toolVerb: string;
   readonly leaves: readonly { readonly name: string }[];
 }
 
@@ -124,20 +168,51 @@ export function specLongFlags(spec: SpecLike): readonly string[] {
  * Assemble the completion inventory from the live specs. Pure: callers pass
  * the tool command specs (from the populated `ToolRegistry`), the top-level
  * host specs, and the action-less groups; this turns them into the flag /
- * subcommand maps the script builders consume. Internal worker commands are
- * filtered out ({@link INTERNAL_COMMANDS}).
+ * subcommand maps the script builders consume.
+ *
+ * Internal commands are filtered out by `input.internalCommands` — the
+ * descriptor-driven `visibility: 'internal'` set the host computes from the live
+ * tool registry (`internalCommandNames`), so completion and the `--help` hide
+ * pass key on the SAME source. Defaults to the static {@link INTERNAL_COMMANDS}
+ * fallback when omitted (tests / callers without a registry). The
+ * `OPENSIP_CLI_SHOW_INTERNAL=1` reveal is applied at the call site: the host
+ * passes an EMPTY set to skip filtering when the override is on.
  */
 export function assembleCompletionInventory(input: {
   readonly toolSpecs: readonly SpecLike[];
   readonly hostSpecs: readonly SpecLike[];
   readonly groups: readonly GroupLike[];
+  /**
+   * The DOMAIN-BOUND per-tool `plugin` groups (mounted under each pack-supporting
+   * tool primary). Folded into the group map so completion offers `plugin` under
+   * the tool verb and `add|list|remove|sync` under `${toolVerb} plugin`. Optional
+   * so callers without tools omit it.
+   */
+  readonly toolPluginGroups?: readonly ToolPluginGroupLike[];
+  readonly internalCommands?: ReadonlySet<string>;
 }): CompletionInventory {
+  const internalCommands = input.internalCommands ?? INTERNAL_COMMANDS;
   const commandFlags: Record<string, readonly string[]> = {};
   const subcommands: string[] = [];
+  // `parent` → leaf names, accumulated from `parent`-nested tool specs (the
+  // `<tool> <verb>` grammar). Merged into `groupSubcommands` below so the
+  // emitted script offers `<parent> <leaf>` exactly like a host group.
+  const toolGroupLeaves: Record<string, string[]> = {};
 
   for (const spec of [...input.toolSpecs, ...input.hostSpecs]) {
-    if (INTERNAL_COMMANDS.has(spec.name)) continue;
+    if (internalCommands.has(spec.name)) continue;
     const flags = specLongFlags(spec);
+    // A `parent`-nested tool spec is a sub-subcommand, NOT a top-level command:
+    // offer it as a leaf under its parent and key its flags under the qualified
+    // `${parent} ${name}` path (mirroring the host group leaves).
+    if (spec.parent !== undefined) {
+      const leaves = (toolGroupLeaves[spec.parent] ??= []);
+      for (const name of [spec.name, ...(spec.aliases ?? [])]) {
+        leaves.push(name);
+        commandFlags[`${spec.parent} ${name}`] = flags;
+      }
+      continue;
+    }
     for (const name of [spec.name, ...(spec.aliases ?? [])]) {
       subcommands.push(name);
       commandFlags[name] = flags;
@@ -148,6 +223,20 @@ export function assembleCompletionInventory(input: {
   for (const group of input.groups) {
     subcommands.push(group.name);
     groupSubcommands[group.name] = group.leaves.map((l) => l.name);
+  }
+  // Fold tool-command sub-subcommands into the group map. A primary verb
+  // (e.g. `graph`) is already a top-level subcommand with its own flags; adding
+  // its nested leaves here lets the script also complete `graph export` etc.
+  for (const [parent, leaves] of Object.entries(toolGroupLeaves)) {
+    groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), ...leaves];
+  }
+  // Fold the per-tool `plugin` groups in: `plugin` becomes a completable leaf
+  // under the tool verb (`opensip fit <TAB>` ⇒ `… plugin`), and the bound
+  // leaf names register under the doubly-nested `${toolVerb} plugin` key for
+  // deeper completion. There is NO top-level `plugin` group anymore.
+  for (const group of input.toolPluginGroups ?? []) {
+    groupSubcommands[group.toolVerb] = [...(groupSubcommands[group.toolVerb] ?? []), 'plugin'];
+    groupSubcommands[`${group.toolVerb} plugin`] = group.leaves.map((l) => l.name);
   }
 
   // `help` is a Commander built-in the script also surfaces.
@@ -169,7 +258,14 @@ function bashScript(inv: CompletionInventory): string {
   const commonFlagList = COMMON_FLAGS.join(' ');
   const arms: string[] = [];
   for (const [name, subsList] of Object.entries(inv.groupSubcommands)) {
-    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${subsList.join(' ')}" -- "\${cur}")) ;;`);
+    // A primary tool verb (e.g. `fit`/`graph`) is BOTH a flag-bearing command
+    // AND a group with nested `<tool> <verb>` children (taxonomy Task 0.4): at
+    // the second-word position the user can type either a nested subcommand or
+    // one of the parent's own flags, so offer the union. An action-less host
+    // group (`plugin`/`sessions`) has no own flags, so its union is just leaves.
+    const ownFlags = inv.commandFlags[name] ?? [];
+    const offered = [...new Set([...subsList, ...ownFlags])];
+    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${offered.join(' ')}" -- "\${cur}")) ;;`);
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
@@ -211,7 +307,10 @@ function zshScript(inv: CompletionInventory): string {
   const commonFlagList = COMMON_FLAGS.join(' ');
   const arms: string[] = [];
   for (const [name, subsList] of Object.entries(inv.groupSubcommands)) {
-    arms.push(`    ${name}) _values '${name} subcommand' ${subsList.join(' ')} ;;`);
+    // Union of nested subcommands + the parent verb's own flags (see bashScript).
+    const ownFlags = inv.commandFlags[name] ?? [];
+    const offered = [...new Set([...subsList, ...ownFlags])];
+    arms.push(`    ${name}) _values '${name} subcommand' ${offered.join(' ')} ;;`);
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
@@ -253,7 +352,12 @@ function fishScript(inv: CompletionInventory): string {
     `complete -c opensip -f -n "__fish_use_subcommand" -a "${subs}" -d "opensip subcommand"`,
   ];
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
-    if (name in inv.groupSubcommands) continue;
+    // A primary tool verb that also hosts nested `<tool> <verb>` children stays
+    // in `groupSubcommands`, but it still owns its own flags — emit them so fish
+    // completes `fit --<flag>` (the qualified `${parent} ${name}` keys for the
+    // nested leaves are skipped here; they are not top-level commands). An
+    // action-less host group has no `commandFlags` entry, so it is unaffected.
+    if (name.includes(' ')) continue; // a nested `${parent} ${name}` key, not a verb
     for (const flag of flags) {
       lines.push(
         `complete -c opensip -n "__fish_seen_subcommand_from ${name}" -l "${flag.replace(/^--/, '')}"`,

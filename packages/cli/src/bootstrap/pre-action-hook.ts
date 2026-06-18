@@ -7,9 +7,10 @@
  * to Commander's preAction/postAction hooks.
  */
 
-import { currentScope, generatePrefixedId } from '@opensip-cli/core';
+import { currentScope, exitScope, generatePrefixedId } from '@opensip-cli/core';
 
 import { commandPath } from '../commands/command-scope-index.js';
+import { hostEnv } from '../env/host-env-specs.js';
 
 import { executePostBailoutBootstrap } from './execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from './plan-pre-action-bootstrap.js';
@@ -28,7 +29,14 @@ export function installPreActionHook(
   commandScopes: CommandScopeIndex,
 ): void {
   program.hook('preAction', async (_thisCommand, actionCommand) => {
-    const runId = generatePrefixedId('run');
+    // B1 ("Child runId behavior"): resolve `runId` env-FIRST. A forked/spawned
+    // child re-enters this hook and inherits its parent's run via `OPENSIP_RUN_ID`
+    // (set in the child env by `correlationToEnv`); a top-level invocation, with
+    // no `OPENSIP_RUN_ID` set, mints a fresh id. This is the single inheritance
+    // seam — the spec JSON deliberately never carries `runId`, because the logger
+    // that stamps every worker line is already live before the spec is parsed.
+    const inherited = hostEnv.get<string>('OPENSIP_RUN_ID');
+    const runId = inherited && inherited.length > 0 ? inherited : generatePrefixedId('run');
     const opts = actionCommand.opts();
     const cwd = (opts.cwd as string) ?? process.cwd();
     const cwdExplicit = actionCommand.getOptionValueSource('cwd') === 'cli';
@@ -70,5 +78,13 @@ export function disposeCurrentScope(): void {
     }
   } catch {
     // @swallow-ok dispose errors on shutdown; the run has already produced its outcome.
+  } finally {
+    // Complete the per-command lifecycle: clear the ambient ALS slot so a
+    // subsequent command in the same process (a long-lived host driving
+    // Commander sequentially) starts with a clean slot and its `enterScope`
+    // does not trip the always-on re-entrancy guard against this finished run.
+    // Production runs one command per process, so this is normally the final
+    // teardown; it is a no-op when no scope is current.
+    exitScope();
   }
 }

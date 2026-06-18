@@ -294,7 +294,7 @@ export const tool = auditSecTool; // discovery export
 }
 ```
 
-That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip plugin add @yourorg/audit-sec`), and `opensip audit-sec` works. For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/).
+That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip tools install @yourorg/audit-sec`), and `opensip audit-sec` works. For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/).
 
 What you *don't* need:
 

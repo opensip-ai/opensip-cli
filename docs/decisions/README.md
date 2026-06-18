@@ -33,6 +33,15 @@ distinct from:
 
 - [ADR-0055](ADR-0055-core-kernel-sub-boundaries.md) — Core Kernel Sub-Boundaries (core remains one publishable package, but its internal ownership areas are documented with extraction triggers).
 - [ADR-0054](ADR-0054-tool-fault-isolation-boundary.md) — External Tool Fault-Isolation Boundary (target policy for external-provenance tools; this change only applies worker isolation to first-party graph live runs).
+  - **Readiness (2026-06-18):** a future external-tool worker spawn MUST reuse the
+    same `RunCorrelation` + `TRACEPARENT` pattern the first-party spawn/fork sites
+    use (`correlationToEnv` into the child env + a `correlation` field on the worker
+    spec/descriptor, `runId` via `OPENSIP_RUN_ID`) so a child failure is attributable
+    to the parent run/trace. This is one of the ADR's "Guardrails" workstream items
+    (a fitness check for the capstone invariant) and is now enforced for new
+    spawn/fork sites in `packages/graph`/`packages/cli` by the
+    `subprocess-correlation-required` architecture check
+    (subprocess-correlation-telemetry spec).
 - [ADR-0053](ADR-0053-per-run-logger-scope.md) — Per-Run Logger Scope (production runs construct one `LoggerImpl` per `RunScope`; singleton logging becomes a pre-scope/compatibility adapter).
 - [ADR-0052](ADR-0052-bootstrap-orchestration-state-machine.md) — Bootstrap Orchestration State Machine (the Commander hook remains the adapter, while bailout ordering and side-effect gates become explicit, testable phases).
 - [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md) — Host-Owned Run Lifecycle, Timing, and Persistence (one host `RunTimer` stamps `StoredSession.startedAt`/`completedAt`/`durationMs`; tools return a `ToolSessionContribution`; the `runSession.record` writer is removed).

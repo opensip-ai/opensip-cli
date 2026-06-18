@@ -58,8 +58,11 @@ opensip
 │   ├── --verbose
 │   ├── --gate-save        (writes baseline row into .runtime/datastore.sqlite)
 │   ├── --gate-compare
-│   └── … (see fit-list, fit-recipes for catalogs)
+│   ├── list               (catalog checks)
+│   ├── recipes            (catalog recipes)
+│   └── export --format baseline   (SARIF gate baseline)
 ├── sim                    (run simulation scenarios)
+│   └── recipes            (catalog sim recipes)
 ├── graph [paths...]       (static call-graph + dead-end analysis)
 │   ├── --json
 │   ├── --no-cache
@@ -67,7 +70,12 @@ opensip
 │   ├── --gate-compare
 │   ├── --workspace             (fan-out across detected workspace units)
 │   ├── --concurrency <n>       (cap for --workspace)
-│   └── --language <name>       (force a specific adapter)
+│   ├── --language <name>       (force a specific adapter)
+│   ├── list               (catalog graph rules)
+│   ├── recipes            (catalog graph recipes)
+│   ├── lookup <name>      (look up function occurrences)
+│   ├── index             (emit symbolindex.json)
+│   └── export --format <sarif|catalog|baseline>
 ├── init                   (scaffold the project)
 ├── report                 (open the HTML report)
 ├── sessions
@@ -87,12 +95,7 @@ opensip
 │   └── data-purge <tool-id>
 ├── configure              (cloud API key)
 ├── completion             (shell completion script)
-├── uninstall              (remove ~/.opensip-cli/)
-├── fit-list
-├── fit-recipes
-├── graph-recipes
-├── graph-lookup <name>
-└── graph-symbol-index
+└── uninstall              (remove ~/.opensip-cli/)
 ```
 
 Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](../../../packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](../../../packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](../../../packages/graph/engine/src/tool.ts); top-level commands like `init`, `plugin`, and `configure` live in [`packages/cli/src/commands/`](../../../packages/cli/src/commands/).
@@ -186,7 +189,7 @@ be) is in [`70-reference/04-json-output-schema.md`](../70-reference/04-json-outp
 
 ## 4. SARIF output
 
-SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](../../../packages/output/src/format/signal-sarif.ts)) — reached via the `cli.writeSarif` seam by `--report-to`, by `fit-baseline-export`, and by `graph --sarif <path>` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). Note `graph-baseline-export` is *not* a SARIF producer — it exports the graph gate **fingerprint** baseline as JSON for git-trackable enforcement; graph's SARIF comes from `graph --sarif`. The shape is the SARIF spec's, not ours — opensip-cli commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
+SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](../../../packages/output/src/format/signal-sarif.ts)) — reached via the `cli.writeSarif` seam by `--report-to`, by `fit export --format baseline`, and by `graph --sarif <path>` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). Note `graph export --format baseline` is *not* a SARIF producer — it exports the graph gate **fingerprint** baseline as JSON for git-trackable enforcement; graph's SARIF comes from `graph --sarif`. The shape is the SARIF spec's, not ours — opensip-cli commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
 
 **Stability rule.** The fields opensip-cli fills in are: `runs[0].tool.driver.name = 'opensip-cli-<tool>'`, `runs[0].results[]` carrying `ruleId`, `message.text`, `level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`), and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
@@ -259,7 +262,7 @@ Marker-based discovery always runs; `plugins.checkPackages:` is an exact-name su
 
 ### Sim scenario packs
 
-Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-cli` plus configured `plugins.packageScopes` is discovered automatically (the simulation tool's manifest declares `discovery.mode: "name-pattern"` with `prefix: "scenarios-"`). There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Exact-name pins (`plugins.scenarioPackages:`) and the reproducible project-pinned shape (`plugins.sim:`, managed by `plugin add/remove/sync`) layer on top.
+Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-cli` plus configured `plugins.packageScopes` is discovered automatically (the simulation tool's manifest declares `discovery.mode: "name-pattern"` with `prefix: "scenarios-"`). There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Exact-name pins (`plugins.scenarioPackages:`) and the reproducible project-pinned shape (`plugins.sim:`, managed by `opensip sim plugin add/remove/sync`) layer on top.
 
 ### Stability rules
 

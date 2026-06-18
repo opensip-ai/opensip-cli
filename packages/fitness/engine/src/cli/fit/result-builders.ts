@@ -1,13 +1,15 @@
 /**
  * Pure builders that transform fitness recipe results into the run's
  * `SignalEnvelope` (the universal output currency, ADR-0011) and the
- * `FitDoneResult` that carries it — plus the formatting helpers they rely on
- * and the best-effort session persistence side effect invoked at the
- * `executeFit` boundary.
+ * render-only `RunPresentation` that carries it — plus the formatting helpers
+ * they rely on and the best-effort session persistence side effect invoked at
+ * the `executeFit` boundary.
  *
  * Keeping these together (rather than per-output-shape) makes the
  * signal-shape mapping visible in one place: `buildFitEnvelope` maps check
- * violations to `Signal`s and `buildFitDoneResult` wraps the envelope.
+ * violations to `Signal`s and `buildFitPresentation` wraps the envelope in the
+ * render adjunct (envelope-first-presentation plan; replaced the old per-tool
+ * fit done-result builder).
  */
 
 import {
@@ -15,7 +17,7 @@ import {
   type FitOptions,
   type SignalEnvelope,
   type UnitResult,
-  type FitDoneResult,
+  type RunPresentation,
 } from '@opensip-cli/contracts';
 import {
   currentScope,
@@ -131,55 +133,53 @@ export function buildFitEnvelope(
   });
 }
 
-/** Input bundle for {@link buildFitDoneResult}: CLI args, recipe result, the run envelope, and signaler config. */
-export interface BuildFitDoneArgs {
+/** Input bundle for {@link buildFitPresentation}: CLI args, recipe result, the run envelope, and signaler config. */
+export interface BuildFitPresentationArgs {
   args: FitOptions;
   fitnessResult: FitnessRecipeResult;
   envelope: SignalEnvelope;
   signalersConfig: SignalersConfig;
   recipeName: string | undefined;
-  warnings?: readonly string[];
 }
 
 /**
- * Build the {@link FitDoneResult} the live renderer / non-TTY render path
- * consume. Carries the run's {@link SignalEnvelope} (the composition root
- * derives the terminal table + summary AND the findings exit code FROM it — one
- * row per check unit, `envelope.verdict.passed` the single verdict) plus the run
- * label and non-fatal warnings.
+ * Build the render-only {@link RunPresentation} the live renderer / non-TTY
+ * render path consume (envelope-first-presentation plan; replaced the old
+ * per-tool fit done-result builder). Carries the run's {@link SignalEnvelope}
+ * (the composition root derives the terminal table + summary AND the findings
+ * exit code FROM it — one row per check unit, `envelope.verdict.passed` the
+ * single verdict) plus the optional verbose detail body.
  *
- * ADR-0035: the exit code is no longer carried on the result. `verdict.passed`
+ * No `durationMs` is set: fit's summary duration is the envelope unit-sum (the
+ * presentation renderer falls back to it when no override is supplied), matching
+ * the pre-migration render byte-for-byte. The dropped `*DoneResult` fields
+ * (`label`/`cwd`/`configFound`) were not consumed by the table view; `warnings`
+ * is NOT a display field the view renders — it rides on the `executeFit` result
+ * bundle (a sibling field) so `emitWarningsToStderr` and the live runner keep
+ * surfacing it.
+ *
+ * ADR-0035: the exit code is not carried on the result. `verdict.passed`
  * (computed with fit's resolved failOnErrors/failOnWarnings policy + plugin-load
  * `runFaulted`) is the single exit driver; the host derives it in `deliverSignals`.
  *
- * Pure builder: session persistence (SessionRepo.save) lives at the
- * `executeFit` call site (post-call), not here. The envelope is assembled once
- * in `executeFit` and threaded in so the gate, render, and session-payload
- * paths all consume the same envelope.
+ * Pure builder: session persistence lives at the `executeFit` call site
+ * (post-call), not here. The envelope is assembled once in `executeFit` and
+ * threaded in so the gate, render, and session-payload paths all consume the
+ * same envelope.
  */
-export function buildFitDoneResult({
+export function buildFitPresentation({
   args,
   envelope,
-  recipeName,
-  warnings,
-}: BuildFitDoneArgs): FitDoneResult {
-  const label =
-    args.tags && args.tags.length > 0
-      ? `tags: ${args.tags.join(',')}`
-      : `recipe ${recipeName ?? 'default'}`;
-
-  // ADR-0021: carry the verbose findings body on the result so the shared
+}: BuildFitPresentationArgs): RunPresentation {
+  // ADR-0021: carry the verbose findings body on the presentation so the shared
   // resultToView seam renders it identically in a TTY and a pipe (the old
   // TTY-only path left `fit --verbose | cat` empty).
   const verboseDetail = buildFitVerboseDetail(envelope, args);
 
   return {
-    type: 'fit-done',
-    label,
-    cwd: args.cwd,
+    type: 'run-presentation',
+    tool: 'fitness',
     envelope,
-    configFound: true,
-    warnings: warnings && warnings.length > 0 ? warnings : undefined,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
   };
 }

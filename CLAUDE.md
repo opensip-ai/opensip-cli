@@ -173,7 +173,10 @@ tool dispatcher:
    through the host-owned `mountCommandSpec` infrastructure. Tools never receive
    a raw Commander program.
 5. Adds CLI-only commands: `init`, `report`, `sessions`, `configure`,
-   `plugin`, `tools`, `agent-catalog`, `completion`, and `uninstall`.
+   `tools`, `agent-catalog`, `completion`, and `uninstall`. It also mounts a
+   domain-bound `plugin` group UNDER each pack-supporting tool primary
+   (`opensip fit plugin …`, `opensip sim plugin …`) — there is no top-level
+   `opensip plugin` command.
 
 **The CLI source has zero static imports of first-party tool runtimes**; bundled
 tools load by package name through the same plugin path as installed tools.
@@ -182,21 +185,25 @@ Subcommands available out of the box:
 
 - `opensip fit` — Run fitness checks (with --gate-save, --gate-compare,
   --recipe, --check, --tags, --json, --report-to)
-- `opensip fit-list` — List available checks
-- `opensip fit-recipes` — List available recipes
-- `opensip fit-baseline-export` — Export fitness findings to SARIF
+- `opensip fit list` — List available checks
+- `opensip fit recipes` — List available recipes
+- `opensip fit export --format baseline` — Export fitness findings to SARIF
 - `opensip report` — Generate HTML report
 - `opensip graph` — Build the static call graph
-- `opensip graph-recipes` — List available graph rule recipes
-- `opensip graph-lookup` — Look up a symbol's callers/callees in the graph
-- `opensip graph-symbol-index` — Build/query the symbol index
-- `opensip graph-baseline-export` — Export the graph gate fingerprint baseline to JSON (git-trackable enforcement). For SARIF, use `graph --sarif <path>`.
-- `opensip catalog-export` — Write graph catalog JSON for downstream tooling
-- `opensip sarif-export` — Run graph analysis and write SARIF findings
+- `opensip graph recipes` — List available graph rule recipes
+- `opensip graph lookup` — Look up a symbol's callers/callees in the graph
+- `opensip graph index` — Build/query the symbol index
+- `opensip graph list` — List available graph rules
+- `opensip graph export --format baseline` — Export the graph gate fingerprint baseline to JSON (git-trackable enforcement). For SARIF, use `graph --sarif <path>`.
+- `opensip graph export --format catalog` — Write graph catalog JSON for downstream tooling
+- `opensip graph export --format sarif` — Run graph analysis and write SARIF findings
 - `opensip sim` — Run simulation scenarios [experimental]
 - `opensip init` — Generate `opensip-cli.config.yml`
 - `opensip sessions list|show|purge` — Manage stored sessions
-- `opensip plugin list|add|remove|sync` — Manage fit/sim packs and the Tool-plugin compatibility path
+- `opensip <tool> plugin list|add|remove|sync` — Manage a pack-supporting
+  tool's extension packs (`opensip fit plugin …`, `opensip sim plugin …`); the
+  domain is bound from the tool (no `--domain` flag). There is no top-level
+  `opensip plugin`.
 - `opensip tools list|validate|install|uninstall|data-purge` — Manage whole Tool plugins
 - `opensip configure` — Store an API key for future/private OpenSIP Cloud-compatible endpoints
 
@@ -428,8 +435,8 @@ CI runs `pnpm fit:ci` on every PR — OpenSIP CLI analyzes itself.
 AND hard-fails the step on any error-level finding — it returns the
 `failOnErrors`/`failOnWarnings` exit code (ADR-0020), so the CI step
 itself is the gate, not just the downstream ratchet. A separate
-workflow step then exports to SARIF (`fit-baseline-export --out
-fit.sarif`) under `if: always()` — so the baseline + annotations
+workflow step then exports to SARIF (`fit export --format baseline
+--out fit.sarif`) under `if: always()` — so the baseline + annotations
 export even when the gate fails — and uploads to GitHub Code Scanning.
 GH compares against the latest main-branch SARIF and surfaces **new**
 alerts inline on PR diffs and under Security → Code scanning alerts.
@@ -457,9 +464,9 @@ upload to Code Scanning under category `opensip-cli-graph`. The
 `--sarif` write happens after the gate exit code is set, so the file
 lands even when the gate fails (upload runs under `if: always()`).
 Same ratchet: only net-new graph findings surface on PRs.
-(`graph-baseline-export` is a separate command — it exports the gate
-**fingerprint** baseline JSON for git-trackable enforcement, not
-SARIF.) The graph rules
+(`graph export --format baseline` is a separate command — it exports
+the gate **fingerprint** baseline JSON for git-trackable enforcement,
+not SARIF.) The graph rules
 (large-function, wide-function, high-blast-untested, cycle,
 duplicated-function-body) skip test-file occurrences — they gate
 production code only — and `large-function` skips the synthetic

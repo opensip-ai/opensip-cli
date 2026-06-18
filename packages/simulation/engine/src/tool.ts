@@ -16,6 +16,7 @@ import { createToolScope, defineCommand, defineTool, readPackageVersion } from '
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
+import { simRecipesCommandSpec } from './cli/sim-recipes.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { simRunWorkerCommandSpec } from './cli/sim-worker.js';
 import { executeSim } from './cli/sim.js';
@@ -145,8 +146,10 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
 
   // Effectful egress + host-owned findings exit live at the root (cloud sink +
   // `--report-to` exit 4 + the verdict-derived exit, ADR-0035). Once per run.
+  // envelope-first-presentation: `result` is the render-only RunPresentation —
+  // cwd comes from `opts.cwd` (in scope), recipe from `result.envelope.recipe`.
   await cli.deliverSignals(result.envelope, {
-    cwd: result.cwd,
+    cwd: opts.cwd,
     reportTo: opts.reportTo,
     apiKey: opts.apiKey,
   });
@@ -158,12 +161,13 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
 
   // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
   // host run plane persists it after this handler resolves (no tool-side write).
+  // The session row is built from the envelope, not from *DoneResult fields.
   const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
   return {
     session: {
       tool: 'sim',
-      cwd: result.cwd,
-      recipe: result.recipeName,
+      cwd: opts.cwd,
+      recipe: result.envelope.recipe,
       score: result.envelope.verdict.score,
       passed: result.envelope.verdict.passed,
       payload: buildSimulationSessionPayload(result.envelope),
@@ -358,12 +362,19 @@ export const SIMULATION_STABLE_ID = '715d32c2-692c-4ed4-985b-a35deaf186aa';
 export const simulationTool: Tool = defineTool({
   metadata: {
     id: SIMULATION_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
-    name: 'simulation', // human key (previously the value in `id`)
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`sim`). The config namespace key stays `simulation:` — it keys off
+    // the DECOUPLED `simulationConfigDeclaration.namespace = 'simulation'`
+    // literal, NOT metadata.name, so existing `simulation:` config blocks keep
+    // validating. The session `tool` column is already `'sim'`, so aligning the
+    // name REDUCES mismatch. Q6 (flipping the literal to `sim:`) stays open — no
+    // `sim:` config alias is added.
+    name: 'sim', // command verb + human key (was 'simulation')
     version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
   pluginLayout: SIM_PLUGIN_LAYOUT,
-  commandSpecs: [simCommand, simRunWorkerCommandSpec],
+  commandSpecs: [simCommand, simRecipesCommandSpec, simRunWorkerCommandSpec],
   extensionPoints: {
     simulationContractVersion: SIMULATION_CONTRACT_VERSION,
     contributeScope: simulationScope.contributeScope,

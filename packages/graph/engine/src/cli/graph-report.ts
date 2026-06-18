@@ -8,9 +8,10 @@
  *
  * Owns the catalog-summary, findings-by-rule, entry-points, and summary
  * sections as a `string[]` builder (`buildUnifiedReportLines`). The graph
- * CLI feeds these lines into a `GraphDoneResult`; the central render seam
- * turns them into Ink (TTY) or plain text (pipe/CI) — there is no direct
- * stdout writer here anymore.
+ * CLI feeds these lines into the `RunPresentation.verboseDetail` it hands the
+ * render seam (envelope-first-presentation RP-2); the central render seam turns
+ * them into Ink (TTY) or plain text (pipe/CI) — there is no direct stdout writer
+ * here anymore.
  */
 
 import { inferEntryPoints } from '../rules/_entry-points.js';
@@ -53,6 +54,14 @@ export interface LiveGraphOutput {
   readonly signals: readonly Signal[];
   readonly suppressedCount: number;
   readonly reportLines: readonly string[];
+  /**
+   * The catalog's RESOLVED resolution tier (envelope-first-presentation RP-2).
+   * Plain data so it survives the IPC structured-clone. The live done frame
+   * surfaces graph's fast-tier caveat as a muted banner above the per-unit table
+   * — parity with the static `presentationToView` banners, which read the same
+   * `catalog.resolutionMode`. Absent / `exact` ⇒ no banner.
+   */
+  readonly resolutionMode?: 'exact' | 'fast';
 }
 
 /**
@@ -72,10 +81,12 @@ export async function buildLiveGraphOutput(
 ): Promise<LiveGraphOutput> {
   const finalized = await finalizeGraphSignals(input.signals, buildRoot);
   const waivedInput: UnifiedReportInput = { ...input, signals: finalized.signals };
+  const resolutionMode = input.catalog?.resolutionMode;
   return {
     signals: finalized.signals,
     suppressedCount: finalized.suppressedCount,
     reportLines: buildUnifiedReportLines(waivedInput, { includeSummary: false }),
+    ...(resolutionMode === undefined ? {} : { resolutionMode }),
   };
 }
 
@@ -145,9 +156,10 @@ function resolutionBanner(): string {
 
 /**
  * The fast-tier approximation caveat for a catalog, or `undefined` when
- * the catalog is exact (semantic). Surfaced through `GraphDoneResult` so
- * the render seam shows it once, themed in Ink and plain in pipes — no
- * hand-written stdout copy.
+ * the catalog is exact (semantic). Surfaced through `RunPresentation.banners`
+ * (envelope-first-presentation RP-2) so the render seam shows it once as a muted
+ * line above the summary, themed in Ink and plain in pipes — no hand-written
+ * stdout copy.
  */
 export function resolutionBannerText(
   resolutionMode: 'exact' | 'fast' | undefined,

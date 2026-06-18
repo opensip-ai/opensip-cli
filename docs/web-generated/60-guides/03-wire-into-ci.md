@@ -41,11 +41,11 @@ That's the floor. The rest of this page is the polish: how to surface findings a
 
 ## PR annotations via SARIF
 
-opensip-cli exports the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html) format that GitHub understands natively via the `fit-baseline-export` subcommand. The flow is two steps: run `fit --gate-save` (which records findings into the project SQLite store, then exits according to the `failOnErrors`/`failOnWarnings` thresholds — ADR-0020: the step itself is the gate, not a free pass), then `fit-baseline-export --out fit.sarif` to write the SARIF document. Uploaded findings appear inline in the PR's "Files changed" view.
+opensip-cli exports the [SARIF](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html) format that GitHub understands natively via the `fit export --format baseline` subcommand. The flow is two steps: run `fit --gate-save` (which records findings into the project SQLite store, then exits according to the `failOnErrors`/`failOnWarnings` thresholds — ADR-0020: the step itself is the gate, not a free pass), then `fit export --format baseline --out fit.sarif` to write the SARIF document. Uploaded findings appear inline in the PR's "Files changed" view.
 
 ```yaml
 - run: opensip fit --gate-save        # record findings, then exit per fail thresholds
-- run: opensip fit-baseline-export --out fit.sarif
+- run: opensip fit export --format baseline --out fit.sarif
   if: always()      # the save happened before the exit — export even when the gate failed
 - uses: github/codeql-action/upload-sarif@v3
   if: always()      # upload even when a previous step failed
@@ -76,7 +76,7 @@ Then in CI:
 
 `--gate-compare` exits 0 if no *new* violations appeared since the baseline. Existing ones are tolerated. The baseline lives in SQLite (`opensip-cli/.runtime/datastore.sqlite`); since `.runtime/` is gitignored, you'll want to publish + restore the baseline store as a CI artifact.
 
-**The artifact pattern:** the gate baseline is a SQLite store, not a committed file. The standard flow is to run `fit --gate-save` on main-branch builds and upload `opensip-cli/.runtime/datastore.sqlite` as a workflow artifact; PR builds download that artifact into `opensip-cli/.runtime/` before running `fit --gate-compare`. (For a human-readable export — e.g. to inspect the baseline or feed GitHub Code Scanning — use `fit-baseline-export --out baseline.sarif`, which reads the same store.) See [output, gate, SARIF](/docs/opensip-cli/20-fit/04-output-gate-sarif/) and [the architecture-gate CI patterns](/docs/opensip-cli/10-concepts/05-architecture-gate/#ci-integration-patterns) for the full workflow.
+**The artifact pattern:** the gate baseline is a SQLite store, not a committed file. The standard flow is to run `fit --gate-save` on main-branch builds and upload `opensip-cli/.runtime/datastore.sqlite` as a workflow artifact; PR builds download that artifact into `opensip-cli/.runtime/` before running `fit --gate-compare`. (For a human-readable export — e.g. to inspect the baseline or feed GitHub Code Scanning — use `fit export --format baseline --out baseline.sarif`, which reads the same store.) See [output, gate, SARIF](/docs/opensip-cli/20-fit/04-output-gate-sarif/) and [the architecture-gate CI patterns](/docs/opensip-cli/10-concepts/05-architecture-gate/#ci-integration-patterns) for the full workflow.
 
 ## Recommended full setup
 
@@ -117,7 +117,7 @@ jobs:
       # Export the SARIF for PR annotations (reads the SQLite store).
       - name: Export SARIF
         if: always()
-        run: opensip fit-baseline-export --out fit.sarif
+        run: opensip fit export --format baseline --out fit.sarif
 
       - name: Upload SARIF
         if: always()

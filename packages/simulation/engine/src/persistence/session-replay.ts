@@ -1,8 +1,8 @@
 import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
 
 import type {
+  RunPresentation,
   SignalEnvelope,
-  SimDoneResult,
   StoredSession,
   ToolSessionReplay,
   UnitResult,
@@ -10,16 +10,21 @@ import type {
 import type { Signal } from '@opensip-cli/core';
 
 /**
- * Project a stored sim session back into a {@link SignalEnvelope}/{@link SimDoneResult}.
+ * Project a stored sim session back into a {@link SignalEnvelope}/{@link RunPresentation}.
  *
  * The structural decode of the opaque payload is shared across tools
  * (`decodeSessionPayload`); this function owns only sim's projection
- * (`tool: 'sim'`, `category: 'testing'`, signal id prefix, `sim-done` result).
+ * (`tool: 'sim'`, `category: 'testing'`, signal id prefix).
+ *
+ * The replay RENDER path reads only `replay.envelope` + `replay.fidelity` (the
+ * host builds the shared `SessionReplayResult` from those); the inner
+ * `RunPresentation` `result` is a uniform, render-only carrier and is not on the
+ * replay render path.
  *
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */
-export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<SimDoneResult> {
+export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<RunPresentation> {
   const payload = decodeSessionPayload(stored.payload, {
     tool: 'sim',
     requireViolationCount: true,
@@ -52,13 +57,7 @@ export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<S
   return {
     fidelity: 'projection',
     envelope,
-    result: {
-      type: 'sim-done',
-      recipeName: stored.recipe ?? 'default',
-      cwd: stored.cwd,
-      durationMs: stored.durationMs,
-      envelope,
-    },
+    result: { type: 'run-presentation', tool: 'simulation', envelope },
   };
 }
 

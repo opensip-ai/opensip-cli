@@ -73,7 +73,7 @@ describe('executeSimWorker', () => {
     const result = messages.find((m) => m.kind === 'result');
     expect(result?.kind).toBe('result');
     if (result?.kind !== 'result') throw new Error('no result message');
-    expect(result.value.result.type).toBe('sim-done');
+    expect(result.value.result.type).toBe('run-presentation');
   });
 
   it('reports a bad spec path as an error message, not a throw', async () => {

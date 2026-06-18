@@ -28,6 +28,7 @@
  * no `scope.fitness`, and reads return `undefined`.
  */
 
+import type { FileCache } from './framework/file-cache.js';
 import type { CheckRegistry } from './framework/registry.js';
 import type { FitnessRecipeRegistry } from './recipes/registry.js';
 
@@ -35,7 +36,7 @@ import type { FitnessRecipeRegistry } from './recipes/registry.js';
  * Per-RunScope `ensureChecksLoaded` lifecycle state — moved off the
  * `check-loader.ts` module singletons so two concurrent scopes carry
  * independent load state. Mutable: `ensureChecksLoaded` writes it once
- * per run; the phase helpers (`buildFitEnvelope`, `buildFitDoneResult`)
+ * per run; the phase helpers (`buildFitEnvelope`, `buildFitPresentation`)
  * and the public accessors read it back.
  */
 export interface FitnessLoadState {
@@ -63,6 +64,11 @@ export interface FitnessSubscope {
   readonly recipes: FitnessRecipeRegistry;
   /** `ensureChecksLoaded` lifecycle state for this run. */
   readonly load: FitnessLoadState;
+  /** Per-run file cache — prewarmed by the recipe service, read by every
+   *  reader site (execution context, file accessor, ignore processing),
+   *  cleared on scope dispose via the disposer `contributeScope` returns.
+   *  Replaces the module singleton on every production path. */
+  readonly fileCache: FileCache;
 }
 
 declare module '@opensip-cli/core' {
