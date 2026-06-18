@@ -24,6 +24,7 @@
  */
 
 export { makeTestScope, withScope, withScopeSync } from './with-scope.js';
+export { runTwoScopesConcurrently } from './concurrent-scopes.js';
 
 export {
   buildFixtureManifest,
