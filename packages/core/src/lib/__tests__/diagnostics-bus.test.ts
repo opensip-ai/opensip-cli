@@ -47,4 +47,73 @@ describe('DiagnosticsBus', () => {
     expect(JSON.parse(wire)).toEqual(snap);
     expect(snap.events[0].data).toEqual({ count: 2 });
   });
+
+  describe('emitSubprocessEvent', () => {
+    it('stamps the correlation join keys into the event data bag, merged with extras', () => {
+      const bus = new DiagnosticsBus('run_6');
+      bus.emitSubprocessEvent(
+        'load',
+        'debug',
+        'subprocess.spawn',
+        {
+          runId: 'run_6',
+          tool: 'graph',
+          parentCommand: 'graph',
+          traceId: '00-abc-def-01',
+          shardId: 's-1',
+          workerKind: 'shard',
+        },
+        { shards: 3, concurrency: 2 },
+      );
+      const [event] = bus.snapshot().events;
+      expect(event.phase).toBe('load');
+      expect(event.level).toBe('debug');
+      expect(event.message).toBe('subprocess.spawn');
+      expect(event.data).toEqual({
+        runId: 'run_6',
+        tool: 'graph',
+        parentCommand: 'graph',
+        traceId: '00-abc-def-01',
+        shardId: 's-1',
+        workerKind: 'shard',
+        shards: 3,
+        concurrency: 2,
+      });
+    });
+
+    it('omits undefined correlation fields (no empty sentinels) — e.g. traceId when OTel is off', () => {
+      const bus = new DiagnosticsBus('run_7');
+      bus.emitSubprocessEvent('load', 'warn', 'subprocess.failed', {
+        runId: 'run_7',
+        workerKind: 'live-engine',
+        traceId: undefined,
+      });
+      const [event] = bus.snapshot().events;
+      expect(event.data).toEqual({ runId: 'run_7', workerKind: 'live-engine' });
+      expect(event.data).not.toHaveProperty('traceId');
+    });
+
+    it('emits with an empty data bag when no correlation field is present', () => {
+      const bus = new DiagnosticsBus('run_8');
+      bus.emitSubprocessEvent('load', 'debug', 'subprocess.complete', {});
+      const [event] = bus.snapshot().events;
+      expect(event.message).toBe('subprocess.complete');
+      expect(event.data).toEqual({});
+    });
+
+    it('lets a data extra override a correlation key of the same name (data spread last)', () => {
+      const bus = new DiagnosticsBus('run_9');
+      bus.emitSubprocessEvent(
+        'load',
+        'warn',
+        'subprocess.failed',
+        { runId: 'run_9', workerKind: 'shard' },
+        { workerKind: 'external-tool' },
+      );
+      expect(bus.snapshot().events[0].data).toEqual({
+        runId: 'run_9',
+        workerKind: 'external-tool',
+      });
+    });
+  });
 });

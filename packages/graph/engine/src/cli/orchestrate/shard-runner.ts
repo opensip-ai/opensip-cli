@@ -29,7 +29,7 @@ import type { Shard, ShardBuildResult, ShardWorkerSpec } from './shard-model.js'
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { ResolutionMode } from '../../types.js';
-import type { RunCorrelation } from '@opensip-cli/core';
+import type { DiagnosticLevel, DiagnosticsBus, RunCorrelation } from '@opensip-cli/core';
 
 /**
  * The machine-filterable failure taxonomy for a shard worker, stamped on the
@@ -65,6 +65,14 @@ const SHARD_HARD_KILL_TIMEOUT_MS = 10 * 60_000;
  * so `start`, `shard_failed`, and `complete` stamp IDENTICALLY and `traceId` is
  * present on all three whenever OTel is on (GAP d). Absent optionals are omitted
  * (no empty sentinels).
+ *
+ * `traceId` is derived LIVE here (Task 3.3 / GAP d): the runner runs INSIDE the
+ * sharded-build span (`buildShardedGraph`'s `withSpanAsync`), a child of the
+ * bootstrap-time context the assembled `c.traceId` captured. Preferring the live
+ * `currentTraceparent()` makes every runner event carry the SAME traceparent the
+ * merge stage and worker-spawn sites derive (which already read it live) — so the
+ * value cannot drift between events. Falls back to the bootstrap-stamped
+ * `c.traceId`, then omitted when OTel is off (no active recording span).
  */
 function correlationLogFields(c: RunCorrelation | undefined): Record<string, string> {
   if (!c) return {};
@@ -73,11 +81,46 @@ function correlationLogFields(c: RunCorrelation | undefined): Record<string, str
     tool: c.tool,
     parentCommand: c.parentCommand,
   };
-  if (c.traceId !== undefined) fields.traceId = c.traceId;
+  const traceId = currentTraceparent() ?? c.traceId;
+  if (traceId !== undefined) fields.traceId = traceId;
   if (c.repo !== undefined) fields.repo = c.repo;
   if (c.repoId !== undefined) fields.repoId = c.repoId;
   if (c.tenantId !== undefined) fields.tenantId = c.tenantId;
   return fields;
+}
+
+/**
+ * Project the parent {@link RunCorrelation} onto the subset stamped on the
+ * `subprocess.*` diagnostics milestones, with the LIVE `traceId` (Task 3.3 /
+ * GAP d) so the snapshot's events pivot to the same trace as the JSONL events
+ * (which derive it live via {@link correlationLogFields}). Returns `undefined`
+ * when no parent correlation was assembled (tests / bare runs) so the milestones
+ * are omitted, matching `correlationLogFields` returning `{}`.
+ */
+function diagnosticsMilestoneCorrelation(
+  c: RunCorrelation | undefined,
+): RunCorrelation | undefined {
+  if (c === undefined) return undefined;
+  const traceId = currentTraceparent();
+  return { ...c, ...(traceId === undefined ? {} : { traceId }) };
+}
+
+/**
+ * Synchronously emit one `subprocess.spawn|complete|failed` milestone on the
+ * scope-owned diagnostics bus (ADR-0024, Phase 3) — a `void`, fire-and-forget
+ * sync call; a no-op when the bus or the parent correlation is absent. Collapses
+ * the bus-lookup + correlation-presence guard to a single call so the runner's
+ * hot path stays flat.
+ */
+function emitShardMilestone(
+  diagnostics: DiagnosticsBus | undefined,
+  correlation: RunCorrelation | undefined,
+  level: DiagnosticLevel,
+  message: string,
+  data: Record<string, unknown>,
+): void {
+  if (diagnostics === undefined || correlation === undefined) return;
+  diagnostics.emitSubprocessEvent('load', level, message, correlation, data);
 }
 
 export interface RunShardsInput {
@@ -125,10 +168,22 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   // pivot from any one to the run/trace.
   const correlation = currentScope()?.correlation;
   const correlationFields = correlationLogFields(correlation);
+  // The scope-owned diagnostics bus (ADR-0024): the JSONL logs above are for
+  // `jq` grep; these milestones ride `CommandOutcome.diagnostics.events` for the
+  // structured `--json` snapshot (Phase 3). Both surfaces are required. The
+  // milestone correlation carries the LIVE `traceId` (Task 3.3 / GAP d) so the
+  // snapshot's events pivot to the same trace as the JSONL events.
+  const diagnostics = currentScope()?.diagnostics;
+  const diagnosticsCorrelation = diagnosticsMilestoneCorrelation(correlation);
   logger.info({
     evt: 'graph.shard.runner.start',
     module: 'graph:shard-runner',
     ...correlationFields,
+    shards: input.shards.length,
+    concurrency,
+  });
+  // `subprocess.spawn` milestone — the pool is starting N shard workers.
+  emitShardMilestone(diagnostics, diagnosticsCorrelation, 'debug', 'subprocess.spawn', {
     shards: input.shards.length,
     concurrency,
   });
@@ -173,12 +228,26 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
       ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
       stderrPreview: failure.stderr.slice(0, 500),
     });
+    // `subprocess.failed` milestone — one per failed shard, keyed by `shardId`
+    // so a `--json` consumer can filter `events` down to a single shard.
+    emitShardMilestone(diagnostics, diagnosticsCorrelation, 'warn', 'subprocess.failed', {
+      shardId: failure.shardId,
+      exitCode: failure.exitCode,
+      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
+    });
   }
 
   logger.info({
     evt: 'graph.shard.runner.complete',
     module: 'graph:shard-runner',
     ...correlationFields,
+    built: fragments.length,
+    failed: failures.length,
+    failedShardIds: failures.map((f) => f.shardId),
+  });
+  // `subprocess.complete` milestone — the pool drained; carries the same
+  // built/failed/failedShardIds summary as the structured log line.
+  emitShardMilestone(diagnostics, diagnosticsCorrelation, 'debug', 'subprocess.complete', {
     built: fragments.length,
     failed: failures.length,
     failedShardIds: failures.map((f) => f.shardId),

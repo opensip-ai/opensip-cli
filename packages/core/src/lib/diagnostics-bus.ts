@@ -20,13 +20,13 @@
 
 import { currentTraceparent } from './telemetry.js';
 
+import type { RunCorrelation } from './run-correlation.js';
 import type {
   DiagnosticEvent,
   DiagnosticLevel,
   DiagnosticPhase,
   RunDiagnostics,
 } from './run-diagnostics.js';
-import type { RunCorrelation } from './run-correlation.js';
 
 /**
  * The correlation join keys an {@link DiagnosticsBus.emitSubprocessEvent} call
@@ -40,7 +40,9 @@ export type SubprocessEventCorrelation = Pick<
 >;
 
 /** A diagnostic event with the timestamp left to the bus to stamp. */
-export type DiagnosticEventInput = Omit<DiagnosticEvent, 'at'> & { readonly at?: string };
+export type DiagnosticEventInput = Omit<DiagnosticEvent, 'at'> & {
+  readonly at?: string;
+};
 
 /**
  * Parse the `traceId` / `spanId` out of a W3C `traceparent`
@@ -102,7 +104,11 @@ export class DiagnosticsBus {
     phase: DiagnosticPhase,
     level: DiagnosticLevel,
     message: string,
-    correlation: SubprocessEventCorrelation,
+    // `Partial`: the shard (spawn) path passes a full `RunCorrelation`; the fork
+    // path passes the subset it knows (`runId`/`traceId` may be absent without a
+    // scope, `tool`/`parentCommand` come from the optional descriptor bag). Absent
+    // fields are omitted from the stamped `data` below — no empty sentinels.
+    correlation: Partial<SubprocessEventCorrelation>,
     data?: Record<string, unknown>,
   ): void {
     const mergedData: Record<string, unknown> = {};

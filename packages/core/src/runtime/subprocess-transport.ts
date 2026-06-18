@@ -70,7 +70,10 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     else buffer.push(event);
   };
 
-  let settle!: { resolve: (value: TResult) => void; reject: (err: Error) => void };
+  let settle!: {
+    resolve: (value: TResult) => void;
+    reject: (err: Error) => void;
+  };
   const result = new Promise<TResult>((resolve, reject) => {
     settle = { resolve, reject };
   });
@@ -85,6 +88,22 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   // (graph/fit/sim live runners). An external-tool fork (ADR-0054) would set its
   // own `descriptor.correlation.workerKind`.
   const workerKind = descriptor.correlation?.workerKind ?? 'live-engine';
+
+  // The scope-owned diagnostics bus (ADR-0024): the `cli.subprocess.*` JSONL logs
+  // below are for `jq` grep; these milestones ride `CommandOutcome.diagnostics`
+  // for the structured `--json` snapshot (Phase 3). Both surfaces are required.
+  // The correlation subset stamped on each milestone — absent fields (runId/traceId
+  // when no scope/OTel) are omitted by `emitSubprocessEvent`.
+  const diagnostics = currentScope()?.diagnostics;
+  const subprocessCorrelation = {
+    ...(runId === undefined ? {} : { runId }),
+    ...(traceId === undefined ? {} : { traceId }),
+    ...(descriptor.correlation?.tool === undefined ? {} : { tool: descriptor.correlation.tool }),
+    ...(descriptor.correlation?.parentCommand === undefined
+      ? {}
+      : { parentCommand: descriptor.correlation.parentCommand }),
+    workerKind,
+  };
 
   // Fold `correlationToEnv(...)` into the child env so the EXISTING spread carries
   // it (M2). `correlationToEnv` emits `OPENSIP_RUN_ID` from the PARENT run id even
@@ -131,6 +150,10 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     workerKind,
     command: descriptor.command,
   });
+  // `subprocess.spawn` milestone on the diagnostics snapshot (mirrors the log).
+  diagnostics?.emitSubprocessEvent('load', 'debug', 'subprocess.spawn', subprocessCorrelation, {
+    command: descriptor.command,
+  });
 
   let settled = false;
   const done = (apply: () => void): void => {
@@ -144,6 +167,10 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   // worker failure to its run. `failureClass` falls back to `'ipc_error'` for an
   // `error` IPC message and `'exit_nonzero'` for a premature `exit`.
   const logFailed = (failureClass: string, msg?: WorkerMessage<TEvent, TResult>): void => {
+    const resolvedWorkerKind =
+      (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind;
+    const resolvedFailureClass =
+      (msg?.kind === 'error' ? msg.failureClass : undefined) ?? failureClass;
     logger.error({
       evt: 'cli.subprocess.failed',
       module: 'core:subprocess-transport',
@@ -151,9 +178,18 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       ...(traceId === undefined ? {} : { traceId }),
       // Prefer the worker-reported kind/workerKind from the error payload; else
       // the descriptor's kind. The error payload carries no `runId` (B1).
-      workerKind: (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind,
-      failureClass: (msg?.kind === 'error' ? msg.failureClass : undefined) ?? failureClass,
+      workerKind: resolvedWorkerKind,
+      failureClass: resolvedFailureClass,
     });
+    // `subprocess.failed` milestone on the diagnostics snapshot (mirrors the log),
+    // carrying the resolved `failureClass` so a `--json` consumer can triage.
+    diagnostics?.emitSubprocessEvent(
+      'load',
+      'warn',
+      'subprocess.failed',
+      { ...subprocessCorrelation, workerKind: resolvedWorkerKind },
+      { failureClass: resolvedFailureClass },
+    );
   };
 
   child.on('message', (msg: WorkerMessage<TEvent, TResult>) => {
@@ -172,6 +208,14 @@ export function createSubprocessProgressRun<TEvent, TResult>(
           ...(traceId === undefined ? {} : { traceId }),
           workerKind,
         });
+        // `subprocess.complete` milestone on the diagnostics snapshot (the single
+        // parent-side run-level completion; mirrors the log, GAP-b).
+        diagnostics?.emitSubprocessEvent(
+          'load',
+          'debug',
+          'subprocess.complete',
+          subprocessCorrelation,
+        );
         settle.resolve(msg.value);
       });
     } else
