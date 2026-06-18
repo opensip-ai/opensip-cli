@@ -44,7 +44,10 @@ import {
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import { buildTopLevelHostSpecs } from './commands/host-command-specs.js';
-import { buildHostSubcommandGroups } from './commands/host-subcommand-groups.js';
+import {
+  buildHostSubcommandGroups,
+  buildToolPluginGroups,
+} from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
@@ -132,6 +135,7 @@ async function main(): Promise<void> {
     toolSpecs: registrationInput.toolCommandSpecs,
     hostSpecs: buildTopLevelHostSpecs(commandCtx),
     hostGroups: buildHostSubcommandGroups(commandCtx),
+    toolPluginGroups: buildToolPluginGroups(commandCtx),
   });
 
   // Install the pre-action hook AFTER bootstrap + command-scope indexing so the

@@ -3,12 +3,15 @@
  * {@link CommandSpec}s, mounted through the SAME `mountCommandSpec` plane the
  * tools use (launch Phase 6).
  *
- * Host commands (`init` / `configure` / `sessions` / `plugin` / `report` /
- * `completion` / `uninstall`) are NOT tool plugins — they don't ride on a
+ * Host commands (`init` / `configure` / `sessions` / `report` / `completion` /
+ * `uninstall` / `tools`) are NOT tool plugins — they don't ride on a
  * `Tool.commandSpecs` and aren't discovered. But making them mount via the same
  * `mountCommandSpec` means the Phase 7 `command-surface-parity` guardrail sees
- * ONE uniform command surface: there is no second, more-privileged
- * raw-Commander path for "blessed" CLI-owned commands.
+ * ONE uniform command surface: no second, more-privileged raw-Commander path for
+ * "blessed" CLI-owned commands. The pack-management `plugin {add,list,remove,
+ * sync}` ops are host-owned too, but mount UNDER each pack-supporting tool
+ * primary (`opensip fit plugin …`) via {@link mountToolPluginGroups} — there is
+ * no top-level `opensip plugin`.
  *
  * Each spec's handler closes over the per-invocation {@link CliCommandsContext}
  * (render / setExitCode / datastore thunk / pluginLayouts) — the same data the
@@ -18,10 +21,11 @@
  * `signal-envelope` / `live-view` arms are never exercised by a host command, so
  * `CliCommandsContext` is a valid (leaner) `CommandMountContext`.
  *
- * The two action-less subcommand GROUPS (`sessions`, `plugin`) and their leaf
- * specs live in `host-subcommand-groups.ts` (a leaf module that lets
- * `completion.ts` source its sub-subcommand names without a module cycle). This
- * module assembles the TOP-LEVEL specs and mounts the whole surface.
+ * The action-less subcommand GROUPS (`sessions`, `tools`) + the domain-bound
+ * per-tool `plugin` group leaves (and their {@link mountToolPluginGroups}) live
+ * in `host-subcommand-groups.ts` (a leaf module that lets `completion.ts` source
+ * its sub-subcommand names without a module cycle). This module assembles the
+ * TOP-LEVEL specs and mounts the whole surface.
  *
  * Specs are built per-invocation (inside the builders below, not at module
  * load) so the `--cwd` defaults that resolve to `process.cwd()` are evaluated
@@ -42,9 +46,15 @@ import {
   type GroupLike,
   type Shell,
   type SpecLike,
+  type ToolPluginGroupLike,
 } from './completion.js';
 import { executeConfigure } from './configure.js';
-import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-groups.js';
+import {
+  buildHostSubcommandGroups,
+  buildToolPluginGroups,
+  mountToolPluginGroups,
+  type HostSpec,
+} from './host-subcommand-groups.js';
 import { executeInit } from './init.js';
 import { showInternalCommands } from './internal-command-visibility.js';
 import { mountCommandSpec } from './mount-command-spec.js';
@@ -220,6 +230,7 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
         toolSpecs: ctx.toolCommandSpecs ?? [],
         hostSpecs: host.specs,
         groups: host.groups,
+        toolPluginGroups: host.toolPluginGroups,
         internalCommands,
       });
       printCompletionScript(normalized satisfies Shell, inventory);
@@ -351,22 +362,25 @@ function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec
 
 /**
  * The host portion of the completion inventory: the `SpecLike` views of every
- * top-level host command and the action-less groups. The completion command's
- * own surface is the static {@link COMPLETION_SELF_SPEC} stand-in; every OTHER
- * host command is read from its live spec (so its flags can't drift). Consumed
- * by the `completion` handler INSTEAD of {@link buildTopLevelHostSpecs}, so the
- * handler never depends back on {@link buildCompletionSpec}.
- *
- * Order is irrelevant here — the inventory subcommand list is sorted — so the
- * static completion descriptor is simply appended.
+ * top-level host command, the action-less groups, and the per-tool `plugin`
+ * groups. The completion command's own surface is the static
+ * {@link COMPLETION_SELF_SPEC} stand-in; every OTHER host command is read from
+ * its live spec (so its flags can't drift). Consumed by the `completion` handler
+ * INSTEAD of {@link buildTopLevelHostSpecs}, so the handler never depends back on
+ * {@link buildCompletionSpec}.
  */
 function buildHostCompletionSurface(ctx: CliCommandsContext): {
   readonly specs: readonly SpecLike[];
   readonly groups: readonly GroupLike[];
+  readonly toolPluginGroups: readonly ToolPluginGroupLike[];
 } {
   return {
     specs: [...buildNonCompletionHostSpecs(ctx), COMPLETION_SELF_SPEC],
     groups: buildHostSubcommandGroups(ctx),
+    toolPluginGroups: buildToolPluginGroups(ctx).map((g) => ({
+      toolVerb: g.toolVerb,
+      leaves: g.leaves.map((l) => ({ name: l.name })),
+    })),
   };
 }
 
@@ -392,7 +406,10 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
  * Mount every host command onto `program` through the shared `mountCommandSpec`
  * plane. Top-level specs mount directly; each subcommand group becomes a raw
  * action-less parent (the documented exception) onto which its leaf specs mount
- * via the same `mountCommandSpec`.
+ * via the same `mountCommandSpec`. Finally, the per-tool `plugin` groups mount
+ * UNDER each pack-supporting tool primary via {@link mountToolPluginGroups} —
+ * which runs AFTER the tools were mounted (the composition root mounts tools
+ * before `registerCliCommands`), so the tool primaries already exist.
  */
 export function mountHostCommands(program: CliProgram, ctx: CliCommandsContext): void {
   for (const spec of buildTopLevelHostSpecs(ctx)) {
@@ -404,4 +421,5 @@ export function mountHostCommands(program: CliProgram, ctx: CliCommandsContext):
       mountCommandSpec(parent, leaf, ctx);
     }
   }
+  mountToolPluginGroups(program, ctx);
 }

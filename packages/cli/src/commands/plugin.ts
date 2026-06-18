@@ -1,6 +1,14 @@
 // @fitness-ignore-file error-handling-quality -- npm install failures already stream to stderr via inherited stdio (downstream loader surfaces unresolved imports), and the package.json / node_modules walks are probes where unreadable/malformed entries mean "not installable" or "not a candidate" — same as absent.
 /**
- * plugin command — manage project-local npm-installed plugins.
+ * plugin command — manage a PACK-SUPPORTING tool's project-local
+ * npm-installed extension packs (fit/sim checks, recipes, scenarios).
+ *
+ * The pack ops are mounted UNDER each pack-supporting tool primary —
+ * `opensip fit plugin {add|list|remove|sync}` (domain pre-bound to `fit`),
+ * `opensip sim plugin {…}` (domain `sim`). There is no top-level
+ * `opensip plugin` command, and no `--domain`/`--type` flag: the tool the
+ * subcommand hangs off of IS the domain. Whole Tool plugins (platform
+ * subcommands) are installed/uninstalled with `opensip tools …`, never here.
  *
  * Layout (no user-global plugin dir):
  *
@@ -18,17 +26,17 @@
  *                                   installed package (silent loads
  *                                   would surprise users).
  *
- * `plugin add <pkg>` is the one-step install: writes the package to
+ * `<tool> plugin add <pkg>` is the one-step install: writes the package to
  * .runtime/plugins/<domain>/node_modules AND adds it to plugins.<domain>
  * in the project config. After: `opensip fit` loads it on next run.
  *
- * `plugin remove <pkg>` is the inverse: removes from node_modules AND
+ * `<tool> plugin remove <pkg>` is the inverse: removes from node_modules AND
  * deletes from plugins.<domain>.
  *
- * `plugin list` walks .runtime/plugins/<domain>/node_modules + the
+ * `<tool> plugin list` walks .runtime/plugins/<domain>/node_modules + the
  * config to show what's installed and what's currently loaded.
  *
- * `plugin sync` is the post-clone bootstrap: reads plugins.<domain> from
+ * `<tool> plugin sync` is the post-clone bootstrap: reads plugins.<domain> from
  * the config and `npm install`s everything declared. Used by CI and
  * by users who clone a repo with custom plugins.
  *
@@ -37,7 +45,7 @@
  * - This file owns the `plugin {list,add,remove,sync}` command bodies.
  * - `plugin/config-edit.ts` — YAML round-trip edits to plugins.<domain>.
  * - `plugin/domain-resolution.ts` — TOOL_DOMAIN + the pure validation
- *   logic that routes a spec to a domain / Tool host dir (no install).
+ *   logic that routes a spec to a domain (no install).
  * - `plugin/host-dir.ts` — host package.json creation + installed-
  *   package introspection (incl. peer-dependency auto-install).
  */
@@ -47,29 +55,16 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  discoverPackagesInNodeModules,
   readProjectPluginsList,
   resolveProjectPaths,
-  resolveUserPaths,
   type PluginLayout,
   type ToolProvenance,
 } from '@opensip-cli/core';
 
 import { addToConfigPluginList, removeFromConfigPluginList } from './plugin/config-edit.js';
-import {
-  domainNames,
-  isToolTarget,
-  resolveDomain,
-  TOOL_DOMAIN,
-} from './plugin/domain-resolution.js';
+import { domainNames, resolveDomain } from './plugin/domain-resolution.js';
 import { ensurePluginHostDir, HOST_PACKAGE_JSON, isSafeNpmSpec } from './plugin/host-dir.js';
-import {
-  addToolPlugin,
-  editPluginList,
-  npmInstallIntoHost,
-  npmUninstallFromHost,
-  removeToolPlugin,
-} from './plugin-host-ops.js';
+import { editPluginList, npmInstallIntoHost, npmUninstallFromHost } from './plugin-host-ops.js';
 
 import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-cli/contracts';
 
@@ -80,12 +75,6 @@ import type { PluginInfo, PluginResult, SyncEntry } from '@opensip-cli/contracts
  */
 const PLUGIN_ADD = 'plugin-add' as const;
 const PLUGIN_REMOVE = 'plugin-remove' as const;
-
-/** Options shared by `plugin add`/`remove` for Tool-plugin scope selection. */
-export interface PluginScopeOpts {
-  /** Install/remove a Tool plugin in the project-local host dir instead of user-global. */
-  readonly project?: boolean;
-}
 
 /**
  * Test-only export for the YAML-driven config edit so unit tests can
@@ -120,29 +109,18 @@ export async function pluginList(
     }
   }
 
-  // Tool plugins are not a fit/sim layout — they auto-discover by marker
-  // from the user-global host dir and (with --project) the project-local
-  // one. Dedup by name; a project-local pin shadows a user-global install.
-  const seenTools = new Set<string>();
-  for (const dir of [
-    resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN),
-    resolveUserPaths().pluginsDir(TOOL_DOMAIN),
-  ]) {
-    for (const pkg of discoverPackagesInNodeModules(join(dir, 'node_modules'), 'tool')) {
-      if (seenTools.has(pkg.name)) continue;
-      seenTools.add(pkg.name);
-      plugins.push({ domain: TOOL_DOMAIN, namespace: pkg.name, pluginType: 'package' });
-    }
-  }
-
+  // Whole Tool plugins are NOT listed here — `<tool> plugin list` is scoped to
+  // the tool's own extension-pack domain (fit/sim packs). Installed Tool
+  // plugins (platform subcommands) are listed by `opensip tools list`.
+  //
   // Additive provenance section (launch): the tools admitted through the
   // compatibility gate this run — passed in by the command handler from the
   // entered RunScope (`currentScope().toolProvenance`), NOT a disk re-scan.
-  // Surfaces source/identity/manifestHash for bundled/installed/project-local
-  // tools alongside the discovered fit/sim/tool plugin list above.
+  // Surfaces source/identity/manifestHash for the admitted tools alongside the
+  // discovered pack list above.
   return {
     type: 'plugin-list',
-    domains: [...domainsForList(layouts), TOOL_DOMAIN],
+    domains: domainsForList(layouts),
     plugins,
     totalCount: plugins.length,
     toolProvenance,
@@ -158,7 +136,10 @@ function domainsForList(layouts: readonly PluginLayout[]): string[] {
 // =============================================================================
 
 /**
- * Install a plugin AND add it to the project config in one step.
+ * Install a pack AND add it to the project config in one step, scoped to the
+ * caller's bound `domain` (the pack-supporting tool the subcommand hangs off
+ * of — `fit`/`sim`). Whole Tool plugins are NOT installable here; use
+ * `opensip tools install`.
  *
  * Without the config update, the package wouldn't get loaded — making
  * "install" alone always incomplete. Single-step is the only sensible
@@ -170,14 +151,13 @@ export async function pluginAdd(
   cwd: string = process.cwd(),
   domainOverride?: string,
   layouts: readonly PluginLayout[] = [],
-  scope: PluginScopeOpts = {},
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
       type: PLUGIN_ADD,
       packageName: '',
       success: false,
-      error: 'No package name provided. Usage: opensip plugin add <package-name>',
+      error: 'No package name provided. Usage: opensip <tool> plugin add <package-name>',
     };
   }
   if (!isSafeNpmSpec(packageName)) {
@@ -189,14 +169,9 @@ export async function pluginAdd(
     };
   }
 
-  // Tool-plugin path: install into the user-global (or --project) tool host
-  // dir, no config entry (tools auto-discover by marker).
-  if (isToolTarget(domainOverride, packageName, cwd)) {
-    return addToolPlugin(packageName, cwd, scope.project === true);
-  }
-
-  // fit/sim domain path: install into the project-local domain host dir and
-  // record in plugins.<domain> so discovery loads it.
+  // The domain is bound by the host (the pack-supporting tool primary the
+  // subcommand mounts under), so it is always one of the contributed layouts;
+  // resolve/validate defensively against them.
   const domains = domainNames(layouts);
   const domain = resolveDomain(domainOverride, packageName, domains);
   if (!domain) {
@@ -204,7 +179,7 @@ export async function pluginAdd(
       type: PLUGIN_ADD,
       packageName,
       success: false,
-      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...domains, TOOL_DOMAIN].join(', ')}`,
+      error: `Invalid domain '${String(domainOverride)}' — expected one of: ${domains.join(', ')}`,
     };
   }
 
@@ -228,14 +203,13 @@ export async function pluginRemove(
   cwd: string = process.cwd(),
   domainOverride?: string,
   layouts: readonly PluginLayout[] = [],
-  scope: PluginScopeOpts = {},
 ): Promise<PluginResult> {
   if (!packageName) {
     return {
       type: PLUGIN_REMOVE,
       packageName: '',
       success: false,
-      error: 'No package name provided. Usage: opensip plugin remove <package-name>',
+      error: 'No package name provided. Usage: opensip <tool> plugin remove <package-name>',
     };
   }
   if (!isSafeNpmSpec(packageName)) {
@@ -247,13 +221,8 @@ export async function pluginRemove(
     };
   }
 
-  // Tool-plugin path: a tool removal targets the tool host dir directly.
-  // Detection by an installed package can't read a published marker, so the
-  // tool path is keyed on the explicit `--domain tool`.
-  if (domainOverride === TOOL_DOMAIN) {
-    return removeToolPlugin(packageName, cwd, scope.project === true);
-  }
-
+  // The domain is bound by the host (the pack-supporting tool primary). Whole
+  // Tool plugins are uninstalled with `opensip tools uninstall`, not here.
   const domains = domainNames(layouts);
   const domain = resolveDomain(domainOverride, packageName, domains);
   if (!domain) {
@@ -261,7 +230,7 @@ export async function pluginRemove(
       type: PLUGIN_REMOVE,
       packageName,
       success: false,
-      error: `Invalid --domain '${String(domainOverride)}' — expected one of: ${[...domains, TOOL_DOMAIN].join(', ')}`,
+      error: `Invalid domain '${String(domainOverride)}' — expected one of: ${domains.join(', ')}`,
     };
   }
 

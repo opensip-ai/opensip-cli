@@ -8,7 +8,7 @@
  * of a parallel allowlist.
  */
 
-import type { HostSubcommandGroup } from './host-subcommand-groups.js';
+import type { HostSubcommandGroup, ToolPluginGroup } from './host-subcommand-groups.js';
 import type { CommandScopeRequirement } from '@opensip-cli/core';
 import type { Command } from 'commander';
 
@@ -31,6 +31,13 @@ export interface CommandScopeIndexInput {
   readonly hostSpecs: readonly CommandScopeSpec[];
   readonly hostGroups: readonly HostSubcommandGroup[];
   readonly toolSpecs: readonly CommandScopeSpec[];
+  /**
+   * The DOMAIN-BOUND per-tool `plugin` groups (mounted under each pack-supporting
+   * tool primary, e.g. `opensip fit plugin list`). Each leaf keys under
+   * `${toolVerb} plugin ${leaf}` so `commandPath` resolves the doubly-nested path.
+   * Optional so callers without tools (isolated tests) can omit it.
+   */
+  readonly toolPluginGroups?: readonly ToolPluginGroup[];
 }
 
 function addSpec(
@@ -54,6 +61,12 @@ export function buildCommandScopeIndex(input: CommandScopeIndexInput): CommandSc
   input.hostSpecs.forEach((spec) => addSpec(index, undefined, spec));
   input.hostGroups.forEach((group) => {
     group.leaves.forEach((leaf) => addSpec(index, group.name, leaf));
+  });
+  // Per-tool `plugin` group leaves key under the doubly-nested
+  // `${toolVerb} plugin ${leaf}` path (e.g. `fit plugin list`), matching what
+  // `commandPath` resolves for the mounted `opensip fit plugin list`.
+  (input.toolPluginGroups ?? []).forEach((group) => {
+    group.leaves.forEach((leaf) => addSpec(index, `${group.toolVerb} plugin`, leaf));
   });
 
   return index;

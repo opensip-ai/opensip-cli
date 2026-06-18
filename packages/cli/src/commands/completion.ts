@@ -75,7 +75,11 @@ export interface CompletionInventory {
   readonly subcommands: readonly string[];
   /** Per-command long-flag list, keyed by command name (and alias). */
   readonly commandFlags: Readonly<Record<string, readonly string[]>>;
-  /** Sub-subcommand names for the action-less groups (`plugin`, `sessions`). */
+  /**
+   * Sub-subcommand names for the action-less groups (`sessions`, `tools`), the
+   * `<tool> <verb>` grammar (`fit export`…), and the per-tool `plugin` groups
+   * (`fit plugin`, keyed under `${toolVerb} plugin`).
+   */
   readonly groupSubcommands: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -95,9 +99,20 @@ export interface SpecLike {
   readonly parent?: string;
 }
 
-/** One action-less group (`plugin` / `sessions`) and its leaf command names. */
+/** One action-less group (`sessions` / `tools`) and its leaf command names. */
 export interface GroupLike {
   readonly name: string;
+  readonly leaves: readonly { readonly name: string }[];
+}
+
+/**
+ * One pack-supporting tool's `plugin` group, keyed by the tool verb it mounts
+ * under (`fit`/`sim`). The `plugin` parent is offered as a leaf under that verb
+ * (`opensip fit <TAB>` ⇒ `… plugin`), and the `add|list|remove|sync` leaves are
+ * registered under the `${toolVerb} plugin` path for deeper completion.
+ */
+export interface ToolPluginGroupLike {
+  readonly toolVerb: string;
   readonly leaves: readonly { readonly name: string }[];
 }
 
@@ -169,6 +184,13 @@ export function assembleCompletionInventory(input: {
   readonly toolSpecs: readonly SpecLike[];
   readonly hostSpecs: readonly SpecLike[];
   readonly groups: readonly GroupLike[];
+  /**
+   * The DOMAIN-BOUND per-tool `plugin` groups (mounted under each pack-supporting
+   * tool primary). Folded into the group map so completion offers `plugin` under
+   * the tool verb and `add|list|remove|sync` under `${toolVerb} plugin`. Optional
+   * so callers without tools omit it.
+   */
+  readonly toolPluginGroups?: readonly ToolPluginGroupLike[];
   readonly internalCommands?: ReadonlySet<string>;
 }): CompletionInventory {
   const internalCommands = input.internalCommands ?? INTERNAL_COMMANDS;
@@ -209,6 +231,14 @@ export function assembleCompletionInventory(input: {
   // its nested leaves here lets the script also complete `graph export` etc.
   for (const [parent, leaves] of Object.entries(toolGroupLeaves)) {
     groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), ...leaves];
+  }
+  // Fold the per-tool `plugin` groups in: `plugin` becomes a completable leaf
+  // under the tool verb (`opensip fit <TAB>` ⇒ `… plugin`), and the bound
+  // leaf names register under the doubly-nested `${toolVerb} plugin` key for
+  // deeper completion. There is NO top-level `plugin` group anymore.
+  for (const group of input.toolPluginGroups ?? []) {
+    groupSubcommands[group.toolVerb] = [...(groupSubcommands[group.toolVerb] ?? []), 'plugin'];
+    groupSubcommands[`${group.toolVerb} plugin`] = group.leaves.map((l) => l.name);
   }
 
   // `help` is a Commander built-in the script also surfaces.
