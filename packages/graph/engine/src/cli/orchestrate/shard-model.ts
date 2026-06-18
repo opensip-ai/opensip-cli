@@ -24,6 +24,8 @@
 // because the adapter contract (`lang-adapter/types.ts` → `ResolveOutput`)
 // emits it — only the adapter can extract a callee name syntactically.
 // Consumers import it from `../../types.js` (or the package barrel) directly.
+import type { RunCorrelation } from '@opensip-cli/core';
+
 import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
 
 /**
@@ -69,6 +71,22 @@ export interface ShardWorkerSpec {
   /** Optional adapter id requested by the parent `graph --language <id>` run. */
   readonly language?: string;
   readonly resolutionMode: ResolutionMode;
+  /**
+   * OPTIONAL correlation bag forwarded from the parent run so the shard worker
+   * can stamp `tool`/`parentCommand`/`traceId`/`shardId` on its spans and logs
+   * (subprocess-correlation telemetry spec, Phase 1).
+   *
+   * Wire-compat seam: this field is OPTIONAL on purpose. A mismatched
+   * parent↔worker build during a partial upgrade — an old worker reading a new
+   * spec, or a new worker reading an old spec — MUST NOT break. A required field
+   * would. If a hard contract is ever needed, version the envelope with a
+   * `specVersion` field rather than making this required.
+   *
+   * `runId` is deliberately EXCLUDED (`Omit<…, 'runId'>`): it travels via the
+   * `OPENSIP_RUN_ID` env ONLY (B1), inherited at the worker's pre-action hook
+   * before any spec JSON is parsed.
+   */
+  readonly correlation?: Omit<RunCorrelation, 'runId'>;
 }
 
 /**
