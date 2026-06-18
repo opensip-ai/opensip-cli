@@ -263,10 +263,39 @@ export interface RunScope extends ToolScope {}
 // not to whichever package is reading from it. This solves the
 // two-copies-of-fitness hazard documented at the prior
 // `Symbol.for(globalThis)` site.
+//
+// Concurrency contract — two ways to bind a scope, with strict roles:
+//
+//   • `runWithScope(scope, fn)` / `runWithScopeSync(scope, fn)` —
+//     bind `scope` for the dynamic extent of `fn` via
+//     `AsyncLocalStorage.run`. This is the ONLY safe way to bind a
+//     scope for concurrent or nested in-process work: each task's
+//     scope is isolated to its own `fn`, runs nest cleanly, and two
+//     overlapping runs never collide on the shared slot. SaaS hosts
+//     and any in-process parallelism MUST use this.
+//
+//   • `enterScope(scope)` — the Commander single-command path ONLY:
+//     one entry per CLI invocation, in the pre-action hook. It mutates
+//     the single ALS slot (`enterWith`) for the rest of the async
+//     context, so it is unsafe for concurrent or nested work. NEVER
+//     call `enterScope` while another scope task is in flight; the
+//     always-on guard throws `SYSTEM.SCOPE.REENTRANT` if a *different*
+//     scope is already current.
+//
+// Per-run log isolation rides on the same seam: distinct scopes carry
+// distinct `runId`s, and the logger reads `currentScope()?.runId`
+// (wired below via `setRunIdProvider`), so concurrent runs produce
+// non-colliding, per-run-filterable logs.
 
 const scopeStorage = new AsyncLocalStorage<RunScope>();
 
-/** Run `fn` with `scope` bound as the current scope for everything in its dynamic extent. */
+/**
+ * Run `fn` with `scope` bound as the current scope for everything in its
+ * dynamic extent. Backed by `AsyncLocalStorage.run`, so it nests cleanly
+ * and is the concurrency-safe binding: use this (never a shared
+ * {@link enterScope}) for concurrent or nested in-process work — two
+ * overlapping runs each see their own scope and never collide.
+ */
 export function runWithScope<T>(scope: RunScope, fn: () => Promise<T>): Promise<T> {
   return scopeStorage.run(scope, fn);
 }
@@ -308,6 +337,29 @@ export function enterScope(scope: RunScope): void {
     );
   }
   scopeStorage.enterWith(scope);
+}
+
+/**
+ * Clear the ambient scope slot — the symmetric counterpart to {@link enterScope}.
+ * Backed by `AsyncLocalStorage.enterWith(undefined)`, so it resets the single ALS
+ * slot for the rest of the calling async context.
+ *
+ * Host-only, single-command path: the Commander `postAction` hook calls this after
+ * disposing the entered scope, completing the per-command lifecycle (enter in
+ * `preAction` → dispose + exit in `postAction`). Clearing the slot leaves a clean
+ * ALS state for any *subsequent* command run in the same process — so a long-lived
+ * host that drives Commander sequentially (or a test that parses twice) does not
+ * trip the always-on re-entrancy guard on the next `enterScope`. A no-op when no
+ * scope is current. Concurrent/nested work never needs this — {@link runWithScope}
+ * restores the prior slot on its own when its `fn` returns.
+ */
+export function exitScope(): void {
+  // `enterWith(undefined)` clears the slot for this async context. The storage
+  // is typed `AsyncLocalStorage<RunScope>` so `getStore()` stays non-nullable at
+  // read sites; the cast is the one place we exercise the runtime's documented
+  // "store may be undefined" contract to reset the slot.
+  // eslint-disable-next-line unicorn/no-useless-undefined -- the `undefined` is load-bearing: it is the slot-clear value for AsyncLocalStorage.enterWith, not a removable default.
+  (scopeStorage as AsyncLocalStorage<RunScope | undefined>).enterWith(undefined);
 }
 
 /** Read the current scope. Returns undefined when called outside a runWithScope. */

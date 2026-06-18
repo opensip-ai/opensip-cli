@@ -17,7 +17,13 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { LanguageRegistry, ToolRegistry, type Tool, type ToolCliContext } from '@opensip-cli/core';
+import {
+  exitScope,
+  LanguageRegistry,
+  ToolRegistry,
+  type Tool,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -165,6 +171,13 @@ describe('Tool.initialize() wiring (preAction)', () => {
     const program = buildProgram(makeFixtureTool('memo-tool', 'memo-cmd', events));
 
     await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], { from: 'node' });
+    // Production runs one command per process, so each invocation's pre-action
+    // hook enters a fresh ALS slot from a clean state. This test drives Commander
+    // twice in ONE process to exercise the once-per-process initialize() guard, so
+    // clear the ambient slot between invocations — mirroring the fresh-process
+    // boundary — otherwise the second enterScope would (correctly) trip the
+    // always-on SYSTEM.SCOPE.REENTRANT guard against the first run's leaked scope.
+    exitScope();
     await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], { from: 'node' });
 
     // initialize once total; action twice.

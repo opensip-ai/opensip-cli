@@ -275,6 +275,7 @@ const EXPORT_ALLOWLIST = {
   deriveRecipeId: 'run-kernel',
   detectPhantomRuntimes: 'run-kernel',
   enterScope: 'run-kernel',
+  exitScope: 'run-kernel',
   err: 'run-kernel',
   executePipeline: 'run-kernel',
   extractPayloadVersion: 'run-kernel',

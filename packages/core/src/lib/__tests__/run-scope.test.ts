@@ -17,6 +17,7 @@ import {
   currentScope,
   currentLogger,
   enterScope,
+  exitScope,
 } from '../run-scope.js';
 
 describe('RunScope — construction', () => {
@@ -165,6 +166,34 @@ describe('runWithScope / currentScope', () => {
     expect(() => enterScope(scope)).not.toThrow();
     expect(currentScope()).toBe(scope);
     scope.dispose();
+  });
+
+  it('exitScope clears the ambient slot so a subsequent enterScope starts clean', () => {
+    // Run OUTSIDE any runWithScope wrapper. This mirrors the postAction → next
+    // command sequence in one process: enter scope1, exitScope (slot cleared),
+    // then enter a DIFFERENT scope2 without tripping the re-entrancy guard.
+    const scope1 = new RunScope();
+    const scope2 = new RunScope();
+
+    enterScope(scope1);
+    expect(currentScope()).toBe(scope1);
+
+    exitScope();
+    expect(currentScope()).toBeUndefined();
+
+    // A different scope now enters cleanly because the slot was cleared.
+    expect(() => enterScope(scope2)).not.toThrow();
+    expect(currentScope()).toBe(scope2);
+
+    exitScope();
+    scope1.dispose();
+    scope2.dispose();
+  });
+
+  it('exitScope is a no-op when no scope is current', () => {
+    expect(currentScope()).toBeUndefined();
+    expect(() => exitScope()).not.toThrow();
+    expect(currentScope()).toBeUndefined();
   });
 
   it('nested runWithScope: inner overrides; outer is restored', async () => {

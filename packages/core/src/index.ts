@@ -297,6 +297,7 @@ export {
   runWithScope,
   runWithScopeSync,
   enterScope,
+  exitScope,
   currentScope,
   currentLogger,
 } from './lib/run-scope.js';

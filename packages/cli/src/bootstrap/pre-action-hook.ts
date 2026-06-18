@@ -7,7 +7,7 @@
  * to Commander's preAction/postAction hooks.
  */
 
-import { currentScope, generatePrefixedId } from '@opensip-cli/core';
+import { currentScope, exitScope, generatePrefixedId } from '@opensip-cli/core';
 
 import { commandPath } from '../commands/command-scope-index.js';
 
@@ -70,5 +70,13 @@ export function disposeCurrentScope(): void {
     }
   } catch {
     // @swallow-ok dispose errors on shutdown; the run has already produced its outcome.
+  } finally {
+    // Complete the per-command lifecycle: clear the ambient ALS slot so a
+    // subsequent command in the same process (a long-lived host driving
+    // Commander sequentially) starts with a clean slot and its `enterScope`
+    // does not trip the always-on re-entrancy guard against this finished run.
+    // Production runs one command per process, so this is normally the final
+    // teardown; it is a no-op when no scope is current.
+    exitScope();
   }
 }
