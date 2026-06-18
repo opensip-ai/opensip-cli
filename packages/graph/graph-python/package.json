@@ -1,6 +1,7 @@
 {
   "name": "@opensip-cli/graph-python",
   "version": "0.1.6",
+  "private": true,
   "license": "Apache-2.0",
   "description": "Python language adapter for the opensip graph engine",
   "keywords": [

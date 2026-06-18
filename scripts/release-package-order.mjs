@@ -72,32 +72,12 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/contracts',
     filter: '@opensip-cli/contracts',
   },
-  // Layer 2 — session-store + output (extracted from contracts)
-  {
-    unscoped: 'session-store',
-    name: '@opensip-cli/session-store',
-    dir: 'packages/session-store',
-    filter: '@opensip-cli/session-store',
-  },
-  {
-    unscoped: 'output',
-    name: '@opensip-cli/output',
-    dir: 'packages/output',
-    filter: '@opensip-cli/output',
-  },
   // Layer 2 — capability-configuration layer (config composer + schema registry; depends on core)
   {
     unscoped: 'config',
     name: '@opensip-cli/config',
     dir: 'packages/config',
     filter: '@opensip-cli/config',
-  },
-  // Layer 2.5 — file-targeting runtime substrate (ADR-0037; depends on core + config)
-  {
-    unscoped: 'targeting',
-    name: '@opensip-cli/targeting',
-    dir: 'packages/targeting',
-    filter: '@opensip-cli/targeting',
   },
   // Layer 3 — shared Ink/React UI primitives
   {
@@ -150,13 +130,6 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/languages/lang-cpp',
     filter: '@opensip-cli/lang-cpp',
   },
-  // Layer 3 — dashboard (depends on core + contracts only; consumed by fitness)
-  {
-    unscoped: 'dashboard',
-    name: '@opensip-cli/dashboard',
-    dir: 'packages/dashboard',
-    filter: '@opensip-cli/dashboard',
-  },
   // Layer 3 — tools
   {
     unscoped: 'fitness',
@@ -190,30 +163,6 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/graph/graph-typescript',
     filter: '@opensip-cli/graph-typescript',
   },
-  {
-    unscoped: 'graph-python',
-    name: '@opensip-cli/graph-python',
-    dir: 'packages/graph/graph-python',
-    filter: '@opensip-cli/graph-python',
-  },
-  {
-    unscoped: 'graph-rust',
-    name: '@opensip-cli/graph-rust',
-    dir: 'packages/graph/graph-rust',
-    filter: '@opensip-cli/graph-rust',
-  },
-  {
-    unscoped: 'graph-go',
-    name: '@opensip-cli/graph-go',
-    dir: 'packages/graph/graph-go',
-    filter: '@opensip-cli/graph-go',
-  },
-  {
-    unscoped: 'graph-java',
-    name: '@opensip-cli/graph-java',
-    dir: 'packages/graph/graph-java',
-    filter: '@opensip-cli/graph-java',
-  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',
@@ -232,30 +181,6 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/checks-python',
     dir: 'packages/fitness/checks-python',
     filter: '@opensip-cli/checks-python',
-  },
-  {
-    unscoped: 'checks-go',
-    name: '@opensip-cli/checks-go',
-    dir: 'packages/fitness/checks-go',
-    filter: '@opensip-cli/checks-go',
-  },
-  {
-    unscoped: 'checks-java',
-    name: '@opensip-cli/checks-java',
-    dir: 'packages/fitness/checks-java',
-    filter: '@opensip-cli/checks-java',
-  },
-  {
-    unscoped: 'checks-cpp',
-    name: '@opensip-cli/checks-cpp',
-    dir: 'packages/fitness/checks-cpp',
-    filter: '@opensip-cli/checks-cpp',
-  },
-  {
-    unscoped: 'checks-rust',
-    name: '@opensip-cli/checks-rust',
-    dir: 'packages/fitness/checks-rust',
-    filter: '@opensip-cli/checks-rust',
   },
   // Layer 5 — composition root (unscoped name → opensip-cli-<ver>.tgz)
   {
