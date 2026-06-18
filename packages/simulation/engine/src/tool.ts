@@ -158,8 +158,10 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
 
   // Effectful egress + host-owned findings exit live at the root (cloud sink +
   // `--report-to` exit 4 + the verdict-derived exit, ADR-0035). Once per run.
+  // envelope-first-presentation: `result` is the render-only RunPresentation —
+  // cwd comes from `opts.cwd` (in scope), recipe from `result.envelope.recipe`.
   await cli.deliverSignals(result.envelope, {
-    cwd: result.cwd,
+    cwd: opts.cwd,
     reportTo: opts.reportTo,
     apiKey: opts.apiKey,
   });
@@ -171,12 +173,13 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
 
   // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
   // host run plane persists it after this handler resolves (no tool-side write).
+  // The session row is built from the envelope, not from *DoneResult fields.
   const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
   return {
     session: {
       tool: 'sim',
-      cwd: result.cwd,
-      recipe: result.recipeName,
+      cwd: opts.cwd,
+      recipe: result.envelope.recipe,
       score: result.envelope.verdict.score,
       passed: result.envelope.verdict.passed,
       payload: buildSimulationSessionPayload(result.envelope),

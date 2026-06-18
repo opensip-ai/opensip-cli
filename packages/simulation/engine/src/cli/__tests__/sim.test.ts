@@ -87,9 +87,9 @@ describe('executeSim', () => {
       }),
     );
     const { result } = await executeSim(args());
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
-      expect(result.recipeName).toBe('default');
+    expect(result.type).toBe('run-presentation');
+    if (result.type === 'run-presentation') {
+      expect(result.envelope.recipe).toBe('default');
     }
   });
 
@@ -107,8 +107,8 @@ describe('executeSim', () => {
       }),
     );
     const { result } = await executeSim(args());
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
+    expect(result.type).toBe('run-presentation');
+    if (result.type === 'run-presentation') {
       // ADR-0011: per-scenario facts live on the envelope's `units` sidecar
       // (one unit per scenario, slug === scenarioId).
       expect(result.envelope.units).toHaveLength(1);
@@ -127,8 +127,8 @@ describe('executeSim', () => {
       run: () => Promise.reject(new Error('boom')),
     });
     const { result } = await executeSim(args());
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
+    expect(result.type).toBe('run-presentation');
+    if (result.type === 'run-presentation') {
       expect(result.envelope.verdict.summary.failed).toBe(1);
       // ADR-0035: the single host verdict drives the exit (no `shouldFail` field).
       // A crashed scenario carries a unit error → the run verdict fails.
@@ -160,7 +160,7 @@ describe('executeSim', () => {
       run: () => Promise.reject(new Error('a-specific-message')),
     });
     const { result } = await executeSim(args());
-    if (result.type === 'sim-done') {
+    if (result.type === 'run-presentation') {
       // The scenario's thrown error is carried on its unit (slug === scenarioId).
       expect(result.envelope.units[0]?.error).toContain('a-specific-message');
     }
@@ -181,8 +181,8 @@ describe('executeSim', () => {
     });
 
     const { result } = await executeSim(args());
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
+    expect(result.type).toBe('run-presentation');
+    if (result.type === 'run-presentation') {
       const sig = result.envelope.signals.find((s) => s.message === 'fyi');
       expect(sig?.source).toBe('sig-scenario');
     }
@@ -205,8 +205,8 @@ describe('executeSim', () => {
     });
 
     const { result } = await executeSim(args());
-    expect(result.type).toBe('sim-done');
-    if (result.type === 'sim-done') {
+    expect(result.type).toBe('run-presentation');
+    if (result.type === 'run-presentation') {
       const unit = result.envelope.units.find((u) => u.slug === 'crit-scenario');
       // passed:true from the executor, but the critical signal flips the unit.
       expect(unit?.passed).toBe(false);
@@ -214,10 +214,10 @@ describe('executeSim', () => {
   });
 });
 
-/** Run a minimal sim and return its SimDoneResult — the caller persists it.
+/** Run a minimal sim and return its RunPresentation — the caller persists it.
  *  Hoisted to module scope (called inside the per-test scope from beforeEach). */
 async function simDone(): Promise<
-  Extract<Awaited<ReturnType<typeof executeSim>>['result'], { type: 'sim-done' }>
+  Extract<Awaited<ReturnType<typeof executeSim>>['result'], { type: 'run-presentation' }>
 > {
   currentScenarioRegistry().register(
     defineLoadScenario({
@@ -232,7 +232,8 @@ async function simDone(): Promise<
     }),
   );
   const { result } = await executeSim(args());
-  if (result.type !== 'sim-done') throw new Error(`expected sim-done, got ${result.type}`);
+  if (result.type !== 'run-presentation')
+    throw new Error(`expected run-presentation, got ${result.type}`);
   return result;
 }
 
@@ -250,8 +251,8 @@ describe('sim session contribution → SessionRepo', () => {
         tool: 'sim',
         startedAt: '1970-01-01T00:00:00.000Z',
         completedAt: '1970-01-01T00:00:00.000Z',
-        cwd: result.cwd,
-        recipe: result.recipeName,
+        cwd: process.cwd(),
+        recipe: result.envelope.recipe,
         score: result.envelope.verdict.score,
         passed: result.envelope.verdict.passed,
         durationMs: 0,

@@ -5,8 +5,9 @@
  * registered scenario, parallel mode). With `--recipe <name>`, looks
  * the recipe up in the registry and runs it.
  *
- * Returns a structured `SimDoneResult` with per-scenario outcomes;
- * callers (CLI / Tool layer) render or JSON-serialize as appropriate.
+ * Returns a render-only `RunPresentation` carrying the run envelope (the
+ * per-scenario outcomes ride on `envelope.units`); callers (CLI / Tool layer)
+ * render or JSON-serialize the envelope as appropriate.
  *
  * Scenario loading lifecycle (mirrors fitness's `ensureChecksLoaded`):
  *
@@ -44,7 +45,7 @@ import { resolveSimRecipeSelection } from './sim-config.js';
 import type { SimulationScenarioResult } from '../recipes/service.js';
 import type {
   ErrorResult,
-  SimDoneResult,
+  RunPresentation,
   ToolOptions,
   UnitResult,
   VerboseDetail,
@@ -190,13 +191,15 @@ export interface ExecuteSimOptions {
 }
 
 /**
- * Run sim and return a SimDoneResult (or an ErrorResult when the
- * recipe is missing). The caller decides what to print or render.
+ * Run sim and return the render-only {@link RunPresentation} (or an
+ * {@link ErrorResult} when the recipe is missing / no scenarios run). The caller
+ * decides what to print or render. `recipeName`/`cwd` are no longer on the render
+ * object (the handler recovers them from `result.envelope.recipe` + `opts.cwd`).
  */
 export async function executeSim(
   args: ToolOptions & { readonly verbose?: boolean },
   opts: ExecuteSimOptions = {},
-): Promise<{ result: SimDoneResult } | { result: ErrorResult }> {
+): Promise<{ result: RunPresentation } | { result: ErrorResult }> {
   // Lifecycle: load .mjs plugins + scenario packages before the recipe
   // registry is read. Idempotent per project dir.
   await ensureScenariosLoaded(args.cwd);
@@ -304,12 +307,15 @@ export async function executeSim(
       ? { kind: 'findings', groups: buildFindingGroups(units, signals) }
       : undefined;
 
-  const result: SimDoneResult = {
-    type: 'sim-done',
-    recipeName,
-    cwd: args.cwd,
-    // durationMs optional on SimDoneResult (phase2 host timing); internal recipe makespan may be present.
-    ...(recipeResult.durationMs === undefined ? {} : { durationMs: recipeResult.durationMs }),
+  // envelope-first-presentation: the render object is the render-only
+  // RunPresentation. recipeName/cwd are no longer carried on it — the handler
+  // recovers the recipe from `envelope.recipe` and cwd from `opts.cwd`. No
+  // `durationMs` is set: sim's summary duration is the envelope unit-sum (the
+  // presentation renderer falls back to it), matching the pre-migration render
+  // byte-for-byte (sim-done's durationMs field was never consumed by the view).
+  const result: RunPresentation = {
+    type: 'run-presentation',
+    tool: 'simulation',
     // ADR-0035: the run verdict is the single host verdict. With Phase 0 a failed
     // scenario emits an error signal, so `envelope.verdict.passed` (with the {1,0}
     // policy) is exactly the old `failed > 0`; the host derives the exit from it.

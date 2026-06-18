@@ -238,9 +238,11 @@ describe('sim command handler', () => {
     await simSpec().handler({ cwd: process.cwd() }, ctx);
 
     expect(rendered).toHaveLength(1);
-    const result = rendered[0] as { type: string; recipeName?: string };
-    expect(result.type).toBe('sim-done');
-    expect(result.recipeName).toBe('default');
+    // envelope-first-presentation: the handler renders the render-only
+    // RunPresentation; the recipe rides on `envelope.recipe`, not the result.
+    const result = rendered[0] as { type: string; envelope?: { recipe?: string } };
+    expect(result.type).toBe('run-presentation');
+    expect(result.envelope?.recipe).toBe('default');
   });
 
   it('emits the signal envelope through cli.emitEnvelope when --json is passed', async () => {
