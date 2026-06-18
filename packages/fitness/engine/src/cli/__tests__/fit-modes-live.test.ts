@@ -155,7 +155,14 @@ describe('runLiveMode', () => {
     const { cli, setExitCode, render, deliverSignals } = mockCli();
     await runLiveMode(args, cli, 'fit', false);
     expect(setExitCode).toHaveBeenCalledWith(2);
+    // envelope-first-presentation (plan Assumption 5): an error-before-envelope
+    // run renders the `error` variant verbatim — NEVER a `run-presentation`. The
+    // host routes it through `errorView`, not `presentationToView` (proved in
+    // packages/cli/.../envelope-first-invariants.test.tsx).
     expect(render).toHaveBeenCalledWith(result);
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(render.mock.calls[0]?.[0]).toMatchObject({ type: 'error' });
+    expect(render.mock.calls[0]?.[0]).not.toMatchObject({ type: 'run-presentation' });
     expect(deliverSignals).not.toHaveBeenCalled();
   });
 });

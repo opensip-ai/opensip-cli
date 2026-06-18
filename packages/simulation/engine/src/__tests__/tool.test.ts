@@ -288,8 +288,13 @@ describe('sim command handler', () => {
     await simSpec().handler({ cwd: process.cwd(), recipe: 'still-nope' }, ctx);
 
     expect(exitCodes).toContain(2);
+    // envelope-first-presentation (plan Assumption 5): an error-before-envelope
+    // run renders the `error` variant — NEVER a `run-presentation`. A
+    // RunPresentation is constructed only when an envelope exists.
+    expect(rendered).toHaveLength(1);
     const errResult = rendered[0] as { type: string; message?: string };
     expect(errResult.type).toBe('error');
+    expect(errResult.type).not.toBe('run-presentation');
     expect(errResult.message).toContain('still-nope');
   });
 });
