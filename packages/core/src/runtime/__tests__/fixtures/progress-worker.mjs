@@ -9,6 +9,7 @@
  *   throw           — throw uncaught so the child exits non-zero with no result.
  *   exit-clean      — exit 0 without ever sending a result (premature exit).
  *   map-result      — a `result` whose value carries a Map (advanced-serialization proof).
+ *   env-echo        — a `result` carrying the child's OPENSIP_* env (correlation proof).
  */
 const mode = process.argv[2];
 const send = (msg) => process.send?.(msg);
@@ -35,6 +36,17 @@ switch (mode) {
   case 'map-result': {
     send({ kind: 'progress', event: 1 });
     send({ kind: 'result', value: { tag: 'm', map: new Map([['a', 1]]) } });
+    break;
+  }
+  case 'env-echo': {
+    // Echo only the OPENSIP_* env back to the parent so the fork-path correlation
+    // test can assert OPENSIP_RUN_ID / OPENSIP_WORKER_KIND were injected — without
+    // leaking the rest of the parent env into the assertion.
+    const opensipEnv = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (k.startsWith('OPENSIP_') && v !== undefined) opensipEnv[k] = v;
+    }
+    send({ kind: 'result', value: opensipEnv });
     break;
   }
   default: {

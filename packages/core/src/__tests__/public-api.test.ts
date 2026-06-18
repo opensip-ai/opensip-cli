@@ -63,6 +63,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'TENANT_OTEL_ATTR',
   'correlationFromEnv',
   'correlationToEnv',
+  'liveEngineCorrelation',
   // Upstream barrel export missing from this curated list (modular-monolith
   // boundary commits added it to index.ts but not here); the barrel exports it.
   'RAW_STREAM_REASONS',
