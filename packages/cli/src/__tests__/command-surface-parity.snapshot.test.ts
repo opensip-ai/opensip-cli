@@ -193,15 +193,13 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     expect(surface).toMatchSnapshot();
   });
 
-  it('the public command surface excludes Tier-3 internal commands (scaffold; tightened in Phase 1/4)', () => {
+  it('the public command surface excludes Tier-3 internal commands (present-but-hidden)', () => {
     const program = buildFullProgram();
     const topLevel = program.commands.map((c) => c.name());
 
     // The five known Tier-3 internal/worker commands (tool-command-surface-taxonomy
     // T-1). They are IPC/CI bootstrap entry points — still directly invocable, so
-    // they MUST remain mounted in the full tree. Phase 0 only adds the descriptor
-    // `visibility` field; the host hide pass that removes them from the PUBLIC
-    // help/completion/agent-catalog surface lands in Phase 1.
+    // they MUST remain mounted in the full tree (PRESENT below)...
     const TIER_3_INTERNAL = [
       'fit-run-worker',
       'graph-run-worker',
@@ -213,13 +211,25 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       expect(topLevel, `internal command '${name}' must stay mounted (invocable)`).toContain(name);
     }
 
-    // PHASE 1/4 INTENT (placeholder): once `visibility` filtering is wired
-    // (Phase 1), a sibling helper `publicTopLevelCommandNames(program)` will
-    // partition the mounted tree into public vs internal and assert the five
-    // internals above are ABSENT from the public surface while still PRESENT in
-    // the full tree below. Phase 4 regenerates the snapshot and tightens this
-    // assertion. In Phase 0 the active assertion is the present-in-full-tree
-    // guard above (no surface change yet — the full-tree snapshot is untouched).
+    // ...but Phase 1's host hide pass (mountAllToolCommands → hideInternalCommands)
+    // sets Commander's `_hidden` on each so they are ABSENT from `--help`. This is
+    // the no-internal-worker-leakage assertion for the public surface: every Tier-3
+    // command is mounted yet hidden, and NO non-internal command is hidden.
+    const hiddenNames = program.commands
+      .filter((c) => (c as unknown as { _hidden?: boolean })._hidden === true)
+      .map((c) => c.name())
+      .sort();
+    expect(hiddenNames, 'exactly the five Tier-3 internal commands are hidden from --help').toEqual(
+      [...TIER_3_INTERNAL].sort(),
+    );
+    // No public command (fit/graph/sim, the host commands) is hidden.
+    for (const cmd of program.commands) {
+      if (TIER_3_INTERNAL.includes(cmd.name())) continue;
+      expect(
+        (cmd as unknown as { _hidden?: boolean })._hidden,
+        `public command '${cmd.name()}' must NOT be hidden`,
+      ).not.toBe(true);
+    }
   });
 
   it('the three --resolution-bearing graph commands declare choices exact|fast (the sanctioned delta)', () => {
