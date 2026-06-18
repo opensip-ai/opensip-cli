@@ -64,7 +64,8 @@ describe('@opensip-cli/fitness public barrel', () => {
 
   it('exposes `fitnessTool` (and its `tool` alias) as the Tool descriptor', () => {
     expect(barrel.fitnessTool).toBeDefined();
-    expect(barrel.fitnessTool.metadata.name).toBe('fitness');
+    // Task 2.4 (Q1): metadata.name == the command verb (`fit`).
+    expect(barrel.fitnessTool.metadata.name).toBe('fit');
     expect(barrel.fitnessTool.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
     expect(barrel.tool).toBe(barrel.fitnessTool);
   });

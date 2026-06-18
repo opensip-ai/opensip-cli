@@ -161,6 +161,50 @@ describe('composeAndValidateToolConfig', () => {
     expect(result.config?.fitness).toEqual({ failOnErrors: 3 });
   });
 
+  // tool-command-surface-taxonomy Task 2.4 / Q1: the config namespace literal is
+  // DECOUPLED from `metadata.name`. After the rename, fitness's `metadata.name`
+  // is `fit` (the command verb) while its config namespace stays `fitness`. Two
+  // consequences this pair of tests pins:
+  describe('config namespace is decoupled from the renamed metadata.name (Task 2.4)', () => {
+    // A fitness-shaped tool whose human key (`metadata.name`/registry id) is the
+    // renamed short verb `fit`, but whose config namespace stays `fitness`.
+    const renamedFitnessTool = makeTool({
+      id: 'fit',
+      config: {
+        namespace: 'fitness',
+        schema: z.object({ failOnErrors: z.number().int().optional() }),
+        defaults: { failOnErrors: 1 },
+      },
+    });
+
+    it('the long `fitness:` block still validates against the renamed tool (namespace literal unchanged)', () => {
+      const configPath = writeConfig('fitness:\n  failOnErrors: 3\n');
+      const result = composeAndValidateToolConfig({
+        tools: registryWith([renamedFitnessTool]),
+        configPath,
+        env: {},
+      });
+      expect(result.config?.fitness).toEqual({ failOnErrors: 3 });
+    });
+
+    it('REJECTS a `fit:` block with CONFIGURATION_ERROR (loaded-tool unclaimed namespace)', () => {
+      // `fit` is now a loaded tool's human key (`metadata.name`), but the tool
+      // claims the `fitness` namespace — no tool claims `fit`. The
+      // unclaimed-namespace policy hard-fails a block whose key equals a loaded
+      // tool's name that contributes no matching config. This is the explicit
+      // guard that the short config key is NOT a back-compat alias (Q6 timing
+      // stays open; no `fit:` alias is added).
+      const configPath = writeConfig('fit:\n  failOnErrors: 3\n');
+      expect(() =>
+        composeAndValidateToolConfig({
+          tools: registryWith([renamedFitnessTool]),
+          configPath,
+          env: {},
+        }),
+      ).toThrow(ConfigurationError);
+    });
+  });
+
   it('validates the claimed host blocks (cli/targets) and still tolerates genuinely-unknown keys', () => {
     // 2.10.1: cli + a well-formed target are now CLAIMED host declarations and
     // validate through the composed schema; a truly-unclaimed top-level key

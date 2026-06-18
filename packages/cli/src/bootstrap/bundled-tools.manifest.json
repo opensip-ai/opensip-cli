@@ -2,5 +2,5 @@
   "$schema": "./bundled-tools.manifest.schema.json",
   "comment": "Data-driven source for first-party bundled tools. Edit this when adding a new bundled tool (see contributor docs). The CLI composition root loads it at runtime (via require) so BUNDLED_TOOL_PACKAGES and EXPECTED_SCAFFOLDING_TOOL_IDS are derived, not hand-maintained.",
   "bundledPackages": ["@opensip-cli/fitness", "@opensip-cli/simulation", "@opensip-cli/graph"],
-  "scaffoldingToolIds": ["fitness", "simulation"]
+  "scaffoldingToolIds": ["fit", "sim"]
 }

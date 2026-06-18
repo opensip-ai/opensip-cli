@@ -158,11 +158,11 @@ export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as ToolOptions & { out: string; format: FitExportFormat };
-    switch (opts.format) {
-      case 'baseline': {
-        await runFitBaselineExport(opts, cli);
-        return;
-      }
+    // Dispatch on --format (single value today; a `switch` would trip
+    // sonarjs/no-small-switch). `baseline` → the shared SARIF baseline body.
+    // Adding `sarif` later is one more branch here + a FIT_EXPORT_FORMATS entry.
+    if (opts.format === 'baseline') {
+      await runFitBaselineExport(opts, cli);
     }
   },
 });

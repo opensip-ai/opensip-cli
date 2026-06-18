@@ -39,7 +39,7 @@ import {
   assembleCompletionInventory,
   printCompletionScript,
   INTERNAL_COMMANDS,
-  LEGACY_EXPORT_ALIASES,
+  DEPRECATED_EXPORT_COMMANDS,
   type GroupLike,
   type Shell,
   type SpecLike,
@@ -208,16 +208,22 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
       // commands from completion using the descriptor-driven set (the SAME source
       // the `--help` hide pass keys on), so help and completion stay in lockstep.
       //
-      // The legacy `catalog-export`/`sarif-export` export aliases are ALWAYS
-      // filtered (they are masquerading exports Phase 2 turns into aliases of
-      // `graph export` — they are NOT `visibility: 'internal'`), so they sit in a
-      // separate base set that the OPENSIP_CLI_SHOW_INTERNAL reveal does NOT
-      // touch. The descriptor-driven internal set is the ONLY part the override
-      // un-hides — revealing it = unioning an empty descriptor set into the base.
+      // The deprecated flat export commands (`catalog-export`/`sarif-export`/
+      // `graph-baseline-export`/`fit-baseline-export`, taxonomy Task 2.5) are
+      // ALWAYS filtered: Phase 2 made the canonical nested `<tool> export` forms
+      // the advertised surface, and these flat names COEXIST as working commands
+      // (not `visibility: 'internal'`). They sit in a separate base set the
+      // OPENSIP_CLI_SHOW_INTERNAL reveal does NOT touch. The descriptor-driven
+      // internal set is the ONLY part the override un-hides — revealing it = unioning
+      // an empty descriptor set into the base. The canonical nested forms flow into
+      // completion via the Task 0.4 sub-subcommand emission (not filtered).
       const descriptorInternal = showInternalCommands()
         ? new Set<string>()
         : (ctx.toolInternalCommands ?? INTERNAL_COMMANDS);
-      const internalCommands = new Set<string>([...descriptorInternal, ...LEGACY_EXPORT_ALIASES]);
+      const internalCommands = new Set<string>([
+        ...descriptorInternal,
+        ...DEPRECATED_EXPORT_COMMANDS,
+      ]);
       const inventory = assembleCompletionInventory({
         toolSpecs: ctx.toolCommandSpecs ?? [],
         hostSpecs: host.specs,

@@ -57,7 +57,8 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
   it("admits fit's static manifest through the compatibility gate (apiVersion declared)", () => {
     const manifest = loadToolManifest('installed', FIT_DIR);
     expect(manifest, 'fit package.json#opensipTools must load as a manifest').toBeDefined();
-    expect(manifest?.id).toBe('fitness');
+    // Task 2.4: the manifest `id` (human key) equals metadata.name = `fit`.
+    expect(manifest?.id).toBe('fit');
     // 3.0.0: the manifest MUST declare apiVersion (the grace window ended).
     expect(typeof manifest?.apiVersion).toBe('number');
     // All four fit commands are declared in the manifest.
@@ -80,10 +81,11 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
       tool?: Tool;
     };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
-    expect(mod.tool?.metadata.name).toBe('fitness');
+    expect(mod.tool?.metadata.name).toBe('fit');
     expect(mod.tool?.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
-    // fit, fit-list, fit-recipes, fit-baseline-export, fit-run-worker (internal).
-    expect(mod.tool?.commandSpecs?.length).toBe(5);
+    // fit, fit-list, fit-recipes, fit-baseline-export, export (canonical, Task 2.2),
+    // fit-run-worker (internal).
+    expect(mod.tool?.commandSpecs?.length).toBe(6);
   });
 
   it('the externally-loaded fit has a command surface identical to the bundled fit', async () => {

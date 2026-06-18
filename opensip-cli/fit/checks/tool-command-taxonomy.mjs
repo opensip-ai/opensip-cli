@@ -28,10 +28,16 @@
  *
  * - **Rule A (no masquerading export verb)** flags a bare `*-export` descriptor
  *   (`catalog-export` / `sarif-export`) ONLY when the same file ALSO declares a
- *   canonical `export` descriptor (`name: 'export'`). Phase 2 adds the canonical
- *   `graph export` / `fit export` command — and THAT addition is what activates
- *   Rule A to forbid re-introducing a bare top-level export verb. Pre-Phase-2 (no
- *   canonical `export` yet) Rule A is dormant.
+ *   canonical `export` descriptor (`name: 'export'`) AND the bare name is NOT a
+ *   documented legacy alias ({@link ALLOWED_LEGACY_NAMES}). Phase 2 adds the
+ *   canonical `graph export` / `fit export` command — and THAT addition is what
+ *   activates Rule A to forbid re-introducing a NEW bare top-level export verb.
+ *   The EXISTING `catalog-export`/`sarif-export` commands coexist as documented
+ *   legacy aliases (Phase 2 resolved decision: they keep working with
+ *   `legacy_alias_used` telemetry because their required-flag shapes diverge from
+ *   the canonical `export`), so they are exempt — Rule A only catches a NEW bare
+ *   `*-export` verb that is not in the allow-list. Pre-Phase-2 (no canonical
+ *   `export` yet) Rule A is dormant.
  *
  * - **Rule B (internal commands carry the marker)** flags a worker/equivalence
  *   descriptor (`*-run-worker`, `*-shard-worker`, `graph-equivalence-check`) that
@@ -158,9 +164,18 @@ export function analyzeToolCommandTaxonomy(content, filePath) {
   for (const d of descriptors) {
     const isInternalName = INTERNAL_NAME_RE.test(d.name) || d.name === GRAPH_EQUIVALENCE;
 
-    // Rule A — no masquerading export verb (activates once a canonical `export`
-    // command exists in this file; see header).
-    if (hasCanonicalExport && MASQUERADING_EXPORT_RE.test(d.name)) {
+    // Rule A — no NEW masquerading export verb (activates once a canonical
+    // `export` command exists in this file; see header). The EXISTING bare
+    // export commands (`catalog-export`/`sarif-export`) coexist as documented
+    // legacy aliases (Phase 2: kept working with `legacy_alias_used` telemetry
+    // because their required-flag shapes diverge from the canonical `export`), so
+    // names in ALLOWED_LEGACY_NAMES are exempt — Rule A only forbids a NEW bare
+    // `*-export` verb that is not in the allow-list.
+    if (
+      hasCanonicalExport &&
+      MASQUERADING_EXPORT_RE.test(d.name) &&
+      !ALLOWED_LEGACY_NAMES.has(d.name)
+    ) {
       violations.push({
         message: `Export command '${d.name}' is a bare top-level verb; it must live under its tool ('${verb} export --format sarif|catalog'), not masquerade as a platform-level command.`,
         severity: 'error',

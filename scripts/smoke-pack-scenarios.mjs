@@ -323,7 +323,9 @@ export function buildPackedSmokeScenarios({
           const data = cmdData(parsed);
           const rows = Array.isArray(data?.tools) ? data.tools : [];
           const ids = new Set(rows.map((t) => t?.id));
-          for (const bundled of ['fitness', 'simulation', 'graph']) {
+          // tool-command-surface-taxonomy Task 2.4: the tool id (human key =
+          // metadata.name) is the short command verb (fit/sim/graph).
+          for (const bundled of ['fit', 'sim', 'graph']) {
             if (!ids.has(bundled)) failures.push(`tools list: missing bundled id '${bundled}'`);
           }
           const fixture = rows.find((t) => t?.id === 'audit-demo-tool');

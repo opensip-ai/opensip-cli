@@ -277,7 +277,14 @@ export const FITNESS_STABLE_ID = 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224';
 export const fitnessTool: Tool = {
   metadata: {
     id: FITNESS_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
-    name: 'fitness', // human key (previously the value in `id`)
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`fit`). The config namespace key stays `fitness:` — it keys off the
+    // DECOUPLED `fitnessConfigDeclaration.namespace = 'fitness'` literal, NOT
+    // metadata.name, so existing `fitness:` config blocks keep validating. The
+    // session `tool` column is already `'fit'` (sessionReplay.tool + the session
+    // contributions), so aligning the name REDUCES mismatch. Q6 (flipping the
+    // namespace literal to `fit:`) stays open — no `fit:` config alias is added.
+    name: 'fit', // command verb + human key (was 'fitness')
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },

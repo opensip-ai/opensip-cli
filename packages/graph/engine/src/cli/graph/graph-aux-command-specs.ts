@@ -51,6 +51,11 @@ const OPT_DESC_CWD = commonFlags.cwd.description;
 // CommandOutputMode member.
 const RAW_STREAM = 'raw-stream' as const;
 
+// Shared `rawStreamReason` for the file-writing aux commands (symbol-index +
+// the four exports + the canonical `graph export`). Declared once so the literal
+// is not duplicated (sonarjs/no-duplicate-string).
+const REASON_FILE_EXPORT = 'file-export' as const;
+
 /** Read the single trailing positional (`<name>` / `<specPath>`) off the parsed opts. */
 function firstArg(opts: Record<string, unknown>): string {
   const args = (opts._args ?? []) as readonly string[];
@@ -153,7 +158,11 @@ const OPT_CHANGED_FILE = {
 } as const;
 
 /** `--cwd` (catalog/sarif export) — the canonical common-flag description. */
-const OPT_CWD_EXPORT = { flag: OPT_CWD, description: OPT_DESC_CWD, default: process.cwd() } as const;
+const OPT_CWD_EXPORT = {
+  flag: OPT_CWD,
+  description: OPT_DESC_CWD,
+  default: process.cwd(),
+} as const;
 
 /** `--language` (catalog/sarif export). */
 const OPT_LANGUAGE = {
@@ -431,7 +440,7 @@ export const graphSymbolIndexCommandSpec: CommandSpec<unknown, ToolCliContext> =
   ],
   scope: 'project',
   output: RAW_STREAM,
-  rawStreamReason: 'file-export',
+  rawStreamReason: REASON_FILE_EXPORT,
   handler: (rawOpts, cli): void => {
     const opts = rawOpts as { cwd: string; out: string };
     executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
@@ -451,7 +460,7 @@ export const graphBaselineExportCommandSpec: CommandSpec<unknown, ToolCliContext
   options: [{ ...OPT_BASELINE_OUT, required: true }],
   scope: 'project',
   output: RAW_STREAM,
-  rawStreamReason: 'file-export',
+  rawStreamReason: REASON_FILE_EXPORT,
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as { cwd: string; out: string; json?: boolean };
     // Task 2.3: deprecated-command telemetry (canonical form: `graph export
@@ -499,7 +508,7 @@ export const graphCatalogExportCommandSpec: CommandSpec<unknown, ToolCliContext>
   ],
   scope: 'project',
   output: RAW_STREAM,
-  rawStreamReason: 'file-export',
+  rawStreamReason: REASON_FILE_EXPORT,
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as GraphCatalogExportOpts;
     // Task 2.3: deprecated-command telemetry (canonical: `graph export
@@ -540,7 +549,7 @@ export const graphSarifExportCommandSpec: CommandSpec<unknown, ToolCliContext> =
   ],
   scope: 'project',
   output: RAW_STREAM,
-  rawStreamReason: 'file-export',
+  rawStreamReason: REASON_FILE_EXPORT,
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as GraphSarifExportOpts;
     // Task 2.3: deprecated-command telemetry (canonical: `graph export
@@ -650,7 +659,7 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   ],
   scope: 'project',
   output: RAW_STREAM,
-  rawStreamReason: 'file-export',
+  rawStreamReason: REASON_FILE_EXPORT,
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as Record<string, unknown> & { format: GraphExportFormat };
     switch (opts.format) {

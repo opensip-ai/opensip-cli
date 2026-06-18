@@ -133,10 +133,14 @@ describe('completion flag parity', () => {
     for (const spec of toolSpecs) {
       if (INTERNAL_COMMANDS.has(spec.name)) continue;
       const declared = specLongFlags(spec);
+      // A `parent`-nested spec (taxonomy Task 0.4, e.g. `graph export`) keys its
+      // flags under the qualified `${parent} ${name}` path, not the bare name.
+      const parent = (spec as { parent?: string }).parent;
+      const key = parent === undefined ? spec.name : `${parent} ${spec.name}`;
       for (const flag of declared) {
         expect(
-          inventory.commandFlags[spec.name],
-          `expected completion for '${spec.name}' to include '${flag}'`,
+          inventory.commandFlags[key],
+          `expected completion for '${key}' to include '${flag}'`,
         ).toContain(flag);
       }
     }

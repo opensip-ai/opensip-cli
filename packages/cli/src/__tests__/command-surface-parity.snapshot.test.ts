@@ -35,7 +35,17 @@
  *    `--tags a --tags b` silently dropped `a`. Both forms (`--tags a,b` and
  *    `--tags a --tags b`) now accumulate.
  *
- * Every other command is byte-identical to 2.10.0. Any change OTHER than the two
+ * 3. tool-command-surface-taxonomy Tasks 2.1/2.2: a NESTED canonical `export`
+ *    subcommand now appears under BOTH `fit` (`fit export --format baseline`)
+ *    and `graph` (`graph export --format sarif|catalog|baseline`). These are the
+ *    canonical export-under-tool forms (mounted via the Phase 0 `parent`-nested
+ *    mount). The legacy flat-root `sarif-export` / `catalog-export` /
+ *    `graph-baseline-export` / `fit-baseline-export` commands COEXIST unchanged
+ *    (different required-flag shapes, not Commander aliases) — so the surface is
+ *    purely ADDITIVE: the two nested `export` leaves are added; nothing is
+ *    removed.
+ *
+ * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
  */

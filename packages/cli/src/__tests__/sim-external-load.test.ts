@@ -51,7 +51,8 @@ describe('sim externalization proof slice (§8)', () => {
   it("admits sim's static manifest through the compatibility gate", () => {
     const manifest = loadToolManifest('installed', SIM_DIR);
     expect(manifest, 'sim package.json#opensipTools must load as a manifest').toBeDefined();
-    expect(manifest?.id).toBe('simulation');
+    // Task 2.4: the manifest `id` (human key) equals metadata.name = `sim`.
+    expect(manifest?.id).toBe('sim');
     expect(manifest?.apiVersion).toBeGreaterThanOrEqual(1);
     expect(manifest?.commands?.some((c) => c.name === 'sim')).toBe(true);
 
@@ -69,7 +70,7 @@ describe('sim externalization proof slice (§8)', () => {
       tool?: Tool;
     };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
-    expect(mod.tool?.metadata.name).toBe('simulation');
+    expect(mod.tool?.metadata.name).toBe('sim');
     expect(mod.tool?.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(mod.tool?.commandSpecs?.length).toBeGreaterThan(0);
   });

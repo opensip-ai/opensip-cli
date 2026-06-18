@@ -19,6 +19,14 @@ import {
 
 import type { ToolCliContext } from '@opensip-cli/core';
 
+/**
+ * A sentinel output path threaded to the handler. It is NEVER written: the
+ * `exportBaselineSarif` seam is mocked, so the handler only forwards this value
+ * — using a non-`/tmp` relative path avoids the sonarjs publicly-writable-dir
+ * rule while exercising the exact argument passed to the seam.
+ */
+const OUT_PATH = 'out/fit-baseline.sarif';
+
 interface MockBag {
   cli: ToolCliContext;
   exportBaselineSarif: MockInstance;
@@ -64,11 +72,8 @@ describe('fit export (canonical) command spec', () => {
 
   it('--format baseline writes the SARIF baseline via the host seam', async () => {
     const { cli, exportBaselineSarif } = makeCli();
-    await fitExportCommandSpec.handler(
-      { format: 'baseline', out: '/tmp/fit.sarif', _args: [] },
-      cli,
-    );
-    expect(exportBaselineSarif).toHaveBeenCalledWith('fitness', '/tmp/fit.sarif');
+    await fitExportCommandSpec.handler({ format: 'baseline', out: OUT_PATH, _args: [] }, cli);
+    expect(exportBaselineSarif).toHaveBeenCalledWith('fitness', OUT_PATH);
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(out).toContain('Exported fit baseline');
   });
@@ -77,10 +82,7 @@ describe('fit export (canonical) command spec', () => {
     const { cli, setExitCode } = makeCli(() =>
       Promise.reject(new ConfigurationError('No fit baseline captured')),
     );
-    await fitExportCommandSpec.handler(
-      { format: 'baseline', out: '/tmp/fit.sarif', _args: [] },
-      cli,
-    );
+    await fitExportCommandSpec.handler({ format: 'baseline', out: OUT_PATH, _args: [] }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
     const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(err).toContain('Error');
@@ -91,7 +93,7 @@ describe('fit export (canonical) command spec', () => {
       Promise.reject(new ConfigurationError('No fit baseline captured')),
     );
     await fitExportCommandSpec.handler(
-      { format: 'baseline', out: '/tmp/fit.sarif', json: true, _args: [] },
+      { format: 'baseline', out: OUT_PATH, json: true, _args: [] },
       cli,
     );
     // 2.12.0 (§5.5): the --json failure path routes through `emitError` (the host
@@ -109,8 +111,8 @@ describe('fit-baseline-export (legacy alias) command spec', () => {
     const { cli, exportBaselineSarif } = makeCli();
     // The legacy handler logs via the module logger from @opensip-cli/core.
     const loggerInfo = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    await fitBaselineExportCommandSpec.handler({ out: '/tmp/fit.sarif', _args: [] }, cli);
-    expect(exportBaselineSarif).toHaveBeenCalledWith('fitness', '/tmp/fit.sarif');
+    await fitBaselineExportCommandSpec.handler({ out: OUT_PATH, _args: [] }, cli);
+    expect(exportBaselineSarif).toHaveBeenCalledWith('fitness', OUT_PATH);
     const evt = loggerInfo.mock.calls.find(
       (c) => (c[0] as { evt?: string }).evt === 'cli.command.legacy_alias_used',
     );

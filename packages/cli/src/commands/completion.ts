@@ -46,31 +46,48 @@ export type Shell = 'bash' | 'zsh' | 'fish';
  * `graph-equivalence-check`).
  */
 /**
- * The legacy masquerading export verbs (`catalog-export` / `sarif-export`) — a
- * STOPGAP skip until Phase 2 turns them into aliases of the canonical
- * `graph export` form (and gives them their canonical completion entry).
+ * The DEPRECATED-but-working flat export commands — `catalog-export`,
+ * `sarif-export`, `graph-baseline-export`, `fit-baseline-export`
+ * (tool-command-surface-taxonomy Task 2.5). Phase 2 added the canonical NESTED
+ * forms (`graph export --format sarif|catalog|baseline`, `fit export --format
+ * baseline`); these flat names COEXIST as working commands (their required-flag
+ * shapes diverge, so they are NOT Commander aliases) but are no longer the
+ * advertised surface. Completion offers ONLY the canonical nested `<tool> export`
+ * forms (which flow in via the Task 0.4 sub-subcommand emission) and suppresses
+ * these deprecated flat verbs from the offered list — they remain invocable for
+ * any user who still types them.
  *
- * Held separately from the `visibility: 'internal'` Tier-3 set because they are
- * NOT internal — they are user-facing exports today. The
+ * Held SEPARATELY from the `visibility: 'internal'` Tier-3 set because these are
+ * NOT internal — they are deprecated user-facing exports. The
  * `OPENSIP_CLI_SHOW_INTERNAL=1` reveal therefore does NOT un-hide them (it scopes
  * to Tier-3 only); the completion call site always keeps them filtered.
  */
-export const LEGACY_EXPORT_ALIASES: ReadonlySet<string> = new Set([
+export const DEPRECATED_EXPORT_COMMANDS: ReadonlySet<string> = new Set([
   'catalog-export',
   'sarif-export',
+  'graph-baseline-export',
+  'fit-baseline-export',
 ]);
 
+/**
+ * Internal/machine-facing command names never offered in shell completion (the
+ * `visibility: 'internal'` Tier-3 commands + the deprecated flat exports).
+ *
+ * Two suppression reasons, deliberately combined here for the completion filter:
+ *  - Tier-3 INTERNALS (`*-run-worker`, `*-shard-worker`, `graph-equivalence-check`):
+ *    machine-only IPC/CI bootstrap entry points (ADR-0028), revealed by
+ *    `OPENSIP_CLI_SHOW_INTERNAL=1`.
+ *  - DEPRECATED EXPORTS ({@link DEPRECATED_EXPORT_COMMANDS}): user-facing but
+ *    superseded by the canonical nested `<tool> export` forms; advertised only as
+ *    the canonical form, never un-hidden by the internal reveal.
+ */
 export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'graph-shard-worker',
   'graph-equivalence-check',
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
-  // Phase 2: these become aliases of `graph export` — revisit. They are NOT
-  // `visibility: 'internal'` (they are user-facing exports today); they are kept
-  // in the skip set as a stopgap until Phase 2 turns them into aliases of the
-  // canonical `graph export` form and gives them their canonical completion entry.
-  ...LEGACY_EXPORT_ALIASES,
+  ...DEPRECATED_EXPORT_COMMANDS,
 ]);
 
 /**
@@ -239,7 +256,14 @@ function bashScript(inv: CompletionInventory): string {
   const commonFlagList = COMMON_FLAGS.join(' ');
   const arms: string[] = [];
   for (const [name, subsList] of Object.entries(inv.groupSubcommands)) {
-    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${subsList.join(' ')}" -- "\${cur}")) ;;`);
+    // A primary tool verb (e.g. `fit`/`graph`) is BOTH a flag-bearing command
+    // AND a group with nested `<tool> <verb>` children (taxonomy Task 0.4): at
+    // the second-word position the user can type either a nested subcommand or
+    // one of the parent's own flags, so offer the union. An action-less host
+    // group (`plugin`/`sessions`) has no own flags, so its union is just leaves.
+    const ownFlags = inv.commandFlags[name] ?? [];
+    const offered = [...new Set([...subsList, ...ownFlags])];
+    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${offered.join(' ')}" -- "\${cur}")) ;;`);
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
@@ -281,7 +305,10 @@ function zshScript(inv: CompletionInventory): string {
   const commonFlagList = COMMON_FLAGS.join(' ');
   const arms: string[] = [];
   for (const [name, subsList] of Object.entries(inv.groupSubcommands)) {
-    arms.push(`    ${name}) _values '${name} subcommand' ${subsList.join(' ')} ;;`);
+    // Union of nested subcommands + the parent verb's own flags (see bashScript).
+    const ownFlags = inv.commandFlags[name] ?? [];
+    const offered = [...new Set([...subsList, ...ownFlags])];
+    arms.push(`    ${name}) _values '${name} subcommand' ${offered.join(' ')} ;;`);
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
@@ -323,7 +350,12 @@ function fishScript(inv: CompletionInventory): string {
     `complete -c opensip -f -n "__fish_use_subcommand" -a "${subs}" -d "opensip subcommand"`,
   ];
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
-    if (name in inv.groupSubcommands) continue;
+    // A primary tool verb that also hosts nested `<tool> <verb>` children stays
+    // in `groupSubcommands`, but it still owns its own flags — emit them so fish
+    // completes `fit --<flag>` (the qualified `${parent} ${name}` keys for the
+    // nested leaves are skipped here; they are not top-level commands). An
+    // action-less host group has no `commandFlags` entry, so it is unaffected.
+    if (name.includes(' ')) continue; // a nested `${parent} ${name}` key, not a verb
     for (const flag of flags) {
       lines.push(
         `complete -c opensip -n "__fish_seen_subcommand_from ${name}" -l "${flag.replace(/^--/, '')}"`,

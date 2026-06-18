@@ -21,8 +21,10 @@ const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')
 };
 
 describe('fitnessTool contract conformance', () => {
-  it("metadata.name is the human key 'fitness'; id is the stable UUID", () => {
-    expect(fitnessTool.metadata.name).toBe('fitness');
+  it("metadata.name is the command verb 'fit'; id is the stable UUID", () => {
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`fit`). The config namespace literal stays `fitness` (decoupled).
+    expect(fitnessTool.metadata.name).toBe('fit');
     expect(fitnessTool.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
   });
 

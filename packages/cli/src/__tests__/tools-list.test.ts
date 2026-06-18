@@ -114,6 +114,7 @@ describe('tools list', () => {
 
     const all = listRows();
     const bundled = all.rows.filter((t) => t.source === 'bundled').map((t) => t.id);
-    expect([...bundled].sort()).toEqual(['fitness', 'graph', 'simulation']);
+    // Task 2.4: the tool id (human key = metadata.name) is the short verb.
+    expect([...bundled].sort()).toEqual(['fit', 'graph', 'sim']);
   });
 });

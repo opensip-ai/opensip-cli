@@ -174,7 +174,9 @@ function registerProbeScenario(): void {
 
 describe('simulationTool metadata', () => {
   it('exposes name (human), id (stable UUID), version, description', () => {
-    expect(simulationTool.metadata.name).toBe('simulation');
+    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
+    // verb (`sim`). The config namespace literal stays `simulation` (decoupled).
+    expect(simulationTool.metadata.name).toBe('sim');
     expect(simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(simulationTool.metadata.version).toBe(PKG.version);
     expect(simulationTool.metadata.description).toContain('simulation');

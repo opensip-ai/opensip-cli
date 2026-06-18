@@ -148,8 +148,7 @@ const GRAPH_RECIPES: ToolCommandDescriptor = {
 const GRAPH_EXPORT: ToolCommandDescriptor = {
   name: 'export',
   parent: 'graph',
-  description:
-    'Export graph analysis artifacts (--format sarif | catalog | baseline)',
+  description: 'Export graph analysis artifacts (--format sarif | catalog | baseline)',
 };
 
 // =============================================================================

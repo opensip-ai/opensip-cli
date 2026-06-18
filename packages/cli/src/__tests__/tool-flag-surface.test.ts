@@ -39,19 +39,25 @@ function recordSpecFlags(tool: Tool): string[] {
 // The locked flag surface per tool (union across all of each tool's
 // subcommands). Adding/removing a flag is a deliberate edit here.
 const EXPECTED: Record<string, string[]> = {
-  fitness: [
+  // Keyed by tool.metadata.name, which Task 2.4 aligned to the short command
+  // verb (`fit`/`sim`/`graph`).
+  fit: [
     // release 2.11.0 Phase 4: fitness migrated to commandSpecs, so this set is
     // now derived via recordSpecFlags. That surfaces `--out` (the
     // `fit-baseline-export --out <path>` required flag), which the old
     // register()-recorder missed: it only trapped `.option(...)` calls and
     // `--out` was declared via `.requiredOption(...)`. The flag was always part
     // of the real surface; the spec-based recorder records it faithfully.
+    //
+    // tool-command-surface-taxonomy Task 2.2: the canonical `fit export`
+    // command adds `--format` (choices: baseline).
     '--api-key',
     '--check',
     '--config',
     '--cwd',
     '--debug',
     '--exclude',
+    '--format',
     '--gate-compare',
     '--gate-save',
     '--json',
@@ -84,6 +90,9 @@ const EXPECTED: Record<string, string[]> = {
     //
     // graph-equivalence-check (internal real-repo sharded≡exact guardrail) adds
     // `--budget` (committed budget path) and `--update-budget` (capture/tighten).
+    // tool-command-surface-taxonomy Task 2.1: the canonical `graph export`
+    // command adds `--format` (choices: sarif|catalog|baseline) — the union of
+    // the legacy export flags is already present below.
     '--api-key',
     '--budget',
     '--catalog-output',
@@ -92,6 +101,7 @@ const EXPECTED: Record<string, string[]> = {
     '--cwd',
     '--debug',
     '--exact',
+    '--format',
     '--gate-compare',
     '--gate-save',
     '--git-sha',
@@ -118,7 +128,7 @@ const EXPECTED: Record<string, string[]> = {
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
-  simulation: [
+  sim: [
     '--api-key',
     '--cwd',
     '--debug',

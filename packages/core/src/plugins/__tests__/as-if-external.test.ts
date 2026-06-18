@@ -43,12 +43,17 @@ interface BundledTool {
  */
 const BUNDLED_TOOLS: readonly BundledTool[] = [
   {
-    id: 'fitness',
+    // tool-command-surface-taxonomy Task 2.4: the manifest `id` (human key) equals
+    // `metadata.name`, now the short command verb (`fit`/`sim`; graph already
+    // matched). The config namespace literal (`fitness`/`simulation`) is decoupled
+    // and unchanged.
+    id: 'fit',
     dir: join(REPO_ROOT, 'packages', 'fitness', 'engine'),
-    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export', 'fit-run-worker'],
+    // Task 2.2 adds the canonical nested `export` (parent: 'fit') command.
+    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export', 'export', 'fit-run-worker'],
   },
   {
-    id: 'simulation',
+    id: 'sim',
     dir: join(REPO_ROOT, 'packages', 'simulation', 'engine'),
     commands: ['sim', 'sim-run-worker'],
   },
@@ -65,6 +70,8 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
       'graph-run-worker',
       'catalog-export',
       'sarif-export',
+      // Task 2.1 adds the canonical nested `export` (parent: 'graph') command.
+      'export',
       'graph-recipes',
     ],
   },

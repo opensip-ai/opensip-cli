@@ -90,10 +90,11 @@ describe('registerFirstPartyTools', () => {
     expect(names).toEqual(BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id));
   });
 
-  it('produces a deterministic ordering matching BUNDLED_TOOLS (human names)', () => {
+  it('produces a deterministic ordering matching BUNDLED_TOOLS (human names = verbs)', () => {
+    // Task 2.4: metadata.name == the short command verb (fit/sim/graph).
     expect(BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id)).toEqual([
-      'fitness',
-      'simulation',
+      'fit',
+      'sim',
       'graph',
     ]);
   });
