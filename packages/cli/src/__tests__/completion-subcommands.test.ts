@@ -20,12 +20,17 @@ import {
   assembleCompletionInventory,
   buildCompletionScript,
   specLongFlags,
+  DEPRECATED_EXPORT_COMMANDS,
   INTERNAL_COMMANDS,
   type CompletionInventory,
 } from '../commands/completion.js';
 import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
 import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
 import { registerCliCommands } from '../commands/index.js';
+import {
+  internalCommandNames,
+  showInternalCommands,
+} from '../commands/internal-command-visibility.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
 
@@ -185,5 +190,116 @@ describe('completion plugin sub-subcommand parity', () => {
     }
     // The historical drift was `install` (canonical action is `add` post-F7).
     expect(inventory.groupSubcommands.plugin).not.toContain('install');
+  });
+});
+
+describe('completion taxonomy — internal excluded, canonical exports advertised (Task 4.3)', () => {
+  /** The five Tier-3 internal command names + the non-`*-worker` equivalence gate. */
+  const INTERNAL_NAMES = [
+    'fit-run-worker',
+    'graph-run-worker',
+    'graph-shard-worker',
+    'graph-equivalence-check',
+    'sim-run-worker',
+  ];
+
+  it('no internal command (workers + graph-equivalence-check) appears in completion subcommands', async () => {
+    const { inventory } = await buildLiveInventory();
+    for (const name of INTERNAL_NAMES) {
+      expect(
+        inventory.subcommands,
+        `internal command '${name}' must not be offered in completion`,
+      ).not.toContain(name);
+      // It must also not leak as a per-command flag key.
+      expect(inventory.commandFlags[name], `'${name}' must have no completion flag set`).toBeUndefined();
+    }
+  });
+
+  it('the descriptor-driven internal set covers all five (incl. the Phase 1 graph-equivalence-check leak fix)', async () => {
+    const { registry } = await buildLiveInventory();
+    const internal = internalCommandNames(registry);
+    for (const name of INTERNAL_NAMES) {
+      expect(internal, `descriptor-driven internal set must include '${name}'`).toContain(name);
+    }
+  });
+
+  it('offers the canonical nested `graph export` / `fit export`, not the deprecated flat verbs', async () => {
+    const { inventory } = await buildLiveInventory();
+    // Canonical nested exports flow into the group map under their tool primary.
+    expect(inventory.groupSubcommands.graph, 'graph must offer the nested `export` leaf').toContain(
+      'export',
+    );
+    expect(inventory.groupSubcommands.fit, 'fit must offer the nested `export` leaf').toContain(
+      'export',
+    );
+    // The nested forms carry their own flag set keyed under `${parent} export`.
+    expect(inventory.commandFlags['graph export']).toBeDefined();
+    expect(inventory.commandFlags['fit export']).toBeDefined();
+    // The deprecated flat export verbs are NOT offered as top-level subcommands.
+    for (const deprecated of DEPRECATED_EXPORT_COMMANDS) {
+      expect(
+        inventory.subcommands,
+        `deprecated export '${deprecated}' must not be an offered subcommand`,
+      ).not.toContain(deprecated);
+    }
+  });
+
+  it('OPENSIP_CLI_SHOW_INTERNAL=1 flips internal commands INTO the offered subcommands', async () => {
+    const { registry } = await buildLiveInventory();
+    const toolSpecs = registry.list().flatMap((t) => t.commandSpecs ?? []);
+    const hostCtx = makeStubHostContext();
+
+    const build = (): CompletionInventory => {
+      // Mirror the live call-site internal-set computation
+      // (host-command-specs.ts): the descriptor-driven internal set is revealed
+      // (emptied) when the env override is on; the deprecated exports stay filtered.
+      const descriptorInternal = showInternalCommands()
+        ? new Set<string>()
+        : internalCommandNames(registry);
+      const internalCommands = new Set<string>([...descriptorInternal, ...DEPRECATED_EXPORT_COMMANDS]);
+      return assembleCompletionInventory({
+        toolSpecs,
+        hostSpecs: buildTopLevelHostSpecs(hostCtx),
+        groups: buildHostSubcommandGroups(hostCtx),
+        internalCommands,
+      });
+    };
+
+    // Default (override off): internal workers are filtered out.
+    const before = build();
+    for (const name of INTERNAL_NAMES) {
+      expect(before.subcommands, `'${name}' hidden by default`).not.toContain(name);
+    }
+
+    const prev = process.env.OPENSIP_CLI_SHOW_INTERNAL;
+    process.env.OPENSIP_CLI_SHOW_INTERNAL = '1';
+    try {
+      const revealed = build();
+      for (const name of INTERNAL_NAMES) {
+        expect(revealed.subcommands, `'${name}' revealed by the override`).toContain(name);
+      }
+      // The reveal scopes to Tier-3 ONLY — the deprecated exports stay filtered.
+      for (const deprecated of DEPRECATED_EXPORT_COMMANDS) {
+        expect(
+          revealed.subcommands,
+          `deprecated export '${deprecated}' is NOT un-hidden by the internal reveal`,
+        ).not.toContain(deprecated);
+      }
+    } finally {
+      if (prev === undefined) delete process.env.OPENSIP_CLI_SHOW_INTERNAL;
+      else process.env.OPENSIP_CLI_SHOW_INTERNAL = prev;
+    }
+  });
+
+  it('the grouped `<tool> <verb>` forms appear under fit / graph / sim', async () => {
+    const { inventory } = await buildLiveInventory();
+    // Task 3.x grouped children, folded into the group map by their parent verb.
+    expect(inventory.groupSubcommands.fit).toEqual(
+      expect.arrayContaining(['list', 'recipes', 'export']),
+    );
+    expect(inventory.groupSubcommands.graph).toEqual(
+      expect.arrayContaining(['recipes', 'lookup', 'index', 'list', 'export']),
+    );
+    expect(inventory.groupSubcommands.sim).toEqual(expect.arrayContaining(['recipes']));
   });
 });
