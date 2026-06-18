@@ -13,7 +13,7 @@
  * subscope, and verify the other scope's subscope is independent.
  */
 
-import { RunScope, runWithScope } from '@opensip-cli/core';
+import { applyToolContributeScope, RunScope, runWithScope } from '@opensip-cli/core';
 import { GraphAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { simulationTool } from '@opensip-cli/simulation';
 import { SimulationRecipeRegistry, createScenarioRegistry } from '@opensip-cli/simulation/internal';
@@ -25,8 +25,8 @@ import type { RunnableScenario } from '@opensip-cli/simulation';
 /** Fresh scope with both tool subscopes attached. */
 function makeScopeWithBothTools(): RunScope {
   const scope = new RunScope();
-  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
-  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, simulationTool);
+  applyToolContributeScope(scope, graphTool);
   return scope;
 }
 
@@ -178,7 +178,7 @@ describe('SaaS-mode tool-subscope isolation', () => {
 
   it('a scope can load just one tool (graph-only run carries no simulation)', () => {
     const graphOnly = new RunScope();
-    Object.assign(graphOnly, graphTool.contributeScope?.() ?? {});
+    applyToolContributeScope(graphOnly, graphTool);
 
     expect(graphOnly.graph).toBeDefined();
     expect(graphOnly.simulation).toBeUndefined();

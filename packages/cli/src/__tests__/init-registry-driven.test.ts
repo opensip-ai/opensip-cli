@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveProjectPaths } from '@opensip-cli/core';
+import { resolveProjectPaths, resolveToolHooks } from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
 import { graphTool } from '@opensip-cli/graph';
 import { simulationTool } from '@opensip-cli/simulation';
@@ -35,17 +35,20 @@ import type { Tool } from '@opensip-cli/core';
 function scaffoldsFor(tools: readonly Tool[]): ToolScaffold[] {
   return tools
     .filter((t) => t.pluginLayout !== undefined)
-    .map((t) => ({
-      layout: t.pluginLayout!,
-      scaffoldExamples: t.scaffoldExamples,
-      stableExampleIds: t.stableExampleIds,
-      scaffoldConfigBlock: t.scaffoldConfigBlock,
-    }));
+    .map((t) => {
+      const hooks = resolveToolHooks(t);
+      return {
+        layout: t.pluginLayout!,
+        scaffoldExamples: hooks.scaffoldExamples,
+        stableExampleIds: hooks.stableExampleIds,
+        scaffoldConfigBlock: hooks.scaffoldConfigBlock,
+      };
+    });
 }
 
 /** The pinned check id fitness embeds for a single language — from the tool itself. */
 function pinnedCheckId(language: string): string {
-  const files = fitnessTool.scaffoldExamples?.({ languages: [language] }) ?? [];
+  const files = resolveToolHooks(fitnessTool).scaffoldExamples?.({ languages: [language] }) ?? [];
   const check = files.find((f) => f.filename.startsWith('example-check'));
   if (!check) throw new Error(`no example-check contribution for ${language}`);
   return check.stableId;

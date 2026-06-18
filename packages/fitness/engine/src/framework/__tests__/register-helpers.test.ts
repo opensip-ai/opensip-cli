@@ -1,4 +1,4 @@
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';
@@ -30,7 +30,7 @@ function stub(slug: string): Check {
 // starts empty and is isolated from sibling tests.
 beforeEach(() => {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   enterScope(scope);
 });
 

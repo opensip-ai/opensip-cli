@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
@@ -39,7 +39,7 @@ beforeEach(() => {
   // AsyncLocalStorage so the handler resolves them through currentScope()
   // while it runs.
   const scope = new RunScope();
-  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, simulationTool);
   enterScope(scope);
 });
 
@@ -77,7 +77,7 @@ function makeFakeContext(): {
   // cli.scope, but ToolCliContext requires a scope value; mirror project
   // into a throwaway scope here.
   const ctxScope = new RunScope({ projectContext: project });
-  Object.assign(ctxScope, simulationTool.contributeScope?.() ?? {});
+  applyToolContributeScope(ctxScope, simulationTool);
   const ctx: ToolCliContext = {
     scope: ctxScope,
     render: vi.fn((result: unknown) => {

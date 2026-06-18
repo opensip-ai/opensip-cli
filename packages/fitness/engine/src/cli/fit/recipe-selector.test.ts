@@ -1,5 +1,5 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { CheckRegistry } from '../../framework/registry.js';
@@ -22,7 +22,7 @@ const base: FitOptions = { cwd: '/tmp' } as FitOptions;
 
 beforeEach(() => {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   enterScope(scope);
 });
 

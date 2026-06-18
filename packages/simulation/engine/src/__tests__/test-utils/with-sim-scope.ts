@@ -7,7 +7,7 @@
  * boilerplate.
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, ToolRegistry , applyToolContributeScope} from '@opensip-cli/core';
 
 import { simulationTool } from '../../tool.js';
 
@@ -21,6 +21,6 @@ const makeTestScope = (): RunScope =>
 /** Build a fresh RunScope with `scope.simulation` populated. */
 export function makeSimTestScope(): RunScope {
   const scope = makeTestScope();
-  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, simulationTool);
   return scope;
 }

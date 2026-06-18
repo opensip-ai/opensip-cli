@@ -35,6 +35,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  applyToolContributeScope,
   LanguageRegistry,
   RunScope,
   ToolRegistry,
@@ -119,7 +120,7 @@ function makeScope(includeGlob: string): RunScope {
     tools: new ToolRegistry(),
     languages: new LanguageRegistry(),
   });
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   Object.assign(scope, {
     configDocument: {
       targets: {

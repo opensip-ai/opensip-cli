@@ -7,7 +7,7 @@
  * entry point with a fake `ToolCliContext` whose scope carries a datastore.
  */
 
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -52,7 +52,7 @@ function makeContext(datastore: DataStore | undefined): {
   const emitted: unknown[] = [];
   const exitCodes: number[] = [];
   const scope = new RunScope({ datastore: () => datastore });
-  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, simulationTool);
   const ctx: ToolCliContext = {
     scope,
     render: vi.fn((result: unknown) => {

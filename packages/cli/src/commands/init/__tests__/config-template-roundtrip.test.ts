@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolRegistry } from '@opensip-cli/core';
+import { ToolRegistry, resolveToolHooks } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BUNDLED_TOOLS } from '../../../__tests__/test-utils/bundled-tools.js';
@@ -40,12 +40,15 @@ function realRegistry(): ToolRegistry {
 
 /** Scaffold contributions from the bundled tools — mirrors the host aggregation. */
 function scaffolds(): ToolScaffold[] {
-  return BUNDLED_TOOLS.filter((t) => t.pluginLayout !== undefined).map((t) => ({
-    layout: t.pluginLayout!,
-    scaffoldExamples: t.scaffoldExamples,
-    stableExampleIds: t.stableExampleIds,
-    scaffoldConfigBlock: t.scaffoldConfigBlock,
-  }));
+  return BUNDLED_TOOLS.filter((t) => t.pluginLayout !== undefined).map((t) => {
+    const hooks = resolveToolHooks(t);
+    return {
+      layout: t.pluginLayout!,
+      scaffoldExamples: hooks.scaffoldExamples,
+      stableExampleIds: hooks.stableExampleIds,
+      scaffoldConfigBlock: hooks.scaffoldConfigBlock,
+    };
+  });
 }
 
 describe('init config template round-trips through the composed schema', () => {

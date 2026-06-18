@@ -8,7 +8,7 @@
  * scope (with graph subscope) and reads via `currentRules()`.
  */
 
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { currentRules } from '../../rules/registry.js';
@@ -20,7 +20,7 @@ let rules: readonly Rule[];
 
 beforeEach(() => {
   const scope = new RunScope();
-  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, graphTool);
   enterScope(scope);
   rules = currentRules();
 });

@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveToolHooks } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { fitnessTool } from '../tool.js';
@@ -46,7 +47,7 @@ describe('fitnessTool contract conformance', () => {
   });
 
   it('contributes report data via the Tool.collectReportData seam', () => {
-    expect(typeof fitnessTool.collectReportData).toBe('function');
+    expect(typeof resolveToolHooks(fitnessTool).collectReportData).toBe('function');
   });
 
   it('declares its command surface via commandSpecs (Phase 4), not register()', () => {

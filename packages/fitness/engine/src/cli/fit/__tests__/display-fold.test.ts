@@ -5,7 +5,7 @@
  * CURRENT scope's check registry — there is NO merged-display singleton (F3).
  */
 
-import { RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { RunScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { applyCheckDisplay } from '../../../check-utils/display.js';
@@ -32,7 +32,7 @@ function stubCheck(slug: string): Check {
 /** A RunScope carrying fitness's contributed subscope (fresh check registry). */
 function fitnessScope(): RunScope {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   return scope;
 }
 

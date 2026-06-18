@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { RunScope, runWithScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import {
   HEAP_TARGETS,
@@ -89,7 +89,7 @@ describe('runHeapPreflight', () => {
     // scope, attach graph subscope, and register the adapters this test imports
     // so runHeapPreflight()'s pickAdapter() resolves them.
     scope = new RunScope();
-    Object.assign(scope, graphTool.contributeScope?.() ?? {});
+    applyToolContributeScope(scope, graphTool);
     runWithScopeSync(scope, () => {
       currentAdapterRegistry().register(typescriptGraphAdapter);
       currentAdapterRegistry().register(pythonGraphAdapter);

@@ -75,6 +75,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'admitTool',
   'applyContentFilter',
   'applyRegions',
+  'applyToolContributeScope',
   'assertCommandSpec',
   'assertManifestMatchesTool',
   'buildLineStarts',

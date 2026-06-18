@@ -20,7 +20,7 @@
  * invocation.
  */
 
-import { logger, readPackageVersion } from '@opensip-cli/core';
+import { defineTool, logger, readPackageVersion } from '@opensip-cli/core';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md: the
 // engine no longer hosts adapter source. First-party adapters live in
@@ -58,70 +58,9 @@ import type {
   ScopeContribution,
   Tool,
   ToolCliContext,
-  ToolCommandDescriptor,
   ToolScope,
 } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
-
-// =============================================================================
-// COMMAND DESCRIPTORS — used by --help listings and conflict detection.
-// =============================================================================
-
-const GRAPH: ToolCommandDescriptor = {
-  name: 'graph',
-  description:
-    'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
-};
-
-const GRAPH_LOOKUP: ToolCommandDescriptor = {
-  name: 'graph-lookup',
-  description: 'Look up function occurrences by simple name from the persisted catalog',
-};
-
-const GRAPH_SYMBOL_INDEX: ToolCommandDescriptor = {
-  name: 'graph-symbol-index',
-  description:
-    'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
-};
-
-const GRAPH_BASELINE_EXPORT: ToolCommandDescriptor = {
-  name: 'graph-baseline-export',
-  description: 'Export the graph gate baseline (JSON) from the datastore to a file',
-};
-
-const GRAPH_SHARD_WORKER: ToolCommandDescriptor = {
-  name: 'graph-shard-worker',
-  description:
-    '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
-};
-
-const GRAPH_EQUIVALENCE_CHECK: ToolCommandDescriptor = {
-  name: 'graph-equivalence-check',
-  description:
-    '[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)',
-};
-
-const GRAPH_RUN_WORKER: ToolCommandDescriptor = {
-  name: 'graph-run-worker',
-  description:
-    '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
-};
-
-const GRAPH_CATALOG_EXPORT: ToolCommandDescriptor = {
-  name: 'catalog-export',
-  description:
-    'Run graph analysis and write the CatalogExport JSON document (symbols + edges + provenance) to a file',
-};
-
-const GRAPH_SARIF_EXPORT: ToolCommandDescriptor = {
-  name: 'sarif-export',
-  description: 'Run graph analysis and write OpenSIP-convention SARIF v2.1.0 findings to a file',
-};
-
-const GRAPH_RECIPES: ToolCommandDescriptor = {
-  name: 'graph-recipes',
-  description: 'List available graph recipes',
-};
 
 // =============================================================================
 // COMMAND-SPEC ASSEMBLY
@@ -236,52 +175,24 @@ export const GRAPH_CONTRACT_VERSION = '1.0.0';
 
 export const GRAPH_STABLE_ID = '3873f1c2-02a9-4719-930a-bca74b62b706';
 
-export const graphTool: Tool = {
+export const graphTool: Tool = defineTool({
   metadata: {
     id: GRAPH_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
     name: 'graph', // human key (previously the value in `id`)
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
-  commands: [
-    GRAPH,
-    GRAPH_LOOKUP,
-    GRAPH_SYMBOL_INDEX,
-    GRAPH_BASELINE_EXPORT,
-    GRAPH_SHARD_WORKER,
-    GRAPH_EQUIVALENCE_CHECK,
-    GRAPH_RUN_WORKER,
-    GRAPH_CATALOG_EXPORT,
-    GRAPH_SARIF_EXPORT,
-    GRAPH_RECIPES,
-  ],
-  // Launch Phase 5: graph declares its command surface; the host mounts
-  // each spec via mountCommandSpec. The deprecated `register()` fallback is gone
-  // — graph no longer touches Commander.
   commandSpecs: graphCommandSpecs,
-  contributeScope,
-  collectReportData,
-  sessionReplay: {
-    tool: 'graph',
-    replaySession: graphReplayFromSession,
-  },
-  // ADR-0023 Phase 4: graph contributes its namespaced `graph:` Zod schema so
-  // the host composes + strict-validates the whole config document before
-  // dispatch. The schema-bearing `ToolConfigDeclaration` narrows to the
-  // kernel-side `ToolConfigContribution` carrier (core carries no Zod).
-  config: graphConfigDeclaration,
-  // §5.3 Phase 4: graph owns the `graph-adapter` capability domain (declared in
-  // its manifest). It supplies the REAL registrar so the host can replace the
-  // manifest-time deferred placeholder once graph's module loads.
-  capabilityRegistrars: { 'graph-adapter': registerGraphAdapter },
-  // ADR-0036: graph's byte-preserved baseline identity (ruleId|filePath|line|col),
-  // read by the host baseline/ratchet seams when graph stamps its gate envelope.
-  fingerprintStrategy: graphFingerprintStrategy,
-  // ADR-0047: per-tool contract version for graph's domain surface (rules, catalog,
-  // execution model, adapter contract, etc.). Independent of core
-  // TOOL_CONTRACT_VERSION. Declared under extensionPoints for discoverability
-  // by hosts, agent-catalog, and third-party graph packs.
   extensionPoints: {
     graphContractVersion: GRAPH_CONTRACT_VERSION,
+    contributeScope,
+    collectReportData,
+    sessionReplay: {
+      tool: 'graph',
+      replaySession: graphReplayFromSession,
+    },
+    config: graphConfigDeclaration,
+    capabilityRegistrars: { 'graph-adapter': registerGraphAdapter },
+    fingerprintStrategy: graphFingerprintStrategy,
   },
-};
+});

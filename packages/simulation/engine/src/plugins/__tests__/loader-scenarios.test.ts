@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { currentScenarioRegistry } from '../../framework/registry.js';
@@ -24,7 +24,7 @@ let testDir: string;
 
 beforeEach(() => {
   const scope = new RunScope();
-  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, simulationTool);
   enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'sim-loader-scenarios-'));
 });

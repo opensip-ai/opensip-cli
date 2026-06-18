@@ -17,7 +17,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,7 +42,7 @@ beforeEach(() => {
   // subscope and register the typescript adapter into it so the handler reaches
   // pickAdapter() through a live scope.
   const scope = new RunScope();
-  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, graphTool);
   enterScope(scope);
   currentAdapterRegistry().register(typescriptGraphAdapter);
 });

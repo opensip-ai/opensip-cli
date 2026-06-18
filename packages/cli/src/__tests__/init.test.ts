@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { resolveToolHooks } from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
 import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -25,12 +26,15 @@ import type { InitOptions } from '@opensip-cli/contracts';
 function firstPartyScaffolds(): ToolScaffold[] {
   return [fitnessTool, simulationTool]
     .filter((t) => t.pluginLayout !== undefined)
-    .map((t) => ({
-      layout: t.pluginLayout!,
-      scaffoldExamples: t.scaffoldExamples,
-      stableExampleIds: t.stableExampleIds,
-      scaffoldConfigBlock: t.scaffoldConfigBlock,
-    }));
+    .map((t) => {
+      const hooks = resolveToolHooks(t);
+      return {
+        layout: t.pluginLayout!,
+        scaffoldExamples: hooks.scaffoldExamples,
+        stableExampleIds: hooks.stableExampleIds,
+        scaffoldConfigBlock: hooks.scaffoldConfigBlock,
+      };
+    });
 }
 
 let testDir: string;

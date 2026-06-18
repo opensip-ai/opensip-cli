@@ -149,6 +149,7 @@ export {
   defineTool,
   COMMON_FLAG_KEYS,
   RAW_STREAM_REASONS,
+  applyToolContributeScope,
   resolveToolHooks,
 } from '@opensip-cli/core';
 export {

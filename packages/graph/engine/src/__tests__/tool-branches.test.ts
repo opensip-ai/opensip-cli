@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry, currentScope } from '@opensip-cli/core';
+import { enterScope, LanguageRegistry, currentScope, resolveToolHooks } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -308,7 +308,7 @@ describe('catalog-export handler branches', () => {
 
 describe('contributeScope + collectReportData hooks', () => {
   it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () => {
-    const contribution = graphTool.contributeScope?.() ?? {};
+    const contribution = resolveToolHooks(graphTool).contributeScope?.() ?? {};
     expect(contribution.graph).toBeDefined();
     expect(contribution.graph?.adapters).toBeDefined();
     expect(contribution.graph?.rules).toBeDefined();
@@ -317,7 +317,7 @@ describe('contributeScope + collectReportData hooks', () => {
 
   it('collectReportData returns empty rule/recipe catalogs when no datastore and no graph subscope', () => {
     const scope = { datastore: () => undefined } as unknown as ToolScope;
-    expect(graphTool.collectReportData?.(scope)).toEqual({
+    expect(resolveToolHooks(graphTool).collectReportData?.(scope)).toEqual({
       graphRuleCatalog: [],
       graphRecipeCatalog: [],
     });
@@ -327,7 +327,7 @@ describe('contributeScope + collectReportData hooks', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const scope = { datastore: () => datastore } as unknown as ToolScope;
-      const data = graphTool.collectReportData?.(scope) ?? {};
+      const data = resolveToolHooks(graphTool).collectReportData?.(scope) ?? {};
       expect('graphCatalog' in data).toBe(true);
     } finally {
       datastore.close();

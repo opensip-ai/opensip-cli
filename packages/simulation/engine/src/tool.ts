@@ -12,7 +12,7 @@
  */
 
 import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/contracts';
-import { defineCommand, readPackageVersion } from '@opensip-cli/core';
+import { defineCommand, defineTool, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
@@ -43,21 +43,9 @@ import type {
   ScopeContribution,
   Tool,
   ToolCliContext,
-  ToolCommandDescriptor,
   ToolRunCompletion,
 } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
-
-const SIM: ToolCommandDescriptor = {
-  name: 'sim',
-  description: 'Run simulation scenarios',
-};
-
-const SIM_RUN_WORKER: ToolCommandDescriptor = {
-  name: 'sim-run-worker',
-  description:
-    '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
-};
 
 // Live-view key — matches the `sim` subcommand name so the dispatcher's
 // renderLive(key) lookup resolves it (ADR-0016). sim's Ink/React renderer
@@ -303,8 +291,8 @@ function sessionReplayResult(
  * authoritative — byte-identical to the former action body.
  */
 const simCommand: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
-  name: SIM.name,
-  description: SIM.description,
+  name: 'sim',
+  description: 'Run simulation scenarios',
   // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,
   // --verbose, --debug, --report-to, --api-key, --open. sim carries -v/--verbose
   // (per-scenario detail). `cwd` is seeded with process.cwd() by the mounter.
@@ -376,43 +364,28 @@ export const SIMULATION_CONTRACT_VERSION = '1.0.0';
 
 export const SIMULATION_STABLE_ID = '715d32c2-692c-4ed4-985b-a35deaf186aa';
 
-export const simulationTool: Tool = {
+export const simulationTool: Tool = defineTool({
   metadata: {
     id: SIMULATION_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
     name: 'simulation', // human key (previously the value in `id`)
     version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
-  commands: [SIM, SIM_RUN_WORKER],
   pluginLayout: SIM_PLUGIN_LAYOUT,
-  // Sim declares its command surface; the host mounts it via mountCommandSpec.
-  // The deprecated
-  // `register()` fallback is gone — sim no longer touches Commander.
   commandSpecs: [simCommand, simRunWorkerCommandSpec],
-  contributeScope,
-  sessionReplay: {
-    tool: 'sim',
-    replaySession: simReplayFromSession,
-  },
-  // ADR-0023 Phase 4: simulation contributes its namespaced `simulation:` Zod
-  // schema so the host composes + strict-validates the whole config document
-  // before dispatch.
-  config: simulationConfigDeclaration,
-  // §5.3 Phase 4: simulation owns the `sim-pack` capability domain (declared in
-  // its manifest). It supplies the REAL registrar so the host can replace the
-  // manifest-time deferred placeholder once sim's module loads.
-  capabilityRegistrars: {
-    'sim-pack': registerSimScenario,
-    'sim-recipe': registerSimRecipe,
-  },
-  // ADR-0038: simulation owns its `init` example bytes (language-independent). The
-  // host writes each returned file under userPluginDir('sim', file.kind).
-  scaffoldExamples: simScaffoldExamples,
-  stableExampleIds: simStableExampleIds,
-  // ADR-0047: per-tool contract version for simulation's domain surface
-  // (scenarios, recipes, execution model, etc.). Independent of core
-  // TOOL_CONTRACT_VERSION. Declared under extensionPoints.
   extensionPoints: {
     simulationContractVersion: SIMULATION_CONTRACT_VERSION,
+    contributeScope,
+    sessionReplay: {
+      tool: 'sim',
+      replaySession: simReplayFromSession,
+    },
+    config: simulationConfigDeclaration,
+    capabilityRegistrars: {
+      'sim-pack': registerSimScenario,
+      'sim-recipe': registerSimRecipe,
+    },
+    scaffoldExamples: simScaffoldExamples,
+    stableExampleIds: simStableExampleIds,
   },
-};
+});

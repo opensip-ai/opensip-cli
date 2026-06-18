@@ -91,7 +91,7 @@ export {
 } from './derive-commands-from-specs.js';
 export { defineTool } from './define-tool.js';
 export type { DefineToolInput } from './define-tool.js';
-export { resolveToolHooks } from './resolve-tool-hooks.js';
+export { applyToolContributeScope, resolveToolHooks } from './resolve-tool-hooks.js';
 export type { ResolvedToolHooks } from './resolve-tool-hooks.js';
 export {
   TOOL_LONG_IDS,

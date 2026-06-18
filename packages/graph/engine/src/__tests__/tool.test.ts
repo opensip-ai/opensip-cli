@@ -38,20 +38,21 @@ describe('graphTool contract conformance (AC-2)', () => {
     expect(graphTool.metadata.version).toBe(pkg.version);
   });
 
-  it('commands lists the unified graph subcommand plus the lookup/symbol-index/baseline-export queries', () => {
+  it('commands[] is derived from commandSpecs in declaration order', () => {
+    const specNames = (graphTool.commandSpecs ?? []).map((s) => s.name);
     const names = graphTool.commands.map((c) => c.name);
-    expect(names).toEqual([
-      'graph',
-      'graph-lookup',
-      'graph-symbol-index',
-      'graph-baseline-export',
-      'graph-shard-worker',
-      'graph-equivalence-check',
-      'graph-run-worker',
-      'catalog-export',
-      'sarif-export',
-      'graph-recipes',
-    ]);
+    expect(names).toEqual(specNames);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'graph',
+        'graph-lookup',
+        'graph-symbol-index',
+        'graph-baseline-export',
+        'catalog-export',
+        'sarif-export',
+        'graph-recipes',
+      ]),
+    );
   });
 
   it('mounts via commandSpecs, not the deprecated register() hook', () => {

@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, generatePrefixedId, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, generatePrefixedId, runWithScope , applyToolContributeScope} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -77,7 +77,7 @@ function withFitScope<T>(fn: () => Promise<T>): Promise<T> {
   // carrying both an (empty) language registry and fitness's contributed
   // registries so check loading + recipe selection resolve.
   const scope = new RunScope({ languages: new LanguageRegistry() });
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   Object.assign(scope, {
     configDocument: {
       targets: {

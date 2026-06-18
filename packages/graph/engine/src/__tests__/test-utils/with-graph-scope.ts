@@ -7,7 +7,13 @@
  * the boilerplate.
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-cli/core';
+import {
+  applyToolContributeScope,
+  LanguageRegistry,
+  RunScope,
+  runWithScopeSync,
+  ToolRegistry,
+} from '@opensip-cli/core';
 
 import { graphTool } from '../../tool.js';
 
@@ -21,7 +27,7 @@ const makeTestScope = (): RunScope =>
 /** Build a fresh RunScope with `scope.graph` populated. */
 export function makeGraphTestScope(): RunScope {
   const scope = makeTestScope();
-  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, graphTool);
   return scope;
 }
 

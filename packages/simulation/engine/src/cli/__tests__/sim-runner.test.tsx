@@ -20,7 +20,7 @@
  * re-renders.
  */
 
-import { enterScope, RunScope } from '@opensip-cli/core';
+import { enterScope, RunScope , applyToolContributeScope} from '@opensip-cli/core';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -60,7 +60,7 @@ afterEach(() => {
  *  presentation context the header branch under test needs. */
 function enterSimScope(opts: RunScopeOptions = {}): void {
   const scope = new RunScope(opts);
-  Object.assign(scope, simulationTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, simulationTool);
   enterScope(scope);
 }
 

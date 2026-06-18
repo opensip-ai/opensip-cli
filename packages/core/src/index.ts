@@ -156,6 +156,7 @@ export {
   deriveCommandsFromSpecs,
   resolveToolCommands,
   resolveToolCommandNames,
+  applyToolContributeScope,
   resolveToolHooks,
 } from './tools/index.js';
 export type {

@@ -5,7 +5,7 @@
  * `runWithScope` contexts must carry INDEPENDENT check/recipe registries.
  */
 
-import { RunScope, runWithScope } from '@opensip-cli/core';
+import { RunScope, runWithScope , applyToolContributeScope} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { defineRecipe } from '../../recipes/types.js';
@@ -47,7 +47,7 @@ function stubRecipe(name: string) {
 /** Construct a RunScope carrying fitness's contributed subscope. */
 function fitnessScope(): RunScope {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   return scope;
 }
 

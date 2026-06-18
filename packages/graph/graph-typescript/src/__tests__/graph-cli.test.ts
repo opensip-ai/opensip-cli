@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync , applyToolContributeScope} from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { executeGraph } from '@opensip-cli/graph/internal';
@@ -63,7 +63,7 @@ function makeGraphScope(input: {
     ...(input.datastore ? { datastore: () => input.datastore } : {}),
     ...(input.languages ? { languages: input.languages } : {}),
   });
-  Object.assign(scope, graphTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, graphTool);
   runWithScopeSync(scope, () => currentAdapterRegistry().register(typescriptGraphAdapter));
   return scope;
 }

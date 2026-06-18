@@ -5,6 +5,7 @@
  */
 
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
+import type { RunScope } from '../lib/run-scope.js';
 import type { ScopeContribution, ToolScope } from '../lib/scope-types.js';
 import type {
   CapabilityRegistrar,
@@ -47,4 +48,15 @@ export function resolveToolHooks(tool: Tool): ResolvedToolHooks {
     stableExampleIds: tool.stableExampleIds ?? bag?.stableExampleIds,
     scaffoldConfigBlock: tool.scaffoldConfigBlock ?? bag?.scaffoldConfigBlock,
   };
+}
+
+/**
+ * Install a tool's `contributeScope` contribution onto a {@link RunScope}.
+ * Tests and tooling should use this instead of reading top-level hooks directly.
+ */
+export function applyToolContributeScope(scope: RunScope, tool: Tool): void {
+  const contribution = resolveToolHooks(tool).contributeScope?.();
+  if (contribution) {
+    Object.assign(scope, contribution);
+  }
 }

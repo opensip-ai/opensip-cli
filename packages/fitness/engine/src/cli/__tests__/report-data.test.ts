@@ -13,6 +13,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  applyToolContributeScope,
   LanguageRegistry,
   RunScope,
   ToolRegistry,
@@ -20,6 +21,7 @@ import {
   admitTool,
   loadToolManifest,
   registerCapabilityDomainsFromManifest,
+  resolveToolHooks,
   runWithScope,
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
@@ -60,7 +62,9 @@ function wireFitnessCapabilities(scope: ReturnType<typeof makeTestScope>): void 
       registerCapabilityDomainsFromManifest(result.manifest, capabilities);
     }
   }
-  for (const [domainId, registrar] of Object.entries(fitnessTool.capabilityRegistrars ?? {})) {
+  for (const [domainId, registrar] of Object.entries(
+    resolveToolHooks(fitnessTool).capabilityRegistrars ?? {},
+  )) {
     if (capabilities.hasDomain(domainId)) capabilities.setRegistrar(domainId, registrar);
   }
   Object.assign(scope, { capabilities });
@@ -73,7 +77,7 @@ function wireFitnessCapabilities(scope: ReturnType<typeof makeTestScope>): void 
  */
 function makeFitnessScope(): ReturnType<typeof makeTestScope> {
   const scope = makeTestScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  applyToolContributeScope(scope, fitnessTool);
   wireFitnessCapabilities(scope);
   return scope;
 }
