@@ -27,7 +27,7 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { FunctionOccurrence } from '../../types.js';
-import type { GraphDoneResult, SignalEnvelope } from '@opensip-cli/contracts';
+import type { RunPresentation, SignalEnvelope } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
@@ -254,32 +254,34 @@ describe('executeGraph — render dispatch', () => {
     }
   });
 
-  it('produces a verbose graph-done result with the unified report body', async () => {
+  it('produces a verbose RunPresentation with the unified report body', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode, render } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      const done = render.mock.calls[0]?.[0] as GraphDoneResult;
-      expect(done.type).toBe('graph-done');
+      const done = render.mock.calls[0]?.[0] as RunPresentation;
+      expect(done.type).toBe('run-presentation');
       const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
       expect(body).toContain('== Catalog ==');
-      expect(typeof done.summary.passed).toBe('number');
+      // envelope-first-presentation RP-2: the PASS/FAIL summary derives from the
+      // carried envelope verdict, not a count-based graph-done summary.
+      expect(typeof done.envelope.verdict.passed).toBe('boolean');
     } finally {
       datastore.close();
     }
   });
 
-  it('produces a default (non-verbose) graph-done result with no verbose body', async () => {
+  it('produces a default (non-verbose) RunPresentation with no verbose body', async () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const { cli, setExitCode, render } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      const done = render.mock.calls[0]?.[0] as GraphDoneResult;
-      expect(done.type).toBe('graph-done');
+      const done = render.mock.calls[0]?.[0] as RunPresentation;
+      expect(done.type).toBe('run-presentation');
       // The "Use --verbose…" footer is now emitted by the shared resultToView
       // seam (ADR-0021), not carried on the result.
       expect(done.verboseDetail).toBeUndefined();

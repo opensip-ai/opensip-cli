@@ -52,7 +52,7 @@ import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphRunOutcome } from './graph-run-outcome.js';
-import type { GraphDoneResult, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
+import type { RunPresentation, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 // Re-exports kept so the package barrel + cli/graph-runner.tsx + tests
@@ -364,17 +364,20 @@ async function deliverGraphResult(
  * Render the run and return its {@link SignalEnvelope} (ADR-0011).
  *
  * `--json` emits the envelope through the shared `formatSignalJson`
- * (`cli.emitEnvelope`). The default/`--verbose` path hands a `graph-done`
- * result to the render seam (Ink on TTY, plain text in pipes/CI): graph's
- * report is richer than the neutral per-unit table — it carries the verbose
- * catalog/findings/entry-point body as `verboseDetail` ({kind:'lines'},
- * ADR-0021), a fast-tier caveat (`resolutionBanner`), and the one-line
- * PASS/FAIL `summary`; the non-verbose footer hints are emitted by the shared
- * seam (`graphDoneView`). The summary counts are derived from the envelope's
- * verdict so `--json` and the human report agree; the envelope itself is NOT
- * carried on the result (it would route to the neutral unit table and drop
- * graph's body), but IS returned for the composition root's cloud +
- * `--report-to` delivery.
+ * (`cli.emitEnvelope`). The default/`--verbose` path hands a {@link RunPresentation}
+ * to the render seam (Ink on TTY, plain text in pipes/CI): the SAME `envelope`
+ * already built here IS carried on the render object (envelope-first-presentation
+ * plan, RP-2), so `presentationToView` → `envelopeToTableView` derives the
+ * per-unit table, the PASS/FAIL summary, and the verdict from it — graph no longer
+ * carries a count-based `graph-done` summary. The verbose catalog/findings/entry-
+ * point body rides as `verboseDetail` ({kind:'lines'}, ADR-0021); graph's fast-tier
+ * caveat moves to `RunPresentation.banners` (a muted line above the summary); the
+ * non-verbose footer hints are emitted by the shared seam. The host-stamped
+ * `durationMs` (ADR-0051) is threaded as `RunPresentation.durationMs` so the
+ * summary shows the real wall-clock — graph's envelope units carry `durationMs: 0`,
+ * so without this thread `presentationToView`'s unit-sum default would render
+ * `0ms`. The envelope is also RETURNED for the composition root's cloud +
+ * `--report-to` delivery (egress, a separate plane — untouched here).
  */
 async function renderGraphResult(
   opts: GraphCommandOptions,
@@ -401,7 +404,8 @@ async function renderGraphResult(
   // ADR-0021: graph's verbose body is carried as VerboseDetail{kind:'lines'} and
   // rendered through the shared resultToView seam — the same path the live runner
   // uses — instead of a graph-only `reportLines`/`footerHints` shape. The
-  // non-verbose footer hints are emitted by the seam (`graphDoneView`).
+  // non-verbose footer hints are emitted by the seam (envelope-first-presentation
+  // RP-2 → `presentationToView`).
   const verboseDetail: VerboseDetail | undefined = verbose
     ? {
         kind: 'lines',
@@ -417,20 +421,20 @@ async function renderGraphResult(
       }
     : undefined;
   const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
-  const { summary } = envelope.verdict;
-  const done: GraphDoneResult = {
-    type: 'graph-done',
+  // envelope-first-presentation RP-2: route graph's static render through the
+  // shared envelope table. The envelope IS carried (it drives the per-unit table +
+  // verdict); `durationMs` is threaded so the host-owned wall-clock wins over the
+  // unit-sum (graph units carry durationMs:0); the resolution caveat moves to
+  // `banners`.
+  const presentation: RunPresentation = {
+    type: 'run-presentation',
+    tool: 'graph',
+    envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
-    ...(resolutionBanner === undefined ? {} : { resolutionBanner }),
-    summary: {
-      passed: summary.passed,
-      failed: summary.failed,
-      errors: summary.errors,
-      warnings: summary.warnings,
-    },
+    ...(resolutionBanner === undefined ? {} : { banners: [resolutionBanner] }),
     durationMs,
   };
-  await cli.render(done);
+  await cli.render(presentation);
   logger.info({
     evt: 'graph.render.table.complete',
     module: MODULE_GRAPH_RENDER,

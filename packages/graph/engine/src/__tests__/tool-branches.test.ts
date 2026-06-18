@@ -215,7 +215,9 @@ describe('graph interactive --exact path honors graph config', () => {
     expect(renderLive).not.toHaveBeenCalled();
     expect(render).toHaveBeenCalledTimes(1);
     const [result] = render.mock.calls[0] as [{ type?: string }];
-    expect(result.type).toBe('graph-done');
+    // envelope-first-presentation RP-2: the static render seam now receives a
+    // RunPresentation (envelope-backed) rather than a count-based graph-done.
+    expect(result.type).toBe('run-presentation');
   });
 
   it('a bare default run takes the live view on a TTY (ADR-0032: the live renderer is engine-agnostic — drives the sharded default too)', async () => {
