@@ -18,6 +18,18 @@ import type { Signal } from '@opensip-cli/core';
  * graph's projection (`tool: 'graph'`, `category: 'architecture'`, signal id
  * prefix, `graph-done` summary).
  *
+ * RP-2 finding (prep for RP-3): the replay RENDER path reads only `replay.envelope`
+ * + `replay.fidelity` — `graph-command-spec.ts` builds the host
+ * `SessionReplayResult` from those (`sessionReplayResult`/`sessionShowJson`,
+ * `:443-468`). The inner `result: { type: 'graph-done', ... }` constructed below
+ * is an UNUSED placeholder on the production path (no caller reads
+ * `graphReplayFromSession(...).result`). RP-3 deletes `GraphDoneResult`, so it
+ * must stop being constructed: RP-3 retypes this to
+ * `ToolSessionReplay<RunPresentation>` (or drops the inner `result` if the type
+ * allows) and removes the `result` block. The replay unit test asserts the inner
+ * shape (`session-replay.test.ts:73-75`) and is updated in the same RP-3 change.
+ * Left intact here per the RP-2 scope (the type must still exist).
+ *
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */

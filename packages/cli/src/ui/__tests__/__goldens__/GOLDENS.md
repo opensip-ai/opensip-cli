@@ -25,9 +25,30 @@ human-readable render output through both interpreters:
 - **RP-1 (fit + sim):** the fit/sim cases are re-pointed to render the
   `presentation` projection (a `RunPresentation`) and MUST reproduce these exact
   bytes. Any diff is a regression to fix in RP-1, not an approved change.
-- **RP-2 (graph):** graph's output is *intended* to change (unified onto the
-  shared envelope table). The graph goldens here are the baseline RP-2 diffs
-  against to enumerate every intentional delta — never an equality target.
+- **RP-2 (graph):** DONE. graph's `graph-*` goldens were REGENERATED to the new
+  envelope-backed output (graph now renders a `RunPresentation` through the same
+  `presentationToView` → `envelopeToTableView` path fit/sim use). They are the
+  NEW expected output, not the RP-0 baseline. The intentional deltas vs. the RP-0
+  graph-done baseline (reviewers approve these — they are not regressions):
+
+  1. **Headline summary**: the count-based `graph-done` verdict
+     (`result.summary.errors === 0`) → the envelope verdict
+     (`envelope.verdict.passed`) via the shared `viewRunSummary`.
+  2. **Per-unit table ADDED**: graph's static output now includes the shared
+     per-rule signal table (`Unit | Status | Errors | Warnings | Duration`),
+     which the count-based `graphDoneView` never rendered.
+  3. **Resolution caveat moved**: from a `graph-done` muted line to
+     `RunPresentation.banners`, rendered as a muted line ABOVE the table. (The
+     banner text is also the full production `resolutionBannerText` string — the
+     RP-0 fixture used a truncated stand-in.)
+  4. **NON-regression (NOT a delta)**: the summary `Duration` is the real
+     host wall-clock (`1.2s` / `50ms`), NOT `0ms` — even though every graph unit
+     carries `durationMs: 0`. `RunPresentation.durationMs` is threaded into
+     `envelopeToTableView`'s `durationOverride` (RP-0 Task 0.4), winning over the
+     unit-sum. Preserving the real duration is required behavior.
+
+  The live final frame is brought into parity (same per-unit table) and pinned by
+  `../graph-live-static-parity.test.tsx`.
 
 ## Regenerating
 

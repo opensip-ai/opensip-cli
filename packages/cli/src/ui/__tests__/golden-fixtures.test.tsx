@@ -66,14 +66,15 @@ function golden(name: string, mode: 'tty' | 'pipe', actual: string): string {
 }
 
 /**
- * Choose the projection to render. RP-1: fit/sim render the migrated
- * `presentation` projection (a RunPresentation) and must match the RP-0 goldens
- * byte-for-byte. graph keeps rendering the pre-migration `legacyResult` (its
- * output changes only in RP-2). Any fit/sim case missing a `presentation`
- * projection is a fixture error.
+ * Choose the projection to render. Post-RP-2 every tool renders the migrated
+ * `presentation` projection (a RunPresentation). fit/sim must match the RP-0
+ * goldens byte-for-byte; graph's goldens were REGENERATED in RP-2 to the new
+ * envelope-backed output (intentional, enumerated deltas — count summary →
+ * verdict, per-unit table added, resolutionBanner → banners), so its goldens are
+ * the new expected output, not the RP-0 baseline. Any case missing a
+ * `presentation` projection is a fixture error.
  */
 function renderProjection(testCase: GoldenCase): CommandResult {
-  if (testCase.tool === 'graph') return testCase.legacyResult;
   if (testCase.presentation === undefined) {
     throw new Error(`fixture ${testCase.name} is missing its presentation projection`);
   }

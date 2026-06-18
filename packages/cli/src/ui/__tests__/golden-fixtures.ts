@@ -201,12 +201,119 @@ const SIM_VERBOSE_DETAIL: VerboseDetail = {
   ],
 };
 
-// --- graph (current graph-done shape; envelope built for RP-2 target) -------
+// --- graph (RP-2: envelope-backed RunPresentation; output INTENTIONALLY changes) ---
 
 const GRAPH_VERBOSE_DETAIL: VerboseDetail = {
   kind: 'lines',
   lines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'],
 };
+
+/** Graph signal — `category: 'architecture'`, source === ruleId (post Option-A remap). */
+function graphSignal(over: {
+  source: string;
+  severity: Signal['severity'];
+  message: string;
+  filePath: string;
+  line?: number;
+}): Signal {
+  return {
+    id: `gsig_${over.source}_${String(over.line ?? 0)}`,
+    source: over.source,
+    provider: 'opensip-cli',
+    severity: over.severity,
+    category: 'architecture',
+    ruleId: over.source,
+    message: over.message,
+    filePath: over.filePath,
+    line: over.line,
+    metadata: {},
+    createdAt: CREATED_AT,
+  };
+}
+
+/**
+ * Clean graph run: rules fired with no error-severity findings. Graph units
+ * carry `durationMs: 0` (build-envelope.ts) — so the RunPresentation MUST thread
+ * `durationMs` for the summary to show the real wall-clock (not 0ms). This is
+ * the non-regression guarantee (RP-0 Task 0.4 durationOverride thread).
+ */
+const GRAPH_CLEAN_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
+  tool: 'graph',
+  runId: 'r',
+  createdAt: CREATED_AT,
+  units: [
+    { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
+    { slug: 'graph.dead-code.orphan-subtree', passed: true, violationCount: 0, durationMs: 0 },
+  ],
+  signals: [],
+  policy: HOST_VERDICT_POLICY_FALLBACK,
+  runFaulted: false,
+});
+
+/** Graph run with warning-severity findings on a fast (syntactic) catalog. */
+const GRAPH_FINDINGS_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
+  tool: 'graph',
+  runId: 'r',
+  createdAt: CREATED_AT,
+  resolutionMode: 'fast',
+  units: [
+    { slug: 'graph.dead-code.orphan-subtree', passed: true, violationCount: 3, durationMs: 0 },
+    { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
+  ],
+  signals: [
+    graphSignal({
+      source: 'graph.dead-code.orphan-subtree',
+      severity: 'medium',
+      message: 'orphan subtree',
+      filePath: 'src/a.ts',
+      line: 1,
+    }),
+    graphSignal({
+      source: 'graph.dead-code.orphan-subtree',
+      severity: 'low',
+      message: 'orphan subtree',
+      filePath: 'src/b.ts',
+      line: 2,
+    }),
+    graphSignal({
+      source: 'graph.dead-code.orphan-subtree',
+      severity: 'low',
+      message: 'orphan subtree',
+      filePath: 'src/c.ts',
+      line: 3,
+    }),
+  ],
+  policy: HOST_VERDICT_POLICY_FALLBACK,
+  runFaulted: false,
+});
+
+/** Graph's fast-tier resolution caveat — rendered as a muted banner above the table. */
+const GRAPH_RESOLUTION_BANNER =
+  'Resolution: fast (syntactic) — edges are approximate; re-run with --resolution exact for semantic precision.';
+
+/**
+ * Build a graph RunPresentation. `durationMs` is threaded (host-owned, ADR-0051)
+ * so the summary shows the real wall-clock despite graph's `durationMs: 0` units.
+ */
+function graphCase(
+  name: string,
+  envelope: SignalEnvelope,
+  opts: {
+    readonly verboseDetail?: VerboseDetail;
+    readonly banner?: string;
+    readonly durationMs: number;
+  },
+): GoldenCase {
+  const presentation: RunPresentation = {
+    type: 'run-presentation',
+    tool: 'graph',
+    envelope,
+    ...(opts.verboseDetail ? { verboseDetail: opts.verboseDetail } : {}),
+    ...(opts.banner === undefined ? {} : { banners: [opts.banner] }),
+    durationMs: opts.durationMs,
+  };
+  return { name, tool: 'graph', legacyResult: presentation, presentation };
+}
 
 /**
  * One golden case. `legacyResult` is the pre-migration CommandResult (captured
@@ -296,35 +403,19 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   simCase('sim-clean', SIM_CLEAN_ENVELOPE, undefined),
   simCase('sim-findings', SIM_FINDINGS_ENVELOPE, undefined),
   simCase('sim-findings-verbose', SIM_FINDINGS_ENVELOPE, SIM_VERBOSE_DETAIL),
-  // graph: current graph-done shape (RP-0 baseline; RP-2 will diverge).
-  {
-    name: 'graph-clean',
-    tool: 'graph',
-    legacyResult: {
-      type: 'graph-done',
-      summary: { passed: 3, failed: 0, errors: 0, warnings: 0 },
-      durationMs: 1200,
-    },
-  },
-  {
-    name: 'graph-findings',
-    tool: 'graph',
-    legacyResult: {
-      type: 'graph-done',
-      resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
-      summary: { passed: 1, failed: 1, errors: 0, warnings: 3 },
-      durationMs: 1200,
-    },
-  },
-  {
-    name: 'graph-verbose',
-    tool: 'graph',
-    legacyResult: {
-      type: 'graph-done',
-      verboseDetail: GRAPH_VERBOSE_DETAIL,
-      resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
-      summary: { passed: 1, failed: 1, errors: 0, warnings: 0 },
-      durationMs: 50,
-    },
-  },
+  // graph: RP-2 envelope-backed RunPresentation. Output is INTENTIONALLY changed
+  // from the RP-0 graph-done baseline (enumerated deltas in the phase file): the
+  // count-based summary → envelope verdict, the per-unit (per-rule) table is
+  // added, and resolutionBanner → banners. These goldens are the NEW expected
+  // output (regenerated under UPDATE_GOLDENS), not a byte-identity target.
+  graphCase('graph-clean', GRAPH_CLEAN_ENVELOPE, { durationMs: 1200 }),
+  graphCase('graph-findings', GRAPH_FINDINGS_ENVELOPE, {
+    banner: GRAPH_RESOLUTION_BANNER,
+    durationMs: 1200,
+  }),
+  graphCase('graph-verbose', GRAPH_FINDINGS_ENVELOPE, {
+    verboseDetail: GRAPH_VERBOSE_DETAIL,
+    banner: GRAPH_RESOLUTION_BANNER,
+    durationMs: 50,
+  }),
 ];

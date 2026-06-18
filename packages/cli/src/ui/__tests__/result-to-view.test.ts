@@ -328,4 +328,62 @@ describe('resultToView', () => {
     expect(out).toContain('PASS'); // ADR-0035: graph-done errors:0 → PASS verdict
     expect(out).not.toContain('Use --verbose for detailed results');
   });
+
+  // envelope-first-presentation RP-2: graph now renders a RunPresentation. The
+  // non-regression guarantee — a graph RunPresentation with durationMs > 0 and
+  // all-zero envelope units MUST render a NON-zero Duration (the host-owned
+  // durationMs wins over the unit-sum, which is 0 for graph; RP-0 Task 0.4).
+  it('renders a graph RunPresentation: per-unit table, banner, and host duration (not 0ms)', () => {
+    const out = textOf({
+      type: 'run-presentation',
+      tool: 'graph',
+      banners: ['Resolution: fast (syntactic) — edges are approximate.'],
+      // Host-owned display duration; every unit carries durationMs: 0 (graph's shape).
+      durationMs: 1200,
+      envelope: buildSignalEnvelope({
+        tool: 'graph',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [
+          { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
+          {
+            slug: 'graph.dead-code.orphan-subtree',
+            passed: true,
+            violationCount: 1,
+            durationMs: 0,
+          },
+        ],
+        signals: [
+          {
+            id: 'g1',
+            source: 'graph.dead-code.orphan-subtree',
+            provider: 'opensip-cli',
+            severity: 'medium',
+            category: 'architecture',
+            ruleId: 'graph.dead-code.orphan-subtree',
+            message: 'orphan',
+            filePath: 'src/a.ts',
+            line: 1,
+            metadata: {},
+            createdAt: '2026-06-04T00:00:00.000Z',
+          },
+        ],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      }),
+    });
+    // The resolution caveat renders as a muted banner above the table.
+    expect(out).toContain('Resolution: fast (syntactic)');
+    // The per-unit (per-rule) table is rendered — the count-based graph-done
+    // summary never showed this.
+    expect(out).toContain('graph.dead-code.orphan-subtree');
+    expect(out).toContain('graph.architecture.cycle');
+    expect(out).toMatch(/Unit\s+\|\s+Status\s+\|\s+Errors\s+\|\s+Warnings\s+\|\s+Duration/);
+    // NON-REGRESSION: the summary Duration is the host value (1.2s), NOT 0ms,
+    // despite every unit carrying durationMs: 0.
+    expect(out).toContain('| Duration 1.2s');
+    expect(out).not.toContain('Duration 0ms');
+    // Non-verbose ⇒ the shared footer hint renders.
+    expect(out).toContain('Use --verbose for detailed results');
+  });
 });
