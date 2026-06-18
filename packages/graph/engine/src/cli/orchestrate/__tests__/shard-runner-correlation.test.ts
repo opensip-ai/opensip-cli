@@ -150,14 +150,19 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     shards: readonly Shard[],
     opts: { hardKillTimeoutMs?: number } = {},
   ): Promise<Awaited<ReturnType<typeof runShardsInParallel>>> {
-    const scope = new RunScope({ runId: PARENT_CORRELATION.runId, correlation: PARENT_CORRELATION });
+    const scope = new RunScope({
+      runId: PARENT_CORRELATION.runId,
+      correlation: PARENT_CORRELATION,
+    });
     return runWithScope(scope, () =>
       runShardsInParallel({
         shards: [...shards],
         projectRoot: dir,
         cliScript,
         resolutionMode: 'exact',
-        ...(opts.hardKillTimeoutMs === undefined ? {} : { hardKillTimeoutMs: opts.hardKillTimeoutMs }),
+        ...(opts.hardKillTimeoutMs === undefined
+          ? {}
+          : { hardKillTimeoutMs: opts.hardKillTimeoutMs }),
       }),
     );
   }
@@ -165,7 +170,7 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
   it('forwards OPENSIP_RUN_ID to the child (B1) and writes correlation sans runId into the spec', async () => {
     const out = await runWithCorrelation([shard('pkg:a')]);
     expect(out.failures).toHaveLength(0);
-    const snap = JSON.parse(out.fragments[0]!.fragment.cacheKey) as WorkerSnapshot;
+    const snap = JSON.parse(out.fragments[0].fragment.cacheKey) as WorkerSnapshot;
 
     // The child inherited the PARENT run via env (B1) — not via the spec JSON.
     expect(snap.runIdEnv).toBe('RUN_test');
@@ -185,7 +190,7 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     const out = await runWithCorrelation([shard('fail:x')]);
 
     expect(out.failures).toHaveLength(1);
-    const failure = out.failures[0]!;
+    const failure = out.failures[0];
     expect(failure.shardId).toBe('fail:x');
     expect(failure.exitCode).toBe(3);
     expect(failure.failureClass).toBe('exit_nonzero');
@@ -235,7 +240,7 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
 
     expect(out.failures).toHaveLength(0);
     expect(out.fragments).toHaveLength(1);
-    const snap = JSON.parse(out.fragments[0]!.fragment.cacheKey) as WorkerSnapshot;
+    const snap = JSON.parse(out.fragments[0].fragment.cacheKey) as WorkerSnapshot;
     // GAP a: no scope correlation ⇒ the runner omits `correlation` from the spec,
     // and the worker tolerates `spec.correlation === undefined` (no throw — proven
     // by the valid ShardBuildResult above).

@@ -112,6 +112,16 @@ function baseInput(
   };
 }
 
+/** A bare runtime with empty registries (the GAP-e capture tests). */
+function emptyRuntime(): PreActionRuntime {
+  return {
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+    manifests: [],
+    provenance: [],
+  };
+}
+
 describe('buildPerRunScope correlation assembly (B2)', () => {
   beforeEach(() => {
     // Default both resolvers to the cloud-OFF state; each test opts into
@@ -191,15 +201,6 @@ describe('parentCommand is the FIRST segment of the command path (GAP e)', () =>
     toolSpecs: [],
   });
 
-  function runtime(): PreActionRuntime {
-    return {
-      languages: new LanguageRegistry(),
-      tools: new ToolRegistry(),
-      manifests: [],
-      provenance: [],
-    };
-  }
-
   it('derives parentCommand=graph from a `graph` invocation (never graph-shard-worker)', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'corr-gape-'));
     writeFileSync(join(tmp, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
@@ -216,7 +217,7 @@ describe('parentCommand is the FIRST segment of the command path (GAP e)', () =>
 
       let captured: BuildPerRunScopeInput | undefined;
       await executePostBailoutBootstrap(
-        { plan, runtime: runtime(), version: '0.0.0', noCloud: true },
+        { plan, runtime: emptyRuntime(), version: '0.0.0', noCloud: true },
         captureDeps((input) => {
           captured = input;
         }),
@@ -263,7 +264,7 @@ describe('parentCommand is the FIRST segment of the command path (GAP e)', () =>
 
       let captured: BuildPerRunScopeInput | undefined;
       await executePostBailoutBootstrap(
-        { plan, runtime: runtime(), version: '0.0.0', noCloud: true },
+        { plan, runtime: emptyRuntime(), version: '0.0.0', noCloud: true },
         captureDeps((input) => {
           captured = input;
         }),

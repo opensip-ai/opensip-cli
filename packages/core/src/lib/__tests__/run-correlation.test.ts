@@ -12,11 +12,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  correlationFromEnv,
-  correlationToEnv,
-  type RunCorrelation,
-} from '../run-correlation.js';
+import { correlationFromEnv, correlationToEnv, type RunCorrelation } from '../run-correlation.js';
 
 // The OPENSIP_* keys the codec touches — snapshot/restore so no test leaks into
 // another (and so the suite is hermetic regardless of the ambient shell env).
