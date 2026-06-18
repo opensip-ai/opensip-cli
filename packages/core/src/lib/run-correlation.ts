@@ -127,46 +127,56 @@ export const TENANT_OTEL_ATTR = 'opensip.tenant_id';
  * Frozen so it cannot be mutated at runtime; an immutable definition table is a
  * permitted module constant (it holds no per-run mutable state, exactly like
  * `CONFIG_ENV_SPECS` / the host `CLI_ENV_SPECS`).
+ *
+ * NB: the `canonical:` fields are written as STRING LITERALS (not the
+ * `OPENSIP_*` name constants above), matching every other `*_ENV_SPECS` table
+ * (`CLI_INFRA_ENV_SPECS`, `CONFIG_ENV_SPECS`). This is load-bearing: the
+ * `env-registry-undeclared-read` dogfood check statically collects declared
+ * canonicals by scanning for `canonical: 'NAME'` literals, so a `hostEnv.get`
+ * of a name declared only via a constant would false-fire. The exported name
+ * constants are still the symbolic handle for spawn/fork read sites and the
+ * `CORRELATION_ENV` map; the `satisfies` clause on `CORRELATION_ENV` keeps the
+ * two in sync (a typo there is a compile error).
  */
 export const CORRELATION_ENV_SPECS: readonly EnvVarSpec<unknown>[] = Object.freeze([
   {
-    canonical: OPENSIP_RUN_ID,
+    canonical: 'OPENSIP_RUN_ID',
     docs: "Parent run's correlation id, inherited by a spawned/forked child (B1). Read FIRST at the pre-action hook; the spec JSON never carries runId.",
   },
   {
-    canonical: OPENSIP_TOOL,
+    canonical: 'OPENSIP_TOOL',
     docs: 'Owning tool id of the dispatched command (e.g. graph, fit), forwarded to child workers for log attribution.',
   },
   {
-    canonical: OPENSIP_PARENT_COMMAND,
+    canonical: 'OPENSIP_PARENT_COMMAND',
     docs: 'Top-level command name the run started under (e.g. graph, fit) — distinguishes a child shard worker from a top-level run.',
   },
   {
-    canonical: OPENSIP_TRACE_ID,
+    canonical: 'OPENSIP_TRACE_ID',
     docs: 'OTel trace id for log↔trace pivot, stamped on every subprocess event when telemetry is on. Omitted when OTel is off.',
   },
   {
-    canonical: OPENSIP_SHARD_ID,
+    canonical: 'OPENSIP_SHARD_ID',
     docs: 'Shard id of a graph shard worker; lets an operator filter a parent run down to a single failing shard.',
   },
   {
-    canonical: OPENSIP_WORKER_KIND,
+    canonical: 'OPENSIP_WORKER_KIND',
     docs: "Subprocess worker kind: 'shard', 'live-engine', or 'external-tool'. An unrecognised value coerces to undefined.",
   },
   {
-    canonical: OPENSIP_REPO,
+    canonical: 'OPENSIP_REPO',
     docs: 'Free-form cloud repo join key (cwd or owner/repo) — forwarded only when cloud egress is active for the parent run.',
   },
   {
-    canonical: OPENSIP_REPO_ID,
+    canonical: 'OPENSIP_REPO_ID',
     docs: 'Optional/best-effort resolved repo surrogate (server-side tenant.repos.id). Usually absent; prefer OPENSIP_REPO.',
   },
   {
-    canonical: OPENSIP_TENANT_ID,
+    canonical: 'OPENSIP_TENANT_ID',
     docs: 'Optional cloud tenant id, forwarded only when locally resolvable. The cloud normally derives tenant from the API key server-side.',
   },
   {
-    canonical: OPENSIP_CHILD_INVOCATION_ID,
+    canonical: 'OPENSIP_CHILD_INVOCATION_ID',
     docs: 'Optional per-child uniqueness id, minted only where per-child uniqueness is needed.',
   },
 ]);
