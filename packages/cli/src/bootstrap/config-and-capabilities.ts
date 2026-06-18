@@ -20,9 +20,11 @@
  *      (`tool.capabilityRegistrars`). The host routes by domain; the tool owns
  *      the registrar.
  *
- * This module is the ONE place the CLI imports `@opensip-cli/config` (the
- * composer + precedence resolver). Tools never import it; they read their
- * validated namespace off `scope.toolConfig`.
+ * This module is the ONE place the CLI host imports `@opensip-cli/config` for
+ * runtime composition (schema merge, validation, precedence). Tools may import
+ * `@opensip-cli/config` for {@link ToolConfigDeclaration} when declaring their
+ * config namespace (see `docs/public/10-concepts/03-modular-monolith.md`); at
+ * run time they read the validated namespace off `scope.toolConfig`.
  */
 
 import {

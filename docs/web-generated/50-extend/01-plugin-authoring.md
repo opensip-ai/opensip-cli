@@ -55,6 +55,13 @@ Most tool commands return a `signal-envelope` or `command-result` and let the ho
 
 That's by design. The whole point of the platform is that adding a new tool or pack requires zero CLI changes. For the architecture: [the tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) walks through it end-to-end.
 
+### Trust boundary for external tools
+
+Bundled tools are the trusted computing base. Installed and project-local Tool
+plugins still run in the host process during the ADR-0054 transition — see
+[Full Tool plugins — External tool trust boundary](/docs/opensip-cli/50-extend/06-full-tool-plugins/#external-tool-trust-boundary-adr-0054).
+Use `opensip tools validate` before adopting a third-party tool in CI.
+
 ## Where to go next
 
 - **Authoring your first thing** → [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/). Hands-on walkthrough with `init`, a custom check, a recipe, and a CI gate.

@@ -248,6 +248,32 @@ Commander and passes the parsed options to your handler as the first argument.
 You never touch Commander or take a `commander` dependency — the host owns the
 program.
 
+## External tool trust boundary (ADR-0054)
+
+Bundled first-party tools (`fitness`, `graph`, `simulation`) execute in the CLI host
+process. **Installed npm packages and project-local tools still do too** during the
+ADR-0054 transition: the host dynamically imports your package's runtime module
+before any `ToolCliContext` seam exists. That means your code shares the kernel
+process with `@opensip-cli/core` — a buggy or hostile tool can crash the entire CLI,
+call `process.exit`, or run top-level side effects at import time.
+
+What is enforced today:
+
+- **Admission** — manifest compatibility, `apiVersion`, and manifest⇔runtime drift
+  checks before registration (`admit-tool-package.ts`).
+- **Mount isolation** — a broken `commandSpecs` declaration does not prevent other
+  tools from mounting (`register-tools-mount.ts`).
+- **Narrow import boundary** — `importToolRuntime` may only be called from the
+  admission/discovery modules, with an explicit bundled or `adr0054Transition`
+  policy (`host-tool-runtime-import-boundary` fitness check).
+- **`tools validate`** — can probe a not-yet-trusted package in a child process
+  (`staticOnly` on the admission pipeline).
+
+What is **not** landed yet: worker-owned runtime dispatch for external-provenance
+tools (the ADR-0054 end state). Until that ships, treat third-party Tool plugins
+like any other npm dependency you execute locally — pin versions, review source,
+and use `opensip tools validate` before enabling a new tool in CI.
+
 ## Tips that come up
 
 - **Test every check with the same content filter the framework will use.** The strip behavior is per-language; a check that works on raw content might break on filtered content. Use the language adapter's `stripComments` directly in tests if needed.

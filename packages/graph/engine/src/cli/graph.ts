@@ -39,6 +39,7 @@ import { resolveRecipeToRules } from '../recipes/resolve.js';
 
 import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
+import { planGraphExecution } from './graph-command-plan.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { executeMultiPathGraph } from './graph-multi-path-mode.js';
 import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
@@ -46,7 +47,6 @@ import { buildGraphSessionContribution } from './graph-session-contribution.js';
 import { executeSinglePathGraph } from './graph-single-run-mode.js';
 import { executeWorkspaceGraph } from './graph-workspace-mode.js';
 import { resolveGraphRecipeSelection, type RunGraphResult } from './orchestrate.js';
-import { resolvePositionalPaths } from './positional-paths.js';
 import { MemoryPressureError } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
 
@@ -115,7 +115,7 @@ export async function executeGraph(
   });
   // (profile / startedAtForProfile already declared at top of fn for branch visibility)
   try {
-    validateMutuallyExclusiveFlags(opts);
+    const plan = planGraphExecution(opts);
     // Resolve the recipe once at the top of the run (CLI layer owns selection;
     // the engine stays recipe-agnostic). Tool-scoped (ADR-0022): precedence is
     // `--recipe` flag > `graph.recipe` > `default`.
@@ -135,23 +135,22 @@ export async function executeGraph(
     // request-scoped parsed-options bag the pre-action hook already augments, so
     // this is the single point that owns graph's recipe normalization.
     (opts as { recipe?: string }).recipe = recipeSelection.name;
-    if (opts.workspace === true) {
+    if (plan.shape === 'workspace') {
       const outcome = await executeWorkspaceGraph(opts, cli, profile);
       writeProfileIfRequested(opts, profile);
       return outcome;
     }
-    const positionalPaths = resolvePositionalScope(opts);
-    if (positionalPaths.length > 1) {
+    if (plan.shape === 'multi-path') {
       const outcome = await executeMultiPathGraph(
         { opts, cli, rules, startedAt, profile, deliverGraphResult },
-        positionalPaths,
+        plan.positionalPaths,
       );
       writeProfileIfRequested(opts, profile);
       return outcome;
     }
     const outcome = await executeSinglePathGraph(
       { opts, cli, rules, startedAt, profile, dispatchGraphResult },
-      positionalPaths,
+      plan.positionalPaths,
     );
     writeProfileIfRequested(opts, profile);
     return outcome;
@@ -216,28 +215,6 @@ function writeProfileIfRequested(
     module: MODULE_GRAPH_CLI,
     output: outPath,
   });
-}
-
-function validateMutuallyExclusiveFlags(opts: GraphCommandOptions): void {
-  if (opts.gateSave === true && opts.gateCompare === true) {
-    throw new ConfigurationError('--gate-save and --gate-compare are mutually exclusive.');
-  }
-  if (opts.workspace === true && (opts.paths?.length ?? 0) > 0) {
-    throw new ConfigurationError(
-      '--workspace and positional paths are mutually exclusive. Use one or the other.',
-    );
-  }
-  if (opts.workspace === true && (opts.gateSave === true || opts.gateCompare === true)) {
-    throw new ConfigurationError(
-      '--workspace and --gate-save/--gate-compare are mutually exclusive. ' +
-        'Gates and baselines apply to production code; --workspace intentionally scans the full project (including dependencies and test fixtures).',
-    );
-  }
-}
-
-function resolvePositionalScope(opts: GraphCommandOptions): readonly string[] {
-  if (!opts.paths || opts.paths.length === 0) return [];
-  return resolvePositionalPaths(opts.paths, opts.cwd);
 }
 
 /**
