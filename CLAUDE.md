@@ -173,7 +173,10 @@ tool dispatcher:
    through the host-owned `mountCommandSpec` infrastructure. Tools never receive
    a raw Commander program.
 5. Adds CLI-only commands: `init`, `report`, `sessions`, `configure`,
-   `plugin`, `tools`, `agent-catalog`, `completion`, and `uninstall`.
+   `tools`, `agent-catalog`, `completion`, and `uninstall`. It also mounts a
+   domain-bound `plugin` group UNDER each pack-supporting tool primary
+   (`opensip fit plugin …`, `opensip sim plugin …`) — there is no top-level
+   `opensip plugin` command.
 
 **The CLI source has zero static imports of first-party tool runtimes**; bundled
 tools load by package name through the same plugin path as installed tools.
@@ -197,7 +200,10 @@ Subcommands available out of the box:
 - `opensip sim` — Run simulation scenarios [experimental]
 - `opensip init` — Generate `opensip-cli.config.yml`
 - `opensip sessions list|show|purge` — Manage stored sessions
-- `opensip plugin list|add|remove|sync` — Manage fit/sim packs and the Tool-plugin compatibility path
+- `opensip <tool> plugin list|add|remove|sync` — Manage a pack-supporting
+  tool's extension packs (`opensip fit plugin …`, `opensip sim plugin …`); the
+  domain is bound from the tool (no `--domain` flag). There is no top-level
+  `opensip plugin`.
 - `opensip tools list|validate|install|uninstall|data-purge` — Manage whole Tool plugins
 - `opensip configure` — Store an API key for future/private OpenSIP Cloud-compatible endpoints
 

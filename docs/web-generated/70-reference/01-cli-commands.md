@@ -446,7 +446,7 @@ JSON shape:
 }
 ```
 
-Useful for scripting (`opensip fit list --json | jq '.checks[].slug'`) and for verifying that a `plugin add` actually registered the new pack's checks. `totalCount` is the loaded inventory for the current project, so it increases when project-local checks or installed packs are present.
+Useful for scripting (`opensip fit list --json | jq '.checks[].slug'`) and for verifying that an `opensip fit plugin add` actually registered the new pack's checks. `totalCount` is the loaded inventory for the current project, so it increases when project-local checks or installed packs are present.
 
 ---
 
@@ -666,33 +666,36 @@ The `--filter` and `--raw` options (plus `--summary-only` on `list`) were added 
 
 ---
 
-## `plugin add/remove/list/sync` — manage project-pinned plugins
+## `<tool> plugin add/remove/list/sync` — manage a tool's extension packs
 
 CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.6/packages/cli/src/commands/plugin.ts).
 
+The pack-management `plugin` group is mounted **under each pack-supporting tool primary** — the domain is bound from the tool, so there is **no top-level `opensip plugin`** and **no `--domain` flag**. `fit` and `sim` support packs; `graph` does not (its extensibility is language adapters), so it has no `plugin` group.
+
 ```
-opensip plugin list
-opensip plugin add <pkg>
-opensip plugin add <pkg> --domain <fit|sim|tool>
-opensip plugin add <tool-pkg> --project
-opensip plugin remove <pkg>
-opensip plugin sync
+opensip fit plugin list
+opensip fit plugin add <pkg>
+opensip fit plugin remove <pkg>
+opensip fit plugin sync
+
+opensip sim plugin list
+opensip sim plugin add <pkg>
+opensip sim plugin remove <pkg>
+opensip sim plugin sync
 ```
 
 | Flag | Subcommands | Effect |
 |---|---|---|
-| `--domain <fit\|sim\|tool>` | `add`, `remove`; `fit\|sim` only for `sync` | Override the inferred domain (`add`/`remove`) or scope a sync to one fit/sim domain (`sync`). `tool` selects the full-Tool-plugin path and is not syncable because tool plugins are discovered by marker, not config. |
-| `--project` | `add`, `remove` | For a **tool** plugin, target the project-local host dir (`.runtime/plugins/tool/`) instead of the user-global default. No effect on fit/sim packs (always project-local). |
 | `--cwd <path>` | all | Project root. Default: `process.cwd()`. |
+| `--json` | all | Structured output. |
 
-There are **two plugin shapes** with different install models:
+Extension packs are **project-committed and always project-local**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` (where `<domain>` is the tool the subcommand hangs off of — `fit` or `sim`) **and** appends to `plugins.<domain>:` in `opensip-cli.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse. There is no user-global pack path, so there is no `--project` flag.
 
-- **fit/sim packs** are **project-committed**: `add` writes to `.runtime/plugins/<domain>/node_modules/<pkg>/` **and** appends to `plugins.<domain>:` in `opensip-cli.config.yml` so teammates reproduce them via `sync`. Fit packs declare `kind: "fit-pack"`; sim packs are listed under `plugins.sim:` / `plugins.scenarioPackages:` or discovered by the `scenarios-*` package-name pattern. `remove` is the inverse.
-- **full Tool plugins** (`kind: "tool"`, whole subcommands) **auto-discover by marker — no config entry**. `add` detects the kind before installing (local `package.json`, or `npm view` for a registry spec) and installs **user-global** to `~/.opensip-cli/plugins/tool/` by default (available in every project), or project-local with `--project`. Force the tool path with `--domain tool` when detection can't reach the registry. Because there's no config record, tool plugins are **not** part of `sync`.
+**`<tool> plugin list`** shows that tool's packs (installed ∩ config-listed) for its own domain only — it does **not** list whole Tool plugins. **`<tool> plugin sync`** installs everything declared under that tool's `plugins.<domain>:` — the post-clone bootstrap.
 
-**`list`** shows fit/sim packs (installed ∩ config-listed) plus every discovered tool plugin (under the `tool` domain). **`sync`** installs everything declared in the config — the post-clone bootstrap (fit/sim only).
+**Whole Tool plugins** (a `kind: "tool"` package contributing a whole subcommand) are installed/uninstalled with the [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/) — `opensip tools install <spec>` — NOT here.
 
-**See also:** [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/). For **whole Tool plugins**, prefer the customer-facing [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/) — `plugin add --domain tool` remains supported as the lower-level machinery.
+**See also:** [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/).
 
 ---
 

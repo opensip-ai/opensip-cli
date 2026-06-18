@@ -262,7 +262,7 @@ Marker-based discovery always runs; `plugins.checkPackages:` is an exact-name su
 
 ### Sim scenario packs
 
-Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-cli` plus configured `plugins.packageScopes` is discovered automatically (the simulation tool's manifest declares `discovery.mode: "name-pattern"` with `prefix: "scenarios-"`). There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Exact-name pins (`plugins.scenarioPackages:`) and the reproducible project-pinned shape (`plugins.sim:`, managed by `plugin add/remove/sync`) layer on top.
+Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any installed `<scope>/scenarios-*` package under `@opensip-cli` plus configured `plugins.packageScopes` is discovered automatically (the simulation tool's manifest declares `discovery.mode: "name-pattern"` with `prefix: "scenarios-"`). There is no `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. Exact-name pins (`plugins.scenarioPackages:`) and the reproducible project-pinned shape (`plugins.sim:`, managed by `opensip sim plugin add/remove/sync`) layer on top.
 
 ### Stability rules
 

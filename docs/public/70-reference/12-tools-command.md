@@ -30,9 +30,11 @@ opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
 opensip tools data-purge <tool-id>
 ```
 
-The lower-level `plugin add/remove --domain tool` machinery keeps working;
-`tools` is the documented path and is implemented over the same host
-directories and npm helpers.
+`tools` is the **only** way to install/uninstall a whole Tool plugin — the
+former `plugin add/remove --domain tool` path was retired (the per-tool `plugin`
+group is now scoped to a pack-supporting tool's own extension packs, not whole
+Tool plugins). `tools` is implemented over the same host directories and npm
+helpers the pack path uses.
 
 ## A note you should read first: code execution
 

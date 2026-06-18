@@ -156,7 +156,7 @@ A single mega-package was considered. It would compile faster, ship faster, and 
 A check pack like `@opensip-cli/checks-python` has to be installable on its own. A user who only writes Python should be able to:
 
 ```bash
-opensip plugin add @opensip-cli/checks-python
+opensip fit plugin add @opensip-cli/checks-python
 ```
 
 …and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 33 packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)

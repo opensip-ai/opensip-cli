@@ -57,7 +57,7 @@ Listed in recommendation order:
   `<scope>/scenarios-*` (e.g. `@acme/scenarios-load`). `plugins.packageScopes`
   extends the scopes scanned beyond `@opensip-cli`.
 - **explicit listing** — name individual packages in `plugins.checkPackages` (fit) or `plugins.scenarioPackages` (sim) from project `node_modules`. For fit, an explicit list is ADDED to marker discovery; for sim it pins the set.
-- **Project-pinned install** — `opensip plugin add --domain fit @scope/pack` or `--domain sim @scope/pack` installs into `.runtime/plugins/<domain>/` and records `plugins.fit:` / `plugins.sim:` so teammates can reproduce it with `plugin sync`.
+- **Project-pinned install** — `opensip fit plugin add @scope/pack` or `opensip sim plugin add @scope/pack` installs into `.runtime/plugins/<domain>/` and records `plugins.fit:` / `plugins.sim:` so teammates can reproduce it with `opensip fit plugin sync` (the domain is bound from the tool — no `--domain` flag).
 
 ## When to graduate from loose `.mjs`
 
@@ -242,10 +242,10 @@ Either is a working reference for the pattern when graduating your own pack.
 npm publish --access public      # or wire it up to GitHub OIDC trusted publishing
 
 # In a consuming project:
-opensip plugin add @my-co/checks-internal
+opensip fit plugin add @my-co/checks-internal
 ```
 
-`plugin add` installs to `<project>/opensip-cli/.runtime/plugins/fit/node_modules/` and appends to `plugins.fit:` in `opensip-cli.config.yml`. Next `opensip fit` run, your checks load.
+`opensip fit plugin add` installs to `<project>/opensip-cli/.runtime/plugins/fit/node_modules/` and appends to `plugins.fit:` in `opensip-cli.config.yml`. Next `opensip fit` run, your checks load. (Sim packs use `opensip sim plugin add` — the domain is bound from the tool the `plugin` group hangs off of.)
 
 ## Testing
 

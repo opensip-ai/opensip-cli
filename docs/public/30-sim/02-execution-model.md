@@ -34,7 +34,7 @@ The sim engine has the same architectural shape as fit's recipe engine — selec
 opensip sim --recipe <name>
   → simulationTool.action(opts)
        → executeSim(args)                                                   ↓
-            → loadProjectConfig + plugin sync                                │
+            → loadProjectConfig + load sim-domain plugins                     │
             → resolve recipe (or default)                                    │
             → expand selector → scenario list                                │
             → for each scenario (in mode order):                             │

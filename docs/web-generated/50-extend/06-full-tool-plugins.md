@@ -138,7 +138,7 @@ The three command declarations — `package.json`'s `opensipTools.commands`, the
 
 That's the whole tool. Install it either way and `opensip audit-sec` works on the next invocation:
 
-- **`opensip plugin add @my-co/audit-sec`** — the CLI detects the `opensipTools.kind: "tool"` marker (reading a local path's `package.json`, or `npm view` for a registry spec) and installs it **user-global** into `~/.opensip-cli/plugins/tool/`, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-cli/.runtime/plugins/tool/` instead (that copy is **gitignored and not shared** with teammates, and keeps provenance `installed` — it is still an npm install, not authored content). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its marker. (If detection can't reach the registry — offline / private — pass `--domain tool` to force the tool path.)
+- **`opensip tools install @my-co/audit-sec`** — validates the package against the Tool contract, then installs it **user-global** into `~/.opensip-cli/plugins/tool/` by default, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-cli/.runtime/plugins/tool/` instead (that copy is **gitignored and not shared** with teammates, and keeps provenance `installed` — it is still an npm install, not authored content). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its `opensipTools.kind: "tool"` marker. (Whole Tool plugins are managed ONLY by `opensip tools …`; the per-tool `plugin` group manages a pack-supporting tool's extension packs, not whole tools.)
 - **`npm install @my-co/audit-sec`** in your project — discovery walks the project tree's `node_modules`, so a plain install is picked up too. A global `npm i -g @my-co/audit-sec` next to a global `opensip-cli` is found via the CLI's own install tree.
 
 ## Authored Tool sidecars (tracked, no npm install)
@@ -185,11 +185,11 @@ The runtime contract is unchanged — the directory's resolved main must export
 Authored discovery, admission, dynamic import, and registration travel the exact
 same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.6/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
-> **Sidecar vs `plugin add --project`.** `plugin add --project` *installs an npm
-> package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
+> **Sidecar vs `tools install --project`.** `tools install --project` *installs an
+> npm package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
 > `installed`. An authored sidecar is *tracked source* with provenance
 > `project-local` (project) or `user-global` (home). They are different
-> mechanisms; the provenance label in `plugin list` tells them apart.
+> mechanisms; the provenance label in `opensip tools list` tells them apart.
 
 ## What you don't need
 

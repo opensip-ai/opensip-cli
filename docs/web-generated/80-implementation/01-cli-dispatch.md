@@ -149,7 +149,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `init` | CLI | Scaffolds the project layout. No Tool exists yet to own it. |
 | `configure` | CLI | Manages user-level (`~/.opensip-cli/config.yml`) state. Cross-tool. |
 | `uninstall` | CLI | Removes the user-level dotdir. Cross-tool. |
-| `plugin add/remove/list/sync` | CLI | Manages project-pinned plugins. Cross-tool. |
+| `<tool> plugin add/remove/list/sync` | CLI (host) | Manages a pack-supporting tool's project-pinned extension packs. Mounted UNDER each pack-supporting tool primary (`opensip fit plugin …`, `opensip sim plugin …`) with the domain pre-bound — there is no top-level `opensip plugin`. Whole Tool plugins use `tools …` instead. |
 | `completion` | CLI | Prints a shell-completion script whose subcommands + flags are **derived from the live `CommandSpec`s** at generation time (`assembleCompletionInventory`) — the same specs the runtime mounts, so it can't drift; a flag-parity test enforces it. Discovered third-party tool commands are included (the inventory is sourced from the populated registry). |
 | `report` | CLI | Generates + opens the HTML report, aggregating each tool's contributed report data (composition root). Cross-tool. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. New agent ergonomics (`--summary-only`, `--filter`, `--raw` on show) are also host-owned here. |
