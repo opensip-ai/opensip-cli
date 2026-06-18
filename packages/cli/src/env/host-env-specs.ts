@@ -21,10 +21,10 @@
  */
 
 import { CONFIG_ENV_SPECS } from '@opensip-cli/config';
-import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
+import { CORRELATION_ENV_SPECS, EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 
 /** CLI-layer infra variables: OpenTelemetry + the update-notifier opt-outs. */
-export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
+export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   {
     canonical: 'OTEL_EXPORTER_OTLP_ENDPOINT',
     docs: 'OTLP/HTTP endpoint. When set, the CLI enables OpenTelemetry tracing; unset is a hard no-op.',
@@ -80,6 +80,28 @@ export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'rides in with git clone, so loading it runs untrusted code. Global-authored tools ' +
       '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
   },
+];
+
+/**
+ * The full CLI env surface = infra vars + the ten subprocess-correlation vars.
+ *
+ * The canonical names + docs for the ten `OPENSIP_*` correlation vars
+ * (`OPENSIP_RUN_ID`, `OPENSIP_TOOL`, `OPENSIP_PARENT_COMMAND`, `OPENSIP_TRACE_ID`,
+ * `OPENSIP_SHARD_ID`, `OPENSIP_WORKER_KIND`, `OPENSIP_REPO`, `OPENSIP_REPO_ID`,
+ * `OPENSIP_TENANT_ID`, `OPENSIP_CHILD_INVOCATION_ID`) are OWNED by
+ * `@opensip-cli/core`'s `run-correlation.ts` (`CORRELATION_ENV_SPECS`) — the single
+ * source of truth that `correlationFromEnv()` also reads through. The host SURFACES
+ * them here (for the env-surface reference doc + governance) by SPREADING the core
+ * table; it never re-declares them. The `...CORRELATION_ENV_SPECS` spread — not this
+ * comment — is what keeps the codec and the governed env surface in lockstep.
+ *
+ * `OPENSIP_API_KEY` is deliberately NOT part of this set — it lives in
+ * `CONFIG_ENV_SPECS` (`global-config.ts`) and must never be conflated with
+ * correlation.
+ */
+export const CLI_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
+  ...CLI_INFRA_ENV_SPECS,
+  ...CORRELATION_ENV_SPECS,
 ];
 
 /** The composed CLI-layer registry. Telemetry + update-notifier read through it. */

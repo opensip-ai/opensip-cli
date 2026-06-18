@@ -4,12 +4,14 @@
  * CLI infra reads coerce as the migrated sites expect.
  */
 
+import { CORRELATION_ENV_SPECS } from '@opensip-cli/core';
 import { GRAPH_ENV_SPECS } from '@opensip-cli/graph';
 import { afterEach, describe, it, expect } from 'vitest';
 
 import {
   BUNDLED_TOOL_ENV_SPECS,
   CLI_ENV_SPECS,
+  CLI_INFRA_ENV_SPECS,
   PRE_SCOPE_ENV_SPECS,
   describeHostEnv,
   hostEnv,
@@ -83,8 +85,8 @@ describe('hostEnv reads (CLI infra)', () => {
     expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe('https://collector:4318');
   });
 
-  it('CLI_ENV_SPECS covers the infra variables', () => {
-    expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
+  it('CLI_INFRA_ENV_SPECS covers the infra variables', () => {
+    expect(CLI_INFRA_ENV_SPECS.map((s) => s.canonical)).toEqual([
       'OTEL_EXPORTER_OTLP_ENDPOINT',
       'OPENSIP_PROFILING',
       'TRACEPARENT',
@@ -92,6 +94,31 @@ describe('hostEnv reads (CLI infra)', () => {
       'NO_UPDATE_NOTIFIER',
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
+    ]);
+  });
+
+  it('CLI_ENV_SPECS = infra vars + the ten core CORRELATION_ENV_SPECS (spread, never re-declared)', () => {
+    const correlationNames = CORRELATION_ENV_SPECS.map((s) => s.canonical);
+    // The ten subprocess-correlation vars are owned by core; the host SPREADS
+    // them, so CLI_ENV_SPECS = infra ++ exactly the core correlation set.
+    expect(CLI_ENV_SPECS.map((s) => s.canonical)).toEqual([
+      ...CLI_INFRA_ENV_SPECS.map((s) => s.canonical),
+      ...correlationNames,
+    ]);
+    // The trailing slice is identity-equal to the core specs — the spread, not a
+    // re-declared literal, is the linkage (no drift).
+    expect(CLI_ENV_SPECS.slice(CLI_INFRA_ENV_SPECS.length)).toEqual([...CORRELATION_ENV_SPECS]);
+    expect(correlationNames).toEqual([
+      'OPENSIP_RUN_ID',
+      'OPENSIP_TOOL',
+      'OPENSIP_PARENT_COMMAND',
+      'OPENSIP_TRACE_ID',
+      'OPENSIP_SHARD_ID',
+      'OPENSIP_WORKER_KIND',
+      'OPENSIP_REPO',
+      'OPENSIP_REPO_ID',
+      'OPENSIP_TENANT_ID',
+      'OPENSIP_CHILD_INVOCATION_ID',
     ]);
   });
 
