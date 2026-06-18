@@ -63,6 +63,7 @@ import type {
   CommandResult,
   ErrorResult,
   GraphDoneResult,
+  RunPresentation,
   SessionReplayResult,
   SignalEnvelope,
   VerboseDetail,
@@ -330,10 +331,18 @@ function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
  *
  * When `verboseDetail` is present (a `--verbose` run), its rendered body is
  * prepended above the per-unit table (ADR-0021).
+ *
+ * `durationOverride` is the host-owned display duration (ADR-0051), threaded by
+ * `presentationToView` from `RunPresentation.durationMs`. It WINS over the
+ * envelope unit-sum: tools whose units carry no per-unit duration (graph stamps
+ * `durationMs: 0`) would otherwise render a `0ms` summary. fit/sim units carry
+ * real durations, so they are unaffected when no override is supplied (the
+ * unit-sum fallback stays exact).
  */
 export function envelopeToTableView(
   envelope: SignalEnvelope,
   verboseDetail?: VerboseDetail,
+  durationOverride?: number,
 ): ViewNode {
   const rows = formatSignalTableRows(envelope);
   const summary = formatSignalTableSummary(envelope);
@@ -350,9 +359,36 @@ export function envelopeToTableView(
       passed: envelope.verdict.passed,
       errors: summary.totalErrors,
       warnings: summary.totalWarnings,
-      durationMs: resolveSummaryDuration(summary.durationMs),
+      durationMs: resolveSummaryDuration(durationOverride ?? summary.durationMs),
     }),
   );
+  return group(children);
+}
+
+/**
+ * The single render path for a {@link RunPresentation} (envelope-first-presentation
+ * plan). Renders `p.banners` as muted lines above the table (mirroring the old
+ * `graphDoneView` resolution-caveat rendering), delegates the table+summary to
+ * `envelopeToTableView` (threading `p.durationMs` as the host-owned duration
+ * override), and applies the shared `withVerboseHint` footer when `verboseDetail`
+ * is absent — preserving fit/sim's exact non-verbose footer behavior.
+ *
+ * ADDITIVE in RP-0: this is exported but has no caller. RP-1 Task 1.0 adds the
+ * `case 'run-presentation'` to `resultToView` (atomically with the union-join),
+ * so the exhaustive `assertNever` is never momentarily broken.
+ */
+export function presentationToView(p: RunPresentation): ViewNode {
+  const children: ViewNode[] = [];
+  if (p.banners !== undefined) {
+    for (const banner of p.banners) {
+      children.push(line([{ text: banner, tone: 'muted' }]));
+    }
+  }
+  const body = withVerboseHint(
+    envelopeToTableView(p.envelope, p.verboseDetail, p.durationMs),
+    p.verboseDetail === undefined,
+  );
+  children.push(body);
   return group(children);
 }
 
