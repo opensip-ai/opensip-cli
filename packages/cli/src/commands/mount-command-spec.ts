@@ -98,16 +98,23 @@ export interface CommandMountContext extends RunActionHooks {
  *   5. `cmd.action(...)` → run `spec.handler(opts, ctx)` → {@link dispatchOutput}
  *      → on a thrown {@link ToolError}, `mapToolErrorToExitCode` → `ctx.setExitCode`.
  *
- * @param program The root Commander program (the entry layer's `CliProgram`).
+ * @param program The Commander program to mount onto — the root `CliProgram`
+ *                for a flat command, or a parent command (a host subcommand
+ *                group, or a tool's primary command for a `CommandSpec.parent`
+ *                nested child) when nesting. `program.command(...)` mounts onto
+ *                whatever object it is called on, so nesting is purely a matter
+ *                of which program is passed.
  * @param spec    The declarative command surface the tool/host exported.
  * @param ctx     The per-invocation host context (render/envelope/live-view
  *                emitters, exit-code setter) — today's `ToolCliContext`.
+ * @returns       The mounted Commander command, so a caller nesting children
+ *                (e.g. `mountOneTool`) can mount sub-subcommands onto it.
  */
 export function mountCommandSpec<TCtx extends CommandMountContext>(
   program: CliProgram,
   spec: CommandSpec<unknown, TCtx>,
   ctx: TCtx,
-): void {
+): CliProgram {
   const cmd = program.command(spec.name).description(spec.description);
   if (spec.aliases !== undefined && spec.aliases.length > 0) {
     cmd.aliases([...spec.aliases]);
@@ -167,6 +174,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
       throw error;
     }
   });
+  return cmd;
 }
 
 /**

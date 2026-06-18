@@ -95,6 +95,18 @@ function specTool(id: string, commandName: string): Tool {
   };
 }
 
+/** A tool whose primary `prim` command hosts a `parent`-nested `child` leaf. */
+function nestedTool(id: string): Tool {
+  return {
+    metadata: { id, version: '0.0.0', description: id },
+    commands: [
+      { name: 'prim', description: 'primary' },
+      { name: 'child', description: 'child', parent: 'prim' },
+    ],
+    commandSpecs: [makeSpec('prim'), { ...makeSpec('child'), parent: 'prim' }],
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -126,6 +138,46 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
       expect.objectContaining({ evt: 'cli.tool.no_command_surface', toolId: 'empty-tool' }),
     );
     expect(program.commands.map((c) => c.name())).not.toContain('empty-tool');
+  });
+});
+
+describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.parent)', () => {
+  it('mounts a parent-nested spec UNDER its primary, not flat at root', () => {
+    const registry = new ToolRegistryClass();
+    registry.register(nestedTool('nested-tool'));
+
+    const program = new Command('opensip');
+    mountAllToolCommands(registry, program, makeStubContext());
+
+    // The primary verb is a top-level command; the child is NOT at root.
+    const topLevel = program.commands.map((c) => c.name());
+    expect(topLevel).toContain('prim');
+    expect(topLevel).not.toContain('child');
+
+    // The child is a subcommand of the primary (the `<tool> <verb>` grammar).
+    const prim = program.commands.find((c) => c.name() === 'prim');
+    expect(prim).toBeDefined();
+    expect(prim!.commands.map((c) => c.name())).toContain('child');
+  });
+
+  it('falls back to a flat root mount + warns when the declared parent is absent', () => {
+    const registry = new ToolRegistryClass();
+    const orphan: Tool = {
+      metadata: { id: 'orphan-tool', version: '0.0.0', description: 'orphan' },
+      commands: [{ name: 'lonely', description: 'lonely', parent: 'missing' }],
+      commandSpecs: [{ ...makeSpec('lonely'), parent: 'missing' }],
+    };
+    registry.register(orphan);
+
+    const program = new Command('opensip');
+    const warnSpy = vi.spyOn(logger, 'warn');
+    mountAllToolCommands(registry, program, makeStubContext());
+
+    // No matching parent → mounted flat at root, and the mis-declaration is loud.
+    expect(program.commands.map((c) => c.name())).toContain('lonely');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.tool.unknown_command_parent', toolId: 'orphan-tool' }),
+    );
   });
 });
 

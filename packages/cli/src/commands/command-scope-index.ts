@@ -18,6 +18,13 @@ export interface CommandScopeSpec {
   readonly name: string;
   readonly aliases?: readonly string[];
   readonly scope: CommandScopeRequirement;
+  /**
+   * When set, this tool command is nested under the named primary verb (the
+   * `<tool> <verb>` grammar — see `CommandSpec.parent`). The index then keys it
+   * under `${parent} ${name}` so `commandPath` resolves `graph export` /
+   * `fit list` rather than a bare `export` / `list`. Omitted ⇒ flat root key.
+   */
+  readonly parent?: string;
 }
 
 export interface CommandScopeIndexInput {
@@ -40,7 +47,10 @@ function addSpec(
 export function buildCommandScopeIndex(input: CommandScopeIndexInput): CommandScopeIndex {
   const index = new Map<string, CommandScopeRequirement>();
 
-  input.toolSpecs.forEach((spec) => addSpec(index, undefined, spec));
+  // Tool specs key flat by `name`, EXCEPT `parent`-nested specs (the
+  // `<tool> <verb>` grammar, taxonomy Task 0.4), which key under
+  // `${parent} ${name}` so `commandPath` resolves `graph export` / `fit list`.
+  input.toolSpecs.forEach((spec) => addSpec(index, spec.parent, spec));
   input.hostSpecs.forEach((spec) => addSpec(index, undefined, spec));
   input.hostGroups.forEach((group) => {
     group.leaves.forEach((leaf) => addSpec(index, group.name, leaf));

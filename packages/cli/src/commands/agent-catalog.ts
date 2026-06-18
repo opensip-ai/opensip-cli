@@ -7,6 +7,18 @@
  *
  * Future: can be made more dynamic by introspecting live CommandSpecs
  * (see completion.ts for precedent).
+ *
+ * Command taxonomy (tool-command-surface-taxonomy):
+ * - Entry points are keyed by the PUBLIC command path. A `parent`-nested tool
+ *   verb (the `<tool> <verb>` grammar enabled by `CommandSpec.parent` — e.g.
+ *   `graph export`, `fit list`) is catalogued UNDER its tool's entry point
+ *   (the `<tool> <verb>` form), NOT as a separate root entry point.
+ * - Tier-3 `visibility: 'internal'` commands (`*-run-worker`, `*-shard-worker`,
+ *   `*-equivalence-check`) are NEVER catalogued here — the agent-catalog
+ *   primary surface excludes internal workers (the host-owned tiering pass
+ *   formalized in Phase 1 filters them when this surface becomes spec-derived).
+ * In Phase 0 no tool declares `parent`/`visibility`, so the static catalog below
+ * already satisfies both rules (no nested verb, no internal worker is listed).
  */
 export interface AgentCatalog {
   readonly version: string;

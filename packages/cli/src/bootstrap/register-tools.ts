@@ -28,4 +28,4 @@ export {
   admitUserGlobalTool,
 } from './authored-tool-admission.js';
 
-export { mountAllToolCommands } from './register-tools-mount.js';
+export { mountAllToolCommands, mountOneTool } from './register-tools-mount.js';

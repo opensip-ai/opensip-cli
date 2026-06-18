@@ -64,6 +64,14 @@ export interface SpecLike {
   readonly aliases?: readonly string[];
   readonly commonFlags: readonly CommonFlagKey[];
   readonly options?: readonly { readonly flag: string }[];
+  /**
+   * When set, this tool command is a `<parent> <name>` sub-subcommand (the
+   * `<tool> <verb>` grammar — see `CommandSpec.parent`, taxonomy Task 0.4). The
+   * inventory then offers it as a leaf under `parent` (like a `plugin`/`sessions`
+   * group leaf) and keys its flags under `${parent} ${name}`. Omitted ⇒ a flat
+   * top-level command.
+   */
+  readonly parent?: string;
 }
 
 /** One action-less group (`plugin` / `sessions`) and its leaf command names. */
@@ -136,10 +144,25 @@ export function assembleCompletionInventory(input: {
 }): CompletionInventory {
   const commandFlags: Record<string, readonly string[]> = {};
   const subcommands: string[] = [];
+  // `parent` → leaf names, accumulated from `parent`-nested tool specs (the
+  // `<tool> <verb>` grammar). Merged into `groupSubcommands` below so the
+  // emitted script offers `<parent> <leaf>` exactly like a host group.
+  const toolGroupLeaves: Record<string, string[]> = {};
 
   for (const spec of [...input.toolSpecs, ...input.hostSpecs]) {
     if (INTERNAL_COMMANDS.has(spec.name)) continue;
     const flags = specLongFlags(spec);
+    // A `parent`-nested tool spec is a sub-subcommand, NOT a top-level command:
+    // offer it as a leaf under its parent and key its flags under the qualified
+    // `${parent} ${name}` path (mirroring the host group leaves).
+    if (spec.parent !== undefined) {
+      const leaves = (toolGroupLeaves[spec.parent] ??= []);
+      for (const name of [spec.name, ...(spec.aliases ?? [])]) {
+        leaves.push(name);
+        commandFlags[`${spec.parent} ${name}`] = flags;
+      }
+      continue;
+    }
     for (const name of [spec.name, ...(spec.aliases ?? [])]) {
       subcommands.push(name);
       commandFlags[name] = flags;
@@ -150,6 +173,12 @@ export function assembleCompletionInventory(input: {
   for (const group of input.groups) {
     subcommands.push(group.name);
     groupSubcommands[group.name] = group.leaves.map((l) => l.name);
+  }
+  // Fold tool-command sub-subcommands into the group map. A primary verb
+  // (e.g. `graph`) is already a top-level subcommand with its own flags; adding
+  // its nested leaves here lets the script also complete `graph export` etc.
+  for (const [parent, leaves] of Object.entries(toolGroupLeaves)) {
+    groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), ...leaves];
   }
 
   // `help` is a Commander built-in the script also surfaces.
