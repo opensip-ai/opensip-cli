@@ -53,11 +53,15 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
     await fileCache.prewarm(testDir, ['**/*.ts', '**/*.md', '**/*.json']);
 
     const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    // No-scope test path: pass the (test-only) module singleton explicitly as
+    // options.fileCache. createExecutionContext no longer falls back to a global
+    // (parallel-tool-invocations Phase 1) — it resolves options.fileCache or the
+    // scope cache, else throws SYSTEM.FITNESS.NO_FILE_CACHE.
     const ctx = createExecutionContext(
       { id: 'test-id', slug: 'test-slug', itemType: 'files' },
       testDir,
       matcher,
-      globalExcludes ? { globalExcludes } : undefined,
+      { fileCache, ...(globalExcludes ? { globalExcludes } : {}) },
     );
     return ctx.matchFiles();
   }
@@ -97,6 +101,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
       { id: 'test-id', slug: 'test-slug', itemType: 'files' },
       testDir,
       matcher,
+      { fileCache },
     );
     const out = ctx.extractSnippet('a\nb\nc\nd\ne', 3);
     expect(out.snippet).toBeDefined();
@@ -119,7 +124,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
         { id: 'id', slug: 'slug', itemType: 'files' },
         testDir,
         matcher,
-        { verbose: true },
+        { verbose: true, fileCache },
       );
       verboseCtx.log('hello');
 
@@ -127,6 +132,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
         { id: 'id', slug: 'slug', itemType: 'files' },
         testDir,
         matcher,
+        { fileCache },
       );
       quietCtx.log('silent');
     });
@@ -148,7 +154,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
       matcher,
-      { signal: ac.signal },
+      { signal: ac.signal, fileCache },
     );
     expect(() => {
       ctx.checkAborted();
@@ -165,6 +171,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
       matcher,
+      { fileCache },
     );
     // Read a non-existent file — fs.stat will throw, which propagates.
     await expect(ctx.readFile('/nonexistent/path/file.ts')).rejects.toThrow();
@@ -176,6 +183,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
       matcher,
+      { fileCache },
     );
     const result = await ctx.fileExists('/nonexistent.ts');
     expect(typeof result).toBe('boolean');
@@ -187,6 +195,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
       matcher,
+      { fileCache },
     );
     expect(ctx.getMatcher()).toBe(matcher);
   });
@@ -199,7 +208,7 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
       matcher,
-      { targetFiles: ['/some/preresolved/file.ts'] },
+      { targetFiles: ['/some/preresolved/file.ts'], fileCache },
     );
     // Custom patterns path skips targetFiles fallback.
     const out = await ctx.matchFiles(['src/**/*.ts']);
