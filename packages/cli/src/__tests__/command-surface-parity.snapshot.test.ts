@@ -193,6 +193,35 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     expect(surface).toMatchSnapshot();
   });
 
+  it('the public command surface excludes Tier-3 internal commands (scaffold; tightened in Phase 1/4)', () => {
+    const program = buildFullProgram();
+    const topLevel = program.commands.map((c) => c.name());
+
+    // The five known Tier-3 internal/worker commands (tool-command-surface-taxonomy
+    // T-1). They are IPC/CI bootstrap entry points — still directly invocable, so
+    // they MUST remain mounted in the full tree. Phase 0 only adds the descriptor
+    // `visibility` field; the host hide pass that removes them from the PUBLIC
+    // help/completion/agent-catalog surface lands in Phase 1.
+    const TIER_3_INTERNAL = [
+      'fit-run-worker',
+      'graph-run-worker',
+      'graph-shard-worker',
+      'graph-equivalence-check',
+      'sim-run-worker',
+    ];
+    for (const name of TIER_3_INTERNAL) {
+      expect(topLevel, `internal command '${name}' must stay mounted (invocable)`).toContain(name);
+    }
+
+    // PHASE 1/4 INTENT (placeholder): once `visibility` filtering is wired
+    // (Phase 1), a sibling helper `publicTopLevelCommandNames(program)` will
+    // partition the mounted tree into public vs internal and assert the five
+    // internals above are ABSENT from the public surface while still PRESENT in
+    // the full tree below. Phase 4 regenerates the snapshot and tightens this
+    // assertion. In Phase 0 the active assertion is the present-in-full-tree
+    // guard above (no surface change yet — the full-tree snapshot is untouched).
+  });
+
   it('the three --resolution-bearing graph commands declare choices exact|fast (the sanctioned delta)', () => {
     const program = buildFullProgram();
     const RESOLUTION_COMMANDS = ['graph', 'catalog-export', 'sarif-export'];
