@@ -10,13 +10,14 @@
  *
  * The rendered output is committed under `__goldens__/<case>.{tty,pipe}.txt`.
  *
- * RP-0 captures these from the pre-migration `legacyResult` projection (the
+ * RP-0 captured these from the pre-migration `legacyResult` projection (the
  * unmodified `fit-done`/`sim-done`/`graph-done` render path). RP-1 flips the
  * fit/sim cases to render the `presentation` projection (a RunPresentation) and
  * asserts the output is byte-identical to the SAME committed goldens — the
  * migration must not change a single byte for fit/sim. (Graph's output is
  * intended to change in RP-2; its goldens stay the RP-0 baseline RP-2 diffs
- * against, never an equality target.)
+ * against, never an equality target — so graph keeps rendering `legacyResult`
+ * here until RP-2.)
  *
  * Regenerate after an intentional change:
  *   UPDATE_GOLDENS=1 pnpm --filter=opensip-cli test golden-fixtures
@@ -65,14 +66,21 @@ function golden(name: string, mode: 'tty' | 'pipe', actual: string): string {
 }
 
 /**
- * RP-0: render the LEGACY projection (the pre-migration CommandResult). This is
- * the capture path; RP-1 re-points fit/sim to the `presentation` projection.
+ * Choose the projection to render. RP-1: fit/sim render the migrated
+ * `presentation` projection (a RunPresentation) and must match the RP-0 goldens
+ * byte-for-byte. graph keeps rendering the pre-migration `legacyResult` (its
+ * output changes only in RP-2). Any fit/sim case missing a `presentation`
+ * projection is a fixture error.
  */
 function renderProjection(testCase: GoldenCase): CommandResult {
-  return testCase.legacyResult;
+  if (testCase.tool === 'graph') return testCase.legacyResult;
+  if (testCase.presentation === undefined) {
+    throw new Error(`fixture ${testCase.name} is missing its presentation projection`);
+  }
+  return testCase.presentation;
 }
 
-describe('golden render fixtures (TTY + pipe, pre-migration baseline)', () => {
+describe('golden render fixtures (TTY + pipe; fit/sim byte-identity post-migration)', () => {
   for (const testCase of GOLDEN_CASES) {
     it(`renders ${testCase.name} byte-identically to its goldens`, () => {
       const result = renderProjection(testCase);
