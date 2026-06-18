@@ -228,7 +228,17 @@ export class FileCache {
 }
 
 /**
- * Shared file cache instance.
+ * TEST-ONLY shared file cache instance.
+ *
+ * Production resolves the per-run cache from `currentScope()?.fitness?.fileCache`
+ * (created once per run by the fitness tool's `contributeScope()`); after
+ * parallel-tool-invocations Phase 1, ZERO production code reads this singleton.
+ * It is retained solely for isolated unit tests that exercise the cache without
+ * a scope (they seed/clear it directly, or pass it explicitly as
+ * `options.fileCache`). New production imports are forbidden by the
+ * `no-module-level-run-state` dogfood check (Phase 3). Note that
+ * `no-module-singleton.mjs` still allowlists this symbol by file
+ * (`EXEMPT_BY_FILE`).
  */
 export const fileCache = new FileCache();
 

@@ -76,7 +76,10 @@ export type {
 // ── Authoring helpers — snippet/line extraction, file access ────────
 export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-builder.js';
 export { execAbortable } from './framework/abortable-exec.js';
-// File cache (checks read content through it; pack tests may seed/clear it).
+// TEST-ONLY re-export — production reads the per-run cache from
+// scope.fitness.fileCache (resolved via currentScope()). Retained for isolated
+// unit tests that seed/clear the singleton; new production imports are forbidden
+// by the no-module-level-run-state dogfood check (parallel-tool-invocations Phase 3).
 export { fileCache } from './framework/file-cache.js';
 export { buildImportGraph, findStronglyConnectedComponents } from './framework/import-graph.js';
 export type { ImportGraph } from './framework/import-graph.js';
