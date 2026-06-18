@@ -4,7 +4,7 @@
  * Owns the fit-lifecycle state (`loadedFor`, `pluginLoadErrors`,
  * `loadWarnings`) — a single unit of state, written exactly once per RUN
  * by `ensureChecksLoaded()` and read by the phase helpers downstream
- * (`buildFitEnvelope`, `buildFitDoneResult`) plus the public
+ * (`buildFitEnvelope`, `buildFitPresentation`) plus the public
  * `getPluginLoadErrors()` / `getDisplayName()` / `getIcon()` accessors
  * that `FitView` and `report-data.ts` consume.
  *

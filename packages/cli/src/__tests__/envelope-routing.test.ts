@@ -12,7 +12,7 @@ import { renderToText } from '@opensip-cli/cli-ui';
 import {
   EXIT_CODES,
   type CommandOutcome,
-  type FitDoneResult,
+  type RunPresentation,
   type SignalEnvelope,
 } from '@opensip-cli/contracts';
 import {
@@ -190,10 +190,9 @@ describe('root --json path (emitEnvelope)', () => {
 
 describe('root table path (renderResult derives the table from the envelope)', () => {
   it('derives the per-unit table from the envelope the result carries', async () => {
-    const result: FitDoneResult = {
-      type: 'fit-done',
-      label: 'fit',
-      cwd: '/tmp',
+    const result: RunPresentation = {
+      type: 'run-presentation',
+      tool: 'fitness',
       envelope: ENVELOPE,
     };
 

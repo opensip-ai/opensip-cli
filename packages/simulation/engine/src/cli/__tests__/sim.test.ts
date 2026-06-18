@@ -93,7 +93,7 @@ describe('executeSim', () => {
     }
   });
 
-  it('returns SimDoneResult with per-scenario outcomes', async () => {
+  it('returns an envelope-backed result with per-scenario outcomes', async () => {
     currentScenarioRegistry().register(
       defineLoadScenario({
         id: 'load-a',

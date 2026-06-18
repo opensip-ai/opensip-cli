@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
 
-import type { CommandResult, SimDoneResult } from '@opensip-cli/contracts';
+import type { CommandResult, RunPresentation } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
 
 function textOf(result: CommandResult): string {
@@ -36,14 +36,13 @@ function fitSignal(over: {
 }
 
 describe('resultToView', () => {
-  it('renders fit-done from the envelope: table (with Validated/Ignores), summary', () => {
-    // ADR-0011 Phase 6: fitness is migrated — the fit-done table is derived
-    // from the envelope's units + signals (one row per check unit), including
-    // the fitness-only Validated/Ignores columns carried on UnitResult.
+  it('renders a fit RunPresentation from the envelope: table (with Validated/Ignores), summary', () => {
+    // ADR-0011 Phase 6: fitness is migrated — the fit table is derived from the
+    // envelope's units + signals (one row per check unit), including the
+    // fitness-only Validated/Ignores columns carried on UnitResult.
     const out = textOf({
-      type: 'fit-done',
-      label: 'fit',
-      cwd: '/x',
+      type: 'run-presentation',
+      tool: 'fitness',
       envelope: buildSignalEnvelope({
         tool: 'fit',
         runId: 'r',
@@ -98,11 +97,10 @@ describe('resultToView', () => {
     expect(out).toContain('FAIL  (2 Errors, 1 Warnings) | Duration 8ms');
   });
 
-  it('renders the fit-done verbose findings body and suppresses the hint (ADR-0021)', () => {
+  it('renders the fit verbose findings body and suppresses the hint (ADR-0021)', () => {
     const out = textOf({
-      type: 'fit-done',
-      label: 'fit',
-      cwd: '/x',
+      type: 'run-presentation',
+      tool: 'fitness',
       envelope: buildSignalEnvelope({
         tool: 'fit',
         runId: 'r',
@@ -140,11 +138,10 @@ describe('resultToView', () => {
     expect(out).not.toContain('Use --verbose for detailed results');
   });
 
-  it('shows the shared "Use --verbose…" hint on a non-verbose fit-done run (ADR-0021)', () => {
+  it('shows the shared "Use --verbose…" hint on a non-verbose fit run (ADR-0021)', () => {
     const out = textOf({
-      type: 'fit-done',
-      label: 'fit',
-      cwd: '/x',
+      type: 'run-presentation',
+      tool: 'fitness',
       envelope: buildSignalEnvelope({
         tool: 'fit',
         runId: 'r',
@@ -159,11 +156,10 @@ describe('resultToView', () => {
     expect(out).toContain('opensip report for HTML report');
   });
 
-  it('renders fit-done errored/clean units: ERROR status, blank validated cell', () => {
+  it('renders a fit run with errored/clean units: ERROR status, blank validated cell', () => {
     const out = textOf({
-      type: 'fit-done',
-      label: 'fit',
-      cwd: '/x',
+      type: 'run-presentation',
+      tool: 'fitness',
       envelope: buildSignalEnvelope({
         tool: 'fit',
         runId: 'r',
@@ -223,10 +219,11 @@ describe('resultToView', () => {
     expect(out).toBe('  ✗ boom');
   });
 
-  // ADR-0011 (Phase 4): sim is migrated — the sim-done view is derived from
-  // the envelope's per-unit table (one row per scenario), not the retired
-  // per-scenario `simDoneView`. Scenario `a` passed; scenario `b` failed an
-  // assertion (emitting a `high` signal sourced at its scenarioId).
+  // ADR-0011 (Phase 4): sim is migrated — the sim view is derived from the
+  // envelope's per-unit table (one row per scenario), not a retired per-scenario
+  // view. Scenario `a` passed; scenario `b` failed an assertion (emitting a
+  // `high` signal sourced at its scenarioId). The sim builder omits durationMs,
+  // so the summary uses the envelope unit-sum (parity with production).
   const bSignal: Signal = {
     id: 'sig_b1',
     source: 'b',
@@ -239,11 +236,9 @@ describe('resultToView', () => {
     metadata: {},
     createdAt: '2026-06-04T00:00:00.000Z',
   };
-  const simBase: SimDoneResult = {
-    type: 'sim-done',
-    recipeName: 'example',
-    cwd: '/x',
-    durationMs: 1500,
+  const simBase: RunPresentation = {
+    type: 'run-presentation',
+    tool: 'simulation',
     envelope: buildSignalEnvelope({
       tool: 'sim',
       recipe: 'example',
@@ -259,7 +254,7 @@ describe('resultToView', () => {
     }),
   };
 
-  it('renders the sim-done table and summary from the envelope', () => {
+  it('renders the sim table and summary from the envelope', () => {
     const out = textOf(simBase);
     // One row per scenario-unit, keyed by scenarioId; b's high signal counts
     // as an error on its row and drives the FAIL status.
@@ -271,7 +266,7 @@ describe('resultToView', () => {
     expect(out).toContain('FAIL  (1 Errors, 0 Warnings)');
   });
 
-  it('renders the empty-scenarios sim-done shape (no table, zeroed summary)', () => {
+  it('renders the empty-scenarios sim shape (no table, zeroed summary)', () => {
     const out = textOf({
       ...simBase,
       envelope: buildSignalEnvelope({
@@ -288,45 +283,12 @@ describe('resultToView', () => {
     expect(out).toContain('PASS  (0 Errors, 0 Warnings)');
   });
 
-  it('renders graph-done summary + footer via the shared producers (no banner text)', () => {
-    // Non-verbose: no verboseDetail; the seam emits the shared "Use --verbose…"
-    // hint + graph's report hint (ADR-0021).
-    const out = textOf({
-      type: 'graph-done',
-      summary: { passed: 3, failed: 0, errors: 0, warnings: 0 },
-      durationMs: 1200,
-    });
-    expect(out).toContain('PASS  (0 Errors, 0 Warnings) | Duration 1.2s');
-    expect(out).toContain('  Use --verbose for detailed results');
-    expect(out).toContain('opensip report for HTML report');
-  });
-
   it('renders gate-done lines verbatim', () => {
     const out = textOf({
       type: 'gate-done',
       lines: ['opensip gate compare', '', '✓ STABLE — no change'],
     });
     expect(out).toBe('opensip gate compare\n\n✓ STABLE — no change');
-  });
-
-  it('renders the graph-done verbose body and fast-tier caveat', () => {
-    // Verbose: the body rides on verboseDetail{kind:'lines'} (ADR-0021); the
-    // seam renders it and suppresses the footer hints.
-    const out = textOf({
-      type: 'graph-done',
-      verboseDetail: {
-        kind: 'lines',
-        lines: ['== Catalog ==', '5 functions across 2 files (cacheHit=false)'],
-      },
-      resolutionBanner: 'Resolution: fast (syntactic) — edges are approximate.',
-      summary: { passed: 1, failed: 1, errors: 0, warnings: 0 },
-      durationMs: 50,
-    });
-    expect(out).toContain('== Catalog ==');
-    expect(out).toContain('5 functions across 2 files');
-    expect(out).toContain('Resolution: fast (syntactic)');
-    expect(out).toContain('PASS'); // ADR-0035: graph-done errors:0 → PASS verdict
-    expect(out).not.toContain('Use --verbose for detailed results');
   });
 
   // envelope-first-presentation RP-2: graph now renders a RunPresentation. The

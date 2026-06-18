@@ -13,7 +13,7 @@
  *   - `fit/display-registry.ts` — merged check display map
  *   - `fit/config-loader.ts`    — config parse + language validation
  *   - `fit/recipe-selector.ts`  — recipe-pick + run
- *   - `fit/result-builders.ts`  — SignalEnvelope / FitDoneResult / session persist
+ *   - `fit/result-builders.ts`  — SignalEnvelope / RunPresentation / session persist
  *
  * This file re-exports the public surface (`executeFit`,
  * `ensureChecksLoaded`, and the display accessors) so existing consumers

@@ -8,8 +8,8 @@
  * Keeping these together (rather than per-output-shape) makes the
  * signal-shape mapping visible in one place: `buildFitEnvelope` maps check
  * violations to `Signal`s and `buildFitPresentation` wraps the envelope in the
- * render adjunct (envelope-first-presentation plan; replaced the old
- * `buildFitDoneResult`/`FitDoneResult`).
+ * render adjunct (envelope-first-presentation plan; replaced the old per-tool
+ * fit done-result builder).
  */
 
 import {
@@ -144,8 +144,8 @@ export interface BuildFitPresentationArgs {
 
 /**
  * Build the render-only {@link RunPresentation} the live renderer / non-TTY
- * render path consume (envelope-first-presentation plan; replaced
- * `buildFitDoneResult`/`FitDoneResult`). Carries the run's {@link SignalEnvelope}
+ * render path consume (envelope-first-presentation plan; replaced the old
+ * per-tool fit done-result builder). Carries the run's {@link SignalEnvelope}
  * (the composition root derives the terminal table + summary AND the findings
  * exit code FROM it — one row per check unit, `envelope.verdict.passed` the
  * single verdict) plus the optional verbose detail body.

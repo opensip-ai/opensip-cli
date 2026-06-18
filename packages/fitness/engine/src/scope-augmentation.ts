@@ -36,7 +36,7 @@ import type { FitnessRecipeRegistry } from './recipes/registry.js';
  * Per-RunScope `ensureChecksLoaded` lifecycle state — moved off the
  * `check-loader.ts` module singletons so two concurrent scopes carry
  * independent load state. Mutable: `ensureChecksLoaded` writes it once
- * per run; the phase helpers (`buildFitEnvelope`, `buildFitDoneResult`)
+ * per run; the phase helpers (`buildFitEnvelope`, `buildFitPresentation`)
  * and the public accessors read it back.
  */
 export interface FitnessLoadState {

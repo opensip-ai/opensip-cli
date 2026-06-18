@@ -118,7 +118,7 @@ export function ResultsTable({
  * the run (plugin load failures, unknown languages in config, missing
  * check packages, etc.).
  *
- * These come through `FitDoneResult.warnings` rather than direct stderr
+ * These come through the run's collected warnings rather than direct stderr
  * writes — emitting them during an active Ink render desyncs the renderer's
  * frame tracking. Rendering them here through Ink keeps the live view's
  * frame contract intact.

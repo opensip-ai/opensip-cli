@@ -2,9 +2,9 @@
  * @fileoverview signal-table formatter (ADR-0011, Phase 2 Task 2.5).
  *
  * Derives the terminal-table view-model purely from the envelope's `units` +
- * `signals` — one row per unit — so tools stop pre-computing `TableRow[]` on
- * their `*DoneResult` (today fitness builds rows in
- * `result-builders.ts:buildFitDoneResult`). The Ink `ResultsTable` (cli-ui)
+ * `signals` — one row per unit — so tools stop pre-computing `TableRow[]` on a
+ * per-tool render result (fitness now wraps the envelope in a RunPresentation in
+ * `result-builders.ts:buildFitPresentation`). The Ink `ResultsTable` (cli-ui)
  * consumes these rows; this layer does no Ink and no IO (formatter-purity
  * contract).
  *

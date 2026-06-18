@@ -10,14 +10,11 @@
  *
  * The rendered output is committed under `__goldens__/<case>.{tty,pipe}.txt`.
  *
- * RP-0 captured these from the pre-migration `legacyResult` projection (the
- * unmodified `fit-done`/`sim-done`/`graph-done` render path). RP-1 flips the
- * fit/sim cases to render the `presentation` projection (a RunPresentation) and
- * asserts the output is byte-identical to the SAME committed goldens — the
- * migration must not change a single byte for fit/sim. (Graph's output is
- * intended to change in RP-2; its goldens stay the RP-0 baseline RP-2 diffs
- * against, never an equality target — so graph keeps rendering `legacyResult`
- * here until RP-2.)
+ * Every case renders its `presentation` projection (a RunPresentation). fit/sim
+ * output is asserted byte-identical to the committed goldens — the migration must
+ * not change a single byte. Graph's goldens were regenerated in RP-2 to the new
+ * envelope-backed output (intentional, enumerated deltas), so they are the new
+ * expected output rather than a pre-migration baseline.
  *
  * Regenerate after an intentional change:
  *   UPDATE_GOLDENS=1 pnpm --filter=opensip-cli test golden-fixtures
@@ -34,19 +31,19 @@ import { describe, it, expect } from 'vitest';
 
 import { resultToView } from '../result-to-view.js';
 
-import { GOLDEN_CASES, type GoldenCase } from './golden-fixtures.js';
+import { GOLDEN_CASES } from './golden-fixtures.js';
 
-import type { CommandResult } from '@opensip-cli/contracts';
+import type { RunPresentation } from '@opensip-cli/contracts';
 
 const GOLDENS_DIR = join(dirname(fileURLToPath(import.meta.url)), '__goldens__');
 const UPDATE = process.env.UPDATE_GOLDENS === '1';
 
-function ttyFrame(result: CommandResult): string {
+function ttyFrame(result: RunPresentation): string {
   const { lastFrame } = render(<ThemeProvider>{renderToInk(resultToView(result))}</ThemeProvider>);
   return lastFrame() ?? '';
 }
 
-function pipeText(result: CommandResult): string {
+function pipeText(result: RunPresentation): string {
   return renderToText(resultToView(result));
 }
 
@@ -65,26 +62,10 @@ function golden(name: string, mode: 'tty' | 'pipe', actual: string): string {
   return readFileSync(path, 'utf8');
 }
 
-/**
- * Choose the projection to render. Post-RP-2 every tool renders the migrated
- * `presentation` projection (a RunPresentation). fit/sim must match the RP-0
- * goldens byte-for-byte; graph's goldens were REGENERATED in RP-2 to the new
- * envelope-backed output (intentional, enumerated deltas — count summary →
- * verdict, per-unit table added, resolutionBanner → banners), so its goldens are
- * the new expected output, not the RP-0 baseline. Any case missing a
- * `presentation` projection is a fixture error.
- */
-function renderProjection(testCase: GoldenCase): CommandResult {
-  if (testCase.presentation === undefined) {
-    throw new Error(`fixture ${testCase.name} is missing its presentation projection`);
-  }
-  return testCase.presentation;
-}
-
 describe('golden render fixtures (TTY + pipe; fit/sim byte-identity post-migration)', () => {
   for (const testCase of GOLDEN_CASES) {
     it(`renders ${testCase.name} byte-identically to its goldens`, () => {
-      const result = renderProjection(testCase);
+      const result = testCase.presentation;
       const tty = ttyFrame(result);
       const pipe = pipeText(result);
       expect(tty).toBe(golden(testCase.name, 'tty', tty));

@@ -72,7 +72,7 @@ export function loadFitConfig(args: FitOptions): LoadedFitConfig | { error: Erro
  * Returns warning strings (one per unknown-language batch) rather than
  * writing to stderr — stderr writes during the Ink live view desync the
  * renderer's frame tracking. `executeFit` collects these and threads
- * them into `FitDoneResult.warnings`.
+ * them into the run warnings the live renderer surfaces.
  *
  * Async only because `currentScope` is imported via dynamic import to
  * keep the executeFit body free of fitness↔core import arrows beyond

@@ -4,7 +4,7 @@
  * The envelope IS the JSON output contract — there is no transform. This
  * single pure formatter replaces the three divergent `CliOutput`-emitting
  * `--json` paths (fitness `buildCliOutput`, graph `json.ts`, sim's bespoke
- * `SimDoneResult`). This formatter emits the envelope itself; on the CLI wire
+ * per-tool result). This formatter emits the envelope itself; on the CLI wire
  * it rides under `.envelope` of a `CommandOutcome` (ADR-0024), so a `--json`
  * consumer reads `jq '.envelope.verdict.passed'` / `.envelope.verdict.score`.
  * The wire severity is the 4-level `SignalSeverity`.

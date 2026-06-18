@@ -251,8 +251,8 @@ describe('sim command handler', () => {
 
     await simSpec().handler({ cwd: process.cwd(), json: true }, ctx);
 
-    // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not the bespoke
-    // SimDoneResult) through the root's emitEnvelope → formatSignalJson.
+    // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not a bespoke
+    // per-tool result) through the root's emitEnvelope → formatSignalJson.
     expect(emitted).toHaveLength(1);
     const payload = emitted[0] as { schemaVersion?: number; tool?: string };
     expect(payload.schemaVersion).toBe(2);

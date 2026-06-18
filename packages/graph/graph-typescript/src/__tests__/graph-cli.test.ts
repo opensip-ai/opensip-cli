@@ -21,9 +21,9 @@ import { typescriptGraphAdapter } from '../index.js';
 
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
-/** Minimal structural view of GraphDoneResult — avoids a contracts dep in this adapter test. */
+/** Minimal structural view of RunPresentation — avoids a contracts dep in this adapter test. */
 // envelope-first-presentation RP-2: executeGraph now hands a RunPresentation
-// (envelope-backed) to the render seam, not a count-based graph-done result.
+// (envelope-backed) to the render seam, not a count-based per-tool result.
 interface RunPresentationLike {
   readonly type: string;
   readonly tool: string;

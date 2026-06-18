@@ -6,30 +6,19 @@
  * human-readable render output (TTY + pipe, ±verbose) across the migration.
  *
  * The load-bearing data for fit/sim is the SignalEnvelope + optional
- * verboseDetail. We define those once per case and expose TWO projections:
- *
- *   - `legacyResult` — the pre-migration `fit-done` / `sim-done` / `graph-done`
- *     CommandResult the tools constructed on `main`. RP-0 captures the goldens
- *     from THIS projection (the unmodified render path).
- *   - `presentationOf` — the post-migration `RunPresentation` carrying the same
- *     envelope/verboseDetail (+ banners for graph). RP-1 asserts that rendering
- *     THIS projection reproduces the same goldens byte-for-byte.
- *
- * Keeping both projections side-by-side means the byte-identity proof is a flip
- * of which projection the test renders — the golden text files never change for
- * fit/sim. (Graph's output is intended to change in RP-2; its goldens are the
- * `legacyResult` baseline that RP-2 diffs against, never an equality target.)
+ * verboseDetail. Each case exposes its `presentation` — the post-migration
+ * `RunPresentation` carrying the envelope/verboseDetail (+ banners for graph) —
+ * which the test renders against the committed goldens. fit/sim goldens were
+ * captured byte-for-byte from the pre-migration render path (the migration must
+ * not change a single byte); graph's goldens were regenerated in RP-2 to the new
+ * envelope-backed output (intentional, enumerated deltas), not a byte-identity
+ * target.
  */
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
 import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 
-import type {
-  CommandResult,
-  RunPresentation,
-  SignalEnvelope,
-  VerboseDetail,
-} from '@opensip-cli/contracts';
+import type { RunPresentation, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
 
 const CREATED_AT = '2026-06-04T00:00:00.000Z';
@@ -312,24 +301,18 @@ function graphCase(
     ...(opts.banner === undefined ? {} : { banners: [opts.banner] }),
     durationMs: opts.durationMs,
   };
-  return { name, tool: 'graph', legacyResult: presentation, presentation };
+  return { name, tool: 'graph', presentation };
 }
 
 /**
- * One golden case. `legacyResult` is the pre-migration CommandResult (captured
- * in RP-0). `presentation` (when present) is the post-migration RunPresentation
- * that must render byte-identically (asserted in RP-1 for fit/sim).
+ * One golden case. `presentation` is the {@link RunPresentation} the test renders
+ * against the committed goldens (byte-identity targets for fit/sim; the
+ * regenerated envelope-backed output for graph).
  */
 export interface GoldenCase {
   readonly name: string;
   readonly tool: 'fit' | 'sim' | 'graph';
-  /** Pre-migration CommandResult — the RP-0 golden source. */
-  readonly legacyResult: CommandResult;
-  /**
-   * Post-migration RunPresentation carrying the same envelope/verboseDetail.
-   * Present for fit/sim (byte-identity targets); graph adds it in RP-2.
-   */
-  readonly presentation?: RunPresentation;
+  readonly presentation: RunPresentation;
 }
 
 function fitCase(
@@ -337,28 +320,17 @@ function fitCase(
   envelope: SignalEnvelope,
   verboseDetail: VerboseDetail | undefined,
 ): GoldenCase {
-  return {
-    name,
-    tool: 'fit',
-    legacyResult: {
-      type: 'fit-done',
-      label: 'fit',
-      cwd: '/x',
-      envelope,
-      ...(verboseDetail ? { verboseDetail } : {}),
-    },
-    // NB: no `durationMs` on the presentation. fit's current render path ignores
-    // any duration override and falls to the envelope unit-sum; RP-1 Task 1.1's
-    // builder likewise omits durationMs, so the presentation renders the SAME
-    // unit-sum duration → byte-identical. (durationOverride exists for graph,
-    // whose units carry durationMs:0 — RP-2.)
-    presentation: {
-      type: 'run-presentation',
-      tool: 'fitness',
-      envelope,
-      ...(verboseDetail ? { verboseDetail } : {}),
-    },
+  // NB: no `durationMs` on the presentation. fit's render path falls to the
+  // envelope unit-sum; the RP-1 builder likewise omits durationMs, so the
+  // presentation renders the unit-sum duration. (durationOverride exists for
+  // graph, whose units carry durationMs:0 — RP-2.)
+  const presentation: RunPresentation = {
+    type: 'run-presentation',
+    tool: 'fitness',
+    envelope,
+    ...(verboseDetail ? { verboseDetail } : {}),
   };
+  return { name, tool: 'fit', presentation };
 }
 
 function simCase(
@@ -366,28 +338,15 @@ function simCase(
   envelope: SignalEnvelope,
   verboseDetail: VerboseDetail | undefined,
 ): GoldenCase {
-  return {
-    name,
-    tool: 'sim',
-    legacyResult: {
-      // sim-done carries a durationMs field today (recipe makespan), but the
-      // current resultToView fit/sim case IGNORES it and renders the unit-sum.
-      // We set it here to mirror the real result shape; it must NOT change the
-      // render. RP-1 Task 1.3's presentation builder omits durationMs likewise.
-      type: 'sim-done',
-      recipeName: 'example',
-      cwd: '/x',
-      durationMs: 1500,
-      envelope,
-      ...(verboseDetail ? { verboseDetail } : {}),
-    },
-    presentation: {
-      type: 'run-presentation',
-      tool: 'simulation',
-      envelope,
-      ...(verboseDetail ? { verboseDetail } : {}),
-    },
+  // The sim builder omits durationMs (the render falls to the envelope unit-sum),
+  // mirroring production.
+  const presentation: RunPresentation = {
+    type: 'run-presentation',
+    tool: 'simulation',
+    envelope,
+    ...(verboseDetail ? { verboseDetail } : {}),
   };
+  return { name, tool: 'sim', presentation };
 }
 
 /**
