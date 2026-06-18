@@ -29,6 +29,7 @@ import {
   type ProjectContext,
   resolveUserPaths,
   RunScope,
+  resolveToolHooks,
   type ScopeContribution,
   type Tool,
   type ToolPluginManifest,
@@ -207,7 +208,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // --json consumers and the uniform diagnostics snapshot see the full
   // per-run construction (addresses architecture review findings on observability
   // of steps 6/7 and blast-radius files).
-  const contributing = tools.list().filter((t) => !!t.contributeScope);
+  const contributing = tools.list().filter((t) => !!resolveToolHooks(t).contributeScope);
   scope.diagnostics.event('load', 'debug', `${contributing.length} tool(s) contributed subscope`, {
     tools: contributing.map((t) => t.metadata.id ?? t.metadata.name),
   });
@@ -218,7 +219,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // the tool RETURNS its slot via `contributeScope()`; the kernel installs it
   // with `Object.assign` (registration order; a tool with no hook is skipped).
   for (const tool of tools.list()) {
-    const contribution = tool.contributeScope?.();
+    const contribution = resolveToolHooks(tool).contributeScope?.();
     if (contribution) installScopeContribution(scope, tool, contribution);
   }
 

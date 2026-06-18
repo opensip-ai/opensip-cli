@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import {
   currentScope,
   resolveProjectPaths,
+  resolveToolHooks,
   SystemError,
   logger as defaultLogger,
 } from '@opensip-cli/core';
@@ -82,7 +83,7 @@ async function composeReportInput(): Promise<HtmlReportInput> {
   const input: HtmlReportInput = { sessions };
 
   for (const tool of scope.tools.list()) {
-    const contribution = await tool.collectReportData?.(scope);
+    const contribution = await resolveToolHooks(tool).collectReportData?.(scope);
     if (contribution) {
       // Guardrail (spec §8): tools must never clobber the host-owned `sessions`
       // run history. Ignore with a warning (best-effort, like other contribution

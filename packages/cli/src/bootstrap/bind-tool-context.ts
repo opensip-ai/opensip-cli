@@ -8,14 +8,21 @@
  * cross-tool keys before they reach persistence.
  */
 
-import { PluginIncompatibleError, type Tool, type ToolCliContext } from '@opensip-cli/core';
+import {
+  PluginIncompatibleError,
+  resolveToolCommands,
+  resolveToolHooks,
+  type Tool,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 
 import type { RunActionHooks } from './run-plane.js';
 
 type BoundToolCliContext = ToolCliContext & RunActionHooks;
 
 function primaryCommandName(tool: Tool): string | undefined {
-  return tool.commandSpecs?.[0]?.name ?? tool.commands[0]?.name;
+  const commands = resolveToolCommands(tool);
+  return tool.commandSpecs?.[0]?.name ?? commands[0]?.name;
 }
 
 export function toolOwnedKeys(tool: Tool): ReadonlySet<string> {
@@ -24,7 +31,7 @@ export function toolOwnedKeys(tool: Tool): ReadonlySet<string> {
       tool.metadata.id,
       tool.metadata.name,
       primaryCommandName(tool),
-      tool.sessionReplay?.tool,
+      resolveToolHooks(tool).sessionReplay?.tool,
     ].filter((value): value is string => typeof value === 'string' && value.length > 0),
   );
 }

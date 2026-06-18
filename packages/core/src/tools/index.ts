@@ -85,6 +85,15 @@ export type { CompatibilityVerdict } from './compatibility.js';
 // Load-time manifest⇔Tool drift guard.
 export { assertManifestMatchesTool } from './manifest-assert.js';
 export {
+  deriveCommandsFromSpecs,
+  resolveToolCommands,
+  resolveToolCommandNames,
+} from './derive-commands-from-specs.js';
+export { defineTool } from './define-tool.js';
+export type { DefineToolInput } from './define-tool.js';
+export { resolveToolHooks } from './resolve-tool-hooks.js';
+export type { ResolvedToolHooks } from './resolve-tool-hooks.js';
+export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,
   TOOL_SHORT_IDS,

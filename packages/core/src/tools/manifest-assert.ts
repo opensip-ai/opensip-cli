@@ -18,6 +18,7 @@
 
 import { ValidationError } from '../lib/errors.js';
 
+import { resolveToolCommandNames } from './derive-commands-from-specs.js';
 import type { ToolPluginManifest } from './manifest.js';
 import type { Tool } from './types.js';
 
@@ -59,7 +60,7 @@ export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: To
   }
 
   const manifestNames = new Set(manifest.commands.map((c) => c.name));
-  const toolNames = new Set(tool.commands.map((c) => c.name));
+  const toolNames = new Set(resolveToolCommandNames(tool));
 
   const missingFromManifest = [...toolNames]
     .filter((n) => !manifestNames.has(n))

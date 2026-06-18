@@ -148,8 +148,19 @@ export type {
 // (discoverToolPackages and friends live under plugins/ and are
 // re-exported above; the Tool / Registry types are tool-shape, not
 // plugin-discovery-shape, hence the separate barrel.)
-export { ToolRegistry, UnknownLiveViewError, TOOL_CONTRACT_VERSION } from './tools/index.js';
+export {
+  ToolRegistry,
+  UnknownLiveViewError,
+  TOOL_CONTRACT_VERSION,
+  defineTool,
+  deriveCommandsFromSpecs,
+  resolveToolCommands,
+  resolveToolCommandNames,
+  resolveToolHooks,
+} from './tools/index.js';
 export type {
+  DefineToolInput,
+  ResolvedToolHooks,
   Tool,
   ToolMetadata,
   ToolCommandDescriptor,

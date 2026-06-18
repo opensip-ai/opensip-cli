@@ -4,8 +4,8 @@
  * an arbitrary npm package and inspects whatever it exports.
  *
  * Verifies the minimal contract the registry depends on: a
- * `metadata.id` string (used for dedupe + listing), a `commands` array,
- * and a command surface — a non-empty `commandSpecs` array (the one command
+ * `metadata.id` string (used for dedupe + listing), and a command surface —
+ * a non-empty `commandSpecs` array (the one command
  * surface as of launch; `register()` was removed). A tool with no `commandSpecs`
  * cannot mount any command, so it fails the shape check. `initialize` and
  * `contributeScope` stay optional per the Tool interface.
@@ -29,13 +29,19 @@ export function isValidTool(value: unknown): value is Tool {
   };
   if (typeof candidate.metadata !== 'object' || candidate.metadata === null) return false;
   if (typeof (candidate.metadata as { id?: unknown }).id !== 'string') return false;
-  if (!Array.isArray(candidate.commands)) return false;
+  // `commands[]` may be omitted when `commandSpecs` is present — defineTool derives it.
+  const hasCommands = Array.isArray(candidate.commands);
+  const commands = hasCommands ? (candidate.commands as Tool['commands']) : [];
   // A tool must expose a command surface: a non-empty declarative `commandSpecs`
   // array (the one command surface, launch — `register()` was removed). A tool
   // with no commandSpecs cannot contribute any command and is rejected.
   if (!Array.isArray(candidate.commandSpecs) || candidate.commandSpecs.length === 0) return false;
   for (const spec of candidate.commandSpecs) {
     if (!validateCommandSpec(spec)) return false;
+  }
+  // Explicit commands[] is optional when commandSpecs is non-empty (defineTool derives it).
+  if (!hasCommands || commands.length === 0) {
+    return true;
   }
   return true;
 }

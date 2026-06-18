@@ -144,7 +144,19 @@ export type {
 // re-exported here for the public Tool↔runner surface. `CommonFlagKey` is also
 // re-exported from ./cli-flags (which now sources it from core) — both paths
 // resolve to the same kernel type.
-export { defineCommand, COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from '@opensip-cli/core';
+export {
+  defineCommand,
+  defineTool,
+  COMMON_FLAG_KEYS,
+  RAW_STREAM_REASONS,
+  resolveToolHooks,
+} from '@opensip-cli/core';
+export {
+  defineRunCommand,
+  defineListCommand,
+  defineAuxExportCommand,
+} from './command-presets.js';
+export type { DefineToolInput, ResolvedToolHooks } from '@opensip-cli/core';
 export type {
   CommandSpec,
   OptionSpec,

@@ -42,6 +42,7 @@ import {
   ConfigurationError,
   logger,
   readYamlFileOrThrow,
+  resolveToolHooks,
   type ResolvedToolConfig,
   type ToolPluginManifest,
   type ToolRegistry,
@@ -63,8 +64,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function collectDeclarations(tools: ToolRegistry): readonly ToolConfigDeclaration[] {
   const declarations: ToolConfigDeclaration[] = [];
   for (const tool of tools.list()) {
-    if (tool.config !== undefined) {
-      declarations.push(tool.config as ToolConfigDeclaration);
+    const config = resolveToolHooks(tool).config;
+    if (config !== undefined) {
+      declarations.push(config as ToolConfigDeclaration);
     }
   }
   return declarations;
@@ -274,7 +276,7 @@ export function wireCapabilityRegistry(args: {
   //    (hasDomain false) — the host never invents a domain a tool didn't
   //    declare.
   for (const tool of tools.list()) {
-    const registrars = tool.capabilityRegistrars;
+    const registrars = resolveToolHooks(tool).capabilityRegistrars;
     if (registrars === undefined) continue;
     for (const [domainId, registrar] of Object.entries(registrars)) {
       if (registry.hasDomain(domainId)) {

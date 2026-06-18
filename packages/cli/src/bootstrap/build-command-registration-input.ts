@@ -11,7 +11,7 @@
  * sequencing (registries, bootstrap, mounting, registration, dispatch).
  */
 
-import { logger } from '@opensip-cli/core';
+import { logger, resolveToolHooks } from '@opensip-cli/core';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
@@ -59,12 +59,13 @@ export function buildCommandRegistrationInput(registry: ToolRegistry): CommandRe
   const toolScaffolds = registry.list().flatMap((t) => {
     const layout = t.pluginLayout;
     if (layout === undefined) return [];
+    const hooks = resolveToolHooks(t);
     return [
       {
         layout,
-        scaffoldExamples: t.scaffoldExamples,
-        stableExampleIds: t.stableExampleIds,
-        scaffoldConfigBlock: t.scaffoldConfigBlock,
+        scaffoldExamples: hooks.scaffoldExamples,
+        stableExampleIds: hooks.stableExampleIds,
+        scaffoldConfigBlock: hooks.scaffoldConfigBlock,
       },
     ];
   });

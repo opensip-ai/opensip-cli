@@ -7,7 +7,13 @@
  * semantics live here as a cohesive unit (see also `tool-lifecycle.ts`).
  */
 
-import { logger, type Tool, type ToolRegistry } from '@opensip-cli/core';
+import {
+  logger,
+  resolveToolCommands,
+  resolveToolHooks,
+  type Tool,
+  type ToolRegistry,
+} from '@opensip-cli/core';
 
 import { BootstrapError } from './bootstrap-error.js';
 import { initializedToolIds } from './process-idempotency.js';
@@ -24,7 +30,9 @@ export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | 
   return tools
     .list()
     .find((tool) =>
-      tool.commands.some((c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false)),
+      resolveToolCommands(tool).some(
+        (c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false),
+      ),
     );
 }
 
@@ -48,11 +56,13 @@ export async function maybeInitializeOwningTool(
   runId: string,
 ): Promise<void> {
   const owningTool = resolveOwningTool(tools, cmdName);
-  if (!owningTool?.initialize) return;
+  if (!owningTool) return;
+  const hooks = resolveToolHooks(owningTool);
+  if (!hooks.initialize) return;
   const toolHumanId = owningTool.metadata.name ?? owningTool.metadata.id;
   if (initializedToolIds.has(toolHumanId)) return;
   try {
-    await owningTool.initialize();
+    await hooks.initialize();
     initializedToolIds.add(toolHumanId);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

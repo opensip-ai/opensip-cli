@@ -1,10 +1,11 @@
 // @fitness-ignore-file batch-operation-limits -- fromTools iterates the bounded, in-process tool registry (a handful of first-party + plugin tools registered for the run), not an unbounded external collection.
 import type { CommandResult, ToolSessionReplay } from '@opensip-cli/contracts';
-import type {
-  ToolRegistry,
-  ToolSessionRecord,
-  ToolSessionReplayContribution,
-  ToolShortId,
+import {
+  resolveToolHooks,
+  type ToolRegistry,
+  type ToolSessionRecord,
+  type ToolSessionReplayContribution,
+  type ToolShortId,
 } from '@opensip-cli/core';
 
 export interface CliSessionReplayContribution {
@@ -30,7 +31,7 @@ export class SessionReplayRegistry {
   static fromTools(registry: ToolRegistry): SessionReplayRegistry {
     const byTool = new Map<ToolShortId, CliSessionReplayContribution>();
     for (const tool of registry.list()) {
-      const contribution = tool.sessionReplay;
+      const contribution = resolveToolHooks(tool).sessionReplay;
       if (contribution === undefined) continue;
       if (byTool.has(contribution.tool)) {
         throw new Error(`Duplicate session replay contribution for tool '${contribution.tool}'`);
