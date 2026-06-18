@@ -122,6 +122,33 @@ describe('hostEnv reads (CLI infra)', () => {
     ]);
   });
 
+  it('drift guard — CLI_ENV_SPECS contains EXACTLY the core correlation specs by canonical name (set-equality)', () => {
+    // The complementary, order-independent guarantee to the ordered-array test
+    // above: the correlation subset of CLI_ENV_SPECS is set-EQUAL to the core
+    // CORRELATION_ENV_SPECS — every core correlation name is present, and none is
+    // missing or duplicated. A future hand-added/removed correlation spec — or a
+    // re-declared literal that drifts from core — fails here. Modeled on the
+    // GRAPH_ENV_SPECS superset drift guard above (test code is exempt from the
+    // no-bootstrap-tool-import rule).
+    const cliNames = CLI_ENV_SPECS.map((s) => s.canonical);
+    const coreCorrelationNames = new Set(CORRELATION_ENV_SPECS.map((s) => s.canonical));
+
+    // The correlation subset of the CLI surface = the names that ARE core
+    // correlation names (the infra prefix is excluded by this filter).
+    const cliCorrelationSubset = cliNames.filter((n) => coreCorrelationNames.has(n));
+
+    // No duplicates within the CLI correlation subset (the spread is honest).
+    expect(new Set(cliCorrelationSubset).size).toBe(cliCorrelationSubset.length);
+    // Set-equality: the CLI correlation subset is exactly the core set.
+    expect(new Set(cliCorrelationSubset)).toEqual(coreCorrelationNames);
+    // Coverage from the other direction: every core name appears in the CLI surface.
+    for (const name of coreCorrelationNames) {
+      expect(cliNames, `core correlation spec '${name}' missing from CLI_ENV_SPECS`).toContain(
+        name,
+      );
+    }
+  });
+
   it('OPENSIP_CLI_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {
     expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_SKIP_BUNDLED')).toEqual([]);
     process.env.OPENSIP_CLI_SKIP_BUNDLED = ' fitness , graph ';
