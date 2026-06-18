@@ -18,6 +18,7 @@ import {
   currentCheckRegistry,
   currentFitnessLoadState,
   currentRecipeRegistry,
+  installFitnessSubscope,
 } from '../scope-registry.js';
 
 import type { Check } from '../check-types.js';
@@ -47,7 +48,7 @@ function stubRecipe(name: string) {
 /** Construct a RunScope carrying fitness's contributed subscope. */
 function fitnessScope(): RunScope {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   return scope;
 }
 

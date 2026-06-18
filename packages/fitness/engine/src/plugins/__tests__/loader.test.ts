@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { enterScope, RunScope } from '@opensip-cli/core';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+import { installFitnessSubscope } from '../../framework/scope-registry.js';
 import { fitnessTool } from '../../tool.js';
 import { loadPlugin, loadAllPlugins } from '../loader.js';
 
@@ -28,7 +29,7 @@ beforeEach(() => {
   // registries (`currentCheckRegistry()` / `currentRecipeRegistry()`), so each
   // test runs inside a fresh RunScope carrying fitness's contributed subscope.
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'opensip-loader-test-'));
 });

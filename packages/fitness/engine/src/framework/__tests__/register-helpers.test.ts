@@ -5,7 +5,7 @@ import { fitnessTool } from '../../tool.js';
 import { defineCheck } from '../define-check.js';
 import { registerChecks } from '../register-helpers.js';
 import { CheckRegistry } from '../registry.js';
-import { currentCheckRegistry } from '../scope-registry.js';
+import { currentCheckRegistry, installFitnessSubscope } from '../scope-registry.js';
 
 import type { Check } from '../check-types.js';
 
@@ -30,7 +30,7 @@ function stub(slug: string): Check {
 // starts empty and is isolated from sibling tests.
 beforeEach(() => {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   enterScope(scope);
 });
 

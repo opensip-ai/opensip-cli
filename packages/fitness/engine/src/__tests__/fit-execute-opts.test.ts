@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildFitnessSessionPayload } from '../cli/fit/result-builders.js';
 import { executeFit } from '../cli/fit.js';
+import { installFitnessSubscope } from '../framework/scope-registry.js';
 import { fitnessTool } from '../tool.js';
 
 import type { FitOptions } from '@opensip-cli/contracts';
@@ -77,7 +78,7 @@ function withFitScope<T>(fn: () => Promise<T>): Promise<T> {
   // carrying both an (empty) language registry and fitness's contributed
   // registries so check loading + recipe selection resolve.
   const scope = new RunScope({ languages: new LanguageRegistry() });
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   Object.assign(scope, {
     configDocument: {
       targets: {

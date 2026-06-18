@@ -60,6 +60,7 @@ import { renderFitLive } from './cli/fit-runner.js';
 import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
 import { collectFitnessReportData } from './cli/report-data.js';
 import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
+import { FileCache } from './framework/file-cache.js';
 import {
   createCheckRegistry,
   createFitnessLoadState,
@@ -81,7 +82,7 @@ import type { FitOptions } from '@opensip-cli/contracts';
 import type {
   CapabilityRegistrar,
   CommandSpec,
-  ScopeContribution,
+  ContributeScopeResult,
   Tool,
   ToolCliContext,
   ToolCommandDescriptor,
@@ -208,17 +209,28 @@ const registerFitRecipe: CapabilityRegistrar = (contribution) => {
 /**
  * Per-run subscope contribution (D7). Called by the CLI's pre-action-hook
  * after constructing the scope and before entering it; the kernel installs
- * the returned `fitness` slot. Fresh check + recipe registries (and an empty
- * `ensureChecksLoaded` lifecycle slot) per run so concurrent scopes carry
- * independent fitness state.
+ * the returned `fitness` slot. Fresh check + recipe registries, an empty
+ * `ensureChecksLoaded` lifecycle slot, and a fresh per-run `FileCache` so
+ * concurrent scopes carry independent fitness state.
+ *
+ * Returns the {@link ScopeContributionWithDisposer} wrapper: the SAME
+ * `fileCache` instance is placed on `scope.fitness.fileCache` and closed over by
+ * the `onDispose` disposer, so `RunScope.dispose()` clears the cache + cancels
+ * its auto-clear timer. The kernel install loop registers the disposer via
+ * `scope.onDispose(...)`; core never names `FileCache` (layering-clean).
  */
-function contributeScope(): ScopeContribution {
+function contributeScope(): ContributeScopeResult {
+  const fileCache = new FileCache();
   return {
-    fitness: {
-      checks: createCheckRegistry(),
-      recipes: createRecipeRegistry(),
-      load: createFitnessLoadState(),
+    contribution: {
+      fitness: {
+        checks: createCheckRegistry(),
+        recipes: createRecipeRegistry(),
+        load: createFitnessLoadState(),
+        fileCache,
+      },
     },
+    onDispose: () => fileCache.clear(),
   };
 }
 

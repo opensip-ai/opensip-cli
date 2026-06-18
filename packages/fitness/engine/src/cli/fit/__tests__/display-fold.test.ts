@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { applyCheckDisplay } from '../../../check-utils/display.js';
 import { defineCheck } from '../../../framework/define-check.js';
-import { currentCheckRegistry } from '../../../framework/scope-registry.js';
+import { currentCheckRegistry, installFitnessSubscope } from '../../../framework/scope-registry.js';
 import { fitnessTool } from '../../../tool.js';
 import { getDisplayName, getIcon } from '../display-registry.js';
 
@@ -32,7 +32,7 @@ function stubCheck(slug: string): Check {
 /** A RunScope carrying fitness's contributed subscope (fresh check registry). */
 function fitnessScope(): RunScope {
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   return scope;
 }
 

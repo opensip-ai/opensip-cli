@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
 import { CheckRegistry } from '../../framework/registry.js';
+import { installFitnessSubscope } from '../../framework/scope-registry.js';
 import { fitnessTool } from '../../tool.js';
 import { FitnessRecipeRegistry } from '../registry.js';
 import { FitnessRecipeService } from '../service.js';
@@ -45,7 +46,7 @@ beforeEach(() => {
   // production behaviour (a fit run always executes inside a scope). Tests that
   // pass explicit registries override these and are unaffected.
   const scope = new RunScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'opensip-recipe-svc-'));
 });

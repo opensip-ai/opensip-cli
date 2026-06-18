@@ -32,6 +32,7 @@ const makeTestScope = (): RunScope =>
   new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
 const withScope = runWithScope;
 
+import { installFitnessSubscope } from '../../framework/scope-registry.js';
 import { fitnessTool } from '../../tool.js';
 import { collectFitnessReportData } from '../report-data.js';
 
@@ -73,7 +74,7 @@ function wireFitnessCapabilities(scope: ReturnType<typeof makeTestScope>): void 
  */
 function makeFitnessScope(): ReturnType<typeof makeTestScope> {
   const scope = makeTestScope();
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  installFitnessSubscope(scope, fitnessTool.contributeScope?.() ?? {});
   wireFitnessCapabilities(scope);
   return scope;
 }

@@ -39,6 +39,7 @@ import {
   RunScope,
   ToolRegistry,
   currentScope,
+  isContributionWithDisposer,
   runWithScope,
 } from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
@@ -119,7 +120,16 @@ function makeScope(includeGlob: string): RunScope {
     tools: new ToolRegistry(),
     languages: new LanguageRegistry(),
   });
-  Object.assign(scope, fitnessTool.contributeScope?.() ?? {});
+  // Mirror the production install loop: unwrap the contributeScope disposer
+  // wrapper (fitness now owns a per-run FileCache needing teardown) and register
+  // the disposer so scope.dispose() clears the cache.
+  const fitnessContribution = fitnessTool.contributeScope?.() ?? {};
+  if (isContributionWithDisposer(fitnessContribution)) {
+    Object.assign(scope, fitnessContribution.contribution);
+    if (fitnessContribution.onDispose) scope.onDispose(fitnessContribution.onDispose);
+  } else {
+    Object.assign(scope, fitnessContribution);
+  }
   Object.assign(scope, {
     configDocument: {
       targets: {

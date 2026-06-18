@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import { resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
   createCapabilityRegistry,
+  isContributionWithDisposer,
   type LanguageRegistry,
   type Logger,
   PluginIncompatibleError,
@@ -217,9 +218,21 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // `scope.simulation`, `scope.graph`) BEFORE the scope is entered. IoC (M4):
   // the tool RETURNS its slot via `contributeScope()`; the kernel installs it
   // with `Object.assign` (registration order; a tool with no hook is skipped).
+  //
+  // Disposer seam (parallel-tool-invocations Phase 1): a tool that owns a
+  // per-run resource needing teardown returns the wrapper form
+  // (`{ contribution, onDispose }`); we install `contribution` and register
+  // `onDispose` on `scope.onDispose(...)` so `dispose()` reclaims the resource.
+  // The bare-`ScopeContribution` form (graph/simulation) carries no disposer.
   for (const tool of tools.list()) {
-    const contribution = tool.contributeScope?.();
-    if (contribution) installScopeContribution(scope, tool, contribution);
+    const result = tool.contributeScope?.();
+    if (!result) continue;
+    if (isContributionWithDisposer(result)) {
+      installScopeContribution(scope, tool, result.contribution);
+      if (result.onDispose) scope.onDispose(result.onDispose);
+    } else {
+      installScopeContribution(scope, tool, result);
+    }
   }
 
   // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
