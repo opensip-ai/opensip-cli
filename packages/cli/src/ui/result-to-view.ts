@@ -395,10 +395,19 @@ export function presentationToView(p: RunPresentation): ViewNode {
 /** Map any CommandResult to its view-model node (total — every variant covered). */
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
+    // The render-only run-presentation adjunct (envelope-first-presentation plan):
+    // fit/sim construct this since RP-1 (graph since RP-2). The table+summary are
+    // derived from the envelope; banners (graph's resolution caveat) render above,
+    // and the shared non-verbose footer below — identically in TTY/pipe.
+    case 'run-presentation': {
+      return presentationToView(result);
+    }
     // fit (Phase 6) and sim (Phase 4) are both envelope-backed: the terminal
     // table is derived from the envelope (one row per check/scenario unit) and
     // the optional verbose body + non-verbose "Use --verbose…" hint render
     // through the one shared seam (ADR-0011/ADR-0021), identically in TTY/pipe.
+    // (These cases stay until RP-3 deletes the *DoneResult types; for fit/sim
+    // `presentationToView` produces a byte-identical tree to this path.)
     case 'fit-done':
     case 'sim-done': {
       return withVerboseHint(

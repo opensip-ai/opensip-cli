@@ -15,13 +15,16 @@
  * to a view-model through `presentationToView` (cli-side).
  *
  * It imports ONLY `SignalEnvelope` and `VerboseDetail` from contracts itself —
- * no UI types, no tool types. dependency-cruiser locks this module to a
- * core-only edge (the `contracts-imports-core-only` rule, which RP-0 extends to
- * forbid a `cli-ui` edge), so it can never silently start importing UI primitives.
+ * no UI types, no tool types. `VerboseDetail` comes from `./verbose-detail.js`
+ * (its currency home), NOT `./command-results.js`, so this module does not form a
+ * `command-results → run-presentation → command-results` cycle (no-circular).
+ * dependency-cruiser locks this module to a core-only edge (the
+ * `contracts-imports-core-only` rule, which RP-0 extends to forbid a `cli-ui`
+ * edge), so it can never silently start importing UI primitives.
  */
 
-import type { VerboseDetail } from './command-results.js';
 import type { SignalEnvelope } from './signal-envelope.js';
+import type { VerboseDetail } from './verbose-detail.js';
 
 export interface RunPresentation {
   /**
