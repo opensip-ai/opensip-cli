@@ -19,6 +19,9 @@ import { fork } from 'node:child_process';
 
 import { EnvRegistry } from '../lib/env-registry.js';
 import { logger } from '../lib/logger.js';
+import { correlationToEnv } from '../lib/run-correlation.js';
+import { currentScope } from '../lib/run-scope.js';
+import { currentTraceparent } from '../lib/telemetry.js';
 
 import { createInProcessTransport } from './in-process-transport.js';
 
@@ -71,6 +74,36 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     settle = { resolve, reject };
   });
 
+  // The parent run's correlation join keys, stamped on every `cli.subprocess.*`
+  // event so an operator can attribute the forked worker's lifecycle to the run
+  // (and the trace, when OTel is on). `runId` is read from the parent scope — it
+  // is NOT on `descriptor.correlation` (B1: env-only) and is injected below.
+  const runId = currentScope()?.runId;
+  const traceId = currentTraceparent();
+  // `workerKind` defaults to `'live-engine'` — the only fork-path caller today
+  // (graph/fit/sim live runners). An external-tool fork (ADR-0054) would set its
+  // own `descriptor.correlation.workerKind`.
+  const workerKind = descriptor.correlation?.workerKind ?? 'live-engine';
+
+  // Fold `correlationToEnv(...)` into the child env so the EXISTING spread carries
+  // it (M2). `correlationToEnv` emits `OPENSIP_RUN_ID` from the PARENT run id even
+  // though `descriptor.correlation` omits `runId` (B1) — the child's pre-action
+  // hook reads it env-first and inherits the run. Built only when the descriptor
+  // carries correlation; otherwise `{}` (no `OPENSIP_*` keys injected).
+  const correlationEnv = descriptor.correlation
+    ? correlationToEnv({ runId: runId ?? '', ...descriptor.correlation })
+    : {};
+
+  // Correlation is spread LAST and only adds `OPENSIP_*` keys (never the API key,
+  // by Task 0.1's guarantee), so `PATH`/`HOME`/`OTEL_*`/`descriptor.env` are all
+  // preserved (M2). The child env is built only when there is something to add
+  // beyond `process.env` (an `env` override or correlation), else left undefined
+  // so `fork` inherits the parent env wholesale.
+  const childEnv =
+    descriptor.env || descriptor.correlation
+      ? { ...process.env, ...descriptor.env, ...correlationEnv }
+      : undefined;
+
   const child = fork(descriptor.command, [...descriptor.argv], {
     // stdout ignored (no child render bytes in the parent's live view); stderr
     // inherited (logs surface); ipc channel for the WorkerMessage protocol.
@@ -80,8 +113,20 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     // (the JSON serializer would silently drop or mangle those). Workers send
     // slim, plain-data results today; this keeps the transport robust regardless.
     serialization: 'advanced',
-    // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; this object is passed to fork, never logged.
-    ...(descriptor.env === undefined ? {} : { env: { ...process.env, ...descriptor.env } }),
+    // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; correlation env carries NO secret (Task 0.1) and this object is passed to fork, never logged.
+    ...(childEnv === undefined ? {} : { env: childEnv }),
+  });
+
+  // `cli.subprocess.spawn` (Event Catalog): the parent records that it forked a
+  // worker, keyed by `runId`/`traceId`/`workerKind`/`command`, so an operator can
+  // pivot from a child log line back to this fork.
+  logger.info({
+    evt: 'cli.subprocess.spawn',
+    module: 'core:subprocess-transport',
+    ...(runId === undefined ? {} : { runId }),
+    ...(traceId === undefined ? {} : { traceId }),
+    workerKind,
+    command: descriptor.command,
   });
 
   let settled = false;
@@ -92,16 +137,60 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     child.kill();
   };
 
+  // Log a structured `cli.subprocess.failed` (Event Catalog) attributing the
+  // worker failure to its run. `failureClass` falls back to `'ipc_error'` for an
+  // `error` IPC message and `'exit_nonzero'` for a premature `exit`.
+  const logFailed = (failureClass: string, msg?: WorkerMessage<TEvent, TResult>): void => {
+    logger.error({
+      evt: 'cli.subprocess.failed',
+      module: 'core:subprocess-transport',
+      ...(runId === undefined ? {} : { runId }),
+      ...(traceId === undefined ? {} : { traceId }),
+      // Prefer the worker-reported kind/workerKind from the error payload; else
+      // the descriptor's kind. The error payload carries no `runId` (B1).
+      workerKind:
+        (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind,
+      failureClass: (msg?.kind === 'error' ? msg.failureClass : undefined) ?? failureClass,
+    });
+  };
+
   child.on('message', (msg: WorkerMessage<TEvent, TResult>) => {
     if (msg.kind === 'progress') emit(msg.event);
-    else if (msg.kind === 'result') done(() => settle.resolve(msg.value));
-    else done(() => settle.reject(workerError(msg.message, msg.stack)));
+    else if (msg.kind === 'result') {
+      // GAP-b: exactly ONE run-level completion per forked worker — the PARENT
+      // owns it. The forked worker emits its own worker-scoped `*.worker.complete`
+      // (distinguished by `workerKind`), so the parent must NOT duplicate a
+      // generic run-level `complete` under the inherited `runId`. This is the only
+      // parent-side completion, in the `result`-success branch alone.
+      done(() => {
+        logger.info({
+          evt: 'cli.subprocess.complete',
+          module: 'core:subprocess-transport',
+          ...(runId === undefined ? {} : { runId }),
+          ...(traceId === undefined ? {} : { traceId }),
+          workerKind,
+        });
+        settle.resolve(msg.value);
+      });
+    } else
+      done(() => {
+        logFailed('ipc_error', msg);
+        settle.reject(workerError(msg.message, msg.stack));
+      });
   });
-  child.on('error', (err: Error) => done(() => settle.reject(err)));
+  child.on('error', (err: Error) =>
+    done(() => {
+      logFailed('spawn');
+      settle.reject(err);
+    }),
+  );
   child.on('exit', (code: number | null) => {
-    done(() =>
-      settle.reject(new Error(`worker exited (code ${code ?? 'null'}) before producing a result`)),
-    );
+    done(() => {
+      logFailed('exit_nonzero');
+      settle.reject(
+        new Error(`worker exited (code ${code ?? 'null'}) before producing a result`),
+      );
+    });
   });
 
   return {
