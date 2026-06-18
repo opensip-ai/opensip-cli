@@ -27,6 +27,9 @@ describe('toolsCreate', () => {
     ) as { id: string; commands: { name: string }[] };
     expect(manifest.id).toBe('hello-tools');
     expect(manifest.commands[0]?.name).toBe('hello-tools');
+    const runtime = readFileSync(join(toolDir, 'index.mjs'), 'utf8');
+    expect(runtime).not.toContain('@opensip-cli/');
+    expect(runtime).toContain('export const tool');
   });
 
   it('rejects invalid ids', () => {

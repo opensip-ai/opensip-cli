@@ -7,7 +7,7 @@
 // disagree with package.json, missing CHANGELOG entries, stale
 // generated docs, cross-package deps pointing at the wrong version.
 //
-// Ten checks (all run; any failure exits 1):
+// Twelve checks (all run; any failure exits 1):
 //
 //   1. All @opensip-cli/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
@@ -41,7 +41,11 @@ import { promises as fs } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { RELEASE_PACKAGE_ORDER, discoverPublishablePackages } from './release-package-order.mjs';
+import {
+  RELEASE_PACKAGE_ORDER,
+  discoverAllScopedPackages,
+  discoverPublishablePackages,
+} from './release-package-order.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCOPE = '@opensip-cli/';
@@ -285,7 +289,31 @@ try {
   }
 }
 
-// 11 — Every publishable package declares a `files` allowlist that ships `dist`.
+// 11 — Publishable packages must not depend on private workspace packages.
+// pnpm links private packages locally, but registry installs cannot resolve them.
+{
+  const allScoped = await discoverAllScopedPackages(REPO_ROOT);
+  const privateNames = new Set(allScoped.filter((p) => p.private).map((p) => p.name));
+  const issues = [];
+  for (const pkg of pkgs) {
+    for (const depName of Object.keys(pkg.dependencies)) {
+      if (!depName.startsWith(SCOPE) && depName !== 'opensip-cli') continue;
+      if (privateNames.has(depName)) {
+        issues.push(`${pkg.name} → ${depName} (private; publish or inline before release)`);
+      }
+    }
+  }
+  if (issues.length === 0) {
+    pass(11, 'no publishable package depends on a private @opensip-cli/* workspace package.');
+  } else {
+    fail(
+      11,
+      `${issues.length} publishable package(s) depend on private workspace packages:\n    ${issues.join('\n    ')}`,
+    );
+  }
+}
+
+// 12 — Every publishable package declares a `files` allowlist that ships `dist`.
 // Without `files`, npm has no .npmignore here to fall back on, so the published
 // tarball includes `src/`, `coverage/`, `.turbo/` build logs, etc. — bloat and
 // internal-artifact leakage from stale package file lists.
@@ -294,14 +322,14 @@ try {
 {
   const missing = pkgs.filter((p) => !Array.isArray(p.files) || !p.files.includes('dist'));
   if (missing.length === 0) {
-    pass(11, `all ${pkgs.length} packages declare a \`files\` allowlist that ships \`dist\`.`);
+    pass(12, `all ${pkgs.length} packages declare a \`files\` allowlist that ships \`dist\`.`);
   } else {
     const lines = missing.map(
       (p) =>
         `    ${p.name}: files=${JSON.stringify(p.files)} (add \`"files": ["dist"]\` so the tarball ships only built output)`,
     );
     fail(
-      11,
+      12,
       `package(s) missing a \`files\` allowlist — npm would publish src/coverage/.turbo junk:\n${lines.join('\n')}`,
     );
   }

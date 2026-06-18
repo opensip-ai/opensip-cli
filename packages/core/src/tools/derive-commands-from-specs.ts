@@ -24,15 +24,16 @@ export function deriveCommandsFromSpecs(
 /**
  * Resolve the authoritative command descriptors for a tool.
  *
- * Prefers an explicit `commands[]` when present (legacy / hand-authored tools).
- * Otherwise derives from `commandSpecs`. Empty when neither is available.
+ * Prefers `commandSpecs` — the host mounts specs, and manifest drift checks
+ * must follow the same surface. Falls back to legacy `commands[]` when specs are
+ * absent. Empty when neither is available.
  */
 export function resolveToolCommands(tool: Tool): readonly ToolCommandDescriptor[] {
-  if (tool.commands !== undefined && tool.commands.length > 0) {
-    return tool.commands;
-  }
   if (tool.commandSpecs !== undefined && tool.commandSpecs.length > 0) {
     return deriveCommandsFromSpecs(tool.commandSpecs);
+  }
+  if (tool.commands !== undefined && tool.commands.length > 0) {
+    return tool.commands;
   }
   return [];
 }

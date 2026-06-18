@@ -393,7 +393,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0' }, commands: [{ name: 'fixture-valid', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0', description: 'fixture' }, commandSpecs: [{ name: 'fixture-valid', description: 'x', commonFlags: ['json'], scope: 'project', output: 'command-result', handler: () => Promise.resolve({ type: 'text-lines', title: 't', lines: [] }) }] };",
       }),
     );
     const registry = new ToolRegistryClass();

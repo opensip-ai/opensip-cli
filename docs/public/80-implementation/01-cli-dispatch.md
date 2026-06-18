@@ -110,7 +110,7 @@ such as `bootstrapCli`, `createPreActionHook`, and
 startup now has explicit phase seams so scope construction, config validation,
 capability loading, and host start effects are testable independently.
 Bundled tools are **not** statically imported: the host lists their package names
-in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/register-tools-bundled.ts`](../../../packages/cli/src/bootstrap/register-tools-bundled.ts))
+in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/bundled-manifest.ts`](../../../packages/cli/src/bootstrap/bundled-manifest.ts), re-exported from [`bootstrap/register-tools.ts`](../../../packages/cli/src/bootstrap/register-tools.ts))
 and loads each through the same manifest → `admitTool` → dynamic-import →
 register path an installed or project-local tool travels. "Bundled" is a trust
 posture, not a privileged load path — a guardrail (`no-bootstrap-tool-import`)

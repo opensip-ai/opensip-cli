@@ -32,7 +32,7 @@ export const BOOTSTRAP_PHASE_MAP: readonly PhaseMapEntry[] = [
   },
   {
     lifecycleStep: TOOL_LIFECYCLE_STEPS.trust,
-    module: 'bootstrap/authored-tool-admission.ts',
+    module: 'bootstrap/register-tools-discovery.ts',
     symbol: 'admitProjectLocalTool',
   },
   {

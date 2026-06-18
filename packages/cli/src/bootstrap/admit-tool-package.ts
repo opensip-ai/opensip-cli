@@ -43,7 +43,7 @@ import {
   type ToolSource,
 } from '@opensip-cli/core';
 
-import { isValidTool } from './validate-tool.js';
+import { isValidTool, toolValidationFailure } from './validate-tool.js';
 
 /**
  * The outcome of importing a tool package's runtime module. A discriminated
@@ -111,7 +111,13 @@ export async function importToolRuntime(
       detail: error instanceof Error ? error.message : String(error),
     };
   }
-  if (!isValidTool(mod.tool)) return { ok: false, reason: 'invalid-shape' };
+  if (!isValidTool(mod.tool)) {
+    return {
+      ok: false,
+      reason: 'invalid-shape',
+      detail: toolValidationFailure(mod.tool) ?? 'tool export failed shape validation',
+    };
+  }
   return { ok: true, tool: mod.tool };
 }
 

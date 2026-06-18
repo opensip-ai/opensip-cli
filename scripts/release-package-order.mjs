@@ -245,8 +245,7 @@ async function maybeAdd(list, pkgPath, dir) {
  *
  * @param {string} [repoRoot] defaults to this repo's root.
  */
-export async function discoverPublishablePackages(repoRoot = REPO_ROOT) {
-  const found = [];
+async function walkWorkspacePackages(repoRoot, onPackage) {
   const baseDir = join(repoRoot, 'packages');
   const topEntries = await fs.readdir(baseDir, { withFileTypes: true });
 
@@ -255,17 +254,43 @@ export async function discoverPublishablePackages(repoRoot = REPO_ROOT) {
     const topRel = join('packages', top.name);
     const topPath = join(repoRoot, topRel);
 
-    // Direct child: packages/<name>/package.json
-    await maybeAdd(found, join(topPath, 'package.json'), topRel);
+    await onPackage(join(topPath, 'package.json'), topRel);
 
-    // One level deeper: packages/<group>/<name>/package.json
     const subEntries = await fs.readdir(topPath, { withFileTypes: true });
     for (const sub of subEntries) {
       if (!sub.isDirectory()) continue;
-      await maybeAdd(found, join(topPath, sub.name, 'package.json'), join(topRel, sub.name));
+      await onPackage(join(topPath, sub.name, 'package.json'), join(topRel, sub.name));
     }
   }
+}
 
+export async function discoverPublishablePackages(repoRoot = REPO_ROOT) {
+  const found = [];
+  await walkWorkspacePackages(repoRoot, (pkgPath, dir) => maybeAdd(found, pkgPath, dir));
+  return found;
+}
+
+/**
+ * Every scoped workspace package (publishable or private). Used by verify-release
+ * to ensure publishable packages do not depend on private internal packages.
+ */
+export async function discoverAllScopedPackages(repoRoot = REPO_ROOT) {
+  const found = [];
+  await walkWorkspacePackages(repoRoot, async (pkgPath, dir) => {
+    if (!(await pathExists(pkgPath))) return;
+    const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
+    if (
+      typeof pkg.name === 'string' &&
+      (pkg.name === 'opensip-cli' || pkg.name.startsWith(SCOPE))
+    ) {
+      found.push({
+        name: pkg.name,
+        dir,
+        private: pkg.private === true,
+        dependencies: pkg.dependencies ?? {},
+      });
+    }
+  });
   return found;
 }
 

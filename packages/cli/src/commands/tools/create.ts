@@ -30,9 +30,9 @@ function manifestJson(toolId: string, commandName: string): string {
 }
 
 function runtimeMjs(toolId: string, commandName: string): string {
-  return `import { defineCommand, defineTool } from '@opensip-cli/contracts';
-
-export const tool = defineTool({
+  // Dependency-free plain object: authored tools load via file URL and must not
+  // require @opensip-cli/* packages in the consumer project node_modules.
+  return `export const tool = {
   metadata: {
     id: '${toolId}',
     name: '${toolId}',
@@ -40,7 +40,7 @@ export const tool = defineTool({
     description: 'Project-local tool scaffolded by opensip tools create',
   },
   commandSpecs: [
-    defineCommand({
+    {
       name: '${commandName}',
       description: 'Run ${toolId}',
       commonFlags: ['json'],
@@ -51,9 +51,9 @@ export const tool = defineTool({
         title: '${toolId}',
         lines: ['Your project-local tool is ready — allowlist it, then run opensip ${commandName}.'],
       }),
-    }),
+    },
   ],
-});
+};
 `;
 }
 
