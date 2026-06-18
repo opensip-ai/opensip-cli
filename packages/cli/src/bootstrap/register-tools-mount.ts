@@ -1,6 +1,10 @@
 import { type CliProgram } from '@opensip-cli/contracts';
 import { logger, type Tool, type ToolCliContext, type ToolRegistry } from '@opensip-cli/core';
 
+import {
+  internalCommandNames,
+  showInternalCommands,
+} from '../commands/internal-command-visibility.js';
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import { bindToolCliContext } from './bind-tool-context.js';
@@ -48,10 +52,51 @@ export function mountAllToolCommands(
       });
     }
   }
+  // tool-command-surface-taxonomy Task 1.2: hide Tier-3 internal commands from
+  // `--help`. This is the single place that has walked EVERY tool's commands, so
+  // the descriptor-driven hide policy lives here (the host owns it; tools never
+  // pass a hidden flag). The commands stay mounted + invocable — only their
+  // `--help` listing is suppressed. `OPENSIP_CLI_SHOW_INTERNAL=1` reveals them.
+  hideInternalCommands(registry, program);
   // ADR-0021: one shared help shape across every mounted command — uniform
   // option/subcommand ordering and a docs footer — applied here (the single
   // place that has walked every tool's commands) rather than per tool.
   applySharedHelpConfiguration(program);
+}
+
+/**
+ * Hide every mounted command the tools declared `visibility: 'internal'`
+ * (Tier-3) from `--help`, unless `OPENSIP_CLI_SHOW_INTERNAL=1`
+ * ({@link showInternalCommands}).
+ *
+ * Mechanism: Commander omits a command from help when its `_hidden` property is
+ * `true`; the command stays fully invocable (`opensip graph-shard-worker <spec>`
+ * still runs). That is the documented, minimal "keep the subcommand but hide it"
+ * mechanism — there is no post-hoc public `.command(name, desc, { hidden })`
+ * path, so we set the property Commander itself reads for help filtering.
+ *
+ * The internal-name set is descriptor-driven ({@link internalCommandNames}) — the
+ * SAME source the completion inventory filters on — so help and completion stay
+ * in lockstep. Walks the full command tree (including nested `<tool> <verb>`
+ * children) so a future internal nested command is hidden too.
+ */
+function hideInternalCommands(registry: ToolRegistry, program: CliProgram): void {
+  if (showInternalCommands()) return; // reveal override — leave everything visible
+  const internal = internalCommandNames(registry);
+  if (internal.size === 0) return;
+  const hide = (cmd: CliProgram): void => {
+    for (const sub of cmd.commands) {
+      if (internal.has(sub.name())) {
+        // Commander 15 reads `_hidden` when filtering help; setting it true hides
+        // the command from `--help` while leaving it invocable. Typed via a
+        // narrow structural cast — `_hidden` is Commander-internal, not on the
+        // public `Command` type, but it is the property the help renderer reads.
+        (sub as unknown as { _hidden: boolean })._hidden = true;
+      }
+      hide(sub);
+    }
+  };
+  hide(program);
 }
 
 /**

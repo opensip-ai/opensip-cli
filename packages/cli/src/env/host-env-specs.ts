@@ -50,6 +50,20 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     docs: 'npm-convention update-notifier opt-out; honoured as an equivalent of OPENSIP_NO_UPDATE.',
   },
   {
+    canonical: 'OPENSIP_CLI_SHOW_INTERNAL',
+    // Strict `=1` gate (tool-command-surface-taxonomy Tier-3 reveal): only the
+    // exact value `'1'` reveals internal commands. The coerce returns a boolean
+    // so `hostEnv.get<boolean>('OPENSIP_CLI_SHOW_INTERNAL')` is the single
+    // predicate help + completion share (see showInternalCommands).
+    coerce: (raw) => raw === '1',
+    default: false,
+    docs:
+      'Set to 1 to reveal Tier-3 internal commands (*-run-worker, *-shard-worker, ' +
+      'graph-equivalence-check) in `--help` and shell completion. They stay directly ' +
+      'invocable regardless of this flag; it only un-hides them from the public surface. ' +
+      'The agent-catalog (a curated machine surface) is intentionally NOT affected.',
+  },
+  {
     canonical: 'OPENSIP_CLI_SKIP_BUNDLED',
     coerce: (raw) =>
       raw
