@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry, currentScope } from '@opensip-cli/core';
+import { enterScope, isContributionWithDisposer, LanguageRegistry, currentScope } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -308,7 +308,11 @@ describe('catalog-export handler branches', () => {
 
 describe('contributeScope + collectReportData hooks', () => {
   it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () => {
-    const contribution = graphTool.contributeScope?.() ?? {};
+    const result = graphTool.contributeScope?.() ?? {};
+    // graph returns the bare ScopeContribution form (no per-run resource to
+    // dispose), so the disposer-wrapper guard must be false here.
+    expect(isContributionWithDisposer(result)).toBe(false);
+    const contribution = isContributionWithDisposer(result) ? result.contribution : result;
     expect(contribution.graph).toBeDefined();
     expect(contribution.graph?.adapters).toBeDefined();
     expect(contribution.graph?.rules).toBeDefined();

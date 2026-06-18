@@ -127,6 +127,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'hasPackageJson',
   'initParseCache',
   'isCapabilityValidator',
+  'isContributionWithDisposer',
   'isErrorSeverity',
   'isErrorSignal',
   'isIdentChar',
