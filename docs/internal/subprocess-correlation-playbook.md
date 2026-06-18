@@ -185,7 +185,7 @@ The events this playbook filters on:
 | `graph.shard.worker.start` | child | full correlation + `shardId` |
 | `graph.shard.worker.complete` | child | full correlation + `durationMs` |
 | `graph.shard.worker.error` | child | full correlation + `err`, `failureClass` |
-| `graph.shard.merge` | parent | `runId`, `traceId`, `fragmentCount`, `failedShardIds` |
+| `graph.shard.merge` | parent | `runId`, `parentCommand`, `tool`, `traceId`, `fragmentCount`, `failedShardIds`; `repo` when cloud active |
 | `cli.subprocess.spawn` | parent | `runId`, `traceId`, `workerKind`, `command` |
 | `cli.subprocess.failed` | parent | `runId`, `traceId`, `workerKind`, `failureClass` |
 | `cli.subprocess.correlation_missing` | child | `runId` (freshly minted), `workerKind`, `reason` (warn) |
