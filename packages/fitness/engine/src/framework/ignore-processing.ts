@@ -11,17 +11,31 @@
  * lives once in `@opensip-cli/core`.
  */
 
-import { filterSignalsBySuppressions, logger } from '@opensip-cli/core';
+import { readFile as readFileFromDisk } from 'node:fs/promises';
+
+import { currentScope, filterSignalsBySuppressions, logger } from '@opensip-cli/core';
 
 import { countErrors, countWarnings } from '../types/severity.js';
 
 import { extractGroup, isWeakReason, parseDirectiveLine } from './directive-inventory.js';
 import { FITNESS_KEYWORDS } from './directive-parsing.js';
-import { fileCache } from './file-cache.js';
 
 import type { DirectiveEntry } from './directive-inventory.js';
+import type { FileCache } from './file-cache.js';
 import type { CheckResult } from '../types/findings.js';
 import type { Signal } from '@opensip-cli/core';
+
+/**
+ * Read file content for directive collection from the per-run scope cache when
+ * present (`scope.fitness.fileCache`), else directly from disk. The module
+ * singleton is no longer read here (parallel-tool-invocations Phase 1) — the
+ * no-scope direct single-check path legitimately has no scope cache and falls
+ * through to a disk read, preserving prior single-check behaviour.
+ */
+async function readViaCacheOrDisk(fc: FileCache | undefined, filePath: string): Promise<string> {
+  if (fc) return fc.get(filePath);
+  return readFileFromDisk(filePath, 'utf8');
+}
 
 // =============================================================================
 // SIGNAL FILTERING
@@ -49,10 +63,14 @@ export async function filterSignalsByDirectives(
   ignoredCount: number;
   appliedDirectives: DirectiveEntry[];
 }> {
+  // Resolve the per-run cache once; runs inside the run's scope on the
+  // production path. The same instance is threaded into directive re-reads below.
+  const fc = currentScope()?.fitness?.fileCache;
+
   const { kept, suppressed } = await filterSignalsBySuppressions({
     signals,
     keywords: FITNESS_KEYWORDS,
-    readFile: (filePath) => fileCache.get(filePath),
+    readFile: (filePath) => readViaCacheOrDisk(fc, filePath),
     ruleIdOf: () => checkId,
   });
 
@@ -75,6 +93,7 @@ export async function filterSignalsByDirectives(
     checkId,
     appliedFileIgnores,
     appliedLineIgnores,
+    fc,
   );
 
   return {
@@ -107,11 +126,12 @@ function toDirectiveEntry(
 async function collectFileIgnoreDirectives(
   checkId: string,
   appliedFileIgnores: Set<string>,
+  fc: FileCache | undefined,
 ): Promise<DirectiveEntry[]> {
   const results = await Promise.all(
     [...appliedFileIgnores].map(async (filePath): Promise<DirectiveEntry | null> => {
       try {
-        const content = await fileCache.get(filePath);
+        const content = await readViaCacheOrDisk(fc, filePath);
         const lines = content.split('\n');
         for (let i = 0; i < Math.min(lines.length, 50); i++) {
           const parsed = parseDirectiveLine(lines[i] ?? '');
@@ -135,13 +155,14 @@ async function collectFileIgnoreDirectives(
 async function collectLineIgnoreDirectives(
   checkId: string,
   appliedLineIgnores: Map<string, Set<number>>,
+  fc: FileCache | undefined,
 ): Promise<DirectiveEntry[]> {
   const results = await Promise.all(
     [...appliedLineIgnores.entries()].map(
       async ([filePath, suppressedLines]): Promise<DirectiveEntry[]> => {
         const found: DirectiveEntry[] = [];
         try {
-          const content = await fileCache.get(filePath);
+          const content = await readViaCacheOrDisk(fc, filePath);
           const lines = content.split('\n');
           for (let i = 0; i < lines.length; i++) {
             const parsed = parseDirectiveLine(lines[i] ?? '');
@@ -181,10 +202,11 @@ async function collectAppliedDirectives(
   checkId: string,
   appliedFileIgnores: Set<string>,
   appliedLineIgnores: Map<string, Set<number>>,
+  fc: FileCache | undefined,
 ): Promise<DirectiveEntry[]> {
   const [fileDirectives, lineDirectives] = await Promise.all([
-    collectFileIgnoreDirectives(checkId, appliedFileIgnores),
-    collectLineIgnoreDirectives(checkId, appliedLineIgnores),
+    collectFileIgnoreDirectives(checkId, appliedFileIgnores, fc),
+    collectLineIgnoreDirectives(checkId, appliedLineIgnores, fc),
   ]);
   return [...fileDirectives, ...lineDirectives];
 }
