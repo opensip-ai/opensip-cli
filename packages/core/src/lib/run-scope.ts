@@ -26,6 +26,7 @@ import { noopSignalSink } from '../signals/signal-sink.js';
 import { ToolRegistry } from '../tools/registry.js';
 
 import { DiagnosticsBus } from './diagnostics-bus.js';
+import { SystemError } from './errors.js';
 import { logger as defaultLogger } from './logger.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
@@ -282,10 +283,30 @@ export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
  * hook where the action body runs after the hook returns but in the
  * same async chain: `enterWith` propagates the scope forward without
  * needing to wrap the action invocation, which Commander does not let
- * us do directly. Throws on misuse: an existing scope must NOT be
- * replaced silently (call `runWithScope` for nested scopes).
+ * us do directly.
+ *
+ * `enterScope` is the **Commander single-command path only** — exactly
+ * one entry per CLI invocation, in the pre-action hook. It mutates the
+ * single ALS slot for the rest of the async context, so it is unsafe for
+ * concurrent or nested work.
+ *
+ * Always-on re-entrancy guard: throws `SystemError`
+ * (`SYSTEM.SCOPE.REENTRANT`) if a *different* scope is already current.
+ * Re-entering the **same** scope (idempotent — e.g. a retried pre-action
+ * path) is a no-op and does NOT throw; entering when **none** is current
+ * (the normal single-command path) is allowed. For concurrent or nested
+ * scopes use {@link runWithScope}/{@link runWithScopeSync}, which bind via
+ * `AsyncLocalStorage.run` and nest cleanly without touching the shared slot.
  */
 export function enterScope(scope: RunScope): void {
+  const current = scopeStorage.getStore();
+  if (current !== undefined && current !== scope) {
+    throw new SystemError(
+      'enterScope called while a different scope is already current. ' +
+        'Concurrent or nested work must use runWithScope(scope, fn), not a shared enterScope.',
+      { code: 'SYSTEM.SCOPE.REENTRANT' },
+    );
+  }
   scopeStorage.enterWith(scope);
 }
 
