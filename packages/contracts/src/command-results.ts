@@ -212,6 +212,14 @@ export interface ListChecksResult {
   type: 'list-checks';
   checks: { slug: string; description: string; tags: string[] }[];
   totalCount: number;
+  /**
+   * Optional heading for the rendered list (tool-command-surface-taxonomy Task
+   * 3.4). Lets a non-fitness producer reuse the shared `list-checks` shape +
+   * `viewListChecks` renderer with an accurate title (e.g. `graph list` →
+   * "Available Graph Rules"). Omitted ⇒ the renderer's default
+   * "Available Fitness Checks" (the fit-list surface is unchanged).
+   */
+  title?: string;
 }
 
 export interface ListRecipesResult {
