@@ -13,6 +13,7 @@
 
 import { logger } from '@opensip-cli/core';
 
+import { internalCommandNames } from '../commands/internal-command-visibility.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
 import { EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
@@ -37,6 +38,13 @@ export interface CommandRegistrationInput {
   }[];
   readonly sessionReplayRegistry: SessionReplayRegistry;
   readonly toolCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[];
+  /**
+   * Descriptor-driven names of the tools' `visibility: 'internal'` (Tier-3)
+   * commands. The `completion` command filters these from its inventory — the
+   * SAME source the `--help` hide pass keys on (tool-command-surface-taxonomy
+   * Task 1.3), so completion and help stay in lockstep.
+   */
+  readonly toolInternalCommands: ReadonlySet<string>;
 }
 
 /**
@@ -93,10 +101,16 @@ export function buildCommandRegistrationInput(registry: ToolRegistry): CommandRe
   // mounts (no hand-maintained flag list to drift).
   const toolCommandSpecs = registry.list().flatMap((t) => t.commandSpecs ?? []);
 
+  // Descriptor-driven Tier-3 set (tool-command-surface-taxonomy Task 1.3): the
+  // `visibility: 'internal'` command names, derived from the same registry the
+  // `--help` hide pass walks so completion and help filter on one source.
+  const toolInternalCommands = internalCommandNames(registry);
+
   return {
     pluginLayouts,
     toolScaffolds,
     sessionReplayRegistry,
     toolCommandSpecs,
+    toolInternalCommands,
   };
 }

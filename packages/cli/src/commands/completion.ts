@@ -31,16 +31,46 @@ export type Shell = 'bash' | 'zsh' | 'fish';
 /**
  * Internal/machine-facing command names never offered in shell completion.
  * These are spawned by the host (sharded build, off-process engine workers,
- * machine exports), never typed by a user. Single source for both the
- * inventory builder and the drift test.
+ * machine exports), never typed by a user.
+ *
+ * This is the STATIC FALLBACK / default for {@link assembleCompletionInventory}'s
+ * `internalCommands` argument. The live path passes a descriptor-driven set
+ * (`visibility: 'internal'` + this fallback), keeping the runtime filter in
+ * lockstep with the `--help` hide pass. The set still backs the completion-drift
+ * test, and matters whenever a caller does not supply the descriptor-derived set.
+ *
+ * Note: the four `*-run-worker` / `*-shard-worker` names AND
+ * `graph-equivalence-check` are the Tier-3 `visibility: 'internal'` commands —
+ * they also flow through the descriptor-driven set. They are listed here so the
+ * static fallback is correct on its own (the historical gap was the missing
+ * `graph-equivalence-check`).
  */
-export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
-  'graph-shard-worker',
+/**
+ * The legacy masquerading export verbs (`catalog-export` / `sarif-export`) — a
+ * STOPGAP skip until Phase 2 turns them into aliases of the canonical
+ * `graph export` form (and gives them their canonical completion entry).
+ *
+ * Held separately from the `visibility: 'internal'` Tier-3 set because they are
+ * NOT internal — they are user-facing exports today. The
+ * `OPENSIP_CLI_SHOW_INTERNAL=1` reveal therefore does NOT un-hide them (it scopes
+ * to Tier-3 only); the completion call site always keeps them filtered.
+ */
+export const LEGACY_EXPORT_ALIASES: ReadonlySet<string> = new Set([
   'catalog-export',
   'sarif-export',
+]);
+
+export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
+  'graph-shard-worker',
+  'graph-equivalence-check',
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
+  // Phase 2: these become aliases of `graph export` — revisit. They are NOT
+  // `visibility: 'internal'` (they are user-facing exports today); they are kept
+  // in the skip set as a stopgap until Phase 2 turns them into aliases of the
+  // canonical `graph export` form and gives them their canonical completion entry.
+  ...LEGACY_EXPORT_ALIASES,
 ]);
 
 /**
@@ -134,14 +164,23 @@ export function specLongFlags(spec: SpecLike): readonly string[] {
  * Assemble the completion inventory from the live specs. Pure: callers pass
  * the tool command specs (from the populated `ToolRegistry`), the top-level
  * host specs, and the action-less groups; this turns them into the flag /
- * subcommand maps the script builders consume. Internal worker commands are
- * filtered out ({@link INTERNAL_COMMANDS}).
+ * subcommand maps the script builders consume.
+ *
+ * Internal commands are filtered out by `input.internalCommands` — the
+ * descriptor-driven `visibility: 'internal'` set the host computes from the live
+ * tool registry (`internalCommandNames`), so completion and the `--help` hide
+ * pass key on the SAME source. Defaults to the static {@link INTERNAL_COMMANDS}
+ * fallback when omitted (tests / callers without a registry). The
+ * `OPENSIP_CLI_SHOW_INTERNAL=1` reveal is applied at the call site: the host
+ * passes an EMPTY set to skip filtering when the override is on.
  */
 export function assembleCompletionInventory(input: {
   readonly toolSpecs: readonly SpecLike[];
   readonly hostSpecs: readonly SpecLike[];
   readonly groups: readonly GroupLike[];
+  readonly internalCommands?: ReadonlySet<string>;
 }): CompletionInventory {
+  const internalCommands = input.internalCommands ?? INTERNAL_COMMANDS;
   const commandFlags: Record<string, readonly string[]> = {};
   const subcommands: string[] = [];
   // `parent` → leaf names, accumulated from `parent`-nested tool specs (the
@@ -150,7 +189,7 @@ export function assembleCompletionInventory(input: {
   const toolGroupLeaves: Record<string, string[]> = {};
 
   for (const spec of [...input.toolSpecs, ...input.hostSpecs]) {
-    if (INTERNAL_COMMANDS.has(spec.name)) continue;
+    if (internalCommands.has(spec.name)) continue;
     const flags = specLongFlags(spec);
     // A `parent`-nested tool spec is a sub-subcommand, NOT a top-level command:
     // offer it as a leaf under its parent and key its flags under the qualified

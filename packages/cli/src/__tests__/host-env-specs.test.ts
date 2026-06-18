@@ -92,6 +92,8 @@ describe('hostEnv reads (CLI infra)', () => {
       'TRACEPARENT',
       'OPENSIP_NO_UPDATE',
       'NO_UPDATE_NOTIFIER',
+      // tool-command-surface-taxonomy Task 1.5: the Tier-3 internal-command reveal.
+      'OPENSIP_CLI_SHOW_INTERNAL',
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     ]);

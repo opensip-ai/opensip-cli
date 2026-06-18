@@ -51,6 +51,12 @@ bypasses the registry.
 |---|---|
 | `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
 
+## Command surface
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_CLI_SHOW_INTERNAL` | Set to `1` to reveal internal (Tier-3) commands — the IPC/CI workers `fit-run-worker`, `sim-run-worker`, `graph-run-worker`, `graph-shard-worker`, and the CI gate `graph-equivalence-check` — in `opensip --help` and shell completion. These commands stay directly invocable regardless of this flag; it only un-hides them from those public surfaces. The `agent-catalog` (a curated machine surface) is intentionally NOT affected. |
+
 ## Graph engine
 
 | Variable | Effect |

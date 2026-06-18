@@ -38,6 +38,8 @@ import { executeAgentCatalog } from './agent-catalog.js';
 import {
   assembleCompletionInventory,
   printCompletionScript,
+  INTERNAL_COMMANDS,
+  LEGACY_EXPORT_ALIASES,
   type GroupLike,
   type Shell,
   type SpecLike,
@@ -45,6 +47,7 @@ import {
 import { executeConfigure } from './configure.js';
 import { buildHostSubcommandGroups, type HostSpec } from './host-subcommand-groups.js';
 import { executeInit } from './init.js';
+import { showInternalCommands } from './internal-command-visibility.js';
 import { mountCommandSpec } from './mount-command-spec.js';
 import { executeUninstall } from './uninstall.js';
 
@@ -201,10 +204,28 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
       // completion spec (it contributes a static, options-free descriptor for
       // itself), keeping the dependency one-directional.
       const host = buildHostCompletionSurface(ctx);
+      // tool-command-surface-taxonomy Task 1.3/1.5: filter Tier-3 internal
+      // commands from completion using the descriptor-driven set (the SAME source
+      // the `--help` hide pass keys on), so help and completion stay in lockstep.
+      //
+      // The legacy `catalog-export`/`sarif-export` export aliases are ALWAYS
+      // filtered (they are masquerading exports Phase 2 turns into aliases of
+      // `graph export` — they are NOT `visibility: 'internal'`), so they sit in a
+      // separate base set that the OPENSIP_CLI_SHOW_INTERNAL reveal does NOT
+      // touch. The descriptor-driven internal set is the ONLY part the override
+      // un-hides — revealing it = unioning an empty descriptor set into the base.
+      const descriptorInternal = showInternalCommands()
+        ? new Set<string>()
+        : (ctx.toolInternalCommands ?? INTERNAL_COMMANDS);
+      const internalCommands = new Set<string>([
+        ...descriptorInternal,
+        ...LEGACY_EXPORT_ALIASES,
+      ]);
       const inventory = assembleCompletionInventory({
         toolSpecs: ctx.toolCommandSpecs ?? [],
         hostSpecs: host.specs,
         groups: host.groups,
+        internalCommands,
       });
       printCompletionScript(normalized satisfies Shell, inventory);
     },
