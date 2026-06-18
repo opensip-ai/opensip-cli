@@ -128,6 +128,18 @@ A few of the constraints that pinned the order:
 
 ---
 
+## Concurrent in-process runs
+
+The `RunScope` is bound to the current async context through one `AsyncLocalStorage` instance exported from `@opensip-cli/core`. There are two ways to bind it, with strict roles:
+
+- **`enterScope(scope)` — the Commander single-command path only.** It is called exactly once per CLI invocation, in the pre-action hook, where the action body runs after the hook returns but in the same async chain. `enterScope` is backed by `AsyncLocalStorage.enterWith`, which mutates the single ALS slot for the rest of the async context — so it is safe only when nothing else is running in the process. **Never call `enterScope` while another scope task is in flight.** An always-on re-entrancy guard throws `SystemError` (`SYSTEM.SCOPE.REENTRANT`) if a *different* scope is already current; re-entering the *same* scope (idempotent) and entering when *none* is current are allowed.
+
+- **`runWithScope(scope, fn)` / `runWithScopeSync(scope, fn)` — the concurrency-safe path.** These bind `scope` for the dynamic extent of `fn` via `AsyncLocalStorage.run`, so runs nest cleanly and never collide on the shared slot. **Concurrent in-process work — a SaaS host running several analyses at once, or any `Promise.all` over multiple runs — MUST use `runWithScope` per task and MUST NOT share `enterScope`.** Two overlapping runs each see their own scope for the dynamic extent of their `fn`; the always-on guard means a stray `enterScope` inside one of them fails loudly instead of silently cross-contaminating the other.
+
+Per-run logs stay filterable for free on the same seam: each scope carries a distinct `runId`, and the logger reads `currentScope()?.runId` (wired via `setRunIdProvider(() => currentScope()?.runId)`), so concurrent runs emit non-colliding, per-`runId` log lines.
+
+---
+
 ## CLI-owned commands
 
 Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.6/packages/cli/src/commands/) and are assembled by `mountHostCommands()` as host-owned `CommandSpec`s:
