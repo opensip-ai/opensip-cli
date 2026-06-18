@@ -207,6 +207,25 @@ function describeCommand(cmd: Command): CommandSurface {
   };
 }
 
+/**
+ * The PUBLIC top-level command names — the ones `--help` actually lists. A
+ * command is public iff Commander's `_hidden` flag (the property the help
+ * renderer filters on, set by the Phase 1 host hide pass) is not `true`. This is
+ * the same flag the hide pass writes; reading it here is the inverse of that
+ * filter, so the assertion tracks exactly what a user would see.
+ */
+function publicTopLevelCommandNames(program: Command): readonly string[] {
+  return program.commands
+    .filter((c) => (c as unknown as { _hidden?: boolean })._hidden !== true)
+    .map((c) => c.name());
+}
+
+/** Resolve a nested `<parent> <verb>` command (e.g. `graph export`) to its leaf. */
+function nestedChild(program: Command, parent: string, verb: string): Command | undefined {
+  const parentCmd = program.commands.find((c) => c.name() === parent);
+  return parentCmd?.commands.find((c) => c.name() === verb);
+}
+
 describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution delta)', () => {
   it('pins the full mounted command surface', () => {
     const program = buildFullProgram();
@@ -235,7 +254,16 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     // ...but Phase 1's host hide pass (mountAllToolCommands → hideInternalCommands)
     // sets Commander's `_hidden` on each so they are ABSENT from `--help`. This is
     // the no-internal-worker-leakage assertion for the public surface: every Tier-3
-    // command is mounted yet hidden, and NO non-internal command is hidden.
+    // command is mounted yet hidden (absent from the PUBLIC surface), and NO
+    // non-internal command is hidden.
+    const publicNames = publicTopLevelCommandNames(program);
+    for (const name of TIER_3_INTERNAL) {
+      expect(
+        publicNames,
+        `internal command '${name}' must be ABSENT from the public surface`,
+      ).not.toContain(name);
+    }
+    // Exactly the five Tier-3 internals are hidden — nothing more, nothing less.
     const hiddenNames = program.commands
       .filter((c) => (c as unknown as { _hidden?: boolean })._hidden === true)
       .map((c) => c.name())
@@ -243,14 +271,38 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     expect(hiddenNames, 'exactly the five Tier-3 internal commands are hidden from --help').toEqual(
       [...TIER_3_INTERNAL].sort(),
     );
-    // No public command (fit/graph/sim, the host commands) is hidden.
-    for (const cmd of program.commands) {
-      if (TIER_3_INTERNAL.includes(cmd.name())) continue;
-      expect(
-        (cmd as unknown as { _hidden?: boolean })._hidden,
-        `public command '${cmd.name()}' must NOT be hidden`,
-      ).not.toBe(true);
+  });
+
+  it('the canonical public verbs are PRESENT in the public surface (no over-hiding)', () => {
+    const program = buildFullProgram();
+    const publicNames = publicTopLevelCommandNames(program);
+
+    // Tier-2 tool primaries + Tier-1 host commands are all on the public surface.
+    for (const verb of [
+      'fit',
+      'graph',
+      'sim',
+      'init',
+      'report',
+      'configure',
+      'agent-catalog',
+      'completion',
+      'uninstall',
+      'sessions',
+      'plugin',
+      'tools',
+    ]) {
+      expect(publicNames, `public verb '${verb}' must be listed in --help`).toContain(verb);
     }
+
+    // The canonical nested export forms (Phase 2) are mounted children under
+    // their tool primary — `graph export` and `fit export`.
+    expect(nestedChild(program, 'graph', 'export'), '`graph export` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'fit', 'export'), '`fit export` must be mounted').toBeDefined();
+
+    // The new discoverability commands (Phase 3) — `sim recipes` and `graph list`.
+    expect(nestedChild(program, 'sim', 'recipes'), '`sim recipes` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'graph', 'list'), '`graph list` must be mounted').toBeDefined();
   });
 
   it('the three --resolution-bearing graph commands declare choices exact|fast (the sanctioned delta)', () => {
