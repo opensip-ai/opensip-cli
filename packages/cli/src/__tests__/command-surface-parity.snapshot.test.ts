@@ -222,6 +222,15 @@ function nestedChild(program: Command, parent: string, verb: string): Command | 
   return parentCmd?.commands.find((c) => c.name() === verb);
 }
 
+/** Assert a command declares `--resolution` with the `exact|fast` choices delta. */
+function assertResolutionChoices(cmd: Command | undefined, name: string): void {
+  expect(cmd, `expected a mounted '${name}' command`).toBeDefined();
+  const resolution = cmd!.options.find((o) => o.long === '--resolution');
+  expect(resolution, `${name} must declare --resolution`).toBeDefined();
+  expect((resolution as { argChoices?: readonly string[] }).argChoices).toEqual(['exact', 'fast']);
+  expect(resolution!.defaultValue).toBe('exact');
+}
+
 describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution delta)', () => {
   it('pins the full mounted command surface', () => {
     const program = buildFullProgram();
@@ -306,21 +315,10 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     // The legacy flat-root catalog-export/sarif-export were removed; the
     // --resolution flag now lives on the `graph` primary and the canonical
     // nested `graph export` command.
-    const assertResolution = (cmd: Command | undefined, name: string): void => {
-      expect(cmd, `expected a mounted '${name}' command`).toBeDefined();
-      const resolution = cmd!.options.find((o) => o.long === '--resolution');
-      expect(resolution, `${name} must declare --resolution`).toBeDefined();
-      expect((resolution as { argChoices?: readonly string[] }).argChoices).toEqual([
-        'exact',
-        'fast',
-      ]);
-      expect(resolution!.defaultValue).toBe('exact');
-    };
-
-    assertResolution(
+    assertResolutionChoices(
       program.commands.find((c) => c.name() === 'graph'),
       'graph',
     );
-    assertResolution(nestedChild(program, 'graph', 'export'), 'graph export');
+    assertResolutionChoices(nestedChild(program, 'graph', 'export'), 'graph export');
   });
 });
