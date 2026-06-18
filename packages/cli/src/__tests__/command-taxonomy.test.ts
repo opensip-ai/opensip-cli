@@ -164,14 +164,11 @@ describe('command taxonomy — internal descriptors carry visibility:internal (S
     { tool: simulationTool, name: 'sim-run-worker' },
   ];
 
-  it.each(INTERNAL)(
-    'descriptor for $name declares visibility: internal',
-    ({ tool, name }) => {
-      const descriptor = tool.commands.find((c) => c.name === name);
-      expect(descriptor, `tool must declare a '${name}' command descriptor`).toBeDefined();
-      expect(descriptor?.visibility).toBe('internal');
-    },
-  );
+  it.each(INTERNAL)('descriptor for $name declares visibility: internal', ({ tool, name }) => {
+    const descriptor = tool.commands.find((c) => c.name === name);
+    expect(descriptor, `tool must declare a '${name}' command descriptor`).toBeDefined();
+    expect(descriptor?.visibility).toBe('internal');
+  });
 
   it('no PUBLIC tool command descriptor is marked visibility: internal', () => {
     const internalNames = new Set(INTERNAL.map((i) => i.name));

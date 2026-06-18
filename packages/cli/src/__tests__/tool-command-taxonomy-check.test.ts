@@ -64,11 +64,7 @@ describe('analyzeToolCommandTaxonomy — path gate (Step 4)', () => {
 
   it('engages for each first-party tool-registration path', () => {
     const content = descriptor({ name: 'frobnicate', description: 'x' });
-    for (const path of [
-      FIT_TOOL,
-      GRAPH_TOOL,
-      '/repo/packages/simulation/engine/src/tool.ts',
-    ]) {
+    for (const path of [FIT_TOOL, GRAPH_TOOL, '/repo/packages/simulation/engine/src/tool.ts']) {
       expect(analyzeToolCommandTaxonomy(content, path).length).toBeGreaterThan(0);
     }
   });

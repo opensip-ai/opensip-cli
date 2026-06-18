@@ -211,7 +211,10 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
         `internal command '${name}' must not be offered in completion`,
       ).not.toContain(name);
       // It must also not leak as a per-command flag key.
-      expect(inventory.commandFlags[name], `'${name}' must have no completion flag set`).toBeUndefined();
+      expect(
+        inventory.commandFlags[name],
+        `'${name}' must have no completion flag set`,
+      ).toBeUndefined();
     }
   });
 
@@ -256,7 +259,10 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
       const descriptorInternal = showInternalCommands()
         ? new Set<string>()
         : internalCommandNames(registry);
-      const internalCommands = new Set<string>([...descriptorInternal, ...DEPRECATED_EXPORT_COMMANDS]);
+      const internalCommands = new Set<string>([
+        ...descriptorInternal,
+        ...DEPRECATED_EXPORT_COMMANDS,
+      ]);
       return assembleCompletionInventory({
         toolSpecs,
         hostSpecs: buildTopLevelHostSpecs(hostCtx),

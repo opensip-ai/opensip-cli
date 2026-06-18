@@ -49,8 +49,7 @@ describe('buildAgentCatalog', () => {
 
     it('fit/graph are tool-tier; the host commands are platform-tier', () => {
       const c = buildAgentCatalog();
-      const tierOf = (command: string) =>
-        c.entryPoints.find((e) => e.command === command)?.tier;
+      const tierOf = (command: string) => c.entryPoints.find((e) => e.command === command)?.tier;
       expect(tierOf('fit')).toBe('tool');
       expect(tierOf('graph')).toBe('tool');
       expect(tierOf('sessions list')).toBe('platform');
