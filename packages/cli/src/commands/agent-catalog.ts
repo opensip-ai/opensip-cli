@@ -20,6 +20,16 @@
  * In Phase 0 no tool declares `parent`/`visibility`, so the static catalog below
  * already satisfies both rules (no nested verb, no internal worker is listed).
  */
+/**
+ * The command-taxonomy tier an entry point belongs to
+ * (tool-command-surface-taxonomy). `'platform'` = host-owned Tier-1 commands
+ * (`init`, `sessions`, `agent-catalog`, …); `'tool'` = a Tier-2 tool verb
+ * (`fit`, `graph`, `sim`, and their `<tool> <verb>` sub-verbs). `'internal'`
+ * (Tier-3 workers) is part of the union for completeness ONLY — the agent-catalog
+ * NEVER emits an `internal` entry point (its primary surface excludes Tier-3).
+ */
+export type CommandTier = 'platform' | 'tool' | 'internal';
+
 export interface AgentCatalog {
   readonly version: string;
   readonly description: string;
@@ -27,6 +37,14 @@ export interface AgentCatalog {
     readonly command: string;
     readonly description: string;
     readonly examples: readonly string[];
+    /**
+     * Taxonomy tier of this entry point (tool-command-surface-taxonomy). Additive
+     * (optional) so existing consumers of the `entryPoints` shape are unaffected;
+     * present on every entry the catalog ships so an agent sees the predictable
+     * Tier-1/Tier-2 structure. NEVER `'internal'` — Tier-3 is excluded from this
+     * surface by construction (see {@link assertNoInternalEntryPoints}).
+     */
+    readonly tier?: CommandTier;
   }[];
   readonly commonPatterns: readonly {
     readonly name: string;
@@ -41,51 +59,92 @@ export interface AgentCatalog {
   readonly notes: readonly string[];
 }
 
+/**
+ * Internal (Tier-3) command-name shapes the agent-catalog must NEVER surface:
+ * the IPC/CI workers and the equivalence gate. The guard checks both the name
+ * shape AND an explicit `tier: 'internal'` so a future edit can't slip one in by
+ * either route. This is the by-construction complement to the Phase 4 test.
+ */
+const INTERNAL_COMMAND_NAME_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
+
+/**
+ * Throw if any entry point is a Tier-3 internal command (by name shape or by an
+ * explicit `tier: 'internal'`). Called at catalog-build time so a regression that
+ * pastes an internal command into `entryPoints` fails loudly the first time the
+ * catalog is built, not silently at the agent boundary.
+ */
+function assertNoInternalEntryPoints(
+  entryPoints: readonly { readonly command: string; readonly tier?: CommandTier }[],
+): void {
+  const leaked = entryPoints.find(
+    (e) => e.tier === 'internal' || INTERNAL_COMMAND_NAME_RE.test(e.command),
+  );
+  if (leaked !== undefined) {
+    throw new Error(
+      `agent-catalog: Tier-3 internal command '${leaked.command}' must not appear in the ` +
+        'agent-catalog primary surface (tool-command-surface-taxonomy). Remove it from entryPoints.',
+    );
+  }
+}
+
 export function buildAgentCatalog(): AgentCatalog {
+  // tool-command-surface-taxonomy Task 1.4: every entry point is annotated with
+  // its taxonomy `tier` so an agent sees the predictable Tier-1/Tier-2 shape, and
+  // NO Tier-3 internal worker is catalogued. The static list below is the
+  // primary surface; `assertNoInternalEntryPoints` guards (by construction)
+  // against a future edit pasting an internal command in (the Phase 4 test
+  // also asserts this).
+  const entryPoints = [
+    {
+      command: 'fit',
+      description: 'Run fitness checks. Use --json for machine output (SignalEnvelope).',
+      examples: ['opensip fit --recipe default --json', 'opensip fit --check some-check --json'],
+      tier: 'tool' as const,
+    },
+    {
+      command: 'graph',
+      description: 'Build static call graph + rules. --json yields SignalEnvelope.',
+      examples: ['opensip graph --json', 'opensip graph --sarif out.sarif'],
+      tier: 'tool' as const,
+    },
+    {
+      command: 'sessions list',
+      description:
+        'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
+      examples: [
+        'opensip sessions list --json --summary-only',
+        'opensip sessions list --json --tool fit --limit 5',
+      ],
+      tier: 'platform' as const,
+    },
+    {
+      command: 'sessions show',
+      description:
+        'Retrieve a prior run as SessionReplayResult (includes projected SignalEnvelope). ' +
+        'Supports latest + --tool and rich filtering.',
+      examples: [
+        'opensip sessions show latest --tool fit --json',
+        'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
+        'opensip sessions show GRAPH_01... --json --raw',
+        'opensip sessions show previous --tool graph --json',
+      ],
+      tier: 'platform' as const,
+    },
+    {
+      command: 'agent-catalog',
+      description: 'This command. Self-describing catalog for agents (JSON preferred).',
+      examples: ['opensip agent-catalog --json'],
+      tier: 'platform' as const,
+    },
+  ];
+  assertNoInternalEntryPoints(entryPoints);
   return {
     version: '1.0.0',
     description:
       'Stable, machine-oriented surface for AI agents using OpenSIP CLI. ' +
       'Focus on --json paths, sessions for historical results, and composable filters. ' +
       'Human UX (tables, banners) is preserved unchanged.',
-    entryPoints: [
-      {
-        command: 'fit',
-        description: 'Run fitness checks. Use --json for machine output (SignalEnvelope).',
-        examples: ['opensip fit --recipe default --json', 'opensip fit --check some-check --json'],
-      },
-      {
-        command: 'graph',
-        description: 'Build static call graph + rules. --json yields SignalEnvelope.',
-        examples: ['opensip graph --json', 'opensip graph --sarif out.sarif'],
-      },
-      {
-        command: 'sessions list',
-        description:
-          'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
-        examples: [
-          'opensip sessions list --json --summary-only',
-          'opensip sessions list --json --tool fit --limit 5',
-        ],
-      },
-      {
-        command: 'sessions show',
-        description:
-          'Retrieve a prior run as SessionReplayResult (includes projected SignalEnvelope). ' +
-          'Supports latest + --tool and rich filtering.',
-        examples: [
-          'opensip sessions show latest --tool fit --json',
-          'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
-          'opensip sessions show GRAPH_01... --json --raw',
-          'opensip sessions show previous --tool graph --json',
-        ],
-      },
-      {
-        command: 'agent-catalog',
-        description: 'This command. Self-describing catalog for agents (JSON preferred).',
-        examples: ['opensip agent-catalog --json'],
-      },
-    ],
+    entryPoints,
     commonPatterns: [
       {
         name: 'Inspect latest fit with focus on errors',
