@@ -2,9 +2,11 @@
  * Tests for the CLI-owned command registration.
  *
  * `registerCliCommands` mounts the cross-tool housekeeping commands
- * (init, report, sessions, configure, plugin, completion, uninstall)
- * onto a Commander program. The tests verify the full subcommand surface
- * exists with no duplicate or missing names — a drift test that catches
+ * (init, report, sessions, configure, completion, uninstall, tools) onto a
+ * Commander program. The pack-management `plugin {add,list,remove,sync}` ops
+ * are NO LONGER a top-level group — they mount UNDER each pack-supporting tool
+ * primary (`opensip fit plugin …`). The tests verify the full subcommand
+ * surface exists with no duplicate or missing names — a drift test that catches
  * additions / removals at PR time.
  */
 
@@ -14,18 +16,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { registerCliCommands } from '../commands/index.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
+import type { PluginLayout } from '@opensip-cli/core';
 
-function makeContext(): {
+function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
   setExitCode: ReturnType<typeof vi.fn>;
   render: (result: CommandResult) => Promise<void>;
   datastore: () => unknown;
-  pluginLayouts: readonly never[];
+  pluginLayouts: readonly PluginLayout[];
 } {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     datastore: () => undefined,
-    pluginLayouts: [],
+    pluginLayouts,
   };
 }
 
@@ -40,7 +43,7 @@ function subcommandNames(parent: Command, name: string): string[] {
 }
 
 describe('registerCliCommands', () => {
-  it('mounts every CLI-owned top-level command', () => {
+  it('mounts every CLI-owned top-level command (no top-level `plugin`)', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
 
@@ -49,7 +52,6 @@ describe('registerCliCommands', () => {
       'completion',
       'configure',
       'init',
-      'plugin',
       'report',
       'sessions',
       'tools',
@@ -63,10 +65,26 @@ describe('registerCliCommands', () => {
     expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge', 'show']);
   });
 
-  it('mounts the documented plugin subcommands', () => {
+  it('mounts the domain-bound plugin subcommands UNDER each pack-supporting tool primary', () => {
     const program = new Command('opensip');
-    registerCliCommands(program, makeContext());
-    expect(subcommandNames(program, 'plugin')).toEqual(['add', 'list', 'remove', 'sync']);
+    // Stub the pack-supporting tool primaries (the composition root mounts tools
+    // before the host commands), then mount host commands with their layouts.
+    program.command('fit').description('Run fitness checks');
+    program.command('sim').description('Run simulation scenarios');
+    registerCliCommands(
+      program,
+      makeContext([
+        { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+        { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+      ]),
+    );
+
+    // No top-level `plugin` group.
+    expect(program.commands.find((c) => c.name() === 'plugin')).toBeUndefined();
+    for (const toolVerb of ['fit', 'sim']) {
+      const primary = program.commands.find((c) => c.name() === toolVerb)!;
+      expect(subcommandNames(primary, 'plugin')).toEqual(['add', 'list', 'remove', 'sync']);
+    }
   });
 
   it('does not mount any tool subcommands (those come via tool.register)', () => {

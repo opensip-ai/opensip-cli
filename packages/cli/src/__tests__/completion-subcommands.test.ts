@@ -24,7 +24,10 @@ import {
   type CompletionInventory,
 } from '../commands/completion.js';
 import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
-import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
+import {
+  buildHostSubcommandGroups,
+  buildToolPluginGroups,
+} from '../commands/host-subcommand-groups.js';
 import { registerCliCommands } from '../commands/index.js';
 import {
   internalCommandNames,
@@ -80,14 +83,19 @@ function makeStubToolContext(): ToolCliContext {
 }
 
 /** A minimal host context for building the host specs we introspect (handlers
- *  are never invoked here — only the static declarations are read). */
+ *  are never invoked here — only the static declarations are read). The pack
+ *  `plugin` groups are derived from `pluginLayouts`, so supply the real fit/sim
+ *  layouts (graph has none) — matching what the composition root threads in. */
 function makeStubHostContext(): CliCommandsContext {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     emitJson: vi.fn(),
     emitError: vi.fn(),
-    pluginLayouts: [],
+    pluginLayouts: [
+      { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+      { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+    ],
     datastore: () => undefined,
   };
 }
@@ -111,6 +119,10 @@ async function buildLiveInventory(): Promise<{
     toolSpecs: registry.list().flatMap((t) => t.commandSpecs ?? []),
     hostSpecs: buildTopLevelHostSpecs(hostCtx),
     groups: buildHostSubcommandGroups(hostCtx),
+    toolPluginGroups: buildToolPluginGroups(hostCtx).map((g) => ({
+      toolVerb: g.toolVerb,
+      leaves: g.leaves.map((l) => ({ name: l.name })),
+    })),
   });
   return { inventory, program, registry };
 }
@@ -174,21 +186,45 @@ describe('completion flag parity', () => {
   });
 });
 
-describe('completion plugin sub-subcommand parity', () => {
-  it('emitted bash/zsh scripts list the live plugin subcommands (no install/add drift)', async () => {
+describe('completion plugin sub-subcommand parity (now under each pack-supporting tool)', () => {
+  it('there is NO top-level plugin command; the pack ops mount under fit/sim', async () => {
+    const { program } = await buildLiveInventory();
+    // The retired top-level `plugin` group must not exist; the pack ops live
+    // under each pack-supporting tool primary.
+    expect(program.commands.find((c) => c.name() === 'plugin')).toBeUndefined();
+    for (const toolVerb of ['fit', 'sim']) {
+      const primary = program.commands.find((c) => c.name() === toolVerb);
+      expect(primary, `${toolVerb} primary should be registered`).toBeDefined();
+      const pluginGroup = primary!.commands.find((c) => c.name() === 'plugin');
+      expect(pluginGroup, `${toolVerb} should host a plugin group`).toBeDefined();
+    }
+  });
+
+  it('emitted bash/zsh scripts list the live <tool> plugin subcommands (no install/add drift)', async () => {
     const { inventory, program } = await buildLiveInventory();
-    const pluginCmd = program.commands.find((c) => c.name() === 'plugin');
-    expect(pluginCmd, 'plugin command should be registered').toBeDefined();
-    const liveSubs = (pluginCmd?.commands ?? []).map((c) => c.name()).sort();
+    const fitPlugin = program.commands
+      .find((c) => c.name() === 'fit')!
+      .commands.find((c) => c.name() === 'plugin');
+    expect(fitPlugin, 'fit plugin group should be registered').toBeDefined();
+    const liveSubs = (fitPlugin?.commands ?? []).map((c) => c.name()).sort();
 
     const bash = buildCompletionScript('bash', inventory);
     const zsh = buildCompletionScript('zsh', inventory);
     for (const sub of liveSubs) {
-      expect(bash, `bash completion should list plugin '${sub}'`).toContain(sub);
-      expect(zsh, `zsh completion should list plugin '${sub}'`).toContain(sub);
+      expect(bash, `bash completion should list fit plugin '${sub}'`).toContain(sub);
+      expect(zsh, `zsh completion should list fit plugin '${sub}'`).toContain(sub);
     }
+    // `plugin` is offered as a leaf under each pack-supporting tool verb, and the
+    // bound leaves under `${toolVerb} plugin`.
+    expect(inventory.groupSubcommands.fit).toContain('plugin');
+    expect(inventory.groupSubcommands.sim).toContain('plugin');
+    expect(inventory.groupSubcommands['fit plugin']).toEqual(
+      expect.arrayContaining(['list', 'add', 'remove', 'sync']),
+    );
+    // No top-level `plugin` group in the inventory anymore.
+    expect(inventory.groupSubcommands.plugin).toBeUndefined();
     // The historical drift was `install` (canonical action is `add` post-F7).
-    expect(inventory.groupSubcommands.plugin).not.toContain('install');
+    expect(inventory.groupSubcommands['fit plugin']).not.toContain('install');
   });
 });
 

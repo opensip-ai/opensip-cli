@@ -308,11 +308,18 @@ describe('CLI e2e', () => {
     });
   });
 
-  describe('plugin list', () => {
-    it('shows plugin information', () => {
-      const { stdout, exitCode } = cli.run(['plugin', 'list'], { cwd: FIXTURE });
+  describe('<tool> plugin list', () => {
+    it('shows fit pack information (domain-bound under the fit primary)', () => {
+      // The top-level `plugin` group was retired — pack ops mount under each
+      // pack-supporting tool primary (`opensip fit plugin …`).
+      const { stdout, exitCode } = cli.run(['fit', 'plugin', 'list'], { cwd: FIXTURE });
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Installed Plugins');
+    });
+
+    it('has no top-level `plugin` command', () => {
+      const { exitCode } = cli.run(['plugin', 'list'], { cwd: FIXTURE });
+      expect(exitCode).not.toBe(0);
     });
   });
 

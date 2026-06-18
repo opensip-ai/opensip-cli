@@ -64,6 +64,16 @@
  *    `--quiet`/`--verbose` baseline was already present (the host decoration is
  *    idempotent and adds only what a tool did not declare).
  *
+ * 7. Packs-under-the-tool (command-surface-taxonomy "retire top-level plugin"):
+ *    the top-level `opensip plugin` group was RETIRED. The pack ops
+ *    (`add`/`list`/`remove`/`sync`) now mount as a `plugin` GROUP under each
+ *    PACK-SUPPORTING tool primary — `fit plugin …` and `sim plugin …` (graph has
+ *    no `pluginLayout`, so it gets no `plugin` group). The domain is PRE-BOUND
+ *    from the tool, so the leaves no longer carry `--domain`/`--project`; their
+ *    descriptions are now domain-specific (`… fit pack …`). Whole Tool plugins
+ *    remain `opensip tools …` (unchanged). So `plugin` is absent from the root
+ *    surface and present under `fit`/`sim`.
+ *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -119,13 +129,18 @@ function buildFullProgram(): Command {
     for (const tool of BUNDLED_TOOLS) registry.register(tool);
     mountAllToolCommands(registry, program, makeStubToolContext());
 
-    // Host-owned commands (init/report/sessions/configure/plugin/completion/
-    // uninstall), mounted via the same command plane.
+    // Host-owned commands (init/report/sessions/configure/completion/uninstall/
+    // tools), mounted via the same command plane — PLUS the domain-bound
+    // per-tool `plugin` groups, which mount UNDER each pack-supporting tool
+    // primary (`opensip fit plugin …`). Those primaries were just mounted above,
+    // so pass the bundled tools' real `pluginLayout`s (fit + sim; graph has
+    // none) for `mountToolPluginGroups` to hang the groups off of.
+    const pluginLayouts = BUNDLED_TOOLS.flatMap((t) => (t.pluginLayout ? [t.pluginLayout] : []));
     registerCliCommands(program, {
       setExitCode: vi.fn(),
       render: vi.fn(() => Promise.resolve()),
       datastore: () => undefined,
-      pluginLayouts: [],
+      pluginLayouts,
     });
 
     return program;
@@ -300,6 +315,8 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     const publicNames = publicTopLevelCommandNames(program);
 
     // Tier-2 tool primaries + Tier-1 host commands are all on the public surface.
+    // NOTE: `plugin` is NO LONGER a top-level verb — the pack ops mount under
+    // each pack-supporting tool primary (`opensip fit plugin …`), asserted below.
     for (const verb of [
       'fit',
       'graph',
@@ -311,11 +328,13 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'completion',
       'uninstall',
       'sessions',
-      'plugin',
       'tools',
     ]) {
       expect(publicNames, `public verb '${verb}' must be listed in --help`).toContain(verb);
     }
+
+    // The retired top-level `plugin` group is GONE from the root surface.
+    expect(publicNames, '`plugin` must NOT be a top-level command').not.toContain('plugin');
 
     // The canonical nested export forms (Phase 2) are mounted children under
     // their tool primary — `graph export` and `fit export`.
@@ -325,6 +344,15 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     // The new discoverability commands (Phase 3) — `sim recipes` and `graph list`.
     expect(nestedChild(program, 'sim', 'recipes'), '`sim recipes` must be mounted').toBeDefined();
     expect(nestedChild(program, 'graph', 'list'), '`graph list` must be mounted').toBeDefined();
+
+    // The per-tool `plugin` groups mount UNDER the pack-supporting tool primaries
+    // (fit + sim; graph has no pluginLayout, so no `plugin` group).
+    expect(nestedChild(program, 'fit', 'plugin'), '`fit plugin` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'sim', 'plugin'), '`sim plugin` must be mounted').toBeDefined();
+    expect(
+      nestedChild(program, 'graph', 'plugin'),
+      '`graph plugin` must NOT exist (graph supports no packs)',
+    ).toBeUndefined();
   });
 
   it('the --resolution-bearing graph commands declare choices exact|fast (the sanctioned delta)', () => {

@@ -246,13 +246,18 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     );
   }
 
-  it('`plugin add <tool>` installs user-global and the subcommand works in the project', () => {
+  // Whole Tool plugins are installed via `opensip tools install` — NOT the
+  // per-tool `plugin add` (the redundant whole-tool path was retired; `plugin`
+  // is now scoped to a pack-supporting tool's own extension packs). These tests
+  // exercise the canonical `tools` platform path.
+
+  it('`tools install <tool>` installs user-global and the subcommand works in the project', () => {
     writeProject();
     const { home, env } = withFreshHome();
     try {
-      const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
+      const add = runCli(['tools', 'install', FIXTURE_TOOL, '--json'], testDir, env);
       expect(add.exitCode).toBe(0);
-      // 2.12.0: the PluginResult rides under `.data` of the outcome wrapper.
+      // The tools-install result rides under `.data` of the outcome wrapper.
       expect((JSON.parse(add.stdout) as { data: { success?: boolean } }).data.success).toBe(true);
       // Landed in the user-global tool host dir, NOT a fit/sim domain dir,
       // and NO config entry was written (tools auto-discover by marker).
@@ -274,11 +279,11 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     }
   });
 
-  it('`plugin add <tool> --project` installs project-local (.runtime/) only', () => {
+  it('`tools install <tool> --project` installs project-local (.runtime/) only', () => {
     writeProject();
     const { home, env } = withFreshHome();
     try {
-      const add = runCli(['plugin', 'add', FIXTURE_TOOL, '--project', '--json'], testDir, env);
+      const add = runCli(['tools', 'install', FIXTURE_TOOL, '--project', '--json'], testDir, env);
       expect(add.exitCode).toBe(0);
       expect(
         existsSync(
@@ -295,19 +300,15 @@ describe('full Tool-plugin install path (audit P1b)', () => {
     }
   });
 
-  it('`plugin list` reports an installed tool plugin under the `tool` domain', () => {
+  it('`tools list` reports an installed tool plugin', () => {
     writeProject();
     const { home, env } = withFreshHome();
     try {
-      runCli(['plugin', 'add', FIXTURE_TOOL, '--json'], testDir, env);
-      const list = runCli(['plugin', 'list', '--json'], testDir, env);
+      runCli(['tools', 'install', FIXTURE_TOOL, '--json'], testDir, env);
+      const list = runCli(['tools', 'list', '--json'], testDir, env);
       expect(list.exitCode).toBe(0);
-      const plugins = (
-        JSON.parse(list.stdout) as { data: { plugins: { domain: string; namespace: string }[] } }
-      ).data.plugins;
-      expect(plugins.some((p) => p.domain === 'tool' && p.namespace.includes('tool-demo'))).toBe(
-        true,
-      );
+      // The installed fixture tool surfaces in the effective tool set.
+      expect(list.stdout).toContain('tool-demo');
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

@@ -141,6 +141,29 @@ describe('buildCompletionScript — action-less groups (plugin / sessions)', () 
   });
 });
 
+describe('assembleCompletionInventory — per-tool plugin groups', () => {
+  it('folds `plugin` under the tool verb and the bound leaves under `${toolVerb} plugin`', () => {
+    const inv = assembleCompletionInventory({
+      toolSpecs: [spec('fit', ['cwd', 'json'], ['--recipe'])],
+      hostSpecs: [],
+      groups: [],
+      toolPluginGroups: [
+        {
+          toolVerb: 'fit',
+          leaves: [{ name: 'list' }, { name: 'add' }, { name: 'remove' }, { name: 'sync' }],
+        },
+      ],
+    });
+    // `plugin` is offered as a leaf under the tool verb (so `opensip fit <TAB>`
+    // can complete `… plugin`), and the bound leaves key under `fit plugin`.
+    expect(inv.groupSubcommands.fit).toContain('plugin');
+    expect(inv.groupSubcommands['fit plugin']).toEqual(['list', 'add', 'remove', 'sync']);
+    // No top-level `plugin` group is introduced.
+    expect(inv.subcommands).not.toContain('plugin');
+    expect(inv.groupSubcommands.plugin).toBeUndefined();
+  });
+});
+
 describe('printCompletionScript', () => {
   it('writes the script through the supplied callback', () => {
     const out: string[] = [];

@@ -20,19 +20,27 @@
  *
  * This replaces the old inline `--version`/`--help` pair with a broad
  * command-level walk: init → fit (built-in + fit-pack plugin) → list → graph →
- * report → sessions → tool-plugin install. Every scenario runs in ONE
+ * report → sessions → tool install. Every scenario runs in ONE
  * consumer cwd (passed in), in order; later scenarios depend on the side effects
  * (config, plugins, seeded files) of earlier ones.
  *
+ * Command-surface taxonomy (packs-under-the-tool):
+ *   - WHOLE Tool plugins (a `kind:"tool"` package contributing a subcommand)
+ *     install via `opensip tools install <spec>` — `--project` keeps the install
+ *     inside the consumer's `.runtime/plugins/tool/` (hermetic). There is no
+ *     top-level `opensip plugin` command anymore.
+ *   - Extension PACKS (a `kind:"fit-pack"` package contributing checks) install
+ *     via the domain-bound `opensip fit plugin add <spec>` — the domain is bound
+ *     from the tool (no `--domain`/`--type` flag), and fit/sim packs always land
+ *     project-local in `.runtime/plugins/<domain>/` (no user-global pack path),
+ *     so no `--project` flag either.
+ *
  * Hermeticity notes:
  *   - The consumer starts empty, so the first real scenario is `init`.
- *   - Plugin installs use `--project` so they land in the consumer's
- *     `opensip-cli/.runtime/plugins/<domain>/` rather than polluting the real
- *     user-global `~/.opensip-cli/`.
- *   - Plugin installs pass an explicit `--domain` because a `.tgz` spec cannot
- *     be marker-sniffed before install (kind-detection reads a directory's
- *     package.json, not inside a tarball), so without `--domain` a tool tarball
- *     would mis-route to the default fit domain.
+ *   - The tool install uses `--project` so it lands in the consumer's
+ *     `opensip-cli/.runtime/plugins/tool/` rather than polluting the real
+ *     user-global `~/.opensip-cli/`. Fit-pack installs are project-local by
+ *     construction.
  *
  * Dependency-free (only imports the acceptance core, which itself only uses
  * node:child_process) so smoke-pack.mjs can import it with no build step.
@@ -236,11 +244,12 @@ export function buildPackedSmokeScenarios({
       expect: { exitCode: 0 },
     },
     {
-      // Tool-plugin install path: a `kind:"tool"` package contributes a whole
-      // subcommand. `--domain tool` is required (tarball can't be sniffed);
-      // `--project` keeps it inside the consumer's .runtime (hermetic).
-      name: 'plugin add <tool-plugin> --domain tool --project --json',
-      args: ['plugin', 'add', toolPluginTarball, '--domain', 'tool', '--project', '--json'],
+      // Whole Tool-plugin install path: a `kind:"tool"` package contributes a
+      // whole subcommand. Installed via `tools install` (NOT the retired
+      // top-level `plugin add`); `--project` keeps it inside the consumer's
+      // .runtime (hermetic).
+      name: 'tools install <tool-plugin> --project --json',
+      args: ['tools', 'install', toolPluginTarball, '--project', '--json'],
       cwd: consumerCwd,
       timeout: 120_000,
       expect: {
@@ -250,7 +259,7 @@ export function buildPackedSmokeScenarios({
           return data?.success === true
             ? []
             : [
-                `plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+                `tools-install.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
               ];
         },
       },
@@ -266,10 +275,11 @@ export function buildPackedSmokeScenarios({
     },
     {
       // Fit-pack install path: a `kind:"fit-pack"` package contributes checks.
-      // `--domain fit` is required (tarball can't be sniffed); `--project`
-      // keeps it inside the consumer's .runtime (hermetic).
-      name: 'plugin add <fit-pack> --domain fit --project --json',
-      args: ['plugin', 'add', fitPackTarball, '--domain', 'fit', '--project', '--json'],
+      // Installed via the domain-bound `fit plugin add` (the `fit` primary binds
+      // the domain — no `--domain` flag). Fit packs are project-local by
+      // construction (`.runtime/plugins/fit/`), so no `--project` flag either.
+      name: 'fit plugin add <fit-pack> --json',
+      args: ['fit', 'plugin', 'add', fitPackTarball, '--json'],
       cwd: consumerCwd,
       timeout: 120_000,
       setup: ({ cwd }) => {
@@ -284,7 +294,7 @@ export function buildPackedSmokeScenarios({
           return data?.success === true
             ? []
             : [
-                `plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+                `fit-plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
               ];
         },
       },
