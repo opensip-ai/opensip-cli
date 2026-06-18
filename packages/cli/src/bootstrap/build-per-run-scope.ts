@@ -18,16 +18,18 @@
  * hook stays focused on orchestration.
  */
 
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
-import { resolveEffectiveCloudConfig } from '@opensip-cli/config';
+import { resolveApiKey, resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
   createCapabilityRegistry,
+  currentTraceparent,
   isContributionWithDisposer,
   type LanguageRegistry,
   type Logger,
   PluginIncompatibleError,
   type ProjectContext,
+  type RunCorrelation,
   resolveUserPaths,
   RunScope,
   type ScopeContribution,
@@ -100,6 +102,18 @@ export interface BuildPerRunScopeInput {
   readonly project: ProjectContext;
   readonly runId: string;
   readonly cwd: string;
+  /**
+   * Top-level command name the run started under (e.g. `graph`, `fit`) — the
+   * FIRST segment of the invoked command path, NOT a child's own
+   * `graph-shard-worker`. Stamped into the assembled `RunCorrelation` so a child
+   * worker can attribute itself to the parent command (B2 / GAP e).
+   */
+  readonly parentCommand: string;
+  /**
+   * Owning tool id of the dispatched command (e.g. `graph`, `fit`), resolved by
+   * the bootstrap. Stamped into the assembled `RunCorrelation.tool`.
+   */
+  readonly toolName: string;
   readonly cliDefaults: ReturnType<typeof loadCliDefaults>; // or narrow if we extract a type
   readonly registries: {
     readonly languages: LanguageRegistry;
@@ -151,12 +165,30 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
 
   const { languages, tools } = registries;
 
+  // Resolve the effective cloud config ONCE — both the signal sink (ADR-0008)
+  // and the correlation cloud-active gate (B2) read it; do not resolve twice.
+  const effectiveCloud = resolveEffectiveCloudConfig(cliDefaults.cloud);
+
   // ADR-0008: select the cloud signal sink for this run.
   const signalSink = resolveSignalSink({
     apiKey,
-    cloud: resolveEffectiveCloudConfig(cliDefaults.cloud),
+    cloud: effectiveCloud,
     noCloud,
     cacheDir: join(resolveUserPaths().userHomeDir, 'cache'), // note: resolveUserPaths is from core
+  });
+
+  // B2: assemble the cloud-aware RunCorrelation here — the one place the
+  // resolved cloud identity is in hand (library code deep in the tree cannot
+  // re-resolve it by layering, so it reads `currentScope()?.correlation`).
+  const { correlation, cloudActive, traceId } = assembleCorrelation({
+    runId,
+    tool: input.toolName,
+    parentCommand: input.parentCommand,
+    apiKey,
+    noCloud,
+    effectiveCloud,
+    project,
+    cwd: input.cwd,
   });
 
   // ADR-0023 Phase 4: compose + STRICT-validate config before building the
@@ -201,6 +233,20 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // uninstall`) read them via `currentScope()` — the single source of truth.
     toolManifests: manifests,
     toolProvenance: provenance,
+    // B2: the cloud-aware correlation bag, read downstream via
+    // `currentScope()?.correlation` and forwarded into spawned/forked children.
+    correlation,
+  });
+
+  // Observability of the assembly step (consistent with the contributeScope /
+  // capabilities diagnostics below). Do NOT log the `repo` VALUE at debug — it
+  // can be a filesystem path; log the boolean `hasRepo` instead.
+  scope.diagnostics.event('load', 'debug', 'run correlation assembled', {
+    tool: correlation.tool,
+    parentCommand: correlation.parentCommand,
+    cloudActive,
+    hasTraceId: traceId !== undefined,
+    hasRepo: correlation.repo !== undefined,
   });
 
   // Lifecycle diagnostics: record wiring steps (contributeScope + capabilities)
@@ -264,6 +310,61 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   );
 
   return scope;
+}
+
+/** Inputs for {@link assembleCorrelation}. */
+interface AssembleCorrelationInput {
+  readonly runId: string;
+  readonly tool: string;
+  readonly parentCommand: string;
+  readonly apiKey?: string;
+  readonly noCloud?: boolean;
+  readonly effectiveCloud: { readonly sync?: boolean; readonly endpoint?: string } | undefined;
+  readonly project: ProjectContext;
+  readonly cwd: string;
+}
+
+/**
+ * Assemble the cloud-aware {@link RunCorrelation} bag (B2). Extracted from
+ * {@link buildPerRunScope} so the builder stays under the cognitive-complexity
+ * cap and the cloud-active gate + repo derivation read as one cohesive unit.
+ *
+ * `cloudActive` mirrors `resolveSignalSink`'s gate (a resolved key AND not
+ * `--no-cloud` AND `sync !== false`): an API key resolves (flag → env → config),
+ * egress is not opted out, and the user/project did not set `sync: false`.
+ *
+ * The free-form `repo` join key (project-root basename, or cwd basename when
+ * there is no project — cwd is the floor, Assumption 2) is attached ONLY when
+ * `cloudActive`; never an empty sentinel. `repoId`/`tenantId` are NOT locally
+ * resolvable in the OSS CLI today, so they are omitted (the future
+ * locally-cached surrogate slot). Returns `cloudActive`/`traceId` alongside the
+ * bag for the assembly-step diagnostics.
+ */
+function assembleCorrelation(input: AssembleCorrelationInput): {
+  readonly correlation: RunCorrelation;
+  readonly cloudActive: boolean;
+  readonly traceId: string | undefined;
+} {
+  const cloudActive =
+    resolveApiKey(input.apiKey) !== undefined &&
+    input.noCloud !== true &&
+    input.effectiveCloud?.sync !== false;
+
+  const repoBaseDir =
+    input.project.scope === 'project' ? input.project.projectRoot : input.cwd;
+  const repo = cloudActive ? basename(repoBaseDir) || undefined : undefined;
+
+  const traceId = currentTraceparent();
+
+  const correlation: RunCorrelation = {
+    runId: input.runId,
+    tool: input.tool,
+    parentCommand: input.parentCommand,
+    ...(traceId ? { traceId } : {}),
+    ...(repo ? { repo } : {}),
+  };
+
+  return { correlation, cloudActive, traceId };
 }
 
 // Helper duplicated from pre-action-hook for now (small, can be shared later if it grows).

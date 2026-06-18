@@ -114,10 +114,21 @@ export async function executePostBailoutBootstrap(
 
   record(PRE_ACTION_PHASES.buildScope);
 
+  // B2 / GAP e: parentCommand is the FIRST segment of the invoked command path
+  // (e.g. `graph`, `fit`) — NOT a child's own `graph-shard-worker`. toolName is
+  // the owning tool id of the dispatched command (resolved by the same
+  // owning-tool resolution the preflight uses); fall back to parentCommand when
+  // the command belongs to no tool (CLI-only commands have a 1:1 name).
+  const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
+  const owningTool = d.resolveOwningTool(tools, plan.commandName);
+  const toolName = owningTool?.metadata.id ?? parentCommand;
+
   const scope = d.buildPerRunScope({
     project: plan.project,
     runId: plan.runId,
     cwd: plan.cwd,
+    parentCommand,
+    toolName,
     cliDefaults: plan.cliDefaults,
     registries: { languages, tools },
     manifests,
