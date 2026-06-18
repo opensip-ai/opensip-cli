@@ -19,6 +19,7 @@ import { join, dirname } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { defineRegexListCheck } from '../define-regex-list-check.js';
+import { FileCache } from '../file-cache.js';
 
 import type { Signal } from '@opensip-cli/core';
 
@@ -43,7 +44,10 @@ async function runOnContent(
     const abs = join(cwd, filename);
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, content);
-    const result = await check.run(cwd, { targetFiles: [abs] });
+    // No-scope test path: pass a fresh per-call FileCache explicitly.
+    // createExecutionContext no longer falls back to a module singleton
+    // (parallel-tool-invocations Phase 1); the empty cache reads through to disk.
+    const result = await check.run(cwd, { targetFiles: [abs], fileCache: new FileCache() });
     return result.signals ?? [];
   } finally {
     rmSync(cwd, { recursive: true, force: true });
