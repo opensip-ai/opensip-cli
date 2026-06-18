@@ -41,6 +41,9 @@ import {
   buildCommandRegistrationInput,
 } from './bootstrap/index.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
+import { buildCommandScopeIndex } from './commands/command-scope-index.js';
+import { buildTopLevelHostSpecs } from './commands/host-command-specs.js';
+import { buildHostSubcommandGroups } from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
@@ -88,18 +91,6 @@ async function main(): Promise<void> {
     cliEntryUrl: import.meta.url,
   });
 
-  // Install the pre-action hook AFTER bootstrap so the populated registries +
-  // admitted-tool manifests/provenance are captured directly in the hook
-  // closure — no module-global handoff bag. The hook builds + enters the
-  // per-run RunScope (stamping manifests/provenance onto it); from there every
-  // per-run read goes through `currentScope()`.
-  installPreActionHook(program, cliVersion, {
-    languages: langRegistry,
-    tools: toolRegistry,
-    manifests,
-    provenance,
-  });
-
   const { ctx } = buildToolCliContext({
     render: renderResult,
     liveViews: createLiveViewRegistry(logger),
@@ -107,17 +98,11 @@ async function main(): Promise<void> {
     logger,
   });
 
-  // Step 8 of the tool lifecycle (§5.4): mount each registered tool's commands
-  // through the named sequencer seam. The host owns `program` and passes it in
-  // (launch — the tool context no longer carries a raw-Commander handle, §8); the
-  // one command surface is each tool's declarative commandSpecs.
-  mountToolCommands(toolRegistry, program, ctx);
-
   // Extracted into a thin dedicated builder (roadmap item 2) to keep the
   // top-level composition root focused on sequencing. The builder returns the
   // exact shape consumed by `registerCliCommands`.
   const registrationInput = buildCommandRegistrationInput(toolRegistry);
-  registerCliCommands(program, {
+  const commandCtx = {
     setExitCode: ctx.setExitCode,
     render: renderResult,
     emitJson: ctx.emitJson,
@@ -125,7 +110,36 @@ async function main(): Promise<void> {
     emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
     ...registrationInput,
+  };
+
+  const commandScopes = buildCommandScopeIndex({
+    toolSpecs: registrationInput.toolCommandSpecs,
+    hostSpecs: buildTopLevelHostSpecs(commandCtx),
+    hostGroups: buildHostSubcommandGroups(commandCtx),
   });
+
+  // Install the pre-action hook AFTER bootstrap + command-scope indexing so the
+  // populated registries, admitted-tool manifests/provenance, and live
+  // CommandSpec.scope declarations are captured directly in the hook closure.
+  installPreActionHook(
+    program,
+    cliVersion,
+    {
+      languages: langRegistry,
+      tools: toolRegistry,
+      manifests,
+      provenance,
+    },
+    commandScopes,
+  );
+
+  // Step 8 of the tool lifecycle (§5.4): mount each registered tool's commands
+  // through the named sequencer seam. The host owns `program` and passes it in
+  // (launch — the tool context no longer carries a raw-Commander handle, §8); the
+  // one command surface is each tool's declarative commandSpecs.
+  mountToolCommands(toolRegistry, program, ctx);
+
+  registerCliCommands(program, commandCtx);
 
   // Bare `opensip` → welcome screen. The update check is owned by the
   // pre-action hook (which only runs for actual subcommands), so it naturally

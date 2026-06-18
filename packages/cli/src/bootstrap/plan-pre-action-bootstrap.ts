@@ -14,7 +14,6 @@ import {
   resolveProjectPaths,
   type LoggerOptions,
   type ProjectContext,
-  type ToolRegistry,
 } from '@opensip-cli/core';
 
 import { BootstrapError } from './bootstrap-error.js';
@@ -27,6 +26,7 @@ import {
 } from './pre-action-guards.js';
 
 import type { loadCliDefaults as loadCliDefaultsFn } from './cli-defaults.js';
+import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 
 export interface PlanPreActionBootstrapInput {
   readonly opts: Record<string, unknown>;
@@ -34,8 +34,9 @@ export interface PlanPreActionBootstrapInput {
   readonly cwdExplicit: boolean;
   readonly runId: string;
   readonly commandName: string;
+  readonly commandPath: string;
+  readonly commandScopes: CommandScopeIndex;
   readonly explicitConfigPath?: string;
-  readonly tools: ToolRegistry;
 }
 
 export interface PreActionBootstrapPlan {
@@ -46,27 +47,11 @@ export interface PreActionBootstrapPlan {
   readonly cliDefaults: ReturnType<typeof loadCliDefaultsFn>;
   readonly project: ProjectContext;
   readonly commandName: string;
-  readonly extraAgnostic: ReadonlySet<string>;
+  readonly commandPath: string;
   readonly jsonOutput: boolean;
   /** Per-run logger options computed after bailouts (ADR-0053). */
   readonly runLoggerOptions: LoggerOptions;
   readonly completedThrough: typeof PRE_ACTION_PHASES.bailoutWindow;
-}
-
-/** Collect tool CommandSpecs that declare `scope: 'none'` for no-project guard. */
-export function collectExtraAgnosticCommands(tools: ToolRegistry): ReadonlySet<string> {
-  const extra = new Set<string>();
-  for (const tool of tools.list()) {
-    for (const c of tool.commands || []) {
-      if (c.scope === 'none') {
-        extra.add(c.name);
-        for (const alias of c.aliases ?? []) {
-          extra.add(alias);
-        }
-      }
-    }
-  }
-  return extra;
 }
 
 /**
@@ -77,7 +62,16 @@ export function collectExtraAgnosticCommands(tools: ToolRegistry): ReadonlySet<s
  *   guard bails out before project side effects are allowed.
  */
 export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreActionBootstrapPlan {
-  const { opts, cwd, cwdExplicit, runId, commandName, tools, explicitConfigPath } = input;
+  const {
+    opts,
+    cwd,
+    cwdExplicit,
+    runId,
+    commandName,
+    commandPath,
+    commandScopes,
+    explicitConfigPath,
+  } = input;
 
   const cliDefaults = loadCliDefaults(cwd, explicitConfigPath);
   mergeConfigDefaults(opts, cliDefaults);
@@ -102,10 +96,8 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   opts.projectContext = project;
   opts.cwdExplicit = cwdExplicit;
 
-  const extraAgnostic = collectExtraAgnosticCommands(tools);
-
   checkSchemaVersionAndBailout(project, runId);
-  checkNoProjectAndBailout(project, cwd, commandName, runId, extraAgnostic);
+  checkNoProjectAndBailout(project, cwd, commandPath, runId, commandScopes);
   warnAboutPhantomRuntimes(project, opts.json === true);
 
   const runLoggerOptions: LoggerOptions = {
@@ -125,7 +117,7 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
     cliDefaults,
     project,
     commandName,
-    extraAgnostic,
+    commandPath,
     jsonOutput: opts.json === true,
     runLoggerOptions,
     completedThrough: PRE_ACTION_PHASES.bailoutWindow,

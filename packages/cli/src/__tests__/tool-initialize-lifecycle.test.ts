@@ -24,6 +24,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
 import { resetInitializedToolIdsForTest } from '../bootstrap/process-idempotency.js';
 import { mountAllToolCommands } from '../bootstrap/register-tools.js';
+import { buildCommandScopeIndex } from '../commands/command-scope-index.js';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/sample-project');
 
@@ -100,12 +101,21 @@ function buildProgram(tool: Tool): Command {
   // The hook captures the registries + admitted-tool facts in its closure
   // (the production shape after eliminating the module-global handoff bag);
   // this fixture run admits a single tool and no manifests/provenance.
-  installPreActionHook(program, 'test', {
-    languages: new LanguageRegistry(),
-    tools,
-    manifests: [],
-    provenance: [],
-  });
+  installPreActionHook(
+    program,
+    'test',
+    {
+      languages: new LanguageRegistry(),
+      tools,
+      manifests: [],
+      provenance: [],
+    },
+    buildCommandScopeIndex({
+      toolSpecs: tool.commandSpecs ?? [],
+      hostSpecs: [],
+      hostGroups: [],
+    }),
+  );
   mountAllToolCommands(tools, program, stubCtx());
   return program;
 }

@@ -2,6 +2,28 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.6] - 2026-06-18
+
+A maintenance release focused on closing unwired command-surface gaps and
+cleaning release guardrails. No intended breaking CLI behavior changes.
+
+### Changed
+
+- Made `CommandSpec.scope` the runtime source of truth for the no-project
+  bootstrap guard across top-level host commands, grouped host leaves, and Tool
+  command specs.
+- Aligned the knip guardrail with recursive project-local fitness check
+  discovery and the path-spawned `tools validate` runtime probe entry.
+
+### Fixed
+
+- Restored documented no-project behavior for `agent-catalog`, `tools list`,
+  `tools validate`, and global-default `tools install`, while keeping
+  project-scoped commands such as `sessions list`, `report`, and
+  `tools data-purge` fail-closed before handler dispatch.
+- Removed stale schedule-config wording from the vocabulary docs so scheduling
+  remains documented only as a strict-rejected roadmap field.
+
 ## [0.1.5] - 2026-06-17
 
 A maintenance release focused on architecture-review follow-through and release

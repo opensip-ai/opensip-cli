@@ -21,31 +21,9 @@ import {
 import { BootstrapError } from './bootstrap-error.js';
 import { formatCliTooOldMessage, formatNoProjectFoundMessage } from './pre-action-messages.js';
 
-const MODULE_TAG = 'cli:bootstrap';
+import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 
-/**
- * Commands that operate WITHOUT requiring a project context. These don't
- * read project files or the datastore; running them from a directory
- * with no opensip-cli project is legitimate.
- *
- * Everything else is project-scoped: when `project.scope === 'none'`,
- * the hook emits the "No OpenSIP CLI project found" error and exits 2.
- *
- * Note: `uninstall --user` is project-agnostic, but `uninstall --project`
- * requires one. The check is per-command name here; uninstall's own
- * mode-specific guarding lives in its action body.
- *
- * The base list covers pure host commands. Tool CommandSpecs that declare
- * `scope: 'none'` are added dynamically at runtime (see pre-action-hook)
- * so the declared `CommandSpec.scope` actually controls behavior (previously
- * this list was the only source of truth, making the field dead for tools).
- */
-const PROJECT_AGNOSTIC_COMMANDS: ReadonlySet<string> = new Set([
-  'init',
-  'configure',
-  'completion',
-  'uninstall',
-]);
+const MODULE_TAG = 'cli:bootstrap';
 
 /**
  * Schema-version bailout. THROWS a {@link BootstrapError} (exit 2) with the
@@ -108,18 +86,17 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
 export function checkNoProjectAndBailout(
   project: ProjectContext,
   cwd: string,
-  cmdName: string,
+  commandPath: string,
   runId: string,
-  extraAgnostic: ReadonlySet<string> = new Set(),
+  commandScopes: CommandScopeIndex,
 ): void {
-  const effective = new Set([...PROJECT_AGNOSTIC_COMMANDS, ...extraAgnostic]);
-  if (project.scope !== 'none' || effective.has(cmdName)) return;
+  if (project.scope !== 'none' || commandScopes.get(commandPath) === 'none') return;
   logger.warn({
     evt: 'cli.project.not-found',
     module: MODULE_TAG,
     runId,
     cwd,
-    command: cmdName,
+    command: commandPath,
   });
   throw new BootstrapError({
     message: `No opensip-cli.config.yml found. Searched from ${cwd} upward.`,

@@ -7,7 +7,7 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["opensip-cli/fit/checks/*.mjs"],
+      "entry": ["opensip-cli/fit/checks/**/*.mjs"],
       "ignoreDependencies": [
         "@opensip-cli/checks-cpp",
         "@opensip-cli/checks-go",
@@ -24,7 +24,7 @@
       ]
     },
     "packages/cli": {
-      "entry": ["src/__tests__/fixtures/**/*.{ts,js}"],
+      "entry": ["src/__tests__/fixtures/**/*.{ts,js}", "src/commands/tools/runtime-probe-entry.ts"],
       "ignoreDependencies": [
         "@opensip-cli/checks-cpp",
         "@opensip-cli/checks-go",

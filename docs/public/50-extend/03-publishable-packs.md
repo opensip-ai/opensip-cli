@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.5
+release: v0.1.6
 title: "Publishable packs"
 audience: [plugin-authors]
 purpose: "Author and publish fit packs or sim scenario packs: workspace package skeleton, discovery contracts, and the migration recipe from loose .mjs files."
@@ -123,8 +123,8 @@ and `defineLoadScenario(...)` / `defineChaosScenario(...)` exports.
   "type": "module",
   "opensipTools": { "kind": "fit-pack" },
   "peerDependencies": {
-    "@opensip-cli/fitness": "^0.1.5",
-    "@opensip-cli/core": "^0.1.5"
+    "@opensip-cli/fitness": "^0.1.6",
+    "@opensip-cli/core": "^0.1.6"
   },
   "scripts": {
     "build": "tsc"

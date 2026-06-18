@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.5
+release: v0.1.6
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -145,9 +145,9 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v0.1.5 against:
+Last verified at v0.1.6 against:
 
-- `packages/` directory listing — **33 publishable packages** total (all at `0.1.5`), plus one workspace-private test-support package:
+- `packages/` directory listing — **33 publishable packages** total (all at `0.1.6`), plus one workspace-private test-support package:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + tree-sitter + cli-ui): 4 — `datastore`, `contracts`, `tree-sitter`, `cli-ui`
   - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 — `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`

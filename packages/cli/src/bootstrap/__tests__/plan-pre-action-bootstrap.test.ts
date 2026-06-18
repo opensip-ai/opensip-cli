@@ -7,14 +7,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  defineCommand,
   LanguageRegistry,
   ToolRegistry,
+  type CommandScopeRequirement,
+  type CommandSpec,
   type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
@@ -22,9 +26,39 @@ import { POST_BAILOUT_PHASE_ORDER, PRE_ACTION_PHASES } from '../pre-action-boots
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
 
-const noopTool = (name: string, scope?: 'project' | 'none'): Tool => ({
+function scopeSpec(name: string, scope: CommandScopeRequirement): CommandSpec {
+  return defineCommand({
+    name,
+    description: `${name} command`,
+    commonFlags: [],
+    scope,
+    output: 'command-result',
+    handler: () => undefined,
+  });
+}
+
+const COMMAND_SCOPES = buildCommandScopeIndex({
+  hostSpecs: [
+    scopeSpec('init', 'none'),
+    scopeSpec('configure', 'none'),
+    scopeSpec('completion', 'none'),
+    scopeSpec('agent-catalog', 'none'),
+    scopeSpec('fit', 'project'),
+    scopeSpec('fit-list', 'project'),
+  ],
+  hostGroups: [
+    {
+      name: 'tools',
+      description: 'Tools group',
+      leaves: [scopeSpec('list', 'none'), scopeSpec('data-purge', 'project')],
+    },
+  ],
+  toolSpecs: [],
+});
+
+const noopTool = (name: string): Tool => ({
   metadata: { id: name, name, version: '0', description: name },
-  commands: [{ name, description: name, scope }],
+  commands: [{ name, description: name }],
   commandSpecs: [],
 });
 
@@ -50,7 +84,8 @@ describe('planPreActionBootstrap', () => {
         cwdExplicit: false,
         runId: 'RUN_test',
         commandName: 'fit-list',
-        tools: new ToolRegistry(),
+        commandPath: 'fit-list',
+        commandScopes: COMMAND_SCOPES,
       }),
     ).toThrow(BootstrapError);
     rmSync(tmp, { recursive: true, force: true });
@@ -65,7 +100,8 @@ describe('planPreActionBootstrap', () => {
         cwdExplicit: false,
         runId: 'RUN_test',
         commandName: 'fit',
-        tools: new ToolRegistry(),
+        commandPath: 'fit',
+        commandScopes: COMMAND_SCOPES,
       }),
     ).toThrow(BootstrapError);
     rmSync(tmp, { recursive: true, force: true });
@@ -79,27 +115,43 @@ describe('planPreActionBootstrap', () => {
       cwdExplicit: false,
       runId: 'RUN_test',
       commandName: 'init',
-      tools: new ToolRegistry(),
+      commandPath: 'init',
+      commandScopes: COMMAND_SCOPES,
     });
     expect(plan.completedThrough).toBe(PRE_ACTION_PHASES.bailoutWindow);
     expect(plan.project.scope).toBe('none');
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('tool scope:none commands are agnostic', () => {
+  it('scope:none command paths are agnostic', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'opensip-plan-'));
-    const tools = new ToolRegistry();
-    tools.register(noopTool('configure', 'none'));
     const plan = planPreActionBootstrap({
       opts: {},
       cwd: tmp,
       cwdExplicit: false,
       runId: 'RUN_test',
-      commandName: 'configure',
-      tools,
+      commandName: 'list',
+      commandPath: 'tools list',
+      commandScopes: COMMAND_SCOPES,
     });
     expect(plan.project.scope).toBe('none');
     expect(plan.completedThrough).toBe(PRE_ACTION_PHASES.bailoutWindow);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('scope:project grouped command paths still require a project', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-plan-'));
+    expect(() =>
+      planPreActionBootstrap({
+        opts: {},
+        cwd: tmp,
+        cwdExplicit: false,
+        runId: 'RUN_test',
+        commandName: 'data-purge',
+        commandPath: 'tools data-purge',
+        commandScopes: COMMAND_SCOPES,
+      }),
+    ).toThrow(BootstrapError);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -112,7 +164,8 @@ describe('planPreActionBootstrap', () => {
       cwdExplicit: false,
       runId: 'RUN_test',
       commandName: 'fit-list',
-      tools: new ToolRegistry(),
+      commandPath: 'fit-list',
+      commandScopes: COMMAND_SCOPES,
     });
     expect(plan.project.scope).toBe('project');
     expect(plan.runLoggerOptions.runId).toBe('RUN_test');
@@ -129,8 +182,9 @@ describe('planPreActionBootstrap', () => {
         cwdExplicit: false,
         runId: 'RUN_test',
         commandName: 'fit',
+        commandPath: 'fit',
+        commandScopes: COMMAND_SCOPES,
         explicitConfigPath: join(tmp, 'missing.yml'),
-        tools: new ToolRegistry(),
       }),
     ).toThrow(BootstrapError);
     rmSync(tmp, { recursive: true, force: true });
@@ -147,7 +201,8 @@ describe('executePostBailoutBootstrap phase ordering', () => {
       cwdExplicit: false,
       runId: 'RUN_order',
       commandName: 'init',
-      tools: new ToolRegistry(),
+      commandPath: 'init',
+      commandScopes: COMMAND_SCOPES,
     });
 
     await executePostBailoutBootstrap(
@@ -185,7 +240,8 @@ describe('executePostBailoutBootstrap phase ordering', () => {
       cwdExplicit: false,
       runId: 'RUN_scope',
       commandName: 'fit-list',
-      tools: runtime.tools,
+      commandPath: 'fit-list',
+      commandScopes: COMMAND_SCOPES,
     });
 
     const result = await executePostBailoutBootstrap(
@@ -237,7 +293,8 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         cwdExplicit: false,
         runId: 'RUN_bail',
         commandName,
-        tools: new ToolRegistry(),
+        commandPath: commandName,
+        commandScopes: COMMAND_SCOPES,
       }),
     ).toThrow(BootstrapError);
 

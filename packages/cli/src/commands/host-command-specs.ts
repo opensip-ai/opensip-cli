@@ -91,7 +91,7 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
         default: false,
       },
     ],
-    scope: 'project',
+    scope: 'none',
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as InitOpts;
@@ -257,7 +257,7 @@ function buildUninstallSpec(): HostSpec {
       },
       { flag: '--json', description: 'Output structured JSON', default: false },
     ],
-    scope: 'project',
+    scope: 'none',
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as UninstallOpts;

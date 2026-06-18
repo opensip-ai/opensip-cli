@@ -9,10 +9,13 @@
 
 import { currentScope, generatePrefixedId } from '@opensip-cli/core';
 
+import { commandPath } from '../commands/command-scope-index.js';
+
 import { executePostBailoutBootstrap } from './execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from './plan-pre-action-bootstrap.js';
 
 import type { PreActionRuntime } from './pre-action-runtime.js';
+import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 import type { Command } from 'commander';
 
 export { resolveOwningTool } from './owning-tool-init.js';
@@ -22,6 +25,7 @@ export function installPreActionHook(
   program: Command,
   version: string,
   runtime: PreActionRuntime,
+  commandScopes: CommandScopeIndex,
 ): void {
   program.hook('preAction', async (_thisCommand, actionCommand) => {
     const runId = generatePrefixedId('run');
@@ -35,8 +39,9 @@ export function installPreActionHook(
       cwdExplicit,
       runId,
       commandName: actionCommand.name(),
+      commandPath: commandPath(actionCommand),
+      commandScopes,
       explicitConfigPath: opts.config as string | undefined,
-      tools: runtime.tools,
     });
 
     const { scope } = await executePostBailoutBootstrap({

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.5
+release: v0.1.6
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-cli. Read this once before going deeper."
@@ -85,7 +85,7 @@ The kernel exports `createSignal(input)` from [`packages/core/src/types/signal.t
 
 ## Signalers config
 
-The "signalers" name applies to a *configuration section*, not a rule primitive. The `signalers` directory ([`packages/fitness/engine/src/signalers/`](../../../packages/fitness/engine/src/signalers/)) owns the loader and Zod schema for `opensip-cli.config.yml`. The schema covers `globalExcludes`, `targets`, `checkOverrides`, fitness/simulation configuration (`failOnErrors`, `maxParallel`, `disabledChecks`, `schedules`), and the `cli` defaults block.
+The "signalers" name applies to a *configuration section*, not a rule primitive. The `signalers` directory ([`packages/fitness/engine/src/signalers/`](../../../packages/fitness/engine/src/signalers/)) owns the loader and Zod schema for `opensip-cli.config.yml`. The schema covers `globalExcludes`, `targets`, `checkOverrides`, current fitness/simulation configuration (`failOnErrors`, `maxParallel`, `disabledChecks`, recipe defaults), and the `cli` defaults block. Scheduling keys are not part of the current schema; see the configuration reference roadmap notes for the strict rejection behavior.
 
 The name reflects the conceptual model: opensip-cli' signal producers (fitness, simulation, future audit) are "signalers", and this is their config file. There is no separate "signaler" rule type — every rule is a `Check`. If you want a configuration-driven shape over `defineCheck`, that's something a check pack can build on top, but the kernel doesn't ship one.
 

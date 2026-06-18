@@ -7,14 +7,46 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { LanguageRegistry, ToolRegistry } from '@opensip-cli/core';
+import { defineCommand, LanguageRegistry, ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
+import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
+
+const COMMAND_SCOPES = buildCommandScopeIndex({
+  hostSpecs: [
+    defineCommand({
+      name: 'init',
+      description: 'init command',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => undefined,
+    }),
+    defineCommand({
+      name: 'fit',
+      description: 'fit command',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      handler: () => undefined,
+    }),
+    defineCommand({
+      name: 'fit-list',
+      description: 'fit-list command',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      handler: () => undefined,
+    }),
+  ],
+  hostGroups: [],
+  toolSpecs: [],
+});
 
 function runtime(): PreActionRuntime {
   return {
@@ -81,7 +113,8 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
         cwdExplicit: false,
         runId: 'RUN_bailout',
         commandName,
-        tools: new ToolRegistry(),
+        commandPath: commandName,
+        commandScopes: COMMAND_SCOPES,
       },
       {
         buildPerRunScope,
@@ -125,7 +158,8 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
         cwdExplicit: false,
         runId: 'RUN_ok',
         commandName: 'init',
-        tools: new ToolRegistry(),
+        commandPath: 'init',
+        commandScopes: COMMAND_SCOPES,
       },
       {
         buildPerRunScope,
