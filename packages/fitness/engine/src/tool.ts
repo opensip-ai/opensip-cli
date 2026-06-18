@@ -54,7 +54,9 @@ import {
   fitBaselineExportCommandSpec,
   fitExportCommandSpec,
   fitListCommandSpec,
+  fitListGroupedCommandSpec,
   fitRecipesCommandSpec,
+  fitRecipesGroupedCommandSpec,
 } from './cli/fit/fit-aux-command-specs.js';
 import { buildFitCommandSpec, FIT_LIVE_VIEW_KEY } from './cli/fit/fit-command-spec.js';
 import { renderFitLive } from './cli/fit-runner.js';
@@ -105,6 +107,25 @@ const FIT_LIST: ToolCommandDescriptor = {
 
 const FIT_RECIPES: ToolCommandDescriptor = {
   name: 'fit-recipes',
+  description: 'List available fitness recipes',
+};
+
+/**
+ * Grouped Tier-2 children (tool-command-surface-taxonomy Task 3.1). `fit list` /
+ * `fit recipes` nest under the `fit` primary (`parent: 'fit'`) so they read as
+ * the canonical `<tool> <verb>` grammar. The legacy flat `fit-list` /
+ * `fit-recipes` descriptors COEXIST as working aliases; both share the same
+ * handler by reference.
+ */
+const FIT_LIST_GROUPED: ToolCommandDescriptor = {
+  name: 'list',
+  parent: 'fit',
+  description: 'List available fitness checks',
+};
+
+const FIT_RECIPES_GROUPED: ToolCommandDescriptor = {
+  name: 'recipes',
+  parent: 'fit',
   description: 'List available fitness recipes',
 };
 
@@ -193,6 +214,11 @@ const fitCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   buildFitCommandSpec(setUpFitLiveView),
   fitListCommandSpec,
   fitRecipesCommandSpec,
+  // Grouped Tier-2 children (Task 3.1) — `fit list` / `fit recipes` nest under
+  // the `fit` primary via the Phase 0 nested-mount capability, reusing the flat
+  // handlers by reference. The flat aliases above coexist.
+  fitListGroupedCommandSpec,
+  fitRecipesGroupedCommandSpec,
   fitBaselineExportCommandSpec,
   // Canonical nested export (Task 2.2) — mounts as `fit export` under the `fit`
   // primary via the Phase 0 nested-mount capability.
@@ -288,7 +314,16 @@ export const fitnessTool: Tool = {
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  commands: [FIT, FIT_LIST, FIT_RECIPES, FIT_BASELINE_EXPORT, FIT_EXPORT, FIT_RUN_WORKER],
+  commands: [
+    FIT,
+    FIT_LIST,
+    FIT_RECIPES,
+    FIT_LIST_GROUPED,
+    FIT_RECIPES_GROUPED,
+    FIT_BASELINE_EXPORT,
+    FIT_EXPORT,
+    FIT_RUN_WORKER,
+  ],
   pluginLayout: FIT_PLUGIN_LAYOUT,
   // Release 2.11.0 Phase 4: fitness declares its command surface; the host
   // mounts each spec via mountCommandSpec. The deprecated `register()` fallback

@@ -54,6 +54,12 @@ describe('graphTool contract conformance (AC-2)', () => {
       // mounts as `graph export` (parent: 'graph').
       'export',
       'graph-recipes',
+      // Grouped Tier-2 children (Task 3.1/3.2/3.4) — name 'recipes' / 'lookup' /
+      // 'index' / 'list', parent 'graph'.
+      'recipes',
+      'lookup',
+      'index',
+      'list',
     ]);
   });
 
@@ -72,6 +78,12 @@ describe('graphTool contract conformance (AC-2)', () => {
       // Canonical nested export spec (Task 2.1) — name 'export', parent 'graph'.
       'export',
       'graph-recipes',
+      // Grouped Tier-2 children (Task 3.1/3.2/3.4) — name 'recipes' / 'lookup' /
+      // 'index' / 'list', parent 'graph'; reuse the flat handlers.
+      'recipes',
+      'lookup',
+      'index',
+      'list',
       'graph-equivalence-check',
     ]);
   });

@@ -50,12 +50,23 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
     id: 'fit',
     dir: join(REPO_ROOT, 'packages', 'fitness', 'engine'),
     // Task 2.2 adds the canonical nested `export` (parent: 'fit') command.
-    commands: ['fit', 'fit-list', 'fit-recipes', 'fit-baseline-export', 'export', 'fit-run-worker'],
+    // Task 3.1 adds the grouped `list` / `recipes` (parent: 'fit') children.
+    commands: [
+      'fit',
+      'fit-list',
+      'fit-recipes',
+      'list',
+      'recipes',
+      'fit-baseline-export',
+      'export',
+      'fit-run-worker',
+    ],
   },
   {
     id: 'sim',
     dir: join(REPO_ROOT, 'packages', 'simulation', 'engine'),
-    commands: ['sim', 'sim-run-worker'],
+    // Task 3.3 adds the grouped `recipes` (parent: 'sim') discoverability child.
+    commands: ['sim', 'recipes', 'sim-run-worker'],
   },
   {
     id: 'graph',
@@ -73,6 +84,12 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
       // Task 2.1 adds the canonical nested `export` (parent: 'graph') command.
       'export',
       'graph-recipes',
+      // Task 3.1/3.2/3.4 add the grouped `recipes` / `lookup` / `index` / `list`
+      // (parent: 'graph') children.
+      'recipes',
+      'lookup',
+      'index',
+      'list',
     ],
   },
 ];

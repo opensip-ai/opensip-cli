@@ -83,9 +83,10 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
     expect(mod.tool?.metadata.name).toBe('fit');
     expect(mod.tool?.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
-    // fit, fit-list, fit-recipes, fit-baseline-export, export (canonical, Task 2.2),
+    // fit, fit-list, fit-recipes, list (grouped, Task 3.1), recipes (grouped,
+    // Task 3.1), fit-baseline-export, export (canonical, Task 2.2),
     // fit-run-worker (internal).
-    expect(mod.tool?.commandSpecs?.length).toBe(6);
+    expect(mod.tool?.commandSpecs?.length).toBe(8);
   });
 
   it('the externally-loaded fit has a command surface identical to the bundled fit', async () => {

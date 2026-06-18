@@ -33,8 +33,12 @@ import {
   graphCatalogExportCommandSpec,
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
+  graphIndexGroupedCommandSpec,
+  graphListCommandSpec,
   graphLookupCommandSpec,
+  graphLookupGroupedCommandSpec,
   graphRecipesCommandSpec,
+  graphRecipesGroupedCommandSpec,
   graphSarifExportCommandSpec,
   graphShardWorkerCommandSpec,
   graphSymbolIndexCommandSpec,
@@ -138,6 +142,43 @@ const GRAPH_RECIPES: ToolCommandDescriptor = {
 };
 
 /**
+ * Grouped Tier-2 children (tool-command-surface-taxonomy Task 3.1 / 3.2 / 3.4).
+ * `graph recipes` / `graph lookup` / `graph index` nest under the `graph`
+ * primary (`parent: 'graph'`) so they read as the canonical `<tool> <verb>`
+ * grammar; the legacy flat `graph-recipes` / `graph-lookup` /
+ * `graph-symbol-index` descriptors COEXIST as working aliases (same handler by
+ * reference). `graph list` is a NEW discoverability command (Task 3.4) — there
+ * is no legacy flat `graph-list` to alias.
+ */
+const GRAPH_RECIPES_GROUPED: ToolCommandDescriptor = {
+  name: 'recipes',
+  parent: 'graph',
+  description: 'List available graph recipes',
+};
+
+const GRAPH_LOOKUP_GROUPED: ToolCommandDescriptor = {
+  name: 'lookup',
+  parent: 'graph',
+  description: 'Look up function occurrences by simple name from the persisted catalog',
+};
+
+// Q7 (open): `graph index` currently both builds and queries; the build/query
+// verb split (`graph index build` | `graph index query`) is deferred. Do NOT add
+// a `--build` flag here without resolving Q7.
+const GRAPH_INDEX_GROUPED: ToolCommandDescriptor = {
+  name: 'index',
+  parent: 'graph',
+  description:
+    'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
+};
+
+const GRAPH_LIST: ToolCommandDescriptor = {
+  name: 'list',
+  parent: 'graph',
+  description: 'List available graph rules',
+};
+
+/**
  * The CANONICAL graph export command (tool-command-surface-taxonomy Task 2.1).
  * Nested under the `graph` primary (`parent: 'graph'`) so it reads as
  * `graph export --format sarif|catalog|baseline`. The legacy flat-root
@@ -177,6 +218,13 @@ const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
   // `graph` primary via the Phase 0 nested-mount capability.
   graphExportCommandSpec,
   graphRecipesCommandSpec,
+  // Grouped Tier-2 children (Task 3.1 / 3.2 / 3.4) — `graph recipes` /
+  // `graph lookup` / `graph index` nest under the `graph` primary, reusing the
+  // flat handlers by reference; `graph list` is a new discoverability command.
+  graphRecipesGroupedCommandSpec,
+  graphLookupGroupedCommandSpec,
+  graphIndexGroupedCommandSpec,
+  graphListCommandSpec,
   graphEquivalenceCheckCommandSpec,
 ];
 
@@ -286,6 +334,10 @@ export const graphTool: Tool = {
     GRAPH_SARIF_EXPORT,
     GRAPH_EXPORT,
     GRAPH_RECIPES,
+    GRAPH_RECIPES_GROUPED,
+    GRAPH_LOOKUP_GROUPED,
+    GRAPH_INDEX_GROUPED,
+    GRAPH_LIST,
   ],
   // Launch Phase 5: graph declares its command surface; the host mounts
   // each spec via mountCommandSpec. The deprecated `register()` fallback is gone

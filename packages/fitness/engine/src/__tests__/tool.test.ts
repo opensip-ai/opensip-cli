@@ -58,6 +58,10 @@ describe('fitnessTool contract conformance', () => {
       'fit',
       'fit-list',
       'fit-recipes',
+      // Grouped Tier-2 children (tool-command-surface-taxonomy Task 3.1) —
+      // name 'list' / 'recipes', parent 'fit'; reuse the flat handlers.
+      'list',
+      'recipes',
       'fit-baseline-export',
       // Canonical nested export (tool-command-surface-taxonomy Task 2.2) —
       // name 'export', parent 'fit'.

@@ -25,6 +25,7 @@ import { commonFlags, EXIT_CODES } from '@opensip-cli/contracts';
 import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
+import { listGraphRules } from '../graph-list.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
 import { listGraphRecipes } from '../graph-recipes.js';
 import { handleGraphError } from '../graph.js';
@@ -710,4 +711,108 @@ export const graphRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   scope: 'project',
   output: 'command-result',
   handler: async () => listGraphRecipes(),
+});
+
+// =============================================================================
+// GROUPED <tool> <verb> CHILDREN (tool-command-surface-taxonomy Task 3.1 / 3.2)
+//
+// The canonical Tier-2 grammar is `graph recipes` / `graph lookup` / `graph
+// index`, mounted as SUBCOMMANDS of the `graph` primary via the Phase 0
+// nested-mount capability (`parent: 'graph'`). The legacy flat `graph-recipes`
+// / `graph-lookup` / `graph-symbol-index` commands COEXIST as working aliases.
+// Each grouped form REUSES its flat counterpart's handler by reference — no
+// handler duplication, no behaviour divergence.
+// =============================================================================
+
+/** `graph recipes` — grouped alias of `graph-recipes` (canonical Tier-2 form). */
+export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'recipes',
+  parent: 'graph',
+  description: 'List available graph recipes',
+  commonFlags: ['json'],
+  scope: 'project',
+  output: 'command-result',
+  handler: graphRecipesCommandSpec.handler,
+});
+
+/** `graph lookup <name>` — grouped alias of `graph-lookup` (canonical Tier-2 form). */
+export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'lookup',
+  parent: 'graph',
+  description: 'Look up function occurrences by simple name from the persisted catalog',
+  commonFlags: ['json'],
+  args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
+  scope: 'project',
+  output: RAW_STREAM,
+  rawStreamReason: 'lookup',
+  handler: graphLookupCommandSpec.handler,
+});
+
+/**
+ * `graph index` — grouped alias of `graph-symbol-index` (canonical Tier-2 form,
+ * tool-command-surface-taxonomy Task 3.2). Reuses the flat handler verbatim, so
+ * it preserves today's behaviour: it BOTH builds and queries the symbol index,
+ * emitting `symbolindex.json`.
+ *
+ * Q7 (open): `graph index` currently both builds and queries; the build/query
+ * verb split (`graph index build` | `graph index query`) is deferred. Do NOT add
+ * a `--build` flag here without resolving Q7.
+ */
+export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'index',
+  parent: 'graph',
+  description:
+    'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
+  commonFlags: [],
+  options: [
+    {
+      flag: OPT_CWD,
+      description: 'Target directory (out path resolves against this)',
+      default: process.cwd(),
+    },
+    {
+      flag: '--out',
+      value: '<path>',
+      description: 'Output file path',
+      default: 'symbolindex.json',
+    },
+  ],
+  scope: 'project',
+  output: RAW_STREAM,
+  rawStreamReason: REASON_FILE_EXPORT,
+  handler: graphSymbolIndexCommandSpec.handler,
+});
+
+/**
+ * `graph list` — list available graph rules (tool-command-surface-taxonomy Task
+ * 3.4). The natural analog of `fit list` (which lists checks): graph *rules* are
+ * the listable surface. There is no legacy flat `graph-list` to alias — this is
+ * a NEW discoverability command, mounted only in the canonical nested
+ * `<tool> <verb>` form (`parent: 'graph'`).
+ *
+ * `command-result`: the handler returns a `ListChecksResult`; the host
+ * dispatches it through the shared seam (`--json` → JSON, else the shared
+ * `viewListChecks` renderer with the graph-supplied title) — the same path
+ * `graph recipes` / `fit list` use.
+ */
+export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'list',
+  parent: 'graph',
+  description: 'List available graph rules',
+  commonFlags: ['cwd', 'json'],
+  scope: 'project',
+  output: 'command-result',
+  handler: async () => listGraphRules(),
 });

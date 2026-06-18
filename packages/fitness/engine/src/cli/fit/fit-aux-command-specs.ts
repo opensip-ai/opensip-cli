@@ -62,6 +62,45 @@ export const fitRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defin
   },
 });
 
+// =============================================================================
+// GROUPED <tool> <verb> CHILDREN (tool-command-surface-taxonomy Task 3.1)
+//
+// The canonical Tier-2 grammar is `fit list` / `fit recipes`, mounted as
+// SUBCOMMANDS of the `fit` primary via the Phase 0 nested-mount capability
+// (`parent: 'fit'`). The legacy flat `fit-list` / `fit-recipes` commands above
+// COEXIST as working aliases. Both forms share the SAME handler body by
+// reference (`listChecks` / `listRecipes`) — no handler duplication, no
+// behaviour divergence.
+// =============================================================================
+
+/** `fit list` — grouped alias of `fit-list` (canonical Tier-2 form). */
+export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'list',
+  parent: 'fit',
+  description: 'List available fitness checks',
+  commonFlags: ['cwd', 'json'],
+  scope: 'project',
+  output: 'command-result',
+  handler: fitListCommandSpec.handler,
+});
+
+/** `fit recipes` — grouped alias of `fit-recipes` (canonical Tier-2 form). */
+export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'recipes',
+  parent: 'fit',
+  description: 'List available fitness recipes',
+  commonFlags: ['cwd', 'json'],
+  scope: 'project',
+  output: 'command-result',
+  handler: fitRecipesCommandSpec.handler,
+});
+
 /**
  * The canonical fit export formats (tool-command-surface-taxonomy Task 2.2).
  * Single value today (`baseline`) but declared as a `choices` enum so adding

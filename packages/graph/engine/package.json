@@ -87,6 +87,22 @@
       {
         "name": "graph-recipes",
         "description": "List available graph recipes"
+      },
+      {
+        "name": "recipes",
+        "description": "List available graph recipes"
+      },
+      {
+        "name": "lookup",
+        "description": "Look up function occurrences by simple name from the persisted catalog"
+      },
+      {
+        "name": "index",
+        "description": "Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog"
+      },
+      {
+        "name": "list",
+        "description": "List available graph rules"
       }
     ],
     "capabilities": [
