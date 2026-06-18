@@ -13,10 +13,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ConfigurationError, enterScope, RunScope } from '@opensip-cli/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ConfigurationError, currentScope, enterScope, RunScope } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
+import { FileCache } from '../../framework/file-cache.js';
 import { CheckRegistry } from '../../framework/registry.js';
 import { installFitnessSubscope } from '../../framework/scope-registry.js';
 import { fitnessTool } from '../../tool.js';
@@ -698,5 +699,65 @@ describe('FitnessRecipeService — includeViolations', () => {
     const cr = result.checkResults[0];
     expect(cr?.violations).toBeDefined();
     expect(cr?.violations?.length).toBeGreaterThan(0);
+  });
+});
+
+// =============================================================================
+// CACHE-INSTANCE IDENTITY (parallel-tool-invocations Phase 1)
+// =============================================================================
+
+describe('FitnessRecipeService — per-run FileCache identity', () => {
+  it('prewarm, exec read, and scope.fitness.fileCache are the SAME instance', async () => {
+    // The `beforeEach` entered a RunScope carrying fitness's subscope, so
+    // `currentScope()?.fitness?.fileCache` is the canonical per-run cache. The
+    // service must resolve THAT instance for prewarm AND the exec read AND clear
+    // THAT instance in `finally` — never a divergent function-local. We capture
+    // the `this` receiver of `prewarm` (the prewarm instance) and of `get` (the
+    // exec read instance) and assert both equal the scope cache.
+    const scopeCache = currentScope()?.fitness?.fileCache;
+    expect(scopeCache).toBeInstanceOf(FileCache);
+
+    let prewarmedInstance: FileCache | undefined;
+    let execReadInstance: FileCache | undefined;
+
+    const prewarmSpy = vi
+      .spyOn(FileCache.prototype, 'prewarm')
+      .mockImplementation(async function (this: FileCache, cwd, patterns) {
+        prewarmedInstance = this;
+        // Restore real prewarm for THIS call so the cache is populated.
+        prewarmSpy.mockRestore();
+        return this.prewarm(cwd, patterns);
+      });
+
+    const getSpy = vi
+      .spyOn(FileCache.prototype, 'get')
+      .mockImplementation(async function (this: FileCache, filePath) {
+        execReadInstance ??= this;
+        getSpy.mockRestore();
+        return this.get(filePath);
+      });
+
+    try {
+      const checkRegistry = new CheckRegistry();
+      checkRegistry.register(makeMarkerCheck('flag-id', 'IDMARK'));
+      writeFixture('id.ts', 'const x = "IDMARK";');
+
+      const svc = new FitnessRecipeService({
+        cwd: testDir,
+        checkRegistry,
+        recipeRegistry: new FitnessRecipeRegistry(),
+        prewarmCache: true,
+      });
+
+      await svc.start(makeRecipe());
+
+      // prewarmed === execOpts.fileCache (the exec read) === scope cache.
+      expect(prewarmedInstance).toBe(scopeCache);
+      expect(execReadInstance).toBe(scopeCache);
+      expect(Object.is(prewarmedInstance, execReadInstance)).toBe(true);
+    } finally {
+      prewarmSpy.mockRestore();
+      getSpy.mockRestore();
+    }
   });
 });
