@@ -63,6 +63,13 @@ function scopeFor(): RunScope {
   } as unknown as RunScope;
 }
 
+function nonProjectScope(): RunScope {
+  return {
+    runId: 'RUN_NO_PROJECT',
+    telemetry: {},
+  } as unknown as RunScope;
+}
+
 function profilesDir(): string {
   return join(tmp, 'opensip-cli/.runtime/profiles');
 }
@@ -118,6 +125,25 @@ describe('isProfilingEnabled', () => {
 describe('startProfiling / stopProfiling — gate + idempotency', () => {
   it('is a no-op when the gate is closed (no session, no files)', () => {
     startProfiling(scopeFor(), 'fit');
+    expect(existsSync(profilesDir())).toBe(false);
+  });
+
+  it('reuses an existing scope-owned profiling state when present', () => {
+    const existing = {
+      session: null,
+      isProfiling: false,
+      profilePath: null,
+      labelsPath: null,
+    };
+    const scope = {
+      runId: 'RUN_EXISTING',
+      projectContext: { scope: 'project', projectRoot: tmp },
+      telemetry: { profiling: existing },
+    } as unknown as RunScope;
+
+    startProfiling(scope, 'fit');
+
+    expect((scope.telemetry as { profiling?: unknown }).profiling).toBe(existing);
     expect(existsSync(profilesDir())).toBe(false);
   });
 
@@ -187,5 +213,27 @@ describe('CPU profiling integration (real inspector session)', () => {
     expect(() => startProfiling(scopeFor(), 'fit')).not.toThrow();
     stopProfiling();
     await waitFor(() => readdirHasCpuprofile());
+  });
+
+  it('uses cwd profile storage and default command labels outside project scope', async () => {
+    process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
+    process.env[GATE] = '1';
+    const previousCwd = process.cwd();
+    process.chdir(tmp);
+    try {
+      startProfiling(nonProjectScope());
+      await waitFor(() => existsSync(profilesDir()) && readdirHasLabels());
+
+      stopProfiling();
+      await waitFor(() => readdirHasCpuprofile());
+
+      const files = readdir();
+      expect(files.some((file) => file.includes('-cli-RUN_NO_PROJECT.'))).toBe(true);
+      const labels = JSON.parse(readFileSync(labelsFile(), 'utf8')) as Record<string, unknown>;
+      expect(labels.runId).toBe('RUN_NO_PROJECT');
+      expect(labels.command).toBe('unknown');
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });

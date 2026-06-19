@@ -43,6 +43,10 @@ vi.mock('../commands/clear.js', () => ({
   executeClear: vi.fn((opts: unknown) => Promise.resolve({ type: 'clear', opts } as never)),
 }));
 
+vi.mock('../commands/session-show.js', () => ({
+  executeSessionShow: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('../commands/configure.js', () => ({
   executeConfigure: vi.fn(() =>
     Promise.resolve({
@@ -84,9 +88,16 @@ import { executeClear } from '../commands/clear.js';
 import { executeConfigure } from '../commands/configure.js';
 import { showHistory } from '../commands/history.js';
 import { mountHostCommands } from '../commands/host-command-specs.js';
-import { buildHostCommandInventory } from '../commands/host-subcommand-groups.js';
+import {
+  buildHostCommandInventory,
+  buildToolPluginLeaves,
+  buildToolPluginGroups,
+  effectiveCwd,
+  mountToolPluginGroups,
+} from '../commands/host-subcommand-groups.js';
 import { executeInit } from '../commands/init.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plugin.js';
+import { executeSessionShow } from '../commands/session-show.js';
 import { executeUninstall } from '../commands/uninstall.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
@@ -109,6 +120,9 @@ function makeCtx(): MakeCtxResult {
       rendered.push(r);
       return Promise.resolve();
     }),
+    emitJson: vi.fn(),
+    emitRaw: vi.fn(),
+    emitError: vi.fn(),
     datastore,
     pluginLayouts: [
       { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
@@ -165,6 +179,66 @@ function toolPluginCmd(program: Command, toolVerb: string, leaf: string): Comman
 }
 
 describe('<tool> plugin spec — action bodies (domain-bound)', () => {
+  it('effectiveCwd prefers discovered project root, then --cwd, then process cwd', () => {
+    expect(
+      effectiveCwd({
+        cwd: '/explicit/cwd',
+        projectContext: { scope: 'project', projectRoot: '/discovered/root', walkedUp: 0 },
+      }),
+    ).toBe('/discovered/root');
+    expect(effectiveCwd({ cwd: '/explicit/cwd' })).toBe('/explicit/cwd');
+    expect(effectiveCwd({})).toBe(process.cwd());
+  });
+
+  it('buildToolPluginGroups derives one plugin parent per contributed layout', () => {
+    const { ctx } = makeCtx();
+
+    expect(
+      buildToolPluginGroups(ctx).map((group) => ({
+        toolVerb: group.toolVerb,
+        domain: group.domain,
+        description: group.description,
+        leaves: group.leaves.map((leaf) => leaf.name),
+      })),
+    ).toEqual([
+      {
+        toolVerb: 'fit',
+        domain: 'fit',
+        description: 'Manage fit extension packs (add, list, remove, sync)',
+        leaves: ['list', 'add', 'remove', 'sync'],
+      },
+      {
+        toolVerb: 'sim',
+        domain: 'sim',
+        description: 'Manage sim extension packs (add, list, remove, sync)',
+        leaves: ['list', 'add', 'remove', 'sync'],
+      },
+    ]);
+  });
+
+  it('mountToolPluginGroups skips domains whose primary command is absent', () => {
+    const { ctx } = makeCtx();
+    const program = new Command('opensip');
+
+    mountToolPluginGroups(program, ctx);
+
+    expect(program.commands).toEqual([]);
+  });
+
+  it('plugin leaves fall back to a minimal bound layout when the domain layout is absent', async () => {
+    const { ctx } = makeCtx();
+    const leaves = buildToolPluginLeaves({ ...ctx, pluginLayouts: [] }, 'audit');
+    const list = leaves.find((leaf) => leaf.name === 'list');
+
+    await list?.handler({ cwd: '/fallback/project' }, ctx);
+
+    expect(pluginList).toHaveBeenCalledWith(
+      '/fallback/project',
+      [{ domain: 'audit', userSubdirs: [] }],
+      [],
+    );
+  });
+
   it('fit plugin list: invokes pluginList with effectiveCwd + the bound fit layout', async () => {
     const { ctx, rendered } = makeCtx();
     const program = mountWithToolPrimaries(ctx);
@@ -248,6 +322,85 @@ describe('sessions spec — action bodies', () => {
     expect(datastore).toHaveBeenCalled();
     expect(showHistory).toHaveBeenCalled();
     expect(rendered).toHaveLength(1);
+  });
+
+  it('sessions list forwards parsed filters and summary-only mode', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(
+      ['sessions', 'list', '--tool', 'fit', '--limit', '2', '--summary-only'],
+      { from: 'user' },
+    );
+
+    expect(showHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tool: 'fit', limit: 2, summaryOnly: true }),
+    );
+  });
+
+  it('sessions list --limit rejects a non-positive value via the spec parser', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    program.exitOverride();
+
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = () => true;
+    try {
+      await expect(
+        program.parseAsync(['sessions', 'list', '--limit', '0'], { from: 'user' }),
+      ).rejects.toThrow(/Invalid --limit/);
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    expect(showHistory).not.toHaveBeenCalled();
+  });
+
+  it('sessions show delegates replay options to executeSessionShow', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(
+      [
+        'sessions',
+        'show',
+        'session-1',
+        '--tool',
+        'fit',
+        '--filter',
+        'errors-only',
+        '--raw',
+        '--json',
+      ],
+      { from: 'user' },
+    );
+
+    expect(executeSessionShow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        replayRegistry: ctx.sessionReplayRegistry,
+        ref: 'session-1',
+        tool: 'fit',
+        json: true,
+        filters: ['errors-only'],
+        raw: true,
+        render: ctx.render,
+        emitJson: ctx.emitJson,
+        emitRaw: ctx.emitRaw,
+        emitError: ctx.emitError,
+        setExitCode: ctx.setExitCode,
+      }),
+    );
+  });
+
+  it('sessions show passes an empty filter list when no --filter is supplied', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['sessions', 'show', 'session-1'], { from: 'user' });
+
+    expect(executeSessionShow).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: 'session-1', filters: [] }),
+    );
   });
 
   it('sessions purge: invokes executeClear with the parsed flags', async () => {

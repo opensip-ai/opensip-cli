@@ -186,6 +186,85 @@ describe('resultToView', () => {
     expect(out).toContain('—'); // loader has no validated count → blank cell
   });
 
+  it('renders validated/ignored columns across ignored-ratio thresholds', () => {
+    const out = textOf({
+      type: 'run-presentation',
+      tool: 'fitness',
+      envelope: buildSignalEnvelope({
+        tool: 'fit',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [
+          {
+            slug: 'ignored.none',
+            passed: true,
+            durationMs: 1,
+            filesValidated: 10,
+            itemType: 'files',
+            ignoredCount: 0,
+          },
+          {
+            slug: 'ignored.warning',
+            passed: true,
+            durationMs: 2,
+            filesValidated: 10,
+            itemType: 'files',
+            ignoredCount: 1,
+          },
+          {
+            slug: 'ignored.error',
+            passed: true,
+            durationMs: 3,
+            filesValidated: 10,
+            itemType: 'files',
+            ignoredCount: 2,
+          },
+        ],
+        signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      }),
+      verboseDetail: { kind: 'findings', groups: [] },
+    });
+
+    expect(out).toContain('Validated');
+    expect(out).toContain('Ignores');
+    expect(out).toContain('ignored.none');
+    expect(out).toContain('ignored.warning');
+    expect(out).toContain('ignored.error');
+  });
+
+  it('renders session replay without a recipe as a PASS replay table', () => {
+    const out = textOf({
+      type: 'session-replay',
+      session: {
+        id: 'FIT_X',
+        tool: 'fit',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: '2026-01-01T00:00:01.000Z',
+        score: 100,
+        passed: true,
+        durationMs: 1000,
+      },
+      envelope: buildSignalEnvelope({
+        tool: 'fit',
+        runId: 'FIT_X',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        units: [{ slug: 'clean', passed: true, durationMs: 1 }],
+        signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      }),
+      fidelity: 'projection',
+    });
+
+    expect(out).toContain('Session FIT_X');
+    expect(out).toContain('PASS');
+    expect(out).toContain('replayed (projection)');
+    expect(out).not.toContain('recipe');
+    expect(out).not.toContain('Use --verbose');
+  });
+
   it('renders help and list views (every result type is now total)', () => {
     expect(renderToText(resultToView({ type: 'help' }))).toContain(
       'Codebase intelligence from your terminal',
@@ -206,6 +285,10 @@ describe('resultToView', () => {
     expect(out).toContain('Custom Tool');
     expect(out).toContain('alpha');
     expect(out).toContain('beta');
+  });
+
+  it('renders text-lines without a title', () => {
+    expect(textOf({ type: 'text-lines', lines: ['alpha'] })).toBe('alpha');
   });
 
   it('renders an error with the ✗ marker and indented suggestion', () => {

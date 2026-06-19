@@ -16,6 +16,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:coverage": "turbo run test --continue -- --coverage",
+    "test:coverage:fresh": "turbo run test --continue --force -- --coverage",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write --config .config/prettier.config.mjs --ignore-path .prettierignore '**/*.{ts,tsx,mjs,cjs,js,json,yml,yaml}'",
     "format:check": "prettier --check --config .config/prettier.config.mjs --ignore-path .prettierignore '**/*.{ts,tsx,mjs,cjs,js,json,yml,yaml}'",
@@ -49,6 +50,7 @@
     "licenses:sync": "node scripts/sync-package-licenses.mjs",
     "licenses:check": "node scripts/sync-package-licenses.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "supply-chain:verify": "node scripts/verify-supply-chain.mjs",
     "smoke-pack": "node scripts/smoke-pack.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"

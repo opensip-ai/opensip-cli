@@ -12,41 +12,41 @@ The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 package set and dependency order. The release workflow, bootstrap script, and
 contract tests derive from or verify against that source.
 
-| Layer | Package | Path |
-| ----- | ------- | ---- |
-| Kernel | `@opensip-cli/core` | `packages/core` |
-| Persistence | `@opensip-cli/datastore` | `packages/datastore` |
-| Shared CLI | `@opensip-cli/contracts` | `packages/contracts` |
-| Persistence | `@opensip-cli/session-store` | `packages/session-store` |
-| Output | `@opensip-cli/output` | `packages/output` |
-| Config | `@opensip-cli/config` | `packages/config` |
-| Targeting | `@opensip-cli/targeting` | `packages/targeting` |
-| Shared CLI | `@opensip-cli/cli-ui` | `packages/cli-ui` |
-| Languages | `@opensip-cli/tree-sitter` | `packages/tree-sitter` |
-| Languages | `@opensip-cli/lang-typescript` | `packages/languages/lang-typescript` |
-| Languages | `@opensip-cli/lang-rust` | `packages/languages/lang-rust` |
-| Languages | `@opensip-cli/lang-python` | `packages/languages/lang-python` |
-| Languages | `@opensip-cli/lang-go` | `packages/languages/lang-go` |
-| Languages | `@opensip-cli/lang-java` | `packages/languages/lang-java` |
-| Languages | `@opensip-cli/lang-cpp` | `packages/languages/lang-cpp` |
-| Tools | `@opensip-cli/dashboard` | `packages/dashboard` |
-| Tools | `@opensip-cli/fitness` | `packages/fitness/engine` |
-| Tools | `@opensip-cli/simulation` | `packages/simulation/engine` |
-| Tools | `@opensip-cli/graph` | `packages/graph/engine` |
+| Layer          | Package                             | Path                                  |
+| -------------- | ----------------------------------- | ------------------------------------- |
+| Kernel         | `@opensip-cli/core`                 | `packages/core`                       |
+| Persistence    | `@opensip-cli/datastore`            | `packages/datastore`                  |
+| Shared CLI     | `@opensip-cli/contracts`            | `packages/contracts`                  |
+| Persistence    | `@opensip-cli/session-store`        | `packages/session-store`              |
+| Output         | `@opensip-cli/output`               | `packages/output`                     |
+| Config         | `@opensip-cli/config`               | `packages/config`                     |
+| Targeting      | `@opensip-cli/targeting`            | `packages/targeting`                  |
+| Shared CLI     | `@opensip-cli/cli-ui`               | `packages/cli-ui`                     |
+| Languages      | `@opensip-cli/tree-sitter`          | `packages/tree-sitter`                |
+| Languages      | `@opensip-cli/lang-typescript`      | `packages/languages/lang-typescript`  |
+| Languages      | `@opensip-cli/lang-rust`            | `packages/languages/lang-rust`        |
+| Languages      | `@opensip-cli/lang-python`          | `packages/languages/lang-python`      |
+| Languages      | `@opensip-cli/lang-go`              | `packages/languages/lang-go`          |
+| Languages      | `@opensip-cli/lang-java`            | `packages/languages/lang-java`        |
+| Languages      | `@opensip-cli/lang-cpp`             | `packages/languages/lang-cpp`         |
+| Tools          | `@opensip-cli/dashboard`            | `packages/dashboard`                  |
+| Tools          | `@opensip-cli/fitness`              | `packages/fitness/engine`             |
+| Tools          | `@opensip-cli/simulation`           | `packages/simulation/engine`          |
+| Tools          | `@opensip-cli/graph`                | `packages/graph/engine`               |
 | Graph adapters | `@opensip-cli/graph-adapter-common` | `packages/graph/graph-adapter-common` |
-| Graph adapters | `@opensip-cli/graph-typescript` | `packages/graph/graph-typescript` |
-| Graph adapters | `@opensip-cli/graph-python` | `packages/graph/graph-python` |
-| Graph adapters | `@opensip-cli/graph-rust` | `packages/graph/graph-rust` |
-| Graph adapters | `@opensip-cli/graph-go` | `packages/graph/graph-go` |
-| Graph adapters | `@opensip-cli/graph-java` | `packages/graph/graph-java` |
-| Check packs | `@opensip-cli/checks-universal` | `packages/fitness/checks-universal` |
-| Check packs | `@opensip-cli/checks-typescript` | `packages/fitness/checks-typescript` |
-| Check packs | `@opensip-cli/checks-python` | `packages/fitness/checks-python` |
-| Check packs | `@opensip-cli/checks-go` | `packages/fitness/checks-go` |
-| Check packs | `@opensip-cli/checks-java` | `packages/fitness/checks-java` |
-| Check packs | `@opensip-cli/checks-cpp` | `packages/fitness/checks-cpp` |
-| Check packs | `@opensip-cli/checks-rust` | `packages/fitness/checks-rust` |
-| CLI | `opensip-cli` (unscoped) | `packages/cli` |
+| Graph adapters | `@opensip-cli/graph-typescript`     | `packages/graph/graph-typescript`     |
+| Graph adapters | `@opensip-cli/graph-python`         | `packages/graph/graph-python`         |
+| Graph adapters | `@opensip-cli/graph-rust`           | `packages/graph/graph-rust`           |
+| Graph adapters | `@opensip-cli/graph-go`             | `packages/graph/graph-go`             |
+| Graph adapters | `@opensip-cli/graph-java`           | `packages/graph/graph-java`           |
+| Check packs    | `@opensip-cli/checks-universal`     | `packages/fitness/checks-universal`   |
+| Check packs    | `@opensip-cli/checks-typescript`    | `packages/fitness/checks-typescript`  |
+| Check packs    | `@opensip-cli/checks-python`        | `packages/fitness/checks-python`      |
+| Check packs    | `@opensip-cli/checks-go`            | `packages/fitness/checks-go`          |
+| Check packs    | `@opensip-cli/checks-java`          | `packages/fitness/checks-java`        |
+| Check packs    | `@opensip-cli/checks-cpp`           | `packages/fitness/checks-cpp`         |
+| Check packs    | `@opensip-cli/checks-rust`          | `packages/fitness/checks-rust`        |
+| CLI            | `opensip-cli` (unscoped)            | `packages/cli`                        |
 
 All publishable packages share the same version. The release workflow publishes
 them in dependency order, with `opensip-cli` last.
@@ -76,11 +76,11 @@ Refresh the lockfile afterward with `pnpm install --lockfile-only`.
 
 Each reads `packages/core/package.json#version`:
 
-| Surface | Regenerate with | Pins |
-| ------- | --------------- | ---- |
-| CLI `--version` | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version |
-| Per-package `README.md` (×33) | `pnpm docs:readmes` | `tree/vX.Y.Z/…` source + catalog links |
-| `docs/web-generated/**` + `manifest.json` | `pnpm docs:build` | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
+| Surface                                   | Regenerate with                                                               | Pins                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| CLI `--version`                           | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version                                 |
+| Per-package `README.md` (×33)             | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
+| `docs/web-generated/**` + `manifest.json` | `pnpm docs:build`                                                             | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
 
 CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
 both run by `verify-release`.
@@ -96,10 +96,10 @@ curated prose markers ("Last verified at vX.Y.Z", the package-catalog "(all at
 website-integration manifest example, the graph `cacheKey: "eng=X.Y.Z|…"`).
 
 It deliberately leaves to you: the **`CHANGELOG.md`** narrative entry, and — when
-crossing the `1.0` boundary — the **peer-dependency *guidance* prose** ("pin to
+crossing the `1.0` boundary — the **peer-dependency _guidance_ prose** ("pin to
 the 0.x line" vs. "pin to majors"; a `^0.y` caret locks to the minor). Example
-third-party plugin/pack `"version"` fields in `docs/public` are the *example's
-own* version (independent of opensip-cli) and are intentionally left alone.
+third-party plugin/pack `"version"` fields in `docs/public` are the _example's
+own_ version (independent of opensip-cli) and are intentionally left alone.
 
 ### Pre-1.0 (`0.x`) caveat
 
@@ -123,27 +123,19 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 
 2. Update `CHANGELOG.md` with the release entry.
 
-3. Run the local preflight. This mirrors the tag-driven release lane closely
-   enough that local results should predict CI:
+3. Run the local preflight. Do not tag or push a release until this passes.
+   This command mirrors the tag-driven release lane before publish, including a
+   fresh Turbo coverage run (`--force`) so stale cached package coverage cannot
+   mask a CI threshold failure:
 
    ```bash
-   pnpm install
-   pnpm -r run clean
-   pnpm build
-   pnpm typecheck
-   pnpm supply-chain:verify
-   pnpm lint
-   pnpm test:coverage
-   pnpm fit:ci
-   pnpm graph:ci
-   pnpm verify-release --expected-version v0.1.0
-   mkdir -p /tmp/opensip-cli-release-tarballs
-   rm -f /tmp/opensip-cli-release-tarballs/*.tgz
-   while IFS= read -r filter; do
-     pnpm --filter "$filter" pack --pack-destination /tmp/opensip-cli-release-tarballs
-   done < <(node scripts/release-package-order.mjs --print pack)
-   node scripts/smoke-pack.mjs --dir /tmp/opensip-cli-release-tarballs --expected-version v0.1.0
+   pnpm release:preflight --expected-version v0.1.0
    ```
+
+   `pnpm test:coverage` is useful during development, but release prep must use
+   `pnpm test:coverage:fresh` directly or through `pnpm release:preflight` so
+   package-level coverage thresholds are recomputed locally before the immutable
+   npm publish lane starts.
 
 4. Commit, tag, and push:
 

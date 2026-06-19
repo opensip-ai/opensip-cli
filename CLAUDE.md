@@ -579,6 +579,12 @@ design exploration not yet ready for external readers, it stays in
 Releases are tag-driven. See `RELEASING.md` — there are 33 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
+When asked to prep a release, run `pnpm release:preflight --expected-version
+vX.Y.Z` before tagging or pushing. Do not treat cached `pnpm test:coverage`
+output as release proof: the preflight uses `pnpm test:coverage:fresh`
+(`turbo --force`) so package coverage thresholds are recomputed locally and
+match the tag-driven release lane.
+
 The release workflow has two non-obvious steps (npm 11 to a separate
 prefix; `pnpm pack` + `npm publish <tarball>`) that look like they
 could be simplified but cannot — both work around concrete bugs in

@@ -63,9 +63,10 @@ jobs:
         run: pnpm supply-chain:verify
 
       # Runs the full test suite WITH coverage so the per-package thresholds
-      # in each vitest.config.ts are enforced on every PR. Coverage had
-      # silently drifted below threshold in 13 packages because the gate only
-      # ran `pnpm test` (no `--coverage`); test:coverage closes that hole.
+      # in each vitest.config.ts are enforced on every PR. The fresh variant
+      # forces Turbo to recompute package test results instead of replaying a
+      # cached local pass with stale coverage numbers. Release prep uses the
+      # same command through `pnpm release:preflight`.
       #
       # This step also runs the per-check pass/fail fixture-coverage meta-tests
       # (each pack's src/__tests__/fixture-coverage.test.ts) — they are ordinary
@@ -77,7 +78,7 @@ jobs:
       # suites, which spawn the built CLI via the shared acceptance harness —
       # hence the `pnpm build` step above is a prerequisite. (Register PR lane.)
       - name: Test (with coverage thresholds)
-        run: pnpm test:coverage
+        run: pnpm test:coverage:fresh
 
       # Dogfood: run opensip-cli fit against this repo. The CI step itself
       # hard-fails on any error-level finding: `fit --gate-save` returns the

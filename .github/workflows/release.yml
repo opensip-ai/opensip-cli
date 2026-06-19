@@ -71,8 +71,10 @@ jobs:
       # These four steps mirror ci.yml exactly (same commands — do not invent a
       # stricter or looser variant):
       #   - `pnpm lint`          — ESLint + both dependency-cruiser passes + gate:verify
-      #   - `pnpm test:coverage` — full suite WITH per-package coverage thresholds
-      #     (replaces the former plain `pnpm test`, which skipped thresholds)
+      #   - `pnpm test:coverage:fresh` — full suite WITH per-package coverage
+      #     thresholds, forcing Turbo to recompute instead of replaying stale
+      #     local cache entries (replaces the former plain `pnpm test`, which
+      #     skipped thresholds, and the cacheable `pnpm test:coverage`)
       #   - `pnpm fit:ci`        — dogfood: fails on any error-level fit finding
       #     (failOnErrors: 1 in opensip-cli.config.yml; ADR-0020)
       #   - `pnpm graph:ci`      — dogfood: fails on any error-level graph finding
@@ -99,7 +101,7 @@ jobs:
       - name: Lint (mirror ci.yml — ADR-0017)
         run: pnpm lint
       - name: Test with coverage thresholds (mirror ci.yml — ADR-0017)
-        run: pnpm test:coverage
+        run: pnpm test:coverage:fresh
       - name: Fit (dogfood — mirror ci.yml; ADR-0017)
         run: pnpm fit:ci
       - name: Graph (dogfood — mirror ci.yml; ADR-0017)
