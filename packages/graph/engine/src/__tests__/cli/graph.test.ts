@@ -265,13 +265,13 @@ describe('executeGraph — human / JSON modes', () => {
     await executeGraph({ cwd: projectDir, noCache: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
     // envelope-first-presentation RP-2: executeGraph now hands a RunPresentation
-    // to the central render seam; the per-unit table + PASS/FAIL summary are
-    // derived from the carried envelope (rendering is the CLI's concern, covered
-    // there). Here we assert the result graph produced.
+    // to the central render seam; the PASS/FAIL summary and optional verbose
+    // table are derived from the carried envelope (rendering is the CLI's
+    // concern, covered there). Here we assert the result graph produced.
     const done = render.mock.calls[0]?.[0] as RunPresentation;
     expect(done.type).toBe('run-presentation');
     expect(done.tool).toBe('graph');
-    // The envelope is the findings currency — the table/verdict derive from it.
+    // The envelope is the findings currency — the verdict derives from it.
     expect(done.envelope.tool).toBe('graph');
     expect(done.envelope.schemaVersion).toBe(2);
     // host-owned display duration (ADR-0051), threaded so the summary shows the

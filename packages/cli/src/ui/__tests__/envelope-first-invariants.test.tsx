@@ -10,12 +10,10 @@
  *      Assumption 5). This pins that the two render paths are disjoint and that
  *      the error path produces no envelope-derived table.
  *
- *   2. Session-replay renders identically to a fresh run of the same envelope.
- *      `sessionReplayView` derives its body from the SAME `envelopeToTableView`
- *      as `presentationToView`, so a replayed session shows the exact per-unit
- *      table (and verdict summary) a fresh `run-presentation` of that envelope
- *      shows. This is the structural parity behind plan Assumption 4 ("session
- *      replay render behavior does not change").
+ *   2. Session-replay remains an envelope-derived detail view. Fresh non-verbose
+ *      runs intentionally render the compact summary/footer surface; replay still
+ *      derives its body from `envelopeToTableView`, so historical inspection can
+ *      show the per-unit table without changing default run output.
  *
  *   3. `run-presentation.ts` adds no `cli-ui` (or any UI) edge. The render-only
  *      `RunPresentation` type stays UI-free; the `contracts-imports-core-only`
@@ -147,9 +145,7 @@ describe('error-before-envelope renders ErrorResult, never a RunPresentation', (
     };
     const presentationText = textOf(presentation);
     const errorText = textOf(errorResult);
-    expect(presentationText).toContain('Status'); // the run table exists on the happy path
     expect(presentationText).toMatch(/\b(PASS|FAIL)\b/);
-    expect(errorText).not.toContain('Status'); // …and is wholly absent on the fault path
     expect(errorText).not.toMatch(/\b(PASS|FAIL)\b/);
   });
 });
@@ -158,7 +154,7 @@ describe('error-before-envelope renders ErrorResult, never a RunPresentation', (
 // 2. Session-replay renders identically to a fresh run of the same envelope.
 // ---------------------------------------------------------------------------
 
-describe('session-replay renders the same envelope-derived table as a fresh run', () => {
+describe('session-replay keeps the envelope-derived detail table', () => {
   const envelope = fitEnvelope();
 
   const presentation: RunPresentation = {
@@ -182,16 +178,14 @@ describe('session-replay renders the same envelope-derived table as a fresh run'
     fidelity: 'projection',
   };
 
-  it('the replay body contains the SAME per-unit table the fresh run renders', () => {
+  it('the replay body contains the per-unit table while a fresh non-verbose run stays compact', () => {
     const replayText = textOf(replay);
     const runText = textOf(presentation);
-    // Every per-unit table row + the verdict summary the fresh run shows must
-    // appear in the replay (both derive the body from `envelopeToTableView`).
     for (const token of ['no-console', 'naming', 'Status', 'Validated', '10 files']) {
-      expect(runText).toContain(token);
       expect(replayText).toContain(token);
+      expect(runText).not.toContain(token);
     }
-    // The shared verdict summary line (2 errors → FAIL) is identical.
+    // The shared verdict summary line (2 errors -> FAIL) remains present in both.
     expect(runText).toContain('FAIL  (2 Errors, 0 Warnings)');
     expect(replayText).toContain('FAIL  (2 Errors, 0 Warnings)');
   });

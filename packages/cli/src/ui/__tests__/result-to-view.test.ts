@@ -36,10 +36,7 @@ function fitSignal(over: {
 }
 
 describe('resultToView', () => {
-  it('renders a fit RunPresentation from the envelope: table (with Validated/Ignores), summary', () => {
-    // ADR-0011 Phase 6: fitness is migrated — the fit table is derived from the
-    // envelope's units + signals (one row per check unit), including the
-    // fitness-only Validated/Ignores columns carried on UnitResult.
+  it('renders a non-verbose fit RunPresentation as summary + footer, without the detailed table', () => {
     const out = textOf({
       type: 'run-presentation',
       tool: 'fitness',
@@ -86,18 +83,16 @@ describe('resultToView', () => {
         runFaulted: false,
       }),
     });
-    // Table: FAIL sorts above PASS, header + the fitness columns present.
-    expect(out).toContain('Unit');
-    expect(out).toContain('Status');
-    expect(out).toContain('Validated');
-    expect(out).toContain('Ignores');
-    expect(out).toContain('10 files');
-    expect(out.indexOf('no-console')).toBeLessThan(out.indexOf('naming')); // FAIL before PASS
-    // Shared summary line (1 passed, 1 failed; 2 errors, 1 warning).
+    expect(out).not.toContain('Unit');
+    expect(out).not.toContain('Status');
+    expect(out).not.toContain('Validated');
+    expect(out).not.toContain('no-console');
+    expect(out).not.toContain('naming');
     expect(out).toContain('FAIL  (2 Errors, 1 Warnings) | Duration 8ms');
+    expect(out).toContain('Use --verbose for detailed results');
   });
 
-  it('renders the fit verbose findings body and suppresses the hint (ADR-0021)', () => {
+  it('renders the fit verbose findings body + detailed table and suppresses the hint (ADR-0021)', () => {
     const out = textOf({
       type: 'run-presentation',
       tool: 'fitness',
@@ -134,6 +129,9 @@ describe('resultToView', () => {
     expect(out).toContain('No Console');
     expect(out).toContain('console.log');
     expect(out).toContain('a.ts:3');
+    expect(out).toContain('Unit');
+    expect(out).toContain('Status');
+    expect(out).toContain('no-console');
     // Verbose run: no "Use --verbose…" hint.
     expect(out).not.toContain('Use --verbose for detailed results');
   });
@@ -156,7 +154,7 @@ describe('resultToView', () => {
     expect(out).toContain('opensip report for HTML report');
   });
 
-  it('renders a fit run with errored/clean units: ERROR status, blank validated cell', () => {
+  it('renders a verbose fit table with errored/clean units: ERROR status, blank validated cell', () => {
     const out = textOf({
       type: 'run-presentation',
       tool: 'fitness',
@@ -181,6 +179,7 @@ describe('resultToView', () => {
         policy: HOST_VERDICT_POLICY_FALLBACK,
         runFaulted: false,
       }),
+      verboseDetail: { kind: 'findings', groups: [] },
     });
     expect(out).toContain('ERROR'); // errored unit status
     expect(out).toContain('loader');
@@ -220,10 +219,10 @@ describe('resultToView', () => {
   });
 
   // ADR-0011 (Phase 4): sim is migrated — the sim view is derived from the
-  // envelope's per-unit table (one row per scenario), not a retired per-scenario
-  // view. Scenario `a` passed; scenario `b` failed an assertion (emitting a
+  // envelope. Scenario `a` passed; scenario `b` failed an assertion (emitting a
   // `high` signal sourced at its scenarioId). The sim builder omits durationMs,
-  // so the summary uses the envelope unit-sum (parity with production).
+  // so the summary uses the envelope unit-sum (parity with production). The
+  // per-scenario table is a verbose/detail surface, not the default run view.
   const bSignal: Signal = {
     id: 'sig_b1',
     source: 'b',
@@ -254,16 +253,24 @@ describe('resultToView', () => {
     }),
   };
 
-  it('renders the sim table and summary from the envelope', () => {
+  it('renders the non-verbose sim summary from the envelope without a table', () => {
     const out = textOf(simBase);
+    expect(out).not.toContain('Unit');
+    expect(out).not.toContain('Status');
+    expect(out).toContain('FAIL  (1 Errors, 0 Warnings)');
+    expect(out).toContain('Use --verbose for detailed results');
+  });
+
+  it('renders the sim verbose table from the envelope', () => {
+    const out = textOf({ ...simBase, verboseDetail: { kind: 'findings', groups: [] } });
     // One row per scenario-unit, keyed by scenarioId; b's high signal counts
     // as an error on its row and drives the FAIL status.
     expect(out).toContain('Unit');
     expect(out).toContain('Status');
     expect(out).toContain('a');
     expect(out).toContain('b');
-    // Shared run summary: 1 passed, 1 failed, 1 error.
     expect(out).toContain('FAIL  (1 Errors, 0 Warnings)');
+    expect(out).not.toContain('Use --verbose for detailed results');
   });
 
   it('renders the empty-scenarios sim shape (no table, zeroed summary)', () => {
@@ -281,6 +288,9 @@ describe('resultToView', () => {
       }),
     });
     expect(out).toContain('PASS  (0 Errors, 0 Warnings)');
+    expect(out).not.toContain('Unit');
+    expect(out).not.toContain('Status');
+    expect(out).toContain('Use --verbose for detailed results');
   });
 
   it('renders gate-done lines verbatim', () => {
@@ -295,7 +305,7 @@ describe('resultToView', () => {
   // non-regression guarantee — a graph RunPresentation with durationMs > 0 and
   // all-zero envelope units MUST render a NON-zero Duration (the host-owned
   // durationMs wins over the unit-sum, which is 0 for graph; RP-0 Task 0.4).
-  it('renders a graph RunPresentation: per-unit table, banner, and host duration (not 0ms)', () => {
+  it('renders a non-verbose graph RunPresentation: banner, summary, footer, and no per-rule table', () => {
     const out = textOf({
       type: 'run-presentation',
       tool: 'graph',
@@ -334,18 +344,63 @@ describe('resultToView', () => {
         runFaulted: false,
       }),
     });
-    // The resolution caveat renders as a muted banner above the table.
+    // The resolution caveat renders as a muted banner above the summary.
     expect(out).toContain('Resolution: fast (syntactic)');
-    // The per-unit (per-rule) table is rendered — the count-based graph-done
-    // summary never showed this.
-    expect(out).toContain('graph.dead-code.orphan-subtree');
-    expect(out).toContain('graph.architecture.cycle');
-    expect(out).toMatch(/Unit\s+\|\s+Status\s+\|\s+Errors\s+\|\s+Warnings\s+\|\s+Duration/);
+    expect(out).not.toContain('graph.dead-code.orphan-subtree');
+    expect(out).not.toContain('graph.architecture.cycle');
+    expect(out).not.toMatch(/Unit\s+\|\s+Status\s+\|\s+Errors\s+\|\s+Warnings\s+\|\s+Duration/);
     // NON-REGRESSION: the summary Duration is the host value (1.2s), NOT 0ms,
     // despite every unit carrying durationMs: 0.
     expect(out).toContain('| Duration 1.2s');
     expect(out).not.toContain('Duration 0ms');
     // Non-verbose ⇒ the shared footer hint renders.
     expect(out).toContain('Use --verbose for detailed results');
+  });
+
+  it('renders a verbose graph RunPresentation with the detailed report and per-rule table', () => {
+    const out = textOf({
+      type: 'run-presentation',
+      tool: 'graph',
+      durationMs: 1200,
+      envelope: buildSignalEnvelope({
+        tool: 'graph',
+        runId: 'r',
+        createdAt: '2026-06-04T00:00:00.000Z',
+        units: [
+          {
+            slug: 'graph.dead-code.orphan-subtree',
+            passed: true,
+            violationCount: 1,
+            durationMs: 0,
+          },
+        ],
+        signals: [
+          {
+            id: 'g1',
+            source: 'graph.dead-code.orphan-subtree',
+            provider: 'opensip-cli',
+            severity: 'medium',
+            category: 'architecture',
+            ruleId: 'graph.dead-code.orphan-subtree',
+            message: 'orphan',
+            filePath: 'src/a.ts',
+            line: 1,
+            metadata: {},
+            createdAt: '2026-06-04T00:00:00.000Z',
+          },
+        ],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      }),
+      verboseDetail: {
+        kind: 'lines',
+        lines: ['== Catalog ==', '1 function across 1 file'],
+      },
+    });
+    expect(out).toContain('== Catalog ==');
+    expect(out).toContain('Unit');
+    expect(out).toContain('Status');
+    expect(out).toContain('graph.dead-code.orphan-subtree');
+    expect(out).not.toContain('Use --verbose for detailed results');
   });
 });

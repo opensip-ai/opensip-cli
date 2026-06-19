@@ -3,10 +3,10 @@
  * live view's done state.
  *
  * The format is fixed: a dim, two-space-indented line listing the
- * next-step flags a user is likely to reach for, separated by " | ". Each
- * tool supplies its own hints so the strip can name tool-specific flags
- * (e.g. `--verbose`, `--report-to <url>`) while the surrounding visual
- * treatment stays consistent.
+ * next-step flags a user is likely to reach for, separated by " | ". The
+ * default run hints and their visibility policy live in `run-render-policy`;
+ * callers pass custom hints only for intentionally custom surfaces while the
+ * surrounding visual treatment stays consistent.
  *
  * The strip lives once, as the `viewFooterHints` view-model producer. The
  * Ink component renders it via `renderToInk`; the non-interactive path

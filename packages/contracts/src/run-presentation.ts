@@ -44,10 +44,10 @@ export interface RunPresentation {
   readonly tool: string;
   /**
    * The run's signal envelope (ADR-0011) — REQUIRED. The findings currency from
-   * which the rendered per-unit table, summary line, and verdict are all derived
-   * (via `envelopeToTableView` → `formatSignalTableRows`). This is the ONLY
-   * machine-facing field; it is never re-serialized FROM the presentation (the
-   * `--json` path reads `CommandOutcome.envelope` directly).
+   * which the rendered summary line, verdict, and verbose/detail table are
+   * derived. This is the ONLY machine-facing field; it is never re-serialized
+   * FROM the presentation (the `--json` path reads `CommandOutcome.envelope`
+   * directly).
    */
   readonly envelope: SignalEnvelope;
   /**

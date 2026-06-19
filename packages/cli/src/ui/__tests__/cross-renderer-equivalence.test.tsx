@@ -65,8 +65,8 @@ const FIXTURES: Readonly<Record<string, CommandResult>> = {
       runFaulted: false,
     }),
   },
-  // RP-2: graph renders the envelope-backed RunPresentation — per-unit table +
-  // verdict summary, with the resolution caveat as a muted banner.
+  // RP-2: graph renders the envelope-backed RunPresentation — compact verdict
+  // summary by default, with the resolution caveat as a muted banner.
   'graph-run': {
     type: 'run-presentation',
     tool: 'graph',

@@ -2,11 +2,10 @@
  * @fileoverview Graph live-view derivation from the run's `SignalEnvelope`
  * (envelope-first-presentation RP-2).
  *
- * Graph's STATIC render path routes through the cli host's `presentationToView`
- * → `envelopeToTableView`, which renders one per-unit (per-rule) row plus the
- * PASS/FAIL summary. To keep the LIVE final frame in parity with that static
- * frame (the plan's table-in-both default — Assumption 3), the live runner must
- * render the SAME per-unit table + summary.
+ * Graph's STATIC verbose/detail render path routes through the cli host's
+ * `presentationToView` → `envelopeToTableView`, which renders one per-unit
+ * (per-rule) row plus the PASS/FAIL summary. To keep the LIVE verbose frame in
+ * parity with that static frame, the live runner renders the SAME per-unit table.
  *
  * It cannot reuse the host's `envelopeTableNode`/`presentationToView` directly:
  * those live in `opensip-cli` (the cli package), which graph — a peer-layer tool
@@ -24,8 +23,8 @@
  * `formatDuration(unit.durationMs)`) and the node layout mirrors the host's
  * `envelopeTableNode` lean 5-column form (graph units carry no
  * `filesValidated`, so the Validated/Ignores columns are absent). The
- * `static === live` byte parity is pinned by a test that renders this node and
- * the host's `envelopeToTableView` side by side
+ * `static === live` byte parity for the verbose table is pinned by a test that
+ * renders this node and the host's `envelopeToTableView` side by side
  * (`packages/cli/src/ui/__tests__/graph-live-static-parity.test.tsx`).
  *
  * Pure: no IO, no clock.
@@ -148,12 +147,9 @@ function graphTableNode(rows: readonly GraphTableRow[]): ViewNode | null {
 
 /**
  * The graph per-unit (per-rule) table as a `ViewNode`, or null when no rule
- * fired — the same table the static path produces via `envelopeToTableView`
- * (`envelopeTableNode`). The live runner renders this above the shared
- * `<RunSummary>` (which already matches the static summary via the shared
- * `viewRunSummary` producer + host `RunTimingProvider`), bringing the live final
- * frame into parity with the static frame (envelope-first-presentation RP-2,
- * table-in-both default).
+ * fired — the same table the static verbose/detail path produces via
+ * `envelopeToTableView` (`envelopeTableNode`). The live runner renders this only
+ * for verbose/detail output.
  */
 export function graphDoneTableNode(envelope: SignalEnvelope): ViewNode | null {
   return graphTableNode(envelopeToGraphRows(envelope));

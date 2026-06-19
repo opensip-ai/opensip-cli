@@ -1,6 +1,2 @@
-Unit                                     | Status  | Errors | Warnings | Duration  
------------------------------------------|---------|--------|----------|-----------
-a                                        | PASS    | 0      | 0        | 10ms      
-c                                        | PASS    | 0      | 0        | 15ms      
 PASS  (0 Errors, 0 Warnings) | Duration 25ms
   Use --verbose for detailed results | opensip report for HTML report

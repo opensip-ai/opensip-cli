@@ -33,9 +33,10 @@ import {
   RunHeader,
   RunSummary,
   RunTimingProvider,
+  shouldRenderRunFooterHints,
   ThemeProvider,
   UpdateHint,
-  VERBOSE_DETAIL_HINT,
+  DEFAULT_RUN_FOOTER_HINTS,
   viewFindingsGroups,
   type ProgressEvent,
   type ProgressSurface,
@@ -268,6 +269,7 @@ export function SimRunner({
 
   const { summary } = state.result.envelope.verdict;
   const { verboseDetail } = state.result;
+  const renderPolicy = { verbose: args.verbose === true };
   const findingsDetail =
     verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0
       ? verboseDetail
@@ -294,25 +296,8 @@ export function SimRunner({
             summaryEl
           );
         })()}
-        {args.quiet !== true && (
-          <RunFooterHints
-            hints={
-              args.verbose === true
-                ? [
-                    {
-                      text: 'opensip report for HTML report',
-                      bold: ['opensip report'],
-                    },
-                  ]
-                : [
-                    VERBOSE_DETAIL_HINT,
-                    {
-                      text: 'opensip report for HTML report',
-                      bold: ['opensip report'],
-                    },
-                  ]
-            }
-          />
+        {args.quiet !== true && shouldRenderRunFooterHints(renderPolicy) && (
+          <RunFooterHints hints={DEFAULT_RUN_FOOTER_HINTS} />
         )}
       </Box>
     </>

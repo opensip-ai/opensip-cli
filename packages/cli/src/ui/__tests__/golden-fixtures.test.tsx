@@ -10,11 +10,9 @@
  *
  * The rendered output is committed under `__goldens__/<case>.{tty,pipe}.txt`.
  *
- * Every case renders its `presentation` projection (a RunPresentation). fit/sim
- * output is asserted byte-identical to the committed goldens — the migration must
- * not change a single byte. Graph's goldens were regenerated in RP-2 to the new
- * envelope-backed output (intentional, enumerated deltas), so they are the new
- * expected output rather than a pre-migration baseline.
+ * Every case renders its `presentation` projection (a RunPresentation). The
+ * committed goldens pin the current compact default surface (summary + footer,
+ * no per-unit table) and the verbose detail surface (detail body + table).
  *
  * Regenerate after an intentional change:
  *   UPDATE_GOLDENS=1 pnpm --filter=opensip-cli test golden-fixtures

@@ -367,12 +367,13 @@ async function deliverGraphResult(
  * (`cli.emitEnvelope`). The default/`--verbose` path hands a {@link RunPresentation}
  * to the render seam (Ink on TTY, plain text in pipes/CI): the SAME `envelope`
  * already built here IS carried on the render object (envelope-first-presentation
- * plan, RP-2), so `presentationToView` → `envelopeToTableView` derives the
- * per-unit table, the PASS/FAIL summary, and the verdict from it — graph no longer
- * carries a count-based `graph-done` summary. The verbose catalog/findings/entry-
- * point body rides as `verboseDetail` ({kind:'lines'}, ADR-0021); graph's fast-tier
- * caveat moves to `RunPresentation.banners` (a muted line above the summary); the
- * non-verbose footer hints are emitted by the shared seam. The host-stamped
+ * plan, RP-2), so `presentationToView` derives the PASS/FAIL summary and verdict
+ * from it — graph no longer carries a count-based `graph-done` summary. The
+ * verbose catalog/findings/entry-point body rides as `verboseDetail`
+ * ({kind:'lines'}, ADR-0021), and that verbose/detail surface also carries the
+ * per-unit table; graph's fast-tier caveat moves to `RunPresentation.banners` (a
+ * muted line above the summary); the non-verbose footer hints are emitted by the
+ * shared seam. The host-stamped
  * `durationMs` (ADR-0051) is threaded as `RunPresentation.durationMs` so the
  * summary shows the real wall-clock — graph's envelope units carry `durationMs: 0`,
  * so without this thread `presentationToView`'s unit-sum default would render
@@ -399,7 +400,7 @@ async function renderGraphResult(
     });
     return envelope;
   }
-  logger.info({ evt: 'graph.render.table.start', module: MODULE_GRAPH_RENDER });
+  logger.info({ evt: 'graph.render.presentation.start', module: MODULE_GRAPH_RENDER });
   const verbose = opts.verbose === true;
   // ADR-0021: graph's verbose body is carried as VerboseDetail{kind:'lines'} and
   // rendered through the shared resultToView seam — the same path the live runner
@@ -422,10 +423,10 @@ async function renderGraphResult(
     : undefined;
   const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
   // envelope-first-presentation RP-2: route graph's static render through the
-  // shared envelope table. The envelope IS carried (it drives the per-unit table +
-  // verdict); `durationMs` is threaded so the host-owned wall-clock wins over the
-  // unit-sum (graph units carry durationMs:0); the resolution caveat moves to
-  // `banners`.
+  // shared RunPresentation. The envelope IS carried (it drives the verdict and
+  // optional verbose/detail table); `durationMs` is threaded so the host-owned
+  // wall-clock wins over the unit-sum (graph units carry durationMs:0); the
+  // resolution caveat moves to `banners`.
   const presentation: RunPresentation = {
     type: 'run-presentation',
     tool: 'graph',
@@ -436,7 +437,7 @@ async function renderGraphResult(
   };
   await cli.render(presentation);
   logger.info({
-    evt: 'graph.render.table.complete',
+    evt: 'graph.render.presentation.complete',
     module: MODULE_GRAPH_RENDER,
   });
   return envelope;

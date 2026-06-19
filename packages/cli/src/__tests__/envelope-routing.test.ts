@@ -188,12 +188,32 @@ describe('root --json path (emitEnvelope)', () => {
   });
 });
 
-describe('root table path (renderResult derives the table from the envelope)', () => {
-  it('derives the per-unit table from the envelope the result carries', async () => {
+describe('root render path (renderResult derives the run view from the envelope)', () => {
+  it('renders the compact non-verbose summary from the envelope the result carries', async () => {
     const result: RunPresentation = {
       type: 'run-presentation',
       tool: 'fitness',
       envelope: ENVELOPE,
+    };
+
+    await runWithScope(makeScope(), () => renderResult(result));
+
+    const out = stdout.join('');
+    expect(out).not.toContain('no-console');
+    expect(out).not.toContain('no-todo');
+    expect(out).not.toContain('Unit');
+    expect(out).not.toContain('Status');
+    // ADR-0035: the headline is the run's single verdict (errors=1 → FAIL).
+    expect(out).toContain('FAIL  (1 Errors, 1 Warnings)');
+    expect(out).toContain('Use --verbose for detailed results');
+  });
+
+  it('renders the per-unit table when the run carries verbose detail', async () => {
+    const result: RunPresentation = {
+      type: 'run-presentation',
+      tool: 'fitness',
+      envelope: ENVELOPE,
+      verboseDetail: { kind: 'findings', groups: [] },
     };
 
     await runWithScope(makeScope(), () => renderResult(result));
@@ -204,8 +224,8 @@ describe('root table path (renderResult derives the table from the envelope)', (
     expect(out).toContain('no-console');
     expect(out).toContain('no-todo');
     expect(out).toContain('PASS'); // no-todo row status
-    // ADR-0035: the headline is the run's single verdict (errors=1 → FAIL).
     expect(out).toContain('FAIL  (1 Errors, 1 Warnings)');
+    expect(out).not.toContain('Use --verbose for detailed results');
   });
 });
 

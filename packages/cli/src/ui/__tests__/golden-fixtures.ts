@@ -190,7 +190,7 @@ const SIM_VERBOSE_DETAIL: VerboseDetail = {
   ],
 };
 
-// --- graph (RP-2: envelope-backed RunPresentation; output INTENTIONALLY changes) ---
+// --- graph (envelope-backed RunPresentation; compact by default, detailed on --verbose) ---
 
 const GRAPH_VERBOSE_DETAIL: VerboseDetail = {
   kind: 'lines',
@@ -276,7 +276,7 @@ const GRAPH_FINDINGS_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
   runFaulted: false,
 });
 
-/** Graph's fast-tier resolution caveat — rendered as a muted banner above the table. */
+/** Graph's fast-tier resolution caveat — rendered as a muted banner above the summary/detail body. */
 const GRAPH_RESOLUTION_BANNER =
   'Resolution: fast (syntactic) — edges are approximate; re-run with --resolution exact for semantic precision.';
 
@@ -306,8 +306,7 @@ function graphCase(
 
 /**
  * One golden case. `presentation` is the {@link RunPresentation} the test renders
- * against the committed goldens (byte-identity targets for fit/sim; the
- * regenerated envelope-backed output for graph).
+ * against the committed goldens.
  */
 export interface GoldenCase {
   readonly name: string;
@@ -362,11 +361,9 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   simCase('sim-clean', SIM_CLEAN_ENVELOPE, undefined),
   simCase('sim-findings', SIM_FINDINGS_ENVELOPE, undefined),
   simCase('sim-findings-verbose', SIM_FINDINGS_ENVELOPE, SIM_VERBOSE_DETAIL),
-  // graph: RP-2 envelope-backed RunPresentation. Output is INTENTIONALLY changed
-  // from the RP-0 graph-done baseline (enumerated deltas in the phase file): the
-  // count-based summary → envelope verdict, the per-unit (per-rule) table is
-  // added, and resolutionBanner → banners. These goldens are the NEW expected
-  // output (regenerated under UPDATE_GOLDENS), not a byte-identity target.
+  // graph: envelope-backed RunPresentation. Non-verbose graph stays compact
+  // (banner + summary + footer); graph-verbose carries the detailed report body
+  // and the per-rule table.
   graphCase('graph-clean', GRAPH_CLEAN_ENVELOPE, { durationMs: 1200 }),
   graphCase('graph-findings', GRAPH_FINDINGS_ENVELOPE, {
     banner: GRAPH_RESOLUTION_BANNER,

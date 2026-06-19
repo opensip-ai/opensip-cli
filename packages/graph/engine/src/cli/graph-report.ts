@@ -57,9 +57,9 @@ export interface LiveGraphOutput {
   /**
    * The catalog's RESOLVED resolution tier (envelope-first-presentation RP-2).
    * Plain data so it survives the IPC structured-clone. The live done frame
-   * surfaces graph's fast-tier caveat as a muted banner above the per-unit table
-   * — parity with the static `presentationToView` banners, which read the same
-   * `catalog.resolutionMode`. Absent / `exact` ⇒ no banner.
+   * surfaces graph's fast-tier caveat as a muted banner above the summary/detail
+   * body — parity with the static `presentationToView` banners, which read the
+   * same `catalog.resolutionMode`. Absent / `exact` ⇒ no banner.
    */
   readonly resolutionMode?: 'exact' | 'fast';
 }

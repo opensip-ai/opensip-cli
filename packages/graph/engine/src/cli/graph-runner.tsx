@@ -44,9 +44,11 @@ import {
   RunHeader,
   RunSummary,
   RunTimingProvider,
+  shouldRenderRunFooterHints,
+  shouldRenderRunUnitTable,
   ThemeProvider,
   UpdateHint,
-  VERBOSE_DETAIL_HINT,
+  DEFAULT_RUN_FOOTER_HINTS,
   viewVerboseLines,
   type ProgressCallback,
   type ProgressEvent,
@@ -142,9 +144,9 @@ type ViewState =
       summary: RunSummaryShape;
       /**
        * The per-unit (per-rule) table node derived from the run envelope, or
-       * null when no rule fired (envelope-first-presentation RP-2). Rendered
-       * above the shared `<RunSummary>` so the live final frame matches the
-       * static `presentationToView` → `envelopeToTableView` frame.
+       * null for default runs or when no rule fired. It is a verbose/detail
+       * surface, matching fit's live runner: default runs show the progress
+       * checklist, summary, and footer only.
        */
       table: ViewNode | null;
       /** Graph's fast-tier resolution caveat (muted banner), or undefined. */
@@ -384,15 +386,13 @@ function GraphRunner({
           warnings: verdict.summary.warnings,
           // durationMs omitted for host provider path
         };
-        // envelope-first-presentation RP-2 (live/static parity): the static path
-        // renders the per-unit (per-rule) envelope table + a muted resolution
-        // banner via `presentationToView`. Build the SAME table node here (from
-        // the run envelope) and surface the resolution caveat, so the live final
-        // frame matches the static frame. The table derivation lives in the
-        // graph package (graph cannot import the host's `envelopeTableNode`, nor
-        // `@opensip-cli/output`); it mirrors that node's lean 5-column form and
-        // is pinned by `graph-live-static-parity.test.tsx`.
-        const table = graphDoneTableNode(envelope);
+        // The per-unit table is a verbose/detail surface. Default graph output
+        // mirrors fit's live default: progress checklist + summary + footer.
+        // Graph keeps its local table derivation because the graph package
+        // cannot import the host's `envelopeTableNode` or `@opensip-cli/output`.
+        const table = shouldRenderRunUnitTable({ verbose: args.verbose === true })
+          ? graphDoneTableNode(envelope)
+          : null;
         const banner = resolutionBannerText(result.resolutionMode);
         // The worker (or the in-process fallback) already assembled the report
         // lines with includeSummary: false — RunSummary renders the verdict
@@ -475,8 +475,8 @@ function GraphRunner({
       {state.phase === 'done' && (
         <>
           {/* envelope-first-presentation RP-2: order matches the static
-              `presentationToView` frame — banner (muted) → verbose body → per-unit
-              table → summary → footer hints. */}
+              `presentationToView` frame — banner (muted) → verbose body/table
+              when requested → summary → footer hints. */}
           {state.banner !== undefined && (
             <Box paddingLeft={2}>
               <Text dimColor>{state.banner}</Text>
@@ -507,16 +507,8 @@ function GraphRunner({
               el
             );
           })()}
-          {args.verbose !== true && (
-            <RunFooterHints
-              hints={[
-                VERBOSE_DETAIL_HINT,
-                {
-                  text: 'opensip report for HTML report',
-                  bold: ['opensip report'],
-                },
-              ]}
-            />
+          {shouldRenderRunFooterHints({ verbose: args.verbose === true }) && (
+            <RunFooterHints hints={DEFAULT_RUN_FOOTER_HINTS} />
           )}
         </>
       )}

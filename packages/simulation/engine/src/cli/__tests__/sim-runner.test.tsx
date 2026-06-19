@@ -80,8 +80,8 @@ function registerProbe(id = 'probe'): void {
 }
 
 const baseArgs = (
-  overrides: Partial<ToolOptions & { quiet?: boolean }> = {},
-): ToolOptions & { quiet?: boolean } => ({
+  overrides: Partial<ToolOptions & { quiet?: boolean; verbose?: boolean }> = {},
+): ToolOptions & { quiet?: boolean; verbose?: boolean } => ({
   json: false,
   cwd: process.cwd(),
   debug: false,
@@ -133,6 +133,28 @@ describe('<SimRunner> — live-view state machine', () => {
     expect(exitCodes).not.toContain(1);
 
     unmount();
+  });
+
+  it('uses the shared compact-run footer policy', async () => {
+    enterSimScope();
+    registerProbe('runner-footer-default');
+
+    const compact = render(<SimRunner args={baseArgs()} />);
+
+    await waitForFrame(compact.lastFrame, 'Use --verbose for detailed results');
+    expect(compact.lastFrame()).toContain('opensip report for HTML report');
+    compact.unmount();
+
+    clearScenarioRegistry();
+    registerProbe('runner-footer-verbose');
+
+    const verbose = render(<SimRunner args={baseArgs({ verbose: true })} />);
+
+    await waitForFrame(verbose.lastFrame, 'PASS');
+    const frame = verbose.lastFrame() ?? '';
+    expect(frame).not.toContain('Use --verbose for detailed results');
+    expect(frame).not.toContain('opensip report for HTML report');
+    verbose.unmount();
   });
 
   it('yields a failing-verdict envelope when a scenario fails (host owns the exit)', async () => {

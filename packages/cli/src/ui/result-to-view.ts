@@ -24,9 +24,11 @@ import {
   viewFooterHints,
   viewVerboseLines,
   viewFindingsGroups,
-  VERBOSE_DETAIL_HINT,
+  DEFAULT_RUN_FOOTER_HINTS,
   formatValidatedColumn,
   parseValidatedCount,
+  shouldRenderRunFooterHints,
+  shouldRenderRunUnitTable,
   sortFitRowPriority,
   type Span,
   type Tone,
@@ -193,9 +195,11 @@ const ENV_SEP: Span = { text: ' | ' };
 
 /**
  * Fixed-width per-unit table from the envelope's signal-table rows, or null
- * when empty. Renders fitness's `Validated`/`Ignores` columns when ANY row
- * carries `validated` (a per-unit fact on {@link UnitResult}); graph/sim rows
- * omit them, so those tools' tables stay the lean 5-column form.
+ * when empty. Fresh non-verbose runs intentionally do not call this helper; the
+ * table is a detailed surface (`--verbose`, replay, and direct table tests).
+ * Renders fitness's `Validated`/`Ignores` columns when ANY row carries
+ * `validated` (a per-unit fact on {@link UnitResult}); graph/sim rows omit them,
+ * so those tools' tables stay the lean 5-column form.
  */
 function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
   if (rows.length === 0) return null;
@@ -268,30 +272,23 @@ export function renderVerboseDetail(detail: VerboseDetail): ViewNode {
 }
 
 /**
- * Append the shared non-verbose footer (the "Use --verbose…" hint + the
- * report hint) to a view when `show` is true (ADR-0021). Used by the
- * envelope-backed tools (fit/sim) so a non-verbose run nudges toward the detail
- * body and the HTML report — parity with graph's footer.
+ * Append the platform-owned compact-run footer to a view when `show` is true
+ * (ADR-0021). The decision to show it lives in `cli-ui`'s run render policy so
+ * static rendering and live runners cannot drift.
  */
-function withVerboseHint(node: ViewNode, show: boolean): ViewNode {
+function withDefaultRunFooter(node: ViewNode, show: boolean): ViewNode {
   if (!show) return node;
-  return group([
-    node,
-    viewFooterHints([
-      VERBOSE_DETAIL_HINT,
-      { text: 'opensip report for HTML report', bold: ['opensip report'] },
-    ]),
-  ]);
+  return group([node, viewFooterHints(DEFAULT_RUN_FOOTER_HINTS)]);
 }
 
 /**
- * The shared envelope → terminal-table view. Used by every migrated tool's
- * result (fit/sim always; graph when it carries an envelope). The per-tool
- * `rows`/`reportLines` legacy derivations it once fell back to were retired in
- * Phase 7 (ADR-0011).
+ * The shared envelope → terminal view. Used by every migrated tool's
+ * RunPresentation. The per-tool `rows`/`reportLines` legacy derivations it once
+ * fell back to were retired in Phase 7 (ADR-0011).
  *
  * When `verboseDetail` is present (a `--verbose` run), its rendered body is
- * prepended above the per-unit table (ADR-0021).
+ * prepended above the per-unit table (ADR-0021). Without verbose detail, callers
+ * can suppress the table for the compact default run surface.
  *
  * `durationOverride` is the host-owned display duration (ADR-0051), threaded by
  * `presentationToView` from `RunPresentation.durationMs`. It WINS over the
@@ -304,6 +301,7 @@ export function envelopeToTableView(
   envelope: SignalEnvelope,
   verboseDetail?: VerboseDetail,
   durationOverride?: number,
+  showTable = true,
 ): ViewNode {
   const rows = formatSignalTableRows(envelope);
   const summary = formatSignalTableSummary(envelope);
@@ -311,8 +309,10 @@ export function envelopeToTableView(
   if (verboseDetail !== undefined) {
     children.push(renderVerboseDetail(verboseDetail), SPACER);
   }
-  const table = envelopeTableNode(rows);
-  if (table !== null) children.push(table);
+  if (showTable) {
+    const table = envelopeTableNode(rows);
+    if (table !== null) children.push(table);
+  }
   children.push(
     viewRunSummary({
       // ADR-0035: the headline is the run's single verdict; the per-unit
@@ -328,11 +328,12 @@ export function envelopeToTableView(
 
 /**
  * The single render path for a {@link RunPresentation} (envelope-first-presentation
- * plan). Renders `p.banners` as muted lines above the table (graph's resolution
- * caveat), delegates the table+summary to `envelopeToTableView` (threading
- * `p.durationMs` as the host-owned duration override), and applies the shared
- * `withVerboseHint` footer when `verboseDetail` is absent — preserving fit/sim's
- * exact non-verbose footer behavior.
+ * plan). Renders `p.banners` as muted lines above the run body (graph's
+ * resolution caveat), delegates the verbose table+summary or default summary to
+ * `envelopeToTableView` (threading `p.durationMs` as the host-owned duration
+ * override), and applies the shared default footer when platform policy says the
+ * run is compact — preserving the live default surface: summary only, no
+ * per-unit table.
  *
  * This is the sole `resultToView` `case 'run-presentation'` target; it superseded
  * the three per-tool `*DoneResult` render cases (hard-removed in RP-3).
@@ -344,9 +345,15 @@ export function presentationToView(p: RunPresentation): ViewNode {
       children.push(line([{ text: banner, tone: 'muted' }]));
     }
   }
-  const body = withVerboseHint(
-    envelopeToTableView(p.envelope, p.verboseDetail, p.durationMs),
-    p.verboseDetail === undefined,
+  const verbose = p.verboseDetail !== undefined;
+  const body = withDefaultRunFooter(
+    envelopeToTableView(
+      p.envelope,
+      p.verboseDetail,
+      p.durationMs,
+      shouldRenderRunUnitTable({ verbose }),
+    ),
+    shouldRenderRunFooterHints({ verbose }),
   );
   children.push(body);
   return group(children);
@@ -356,9 +363,10 @@ export function presentationToView(p: RunPresentation): ViewNode {
 export function resultToView(result: CommandResult): ViewNode {
   switch (result.type) {
     // The render-only run-presentation adjunct (envelope-first-presentation plan):
-    // the SINGLE run variant. fit/sim/graph all construct this; the table+summary
-    // are derived from the envelope, banners (graph's resolution caveat) render
-    // above, and the shared non-verbose footer below — identically in TTY/pipe.
+    // the SINGLE run variant. fit/sim/graph all construct this; summary and
+    // optional verbose/detail table are derived from the envelope, banners
+    // (graph's resolution caveat) render above, and the shared non-verbose footer
+    // below — identically in TTY/pipe.
     // It replaced the three per-tool `*DoneResult` cases (hard-removed in RP-3).
     case 'run-presentation': {
       return presentationToView(result);

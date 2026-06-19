@@ -1,15 +1,14 @@
 /**
- * Graph live/static parity — the table-in-both proof (envelope-first-presentation
- * RP-2, Task 2.3).
+ * Graph live/static parity — the verbose table proof.
  *
  * Graph's STATIC render path routes through the host's `envelopeToTableView`
- * (`result-to-view.ts`), which renders one per-unit (per-rule) row. To keep the
- * LIVE final frame in parity (the plan's table-in-both default), graph's live
- * runner renders its OWN per-unit table node (`graphDoneTableNode`,
+ * (`result-to-view.ts`) when a verbose/detail view asks for the table. To keep
+ * the LIVE verbose final frame in parity, graph's live runner renders its OWN
+ * per-unit table node (`graphDoneTableNode`,
  * `@opensip-cli/graph/internal`) — it cannot import the host's `envelopeTableNode`
  * (cli) nor `@opensip-cli/output` (forbidden to tool engines). This test pins the
  * two against each other: for the same graph envelope, the live table node and the
- * static table portion must render to IDENTICAL content (TTY + pipe), so the two
+ * static detail table must render to IDENTICAL content (TTY + pipe), so the two
  * derivations cannot drift.
  *
  * The static `envelopeToTableView` also renders the summary line; graph's live
@@ -125,8 +124,8 @@ function liveTableLines(envelope: SignalEnvelope): string[] {
   return text.split('\n').filter((l) => l.trim().length > 0);
 }
 
-describe('graph live/static table parity (envelope-first-presentation RP-2)', () => {
-  it('the live table node renders the SAME per-unit table the static path does (pipe)', () => {
+describe('graph live/static verbose table parity', () => {
+  it('the live table node renders the SAME per-unit table the static detail path does (pipe)', () => {
     const envelope = graphEnvelope();
     expect(liveTableLines(envelope)).toEqual(staticTableLines(envelope));
   });

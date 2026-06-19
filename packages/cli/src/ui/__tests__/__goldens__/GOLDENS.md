@@ -25,30 +25,29 @@ human-readable render output through both interpreters:
 - **RP-1 (fit + sim):** the fit/sim cases are re-pointed to render the
   `presentation` projection (a `RunPresentation`) and MUST reproduce these exact
   bytes. Any diff is a regression to fix in RP-1, not an approved change.
-- **RP-2 (graph):** DONE. graph's `graph-*` goldens were REGENERATED to the new
-  envelope-backed output (graph now renders a `RunPresentation` through the same
-  `presentationToView` → `envelopeToTableView` path fit/sim use). They are the
-  NEW expected output, not the RP-0 baseline. The intentional deltas vs. the RP-0
-  graph-done baseline (reviewers approve these — they are not regressions):
+- **RP-2 (graph):** DONE. graph's `graph-*` goldens were REGENERATED to the
+  envelope-backed `RunPresentation` path. The current expected output keeps
+  non-verbose graph compact (banner + summary + footer) and reserves the
+  per-rule table for verbose/detail output.
 
   1. **Headline summary**: the count-based `graph-done` verdict
      (`result.summary.errors === 0`) → the envelope verdict
      (`envelope.verdict.passed`) via the shared `viewRunSummary`.
-  2. **Per-unit table ADDED**: graph's static output now includes the shared
-     per-rule signal table (`Unit | Status | Errors | Warnings | Duration`),
-     which the count-based `graphDoneView` never rendered.
+  2. **Per-unit table remains detailed**: graph's verbose/detail output includes
+     the shared per-rule signal table (`Unit | Status | Errors | Warnings |
+     Duration`), while non-verbose graph output does not.
   3. **Resolution caveat moved**: from a `graph-done` muted line to
-     `RunPresentation.banners`, rendered as a muted line ABOVE the table. (The
-     banner text is also the full production `resolutionBannerText` string — the
-     RP-0 fixture used a truncated stand-in.)
+     `RunPresentation.banners`, rendered as a muted line above the summary/detail
+     body. (The banner text is also the full production `resolutionBannerText`
+     string — the RP-0 fixture used a truncated stand-in.)
   4. **NON-regression (NOT a delta)**: the summary `Duration` is the real
      host wall-clock (`1.2s` / `50ms`), NOT `0ms` — even though every graph unit
      carries `durationMs: 0`. `RunPresentation.durationMs` is threaded into
      `envelopeToTableView`'s `durationOverride` (RP-0 Task 0.4), winning over the
      unit-sum. Preserving the real duration is required behavior.
 
-  The live final frame is brought into parity (same per-unit table) and pinned by
-  `../graph-live-static-parity.test.tsx`.
+  The live verbose table is kept in parity with the static detail table and
+  pinned by `../graph-live-static-parity.test.tsx`.
 
 ## Regenerating
 

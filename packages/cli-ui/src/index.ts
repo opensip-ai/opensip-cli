@@ -51,6 +51,13 @@ export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
 export { formatDuration } from './format-duration.js';
 export { LiveProgress, useProgressState, type LiveProgressProps } from './live-progress.js';
+export {
+  DEFAULT_RUN_FOOTER_HINTS,
+  REPORT_HINT,
+  shouldRenderRunFooterHints,
+  shouldRenderRunUnitTable,
+  type RunRenderPolicyInput,
+} from './run-render-policy.js';
 export type {
   ProgressEvent,
   ProgressCallback,

@@ -39,9 +39,11 @@ import {
   RunHeader,
   RunSummary,
   RunTimingProvider,
+  shouldRenderRunFooterHints,
+  shouldRenderRunUnitTable,
   ThemeProvider,
   UpdateHint,
-  VERBOSE_DETAIL_HINT,
+  DEFAULT_RUN_FOOTER_HINTS,
   viewFindingsGroups,
   type ProgressCallback,
   type ProgressEvent,
@@ -323,6 +325,7 @@ function FitRunner({
     case 'done': {
       const { envelope, verboseDetail } = state.result;
       const { summary } = envelope.verdict;
+      const renderPolicy = { verbose: args.verbose === true };
       // Host-owned timing (via provider from liveContext or outer host wrap):
       // omit explicit durationMs so RunSummary reads from RunTimingProvider.
       // The displayed Duration now matches the value stamped into StoredSession
@@ -354,7 +357,7 @@ function FitRunner({
         <>
           {staticHeader}
           <Box flexDirection="column">
-            {!args.quiet && args.verbose === true && (
+            {!args.quiet && shouldRenderRunUnitTable(renderPolicy) && (
               <Box paddingTop={1} flexDirection="column">
                 <ResultsTable rows={envelopeToFitRows(envelope)} />
               </Box>
@@ -366,16 +369,8 @@ function FitRunner({
             {!args.quiet && findingsDetail !== undefined && (
               <Box>{renderToInk(viewFindingsGroups(findingsDetail.groups))}</Box>
             )}
-            {!args.quiet && args.verbose !== true && (
-              <RunFooterHints
-                hints={[
-                  VERBOSE_DETAIL_HINT,
-                  {
-                    text: 'opensip report for HTML report',
-                    bold: ['opensip report'],
-                  },
-                ]}
-              />
+            {!args.quiet && shouldRenderRunFooterHints(renderPolicy) && (
+              <RunFooterHints hints={DEFAULT_RUN_FOOTER_HINTS} />
             )}
           </Box>
         </>

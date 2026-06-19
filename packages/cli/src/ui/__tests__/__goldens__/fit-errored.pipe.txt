@@ -1,6 +1,2 @@
-Unit                                     | Status  | Errors | Warnings | Validated    | Ignores | Duration  
------------------------------------------|---------|--------|----------|--------------|---------|-----------
-loader                                   | ERROR   | 0      | 0        | —            | 0       | 1ms       
-naming                                   | FAIL    | 0      | 1        | 5 files      | 3       | 2ms       
 FAIL  (0 Errors, 1 Warnings) | Duration 3ms
   Use --verbose for detailed results | opensip report for HTML report

@@ -1,10 +1,2 @@
-Unit                                     | Status  | Errors | Warnings | Validated    | Ignores |
-Duration
------------------------------------------|---------|--------|----------|--------------|---------|---
---------
-no-console                               | FAIL    | 2      | 0        | 10 files     | 0       |
-5ms
-naming                                   | PASS    | 0      | 1        | 10 files     | 0       |
-3ms
 FAIL  (2 Errors, 1 Warnings) | Duration 8ms
   Use --verbose for detailed results | opensip report for HTML report
