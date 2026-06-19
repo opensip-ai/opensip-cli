@@ -18,6 +18,7 @@ function makeTool(): Tool {
     commands: [{ name: 'sim', description: 'run simulation' }],
     extensionPoints: {
       sessionReplay: { tool: 'sim', replaySession: vi.fn() },
+      config: { namespace: 'simulation-config', schema: {} },
     },
   };
 }
@@ -126,11 +127,12 @@ function makeContext(): {
 }
 
 describe('bindToolCliContext', () => {
-  it('derives owned namespaces from stable id, human name, primary command, and replay key', () => {
+  it('derives owned namespaces from stable id, human name, primary command, replay key, and config namespace', () => {
     expect([...toolOwnedKeys(makeTool())].sort()).toEqual([
       '00000000-0000-4000-8000-00000000abcd',
       'sim',
       'simulation',
+      'simulation-config',
     ]);
   });
 
@@ -149,12 +151,14 @@ describe('bindToolCliContext', () => {
 
     await bound.saveBaseline('simulation', {});
     await bound.compareBaseline('sim', {});
+    await bound.exportBaselineFingerprints('simulation-config', 'baseline.json');
     await bound.toolState.put('sim', 'cursor', {});
     await bound.toolState.list('00000000-0000-4000-8000-00000000abcd');
 
     expect(calls).toEqual([
       'save:simulation',
       'compare:sim',
+      'fingerprints:simulation-config',
       'state-put:sim',
       'state-list:00000000-0000-4000-8000-00000000abcd',
     ]);

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.6
+release: v0.1.7
 title: "Sim execution model"
 audience: [contributors]
 purpose: "How the sim engine runs scenarios. Dispatcher, executor lifecycle, result aggregation, exit semantics."

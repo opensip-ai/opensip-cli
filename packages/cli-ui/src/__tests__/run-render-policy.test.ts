@@ -1,9 +1,10 @@
+import { describe, expect, it } from 'vitest';
+
 import {
   DEFAULT_RUN_FOOTER_HINTS,
   shouldRenderRunFooterHints,
   shouldRenderRunUnitTable,
 } from '../run-render-policy.js';
-import { describe, expect, it } from 'vitest';
 
 describe('run render policy', () => {
   it('keeps default fresh runs compact', () => {

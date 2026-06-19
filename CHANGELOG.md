@@ -2,6 +2,40 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.7] - 2026-06-18
+
+A launch-prep release focused on simplifying the public command surface,
+hardening release packaging, and making run output consistent across tools.
+
+### Changed
+
+- Moved extension-pack management under each pack-supporting tool:
+  `opensip fit plugin ...` and `opensip sim plugin ...` replace the retired
+  top-level `opensip plugin` group. Whole-tool plugins remain under
+  `opensip tools ...`.
+- Completed the canonical nested tool-command surface and removed the legacy
+  flat-root aliases (`fit-list`, `fit-recipes`, `fit-baseline-export`,
+  `graph-recipes`, `graph-lookup`, `graph-symbol-index`,
+  `graph-baseline-export`, `sarif-export`, and `catalog-export`). Use the
+  nested forms such as `fit list`, `fit recipes`, `fit export`,
+  `graph recipes`, `graph lookup`, `graph index`, and `graph export`.
+- Added a uniform primary-tool flag surface: `fit`, `graph`, and `sim` now carry
+  the shared baseline flags plus a per-tool `--version`.
+- Added discoverability commands for `graph list` and `sim recipes`.
+- Centralized run rendering policy so default fresh `fit`, `graph`, and `sim`
+  runs stay compact, while `--verbose` and replay/detail surfaces keep detailed
+  tables.
+
+### Fixed
+
+- Ensured the release package order includes runtime workspace dependencies so
+  tag-driven publishes do not omit required packages.
+- Hardened subprocess correlation and graph shard diagnostics so worker logs,
+  spans, and failure milestones retain run context.
+- Moved fitness file caching onto per-run scope state to avoid cross-run cache
+  contamination under concurrent execution.
+- Cleared the current fit/graph dogfood findings ahead of the release.
+
 ## [0.1.6] - 2026-06-18
 
 A maintenance release focused on closing unwired command-surface gaps and

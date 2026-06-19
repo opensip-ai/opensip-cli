@@ -3,16 +3,17 @@
  * New tools must use `extensionPoints` only via {@link defineTool}.
  */
 
-import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
-import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
-import type { Tool, ToolSessionReplayContribution } from './types.js';
-import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
-import type { RunScope } from '../lib/run-scope.js';
 import {
   isContributionWithDisposer,
   type ContributeScopeResult,
   type ToolScope,
 } from '../lib/scope-types.js';
+
+import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
+import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
+import type { Tool, ToolSessionReplayContribution } from './types.js';
+import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
+import type { RunScope } from '../lib/run-scope.js';
 
 /** Every optional hook the host reads, resolved to a single object. */
 export interface ResolvedToolHooks {

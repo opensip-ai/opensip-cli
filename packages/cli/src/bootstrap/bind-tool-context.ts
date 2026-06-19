@@ -32,6 +32,7 @@ export function toolOwnedKeys(tool: Tool): ReadonlySet<string> {
       tool.metadata.name,
       primaryCommandName(tool),
       resolveToolHooks(tool).sessionReplay?.tool,
+      resolveToolHooks(tool).config?.namespace,
     ].filter((value): value is string => typeof value === 'string' && value.length > 0),
   );
 }

@@ -14,7 +14,7 @@ import type { Tool } from '@opensip-cli/core';
 /** A minimal Tool stub — only the fields the decorator reads. */
 function toolStub(over: Partial<Tool['metadata']> & { contractVersion?: string } = {}): Tool {
   const { contractVersion, ...metaOver } = over;
-  return {
+  const tool: Tool = {
     metadata: {
       id: '00000000-0000-0000-0000-000000000000',
       name: 'demo',
@@ -23,7 +23,8 @@ function toolStub(over: Partial<Tool['metadata']> & { contractVersion?: string }
       ...metaOver,
     },
     ...(contractVersion === undefined ? {} : { contractVersion }),
-  } as Tool;
+  };
+  return tool;
 }
 
 const longFlags = (cmd: Command): string[] =>

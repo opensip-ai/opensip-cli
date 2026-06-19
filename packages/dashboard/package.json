@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/dashboard",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "Apache-2.0",
   "description": "Self-contained HTML dashboard generator for OpenSIP CLI — renders the fit/sim/graph report from session data and graph catalogs",
   "keywords": [
