@@ -92,6 +92,21 @@ describe('composed whole-document validation', () => {
     expect(() => validateConfigDocument(schema(), doc)).toThrow(ConfigurationError);
   });
 
+  it('rejects plaintext http cli.reportTo and cli.cloud.endpoint', () => {
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        cli: { reportTo: 'http://insecure.test/api' },
+      }),
+    ).toThrow(ConfigurationError);
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        cli: { cloud: { endpoint: 'http://insecure.test/api' } },
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
   it('rejects the removed cli.recipe fallback', () => {
     expect(() =>
       validateConfigDocument(schema(), {

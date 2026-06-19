@@ -122,6 +122,10 @@ function buildFullProgram(): Command {
       'Codebase intelligence from your terminal — pluggable tools for fitness, simulation, and more',
     );
     program.option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run');
+    program.option(
+      '--no-plugins',
+      'Skip loading installed npm tool packages (incident response; does not affect bundled or authored tools)',
+    );
 
     // Register the bundled tools into a fresh registry and mount their command
     // specs (the same path index.ts drives at step 8 of the tool lifecycle).

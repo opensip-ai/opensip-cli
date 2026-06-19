@@ -15,6 +15,8 @@
  */
 import { logger } from '@opensip-cli/core';
 
+import { isHttpsUrl } from './https-url.js';
+
 /** Per-caller retry/throttle policy. */
 export interface RetryPolicy {
   /** Max attempts per chunk. */
@@ -95,6 +97,24 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   const now = args.now ?? Date.now;
   const sleep = args.sleep ?? defaultSleep;
   const started = now();
+
+  if (args.apiKey && !isHttpsUrl(args.url)) {
+    const detail = 'credential-bearing egress requires an https:// URL';
+    logger.warn({
+      evt: `${evtPrefix}.insecure-endpoint`,
+      module: MODULE_TAG,
+      url: args.url,
+    });
+    return {
+      acceptedChunks: 0,
+      chunkResults: Array.from({ length: chunks.length }, () => false),
+      outcome: 'failed',
+      authRejected: false,
+      throttled: false,
+      deadlineExceeded: false,
+      errors: [detail],
+    };
+  }
 
   const headersBase: Record<string, string> = { 'Content-Type': 'application/json' };
   if (args.apiKey) headersBase['X-API-Key'] = args.apiKey;

@@ -77,6 +77,16 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       '— the install-source-independence escape hatch. Unset = load all bundled tools.',
   },
   {
+    canonical: 'OPENSIP_CLI_SKIP_INSTALLED',
+    coerce: (raw) => raw.length > 0,
+    default: false,
+    docs:
+      'Set to any non-empty value to skip discovery and loading of installed npm tool packages ' +
+      '(opensipTools.kind === tool in ancestor node_modules). Bundled and authored tools are ' +
+      'unaffected. Equivalent to passing --no-plugins. Use for incident response when ambient ' +
+      'plugins must not execute in the host process.',
+  },
+  {
     canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     // Mirror parseAllowlist's split (whitespace AND comma) so the registry value
     // and tool-trust's set agree exactly — including the `*` token, which passes

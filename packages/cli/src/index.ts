@@ -64,6 +64,10 @@ const program = new Command('opensip')
   // ADR-0008: per-run opt-out of OpenSIP Cloud signal sync. `--no-cloud` sets
   // `cloud` to false; the pre-action hook reads it via optsWithGlobals().
   .option('--no-cloud', 'Disable OpenSIP Cloud signal sync for this run')
+  .option(
+    '--no-plugins',
+    'Skip loading installed npm tool packages (incident response; does not affect bundled or authored tools)',
+  )
   // NOTE: the root program does NOT register a Commander `.version()` option.
   // A Commander version option on the root is a GLOBAL option that intercepts
   // `--version` even after a known subcommand, so `opensip fit --version` would
@@ -102,12 +106,14 @@ async function main(): Promise<void> {
   // Persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
+  const userArgv = process.argv.slice(2);
   const { provenance, manifests } = await bootstrapCli({
     langRegistry,
     toolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
     cwd: process.cwd(),
     cliEntryUrl: import.meta.url,
+    argv: userArgv,
   });
 
   const { ctx } = buildToolCliContext({

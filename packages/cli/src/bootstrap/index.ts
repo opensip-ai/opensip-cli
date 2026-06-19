@@ -14,6 +14,7 @@
  */
 
 import {
+  logger,
   resolveProjectContext,
   resolveProjectPaths,
   resolveUserPaths,
@@ -25,6 +26,9 @@ import {
 
 import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
+
+import { BOOTSTRAP_MODULE } from './constants.js';
+import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
 
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
@@ -58,6 +62,12 @@ export { isRootVersionRequest } from './root-version.js';
 export interface BootstrapOptions {
   readonly langRegistry: LanguageRegistry;
   readonly toolRegistry: ToolRegistry;
+  /**
+   * User args after the binary (`process.argv.slice(2)`). Used for bootstrap-
+   * time global flags (e.g. `--no-plugins`) that must be honored before Commander
+   * parses.
+   */
+  readonly argv?: readonly string[];
   /**
    * The CLI's own install directory. Anchors discovery of graph adapters
    * and of tools installed as siblings of a global `opensip-cli`.
@@ -128,13 +138,22 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // the manifests just loaded (not from an imported tool runtime — the host
   // holds none in the launch contract).
   const builtInIds = new Set(manifests.map((m) => m.id));
-  await discoverAndRegisterToolPackages(
-    opts.toolRegistry,
-    { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
-    builtInIds,
-    provenance,
-    manifests,
-  );
+  const argv = opts.argv ?? [];
+  if (!shouldSkipInstalledToolDiscovery(argv)) {
+    await discoverAndRegisterToolPackages(
+      opts.toolRegistry,
+      { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
+      builtInIds,
+      provenance,
+      manifests,
+    );
+  } else {
+    logger.info({
+      evt: 'cli.tool.installed_discovery_skipped',
+      module: BOOTSTRAP_MODULE,
+      reason: argv.includes('--no-plugins') ? 'argv-no-plugins' : 'env-skip-installed',
+    });
+  }
   // Authored Tool sidecars (ADR-0027 realization): global trusted-by-default +
   // project deny-by-default. Resolve the two authored roots — the global root
   // is always present; the project root is best-effort (an unresolvable

@@ -65,6 +65,8 @@ docs/internal/*
 # improvement-process doc) — it is repo-only-but-committed per CLAUDE.md's
 # docs/internal charter. Negate the bulk ignore for just this file.
 !docs/internal/subprocess-correlation-playbook.md
+!docs/internal/specs/
+!docs/internal/specs/**
 
 # Claude Code session state
 .claude/scheduled_tasks.lock

@@ -95,6 +95,7 @@ describe('hostEnv reads (CLI infra)', () => {
       // tool-command-surface-taxonomy Task 1.5: the Tier-3 internal-command reveal.
       'OPENSIP_CLI_SHOW_INTERNAL',
       'OPENSIP_CLI_SKIP_BUNDLED',
+      'OPENSIP_CLI_SKIP_INSTALLED',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     ]);
   });
@@ -149,6 +150,13 @@ describe('hostEnv reads (CLI infra)', () => {
         name,
       );
     }
+  });
+
+  it('OPENSIP_CLI_SKIP_INSTALLED coerces to boolean (default false)', () => {
+    expect(hostEnv.get<boolean>('OPENSIP_CLI_SKIP_INSTALLED')).toBe(false);
+    process.env.OPENSIP_CLI_SKIP_INSTALLED = '1';
+    expect(hostEnv.get<boolean>('OPENSIP_CLI_SKIP_INSTALLED')).toBe(true);
+    delete process.env.OPENSIP_CLI_SKIP_INSTALLED;
   });
 
   it('OPENSIP_CLI_SKIP_BUNDLED coerces to a trimmed id list (default empty)', () => {

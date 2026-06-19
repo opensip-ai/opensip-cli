@@ -16,6 +16,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "required": false,
       "variadic": false,
     },
+    {
+      "choices": undefined,
+      "defaultValue": undefined,
+      "description": "Skip loading installed npm tool packages (incident response; does not affect bundled or authored tools)",
+      "flags": "--no-plugins",
+      "negate": true,
+      "optional": false,
+      "required": false,
+      "variadic": false,
+    },
   ],
   "subcommands": [
     {

@@ -44,6 +44,7 @@ bypasses the registry.
 | `OPENSIP_NO_UPDATE` | Set to any non-empty value to skip the CLI update check. |
 | `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
 | `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead. Unset loads all bundled tools. |
+| `OPENSIP_CLI_SKIP_INSTALLED` | Set to any non-empty value to skip discovery and loading of installed npm tool packages (`opensipTools.kind === tool` in ancestor `node_modules`). Bundled and authored tools are unaffected. Equivalent to passing `--no-plugins`. Use for incident response when ambient plugins must not execute in the host process. |
 
 ## Authored tools
 

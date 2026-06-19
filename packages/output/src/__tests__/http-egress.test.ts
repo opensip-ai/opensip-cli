@@ -195,6 +195,29 @@ describe('postChunked', () => {
     expect(r.errors.join(' ')).toContain('ECONNRESET');
   });
 
+  it('refuses credential-bearing egress over plaintext http without calling fetch', async () => {
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    ) as unknown as typeof fetch;
+    const r = await postChunked(
+      args({ fetchImpl, url: 'http://insecure.test/signals', apiKey: 'secret' }),
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(r.outcome).toBe('failed');
+    expect(r.errors.join(' ')).toContain('https://');
+  });
+
+  it('allows plaintext http when no apiKey is supplied', async () => {
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    ) as unknown as typeof fetch;
+    const r = await postChunked(
+      args({ fetchImpl, url: 'http://127.0.0.1:1/sarif', apiKey: undefined }),
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(r.outcome).toBe('ok');
+  });
+
   it('omits the X-API-Key header when no apiKey is supplied', async () => {
     let sawAuthHeader = true;
     const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {

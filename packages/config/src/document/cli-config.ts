@@ -25,6 +25,14 @@
 import { readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 import { z } from 'zod';
 
+/** Config URLs that may carry credentials must use https. */
+const httpsUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => value.startsWith('https://'), {
+    message: 'URL must use https://',
+  });
+
 /**
  * Shape of the `cli:` block in `opensip-cli.config.yml` as the CLI pre-action
  * hook reads it. The structural mirror of {@link cliConfigSchema}.
@@ -73,7 +81,7 @@ export const cliConfigSchema = z.object({
   exclude: z.array(z.string()).optional(),
   verbose: z.boolean().optional(),
   json: z.boolean().optional(),
-  reportTo: z.url().optional(),
+  reportTo: httpsUrlSchema.optional(),
   apiKey: z.string().min(1).optional(),
   fileTypes: z.array(z.string()).optional(),
   ignore: z.array(z.string()).optional(),
@@ -86,7 +94,7 @@ export const cliConfigSchema = z.object({
   cloud: z
     .object({
       sync: z.boolean().optional(),
-      endpoint: z.string().optional(),
+      endpoint: httpsUrlSchema.optional(),
     })
     .optional(),
 });
