@@ -76,6 +76,10 @@ export function buildPackedSmokeScenarios({
   toolPluginTarball,
   fitPackTarball,
 }) {
+  // Installed npm tools are deny-by-default; the tool-plugin fixture id must be
+  // allowlisted for post-install scenarios that mount/run it in the host process.
+  const allowInstalledEnv = { OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'audit-demo-tool' };
+
   /** @type {import('./cli-acceptance-core.mjs').Scenario[]} */
   const scenarios = [
     {
@@ -398,5 +402,8 @@ export function buildPackedSmokeScenarios({
     },
   ];
 
-  return scenarios;
+  return scenarios.map((scenario) => ({
+    ...scenario,
+    env: { ...allowInstalledEnv, ...scenario.env },
+  }));
 }

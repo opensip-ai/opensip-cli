@@ -26,12 +26,16 @@ import { readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 import { z } from 'zod';
 
 /** Config URLs that may carry credentials must use https. */
-const httpsUrlSchema = z
-  .string()
-  .url()
-  .refine((value) => value.startsWith('https://'), {
-    message: 'URL must use https://',
-  });
+const httpsUrlSchema = z.string().refine(
+  (value) => {
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  },
+  { message: 'URL must use https://' },
+);
 
 /**
  * Shape of the `cli:` block in `opensip-cli.config.yml` as the CLI pre-action

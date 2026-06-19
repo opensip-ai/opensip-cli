@@ -87,6 +87,21 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'plugins must not execute in the host process.',
   },
   {
+    canonical: 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
+    coerce: (raw) =>
+      raw
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    default: [] as readonly string[],
+    docs:
+      'Comma/whitespace-separated installed npm Tool ids to admit (deny-by-default). ' +
+      "Use '*' to admit all ambient opensipTools.kind === tool packages discovered in " +
+      'ancestor node_modules. Unset = skip installed tools unless explicitly allowlisted. ' +
+      'Does not affect bundled or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for ' +
+      'incident response (kill switch wins).',
+  },
+  {
     canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     // Mirror parseAllowlist's split (whitespace AND comma) so the registry value
     // and tool-trust's set agree exactly — including the `*` token, which passes

@@ -28,8 +28,6 @@ import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
 
 import { BOOTSTRAP_MODULE } from './constants.js';
-import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
-
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
   BUNDLED_TOOL_PACKAGES,
@@ -38,6 +36,7 @@ import {
   discoverAndRegisterAuthoredTools,
   buildToolDiscoverySources,
 } from './register-tools.js';
+import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
@@ -139,7 +138,13 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // holds none in the launch contract).
   const builtInIds = new Set(manifests.map((m) => m.id));
   const argv = opts.argv ?? [];
-  if (!shouldSkipInstalledToolDiscovery(argv)) {
+  if (shouldSkipInstalledToolDiscovery(argv)) {
+    logger.info({
+      evt: 'cli.tool.installed_discovery_skipped',
+      module: BOOTSTRAP_MODULE,
+      reason: argv.includes('--no-plugins') ? 'argv-no-plugins' : 'env-skip-installed',
+    });
+  } else {
     await discoverAndRegisterToolPackages(
       opts.toolRegistry,
       { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
@@ -147,12 +152,6 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
       provenance,
       manifests,
     );
-  } else {
-    logger.info({
-      evt: 'cli.tool.installed_discovery_skipped',
-      module: BOOTSTRAP_MODULE,
-      reason: argv.includes('--no-plugins') ? 'argv-no-plugins' : 'env-skip-installed',
-    });
   }
   // Authored Tool sidecars (ADR-0027 realization): global trusted-by-default +
   // project deny-by-default. Resolve the two authored roots — the global root

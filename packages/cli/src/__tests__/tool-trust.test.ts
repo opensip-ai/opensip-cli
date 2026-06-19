@@ -14,7 +14,12 @@ import { PluginIncompatibleError } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
-import { isProjectLocalToolTrusted, PROJECT_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
+import {
+  INSTALLED_TOOL_ALLOWLIST_ENV,
+  isInstalledToolTrusted,
+  isProjectLocalToolTrusted,
+  PROJECT_TOOL_ALLOWLIST_ENV,
+} from '../bootstrap/tool-trust.js';
 
 const SIDECAR = 'opensip-tool.manifest.json';
 
@@ -32,6 +37,24 @@ function stageProjectLocalTool(id: string, apiVersion?: number): string {
   writeFileSync(join(dir, SIDECAR), JSON.stringify(manifest), 'utf8');
   return dir;
 }
+
+describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
+  it('denies by default when the allowlist env is unset/empty', () => {
+    expect(isInstalledToolTrusted('my-plugin', {})).toBe(false);
+    expect(isInstalledToolTrusted('my-plugin', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '' })).toBe(false);
+  });
+
+  it('admits an id present in the comma/space-separated allowlist', () => {
+    const env = { [INSTALLED_TOOL_ALLOWLIST_ENV]: 'my-plugin, other-tool' };
+    expect(isInstalledToolTrusted('my-plugin', env)).toBe(true);
+    expect(isInstalledToolTrusted('other-tool', env)).toBe(true);
+    expect(isInstalledToolTrusted('unknown', env)).toBe(false);
+  });
+
+  it('admits all on the wildcard', () => {
+    expect(isInstalledToolTrusted('anything', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+  });
+});
 
 describe('isProjectLocalToolTrusted (deny-by-default allowlist)', () => {
   it('denies by default when the allowlist env is unset/empty', () => {

@@ -7,7 +7,12 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DataStoreFactory, DataStoreVersionError } from '../index.js';
-import { isDbNewerThanCli, readSupportedDbVersion } from '../schema-version.js';
+import {
+  isDbNewerThanCli,
+  LEGACY_PRE_SQUASH_MAX_USER_VERSION,
+  LOGICAL_SCHEMA_VERSION,
+  readSupportedDbVersion,
+} from '../schema-version.js';
 
 /** The bundled migrations folder lives at the package root (mirrors factory's default). */
 const MIGRATIONS_FOLDER = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'migrations');
@@ -43,15 +48,17 @@ afterEach(() => {
 });
 
 describe('readSupportedDbVersion', () => {
-  it('equals the bundled migration journal entry count', () => {
+  it('returns the logical schema version when the journal is readable', () => {
     const journal = JSON.parse(
       readFileSync(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8'),
     ) as { entries: unknown[] };
-    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBe(journal.entries.length);
+    expect(journal.entries.length).toBeGreaterThanOrEqual(1);
+    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBe(LOGICAL_SCHEMA_VERSION);
   });
 
-  it('is at least 1 (the package ships migrations)', () => {
-    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBeGreaterThanOrEqual(1);
+  it('is independent of journal entry count (squash-safe)', () => {
+    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBe(LOGICAL_SCHEMA_VERSION);
+    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).not.toBe(LEGACY_PRE_SQUASH_MAX_USER_VERSION);
   });
 
   it('returns undefined for an unreadable journal (broken install)', () => {
@@ -64,6 +71,15 @@ describe('isDbNewerThanCli', () => {
     expect(isDbNewerThanCli(7, 6)).toBe(true);
     expect(isDbNewerThanCli(6, 6)).toBe(false); // equal = same schema, safe
     expect(isDbNewerThanCli(0, 6)).toBe(false); // fresh / legacy, safe
+  });
+
+  it('adopts v0.1.0 legacy stamps (journal count ≤ 14) against logical v2', () => {
+    expect(isDbNewerThanCli(LEGACY_PRE_SQUASH_MAX_USER_VERSION, LOGICAL_SCHEMA_VERSION)).toBe(
+      false,
+    );
+    expect(isDbNewerThanCli(LEGACY_PRE_SQUASH_MAX_USER_VERSION + 1, LOGICAL_SCHEMA_VERSION)).toBe(
+      true,
+    );
   });
 });
 
@@ -87,6 +103,17 @@ describe('DataStoreFactory.open — version stamp', () => {
     const reopened = DataStoreFactory.open({ backend: 'sqlite', path });
     reopened.close();
     expect(readUserVersion(path)).toBe(readSupportedDbVersion(MIGRATIONS_FOLDER));
+  });
+
+  it('adopts a v0.1.0 legacy stamp (user_version 14) without DataStoreVersionError', () => {
+    const path = join(tmp, 'legacy-v010.sqlite');
+    DataStoreFactory.open({ backend: 'sqlite', path }).close();
+    writeUserVersion(path, LEGACY_PRE_SQUASH_MAX_USER_VERSION);
+    expect(readUserVersion(path)).toBe(LEGACY_PRE_SQUASH_MAX_USER_VERSION);
+
+    const reopened = DataStoreFactory.open({ backend: 'sqlite', path });
+    reopened.close();
+    expect(readUserVersion(path)).toBe(LOGICAL_SCHEMA_VERSION);
   });
 
   it('reopening an already-current db is a no-op that preserves the stamp', () => {

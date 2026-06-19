@@ -154,6 +154,12 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 6. Verify npm after publish:
 
    ```bash
+   node scripts/verify-release-publish-surface.mjs --expected-version vX.Y.Z --tag latest
+   ```
+
+   Or inspect manually:
+
+   ```bash
    for p in core datastore contracts session-store output config targeting cli-ui tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard fitness simulation graph graph-adapter-common graph-typescript \
@@ -163,6 +169,39 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    done
    printf '%-40s %s\n' "opensip-cli" "$(npm view opensip-cli version 2>/dev/null || echo MISSING)"
    ```
+
+## Partial publish recovery
+
+The release workflow publishes every package to a version-scoped staging dist-tag
+(`release-candidate-<version>`) first, then promotes the full set to `latest` in
+one batch. If the workflow fails mid-loop, `latest` should still point at the
+previous complete release.
+
+**Detect a partial publish:**
+
+```bash
+# Staging lane (incomplete set is OK here while the workflow is running)
+node scripts/verify-release-publish-surface.mjs --expected-version vX.Y.Z --tag release-candidate-X.Y.Z
+
+# Consumer-visible lane (must be complete before calling the release good)
+node scripts/verify-release-publish-surface.mjs --expected-version vX.Y.Z --tag latest
+```
+
+**Safe recovery:**
+
+1. Re-run the failed release workflow on the **same tag**. Publish is idempotent:
+   packages already on npm are skipped; promotion runs again for any version that
+   exists but is not yet on `latest`.
+2. If the workflow cannot be re-run, publish any missing tarballs manually with
+   the same staging tag, then promote each name to `latest` in dependency order
+   from `scripts/release-package-order.mjs`.
+3. Do **not** bump a patch version just to “fix” a partial publish — npm versions
+   are immutable. Finish `X.Y.Z` on the registry, or yank only as a last resort
+   after operator review.
+
+**GitHub Release coupling:** the GitHub Release step runs only after staging
+publish + `latest` promotion succeed, so consumers never see a GitHub Release for
+a version whose CLI package is missing from `latest`.
 
 ## Publish Order
 
@@ -203,3 +242,10 @@ SQLite/Drizzle schema changes require a new migration under
 4. Never edit a previously committed migration file.
 
 The CLI applies pending migrations automatically when opening the datastore.
+
+`PRAGMA user_version` stores a **logical schema id** (`LOGICAL_SCHEMA_VERSION` in
+`packages/datastore/src/schema-version.ts`), not the Drizzle journal entry count.
+Bump the logical id only when squashing migrations or making an incompatible
+rewrite — not on every additive migration. Users upgrading from v0.1.0 may see
+their local `.runtime/` cache re-stamped once across the v0.1.0→v0.1.1 squash
+boundary without deleting it.

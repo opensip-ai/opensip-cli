@@ -120,6 +120,7 @@ describe('viewToolsInstall', () => {
     expect(out).toContain('demo-tool');
     expect(out).toContain('global');
     expect(out).toContain('Validation');
+    expect(out).toContain("OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo-tool'");
   });
 
   it('renders a failed install with the error line', () => {

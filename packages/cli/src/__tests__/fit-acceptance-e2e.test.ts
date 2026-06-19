@@ -33,7 +33,10 @@ import { distRunner } from './harness/cli-acceptance.js';
 const cli = distRunner();
 /** Run `fit` through the INSTALLED path: drop it from the bundled set so the CLI
  *  discovers + loads it as an external plugin (the §1 "as if external" lever). */
-const AS_INSTALLED = { OPENSIP_CLI_SKIP_BUNDLED: 'fitness' };
+const AS_INSTALLED = {
+  OPENSIP_CLI_SKIP_BUNDLED: 'fitness',
+  OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'fit',
+};
 
 let testDir: string;
 

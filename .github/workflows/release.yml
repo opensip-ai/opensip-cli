@@ -1,9 +1,19 @@
 name: Release
 
+# Pinned action SHAs (bump via dependabot or deliberate review):
+#   actions/checkout@v6        → df4cb1c069e1874edd31b4311f1884172cec0e10
+#   pnpm/action-setup@v6       → 0ebf47130e4866e96fce0953f49152a61190b271
+#   actions/setup-node@v6      → 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+#   softprops/action-gh-release@v3 → 718ea10b132b3b2eba29c1007bb80653f286566b
+
 on:
   push:
     tags:
       - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -12,11 +22,11 @@ jobs:
       contents: write # softprops/action-gh-release creates the GitHub Release
       id-token: write # OIDC token for npm trusted publishing
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           # Single source of truth: pinned in .nvmrc (see ci.yml).
           node-version-file: .nvmrc
@@ -187,23 +197,25 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/smoke-pack.mjs --expected-version "$RELEASE_TAG"
 
-      # Publish in strict dependency order. Sequential (not parallel) by
-      # design — racing a downstream publish ahead of its upstream
-      # produces a broken release because the upstream version isn't in
-      # the registry yet when downstream's `dependencies` field is
-      # resolved by consumers.
+      # Publish in strict dependency order to a STAGING dist-tag first; only
+      # after every package succeeds do we promote the full set to `latest`.
+      # Sequential (not parallel) by design — racing a downstream publish
+      # ahead of its upstream produces a broken release because the upstream
+      # version isn't in the registry yet when downstream's `dependencies`
+      # field is resolved by consumers.
       #
       # `npm publish <tarball>` performs the OIDC handshake (unlike
       # `pnpm publish`, which uses its own HTTP client and skips OIDC).
       #
-      # Idempotent — already-published versions are skipped, so re-running
-      # the workflow on the same tag is safe (e.g. after a network blip
-      # halfway through the publish loop).
-      - name: Publish via npm (OIDC trusted publishing)
+      # Idempotent — already-published versions are skipped on publish, and
+      # promotion re-runs safely; re-running the workflow on the same tag is
+      # safe after a network blip halfway through the loop.
+      - name: Publish via npm (OIDC trusted publishing — staging tag)
         run: |
           set -e
           VERSION=$(node -p "require('./packages/core/package.json').version")
-          echo "Publishing version: $VERSION"
+          STAGING_TAG="release-candidate-${VERSION}"
+          echo "Publishing version: $VERSION (staging tag: $STAGING_TAG)"
 
           publish_if_new() {
             local pkg="$1"
@@ -217,7 +229,7 @@ jobs:
             # a prefix of another's — e.g. `graph` matches `graph-typescript`,
             # `graph-python`, `graph-rust`, `graph-go`, `graph-java` — and
             # `npm publish` receives multiple paths and errors EUSAGE.
-            npm publish /tmp/tarballs/opensip-cli-${pkg}-${VERSION}.tgz --access public --provenance
+            npm publish /tmp/tarballs/opensip-cli-${pkg}-${VERSION}.tgz --access public --provenance --tag "$STAGING_TAG"
           }
 
           # The CLI publishes under the UNSCOPED name `opensip-cli`, so its
@@ -229,7 +241,7 @@ jobs:
               echo "::notice::skip ${name}@${VERSION} (already on npm)"
               return 0
             fi
-            npm publish /tmp/tarballs/${name}-${VERSION}.tgz --access public --provenance
+            npm publish /tmp/tarballs/${name}-${VERSION}.tgz --access public --provenance --tag "$STAGING_TAG"
           }
 
           # The publish ORDER is DERIVED from scripts/release-package-order.mjs
@@ -247,7 +259,37 @@ jobs:
             fi
           done < <(node scripts/release-package-order.mjs --print names)
 
+      - name: Promote staged release to latest
+        run: |
+          set -e
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          STAGING_TAG="release-candidate-${VERSION}"
+          echo "Promoting ${VERSION} from ${STAGING_TAG} to latest"
+
+          promote() {
+            local name="$1"
+            if ! npm view "${name}@${VERSION}" version >/dev/null 2>&1 ; then
+              echo "::error::${name}@${VERSION} is missing on npm — cannot promote"
+              exit 1
+            fi
+            npm dist-tag add "${name}@${VERSION}" latest
+            echo "  promoted ${name}@${VERSION} → latest"
+          }
+
+          while IFS= read -r pkg ; do
+            if [ "$pkg" = "opensip-cli" ] ; then
+              promote opensip-cli
+            else
+              promote "@opensip-cli/$pkg"
+            fi
+          done < <(node scripts/release-package-order.mjs --print names)
+
+      - name: Verify publish surface on latest
+        run: |
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          node scripts/verify-release-publish-surface.mjs --expected-version "v${VERSION}" --tag latest
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           generate_release_notes: true

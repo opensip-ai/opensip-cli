@@ -1,6 +1,6 @@
 /**
- * tool-trust — the project-local executable-tool trust policy (release
- * launch, Phase 3 Task 3.2).
+ * tool-trust — executable-tool trust policies for project-local and installed
+ * npm tools (release launch, Phase 3 Task 3.2; audit remediation).
  *
  * A `project-local` tool is authored code under `<project>/opensip-cli/…`
  * that changes with the repo (§5.2.1). Running it imports arbitrary code
@@ -26,6 +26,13 @@
  * around a single call.
  */
 export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS';
+
+/**
+ * Environment variable carrying the installed-npm tool allowlist. Empty/unset
+ * ⇒ deny-by-default for ambient `node_modules` discovery (paired with
+ * {@link isInstalledToolTrusted}).
+ */
+export const INSTALLED_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS';
 
 /**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
@@ -67,5 +74,23 @@ export function isProjectLocalToolTrusted(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const allow = parseAllowlist(env[PROJECT_TOOL_ALLOWLIST_ENV]);
+  return allow.has('*') || allow.has(id);
+}
+
+/**
+ * Decide whether an installed npm tool with the given manifest `id` is trusted
+ * to `import()` into the host process, under deny-by-default + allowlist-opt-in.
+ *
+ * Read timing and env governance mirror {@link isProjectLocalToolTrusted}: the
+ * check runs at bootstrap before any `RunScope` exists, via the injected `env`
+ * param for testability.
+ *
+ * @param id The tool's stable id (from `package.json#opensipTools.id`).
+ * @param env The environment to read the allowlist from (defaults to
+ *   `process.env`; injectable for tests).
+ * @returns `true` iff the allowlist contains `id` or the wildcard `'*'`.
+ */
+export function isInstalledToolTrusted(id: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  const allow = parseAllowlist(env[INSTALLED_TOOL_ALLOWLIST_ENV]);
   return allow.has('*') || allow.has(id);
 }

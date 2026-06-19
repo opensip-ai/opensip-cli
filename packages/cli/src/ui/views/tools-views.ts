@@ -165,6 +165,16 @@ export function viewToolsInstall(result: ToolsInstallResult): ViewNode {
   if (result.error !== undefined) {
     children.push(line([{ text: `  ${result.error}`, tone: 'error' }]));
   }
+  if (result.success && result.toolId !== undefined) {
+    children.push(
+      line([
+        {
+          text: `  Allow on next run: OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='${result.toolId}'`,
+          dim: true,
+        },
+      ]),
+    );
+  }
   children.push(SPACER, validationView(result.validation, 'Validation'));
   return group(children, 2);
 }

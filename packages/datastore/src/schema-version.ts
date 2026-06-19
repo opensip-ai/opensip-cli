@@ -1,14 +1,15 @@
 /**
- * schema-version — derives the DB schema version this CLI supports from the
- * bundled Drizzle migration journal, and owns the version-guard math.
+ * schema-version — derives the DB schema version this CLI supports, and owns the
+ * version-guard math.
  *
- * The "supported version" is simply the number of migrations this build ships
- * (the journal's entry count). It is monotonic: every new migration increments
- * it automatically, so there is NO constant to hand-bump when a migration is
- * added. We stamp this integer into the SQLite header (`PRAGMA user_version`)
- * after a successful migrate, and compare it on the next open to detect a
- * database written by a NEWER CLI than the one now opening it (the downgrade
- * direction Drizzle's own migrator cannot detect — see {@link isDbNewerThanCli}).
+ * The supported version is a **logical schema id** (`LOGICAL_SCHEMA_VERSION`),
+ * independent of Drizzle journal entry count. Journal squashes renumber entries
+ * without changing the on-disk schema shape, so equating `user_version` with
+ * `entries.length` falsely blocks adopters after a squash (v0.1.0 stamped 14,
+ * v0.1.1+ squashed to one entry). We stamp the logical id into SQLite's
+ * `PRAGMA user_version` after a successful migrate and compare it on the next
+ * open to detect a database written by a NEWER CLI (the downgrade direction
+ * Drizzle's migrator cannot detect — see {@link isDbNewerThanCli}).
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,20 +22,32 @@ interface DrizzleJournal {
 }
 
 /**
- * The DB schema version this CLI supports = the count of migrations it bundles.
+ * Logical schema identity — bump only on a breaking squash or incompatible
+ * migration rewrite. Additive migrations do NOT increment this.
+ */
+export const LOGICAL_SCHEMA_VERSION = 2;
+
+/**
+ * Last `user_version` stamped by v0.1.0 (14 pre-squash journal entries).
+ * DBs in the transitional range `1..LEGACY_PRE_SQUASH_MAX_USER_VERSION` are
+ * adoptable by current builds even when ahead of {@link LOGICAL_SCHEMA_VERSION}
+ * under the old journal-count scheme.
+ */
+export const LEGACY_PRE_SQUASH_MAX_USER_VERSION = 14;
+
+/**
+ * The DB schema version this CLI supports = {@link LOGICAL_SCHEMA_VERSION}.
  *
- * Returns `undefined` when the bundled journal cannot be read or parsed (a
- * broken install). Callers treat `undefined` as "skip the version guard": the
- * subsequent `migrate()` reads the same journal and will surface the canonical
- * {@link DataStoreMigrationError} loudly, so skipping here hides nothing — it
- * just declines to invent a version we cannot determine. We still warn so the
- * anomaly is observable rather than silent.
+ * The migrations folder is still read to verify the bundle is intact; an
+ * unreadable journal returns `undefined` so callers skip the version guard
+ * (migrate() will surface the canonical failure).
  */
 export function readSupportedDbVersion(migrationsFolder: string): number | undefined {
   const journalPath = join(migrationsFolder, 'meta', '_journal.json');
   try {
     const parsed = JSON.parse(readFileSync(journalPath, 'utf8')) as DrizzleJournal;
-    return Array.isArray(parsed.entries) ? parsed.entries.length : undefined;
+    if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) return undefined;
+    return LOGICAL_SCHEMA_VERSION;
   } catch (error) {
     logger.warn({
       evt: 'datastore.schema-version.journal-unreadable',
@@ -47,15 +60,25 @@ export function readSupportedDbVersion(migrationsFolder: string): number | undef
 }
 
 /**
- * True when the on-disk database was stamped by a CLI that knew MORE migrations
- * than this one (`dbVersion > supportedVersion`) — i.e. the user downgraded the
- * CLI after a newer version advanced the schema.
+ * True when the on-disk database was stamped by a CLI that knew a NEWER logical
+ * schema than this one (`dbVersion > supportedVersion`) — i.e. the user
+ * downgraded the CLI after a newer version advanced the schema.
  *
- * The forward direction (`dbVersion <= supportedVersion`, including the `0` of a
- * fresh or pre-guard "legacy" database) is always safe: Drizzle's migrator
- * applies any pending migrations and we re-stamp afterward. Only the future
- * database is blocked.
+ * Legacy v0.1.0 files stamped with the pre-squash journal count (≤
+ * {@link LEGACY_PRE_SQUASH_MAX_USER_VERSION}) are NOT treated as newer: they
+ * are adopted via `migrate()` + re-stamp to the current logical version.
+ *
+ * The forward direction (`dbVersion <= supportedVersion`, including `0` on a
+ * fresh or pre-guard database) is always safe.
  */
 export function isDbNewerThanCli(dbVersion: number, supportedVersion: number): boolean {
-  return dbVersion > supportedVersion;
+  if (dbVersion <= supportedVersion) return false;
+  // v0.1.0 stamped the pre-squash journal count (≤14), not the logical id.
+  if (
+    supportedVersion === LOGICAL_SCHEMA_VERSION &&
+    dbVersion <= LEGACY_PRE_SQUASH_MAX_USER_VERSION
+  ) {
+    return false;
+  }
+  return true;
 }

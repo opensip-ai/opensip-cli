@@ -21,6 +21,7 @@ import {
   mountAllToolCommands,
   registerFirstPartyTools,
 } from '../bootstrap/register-tools.js';
+import { INSTALLED_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
 import { BUNDLED_TOOLS, BUNDLED_TOOL_IDS } from './test-utils/bundled-tools.js';
 
@@ -347,6 +348,12 @@ describe('discoverAndRegisterToolPackages', () => {
 
 const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
+/** Installed npm tools are deny-by-default; tests that expect load opt in via `*`. */
+const ALLOW_ALL_INSTALLED: NodeJS.ProcessEnv = { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' };
+const WALK_UP_SOURCES = {
+  sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }],
+  env: ALLOW_ALL_INSTALLED,
+};
 
 interface Fixture {
   readonly name: string;
@@ -397,12 +404,67 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
+    await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
+    expect(registry.get('fixture-valid')).toBeDefined();
+  });
+
+  it('skips a discovered installed package when not allowlisted (trust gate precedes import)', async () => {
+    staged.push(
+      stageFixture('trust-denied', {
+        packageJson: {
+          name: '@opensip-cli-fixture/trust-denied',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-trust-denied',
+            apiVersion: 1,
+            commands: [{ name: 'fixture-trust-denied', description: 'x' }],
+          },
+        },
+        indexJs: "throw new Error('trust-denied tool must never be imported');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const restore = silenceStderr();
+    try {
+      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
+    } finally {
+      restore();
+    }
+    expect(registry.get('fixture-trust-denied')).toBeUndefined();
+  });
+
+  it('loads a discovered installed package when its id is allowlisted', async () => {
+    staged.push(
+      stageFixture('trust-allowed', {
+        packageJson: {
+          name: '@opensip-cli-fixture/trust-allowed',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-trust-allowed',
+            apiVersion: 1,
+            commands: [{ name: 'fixture-trust-allowed', description: 'x' }],
+          },
+        },
+        indexJs:
+          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000d5', name: 'fixture-trust-allowed', version: '0.0.0', description: 'fixture' }, commandSpecs: [{ name: 'fixture-trust-allowed', description: 'x', commonFlags: ['json'], scope: 'project', output: 'command-result', handler: () => Promise.resolve({ type: 'text-lines', title: 't', lines: [] }) }] };",
+      }),
+    );
+    const registry = new ToolRegistryClass();
     await discoverAndRegisterToolPackages(
       registry,
-      { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+      {
+        sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
+        env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: 'fixture-trust-allowed' },
+      },
       BUILTIN_IDS,
     );
-    expect(registry.get('fixture-valid')).toBeDefined();
+    expect(registry.get('fixture-trust-allowed')).toBeDefined();
   });
 
   it('skips a discovered package whose manifest drifted from its runtime commands', async () => {
@@ -437,12 +499,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const restore = silenceStderr();
     try {
       await expect(
-        discoverAndRegisterToolPackages(
-          registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
-          BUILTIN_IDS,
-          provenance,
-        ),
+        discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS, provenance),
       ).resolves.toBeUndefined();
     } finally {
       restore();
@@ -472,11 +529,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(
-        registry,
-        { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
-        BUILTIN_IDS,
-      );
+      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
     } finally {
       restore();
     }
@@ -508,11 +561,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(
-        registry,
-        { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
-        BUILTIN_IDS,
-      );
+      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
     } finally {
       restore();
     }
@@ -539,11 +588,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
-    await discoverAndRegisterToolPackages(
-      registry,
-      { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
-      BUILTIN_IDS,
-    );
+    await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
     // The built-in id is skipped before registration ⇒ nothing added.
     expect(registry.list()).toHaveLength(0);
   });
@@ -577,12 +622,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     try {
       // Whole-CLI must NOT fail — the incompatible installed tool is skipped.
       await expect(
-        discoverAndRegisterToolPackages(
-          registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
-          BUILTIN_IDS,
-          provenance,
-        ),
+        discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS, provenance),
       ).resolves.toBeUndefined();
     } finally {
       restore();
@@ -699,7 +739,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          WALK_UP_SOURCES,
           BUILTIN_IDS,
           provenance,
           manifests,

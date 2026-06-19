@@ -96,6 +96,7 @@ describe('hostEnv reads (CLI infra)', () => {
       'OPENSIP_CLI_SHOW_INTERNAL',
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_SKIP_INSTALLED',
+      'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     ]);
   });
@@ -167,6 +168,18 @@ describe('hostEnv reads (CLI infra)', () => {
       'graph',
     ]);
     delete process.env.OPENSIP_CLI_SKIP_BUNDLED;
+  });
+
+  it('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS coerces on whitespace AND comma (default empty), agreeing with parseAllowlist', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS')).toEqual([]);
+    process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS = 'my-plugin, other-tool';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS')).toEqual([
+      'my-plugin',
+      'other-tool',
+    ]);
+    process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS = '*';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS')).toEqual(['*']);
+    delete process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS;
   });
 
   it('OPENSIP_CLI_ALLOW_PROJECT_TOOLS coerces on whitespace AND comma (default empty), agreeing with parseAllowlist', () => {

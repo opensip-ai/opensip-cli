@@ -31,7 +31,7 @@ import {
   type ToolRuntimeLoad,
 } from './admit-tool-package.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
-import { isProjectLocalToolTrusted } from './tool-trust.js';
+import { isInstalledToolTrusted, isProjectLocalToolTrusted } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
 
@@ -150,6 +150,26 @@ function admitInstalledTool(
  * INSTALLED tool whose runtime failed to load. Each failure reason maps to its
  * own diagnostic while preserving the installed leg's skip-not-crash posture.
  */
+/** Stderr + structured log when an installed tool is skipped by the trust gate. */
+export function emitInstalledTrustDenied(
+  toolId: string,
+  packageName: string,
+  packageDir: string,
+): void {
+  process.stderr.write(
+    `opensip: installed tool ${packageName} (${toolId}) is not trusted to load (deny-by-default). ` +
+      `Allowlist it via OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='${toolId}' to admit it ` +
+      `(or OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='*' for all). See opensip.ai/docs/opensip-cli/70-reference/10-environment-variables/\n`,
+  );
+  logger.warn({
+    evt: 'cli.tool.installed_trust_denied',
+    module: BOOTSTRAP_MODULE,
+    toolId,
+    packageName,
+    packageDir,
+  });
+}
+
 export function emitInstalledLoadFailure(
   name: string,
   load: Extract<ToolRuntimeLoad, { ok: false }>,
@@ -189,6 +209,8 @@ export interface DiscoveryOptions {
    * and stays unit-testable with explicit anchors.
    */
   readonly sources: readonly ToolDiscoverySource[];
+  /** Injectable env for installed-tool trust (bootstrap-time; defaults to `process.env`). */
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /**
@@ -251,6 +273,42 @@ export function buildToolDiscoverySources(
  *
  * @param provenance Optional sink for admitted tools' provenance records.
  */
+async function registerDiscoveredInstalledPackage(
+  pkg: { readonly name: string; readonly packageDir: string },
+  args: {
+    readonly registry: ToolRegistry;
+    readonly builtInIds: ReadonlySet<string>;
+    readonly env: NodeJS.ProcessEnv;
+    readonly registeredStableIds: ReadonlySet<string>;
+    readonly provenance: ToolProvenance[];
+    readonly manifests: ToolPluginManifest[];
+  },
+): Promise<void> {
+  const admission = admitInstalledTool(pkg, args.builtInIds);
+  if (admission === undefined) return;
+
+  if (!isInstalledToolTrusted(admission.manifest.id, args.env)) {
+    emitInstalledTrustDenied(admission.manifest.id, pkg.name, pkg.packageDir);
+    return;
+  }
+
+  const load = await importToolRuntime(pkg.packageDir, hostRuntimeImportPolicyFor('installed'));
+  if (!load.ok) {
+    emitInstalledLoadFailure(pkg.name, load);
+    return;
+  }
+  if (args.builtInIds.has(load.tool.metadata.name ?? load.tool.metadata.id)) return;
+  // Stable-UUID collision (ADR-0048): skip a re-discovered copy of an already-
+  // registered tool (see discoverAndRegisterToolPackages JSDoc).
+  if (args.registeredStableIds.has(load.tool.metadata.id)) return;
+
+  assertManifestMatchesTool(admission.manifest, load.tool);
+
+  args.registry.register(load.tool, { sourcePackage: pkg.name });
+  args.provenance.push(admission.provenance);
+  args.manifests.push(admission.manifest);
+}
+
 export async function discoverAndRegisterToolPackages(
   registry: ToolRegistry,
   opts: DiscoveryOptions,
@@ -269,26 +327,18 @@ export async function discoverAndRegisterToolPackages(
   // session-replay duplicate guard. UUID is identity; skip on a UUID match.
   const registeredStableIds = new Set(registry.list().map((t) => t.metadata.id));
 
+  const env = opts.env ?? process.env;
+
   for (const pkg of discovered) {
     try {
-      const admission = admitInstalledTool(pkg, builtInIds);
-      if (admission === undefined) continue;
-
-      const load = await importToolRuntime(pkg.packageDir, hostRuntimeImportPolicyFor('installed'));
-      if (!load.ok) {
-        emitInstalledLoadFailure(pkg.name, load);
-        continue;
-      }
-      if (builtInIds.has(load.tool.metadata.name ?? load.tool.metadata.id)) continue;
-      // Stable-UUID collision (see above): the same tool already registered
-      // under a possibly-different human name. Skip the re-discovered copy.
-      if (registeredStableIds.has(load.tool.metadata.id)) continue;
-
-      assertManifestMatchesTool(admission.manifest, load.tool);
-
-      registry.register(load.tool, { sourcePackage: pkg.name });
-      provenance.push(admission.provenance);
-      manifests.push(admission.manifest);
+      await registerDiscoveredInstalledPackage(pkg, {
+        registry,
+        builtInIds,
+        env,
+        registeredStableIds,
+        provenance,
+        manifests,
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       process.stderr.write(`opensip: failed to load tool ${pkg.name}: ${msg}\n`);

@@ -235,7 +235,14 @@ describe('full Tool-plugin install path (audit P1b)', () => {
   // in a temp dir, never the real home. resolveUserPaths() reads homedir().
   function withFreshHome(): { home: string; env: Record<string, string> } {
     const home = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-e2e-home-')));
-    return { home, env: { HOME: home, USERPROFILE: home } };
+    return {
+      home,
+      env: {
+        HOME: home,
+        USERPROFILE: home,
+        OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'audit-demo-tool',
+      },
+    };
   }
 
   function writeProject(): void {
