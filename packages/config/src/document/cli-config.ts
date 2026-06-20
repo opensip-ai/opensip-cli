@@ -31,6 +31,7 @@ const httpsUrlSchema = z.string().refine(
     try {
       return new URL(value).protocol === 'https:';
     } catch {
+      // @fitness-ignore-next-line error-handling-quality -- URL-validation predicate: a malformed URL is a normal "not https" result (false), not an error to log; mirrors the existing error-handling-quality suppression elsewhere in this file.
       return false;
     }
   },

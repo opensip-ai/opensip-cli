@@ -304,6 +304,7 @@ async function registerDiscoveredInstalledPackage(
 
   assertManifestMatchesTool(admission.manifest, load.tool);
 
+  // @fitness-ignore-next-line detached-promises -- ToolRegistry.register(...) returns void (registry.ts:46); the detached-promise heuristic misfires on the discarded non-promise call result.
   args.registry.register(load.tool, { sourcePackage: pkg.name });
   args.provenance.push(admission.provenance);
   args.manifests.push(admission.manifest);
