@@ -75,7 +75,7 @@ const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
  * These are entry points that bridge external systems, CLI, or pipeline layers
  * where callers can't meaningfully recover — throw is the correct pattern.
  */
-const THROW_ALLOWED_PATHS = [
+export const THROW_ALLOWED_PATHS = [
   // Generic architectural boundaries that bridge external systems, CLI, or
   // entry/edge layers where callers can't meaningfully recover.
   /\/routes\//,

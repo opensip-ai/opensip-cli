@@ -54,11 +54,28 @@ const INTERNAL_ENGINE =
 /** An authoring-API import line — never itself a leak signal. */
 const AUTHORING_IMPORT = /^\s*import\b.*@opensip-cli\/(?:fitness|core|lang-[a-z]+|test-support)\b/;
 
+/**
+ * Foreign-domain symbols leaked from the original (pre-open-source) private
+ * codebase this tool was extracted from — see the H1 de-leak in
+ * data-integrity/null-safety.ts. A SHIPPED check must never hardcode these:
+ * they are meaningless to adopters and (in a safe-symbol allowlist) silently
+ * suppress real findings in adopter code. Only DISTINCTIVE project-specific
+ * IDENTIFIERS / brand+infra tokens are listed — generic domain *words*
+ * (e.g. `escrow`/`wallet`/`payment` as financial keywords) are intentionally
+ * NOT here, so legitimately domain-aware checks (cache-ttl-validation) don't
+ * false-fire. This is the regression ratchet (guard "a"): the deleted symbols
+ * cannot return. New unknown leaks in safe-symbol arrays are caught by the
+ * companion allowlist-equality test (guard "b").
+ */
+const FOREIGN_DOMAIN_SYMBOL =
+  /\b(?:EscrowManagementErrorBuilder|I18nErrorBuilder|CheckResultBuilder|getTypedEventBus|getCredentialConfig|getContextManager|stripThinkTags|getNumberFormatter|getDateFormatter|chronoswap)\b/i;
+
 const SIGNALS = [
   ['a hardcoded first-party package path (packages/<pkg>/...)', FIRST_PARTY_PATH],
   ['an opensip ADR reference (ADR-NNNN)', ADR_REF],
   ['an opensip spec-section citation (§N.N)', SECTION_REF],
   ['an internal engine-package coupling (@opensip-cli/<engine>)', INTERNAL_ENGINE],
+  ['a foreign-domain symbol from the original private codebase', FOREIGN_DOMAIN_SYMBOL],
 ];
 
 /** Pure analysis. Exported for direct exercise if this check grows a test harness. */
@@ -100,7 +117,7 @@ export const checks = [
     id: '270cf3d8-d8eb-4019-b0a3-0920a44c2c88',
     slug: 'shipped-checks-must-be-generic',
     description:
-      'A check in the shipped @opensip-cli/checks-* packs must apply to arbitrary customer codebases — it must not hardcode opensip-cli paths, ADRs, spec sections, or internal engine packages (those belong in project-local .mjs self-checks)',
+      'A check in the shipped @opensip-cli/checks-* packs must apply to arbitrary customer codebases — it must not hardcode opensip-cli paths, ADRs, spec sections, internal engine packages, or foreign-domain symbols from the original private codebase (those belong in project-local .mjs self-checks or recipe config)',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture', 'checks', 'meta'],
     fileTypes: ['ts', 'tsx'],

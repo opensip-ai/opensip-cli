@@ -79,7 +79,7 @@ const MIN_FUNCTION_BODY_LENGTH = 50;
  * block. The check reads that list via {@link getCheckConfig} and merges it
  * with these defaults.
  */
-const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
+export const DOMAIN_SPECIFIC_FUNCTION_NAMES: readonly string[] = [
   // Config / factory pattern - each domain has its own configuration
   'getConfig',
   'getDefaultConfig',
@@ -121,7 +121,12 @@ const DOMAIN_SPECIFIC_FUNCTIONS = new Set([
   'isIdentChar',
   // Assertion validation — fitness engine + simulation engine each own one
   'validateAssertions',
-]);
+];
+
+// Built once at module load from the immutable name list above. Kept private (a
+// module-level `new Set()` is mutable shared state); the de-leak guard test
+// imports the readonly DOMAIN_SPECIFIC_FUNCTION_NAMES instead.
+const DOMAIN_SPECIFIC_FUNCTIONS = new Set<string>(DOMAIN_SPECIFIC_FUNCTION_NAMES);
 
 /**
  * Build the effective domain-specific set by merging built-in defaults with

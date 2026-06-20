@@ -58,7 +58,7 @@ const SAFE_PATTERNS = [
  * return null). Adopters extend this set with their own factories via the
  * `additionalSafeBuilders` recipe-config key — see `buildEffectiveSafeBuilders`.
  */
-const SAFE_BUILDER_PREFIXES = [
+export const SAFE_BUILDER_PREFIXES = [
   // 1. Language / runtime guarantees
   'Object.entries',
   'Object.values',
@@ -428,7 +428,7 @@ const SAFE_FLUENT_METHODS = new Set([
  * Methods starting with these prefixes are conventionally designed to always
  * return a value or throw, never return null/undefined.
  */
-const SAFE_METHOD_PREFIXES = [
+export const SAFE_METHOD_PREFIXES = [
   'get',
   'set',
   'is',
