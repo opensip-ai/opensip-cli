@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ import {
   LEGACY_PRE_SQUASH_MAX_USER_VERSION,
   LOGICAL_SCHEMA_VERSION,
   readSupportedDbVersion,
+  SCHEMA_VERSION_OFFSET,
 } from '../schema-version.js';
 
 /** The bundled migrations folder lives at the package root (mirrors factory's default). */
@@ -37,6 +38,20 @@ function writeUserVersion(path: string, version: number): void {
   }
 }
 
+function writeJournal(migrationsFolder: string, entries: number): void {
+  const metaDir = join(migrationsFolder, 'meta');
+  mkdirSync(metaDir, { recursive: true });
+  writeFileSync(
+    join(metaDir, '_journal.json'),
+    JSON.stringify({
+      version: '7',
+      dialect: 'sqlite',
+      entries: Array.from({ length: entries }, (_value, index) => ({ idx: index })),
+    }),
+    'utf8',
+  );
+}
+
 let tmp: string;
 
 beforeEach(() => {
@@ -48,17 +63,32 @@ afterEach(() => {
 });
 
 describe('readSupportedDbVersion', () => {
-  it('returns the logical schema version when the journal is readable', () => {
+  it('returns the monotonic schema version when the journal is readable', () => {
     const journal = JSON.parse(
       readFileSync(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8'),
     ) as { entries: unknown[] };
     expect(journal.entries.length).toBeGreaterThanOrEqual(1);
+    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBe(
+      SCHEMA_VERSION_OFFSET + journal.entries.length,
+    );
     expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBe(LOGICAL_SCHEMA_VERSION);
   });
 
-  it('is independent of journal entry count (squash-safe)', () => {
+  it('is not the raw journal entry count (squash-safe)', () => {
+    const journal = JSON.parse(
+      readFileSync(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: unknown[] };
     expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).toBe(LOGICAL_SCHEMA_VERSION);
+    expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).not.toBe(journal.entries.length);
     expect(readSupportedDbVersion(MIGRATIONS_FOLDER)).not.toBe(LEGACY_PRE_SQUASH_MAX_USER_VERSION);
+  });
+
+  it('increments when additive migrations add journal entries', () => {
+    const migrations = join(tmp, 'migrations');
+    writeJournal(migrations, 1);
+    expect(readSupportedDbVersion(migrations)).toBe(SCHEMA_VERSION_OFFSET + 1);
+    writeJournal(migrations, 2);
+    expect(readSupportedDbVersion(migrations)).toBe(SCHEMA_VERSION_OFFSET + 2);
   });
 
   it('returns undefined for an unreadable journal (broken install)', () => {
@@ -73,13 +103,22 @@ describe('isDbNewerThanCli', () => {
     expect(isDbNewerThanCli(0, 6)).toBe(false); // fresh / legacy, safe
   });
 
-  it('adopts v0.1.0 legacy stamps (journal count ≤ 14) against logical v2', () => {
-    expect(isDbNewerThanCli(LEGACY_PRE_SQUASH_MAX_USER_VERSION, LOGICAL_SCHEMA_VERSION)).toBe(
-      false,
-    );
-    expect(isDbNewerThanCli(LEGACY_PRE_SQUASH_MAX_USER_VERSION + 1, LOGICAL_SCHEMA_VERSION)).toBe(
-      true,
-    );
+  it('keeps the supported stamp above the legacy ceiling so legacy and future stamps never overlap', () => {
+    // Regression guard for the squash-trap fix: SCHEMA_VERSION_OFFSET pins the
+    // supported version above LEGACY_PRE_SQUASH_MAX_USER_VERSION, so no future
+    // logical schema can fall inside the 1..14 legacy band and be mis-adopted.
+    // If a maintainer ever lowers the offset below the ceiling, the first
+    // assertion fails before any DB can be silently mis-adopted on downgrade.
+    expect(LOGICAL_SCHEMA_VERSION).toBeGreaterThan(LEGACY_PRE_SQUASH_MAX_USER_VERSION);
+
+    // Every v0.1.0-era legacy stamp (≤ 14) is adopted as "older", not blocked.
+    for (let v = 0; v <= LEGACY_PRE_SQUASH_MAX_USER_VERSION; v++) {
+      expect(isDbNewerThanCli(v, LOGICAL_SCHEMA_VERSION)).toBe(false);
+    }
+
+    // A genuinely newer schema (the next migration's stamp) IS blocked on
+    // downgrade — the guarantee the previous LOGICAL=2 form silently lost.
+    expect(isDbNewerThanCli(LOGICAL_SCHEMA_VERSION + 1, LOGICAL_SCHEMA_VERSION)).toBe(true);
   });
 });
 

@@ -24,12 +24,15 @@ Prevent false **"your cache is newer than the CLI"** (`DataStoreVersionError`) w
 
 ## Requirements
 
-### R1 — Stable logical schema identity
+### R1 — Monotonic schema stamp
 
-Introduce a **logical schema id** independent of journal entry count, e.g.:
+Introduce a stamp that remains monotonic across both additive migrations and
+journal squashes:
 
-- Constant `CURRENT_LOGICAL_SCHEMA_ID = 2` in `schema-version.ts`, bumped only on breaking squash or incompatible migration rewrites.
-- Persist `user_version` = logical id (not journal count).
+- `supportedVersion = SCHEMA_VERSION_OFFSET + bundledJournalEntryCount`.
+- Additive migrations advance the stamp automatically as Drizzle adds journal entries.
+- Future squashes update `SCHEMA_VERSION_OFFSET` so the post-squash result equals the pre-squash supported version.
+- Persist `user_version` = supported stamp, not raw journal count.
 
 OR embed in journal meta:
 
@@ -41,7 +44,10 @@ OR embed in journal meta:
 
 Until R1 ships, detect legacy stamps:
 
-- If `dbVersion > supportedVersion` **and** `supportedVersion === 1` **and** `dbVersion <= 14` (last pre-squash count), treat as **adoptable legacy** → run `migrate()` + re-stamp to current logical version without throwing.
+- If `dbVersion > supportedVersion` **and** the current supported version is past
+  the v0.1.0 pre-squash range **and** `dbVersion <= 14` (last pre-squash count),
+  treat as **adoptable legacy** → run `migrate()` + re-stamp to current supported
+  version without throwing.
 
 Hard-code boundary only with comment + test fixture referencing v0.1.0 journal count; remove after N releases or when telemetry shows zero affected DBs.
 
@@ -54,22 +60,24 @@ When genuinely blocked:
 
 ### R4 — Tests
 
-- Unit: `isDbNewerThanCli` matrix (legacy 14 vs supported 1 → adopt; 15 vs 1 → error; 1 vs 1 → ok).
+- Unit: `isDbNewerThanCli` matrix (legacy 14 vs current supported → adopt; current+1 vs current → error; equal → ok).
+- Unit: fake journal with 1 then 2 entries proves additive migrations advance the stamp.
 - Integration: open memory backend with fake `user_version`, assert migrate + stamp.
 
 ## Design options
 
 | Option | Pros | Cons |
 |---|---|---|
-| **Logical schema id constant** | Clear, squash-proof | Manual bump discipline |
+| **Offset + journal count** | Additive migrations increment automatically; squashes are explicit offset changes | Requires offset discipline on squash |
+| **Logical schema id constant** | Clear, squash-proof | Easy to forget on additive migrations |
 | **Journal `version` field** | Single source in migrations folder | Requires drizzle-kit discipline |
 | **Squash-only special case** | Minimal code | Technical debt, easy to get wrong |
 
-**Recommendation:** Logical schema id constant (R1) + transitional R2 for v0.1.0→v0.1.1 boundary in same PR.
+**Recommendation:** Offset + journal count (R1) + transitional R2 for v0.1.0→v0.1.1 boundary in same PR.
 
 ## Implementation plan
 
-1. Add `LOGICAL_SCHEMA_VERSION` (or read from journal meta) — replace `entries.length` for stamp/compare.
+1. Add `SCHEMA_VERSION_OFFSET` and compute `supportedVersion = offset + entries.length`.
 2. Implement `resolveDbVersionGuard(dbVersion, supported)` with squash boundary table.
 3. Update `factory.ts` open path to use new guard.
 4. Add tests + fixture journal snippets (v0.1.0 count documented in test name).

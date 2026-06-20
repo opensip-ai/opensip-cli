@@ -350,8 +350,9 @@ const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
 /** Installed npm tools are deny-by-default; tests that expect load opt in via `*`. */
 const ALLOW_ALL_INSTALLED: NodeJS.ProcessEnv = { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' };
+const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
 const WALK_UP_SOURCES = {
-  sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }],
+  sources: WALK_UP_SOURCE_LIST,
   env: ALLOW_ALL_INSTALLED,
 };
 
@@ -373,6 +374,21 @@ function silenceStderr(): () => void {
   process.stderr.write = () => true;
   return () => {
     process.stderr.write = orig;
+  };
+}
+
+function captureStderr(): { readonly read: () => string; readonly restore: () => void } {
+  const orig = process.stderr.write.bind(process.stderr);
+  let output = '';
+  process.stderr.write = (chunk: unknown) => {
+    output += String(chunk);
+    return true;
+  };
+  return {
+    read: () => output,
+    restore: () => {
+      process.stderr.write = orig;
+    },
   };
 }
 
@@ -427,13 +443,19 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
-    const restore = silenceStderr();
+    const stderr = captureStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
+      await discoverAndRegisterToolPackages(
+        registry,
+        { sources: WALK_UP_SOURCE_LIST, env: {} },
+        BUILTIN_IDS,
+      );
     } finally {
-      restore();
+      stderr.restore();
     }
     expect(registry.get('fixture-trust-denied')).toBeUndefined();
+    expect(stderr.read()).toContain('not trusted to load');
+    expect(stderr.read()).not.toContain('trust-denied tool must never be imported');
   });
 
   it('loads a discovered installed package when its id is allowlisted', async () => {
