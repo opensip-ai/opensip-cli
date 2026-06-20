@@ -3,7 +3,28 @@
  * use a wrapped HTTP client.
  */
 
-import { defineCheck, isCommentLine, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  getCheckConfig,
+  isCommentLine,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-cli/fitness';
+
+/**
+ * Recipe-config shape for no-raw-fetch. Infrastructure/adapter directories that
+ * legitimately call `fetch` directly are PROJECT-SPECIFIC and belong in a
+ * recipe's `checks.config['no-raw-fetch']` block, not hardcoded into this
+ * generic check.
+ */
+export interface NoRawFetchConfig extends Record<string, unknown> {
+  /**
+   * Path substrings whose files are exempt from the raw-fetch rule (e.g. an
+   * infrastructure/adapter boundary that wraps `fetch` itself). Matched via
+   * `String.prototype.includes` against the file path.
+   */
+  skipPaths?: readonly string[];
+}
 
 /**
  * Pattern for detecting raw fetch() calls.
@@ -62,13 +83,12 @@ export const noRawFetch = defineCheck({
       return violations;
     }
 
-    // Skip fitness check definitions that reference fetch in string/regex patterns
-    if (filePath.includes('/fitness/src/checks/')) {
-      return violations;
-    }
-
-    // Skip LLM adapter files — infrastructure boundary making direct API calls
-    if (filePath.includes('/llm/') || filePath.includes('/llm-adapter')) {
+    // Skip caller-configured infrastructure/adapter boundaries that legitimately
+    // call fetch directly. These are PROJECT-SPECIFIC (e.g. an `/llm/` adapter
+    // layer) and supplied via the `skipPaths` recipe-config key — not hardcoded
+    // into this generic check.
+    const cfg = getCheckConfig<NoRawFetchConfig>('no-raw-fetch');
+    if ((cfg.skipPaths ?? []).some((p) => filePath.includes(p))) {
       return violations;
     }
 

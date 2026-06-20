@@ -156,10 +156,8 @@ describe('no-unbounded-concurrency — bounded-pattern branches', () => {
 // ---------------------------------------------------------------------------
 
 describe('no-raw-fetch — skip-path branches', () => {
-  it('skips resilient-fetch, fitness/checks paths, llm paths, streaming files, test files', async () => {
+  it('skips resilient-fetch wrapper, streaming files, test files, comment lines', async () => {
     fx('src/lib/resilient-fetch.ts', 'await fetch("/x")');
-    fx('src/llm/openai.ts', 'await fetch("/x")');
-    fx('src/llm-adapter/openai.ts', 'await fetch("/x")');
     fx('src/sse/stream.ts', 'const r = new ReadableStream(); await fetch("/x")');
     fx('src/sse/event.ts', 'const r = new EventSource(""); await fetch("/x")');
     fx('src/sse/r.ts', 'const reader = body.getReader(); await fetch("/x")');

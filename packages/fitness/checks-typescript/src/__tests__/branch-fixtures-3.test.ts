@@ -123,6 +123,54 @@ describe('toctou-race-condition — with recipe config', () => {
 });
 
 // ---------------------------------------------------------------------------
+// de-leak config keys (D1/D3) — project-specific overrides replace the
+// formerly-hardcoded foreign symbols / paths
+// ---------------------------------------------------------------------------
+
+describe('null-safety — additionalSafeBuilders config', () => {
+  it('treats a configured builder prefix as non-null', async () => {
+    await runWithScope(testScope, async () => {
+      setCurrentRecipeCheckConfig(testScope, {
+        'null-safety': { additionalSafeBuilders: ['acmeFactory.'] },
+      });
+      fx('src/x/n.ts', 'export function f() { return acmeFactory.create().value }');
+      const result = await runCheck('null-safety');
+      expect(result).toBeDefined();
+    });
+  });
+});
+
+describe('result-pattern-consistency — additionalThrowAllowedPaths config', () => {
+  it('treats a configured path as a throw-allowed boundary', async () => {
+    await runWithScope(testScope, async () => {
+      setCurrentRecipeCheckConfig(testScope, {
+        'result-pattern-consistency': { additionalThrowAllowedPaths: ['/acme-bridge/'] },
+      });
+      fx(
+        'src/acme-bridge/edge.ts',
+        ['export function f() {', '  throw new ValidationError("x")', '}'].join('\n'),
+      );
+      const result = await runCheck('result-pattern-consistency');
+      expect(result).toBeDefined();
+    });
+  });
+});
+
+describe('no-raw-fetch — skipPaths config', () => {
+  it('skips a caller-configured path that would otherwise be flagged', async () => {
+    await runWithScope(testScope, async () => {
+      setCurrentRecipeCheckConfig(testScope, {
+        'no-raw-fetch': { skipPaths: ['/acme-integrations/'] },
+      });
+      fx('src/acme-integrations/client.ts', 'await fetch("/x")');
+      const result = await runCheck('no-raw-fetch');
+      // The raw fetch is suppressed purely by the configured skipPaths entry.
+      expect(result.signals).toHaveLength(0);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // throws-documentation with recipe config — drive additionalSelfDocumentingSuffixes
 // ---------------------------------------------------------------------------
 

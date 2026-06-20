@@ -28,7 +28,7 @@ import * as ts from 'typescript';
  * names that are deliberately distinct implementations sharing a name.
  *
  * Project-specific functions like `getCurrentCorrelationId`, `formatDuration`,
- * `getRemoteUrl`, `sanitizeForPrompt`, etc. belong in a recipe's
+ * `getRemoteUrl`, `sanitizeFilename`, etc. belong in a recipe's
  * `checks.config['duplicate-utility-functions'].additionalDomainSpecificFunctions`
  * block, NOT in built-in defaults.
  */
@@ -74,7 +74,7 @@ const MIN_FUNCTION_BODY_LENGTH = 50;
  * / logger / common type-guard names — that almost any TS codebase will hit.
  *
  * Project-specific names (e.g. opensip's `getCurrentCorrelationId`,
- * `formatDuration`, `getRemoteUrl`, `sanitizeForPrompt`) belong in a recipe's
+ * `formatDuration`, `getRemoteUrl`, `sanitizeFilename`) belong in a recipe's
  * `checks.config['duplicate-utility-functions'].additionalDomainSpecificFunctions`
  * block. The check reads that list via {@link getCheckConfig} and merges it
  * with these defaults.

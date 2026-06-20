@@ -9,9 +9,25 @@
  * @see CLAUDE.md Error Handling Policy
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
+
+/**
+ * Recipe-config shape for result-pattern-consistency. Project-specific boundary
+ * directories (where throwing is the intended pattern) belong in a recipe's
+ * `checks.config['result-pattern-consistency']` block, not in the check's
+ * built-in defaults — hardcoding one codebase's layout into a generic check
+ * either leaks that layout or misclassifies another codebase's files.
+ */
+export interface ResultPatternConsistencyConfig extends Record<string, unknown> {
+  /**
+   * Additional path patterns where `throw` is allowed (treated as an
+   * infrastructure/edge boundary). Each entry compiles to a RegExp via
+   * `new RegExp(entry)` and is matched against the file path.
+   */
+  additionalThrowAllowedPaths?: readonly string[];
+}
 
 /**
  * Expected error types that should use Result pattern
@@ -60,6 +76,8 @@ const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
  * where callers can't meaningfully recover — throw is the correct pattern.
  */
 const THROW_ALLOWED_PATHS = [
+  // Generic architectural boundaries that bridge external systems, CLI, or
+  // entry/edge layers where callers can't meaningfully recover.
   /\/routes\//,
   /\/handlers\//,
   /\/controllers\//,
@@ -67,25 +85,18 @@ const THROW_ALLOWED_PATHS = [
   /\/plugins?\//,
   /\/bootstrap/,
   /\/providers\//,
-  // Internal services
-  /\/services\/internal\//,
-  // Validation utilities
-  /\/utils\/validation/,
-  // LLM and external API adapters (bridge external services)
-  /\/llm\//,
   /\/adapters\//,
-  /\/embeddings\//,
+  /\/utils\/validation/,
   // CLI command entry points (bridge CLI to domain)
   /\/commands\//,
-  // Pipeline governance and orchestration boundaries
-  /\/governor\//,
-  /\/prompt\//,
   // ID parsing/validation (infrastructure boundary for data integrity)
   /\/ids\//,
-  // Infrastructure boundary packages and patterns (DEC-015: throw is correct)
-  /packages\/infrastructure\//,
   /\/stores\//,
   /\/registry\//,
+  // NOTE: project-specific boundary directories (e.g. `/llm/`, `/embeddings/`,
+  // a bespoke `/governor/` or `packages/infrastructure/` layout) are NOT
+  // hardcoded here — add them via the `additionalThrowAllowedPaths`
+  // recipe-config key (see buildEffectiveThrowAllowedPaths).
 ];
 
 /**
@@ -96,8 +107,15 @@ const INFRASTRUCTURE_FILE_PATTERNS = [/registry/i, /-registry/i, /store/i, /-sto
 /**
  * Check if a file path is in a throw-allowed context
  */
+/** Merge built-in (generic) throw-allowed paths with the recipe-config slice. */
+function buildEffectiveThrowAllowedPaths(): readonly RegExp[] {
+  const cfg = getCheckConfig<ResultPatternConsistencyConfig>('result-pattern-consistency');
+  const extra = (cfg.additionalThrowAllowedPaths ?? []).map((src) => new RegExp(src));
+  return [...THROW_ALLOWED_PATHS, ...extra];
+}
+
 function isThrowAllowedPath(filePath: string): boolean {
-  if (THROW_ALLOWED_PATHS.some((pattern) => pattern.test(filePath))) {
+  if (buildEffectiveThrowAllowedPaths().some((pattern) => pattern.test(filePath))) {
     return true;
   }
 
