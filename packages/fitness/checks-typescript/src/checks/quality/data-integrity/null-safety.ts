@@ -11,8 +11,8 @@ import * as ts from 'typescript';
 
 /**
  * Recipe-config shape for null-safety. Project-specific safe-by-construction
- * paths (e.g. opensip's `/dbos/schema`) belong in a recipe's
- * `checks.config['null-safety']` block, not in built-in defaults.
+ * paths and factory/builder symbols belong in a recipe's
+ * `checks.config['null-safety']` block, not in the check's built-in defaults.
  */
 export interface NullSafetyConfig extends Record<string, unknown> {
   /**
@@ -20,6 +20,14 @@ export interface NullSafetyConfig extends Record<string, unknown> {
    * is compiled to a case-insensitive RegExp via `new RegExp(entry, 'i')`.
    */
   additionalSafeNullPaths?: readonly string[];
+  /**
+   * Additional call-text prefixes treated as non-null by construction (a
+   * property access on a matching call result is not flagged). Use this for
+   * PROJECT-SPECIFIC factory/builder functions whose non-null contract is
+   * local to your codebase — do not hardcode them into the shipped check.
+   * Matched via `String.prototype.startsWith` against the full call text.
+   */
+  additionalSafeBuilders?: readonly string[];
 }
 
 /**
@@ -34,47 +42,50 @@ const SAFE_PATTERNS = [
 ];
 
 /**
- * Known builder pattern libraries whose method calls always return non-null objects.
- * These are safe because the library design guarantees non-null returns.
+ * Call prefixes whose results are non-null by construction, so a property
+ * access on them needs no guard. Scope is deliberately limited to facts that
+ * hold for ANY codebase:
+ *
+ *   1. Language / runtime guarantees — `Object.*`, `Array.*`, `JSON.*`,
+ *      `new URL()`, Node `crypto`/`child_process`, `Intl`, the TS compiler API.
+ *   2. Widely-used libraries whose builder/query APIs are documented non-null
+ *      — Zod, TypeORM, Drizzle, better-sqlite3, neverthrow `Result`, Express.
+ *   3. Generic builder-pattern conventions — `builder.`, `*ResultBuilder.`.
+ *
+ * PROJECT-SPECIFIC safe symbols must NOT be hardcoded here: baking one
+ * codebase's invariants into a generic check silently suppresses real null
+ * bugs in every other codebase (e.g. an adopter whose own `getThing()` can
+ * return null). Adopters extend this set with their own factories via the
+ * `additionalSafeBuilders` recipe-config key — see `buildEffectiveSafeBuilders`.
  */
 const SAFE_BUILDER_PREFIXES = [
-  'z.', // Zod schema builder (z.string(), z.object(), etc.)
-  'createQueryBuilder', // TypeORM QueryBuilder
-  'getRepository', // TypeORM Repository
-  'EntityManager.', // TypeORM EntityManager
-  'queryBuilder.', // TypeORM QueryBuilder variable
-  'repository.', // TypeORM Repository variable
-  'builder.', // Generic builder pattern
-  'Result.', // Result pattern builder
-  'ResultAsync.', // neverthrow ResultAsync
-  'ErrorBuilder', // Error builder fluent chain
-  'EscrowManagementErrorBuilder', // Escrow error builder
-  'I18nErrorBuilder', // I18n error builder
-  'Object.entries', // Always returns array
-  'Object.values', // Always returns array
-  'Object.keys', // Always returns string array
-  'Object.assign', // Always returns object
-  'Object.freeze', // Always returns object
-  'Array.from', // Always returns array
-  'Array.isArray', // Returns boolean
-  'String(', // String constructor always returns string
-  'Number(', // Number constructor always returns number
-  'Boolean(', // Boolean constructor always returns boolean
-  'Buffer.from', // Always returns Buffer
-  'JSON.stringify', // Always returns string
-  'JSON.parse', // Always returns value
-  'process.memoryUsage', // Always returns MemoryUsage
-  'getTypedEventBus', // Singleton factory always returns non-null
-  'res.status', // Express/Fastify response chaining
-  'response.status', // Express/Fastify response chaining
-  // better-sqlite3 (prepare always returns Statement)
-  'prepare(', // db.prepare() always returns Statement object
-  // Drizzle ORM
-  'drizzle(', // Drizzle instance creation
-  'db.select', // Drizzle query builder
-  'db.insert', // Drizzle query builder
-  'db.update', // Drizzle query builder
-  'db.delete', // Drizzle query builder
+  // 1. Language / runtime guarantees
+  'Object.entries',
+  'Object.values',
+  'Object.keys',
+  'Object.assign',
+  'Object.freeze',
+  'Array.from',
+  'Array.isArray',
+  'String(',
+  'Number(',
+  'Boolean(',
+  'Buffer.from',
+  'JSON.stringify',
+  'JSON.parse',
+  'process.memoryUsage',
+  'pathToFileURL(',
+  'fileURLToPath(',
+  'new URL(',
+  'spawn(',
+  'fork(',
+  'createHash(',
+  'createHmac(',
+  'createCipheriv(',
+  'createDecipheriv(',
+  'new Intl.',
+  'Intl.NumberFormat',
+  'Intl.DateTimeFormat',
   // TypeScript compiler API (always return valid objects)
   'sourceFile.getLineAndCharacterOfPosition',
   'node.getText',
@@ -86,46 +97,27 @@ const SAFE_BUILDER_PREFIXES = [
   'window.matchMedia',
   'document.createElement',
   'document.createTextNode',
-  // Singleton factories that throw on failure (never return null)
-  'getContextManager',
-  'getCredentialConfig',
-  'getLogger',
-  // Custom builder patterns
-  'ScenarioResultBuilder.',
+  // 2. Common library builder / query APIs
+  'z.', // Zod schema builder (z.string(), z.object(), …)
+  'createQueryBuilder', // TypeORM QueryBuilder
+  'getRepository', // TypeORM Repository
+  'EntityManager.', // TypeORM EntityManager
+  'queryBuilder.', // TypeORM QueryBuilder variable
+  'repository.', // TypeORM Repository variable
+  'Result.', // Result pattern builder
+  'ResultAsync.', // neverthrow ResultAsync
+  'prepare(', // better-sqlite3 db.prepare() → Statement
+  'drizzle(', // Drizzle instance creation
+  'db.select', // Drizzle query builder
+  'db.insert',
+  'db.update',
+  'db.delete',
+  'res.status', // Express/Fastify response chaining
+  'response.status',
+  // 3. Generic builder-pattern conventions
+  'builder.',
   'ResultBuilder.',
-  'CheckResultBuilder.',
-  // Node.js URL helpers (always return a URL/string)
-  'pathToFileURL(',
-  'fileURLToPath(',
-  // new URL(...) constructor — returns URL or throws
-  'new URL(',
-  // Node.js child_process (spawn always returns ChildProcess or throws)
-  'spawn(',
-  'fork(',
-  // Node.js crypto (createHash/createHmac always return Hash/Hmac)
-  'createHash(',
-  'createHmac(',
-  'createCipheriv(',
-  'createDecipheriv(',
-  // Intl formatters (always return formatter instances)
-  'getNumberFormatter',
-  'getDateFormatter',
-  'new Intl.',
-  'Intl.NumberFormat',
-  'Intl.DateTimeFormat',
-  // Project-specific safe functions (always return non-null)
-  'loadConfig',
-  'getConfig',
-  'getTenantId',
-  'getDatabase',
-  'getSqlite',
-  'getRegistry',
-  'getSync',
-  'formatRelative',
-  'stripThinkTags',
-  'getStatus',
-  'ensureError',
-  'extractErrorMessage',
+  'ScenarioResultBuilder.',
 ];
 
 /**
@@ -492,9 +484,13 @@ const SAFE_METHOD_PREFIXES = [
  *     `readScope`, `currentScenarioRegistry`, etc. whose names convey the same
  *     "returns a value or throws" contract.
  */
-function isSafeBuilderPattern(expression: ts.CallExpression, sourceFile: ts.SourceFile): boolean {
+function isSafeBuilderPattern(
+  expression: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+  safeBuilders: readonly string[],
+): boolean {
   const text = expression.getText(sourceFile);
-  if (SAFE_BUILDER_PREFIXES.some((prefix) => text.startsWith(prefix))) return true;
+  if (safeBuilders.some((prefix) => text.startsWith(prefix))) return true;
   if (ts.isIdentifier(expression.expression)) {
     return isSafeFluentMethod(expression.expression.text);
   }
@@ -666,19 +662,18 @@ function isFluentChain(node: ts.PropertyAccessExpression): boolean {
  *   (`.provideValue/.provideClass/...` always return Injector<T>); the chain
  *   is split across many lines so the AST chain-depth heuristic does not always
  *   apply. The whole-file safe-list captures the convention.
- * - `**\/schema/*.ts`, `**\/*-schema.ts`, `**\/dbos/schema*.ts` — Drizzle/Zod
- *   schema declarations are pure column/shape builders. No runtime null-access
- *   surface to protect.
+ * - `**\/schema/*.ts`, `**\/*-schema.ts` — Drizzle/Zod schema declarations are
+ *   pure column/shape builders. No runtime null-access surface to protect.
+ *
+ * These are deliberately generic path conventions. Project-specific safe paths
+ * (e.g. a bespoke schema/DI folder layout) belong in the
+ * `additionalSafeNullPaths` recipe-config key, not in these built-in defaults.
  */
 const SAFE_NULL_PATHS: readonly RegExp[] = [
   /\/di\/fragment\.ts$/,
   /\/di\/fragments\//,
   /\/schema\//,
   /-schema\.ts$/,
-  // NOTE: opensip's `/dbos/schema` path is NOT a default. DBOS is a
-  // published library, but the path layout is opensip's convention. It
-  // lives in opensip's recipe under
-  // `checks.config['null-safety'].additionalSafeNullPaths`.
 ];
 
 /** Merge built-in defaults with the recipe-config slice. */
@@ -686,6 +681,15 @@ function buildEffectiveSafePaths(): readonly RegExp[] {
   const cfg = getCheckConfig<NullSafetyConfig>('null-safety');
   const extras = (cfg.additionalSafeNullPaths ?? []).map((src) => new RegExp(src, 'i'));
   return [...SAFE_NULL_PATHS, ...extras];
+}
+
+/**
+ * Merge the built-in (generic) safe-builder prefixes with any project-specific
+ * ones supplied via `checks.config['null-safety'].additionalSafeBuilders`.
+ */
+function buildEffectiveSafeBuilders(): readonly string[] {
+  const cfg = getCheckConfig<NullSafetyConfig>('null-safety');
+  return [...SAFE_BUILDER_PREFIXES, ...(cfg.additionalSafeBuilders ?? [])];
 }
 
 function isSafeNullPath(filePath: string, paths: readonly RegExp[]): boolean {
@@ -706,6 +710,9 @@ export function analyzeNullSafety(content: string, filePath: string): CheckViola
   // Built-in defaults are merged with the recipe-config slice once per file.
   const safePaths = buildEffectiveSafePaths();
   if (isSafeNullPath(filePath, safePaths)) return violations;
+
+  // Effective safe-builder prefixes = generic built-ins + project config.
+  const safeBuilders = buildEffectiveSafeBuilders();
 
   try {
     const sourceFile = getSharedSourceFile(filePath, content);
@@ -732,7 +739,11 @@ export function analyzeNullSafety(content: string, filePath: string): CheckViola
       if (isZodBuilderChain(node, sourceFile)) return;
 
       // Skip known safe builder patterns
-      if (ts.isCallExpression(expression) && isSafeBuilderPattern(expression, sourceFile)) return;
+      if (
+        ts.isCallExpression(expression) &&
+        isSafeBuilderPattern(expression, sourceFile, safeBuilders)
+      )
+        return;
 
       // Skip fluent API chains (promise.then().catch(), queryBuilder.where().orderBy())
       if (isFluentChain(node)) return;
@@ -794,7 +805,7 @@ export const nullSafety = defineCheck({
 
 **Detects:**
 - Property access (\`.foo\`) on call expression or element access results without optional chaining (\`?.\`), nullish coalescing (\`??\`), \`&&\` guards, or \`if\` checks
-- Skips known safe patterns: Zod builder chains (\`z.string().min()\`), TypeORM QueryBuilder fluent chains, Promise \`.then().catch()\`, Result pattern methods, and Pino logger chains
+- Skips known safe patterns: Zod builder chains (\`z.string().min()\`), TypeORM QueryBuilder fluent chains, Promise \`.then().catch()\`, and Result pattern methods. Project-specific factories can be added via the \`additionalSafeBuilders\` config key.
 - Skips safe property names: \`length\`, \`toString\`, \`valueOf\`
 - Excludes contracts, schemas, types, CLI/internal tools, and foundation infrastructure files
 
