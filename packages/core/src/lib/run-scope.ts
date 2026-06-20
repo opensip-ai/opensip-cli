@@ -258,8 +258,9 @@ export class RunScope {
         /* @swallow-ok a disposer failure must not abort teardown */
       }
     }
-    // datastore close is the consumer's responsibility — RunScope
-    // doesn't open it eagerly.
+    // datastore close is the consumer's responsibility — RunScope doesn't open
+    // it eagerly. The CLI bootstrap registers the datastore thunk's `dispose`
+    // via onDispose, so a connection opened this run IS closed by the loop above.
   }
 }
 

@@ -66,6 +66,21 @@ export function getCurrentProjectRoot(): string {
 }
 
 /**
+ * A lazy datastore accessor (callable) that also exposes a `dispose()` to close
+ * the cached connection on scope teardown. Still assignable to the kernel's
+ * `DataStoreThunk` (`() => unknown`) — `dispose` is additive.
+ */
+export interface DatastoreThunk {
+  (): DataStore;
+  /**
+   * Close the cached connection (no-op if it was never opened). An arrow-type
+   * property, not a method, so it can be passed straight to `scope.onDispose`
+   * (no unbound-method footgun) while still being assignable on construction.
+   */
+  dispose: () => void;
+}
+
+/**
  * Build a closure-based datastore thunk for the given project.
  * Caches the open DataStore on first access. The pre-action-hook
  * wires the result into `RunScope.datastore` so tools and CLI
@@ -79,9 +94,9 @@ export function getCurrentProjectRoot(): string {
 export function buildDatastoreThunk(
   project: ProjectContext,
   log: Logger = defaultLogger,
-): () => DataStore {
+): DatastoreThunk {
   let cached: DataStore | undefined;
-  return () => {
+  const thunk = (() => {
     if (cached) return cached;
     if (project.scope !== 'project') {
       throw new SystemError(
@@ -98,7 +113,17 @@ export function buildDatastoreThunk(
       path,
     });
     return cached;
+  }) as DatastoreThunk;
+  // Close the cached connection on scope teardown (registered via
+  // `scope.onDispose`). Closing checkpoints + truncates the WAL; without this the
+  // connection (and its growing -wal sidecar) leaked for the process lifetime.
+  thunk.dispose = (): void => {
+    if (!cached) return;
+    cached.close();
+    cached = undefined;
+    log.info({ evt: 'cli.datastore.closed', module: 'cli:context' });
   };
+  return thunk;
 }
 
 /**

@@ -6,11 +6,15 @@
  * propagates unchanged. Driven by a scope whose datastore thunk throws.
  */
 
-import { SystemError } from '@opensip-cli/core';
-import { makeTestScope, withScope } from '@opensip-cli/test-support';
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { getProjectDatastore } from '../scope-access.js';
+import { SystemError, resolveProjectPaths, type ProjectContext } from '@opensip-cli/core';
+import { makeTestScope, withScope } from '@opensip-cli/test-support';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -43,5 +47,43 @@ describe('getProjectDatastore', () => {
     await withScope(scopeThrowing(other), () => {
       expect(() => getProjectDatastore()).toThrow('disk exploded');
     });
+  });
+});
+
+describe('buildDatastoreThunk lifecycle', () => {
+  let root: string;
+  const project = (): ProjectContext => ({
+    cwd: root,
+    cwdExplicit: false,
+    projectRoot: root,
+    configPath: join(root, 'opensip-cli.config.yml'),
+    walkedUp: 0,
+    scope: 'project',
+  });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'opensip-dsthunk-'));
+    mkdirSync(resolveProjectPaths(root).runtimeDir, { recursive: true });
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('caches the open store; dispose() closes it so the next access reopens', () => {
+    const thunk = buildDatastoreThunk(project());
+    const first = thunk();
+    expect(thunk()).toBe(first); // cached on subsequent access
+
+    thunk.dispose();
+    // The closed connection rejects further use...
+    expect(() => first.transaction(() => 1)).toThrow();
+    // ...and the next access transparently reopens a fresh connection.
+    const second = thunk();
+    expect(second).not.toBe(first);
+    thunk.dispose();
+  });
+
+  it('dispose() is a no-op when the store was never opened', () => {
+    expect(() => buildDatastoreThunk(project()).dispose()).not.toThrow();
   });
 });

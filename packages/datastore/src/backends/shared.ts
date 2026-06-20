@@ -7,12 +7,19 @@ export function buildSqliteDataStore(dbPath: string): SqliteBackendHandle {
   const sqlite = new Database(dbPath);
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');
+  // Single connection per process, but two concurrent `opensip` invocations can
+  // contend on the same project DB. Wait briefly instead of throwing SQLITE_BUSY.
+  sqlite.pragma('busy_timeout = 5000');
   const db: DrizzleHandle = drizzle(sqlite);
   let closed = false;
   return {
     db,
     close(): void {
       if (closed) return;
+      // Fold the WAL back into the main DB and truncate the -wal/-shm sidecars so
+      // they don't grow unbounded across runs (better-sqlite3 close() checkpoints,
+      // but TRUNCATE also shrinks the file on disk).
+      sqlite.pragma('wal_checkpoint(TRUNCATE)');
       sqlite.close();
       closed = true;
     },

@@ -207,6 +207,10 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // reader — `buildTargets` is a pure builder, never a second `readYamlFile`).
   const targets = buildTargets({ document: configDocument });
 
+  // Lazy datastore thunk; its `dispose` (registered on the scope below) closes
+  // the cached SQLite connection on teardown — checkpointing/truncating the WAL
+  // and freeing the handle, which otherwise leaked for the process lifetime.
+  const datastoreThunk = buildDatastoreThunk(project, logger);
   const scope = new RunScope({
     logger,
     projectContext: project,
@@ -218,7 +222,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // first access. The thunk captures `project` so non-action paths
     // (post-action handlers, error printers) that read via
     // `getOrOpenDatastore()` find the same instance.
-    datastore: buildDatastoreThunk(project, logger),
+    datastore: datastoreThunk,
     // Presentation settings the render paths read via currentScope()?.ui.
     // bannerSize stays an untyped string at the kernel boundary; the
     // cli-ui render sites narrow it with normalizeBannerSize.
@@ -238,6 +242,10 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // `currentScope()?.correlation` and forwarded into spawned/forked children.
     correlation,
   });
+
+  // Close the datastore on scope teardown — the "consumer responsibility"
+  // RunScope.dispose() documents. No-op when no command opened it.
+  scope.onDispose(datastoreThunk.dispose);
 
   // Observability of the assembly step (consistent with the contributeScope /
   // capabilities diagnostics below). Do NOT log the `repo` VALUE at debug — it
