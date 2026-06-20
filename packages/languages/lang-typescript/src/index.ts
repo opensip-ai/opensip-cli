@@ -16,6 +16,11 @@ export { filterContent } from './filter.js';
 export type { FilteredContent } from './filter.js';
 export { discoverTypescriptWorkspaceUnits } from './workspace-units.js';
 
+// Type-checked Program service (D2): the shared builder of a real ts.Program +
+// bound TypeChecker for type-aware checks. See program-service.ts.
+export { createTypeCheckedProgram, isTypeNullable } from './program-service.js';
+export type { TypeCheckedProgram, CreateTypeCheckedProgramOptions } from './program-service.js';
+
 // Function-scope helpers — extracted from `ast-utilities.ts` into a
 // concern-named module. New scope helpers go in `./function-scope.ts`,
 // NOT in `ast-utilities.ts`.
