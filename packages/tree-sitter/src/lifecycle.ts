@@ -20,10 +20,30 @@ import { Parser, Language, type Tree } from 'web-tree-sitter';
 // One-time WASM runtime init. Top-level await — every consumer statically
 // imports this module — guarantees the runtime is ready before any adapter's
 // `loadGrammar(<wasm>)` (which also runs at module top level).
-await Parser.init();
+// Contained: if the WASM runtime fails to initialize (a broken/incompatible
+// web-tree-sitter build), this module still LOADS — `loadGrammar` then throws,
+// and each lang-* adapter degrades its language to "unavailable" rather than
+// crashing the whole CLI on import.
+let runtimeReady = false;
+/* v8 ignore start -- runtime-init failure is environment-dependent; not reproducible under the test runner */
+try {
+  await Parser.init();
+  runtimeReady = true;
+} catch {
+  /* @swallow-ok runtime init failed → loadGrammar throws → adapters degrade per-language */
+}
+/* v8 ignore stop */
 
-/** Load a tree-sitter grammar from a `.wasm` path (adapter module top level). */
+/**
+ * Load a tree-sitter grammar from a `.wasm` path (adapter module top level).
+ *
+ * @throws {Error} When the web-tree-sitter runtime failed to initialize (the
+ *   contained `Parser.init()` above) — lang-* adapters catch this and degrade
+ *   that language to "unavailable" rather than crashing the CLI.
+ */
 export async function loadGrammar(wasmPath: string): Promise<Language> {
+  /* v8 ignore next -- only reachable when Parser.init() failed above */
+  if (!runtimeReady) throw new Error('web-tree-sitter runtime is not initialized');
   return Language.load(wasmPath);
 }
 
