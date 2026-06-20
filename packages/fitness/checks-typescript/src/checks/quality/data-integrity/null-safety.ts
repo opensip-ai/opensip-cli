@@ -41,14 +41,17 @@ export interface NullSafetyConfig extends Record<string, unknown> {
    */
   additionalSafeBuilders?: readonly string[];
   /**
-   * Opt-in (D2): use TYPE-AWARE analysis (a real `ts.Program` + `TypeChecker`)
-   * instead of the name/convention heuristic. When enabled, a property access on
-   * a call/element-access result is flagged only when the receiver's ACTUAL
-   * static type includes `null`/`undefined` (`any`/`unknown`/unresolved → not
-   * flagged; the checker also handles control-flow narrowing, builder/Zod return
-   * types, and chain depth — so the verb-prefix convention no longer applies).
-   * `additionalSafeBuilders` still acts as a manual escape hatch for symbols the
-   * checker cannot resolve. Default `false` (convention path, unchanged).
+   * Use TYPE-AWARE analysis (a real `ts.Program` + `TypeChecker`): a property
+   * access on a call/element-access result is flagged only when the receiver's
+   * ACTUAL static type includes `null`/`undefined` (`any`/`unknown`/unresolved →
+   * not flagged; the checker also handles control-flow narrowing, builder/Zod
+   * return types, and chain depth, so the verb-prefix convention does not apply).
+   * `additionalSafeBuilders` remains a manual escape hatch for symbols the checker
+   * cannot resolve.
+   *
+   * **Default `true`** (D2). Set `false` to fall back to the legacy
+   * name/convention heuristic (faster, no Program build, but higher
+   * false-negative rate — it trusts any `get*`/`find*`/… call as non-null).
    */
   typeAware?: boolean;
 }
@@ -912,11 +915,9 @@ export const nullSafety = defineCheck({
   description: 'Detect unsafe property and method access without null checks',
   longDescription: `**Purpose:** Detects property access on potentially nullable expressions (call results, element access) that lack null/undefined guards, preventing runtime \`TypeError\` crashes.
 
-**Detects:**
-- Property access (\`.foo\`) on call expression or element access results without optional chaining (\`?.\`), nullish coalescing (\`??\`), \`&&\` guards, or \`if\` checks
-- Skips known safe patterns: Zod builder chains (\`z.string().min()\`), TypeORM QueryBuilder fluent chains, Promise \`.then().catch()\`, and Result pattern methods. Project-specific factories can be added via the \`additionalSafeBuilders\` config key.
-- Skips safe property names: \`length\`, \`toString\`, \`valueOf\`
-- Excludes contracts, schemas, types, CLI/internal tools, and foundation infrastructure files
+**Mode (\`typeAware\`, default \`true\`):** Type-aware — flags a property access on a call/element-access result only when the receiver's ACTUAL type includes \`null\`/\`undefined\`. The checker handles control-flow guards, optional chaining (\`?.\`), builder/Zod/TypeORM return types, and chain depth; \`any\`/\`unknown\`/unresolved types are never flagged (fail-open). \`additionalSafeBuilders\` is a manual escape hatch. Set \`typeAware: false\` for the legacy name/convention heuristic (higher false-negative rate).
+
+**Always skipped:** safe property names (\`length\`, \`toString\`, \`valueOf\`) and \`additionalSafeNullPaths\` (schema/DI) files.
 
 **Why it matters:** Accessing a property on a \`null\` or \`undefined\` value causes runtime \`TypeError\` exceptions that crash the process if uncaught.
 
@@ -929,9 +930,12 @@ export const nullSafety = defineCheck({
   // type-aware detector; otherwise the convention-based detector runs unchanged,
   // so default behavior is byte-identical to the prior per-file `analyze` mode.
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    const typeAware = getCheckConfig<NullSafetyConfig>('null-safety').typeAware === true;
+    // Type-aware is the DEFAULT (D2): flag a property access only when the
+    // receiver's actual type is nullable. Set `typeAware: false` in recipe config
+    // to fall back to the legacy name/convention heuristic.
+    const typeAware = getCheckConfig<NullSafetyConfig>('null-safety').typeAware !== false;
     // Build the shared type-checked Program only in type-aware mode (~1s/~0.6GB,
-    // amortized across type-aware checks). The convention path needs no Program.
+    // amortized across type-aware checks). The convention fallback needs no Program.
     const program = typeAware ? getSharedTypeCheckedProgram(files.paths) : undefined;
 
     const violations: CheckViolation[] = [];

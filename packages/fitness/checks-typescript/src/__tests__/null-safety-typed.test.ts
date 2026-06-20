@@ -29,6 +29,13 @@ function write(rel: string, content: string): string {
   return abs;
 }
 
+/** A scope carrying the fitness fileCache + a fresh shared-Program cell. */
+function scopeWithFitness(): RunScope {
+  const scope = new RunScope();
+  Object.assign(scope, { fitness: { fileCache, tsProgram: { value: undefined } } });
+  return scope;
+}
+
 // One fixture exercising every decision: nullable/undefined call receivers
 // (flag), non-null receiver (ok), `any` receiver (fail-open), optional chain
 // (skip), and a nullable element-access receiver (flag).
@@ -90,19 +97,33 @@ describe('analyzeNullSafetyTyped (type-aware detector)', () => {
   });
 });
 
-describe('null-safety check — typeAware analyzeAll wiring', () => {
-  it('uses the type-aware detector end-to-end when typeAware is enabled', async () => {
+describe('null-safety check — analyzeAll mode selection', () => {
+  it('defaults to type-aware — catches nullable-return accesses the convention misses', async () => {
     const file = write('src/svc.ts', FIXTURE);
-    const scope = new RunScope();
-    Object.assign(scope, { fitness: { fileCache, tsProgram: { value: undefined } } });
+    const scope = scopeWithFitness();
     await runWithScope(scope, async () => {
-      setCurrentRecipeCheckConfig(scope, { 'null-safety': { typeAware: true } });
+      // No typeAware config → default on.
       await fileCache.prewarm(dir, ['**/*']);
       const result = await nullSafety.run(dir, { targetFiles: [file] });
-      // Type-aware catches the nullable-return accesses the verb-prefix
-      // convention misses (`getNullable`/`getMaybe` match the safe `get*` prefix).
       expect(result.signals.length).toBeGreaterThanOrEqual(3);
       expect(result.signals.every((s) => s.message.includes('unsafe property access'))).toBe(true);
+      // The `get*`-prefixed nullable returns are caught (convention would miss them).
+      expect(result.signals.some((s) => s.message.includes("'.x'"))).toBe(true);
+    });
+  });
+
+  it('falls back to the convention heuristic when typeAware is disabled', async () => {
+    const file = write('src/svc.ts', FIXTURE);
+    const scope = scopeWithFitness();
+    await runWithScope(scope, async () => {
+      setCurrentRecipeCheckConfig(scope, { 'null-safety': { typeAware: false } });
+      await fileCache.prewarm(dir, ['**/*']);
+      const result = await nullSafety.run(dir, { targetFiles: [file] });
+      // Convention trusts `get*` calls as non-null (its false-negative), so the
+      // nullable-return accesses are missed; the unknown element-access receiver
+      // (`arr[0]`) is still flagged.
+      expect(result.signals.some((s) => s.message.includes("'.x'"))).toBe(false);
+      expect(result.signals.some((s) => s.message.includes("'.a'"))).toBe(true);
     });
   });
 });
