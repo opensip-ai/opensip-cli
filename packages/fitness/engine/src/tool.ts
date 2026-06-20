@@ -196,6 +196,11 @@ const registerFitRecipe: CapabilityRegistrar = (contribution) => {
  */
 function contributeScope(): ContributeScopeResult {
   const fileCache = new FileCache();
+  // Lazily populated by checks-typescript's getSharedTypeCheckedProgram; held
+  // here so one ts.Program is shared by every type-aware check in the run and
+  // released on dispose. `value` is opaque (unknown) — the engine never names
+  // lang-typescript's TypeCheckedProgram, keeping the typescript dep out of here.
+  const tsProgram: { value: unknown } = { value: undefined };
   return {
     contribution: {
       fitness: {
@@ -203,9 +208,13 @@ function contributeScope(): ContributeScopeResult {
         recipes: createRecipeRegistry(),
         load: createFitnessLoadState(),
         fileCache,
+        tsProgram,
       },
     },
-    onDispose: () => fileCache.clear(),
+    onDispose: () => {
+      fileCache.clear();
+      tsProgram.value = undefined;
+    },
   };
 }
 

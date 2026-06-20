@@ -52,6 +52,22 @@ export interface FitnessLoadState {
 }
 
 /**
+ * Per-run holder for the shared, lazily-built type-checked TypeScript Program
+ * (D2). A single `ts.Program` + bound `TypeChecker` is expensive (~1s / ~0.6 GB
+ * on a ~900-file corpus) but type-aware checks need it, so it is built ONCE per
+ * run and reused by every type-aware TS check, then released on dispose.
+ *
+ * `value` is intentionally `unknown`: the build logic lives in
+ * `@opensip-cli/checks-typescript` (which owns the `lang-typescript`/`typescript`
+ * runtime dep), so the fitness engine and core never name lang-typescript's
+ * `TypeCheckedProgram` — keeping the heavy `typescript` dep out of the engine
+ * and every non-TS check run. The TS pack casts `value` to its concrete type.
+ */
+export interface SharedTsProgramCell {
+  value: unknown;
+}
+
+/**
  * Per-RunScope fitness state. Constructed by the fitness tool's
  * `contributeScope()` hook and attached to `scope.fitness`.
  */
@@ -69,6 +85,10 @@ export interface FitnessSubscope {
    *  cleared on scope dispose via the disposer `contributeScope` returns.
    *  Replaces the module singleton on every production path. */
   readonly fileCache: FileCache;
+  /** Lazily-built shared type-checked TS Program for this run (D2). Built by
+   *  checks-typescript's `getSharedTypeCheckedProgram` on the first type-aware
+   *  check, reused by all, and cleared by the dispose hook. */
+  readonly tsProgram: SharedTsProgramCell;
 }
 
 declare module '@opensip-cli/core' {

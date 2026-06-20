@@ -5,9 +5,17 @@
  * Detects unsafe property and method access without null checks.
  */
 
-import { defineCheck, getCheckConfig, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  getCheckConfig,
+  isTestFile,
+  type CheckViolation,
+  type FileAccessor,
+} from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
+
+import { getSharedTypeCheckedProgram } from '../../../shared/type-program.js';
 
 /**
  * Recipe-config shape for null-safety. Project-specific safe-by-construction
@@ -815,9 +823,33 @@ export const nullSafety = defineCheck({
   tags: ['quality', 'code-quality', 'type-safety'],
   fileTypes: ['ts', 'tsx'],
 
-  analyze(content: string, filePath: string): CheckViolation[] {
-    // Skip test files — null safety in tests is low-risk due to controlled inputs
-    if (isTestFile(filePath)) return [];
-    return analyzeNullSafety(content, filePath);
+  // D2 P2: run as analyzeAll so a single type-checked ts.Program can be built
+  // once per run and shared by every type-aware check. Detection stays the
+  // convention-based `analyzeNullSafety` in P2, so findings are byte-identical
+  // to the prior per-file `analyze` mode; the Program's checker is consumed in P3.
+  async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
+    // Build (or reuse) the run's shared type-checked Program. Unused by P2's
+    // detection — this establishes the seam and amortizes the cost across
+    // type-aware checks before P3 switches detection to the checker.
+    getSharedTypeCheckedProgram(files.paths);
+
+    const violations: CheckViolation[] = [];
+    for (const filePath of files.paths) {
+      // Skip test files — null safety in tests is low-risk due to controlled inputs.
+      if (isTestFile(filePath)) continue;
+      let content: string;
+      try {
+        // FileAccessor.read applies this check's `strip-strings` contentFilter,
+        // so `content` matches what the prior `analyze` mode received.
+        content = await files.read(filePath);
+      } catch {
+        continue; // unreadable file — skip, matching per-file analyze resilience
+      }
+      for (const violation of analyzeNullSafety(content, filePath)) {
+        // analyzeAll injects no default filePath (analyze mode did) — stamp it.
+        violations.push(violation.filePath ? violation : { ...violation, filePath });
+      }
+    }
+    return violations;
   },
 });
