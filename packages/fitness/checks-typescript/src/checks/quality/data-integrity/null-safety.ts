@@ -12,7 +12,11 @@ import {
   type CheckViolation,
   type FileAccessor,
 } from '@opensip-cli/fitness';
-import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
+import {
+  getSharedSourceFile,
+  isTypeNullable,
+  type TypeCheckedProgram,
+} from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 import { getSharedTypeCheckedProgram } from '../../../shared/type-program.js';
@@ -36,6 +40,17 @@ export interface NullSafetyConfig extends Record<string, unknown> {
    * Matched via `String.prototype.startsWith` against the full call text.
    */
   additionalSafeBuilders?: readonly string[];
+  /**
+   * Opt-in (D2): use TYPE-AWARE analysis (a real `ts.Program` + `TypeChecker`)
+   * instead of the name/convention heuristic. When enabled, a property access on
+   * a call/element-access result is flagged only when the receiver's ACTUAL
+   * static type includes `null`/`undefined` (`any`/`unknown`/unresolved → not
+   * flagged; the checker also handles control-flow narrowing, builder/Zod return
+   * types, and chain depth — so the verb-prefix convention no longer applies).
+   * `additionalSafeBuilders` still acts as a manual escape hatch for symbols the
+   * checker cannot resolve. Default `false` (convention path, unchanged).
+   */
+  typeAware?: boolean;
 }
 
 /**
@@ -797,6 +812,92 @@ export function analyzeNullSafety(content: string, filePath: string): CheckViola
 }
 
 /**
+ * Type-aware variant (D2): walk the Program's SourceFile and flag a property
+ * access on a call/element-access result ONLY when the receiver's actual type
+ * includes `null`/`undefined`. The TypeChecker subsumes every heuristic the
+ * convention path uses — control-flow narrowing (guards), builder/Zod return
+ * types, and chain depth all fall out of real types — so this detector is
+ * deliberately minimal. Fail-open: `any`/`unknown`/unresolved types are not
+ * nullable per `isTypeNullable`, so "the compiler doesn't know" never flags.
+ *
+ * Reads the same path skip + escape-hatch config as the convention path
+ * (`additionalSafeNullPaths`, `additionalSafeBuilders`). Exported for the
+ * type-aware test suite.
+ */
+export function analyzeNullSafetyTyped(
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+  filePath: string,
+): CheckViolation[] {
+  const violations: CheckViolation[] = [];
+
+  const safePaths = buildEffectiveSafePaths();
+  if (isSafeNullPath(filePath, safePaths)) return violations;
+
+  // Manual escape hatch for symbols the checker can't resolve (untyped JS
+  // boundaries, ambient factories): a matching receiver call-text is trusted.
+  const safeBuilders = buildEffectiveSafeBuilders();
+
+  const visit = (node: ts.Node): void => {
+    ts.forEachChild(node, visit);
+
+    if (!ts.isPropertyAccessExpression(node) || ts.isOptionalChain(node)) return;
+    const expression = node.expression;
+    if (!ts.isCallExpression(expression) && !ts.isElementAccessExpression(expression)) return;
+    // No `isThisAccess` skip here (unlike the convention path): the checker types
+    // `this`-rooted chains correctly — `this.prop` isn't a candidate (receiver is
+    // not a call), and `this.getThing()` where getThing() returns nullable SHOULD
+    // flag — so the heuristic would only cause false negatives.
+
+    const propName = node.name.text;
+    if (['length', 'toString', 'valueOf'].includes(propName)) return;
+
+    const receiverText = expression.getText(sourceFile);
+    if (safeBuilders.some((prefix) => receiverText.startsWith(prefix))) return;
+
+    // The one decision: does the receiver's ACTUAL type include null/undefined?
+    if (!isTypeNullable(checker.getTypeAtLocation(expression))) return;
+
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    violations.push({
+      line: line + 1,
+      column: character + 1,
+      message: `Potentially unsafe property access '.${propName}' without null check`,
+      severity: 'warning',
+      type: 'unsafe-access',
+      suggestion: `Use optional chaining: change '.${propName}' to '?.${propName}', or add an explicit null/undefined check before accessing the property`,
+      match: node.getText(sourceFile),
+    });
+  };
+
+  visit(sourceFile);
+  return violations;
+}
+
+/** Type-aware per-file analysis (D2): flag via the shared Program's checker. */
+function analyzeFileTyped(program: TypeCheckedProgram, filePath: string): CheckViolation[] {
+  const sourceFile = program.getSourceFile(filePath);
+  if (!sourceFile) return []; // not in the Program (e.g. excluded) — skip
+  return analyzeNullSafetyTyped(sourceFile, program.checker, filePath);
+}
+
+/** Convention per-file analysis (default): scan the filtered content (no types). */
+async function analyzeFileConvention(
+  files: FileAccessor,
+  filePath: string,
+): Promise<CheckViolation[]> {
+  try {
+    // FileAccessor.read applies this check's `strip-strings` contentFilter, so
+    // `content` matches what the prior per-file `analyze` mode received.
+    const content = await files.read(filePath);
+    return analyzeNullSafety(content, filePath);
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- an unreadable target file is an expected skip (the engine's own analyze mode does the same — see define-check.ts executeAnalyzeMode); a pure check has no actionable error to surface here.
+    return []; // unreadable file — skip, matching per-file analyze resilience
+  }
+}
+
+/**
  * Check: quality/null-safety
  *
  * Detects unsafe property and method access without null checks.
@@ -823,29 +924,24 @@ export const nullSafety = defineCheck({
   tags: ['quality', 'code-quality', 'type-safety'],
   fileTypes: ['ts', 'tsx'],
 
-  // D2 P2: run as analyzeAll so a single type-checked ts.Program can be built
-  // once per run and shared by every type-aware check. Detection stays the
-  // convention-based `analyzeNullSafety` in P2, so findings are byte-identical
-  // to the prior per-file `analyze` mode; the Program's checker is consumed in P3.
+  // D2: runs as analyzeAll so a single type-checked ts.Program can be shared
+  // across the run. `typeAware` (recipe config, default off) selects the
+  // type-aware detector; otherwise the convention-based detector runs unchanged,
+  // so default behavior is byte-identical to the prior per-file `analyze` mode.
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    // Build (or reuse) the run's shared type-checked Program. Unused by P2's
-    // detection — this establishes the seam and amortizes the cost across
-    // type-aware checks before P3 switches detection to the checker.
-    getSharedTypeCheckedProgram(files.paths);
+    const typeAware = getCheckConfig<NullSafetyConfig>('null-safety').typeAware === true;
+    // Build the shared type-checked Program only in type-aware mode (~1s/~0.6GB,
+    // amortized across type-aware checks). The convention path needs no Program.
+    const program = typeAware ? getSharedTypeCheckedProgram(files.paths) : undefined;
 
     const violations: CheckViolation[] = [];
     for (const filePath of files.paths) {
       // Skip test files — null safety in tests is low-risk due to controlled inputs.
       if (isTestFile(filePath)) continue;
-      let content: string;
-      try {
-        // FileAccessor.read applies this check's `strip-strings` contentFilter,
-        // so `content` matches what the prior `analyze` mode received.
-        content = await files.read(filePath);
-      } catch {
-        continue; // unreadable file — skip, matching per-file analyze resilience
-      }
-      for (const violation of analyzeNullSafety(content, filePath)) {
+      const fileViolations = program
+        ? analyzeFileTyped(program, filePath)
+        : await analyzeFileConvention(files, filePath);
+      for (const violation of fileViolations) {
         // analyzeAll injects no default filePath (analyze mode did) — stamp it.
         violations.push(violation.filePath ? violation : { ...violation, filePath });
       }
