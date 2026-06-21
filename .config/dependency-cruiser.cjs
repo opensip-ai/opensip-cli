@@ -95,7 +95,8 @@ module.exports = {
     // off (set below), dep-cruiser can't see `import type` and `export type`
     // edges, so every dedicated types module looks orphaned. Orphan / dead-
     // export detection lives in knip, which understands TypeScript barrel
-    // re-exports natively. dep-cruiser stays focused on architecture rules
+    // re-exports natively and is run by `pnpm lint` (so it gates CI alongside
+    // these rules). dep-cruiser stays focused on architecture rules
     // (no-circular, layer enforcement) where it's the right tool.
     {
       name: 'no-deprecated-core',
