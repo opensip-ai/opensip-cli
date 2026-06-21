@@ -11,6 +11,7 @@ source-files:
   - packages/fitness/engine/src/tool.ts
 related-docs:
   - ./03-publishable-packs.md
+  - ./07-command-taxonomy.md
   - ../10-concepts/02-tool-plugin-model.md
   - ../70-reference/01-cli-commands.md
   - ../70-reference/12-tools-command.md
@@ -51,7 +52,10 @@ Once a Tool exists as a package, the customer-facing management surface is the [
     "id": "audit-sec",
     "apiVersion": 1,
     "commands": [
-      { "name": "audit-sec", "description": "Run the security audit" }
+      { "name": "audit-sec", "description": "Run the security audit" },
+      { "name": "list", "description": "List audit rules" },
+      { "name": "recipes", "description": "List audit recipes" },
+      { "name": "export", "description": "Export audit artifacts (--format sarif)" }
     ]
   },
   "peerDependencies": {
@@ -85,56 +89,86 @@ add `--json` yourself, and never write to stdout — the host renders your resul
 wraps `--json` in a `CommandOutcome`.
 
 ```ts
-import { defineCommand, type Tool, type ToolCliContext } from '@opensip-cli/core';
-import { runAudit } from './audit.js';
+import { defineCommand, defineTool, type ToolCliContext } from '@opensip-cli/core';
+import { listAuditRecipes, listAuditRules, runAudit } from './audit.js';
 
-export const tool: Tool = {
+export const tool = defineTool({
   metadata: {
     id: 'audit-sec', // must equal opensipTools.id in package.json
+    name: 'audit-sec', // primary verb — mounts as `opensip audit-sec`
     version: '1.0.0',
     description: 'Lightweight security audit',
   },
-  // Command metadata (name + description) — enumerated for --help/completion
-  // without importing your module. Its name SET must match opensipTools.commands
-  // in package.json AND your commandSpecs below (the host asserts all three agree).
-  commands: [
-    { name: 'audit-sec', description: 'Run the security audit' },
-  ],
-  // The typed specs the host mounts (mountCommandSpec): name/description/flags/
-  // args + the handler. This is the one command surface — you never touch Commander.
+  // The typed specs the host mounts (mountCommandSpec). `defineTool` derives
+  // `commands[]` from these — the manifest's `opensipTools.commands` name set
+  // must match (the host asserts at load).
   commandSpecs: [
     defineCommand<{ cwd: string }, ToolCliContext>({
       name: 'audit-sec',
       description: 'Run the security audit',
-      // Cross-tool flags from the shared registry — `--cwd` and `--json` arrive
-      // for free; you do NOT declare `--json` or render it yourself.
       commonFlags: ['cwd', 'json'],
       scope: 'project',
-      // The host renders the result and serializes `--json` as a CommandOutcome.
       output: 'command-result',
       handler: async (opts, cli) => {
         const result = await runAudit(opts.cwd);
         cli.setExitCode(result.passed ? 0 : 1);
-        return result; // return your domain result — the host owns rendering / --json / exit
+        return result;
+      },
+    }),
+    defineCommand<{ cwd: string }, ToolCliContext>({
+      name: 'list',
+      parent: 'audit-sec', // nested: `opensip audit-sec list`
+      description: 'List audit rules',
+      commonFlags: ['cwd', 'json'],
+      scope: 'project',
+      output: 'command-result',
+      handler: async (opts) => listAuditRules(opts.cwd),
+    }),
+    defineCommand<{ cwd: string }, ToolCliContext>({
+      name: 'recipes',
+      parent: 'audit-sec', // nested: `opensip audit-sec recipes`
+      description: 'List audit recipes',
+      commonFlags: ['cwd', 'json'],
+      scope: 'project',
+      output: 'command-result',
+      handler: async (opts) => listAuditRecipes(opts.cwd),
+    }),
+    defineCommand<{ cwd: string; out: string }, ToolCliContext>({
+      name: 'export',
+      parent: 'audit-sec', // nested: `opensip audit-sec export --format sarif`
+      description: 'Export audit artifacts',
+      commonFlags: ['cwd', 'json'],
+      options: [
+        {
+          flag: '--format',
+          value: '<fmt>',
+          required: true,
+          choices: ['sarif'],
+          description: 'Export artifact: sarif',
+        },
+        { flag: '--out', value: '<path>', required: true, description: 'Output file path' },
+      ],
+      scope: 'project',
+      output: 'raw-stream',
+      rawStreamReason: 'file-export',
+      handler: async (opts, cli) => {
+        // file-writing export — same pattern as `fit export` / `graph export`
+        await cli.writeSarif(/* … */, opts.out);
       },
     }),
   ],
-  // Host-owned run timing (host-owned-run-timing): if your tool writes a
-  // cross-tool history row (sessions list / report), do NOT persist it
-  // yourself. RETURN a `ToolRunCompletion` from your handler (or live renderer)
-  // — i.e. `{ result?, envelope?, session? }` — whose `session` is a
-  // `ToolSessionContribution` `{ tool, cwd, recipe?, score, passed, payload? }`.
-  // The host run plane stamps `startedAt`/`completedAt`/`durationMs` from the
-  // single `RunTimer` and persists the row. The timer is read-only on the
-  // context (`cli.runSession.timing`, also passed to live renderers as the
-  // optional second `LiveViewContext` arg) for a display clock only — there is
-  // no `record(...)` writer. Tools never capture their own Date for the generic
-  // columns; internal per-scenario/per-check timers are fine and belong in your
-  // `payload`.
-};
+});
 ```
 
-The three command declarations — `package.json`'s `opensipTools.commands`, the Tool's `commands` metadata, and the `commandSpecs` — must agree on the command-name set. The host asserts this at load, so a half-renamed command fails fast with a clear error instead of a silent half-mounted surface.
+`defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
+nested children). The manifest lists every command by **short name** — `list`,
+`recipes`, `export` — not as nested paths; mounting uses `parent` on the spec.
+See [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/) for the full Tier-1/2/3
+grammar.
+
+The manifest and derived `commands[]` must agree on the command-name set. The
+host asserts this at load, so a half-renamed command fails fast with a clear
+error instead of a silent half-mounted surface.
 
 That's the whole tool. Install it either way and `opensip audit-sec` works on the next invocation:
 
@@ -175,7 +209,10 @@ carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
   "apiVersion": 1,
   "main": "dist/index.js",
   "commands": [
-    { "name": "audit-sec", "description": "Run the security audit" }
+    { "name": "audit-sec", "description": "Run the security audit" },
+    { "name": "list", "description": "List audit rules" },
+    { "name": "recipes", "description": "List audit recipes" },
+    { "name": "export", "description": "Export audit artifacts (--format sarif)" }
   ]
 }
 ```
@@ -284,6 +321,7 @@ and use `opensip tools validate` before enabling a new tool in CI.
 
 ## Where to go next
 
+- [**Command surface taxonomy**](/docs/opensip-cli/50-extend/07-command-taxonomy/) — Tier-1/2/3 grammar, nested `parent`, export `--format`, internal visibility.
 - [**The tool-plugin model**](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) — the architectural seam your Tool plugs into.
 - [**`tools` command**](/docs/opensip-cli/70-reference/12-tools-command/) — list, validate, install, uninstall, and purge data for whole Tool plugins.
 - [**Report**](/docs/opensip-cli/70-reference/06-dashboard/) — the HTML report's lifecycle (the renderer your Tool's findings end up in).

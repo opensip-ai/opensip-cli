@@ -14,6 +14,7 @@ related-docs:
   - ./04-check-pack-architecture.md
   - ./05-language-adapters.md
   - ./06-full-tool-plugins.md
+  - ./07-command-taxonomy.md
   - ../00-start/05-vocabulary.md
   - ../10-concepts/02-tool-plugin-model.md
 ---
@@ -66,5 +67,6 @@ Use `opensip tools validate` before adopting a third-party tool in CI.
 
 - **Authoring your first thing** → [Write your first check](../60-guides/01-write-your-first-check.md). Hands-on walkthrough with `init`, a custom check, a recipe, and a CI gate.
 - **Creating a whole CLI subcommand** → [Create your first Tool](../60-guides/07-create-your-first-tool.md). Short path before the full Tool reference.
+- **Nested `<tool> <verb>` grammar** → [Command surface taxonomy](./07-command-taxonomy.md). Tier-1/2/3 rules, `parent`, export `--format`, internal visibility.
 - **Reference for every check that ships** → [Checks reference](../70-reference/05-checks-index.md). Browse all 151 built-in checks with descriptions and links to source.
 - **Deep dive on what a "Tool" is architecturally** → [The tool-plugin model](../10-concepts/02-tool-plugin-model.md).

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-21
 release: v0.1.8
 title: "Create your first Tool"
 audience: [plugin-authors, contributors]
@@ -13,6 +13,7 @@ source-files:
   - packages/cli/src/__tests__/authored-tool-load.test.ts
 related-docs:
   - ../50-extend/06-full-tool-plugins.md
+  - ../50-extend/07-command-taxonomy.md
   - ../70-reference/12-tools-command.md
   - ../70-reference/10-environment-variables.md
 ---
@@ -21,6 +22,11 @@ related-docs:
 A Tool plugin adds a whole subcommand to `opensip-cli`. Use this path when your work is not a fitness check, simulation scenario, or graph adapter.
 
 This guide creates a tracked project-local Tool under `opensip-cli/tools/`. It is the fastest way to understand the contract before you package a Tool for npm.
+
+The example uses the canonical nested grammar: a `hello-tools` primary plus a
+`hello-tools list` discoverability child (`parent: 'hello-tools'`). See
+[Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/) for the full
+Tier-1/2/3 rules.
 
 ## 1. Create the directory
 
@@ -41,27 +47,28 @@ Create `opensip-cli/tools/hello-tools/opensip-tool.manifest.json`:
   "apiVersion": 1,
   "main": "./index.mjs",
   "commands": [
-    { "name": "hello-tools", "description": "Print a Tool plugin hello" }
+    { "name": "hello-tools", "description": "Print a Tool plugin hello" },
+    { "name": "list", "description": "List hello variants" }
   ]
 }
 ```
 
-The manifest is read before the module is imported. Its `id` must match the runtime Tool's `metadata.id`, and its command names must match the runtime `commands` and `commandSpecs`.
+The manifest is read before the module is imported. Its `id` must match the runtime Tool's `metadata.id`, and its command names must match the runtime descriptors derived from `commandSpecs`.
 
 ## 3. Add the runtime
 
 Create `opensip-cli/tools/hello-tools/index.mjs`:
 
 ```js
+const HELLO_VARIANTS = ['formal', 'casual', 'pirate'];
+
 export const tool = {
   metadata: {
     id: 'hello-tools',
+    name: 'hello-tools',
     version: '1.0.0',
     description: 'Small project-local Tool example',
   },
-  commands: [
-    { name: 'hello-tools', description: 'Print a Tool plugin hello' },
-  ],
   commandSpecs: [
     {
       name: 'hello-tools',
@@ -75,11 +82,27 @@ export const tool = {
         lines: ['Your project-local Tool is loaded.'],
       }),
     },
+    {
+      name: 'list',
+      parent: 'hello-tools',
+      description: 'List hello variants',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => ({
+        type: 'text-lines',
+        title: 'Hello variants',
+        lines: HELLO_VARIANTS,
+      }),
+    },
   ],
 };
 ```
 
-This example uses a plain object so it has no package dependencies. A publishable Tool package can use `defineCommand` and TypeScript types from `@opensip-cli/core`.
+This example uses plain objects so it has no package dependencies. A publishable
+Tool package can use `defineCommand`, `defineTool`, and TypeScript types from
+`@opensip-cli/core` — `defineTool` derives `commands[]` from `commandSpecs`, so
+you do not hand-maintain a parallel `commands` array.
 
 If your TypeScript Tool contributes a typed per-run subscope, add a
 `scope-augmentation.ts` file and import it from the Tool entry for side effects:
@@ -124,12 +147,14 @@ Use a comma-separated list for more than one Tool, or `*` only when you trust ev
 
 ```bash
 opensip hello-tools
+opensip hello-tools list
 ```
 
-You can also ask for JSON because the command declared the shared `json` flag:
+You can also ask for JSON because both commands declared the shared `json` flag:
 
 ```bash
 opensip hello-tools --json
+opensip hello-tools list --json
 ```
 
 ## 6. See it in the Tool inventory
@@ -157,6 +182,7 @@ The tracked sidecar layout is ideal while authoring inside one repo. To distribu
 | You want to ... | Go to |
 |---|---|
 | Learn the full Tool contract | [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) |
+| Read the command grammar | [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/) |
 | Manage installed Tools | [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/) |
 | See the allowlist environment variable | [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/) |
 | Understand Tool architecture | [The tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) |

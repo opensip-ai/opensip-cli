@@ -19,6 +19,7 @@ related-docs:
   - ./04-contract-surfaces.md
   - ../50-extend/01-plugin-authoring.md
   - ../50-extend/06-full-tool-plugins.md
+  - ../50-extend/07-command-taxonomy.md
 ---
 # The tool-plugin model
 
@@ -294,7 +295,7 @@ export const tool = auditSecTool; // discovery export
 }
 ```
 
-That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip tools install @yourorg/audit-sec`), and `opensip audit-sec` works. For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/).
+That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip tools install @yourorg/audit-sec`), and `opensip audit-sec` works. For discoverability verbs (`list`, `recipes`, `export`) mount as nested children via `parent: 'audit-sec'` — see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/). For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/).
 
 What you *don't* need:
 
@@ -322,4 +323,5 @@ Three things, in order of importance:
 
 - **[`03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/)** — the layer cake the Tool contract sits at the top of. Why `fitness` is one package and not three; why `core` is the only thing every tool depends on.
 - **[`04-contract-surfaces.md`](/docs/opensip-cli/10-concepts/04-contract-surfaces/)** — every public edge: argv, Tool, plugin manifest, JSON output. The contract budget.
+- **[`../50-extend/07-command-taxonomy.md`](/docs/opensip-cli/50-extend/07-command-taxonomy/)** — Tier-1/2/3 command grammar for Tool authors.
 - **[`../50-extend/06-full-tool-plugins.md`](/docs/opensip-cli/50-extend/06-full-tool-plugins/)** — the full how-to for writing a Tool plugin.

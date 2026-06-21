@@ -359,6 +359,18 @@
       "purpose": "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
     },
     {
+      "file": "docs/web-generated/50-extend/07-command-taxonomy.md",
+      "path": "/docs/opensip-cli/50-extend/07-command-taxonomy/",
+      "section": "50-extend",
+      "title": "Command surface taxonomy",
+      "audience": [
+        "plugin-authors",
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
+    },
+    {
       "file": "docs/web-generated/60-guides/00-initialize-your-first-repo.md",
       "path": "/docs/opensip-cli/60-guides/00-initialize-your-first-repo/",
       "section": "60-guides",
@@ -688,7 +700,8 @@
         "/docs/opensip-cli/50-extend/03-publishable-packs/",
         "/docs/opensip-cli/50-extend/04-check-pack-architecture/",
         "/docs/opensip-cli/50-extend/05-language-adapters/",
-        "/docs/opensip-cli/50-extend/06-full-tool-plugins/"
+        "/docs/opensip-cli/50-extend/06-full-tool-plugins/",
+        "/docs/opensip-cli/50-extend/07-command-taxonomy/"
       ]
     },
     {
@@ -783,6 +796,7 @@
         "/docs/opensip-cli/50-extend/04-check-pack-architecture/",
         "/docs/opensip-cli/50-extend/05-language-adapters/",
         "/docs/opensip-cli/50-extend/06-full-tool-plugins/",
+        "/docs/opensip-cli/50-extend/07-command-taxonomy/",
         "/docs/opensip-cli/60-guides/01-write-your-first-check/",
         "/docs/opensip-cli/60-guides/02-ban-an-api-pattern/",
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
@@ -814,6 +828,7 @@
         "/docs/opensip-cli/40-graph/01-stages-and-catalog/",
         "/docs/opensip-cli/40-graph/02-rules-and-gating/",
         "/docs/opensip-cli/40-graph/04-suppressing-findings/",
+        "/docs/opensip-cli/50-extend/07-command-taxonomy/",
         "/docs/opensip-cli/60-guides/00-initialize-your-first-repo/",
         "/docs/opensip-cli/60-guides/03-wire-into-ci/",
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
@@ -856,6 +871,7 @@
         "/docs/opensip-cli/40-graph/04-suppressing-findings/",
         "/docs/opensip-cli/50-extend/04-check-pack-architecture/",
         "/docs/opensip-cli/50-extend/05-language-adapters/",
+        "/docs/opensip-cli/50-extend/07-command-taxonomy/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
         "/docs/opensip-cli/60-guides/07-create-your-first-tool/",
         "/docs/opensip-cli/70-reference/01-cli-commands/",
