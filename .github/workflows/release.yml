@@ -260,6 +260,14 @@ jobs:
           done < <(node scripts/release-package-order.mjs --print names)
 
       - name: Promote staged release to latest
+        # `npm dist-tag add` (the staged→latest promotion) is NOT covered by OIDC
+        # trusted publishing — OIDC authorizes `npm publish` only. So unlike the
+        # publish step above, the promotion needs a classic npm auth token. Without
+        # it the step fails E401 and `latest` is never advanced (the symptom in the
+        # v0.1.8 run). MACBOOKM5 holds an npm automation token with publish +
+        # dist-tag rights for the @opensip-cli scope and the unscoped opensip-cli.
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.MACBOOKM5 }}
         run: |
           set -e
           VERSION=$(node -p "require('./packages/core/package.json').version")
