@@ -1,12 +1,14 @@
 /**
  * tool-command-worker-entry — the WORKER side of the out-of-process external
- * tool command dispatch plane (ADR-0054, increment M4-D vertical slice).
+ * tool command dispatch plane (ADR-0054, increments M4-C / M4-D).
  *
  * This module is forked as a standalone node entry by the host supervisor
  * (`fork(<this module's built .js>, [specPath])`), exactly as the graph live
  * runner forks `graph-run-worker` and the transport tests fork the
  * `progress-worker.mjs` fixture. It speaks the {@link WorkerMessage} IPC
- * protocol (`progress | result | error`) back to the parent over `process.send`.
+ * protocol (`progress | result | error`) back to the parent over `process.send`,
+ * and now also RECEIVES host replies on `process.on('message')` for the M4-C
+ * host-RPC upcall channel (see `tool-command-worker-rpc.ts`).
  *
  * The isolation move (ADR-0054's core decision): the untrusted EXTERNAL tool
  * runtime is dynamic-imported HERE, in the worker process — never in the host.
@@ -15,13 +17,12 @@
  * exit / timeout / `error` message into a structured parent-side failure, and
  * the host process survives.
  *
- * The marshalled context subset for the slice is the final-result-return seams
- * (`render` / `emitJson` / `emitEnvelope` / `emitRaw` / `emitError`) plus
- * `setExitCode` (last-write-wins). Every other `ToolCliContext` seam (datastore
- * reads, cloud egress, SARIF write, baselines, toolState, hostPlanes, live
- * views) throws an `unsupported-seam` failure in the worker shim — it fails
- * loudly, never silently no-ops. Those become host-RPC upcalls in later
- * increments (ADR-0054 M4-C/M4-E/M4-F).
+ * The marshalled context (`tool-command-worker-context.ts`): FRR seams record
+ * the value and return it once in the result; the host-RPC seams (datastore /
+ * egress / SARIF / baselines / toolState / hostPlanes / report-open / exit-code
+ * re-affirm) UPCALL the host over the rpc-reply channel — the host performs the
+ * privileged effect through the real seam and replies. Only the live-view seams
+ * fail loud (`unsupported-seam`): Ink/TTY rendering stays host-side.
  */
 
 import { readFileSync } from 'node:fs';
@@ -32,132 +33,35 @@ import {
   enterScope,
   RunScope,
   type CommandSpec,
-  type RunTimer,
   type ToolCliContext,
   type Tool,
   type WorkerMessage,
 } from '@opensip-cli/core';
 
 import { hostRuntimeImportPolicyFor, importToolRuntime } from './admit-tool-package.js';
+import {
+  buildWorkerContext,
+  UnsupportedSeamError,
+  type ResultAccumulator,
+} from './tool-command-worker-context.js';
+import { createWorkerRpcClient } from './tool-command-worker-rpc.js';
 
 import type {
+  HostRpcRequest,
   ToolCommandFailureClass,
   ToolCommandResult,
   ToolCommandWorkerSpec,
 } from './tool-command-dispatch-types.js';
 
-/** The worker's IPC result type binding: no progress events in the slice (never[]). */
-type DispatchWorkerMessage = WorkerMessage<never, ToolCommandResult>;
+/**
+ * The worker's IPC message type binding: host-RPC requests stream on the
+ * `progress` arm; the final {@link ToolCommandResult} settles `result`.
+ */
+type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
 
 /** Post one IPC message to the parent (no-op when not forked — e.g. a unit call). */
 function send(msg: DispatchWorkerMessage): void {
   process.send?.(msg);
-}
-
-/**
- * A loud, marked failure for a seam the worker shim does not marshal in this
- * slice. Carries the {@link ToolCommandFailureClass} so the supervisor can
- * triage; the worker catch turns it into an `error` IPC message.
- */
-class UnsupportedSeamError extends Error {
-  readonly failureClass: ToolCommandFailureClass = 'unsupported-seam';
-  constructor(seam: string) {
-    super(
-      `tool command worker: seam '${seam}' is not marshalled in the ADR-0054 ` +
-        'dispatch slice (host-RPC / live-view seams arrive in a later increment). ' +
-        'The external command attempted a privileged effect the worker cannot perform.',
-    );
-    this.name = 'UnsupportedSeamError';
-  }
-}
-
-/**
- * Build a host-RPC seam stub that fails loudly when an external handler calls a
- * seam not marshalled in this slice.
- *
- * @throws {UnsupportedSeamError} always — that is the point: an unmarshalled seam
- *   must surface as a structured failure, never a silent no-op.
- */
-function unsupported(seam: string): (...args: unknown[]) => never {
-  // @fitness-ignore-next-line throws-documentation -- the throw is documented on the enclosing `unsupported` factory's @throws above; this is the one-line closure it returns.
-  return () => {
-    throw new UnsupportedSeamError(seam);
-  };
-}
-
-/**
- * The mutable accumulator the worker-side context shim records final-result
- * seam calls into. Drained into a {@link ToolCommandResult} after the handler
- * resolves.
- */
-interface ResultAccumulator {
-  render?: unknown;
-  envelope?: unknown;
-  json?: unknown;
-  raw?: unknown;
-  error?: ToolCommandResult['error'];
-  exitCode?: number;
-}
-
-/**
- * Build the worker-side {@link ToolCliContext} shim. Final-result-return seams
- * record into `acc`; host-RPC and live-view seams throw an
- * {@link UnsupportedSeamError}. `scope` / `runSession` / `logger` are backed by
- * the worker's own minimal {@link RunScope} (entered before the handler runs).
- */
-function buildWorkerContext(
-  scope: RunScope,
-  timing: RunTimer,
-  acc: ResultAccumulator,
-): ToolCliContext {
-  return {
-    scope,
-    runSession: { timing },
-    logger: scope.logger,
-    // ── Final-result-return seams (marshalled) ────────────────────────────
-    render: (result: unknown) => {
-      acc.render = result;
-      return Promise.resolve();
-    },
-    emitJson: (value: unknown) => {
-      acc.json = value;
-    },
-    emitEnvelope: (envelope: unknown) => {
-      acc.envelope = envelope;
-    },
-    emitRaw: (value: unknown) => {
-      acc.raw = value;
-    },
-    emitError: (detail) => {
-      acc.error = {
-        message: detail.message,
-        exitCode: detail.exitCode,
-        ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
-        ...(detail.code === undefined ? {} : { code: detail.code }),
-      };
-    },
-    setExitCode: (code: number) => {
-      acc.exitCode = code;
-    },
-    getExitCode: () => acc.exitCode,
-    // ── Host-RPC seams (NOT in this slice — fail loud) ────────────────────
-    deliverSignals: unsupported('deliverSignals'),
-    writeSarif: unsupported('writeSarif'),
-    saveBaseline: unsupported('saveBaseline'),
-    compareBaseline: unsupported('compareBaseline'),
-    exportBaselineSarif: unsupported('exportBaselineSarif'),
-    exportBaselineFingerprints: unsupported('exportBaselineFingerprints'),
-    maybeOpenReport: unsupported('maybeOpenReport'),
-    toolState: {
-      get: unsupported('toolState.get'),
-      put: unsupported('toolState.put'),
-      delete: unsupported('toolState.delete'),
-      list: unsupported('toolState.list'),
-    },
-    // ── Live-view seams (host-only — fail loud) ───────────────────────────
-    registerLiveView: unsupported('registerLiveView'),
-    renderLive: unsupported('renderLive'),
-  };
 }
 
 /** Resolve the command spec the worker should run, or throw `command-not-found`. */
@@ -180,6 +84,7 @@ function findCommandSpec(tool: Tool, commandName: string): CommandSpec<unknown, 
  * rejects cleanly. This is the testable core of the worker entry.
  */
 export async function executeToolCommandWorker(specPath: string): Promise<void> {
+  // @fitness-ignore-next-line detached-promises -- the promise IS awaited; `send(...)` is a synchronous void IPC post of the already-resolved value. The name-based heuristic misfires on `send(await ...)`.
   send(await runToolCommandWorker(specPath));
 }
 
@@ -262,9 +167,13 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
   const scope = new RunScope({ runId: correlationFromEnv()?.runId ?? '' });
   // @fitness-ignore-next-line detached-promises -- enterScope returns void (synchronous AsyncLocalStorage enter); the name-based heuristic misfires inside this async fn.
   enterScope(scope);
+  // The host-RPC upcall client over the live IPC channel (M4-C). `process` is
+  // the duplex: requests post via `process.send`; replies arrive on
+  // `process.on('message')`. Disposed in the finally so the listener is removed.
+  const rpcClient = createWorkerRpcClient(process);
   try {
     const acc: ResultAccumulator = {};
-    const ctx = buildWorkerContext(scope, createRunTimer(), acc);
+    const ctx = buildWorkerContext(scope, createRunTimer(), acc, rpcClient);
 
     // Run the handler. A `process.exit` / crash / hang here is contained by the
     // supervisor (premature-exit / timeout → structured parent failure); a throw
@@ -272,6 +181,8 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
     await commandSpec.handler({ ...spec.opts, _args: spec.positionals }, ctx);
     return { kind: 'result', value: toResult(commandSpec.output, acc) };
   } finally {
+    // @fitness-ignore-next-line detached-promises -- WorkerRpcClient.dispose() returns void (removes the reply listener + clears the pending map, synchronous); the name-based heuristic misfires inside this async fn.
+    rpcClient.dispose();
     // Release per-run caches even in this short-lived fork (resilience hygiene).
     // @fitness-ignore-next-line detached-promises -- RunScope.dispose() returns void (synchronous cache teardown); the name-based heuristic misfires inside this async fn.
     scope.dispose();

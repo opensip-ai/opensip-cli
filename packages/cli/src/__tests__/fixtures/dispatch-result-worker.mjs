@@ -34,8 +34,11 @@ switch (mode) {
     break;
   }
   case 'progress-then-result': {
-    // The dispatch slice ignores progress defensively; prove it does not settle.
-    send({ kind: 'progress', event: 1 });
+    // With M4-C the `progress` arm carries a host-RPC request. A malformed one
+    // (no matching `seam`) must be tolerated host-side (the supervisor serves it,
+    // dropping the reply as this worker exits) and the run must still settle on
+    // the result that follows — never a spurious dispatch failure.
+    send({ kind: 'progress', event: { rpcId: 1 } });
     send({ kind: 'result', value: { output: 'signal-envelope', exitCode: 0 } });
     break;
   }

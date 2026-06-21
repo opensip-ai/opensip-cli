@@ -3,9 +3,16 @@
  * dispatch-host-ctx — a host {@link ToolCliContext} stub for the ADR-0054
  * dispatch tests. Records the final-result-return seams the supervisor replays
  * into (`render` / `emitEnvelope` / `emitJson` / `emitRaw` / `emitError` /
- * `setExitCode`) and fails loudly on any host-RPC / live-view seam (none should
- * be touched during a dispatch-slice replay). Shared so the supervisor and
- * end-to-end suites assert against the same surface.
+ * `setExitCode`) AND the M4-C host-RPC seams the supervisor performs during a
+ * run (`toolState.*` / `saveBaseline` / `deliverSignals` / …). The RPC seams
+ * record their effects into capture buckets so the dispatch tests can assert the
+ * effect happened HOST-SIDE (the worker only triggered the upcall). The
+ * live-view seams remain `unexpectedSeam` — they are host-only and never reached
+ * during a dispatch replay.
+ *
+ * `toolState.get(tool, 'boom')` rejects with a structured error so a test can
+ * prove a host-side RPC fault crosses back as a normal thrown error in the
+ * handler (fault-not-crash), not a host crash.
  */
 
 import type { ToolCliContext } from '@opensip-cli/core';
@@ -21,6 +28,12 @@ export interface CapturedHostCtx {
   readonly exitCodes: number[];
   /** Ordered flat log of every replayed seam call (`seam:json` form). */
   readonly calls: string[];
+  /** In-memory toolState store keyed by `${tool}:${key}`, written host-side via RPC. */
+  readonly toolStateStore: Map<string, unknown>;
+  /** Baselines saved host-side via the RPC `saveBaseline` upcall. */
+  readonly baselines: { tool: string; envelope: unknown }[];
+  /** Envelopes delivered host-side via the RPC `deliverSignals` upcall. */
+  readonly delivered: unknown[];
 }
 
 const noop = (): void => {
@@ -39,6 +52,10 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
   const errors: unknown[] = [];
   const exitCodes: number[] = [];
   const calls: string[] = [];
+  const toolStateStore = new Map<string, unknown>();
+  const baselines: { tool: string; envelope: unknown }[] = [];
+  const delivered: unknown[] = [];
+
   const ctx = {
     scope: { runId: scopeRunId } as ToolCliContext['scope'],
     runSession: { timing: {} as ToolCliContext['runSession']['timing'] },
@@ -76,20 +93,71 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
     getExitCode: () => exitCodes.at(-1),
     registerLiveView: unexpectedSeam,
     renderLive: unexpectedSeam as unknown as ToolCliContext['renderLive'],
-    maybeOpenReport: () => Promise.resolve(),
-    deliverSignals: unexpectedSeam as unknown as ToolCliContext['deliverSignals'],
-    writeSarif: unexpectedSeam as unknown as ToolCliContext['writeSarif'],
-    saveBaseline: unexpectedSeam as unknown as ToolCliContext['saveBaseline'],
-    compareBaseline: unexpectedSeam as unknown as ToolCliContext['compareBaseline'],
-    exportBaselineSarif: unexpectedSeam as unknown as ToolCliContext['exportBaselineSarif'],
-    exportBaselineFingerprints:
-      unexpectedSeam as unknown as ToolCliContext['exportBaselineFingerprints'],
+    maybeOpenReport: () => {
+      calls.push('maybeOpenReport');
+      return Promise.resolve();
+    },
+    // ── M4-C host-RPC seams (performed host-side; record the effect) ───────
+    deliverSignals: ((envelope: unknown) => {
+      delivered.push(envelope);
+      calls.push('deliverSignals');
+      return Promise.resolve({ cloudAccepted: 0 });
+    }) as ToolCliContext['deliverSignals'],
+    writeSarif: (() => {
+      calls.push('writeSarif');
+      return Promise.resolve();
+    }) as ToolCliContext['writeSarif'],
+    saveBaseline: ((tool: string, envelope: unknown) => {
+      baselines.push({ tool, envelope });
+      calls.push(`saveBaseline:${tool}`);
+      return Promise.resolve();
+    }) as ToolCliContext['saveBaseline'],
+    compareBaseline: ((tool: string) => {
+      calls.push(`compareBaseline:${tool}`);
+      return Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false });
+    }) as ToolCliContext['compareBaseline'],
+    exportBaselineSarif: (() => Promise.resolve()) as ToolCliContext['exportBaselineSarif'],
+    exportBaselineFingerprints: (() =>
+      Promise.resolve()) as ToolCliContext['exportBaselineFingerprints'],
     toolState: {
-      get: unexpectedSeam,
-      put: unexpectedSeam,
-      delete: unexpectedSeam,
-      list: unexpectedSeam,
+      get: (tool: string, key: string) => {
+        calls.push(`toolState.get:${tool}:${key}`);
+        if (key === 'boom') {
+          return Promise.reject(new Error('host toolState.get faulted for key boom'));
+        }
+        return Promise.resolve(toolStateStore.get(`${tool}:${key}`));
+      },
+      put: (tool: string, key: string, payload: unknown) => {
+        toolStateStore.set(`${tool}:${key}`, payload);
+        calls.push(`toolState.put:${tool}:${key}`);
+        return Promise.resolve();
+      },
+      delete: (tool: string, key: string) => {
+        toolStateStore.delete(`${tool}:${key}`);
+        calls.push(`toolState.delete:${tool}:${key}`);
+        return Promise.resolve();
+      },
+      list: (tool: string) => {
+        calls.push(`toolState.list:${tool}`);
+        const prefix = `${tool}:`;
+        const keys = [...toolStateStore.keys()]
+          .filter((k) => k.startsWith(prefix))
+          .map((k) => k.slice(prefix.length));
+        return Promise.resolve(keys);
+      },
     },
   } satisfies ToolCliContext;
-  return { ctx, envelopes, rendered, jsons, raws, errors, exitCodes, calls };
+  return {
+    ctx,
+    envelopes,
+    rendered,
+    jsons,
+    raws,
+    errors,
+    exitCodes,
+    calls,
+    toolStateStore,
+    baselines,
+    delivered,
+  };
 }

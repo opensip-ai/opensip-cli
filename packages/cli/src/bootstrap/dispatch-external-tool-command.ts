@@ -1,7 +1,6 @@
 /**
  * dispatch-external-tool-command — the HOST supervisor for the out-of-process
- * external tool command dispatch plane (ADR-0054, increment M4-D vertical
- * slice).
+ * external tool command dispatch plane (ADR-0054, increments M4-C / M4-D).
  *
  * For an EXTERNAL-provenance tool command (installed / project-local /
  * user-global), the host forks the {@link executeToolCommandWorker} entry
@@ -16,11 +15,17 @@
  *   2. enforces a wall-clock timeout (supervisor-owned resource control,
  *      ADR-0054 Consequences) — a hung handler is SIGKILLed and surfaces as a
  *      structured failure, never a host hang;
- *   3. on success, replays the slim {@link ToolCommandResult} through the REAL
- *      host {@link ToolCliContext} seams (`render` / `emitEnvelope` / `emitJson`
- *      / `emitRaw` / `emitError` / `setExitCode`) so the host remains the only
- *      process that performs the privileged effect and the output contract stays
- *      byte-identical to the in-process path.
+ *   3. serves the worker's host-RPC upcalls mid-run (ADR-0054 M4-C): a
+ *      {@link HostRpcRequest} streamed on the transport's `progress` arm is
+ *      performed through the REAL host {@link ToolCliContext} (datastore /
+ *      egress / FS / baselines / toolState / host planes) by
+ *      {@link handleHostRpc}, and the {@link RpcReply} is sent back via
+ *      `child.send` — the host remains the only process that performs the
+ *      privileged effect;
+ *   4. on success, replays the slim {@link ToolCommandResult} through the REAL
+ *      host seams (`render` / `emitEnvelope` / `emitJson` / `emitRaw` /
+ *      `emitError` / `setExitCode`) so the output contract stays byte-identical
+ *      to the in-process path.
  *
  * Bundled first-party tools never reach here — they stay in-process (the trusted
  * computing base). External tools have NO in-process fallback by trust tier
@@ -28,7 +33,7 @@
  * run.
  */
 
-import { fork } from 'node:child_process';
+import { fork, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -45,8 +50,14 @@ import {
 } from '@opensip-cli/core';
 
 import { BOOTSTRAP_MODULE } from './constants.js';
+import { handleHostRpc } from './dispatch-host-rpc-handler.js';
 
-import type { ToolCommandResult, ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
+import type {
+  HostRpcRequest,
+  RpcReply,
+  ToolCommandResult,
+  ToolCommandWorkerSpec,
+} from './tool-command-dispatch-types.js';
 
 /** Default supervisor wall-clock timeout for one dispatched command (ms). */
 const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
@@ -54,8 +65,11 @@ const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
 /** The built worker entry module the supervisor forks (sibling of this file in dist/). */
 const WORKER_ENTRY = fileURLToPath(new URL('tool-command-worker-entry.js', import.meta.url));
 
+/** The dispatch IPC binding: host-RPC requests stream on `progress`. */
+type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
+
 /** Narrowing helper: a worker `error` IPC message carries an optional failureClass/stack. */
-type DispatchWorkerError = Extract<WorkerMessage<never, ToolCommandResult>, { kind: 'error' }>;
+type DispatchWorkerError = Extract<DispatchWorkerMessage, { kind: 'error' }>;
 
 export interface DispatchExternalToolCommandArgs {
   /** The external tool's provenance (source must NOT be `'bundled'`). */
@@ -119,7 +133,7 @@ async function runWorker(args: DispatchExternalToolCommandArgs): Promise<ToolCom
   const timeoutMs = args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS;
 
   try {
-    return await forkAndAwait(entry, specPath, spec, timeoutMs);
+    return await forkAndAwait(entry, specPath, spec, timeoutMs, args.ctx);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -127,17 +141,24 @@ async function runWorker(args: DispatchExternalToolCommandArgs): Promise<ToolCom
 
 /**
  * The low-level fork + IPC settle. Mirrors the shared subprocess transport's
- * single-settle / kill-on-settle discipline, but adds a supervisor timeout and
- * binds the COMMAND result/error shapes. Kept self-contained (not routed through
- * `createSubprocessProgressRun`) because this path needs no progress fan-out and
- * does need an owned timeout + correlation env injection symmetric to the
- * transport.
+ * single-settle / kill-on-settle discipline, but adds a supervisor timeout, the
+ * M4-C host-RPC reply channel, and binds the COMMAND result/error shapes. Kept
+ * self-contained (not routed through `createSubprocessProgressRun`) because this
+ * path needs the rpc-reply direction (`child.send`) the fire-and-forget transport
+ * does not have, plus an owned timeout + correlation env injection symmetric to
+ * the transport.
+ *
+ * The wall-clock timeout is a HARD cap on the WHOLE command (resource control,
+ * ADR-0054 Consequences) — it is deliberately NOT reset on each RPC, so a
+ * runaway upcall loop is still SIGKILLed rather than extending the budget
+ * indefinitely.
  */
 function forkAndAwait(
   entry: string,
   specPath: string,
   spec: ToolCommandWorkerSpec,
   timeoutMs: number,
+  ctx: ToolCliContext,
 ): Promise<ToolCommandResult> {
   return new Promise<ToolCommandResult>((resolve, reject) => {
     const runId = currentScope()?.runId;
@@ -172,17 +193,28 @@ function forkAndAwait(
     }, timeoutMs);
     timer.unref?.();
 
-    child.on('message', (msg: WorkerMessage<never, ToolCommandResult>) => {
-      if (msg.kind === 'result') {
+    // M4-C: serve one host-RPC upcall against the REAL host ctx and reply. A
+    // host-side fault is folded into a structured `{ ok: false }` reply by
+    // handleHostRpc — never an unhandled host crash. If the child has already
+    // settled (raced a result/exit), the reply is dropped (the worker is gone).
+    const serveRpc = (request: HostRpcRequest): void => {
+      void handleHostRpc(request, ctx).then((reply: RpcReply) => {
+        if (!settled) sendRpcReply(child, reply, spec);
+      });
+    };
+
+    child.on('message', (msg: DispatchWorkerMessage) => {
+      if (msg.kind === 'progress') {
+        serveRpc(msg.event);
+      } else if (msg.kind === 'result') {
         done(() => {
           resolve(msg.value);
         });
-      } else if (msg.kind === 'error') {
+      } else {
         done(() => {
           reject(workerErrorToToolError(spec, msg));
         });
       }
-      // `progress` is unused in the dispatch slice; ignore defensively.
     });
     child.on('error', (err: Error) => {
       done(() => {
@@ -213,6 +245,27 @@ function requirePackageDir(provenance: ToolProvenance): string {
     );
   }
   return dir;
+}
+
+/**
+ * Post one host-RPC {@link RpcReply} back to the worker, only while the child is
+ * still attached: a settle (result/exit/timeout) kills it, after which
+ * `child.send` would write to a closed channel. The send callback swallows a
+ * racing EPIPE (the channel can close between the `connected` check and the
+ * write) so a reply to a departing worker never surfaces as a spurious dispatch
+ * failure — a dropped reply is logged at debug and otherwise ignored.
+ */
+function sendRpcReply(child: ChildProcess, reply: RpcReply, spec: ToolCommandWorkerSpec): void {
+  if (!child.connected) return;
+  child.send(reply, (err) => {
+    if (err === null) return;
+    currentScope()?.logger.debug({
+      evt: 'cli.tool.dispatch_rpc_reply_dropped',
+      module: BOOTSTRAP_MODULE,
+      toolId: spec.toolId,
+      command: spec.commandName,
+    });
+  });
 }
 
 /** Build a structured supervisor-side dispatch error, logged with its failure class. */

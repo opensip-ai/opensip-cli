@@ -103,13 +103,13 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   },
   {
     canonical: 'OPENSIP_CLI_EXTERNAL_WORKER',
-    // Strict `=1` gate. Opt-in for the ADR-0054 out-of-process dispatch plane
-    // (M4 vertical slice): when on, an EXTERNAL-provenance tool command runs in
-    // a forked worker (the worker imports the untrusted runtime) instead of
-    // in-process. Default OFF so production behaviour — and the bundled ≡
-    // installed parity invariant (ADR-0027) — is byte-identical: the slice only
-    // marshals the final-result-return seam subset, so it is not the default for
-    // arbitrary tools until the host-RPC seams land (ADR-0054 M4-E).
+    // Strict `=1` gate. Opt-in for the ADR-0054 out-of-process dispatch plane:
+    // when on, an EXTERNAL-provenance tool command runs in a forked worker (the
+    // worker imports the untrusted runtime) instead of in-process. Default OFF
+    // so production behaviour — and the bundled ≡ installed parity invariant
+    // (ADR-0027) — is byte-identical. With M4-C the worker now marshals the FRR
+    // seams AND upcalls the host for the host-RPC seams; worker-by-default is a
+    // later increment (ADR-0054 M4-E).
     coerce: (raw) => raw === '1',
     default: false,
     docs:
@@ -117,10 +117,11 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       '(installed / project-local / user-global) tool commands run in a forked ' +
       'worker that imports the untrusted runtime, instead of in the host process. ' +
       'Default off (external tools run in-process, byte-identical to bundled). ' +
-      'Experimental: the current slice marshals only the final-result-return ' +
-      'context seams (render / json / envelope / raw / error / exit code); a tool ' +
-      'command that calls a host-RPC seam (datastore / egress / SARIF / baselines ' +
-      '/ toolState) under this flag fails loudly rather than silently no-op.',
+      'Experimental: the worker marshals the final-result-return context seams ' +
+      '(render / json / envelope / raw / error / exit code) and upcalls the host ' +
+      'for the host-RPC seams (datastore / egress / SARIF / baselines / toolState ' +
+      '/ hostPlanes / report-open); only the live-view seams stay host-only and ' +
+      'fail loud in the worker.',
   },
   {
     canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',

@@ -1,7 +1,7 @@
 /**
  * tool-command-dispatch-types — the serializable wire contract for the
- * out-of-process external-tool command dispatch plane (ADR-0054, increment
- * M4-B / M4-C vertical slice).
+ * out-of-process external-tool command dispatch plane (ADR-0054, increments
+ * M4-B / M4-C).
  *
  * These are the ONLY shapes that cross the host↔worker IPC boundary for a
  * dispatched external-tool command. Everything here MUST be structured-clone
@@ -12,13 +12,23 @@
  * shim, and posts back a {@link ToolCommandResult} (the final-result-return
  * subset of the seam→RPC mapping in ADR-0054's Build Plan).
  *
- * Scope of the slice (ADR-0054 M4-D): the marshalled context subset is the
- * final-result-return seams (`render` / `emitJson` / `emitEnvelope` / `emitRaw`
- * / `emitError`) plus `setExitCode` (last-write-wins). Host-RPC seams
- * (datastore, egress, SARIF write, baselines, toolState, hostPlanes) and the
- * live-view seams are explicitly NOT in this slice — a tool command that calls
- * them in the worker fails loudly (see the worker shim), it does not silently
- * no-op. Those land in later increments (M4-C RPC upcalls, M4-E/F).
+ * Two transport strategies cross this boundary (ADR-0054 M4-C):
+ *   - final-result-return (FRR): the worker accumulates the value and returns it
+ *     ONCE in {@link ToolCommandResult} (`render` / `emitJson` / `emitEnvelope`
+ *     / `emitRaw` / `emitError` / `setExitCode`); the host replays it after the
+ *     worker resolves.
+ *   - host-RPC-request (RPC): a streamed upcall ({@link HostRpcRequest}) — the
+ *     worker BLOCKS on a reply ({@link RpcReply}) because the effect touches the
+ *     datastore / network / filesystem / process exit, which only the host may
+ *     do. The host performs the privileged effect through the REAL host
+ *     `ToolCliContext` and replies. This is the M4-C addition over the M4-D FRR
+ *     slice: `deliverSignals` / `writeSarif` / the four baseline seams /
+ *     `toolState.*` / `hostPlanes.*` / `maybeOpenReport` / `getExitCode` now
+ *     upcall instead of failing loud.
+ *
+ * Live-view seams (`registerLiveView` / `renderLive`) stay host-side-only and
+ * still fail loud in the worker — Ink/TTY rendering cannot leave the host
+ * (ADR-0054 M4-C mapping table; documented as a later increment).
  */
 
 import type { CommandOutputMode, ToolSource } from '@opensip-cli/core';
@@ -57,8 +67,12 @@ export interface ToolCommandWorkerSpec {
  * taxonomy but for the COMMAND layer, not the fork layer).
  *
  *   - `tool-handler-throw`   — the handler threw inside the worker.
- *   - `unsupported-seam`     — the handler called a seam not marshalled in this
- *                              slice (datastore/egress/live-view); fail loud.
+ *   - `unsupported-seam`     — the handler called a seam the worker cannot
+ *                              marshal (the live-view seams; Ink/TTY rendering
+ *                              cannot leave the host). The host-RPC seams are no
+ *                              longer in this class — they upcall (M4-C).
+ *   - `host-rpc-failed`      — a host-RPC upcall faulted host-side (the error
+ *                              crossed back as a structured {@link RpcReply}).
  *   - `command-not-found`    — `commandName` did not match any `commandSpecs`.
  *   - `runtime-load-failed`  — `importToolRuntime` failed in the worker.
  *   - `bad-spec`             — the spec file was missing or unparseable.
@@ -66,6 +80,7 @@ export interface ToolCommandWorkerSpec {
 export type ToolCommandFailureClass =
   | 'tool-handler-throw'
   | 'unsupported-seam'
+  | 'host-rpc-failed'
   | 'command-not-found'
   | 'runtime-load-failed'
   | 'bad-spec';
@@ -100,3 +115,102 @@ export interface ToolCommandResult {
   /** The last `ctx.setExitCode(...)` value (last-write-wins). */
   readonly exitCode?: number;
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Host-RPC upcall protocol (ADR-0054 M4-C)
+//
+// A streamed upcall: the worker sends ONE {@link HostRpcRequest} (carried over
+// the transport's `progress` arm, `WorkerMessage<HostRpcRequest, ToolCommandResult>`)
+// and BLOCKS until the matching {@link RpcReply} arrives (parent → child
+// `child.send`). Every request carries a monotonic `rpcId`; the host replies
+// with the same `rpcId`. The HOST performs the privileged effect through the
+// REAL `ToolCliContext` seam and returns the value (or a structured error) — the
+// host remains the only process that touches the datastore / network / FS /
+// process exit. Both shapes are plain-data (structured-clone safe).
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The three datastore-backed host planes reachable via `ctx.hostPlanes.*`. A
+ * generic `hostPlane` upcall names the plane + method + serializable args so the
+ * host can dispatch to the real plane impl without a dedicated request variant
+ * per method (the planes carry several opaque-record methods each; one generic
+ * variant keeps this contract small and forward-compatible).
+ */
+export type HostPlaneKind = 'governance' | 'audit' | 'entitlements';
+
+/** The serializable subset of `deliverSignals`'s opts (no functions/handles). */
+export interface DeliverSignalsOpts {
+  readonly cwd: string;
+  readonly reportTo?: string;
+  readonly apiKey?: string;
+  readonly runFailed?: boolean;
+}
+
+/**
+ * One host-RPC upcall, WITHOUT the correlation id — the shape the worker shim
+ * builds and the host switch consumes. Discriminated by `seam`; each variant's
+ * payload mirrors the arguments of the matching `ToolCliContext` seam (the
+ * envelope/opts/payloads are all plain-data on those seams already).
+ *
+ * Kept as a standalone union (rather than `Omit<HostRpcRequest, 'rpcId'>`)
+ * because `Omit` does not distribute over the `{ rpcId } & union` intersection
+ * — it would collapse to only the common keys.
+ */
+export type HostRpcCall =
+  | {
+      readonly seam: 'deliverSignals';
+      readonly envelope: unknown;
+      readonly opts: DeliverSignalsOpts;
+    }
+  | { readonly seam: 'writeSarif'; readonly envelope: unknown; readonly path: string }
+  | { readonly seam: 'saveBaseline'; readonly tool: string; readonly envelope: unknown }
+  | { readonly seam: 'compareBaseline'; readonly tool: string; readonly envelope: unknown }
+  | { readonly seam: 'exportBaselineSarif'; readonly tool: string; readonly path: string }
+  | { readonly seam: 'exportBaselineFingerprints'; readonly tool: string; readonly path: string }
+  | { readonly seam: 'toolState.get'; readonly tool: string; readonly key: string }
+  | {
+      readonly seam: 'toolState.put';
+      readonly tool: string;
+      readonly key: string;
+      readonly payload: unknown;
+    }
+  | { readonly seam: 'toolState.delete'; readonly tool: string; readonly key: string }
+  | { readonly seam: 'toolState.list'; readonly tool: string }
+  | {
+      readonly seam: 'maybeOpenReport';
+      readonly opts: { readonly openRequested: boolean; readonly jsonOutput: boolean };
+    }
+  | { readonly seam: 'getExitCode' }
+  | {
+      readonly seam: 'hostPlane';
+      readonly plane: HostPlaneKind;
+      readonly method: string;
+      readonly args: readonly unknown[];
+    };
+
+/**
+ * One host-RPC upcall as it crosses the wire: a {@link HostRpcCall} stamped with
+ * the monotonic `rpcId` that correlates the matching {@link RpcReply}.
+ */
+export type HostRpcRequest = HostRpcCall & { readonly rpcId: number };
+
+/**
+ * The host's reply to one {@link HostRpcRequest} (parent → child). Discriminated
+ * by `ok`: a resolved value crosses as `{ ok: true, value }`; a host-side fault
+ * crosses as `{ ok: false, error }` (a STRUCTURED rejection the worker shim
+ * re-throws so the handler sees it as a normal thrown error — never a host
+ * crash, never a silent no-op).
+ */
+export type RpcReply =
+  | {
+      readonly kind: 'rpc-reply';
+      readonly rpcId: number;
+      readonly ok: true;
+      readonly value: unknown;
+    }
+  | {
+      readonly kind: 'rpc-reply';
+      readonly rpcId: number;
+      readonly ok: false;
+      readonly error: { readonly message: string; readonly code?: string; readonly stack?: string };
+    };

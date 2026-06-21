@@ -62,7 +62,7 @@ describe('dispatchExternalToolCommand — replay + failure arms', () => {
     expect(cap.calls).toContain('exit:0');
   });
 
-  it('ignores a stray progress message and still settles on the result', async () => {
+  it('tolerates a malformed host-RPC request and still settles on the result', async () => {
     const cap = makeDispatchHostCtx();
     await dispatch(cap, 'progress-then-result');
     expect(cap.calls).toContain('exit:0');

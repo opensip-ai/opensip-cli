@@ -92,11 +92,11 @@ describe('runToolCommandWorker', () => {
     expect(msg.stack).toBeTypeOf('string');
   });
 
-  it('fails loud (unsupported-seam) when the handler calls an unmarshalled host-RPC seam', async () => {
-    const msg = await runToolCommandWorker(writeSpec(specFor({ opts: { mode: 'bad-seam' } })));
+  it('fails loud (unsupported-seam) when the handler calls a host-only live-view seam', async () => {
+    const msg = await runToolCommandWorker(writeSpec(specFor({ opts: { mode: 'live-seam' } })));
     expect(msg.kind).toBe('error');
     if (msg.kind !== 'error') throw new Error('expected error');
     expect(msg.failureClass).toBe('unsupported-seam');
-    expect(msg.message).toContain("seam 'toolState.get'");
+    expect(msg.message).toContain("seam 'registerLiveView'");
   });
 });

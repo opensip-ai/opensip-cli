@@ -1,0 +1,124 @@
+/**
+ * tool-command-worker-context — unit coverage for the worker-side
+ * {@link ToolCliContext} shim builder (ADR-0054 M4-C). Verifies the three seam
+ * strategies in isolation: FRR seams record into the accumulator, RPC seams
+ * issue a typed upcall through the (stub) RPC client, and the host-only
+ * live-view seams throw {@link UnsupportedSeamError}.
+ */
+
+import { RunScope, createRunTimer } from '@opensip-cli/core';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  buildWorkerContext,
+  UnsupportedSeamError,
+  type ResultAccumulator,
+} from '../bootstrap/tool-command-worker-context.js';
+
+import type { HostRpcCall } from '../bootstrap/tool-command-dispatch-types.js';
+import type { WorkerRpcClient } from '../bootstrap/tool-command-worker-rpc.js';
+
+function makeStubClient(): { client: WorkerRpcClient; calls: HostRpcCall[] } {
+  const calls: HostRpcCall[] = [];
+  const client: WorkerRpcClient = {
+    call: (request) => {
+      calls.push(request);
+      return Promise.resolve({ echoed: request.seam });
+    },
+    dispose: vi.fn(),
+  };
+  return { client, calls };
+}
+
+function build(): {
+  ctx: ReturnType<typeof buildWorkerContext>;
+  acc: ResultAccumulator;
+  calls: HostRpcCall[];
+} {
+  const acc: ResultAccumulator = {};
+  const { client, calls } = makeStubClient();
+  const scope = new RunScope({ runId: 'r' });
+  const ctx = buildWorkerContext(scope, createRunTimer(), acc, client);
+  return { ctx, acc, calls };
+}
+
+describe('buildWorkerContext — FRR seams', () => {
+  it('records render / json / envelope / raw / error / exitCode into the accumulator', async () => {
+    const { ctx, acc } = build();
+    await ctx.render({ r: 1 });
+    ctx.emitJson({ j: 1 });
+    ctx.emitEnvelope({ e: 1 });
+    ctx.emitRaw('raw');
+    ctx.emitError({ message: 'm', exitCode: 2, suggestion: 's', code: 'c' });
+    ctx.setExitCode(0);
+    expect(acc.render).toEqual({ r: 1 });
+    expect(acc.json).toEqual({ j: 1 });
+    expect(acc.envelope).toEqual({ e: 1 });
+    expect(acc.raw).toBe('raw');
+    expect(acc.error).toEqual({ message: 'm', exitCode: 2, suggestion: 's', code: 'c' });
+    expect(acc.exitCode).toBe(0);
+    expect(ctx.getExitCode?.()).toBe(0);
+  });
+});
+
+describe('buildWorkerContext — RPC seams upcall the client', () => {
+  it('toolState.* / saveBaseline / deliverSignals / writeSarif / baseline exports / report build typed requests', async () => {
+    const { ctx, calls } = build();
+    await ctx.toolState.put('t', 'k', { v: 1 });
+    await ctx.toolState.get('t', 'k');
+    await ctx.toolState.delete('t', 'k');
+    await ctx.toolState.list('t');
+    await ctx.saveBaseline('t', { env: 1 });
+    await ctx.compareBaseline('t', { env: 1 });
+    await ctx.exportBaselineSarif('t', '/a.sarif');
+    await ctx.exportBaselineFingerprints('t', '/a.json');
+    await ctx.writeSarif({ env: 1 }, '/b.sarif');
+    await ctx.deliverSignals({ env: 1 }, { cwd: '/x', reportTo: 'https://h', runFailed: true });
+    await ctx.maybeOpenReport({ openRequested: true, jsonOutput: false });
+
+    const seams = calls.map((c) => c.seam);
+    expect(seams).toEqual([
+      'toolState.put',
+      'toolState.get',
+      'toolState.delete',
+      'toolState.list',
+      'saveBaseline',
+      'compareBaseline',
+      'exportBaselineSarif',
+      'exportBaselineFingerprints',
+      'writeSarif',
+      'deliverSignals',
+      'maybeOpenReport',
+    ]);
+    const deliver = calls.find((c) => c.seam === 'deliverSignals');
+    expect(deliver).toMatchObject({
+      opts: { cwd: '/x', reportTo: 'https://h', runFailed: true },
+    });
+  });
+
+  it('routes hostPlanes.<plane>.<method> through a generic hostPlane upcall', async () => {
+    const { ctx, calls } = build();
+    await ctx.hostPlanes?.audit?.append('t', { e: 1 });
+    await ctx.hostPlanes?.entitlements?.check('t', 'run');
+    expect(calls).toContainEqual({
+      seam: 'hostPlane',
+      plane: 'audit',
+      method: 'append',
+      args: ['t', { e: 1 }],
+    });
+    expect(calls).toContainEqual({
+      seam: 'hostPlane',
+      plane: 'entitlements',
+      method: 'check',
+      args: ['t', 'run'],
+    });
+  });
+});
+
+describe('buildWorkerContext — host-only seams fail loud', () => {
+  it('registerLiveView / renderLive throw UnsupportedSeamError', () => {
+    const { ctx } = build();
+    expect(() => ctx.registerLiveView('k', () => undefined)).toThrow(UnsupportedSeamError);
+    expect(() => ctx.renderLive('k', {})).toThrow(UnsupportedSeamError);
+  });
+});

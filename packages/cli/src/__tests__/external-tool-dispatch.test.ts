@@ -12,9 +12,15 @@
  *
  *   - happy path: the handler's emitted envelope + exit code cross the boundary
  *     and the supervisor replays them through the host seams;
+ *   - host-RPC (M4-C): a handler that calls `toolState.put`/`get` +
+ *     `saveBaseline` + `deliverSignals` IN THE WORKER upcalls the host, which
+ *     performs the privileged effect (datastore / egress) and replies — the
+ *     EFFECT is asserted on the host capture, while ISOLATION still holds;
+ *   - host-RPC fault: a host-side RPC rejection crosses back as a normal thrown
+ *     error in the handler (fault-not-crash);
  *   - isolation: a handler that `process.exit(1)`s, throws, hangs (timeout), or
- *     calls an unmarshalled host-RPC seam is contained as a STRUCTURED
- *     parent-side failure while THIS host process survives.
+ *     calls a host-only live-view seam is contained as a STRUCTURED parent-side
+ *     failure while THIS host process survives.
  */
 
 import { existsSync } from 'node:fs';
@@ -108,9 +114,44 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
     await expect(dispatch(cap, 'hang', {}, 750)).rejects.toThrow(/timed out|failed/);
   }, 10_000);
 
-  it('an unmarshalled host-RPC seam fails loud (unsupported-seam) — never a silent no-op', async () => {
+  it('a host-only live-view seam fails loud (unsupported-seam) — never a silent no-op', async () => {
     const cap = makeDispatchHostCtx();
-    await expect(dispatch(cap, 'bad-seam')).rejects.toThrow(/failed/);
+    await expect(dispatch(cap, 'live-seam')).rejects.toThrow(/failed/);
+  });
+
+  it('host-RPC (M4-C): worker seam calls upcall the host, which performs the effect host-side', async () => {
+    const cap = makeDispatchHostCtx();
+    await dispatch(cap, 'rpc', { echo: 'via-rpc' });
+
+    // The datastore write happened HOST-SIDE via the toolState.put upcall.
+    expect(cap.toolStateStore.get('external-dispatch-tool:k')).toEqual({ v: 'via-rpc' });
+    // The baseline was saved HOST-SIDE via the saveBaseline upcall.
+    expect(cap.baselines).toHaveLength(1);
+    expect(cap.baselines[0]?.tool).toBe('external-dispatch-tool');
+    // The envelope was delivered HOST-SIDE via the deliverSignals upcall.
+    expect(cap.delivered).toHaveLength(1);
+
+    // The round-tripped reply values reached the WORKER handler and were echoed
+    // into its envelope (proves the reply crossed back, not just fired).
+    const env = cap.envelopes[0] as {
+      signals: {
+        rpcEcho: { got: { v: string }; delivery: { cloudAccepted: number }; list: string[] };
+      }[];
+    };
+    const echo = env.signals[0]?.rpcEcho;
+    expect(echo?.got).toEqual({ v: 'via-rpc' });
+    expect(echo?.delivery).toEqual({ cloudAccepted: 0 });
+    expect(echo?.list).toContain('k');
+    expect(cap.exitCodes).toContain(0);
+  });
+
+  it('host-RPC fault: a host-side RPC rejection crosses back as a structured failure (host survives)', async () => {
+    const cap = makeDispatchHostCtx();
+    // The handler calls toolState.get('boom'); the host rejects; the worker shim
+    // re-throws into the handler, which does not catch → tool-handler-throw.
+    await expect(dispatch(cap, 'rpc-fail')).rejects.toThrow(/faulted for key boom|failed/);
+    // No envelope replayed (the handler never reached its emit).
+    expect(cap.envelopes).toHaveLength(0);
   });
 
   it('the host still dispatches a happy run AFTER containing a fault (host survived)', async () => {
