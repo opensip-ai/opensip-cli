@@ -32,9 +32,9 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "tsc && node scripts/copy-vendor.mjs",
+    "build": "tsc -p src/client/tsconfig.json --noEmit && node scripts/bundle-client.mjs && tsc && node scripts/copy-vendor.mjs",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p src/client/tsconfig.json --noEmit",
     "vendor:cytoscape": "node scripts/vendor-cytoscape.mjs",
     "clean": "rm -rf dist"
   },
@@ -45,6 +45,7 @@
     "@types/node": "^24.13.2",
     "cytoscape": "3.34.0",
     "cytoscape-dagre": "4.0.0",
+    "esbuild": "^0.28.1",
     "jsdom": "^29.1.1",
     "typescript": "~6.0.3",
     "vitest": "^4.1.8"

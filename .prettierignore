@@ -34,3 +34,6 @@ docs/**
 
 # Lockfile is pnpm-owned
 pnpm-lock.yaml
+
+# Generated client bundle (esbuild output inlined into the dashboard report)
+**/client-bundle.generated.ts

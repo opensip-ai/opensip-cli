@@ -39,6 +39,7 @@
       ]
     },
     "packages/dashboard": {
+      "entry": ["src/client/index.ts", "scripts/*.mjs"],
       "ignore": ["src/vendor/cytoscape-bundle.js"],
       "ignoreDependencies": ["cytoscape", "cytoscape-dagre"]
     },

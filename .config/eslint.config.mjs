@@ -51,6 +51,8 @@ export default tseslint.config(
       'fixtures/**',
       '**/__fixtures__/**',
       'docs/**',
+      // Build-generated bundle (esbuild output as a string const); not authored.
+      '**/*.generated.ts',
     ],
   },
 

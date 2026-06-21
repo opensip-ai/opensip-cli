@@ -1,0 +1,13 @@
+{
+  "//": "Type-checks the browser client modules (DOM lib) — the L4 goal: client JS visible to tsc. Excluded from the package's main tsconfig (which is Node, no DOM). esbuild does the actual transpile/bundle; this is noEmit type-checking only.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["./**/*.ts"],
+  "//exclude": "Override the package tsconfig's `exclude: [src/client]` (which it inherits via extends) — that would otherwise exclude this config's own inputs.",
+  "exclude": []
+}

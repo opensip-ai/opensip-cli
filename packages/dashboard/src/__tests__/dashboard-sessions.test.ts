@@ -14,8 +14,8 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardSessionsJs } from '../sessions.js';
-import { dashboardElJs } from '../shared/el.js';
 import { dashboardPaginationJs } from '../shared/pagination.js';
 import { dashboardSortableJs } from '../shared/sortable.js';
 
@@ -48,7 +48,10 @@ return {
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own emitted dashboard JS.
   const factory = new Function(
-    dashboardElJs() +
+    // `el` now comes from the bundled client modules (exposes window.el); the
+    // legacy pagination/sortable/sessions emitters still reference it as a global.
+    DASHBOARD_CLIENT_BUNDLE +
+      '\n' +
       dashboardPaginationJs() +
       dashboardSortableJs() +
       dashboardSessionsJs() +

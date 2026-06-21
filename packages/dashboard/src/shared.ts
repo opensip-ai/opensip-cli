@@ -23,17 +23,18 @@
  * appended blindly.
  */
 
-import { dashboardElJs } from './shared/el.js';
 import { dashboardPaginationJs } from './shared/pagination.js';
 import { dashboardSortableJs } from './shared/sortable.js';
 import { dashboardTabActivatorsJs } from './shared/tab-activators.js';
 import { dashboardTabBarJs } from './shared/tab-bar.js';
 
 export function dashboardSharedJs(): string {
+  // `el` is no longer composed here — it migrated to the bundled, type-checked
+  // client modules (src/client/el.ts), inlined by generator.ts BEFORE this. The
+  // helpers below call it as the global `el` the bundle exposes (L4 migration).
   return [
     dashboardTabBarJs(),
     dashboardTabActivatorsJs(),
-    dashboardElJs(),
     dashboardPaginationJs(),
     dashboardSortableJs(),
   ].join('\n');
