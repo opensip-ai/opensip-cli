@@ -18,6 +18,8 @@ INSTALL_SPEC="${PACKAGE_NAME}@${PACKAGE_VERSION}"
 MIN_NODE_MAJOR=24
 SMOKE_DIR=""
 ACTIVE_CHILD_PID=""
+STEP_MARKER="==>"
+SUCCESS_MARKER="🎉"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   BOLD="$(printf '\033[1m')"
@@ -36,15 +38,15 @@ else
 fi
 
 info() {
-  printf '%s\n' "${BOLD}OpenSIP CLI${RESET}: ${DIM}$1${RESET}"
+  printf '%s\n' "${BOLD}${STEP_MARKER}${RESET} ${DIM}$1${RESET}"
 }
 
 ok() {
-  printf '%s\n' "${GREEN}Success:${RESET} $1"
+  printf '%s\n' "${GREEN}${STEP_MARKER}${RESET} $1"
 }
 
 warn() {
-  printf '%s\n' "${YELLOW}Note:${RESET} $1"
+  printf '%s\n' "${YELLOW}${STEP_MARKER}${RESET} $1"
 }
 
 error() {
@@ -74,7 +76,7 @@ run_with_spinner() {
         2) dots=".. " ;;
         *) dots="..." ;;
       esac
-      printf '\r%sOpenSIP CLI%s: %s%s%s%s' "$BOLD" "$RESET" "$DIM" "$label" "$dots" "$RESET"
+      printf '\r%s%s%s %s%s%s%s' "$BOLD" "$STEP_MARKER" "$RESET" "$DIM" "$label" "$dots" "$RESET"
       frame=$(((frame + 1) % 4))
       sleep 0.2
     done
@@ -203,4 +205,5 @@ else
   fi
 fi
 
-printf '%s\n' "Run ${BOLD}opensip init${RESET} in your project to get started."
+printf '\n%s\n' "${SUCCESS_MARKER} OpenSIP CLI installed successfully."
+info "Run ${BOLD}opensip init${RESET} in your project to get started."
