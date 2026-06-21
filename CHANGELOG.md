@@ -2,6 +2,43 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.8] - 2026-06-21
+
+A release-hardening update focused on audit remediation, stronger type-aware
+analysis, safer publishing, and improved install/reporting feedback.
+
+### Changed
+
+- Added a staged release publish lane with version-scoped candidate dist-tags,
+  full-surface verification, and atomic promotion to `latest`.
+- Made TypeScript null-safety analysis type-aware by default and shared the
+  per-run TypeScript Program across checks to reduce repeated compiler work.
+- Added simulation scenario and recipe catalog data to dashboard reports so
+  `sim` contributions appear alongside other first-party tool data.
+- Authored the dashboard report's client JavaScript as type-checked, bundled
+  TypeScript modules (previously inlined template-literal strings invisible to
+  the type checker and linter); behaviour is unchanged.
+- `fit` verbose output now reports check counts — total available, disabled, and
+  running — in its live progress display.
+- Single-sourced the `cli:` config block from its Zod schema and expanded
+  release/lint guardrails, including knip in the standard lint lane.
+- Updated the curl installer output to use `==>` progress lines and a final
+  success message.
+
+### Fixed
+
+- Closed audit findings around HTTPS egress policy, installed npm tool trust,
+  plugin disablement, and datastore schema-stamp safety.
+- Hardened SQLite lifecycle behavior with explicit close handling,
+  `busy_timeout`, WAL checkpointing, and squash-safe migration stamping.
+- Contained language grammar-load failures so one bad `.wasm` file no longer
+  crashes the CLI.
+- Removed always-pass simulation assertion helpers and clarified chaos timing
+  units.
+- Tightened telemetry endpoint warnings and bounded command-duration labels so
+  observability output stays useful without high-cardinality metrics.
+- Batched session listing to remove the N+1 query pattern in session history.
+
 ## [0.1.7] - 2026-06-18
 
 A launch-prep release focused on simplifying the public command surface,

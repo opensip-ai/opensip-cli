@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-11
-release: v0.1.7
+release: v0.1.8
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
@@ -27,7 +27,7 @@ opensip-cli reads two config files:
 | `<project>/opensip-cli.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
-Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.7/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.7/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
+Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
 
 ## Top-level shape
 
@@ -46,7 +46,7 @@ graph: {}                 # graph rule knobs (tool-contributed namespace)
 
 Every section is optional; a missing section becomes `{}`.
 
-The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.7/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
@@ -216,7 +216,7 @@ Validated by the project-config schema and read by the dashboard data path. Unkn
 
 ## `graph`
 
-Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.7/packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
+Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
 
 ### Duplicated-function-body (`graph:duplicated-function-body`)
 
