@@ -30,8 +30,9 @@ import { dirname, resolve } from 'node:path';
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { ConfigurationError, logger } from '@opensip-cli/core';
 
-import { loadGraphConfig, runGraph } from './orchestrate.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
+
+import { loadGraphConfig, runGraph } from './orchestrate.js';
 
 import type { Catalog } from '../types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
