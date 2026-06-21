@@ -1,3 +1,21 @@
+/**
+ * @fileoverview Graph tool's Drizzle table definitions (catalog + shard fragment).
+ *
+ * ⚠️ MIGRATIONS LIVE IN `@opensip-cli/datastore`, NOT HERE. The platform uses one
+ * SQLite database with a single centralized migrations folder; this tool's tables
+ * are migrated alongside everyone else's. `datastore/drizzle.config.ts` imports
+ * THIS file as a schema source. Therefore, after editing the tables below you MUST:
+ *
+ *   1. `pnpm --filter @opensip-cli/datastore db:generate`  (regenerate the migration)
+ *   2. commit the generated `packages/datastore/migrations/*` files
+ *   3. bump `LOGICAL_SCHEMA_VERSION` in `datastore/src/schema-version.ts` in lockstep
+ *      with the new journal entry count (so existing DBs migrate forward).
+ *
+ * `datastore`'s `migration-integrity` + `version-guard` test suites fail loudly if
+ * the journal and schema drift, but they can't tell you to run db:generate — this
+ * note is the signpost. (Owning the schema here but the migration there is a known
+ * inversion; centralizing migrations is the deliberate trade — see ADR-0036.)
+ */
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // ADR-0036: the graph baseline tables (`graph_baseline_signals` /

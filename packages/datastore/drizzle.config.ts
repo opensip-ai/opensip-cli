@@ -1,5 +1,14 @@
 import type { Config } from 'drizzle-kit';
 
+/**
+ * Single, centralized Drizzle migration config for the whole platform: one SQLite
+ * database, one `migrations/` folder. It aggregates BOTH host-owned schema
+ * (`./src/schema/*`) and TOOL-owned schema sources (session-store, graph) into one
+ * migration set. Consequence (a known ownership inversion — ADR-0036): editing any
+ * listed schema, including a tool's, requires regenerating migrations HERE:
+ *   `pnpm --filter @opensip-cli/datastore db:generate` + bump LOGICAL_SCHEMA_VERSION.
+ * Each tool-owned schema file carries the same signpost at its top.
+ */
 export default {
   dialect: 'sqlite',
   schema: [
