@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardCodePathsJs } from '../code-paths.js';
 
 const expectedIds = new Set(['graph', 'coupling', 'distribution']);
@@ -21,25 +22,24 @@ interface Probe {
 }
 
 function loadViews(): Probe['views'] {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
+  // The Code Paths prelude now lives in the typed client bundle (L4) and is
+  // exposed as page globals; `dashboardCodePathsJs()` emits the cytoscape vendor
+  // blob + the three string view emitters (which push into the bundle's `views`)
+  // + the panel orchestrator. The orchestrator declares its own `let graphCatalog`
+  // / `graphIndexes`, so only `sessions` + `EDITOR_PROTOCOL` are declared here
+  // (declaring graphCatalog again would be a duplicate-binding SyntaxError). Reset
+  // `views` so only this load's emitters register.
+  const head = `
+var sessions = [];
 var EDITOR_PROTOCOL = null;
 `;
   const tail = `
 return { views };
 `;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const factory = new Function(elSrc + dashboardCodePathsJs() + tail);
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const factory = new Function(
+    head + DASHBOARD_CLIENT_BUNDLE + 'views.length = 0;\n' + dashboardCodePathsJs() + tail,
+  );
   return (factory() as Probe).views;
 }
 

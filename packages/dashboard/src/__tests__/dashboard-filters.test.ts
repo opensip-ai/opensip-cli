@@ -9,8 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardFiltersJs } from '../code-paths/filters.js';
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 import type { GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -26,21 +25,14 @@ interface FilterState {
 }
 
 function loadFilterEnv(): FilterEnv {
-  // The filters/path-utils emitters expect `el(...)` and `views`/`graph*`
-  // globals at runtime. The `passesFilter` and `packageOfPath` functions
-  // we test here have no such dependency; we inject minimal shims.
-  const stubs = `
-function el(tag, attrs, children) { const e = document.createElement(tag); return e; }
-const views = [];
-let activeViewId = null;
-let graphCatalog = null;
-let graphIndexes = null;
-`;
+  // `passesFilter` / `packageOfPath` now live in the typed client bundle (L4)
+  // and are exposed as page globals; `var sessions = []` satisfies checks.ts's
+  // load-time `computeCheckStats()` read.
   const tail = `
 return { passesFilter, packageOfPath };
 `;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const factory = new Function(stubs + dashboardPathUtilsJs() + dashboardFiltersJs() + tail);
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const factory = new Function('var sessions = [];\n' + DASHBOARD_CLIENT_BUNDLE + tail);
   return factory() as FilterEnv;
 }
 

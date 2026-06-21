@@ -2,20 +2,15 @@
 /**
  * @vitest-environment jsdom
  *
- * Function Card overlay behavior tests. Loads the emitted JS from the
- * indexes + function-card + function-row + path-utils + editor-link +
- * trace + filters + views-registry modules into a jsdom global, then
- * exercises the public API (openFunctionCard, closeFunctionCard).
+ * Function Card overlay behavior tests. Loads the typed client bundle (L4) —
+ * which carries indexes + function-card + path-utils + editor-link + trace —
+ * into the jsdom global scope, then exercises the public API (openFunctionCard,
+ * closeFunctionCard, both exposed as page globals).
  */
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
-import { dashboardFiltersJs } from '../code-paths/filters.js';
-import { dashboardFunctionCardJs } from '../code-paths/function-card.js';
-import { dashboardIndexesJs } from '../code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
-import { dashboardTraceJs } from '../code-paths/trace.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -42,43 +37,27 @@ function makeOcc(
 }
 
 function bootDashboard(catalog: GraphCatalog): void {
-  // The emitted JS expects an `el(tag, attrs, children)` helper to exist
-  // in scope (provided by shared.ts). We provide a minimal compatible
-  // version for the test environment.
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
+  // The bundle (with `el`, `buildIndexes`, `editorLinkUrl`, `traceFromEntry`,
+  // path-utils, function-card) exposes openFunctionCard / closeFunctionCard on
+  // globalThis. It reads `graphCatalog` / `graphIndexes` as free identifiers;
+  // declare them (plus `EDITOR_PROTOCOL`, `sessions`) in the eval scope so the
+  // bundle's IIFE closes over them, then seed graphCatalog / graphIndexes after
+  // the bundle has defined `buildIndexes` and re-expose them on globalThis.
+  const head = `
+var sessions = [];
+var EDITOR_PROTOCOL = null;
+var graphCatalog = null;
+var graphIndexes = null;
 `;
-  const editorProtocolSrc = `var EDITOR_PROTOCOL = null;`;
   const tail = `
-var graphCatalog = ${JSON.stringify(catalog)};
-var graphIndexes = buildIndexes(graphCatalog);
-window.openFunctionCard = openFunctionCard;
-window.closeFunctionCard = closeFunctionCard;
-window.graphIndexes = graphIndexes;
+graphCatalog = ${JSON.stringify(catalog)};
+graphIndexes = buildIndexes(graphCatalog);
+globalThis.openFunctionCard = openFunctionCard;
+globalThis.closeFunctionCard = closeFunctionCard;
+globalThis.graphIndexes = graphIndexes;
 `;
-  const src = [
-    elSrc,
-    editorProtocolSrc,
-    dashboardPathUtilsJs(),
-    dashboardIndexesJs(),
-    dashboardFiltersJs(),
-    dashboardEditorLinkJs(),
-    dashboardTraceJs(),
-    dashboardFunctionCardJs(),
-    tail,
-  ].join('\n');
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own emitter.
-  new Function(src).call(globalThis);
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  new Function(head + DASHBOARD_CLIENT_BUNDLE + tail).call(globalThis);
 }
 
 interface DashboardWindow extends Window {

@@ -1,3 +1,4 @@
+// @fitness-ignore-file module-coupling-fan-out -- Bundle aggregator: imports every migrated client module to compose the single inlined <script> and to re-expose the bridge globals; fan-out is intrinsic to its role as the esbuild entry point.
 /**
  * Dashboard client-bundle entry (L4 migration).
  *
@@ -19,19 +20,31 @@
  * need no global — only the bridge surface below is exposed.
  */
 
+import { renderCatalogProvenance } from './catalog-provenance.js';
+import { renderGraphRecipeCatalog, renderGraphRuleCatalog } from './catalog-recipes-tables.js';
 import { renderChecksCatalog } from './checks.js';
 import { el } from './el.js';
+import { filterState, KIND_LIST, packagesInCatalog, passesFilter } from './filters.js';
+import { closeFunctionCard, openFunctionCard } from './function-card.js';
+import { makeSectionHeading, renderFunctionRows } from './function-row.js';
+import { openHelpDrawer } from './help-drawer.js';
+import { buildIndexes, resolveCalleeOcc } from './indexes.js';
 import { renderOverview } from './overview.js';
 import { paginateTable } from './pagination.js';
+import { displayName, packageOfPath, pkgOf, shortPkg } from './path-utils.js';
 import { renderRecipesPanel } from './recipes.js';
+import { fuzzyMatch } from './search.js';
 import { renderSessionTable } from './sessions.js';
 import { makeSortable } from './sortable.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { activateTabForSession, registerTabActivator } from './tab-activators.js';
 import { renderFitnessTab, renderSimulationTab } from './tool-tabs.js';
+import { activateView, views } from './views-registry.js';
 // Side-effect-only module: tab-bar wires the #tab-bar click handler at load.
 // (sortable also schedules its setTimeout(0) `.data-table.sortable` activation
-// pass as a load-time side effect, imported above for `makeSortable`.)
+// pass as a load-time side effect, imported above for `makeSortable`. help-drawer
+// attaches its document-level Escape keydown handler at load, imported above for
+// `openHelpDrawer`.)
 import './tab-bar.js';
 
 // Expose the migrated helpers as page globals so the still-string-emitted client
@@ -53,6 +66,30 @@ interface ClientGlobals {
   renderOverview: typeof renderOverview;
   renderFitnessTab: typeof renderFitnessTab;
   renderSimulationTab: typeof renderSimulationTab;
+  // Code Paths prelude (L4): consumed by the still-string-emitted view modules
+  // (view-coupling / view-distribution / view-graph + their graph-* helpers and
+  // view-template) and the panel orchestrator (code-paths.ts).
+  packageOfPath: typeof packageOfPath;
+  shortPkg: typeof shortPkg;
+  pkgOf: typeof pkgOf;
+  displayName: typeof displayName;
+  buildIndexes: typeof buildIndexes;
+  resolveCalleeOcc: typeof resolveCalleeOcc;
+  filterState: typeof filterState;
+  KIND_LIST: typeof KIND_LIST;
+  packagesInCatalog: typeof packagesInCatalog;
+  passesFilter: typeof passesFilter;
+  fuzzyMatch: typeof fuzzyMatch;
+  makeSectionHeading: typeof makeSectionHeading;
+  renderFunctionRows: typeof renderFunctionRows;
+  openFunctionCard: typeof openFunctionCard;
+  closeFunctionCard: typeof closeFunctionCard;
+  views: typeof views;
+  activateView: typeof activateView;
+  openHelpDrawer: typeof openHelpDrawer;
+  renderCatalogProvenance: typeof renderCatalogProvenance;
+  renderGraphRuleCatalog: typeof renderGraphRuleCatalog;
+  renderGraphRecipeCatalog: typeof renderGraphRecipeCatalog;
 }
 const g = globalThis as typeof globalThis & ClientGlobals;
 g.el = el;
@@ -67,3 +104,25 @@ g.renderRecipesPanel = renderRecipesPanel;
 g.renderOverview = renderOverview;
 g.renderFitnessTab = renderFitnessTab;
 g.renderSimulationTab = renderSimulationTab;
+// Code Paths prelude bridge globals (L4).
+g.packageOfPath = packageOfPath;
+g.shortPkg = shortPkg;
+g.pkgOf = pkgOf;
+g.displayName = displayName;
+g.buildIndexes = buildIndexes;
+g.resolveCalleeOcc = resolveCalleeOcc;
+g.filterState = filterState;
+g.KIND_LIST = KIND_LIST;
+g.packagesInCatalog = packagesInCatalog;
+g.passesFilter = passesFilter;
+g.fuzzyMatch = fuzzyMatch;
+g.makeSectionHeading = makeSectionHeading;
+g.renderFunctionRows = renderFunctionRows;
+g.openFunctionCard = openFunctionCard;
+g.closeFunctionCard = closeFunctionCard;
+g.views = views;
+g.activateView = activateView;
+g.openHelpDrawer = openHelpDrawer;
+g.renderCatalogProvenance = renderCatalogProvenance;
+g.renderGraphRuleCatalog = renderGraphRuleCatalog;
+g.renderGraphRecipeCatalog = renderGraphRecipeCatalog;

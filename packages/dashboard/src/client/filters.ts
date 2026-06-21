@@ -12,36 +12,48 @@
  *   - `passesFilter(occ, filterState)` — the per-row predicate the Functions
  *     view (and the Coupling drilldown) applies.
  *   - `packagesInCatalog(catalog)` / `KIND_LIST` — the package list and kind
- *     vocabulary the Visualization controls (`graph-controls.ts`) drive their
- *     Package and Kind selectors from.
+ *     vocabulary the Visualization controls drive their Package and Kind
+ *     selectors from.
+ *
+ * Migrated out of the legacy String.raw emitter (L4): real, type-checked
+ * TypeScript (DOM lib) bundled into the inlined client `<script>`.
  */
 
-export function dashboardFiltersJs(): string {
-  return String.raw`
-const filterState = {
-  packages: new Set(),
-  kinds: new Set(),
+import { pkgOf } from './path-utils.js';
+
+import type { CatalogLike, FilterStateLike, OccLike } from './code-paths-types.js';
+
+export const filterState: FilterStateLike = {
+  packages: new Set<string>(),
+  kinds: new Set<string>(),
   includeTests: false,
 };
 
-const KIND_LIST = ['function-declaration', 'function-expression', 'method', 'arrow', 'constructor', 'getter', 'setter', 'module-init'];
+export const KIND_LIST: readonly string[] = [
+  'function-declaration',
+  'function-expression',
+  'method',
+  'arrow',
+  'constructor',
+  'getter',
+  'setter',
+  'module-init',
+];
 
-function packagesInCatalog(catalog) {
-  const pkgs = new Set();
-  if (!catalog || !catalog.functions) return [];
+export function packagesInCatalog(catalog: CatalogLike | null): string[] {
+  const pkgs = new Set<string>();
+  if (!catalog?.functions) return [];
   for (const name of Object.keys(catalog.functions)) {
-    for (const occ of (catalog.functions[name] || [])) {
+    for (const occ of catalog.functions[name] || []) {
       pkgs.add(pkgOf(occ));
     }
   }
-  return Array.from(pkgs).sort();
+  return [...pkgs].sort();
 }
 
-function passesFilter(occ, fs) {
+export function passesFilter(occ: OccLike, fs: FilterStateLike): boolean {
   if (!fs.includeTests && occ.inTestFile) return false;
   if (fs.packages.size > 0 && !fs.packages.has(pkgOf(occ))) return false;
-  if (fs.kinds.size > 0 && !fs.kinds.has(occ.kind)) return false;
+  if (fs.kinds.size > 0 && !fs.kinds.has(occ.kind ?? '')) return false;
   return true;
-}
-`;
 }

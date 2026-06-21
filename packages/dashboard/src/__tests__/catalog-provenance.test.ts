@@ -11,10 +11,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardCatalogProvenanceJs } from '../code-paths/catalog-provenance.js';
-import { dashboardFiltersJs } from '../code-paths/filters.js';
-import { dashboardIndexesJs } from '../code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -23,29 +20,12 @@ interface Env {
 }
 
 function loadEnv(): Env {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
-`;
+  // `renderCatalogProvenance` (with `el`, `packagesInCatalog`) now lives in the
+  // typed client bundle (L4) and is exposed as a page global; `var sessions = []`
+  // satisfies checks.ts's load-time `computeCheckStats()` read.
   const tail = `return { renderCatalogProvenance };`;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source (our own emitted JS).
-  const factory = new Function(
-    elSrc +
-      dashboardPathUtilsJs() +
-      dashboardIndexesJs() +
-      dashboardFiltersJs() +
-      dashboardCatalogProvenanceJs() +
-      tail,
-  );
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const factory = new Function('var sessions = [];\n' + DASHBOARD_CLIENT_BUNDLE + tail);
   return factory() as Env;
 }
 

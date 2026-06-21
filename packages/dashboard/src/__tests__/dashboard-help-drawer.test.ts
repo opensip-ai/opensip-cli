@@ -9,12 +9,10 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardHelpDrawerJs } from '../code-paths/help-drawer.js';
-import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 interface Env {
   openHelpDrawer: (id: string) => void;
-  closeHelpDrawer: () => void;
   views: {
     id: string;
     label: string;
@@ -23,26 +21,21 @@ interface Env {
 }
 
 function loadEnv(): Env {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
+  // The views registry + help drawer (with `el`) now live in the typed client
+  // bundle (L4) and are exposed as page globals; the bundle's help-drawer also
+  // attaches its load-time Escape keydown handler. `var sessions = []` satisfies
+  // checks.ts's load-time `computeCheckStats()` read.
+  const shim = `
 // jsdom does not implement requestAnimationFrame in all configurations;
 // inline a synchronous shim so the drawer's open class is applied
 // deterministically inside the test.
 if (typeof requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb) => { cb(0); return 0; };
 }
+var sessions = [];
 `;
   const seed = `
+views.length = 0;
 views.push({
   id: 'hot',
   label: 'Hot functions',
@@ -56,10 +49,10 @@ views.push({
   render() {},
 });
 views.push({ id: 'no-help', label: 'No help', render() {} });
-return { openHelpDrawer, closeHelpDrawer, views };
+return { openHelpDrawer, views };
 `;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const factory = new Function(elSrc + dashboardViewsRegistryJs() + dashboardHelpDrawerJs() + seed);
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const factory = new Function(shim + DASHBOARD_CLIENT_BUNDLE + seed);
   return factory() as Env;
 }
 

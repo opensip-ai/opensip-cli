@@ -1,18 +1,28 @@
+/// <reference lib="dom" />
 /**
+ * @vitest-environment jsdom
+ *
  * Path-utils — `packageOfPath(filePath)` and `displayName(simpleName)`
  * smoke tests (§11.2).
+ *
+ * `packageOfPath` / `displayName` now live in the typed client bundle (L4) and
+ * are exposed as page globals; the test loads the bundle and reads them off the
+ * eval scope. `var sessions = []` satisfies checks.ts's load-time
+ * `computeCheckStats()` read.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 function loadHelpers(): {
   packageOfPath: (p: string) => string;
   displayName: (s: string) => string;
 } {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  return new Function(dashboardPathUtilsJs() + '\nreturn { packageOfPath, displayName };')() as {
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  return new Function(
+    'var sessions = [];\n' + DASHBOARD_CLIENT_BUNDLE + '\nreturn { packageOfPath, displayName };',
+  )() as {
     packageOfPath: (p: string) => string;
     displayName: (s: string) => string;
   };

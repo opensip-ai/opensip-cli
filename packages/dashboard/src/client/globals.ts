@@ -23,6 +23,8 @@
  * here — these globals are only the generator-injected data.
  */
 
+import type { CatalogLike, IndexesLike } from './code-paths-types.js';
+
 declare global {
   /** A persisted run row, as inlined by `generator.ts` (read structurally). */
   interface DashboardSession {
@@ -65,6 +67,30 @@ declare global {
    */
   const toolBadgeStyles: Readonly<Record<string, string>>;
   const tabMap: Readonly<Record<string, string>>;
+
+  // ---- Code Paths panel globals (declared by the still-string-emitted panel
+  //      orchestrator + editor-protocol literal in generator.ts) ----
+
+  /**
+   * Editor deep-link scheme ('vscode' | 'cursor' | other | null), emitted by
+   * generator.ts as a `const EDITOR_PROTOCOL = …;` literal. Read by editor-link.
+   */
+  const EDITOR_PROTOCOL: string | null;
+
+  /**
+   * The loaded graph catalog (the latest `graph` build), assigned by the panel
+   * orchestrator (`code-paths.ts`, still string-emitted) at panel-init. `null`
+   * until the inline `<script id="graph-catalog">` blob is parsed. The bundle
+   * only READS it (function-card / views-registry); the orchestrator owns
+   * the mutable binding.
+   */
+  const graphCatalog: CatalogLike | null;
+
+  /**
+   * The adjacency/index maps rebuilt from `graphCatalog`, assigned by the panel
+   * orchestrator at Explore-render time. The bundle only reads it.
+   */
+  const graphIndexes: IndexesLike;
 }
 
 export {};

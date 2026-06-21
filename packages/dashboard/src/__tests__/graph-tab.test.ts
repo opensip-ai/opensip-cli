@@ -58,8 +58,10 @@ describe('dashboard graph-tab — rule/recipe catalog wiring', () => {
   it('renders the Catalog rule cell without a monospace/font-mono override (item 13)', () => {
     // The Rule slug cell used to force font-family: var(--font-mono,monospace).
     // It must now inherit the shared .data-table td styling instead. Guard the
-    // emitted renderGraphRuleCatalog source against the regression.
-    const ruleCellMarker = "el('td', { text: rule.slug,";
+    // renderGraphRuleCatalog source against the regression. `renderGraphRuleCatalog`
+    // now lives in the typed client bundle (L4) — esbuild emits double-quoted
+    // strings, so the marker is the bundled (double-quote) form.
+    const ruleCellMarker = 'el("td", { text: rule.slug,';
     const idx = html.indexOf(ruleCellMarker);
     expect(idx).toBeGreaterThan(-1);
     const cellDecl = html.slice(idx, idx + 120);

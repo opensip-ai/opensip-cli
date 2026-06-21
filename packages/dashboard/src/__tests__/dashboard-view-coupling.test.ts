@@ -7,15 +7,8 @@
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
-import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
-import { dashboardFiltersJs } from '../code-paths/filters.js';
-import { dashboardFunctionCardJs } from '../code-paths/function-card.js';
-import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
-import { dashboardIndexesJs } from '../code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
-import { dashboardTraceJs } from '../code-paths/trace.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardViewCouplingJs } from '../code-paths/view-coupling.js';
-import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -30,38 +23,32 @@ interface Env {
 }
 
 function loadEnv(catalog: GraphCatalog): Env {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
+  // The Code Paths prelude (el, path-utils, indexes, filters, function-row,
+  // editor-link, trace, function-card, views-registry) now lives in the typed
+  // client bundle (L4) and is exposed as page globals; the still-string-emitted
+  // coupling view runs `views.push(...)` against the bundle's `views` global.
+  // Declare the page globals the bundle reads (sessions, EDITOR_PROTOCOL,
+  // graphCatalog, graphIndexes); seed graphCatalog/graphIndexes after the bundle
+  // has defined `buildIndexes`.
+  const head = `
+var sessions = [];
 var EDITOR_PROTOCOL = null;
+var graphCatalog = null;
+var graphIndexes = null;
 `;
+  // The bundle's `views` is a persistent page global; each load re-pushes the
+  // coupling view, so reset it before this load's emitter runs so `views.find`
+  // resolves to THIS load's render closure (which closes over this scope's
+  // graphCatalog), not an earlier load's.
+  const resetViews = `views.length = 0;\n`;
   const tail = `
-var graphCatalog = ${JSON.stringify(catalog)};
-var graphIndexes = buildIndexes(graphCatalog);
+graphCatalog = ${JSON.stringify(catalog)};
+graphIndexes = buildIndexes(graphCatalog);
 return { views, graphCatalog, graphIndexes, filterState };
 `;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
   const factory = new Function(
-    elSrc +
-      dashboardPathUtilsJs() +
-      dashboardIndexesJs() +
-      dashboardViewsRegistryJs() +
-      dashboardFiltersJs() +
-      dashboardFunctionRowJs() +
-      dashboardEditorLinkJs() +
-      dashboardTraceJs() +
-      dashboardFunctionCardJs() +
-      dashboardViewCouplingJs() +
-      tail,
+    head + DASHBOARD_CLIENT_BUNDLE + resetViews + dashboardViewCouplingJs() + tail,
   );
   return factory() as Env;
 }

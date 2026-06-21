@@ -22,22 +22,10 @@
  * from the graph engine's runtime types).
  */
 
-import { dashboardCatalogProvenanceJs } from './code-paths/catalog-provenance.js';
-import { dashboardCatalogRecipesTablesJs } from './code-paths/catalog-recipes-tables.js';
 import { dashboardCytoscapeVendorJs } from './code-paths/cytoscape-vendor.js';
-import { dashboardEditorLinkJs } from './code-paths/editor-link.js';
-import { dashboardFiltersJs } from './code-paths/filters.js';
-import { dashboardFunctionCardJs } from './code-paths/function-card.js';
-import { dashboardFunctionRowJs } from './code-paths/function-row.js';
-import { dashboardHelpDrawerJs } from './code-paths/help-drawer.js';
-import { dashboardIndexesJs } from './code-paths/indexes.js';
-import { dashboardPathUtilsJs } from './code-paths/path-utils.js';
-import { dashboardSearchJs } from './code-paths/search.js';
-import { dashboardTraceJs } from './code-paths/trace.js';
 import { dashboardViewCouplingJs } from './code-paths/view-coupling.js';
 import { dashboardViewDistributionJs } from './code-paths/view-distribution.js';
 import { dashboardViewGraphJs } from './code-paths/view-graph.js';
-import { dashboardViewsRegistryJs } from './code-paths/views-registry.js';
 
 /**
  * Build flag for the Code Paths explore-tab restructure.
@@ -63,75 +51,49 @@ const RESTRUCTURED_EXPLORE_TABS = true;
  * Concatenation order is load-bearing — each emitter declares
  * top-level names that later emitters reference. The order below is
  * the topological sort; reordering will silently break the page with
- * `<name> is not defined`. Free-identifier dependencies of each
- * emitter, listed against the emitter that supplies them:
+ * `<name> is not defined`.
  *
- *  1. path-utils       — declares `displayName`, `packageOfPath`, `pkgOf`,
- *                        `shortPkg`.
- *  2. indexes          — declares `buildIndexes`, `resolveCalleeOcc`. Uses
- *                        `pkgOf` (path-utils, above).
- *  3. filters          — declares `filterState` (default, non-interactive),
- *                        `passesFilter`, `packagesInCatalog`, `KIND_LIST`.
- *                        Uses `pkgOf` (path-utils, above).
- *  4. editor-link      — declares `editorLink`. Reads `EDITOR_PROTOCOL`
- *                        (declared in generator.ts before the script
- *                        block).
- *  5. trace            — declares `findUpstreamTrace`. Uses `indexes`.
- *  6. search           — declares `searchFunctions`. Uses `indexes`,
- *                        `displayName`.
- *  7. function-row     — declares `renderFunctionRows` and the empty
- *                        states it uses. Calls `el`, `displayName`,
- *                        `packageOfPath`, `passesFilter`.
- *  8. function-card    — declares `openFunctionCard`, `closeFunctionCard`.
- *                        Uses `editorLink`, `findUpstreamTrace`, `el`.
- *  9. views-registry   — declares the singleton `views = []` array.
- *                        Must come before any view emitter.
- * 10. help-drawer      — declares `openHelpDrawer`. No external deps
- *                        beyond `el`.
- * 11-13. view-*        — push View descriptors into `views` in TAB order:
- *                        coupling / distribution / graph (alphabetical:
- *                        Coupling, Functions, Visualization — the first is the
- *                        default view). Each renderer closes over `el`,
- *                        `passesFilter`, `displayName`, `packageOfPath`,
- *                        `renderFunctionRows`, plus its own utilities; the
- *                        Visualization renderer also uses `resolveCalleeOcc`
- *                        (prelude) for its function-level projection.
- * 15. panelOrchestrator — top-level `renderCodePathsTab`,
+ * The shared prelude — `path-utils`, `indexes`, `filters`, `catalog-provenance`,
+ * `catalog-recipes-tables`, `editor-link`, `trace`, `search`, `function-row`,
+ * `function-card`, `views-registry`, `help-drawer` — has been migrated to the
+ * typed client bundle (`src/client/*.ts`, L4). generator.ts inlines that bundle
+ * BEFORE this string, exposing each as a page global (`pkgOf`, `buildIndexes`,
+ * `views`, `openFunctionCard`, `renderFunctionRows`, …), so the still-string
+ * view emitters and the panel orchestrator below resolve them as free
+ * identifiers exactly as before. Free-identifier dependencies of each remaining
+ * emitter, listed against the source that supplies them:
+ *
+ *  0. cytoscape vendor — defines the `cytoscape` / `cytoscapeDagre` browser
+ *                        globals the Graph view consumes. Still a vendor blob
+ *                        (a 493KB third-party UMD), NOT our client JS. MUST
+ *                        precede any view emitter that references them.
+ *  1-3. view-*         — push View descriptors into the bundle's `views` array
+ *                        in TAB order: coupling / distribution / graph
+ *                        (alphabetical: Coupling, Functions, Visualization — the
+ *                        first is the default view). Each renderer closes over
+ *                        the bundle prelude globals (`el`, `passesFilter`,
+ *                        `displayName`, `packageOfPath`, `renderFunctionRows`,
+ *                        `makeSectionHeading`, `openHelpDrawer`, `openFunctionCard`,
+ *                        plus `resolveCalleeOcc` for the function-level projection).
+ *  4. panelOrchestrator — top-level `renderCodePathsTab`,
  *                        `renderCodePathsExplore`, `openCodePathsSession`.
- *                        Uses every name above plus `renderSubtabBar`
- *                        (from shared/) and `registerTabActivator`.
- *
- * If the list grows past ~30 entries, replace this manual order with
- * a `{ id, deps, emit }` topological sort.
+ *                        Uses the bundle prelude globals plus `renderSubtabBar`,
+ *                        `renderSessionTable`, `registerTabActivator` (also
+ *                        bundle globals) and `renderCatalogProvenance` /
+ *                        `renderGraphRuleCatalog` / `renderGraphRecipeCatalog`.
  */
 export function dashboardCodePathsJs(_restructured: boolean = RESTRUCTURED_EXPLORE_TABS): string {
   // The explore-tab restructure has shipped: there is one view set (coupling /
   // distribution / graph). The `_restructured` parameter is kept
   // for the test seam's call-shape compatibility but no longer selects a
   // legacy branch (the single-metric view emitters were deleted in Plan D).
-  // Shared prelude — utilities + the views registry + help drawer. Every view
-  // emitter depends on these top-level names.
+  // The shared prelude now lives in the typed client bundle (L4); only the
+  // cytoscape vendor blob remains string-emitted ahead of the views.
   const prelude = [
     // 0. cytoscape vendor — defines the `cytoscape` / `cytoscapeDagre`
     //    browser globals the Graph view consumes. MUST precede any view
     //    emitter that references them. No deps of its own.
     dashboardCytoscapeVendorJs(),
-    dashboardPathUtilsJs(),
-    dashboardIndexesJs(),
-    dashboardFiltersJs(),
-    // Depends on `packagesInCatalog` (filters, above) + `el`; declares
-    // `renderCatalogProvenance`, called at the top of the Explore body.
-    dashboardCatalogProvenanceJs(),
-    // Declares `renderGraphRuleCatalog` / `renderGraphRecipeCatalog` (the
-    // Catalog/Recipes subtab tables); only needs `el`.
-    dashboardCatalogRecipesTablesJs(),
-    dashboardEditorLinkJs(),
-    dashboardTraceJs(),
-    dashboardSearchJs(),
-    dashboardFunctionRowJs(),
-    dashboardFunctionCardJs(),
-    dashboardViewsRegistryJs(),
-    dashboardHelpDrawerJs(),
   ];
 
   // The kept visualizations + the ranked-distribution affordance, in TAB

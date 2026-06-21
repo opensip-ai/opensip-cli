@@ -11,7 +11,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 type RenderFn = (
   container: HTMLElement,
@@ -20,22 +20,12 @@ type RenderFn = (
 ) => void;
 
 function loadRenderFn(): RenderFn {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
-`;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
+  // `renderFunctionRows` (with `el`, the paginators and `makeSortable`) now all
+  // live in the typed client bundle (L4) and are exposed as page globals;
+  // `var sessions = []` satisfies checks.ts's load-time `computeCheckStats()` read.
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
   return new Function(
-    elSrc + dashboardFunctionRowJs() + '\nreturn renderFunctionRows;',
+    'var sessions = [];\n' + DASHBOARD_CLIENT_BUNDLE + '\nreturn renderFunctionRows;',
   )() as RenderFn;
 }
 

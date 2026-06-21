@@ -1,10 +1,16 @@
+/// <reference lib="dom" />
 /**
+ * @vitest-environment jsdom
+ *
  * Fuzzy search algorithm — substring-with-character-skip with scoring.
+ *
+ * `fuzzyMatch` now lives in the typed client bundle (L4) and is exposed as a
+ * page global; the test loads the bundle and reads it off the eval scope.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardSearchJs } from '../code-paths/search.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 interface Match {
   name: string;
@@ -12,11 +18,10 @@ interface Match {
 }
 
 function loadFuzzyMatch(): (q: string, names: string[]) => Match[] {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  const fn = new Function(dashboardSearchJs() + '\nreturn fuzzyMatch;')() as (
-    q: string,
-    n: string[],
-  ) => Match[];
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const fn = new Function(
+    'var sessions = [];\n' + DASHBOARD_CLIENT_BUNDLE + '\nreturn fuzzyMatch;',
+  )() as (q: string, n: string[]) => Match[];
   return fn;
 }
 

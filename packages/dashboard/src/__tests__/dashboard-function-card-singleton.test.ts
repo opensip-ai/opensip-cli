@@ -9,11 +9,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { dashboardEditorLinkJs } from '../code-paths/editor-link.js';
-import { dashboardFunctionCardJs } from '../code-paths/function-card.js';
-import { dashboardIndexesJs } from '../code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
-import { dashboardTraceJs } from '../code-paths/trace.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -44,35 +40,25 @@ function makeOcc(
 }
 
 function loadEnv(catalog: GraphCatalog): Env {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
+  // `openFunctionCard` (with `el`, `buildIndexes`, `editorLinkUrl`, `traceFromEntry`,
+  // path-utils) now lives in the typed client bundle (L4) and is exposed as a page
+  // global; it reads the `graphCatalog` / `graphIndexes` page globals as free
+  // identifiers. Declare those (plus `EDITOR_PROTOCOL` and `sessions`) in the eval
+  // scope so the bundle's IIFE closes over them; the tail seeds graphCatalog /
+  // graphIndexes after the bundle has defined `buildIndexes`.
+  const head = `
+var sessions = [];
 var EDITOR_PROTOCOL = null;
+var graphCatalog = null;
+var graphIndexes = null;
 `;
   const tail = `
-var graphCatalog = ${JSON.stringify(catalog)};
-var graphIndexes = buildIndexes(graphCatalog);
+graphCatalog = ${JSON.stringify(catalog)};
+graphIndexes = buildIndexes(graphCatalog);
 return { open: openFunctionCard };
 `;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
-  return new Function(
-    elSrc +
-      dashboardPathUtilsJs() +
-      dashboardIndexesJs() +
-      dashboardEditorLinkJs() +
-      dashboardTraceJs() +
-      dashboardFunctionCardJs() +
-      tail,
-  )() as Env;
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  return new Function(head + DASHBOARD_CLIENT_BUNDLE + tail)() as Env;
 }
 
 beforeEach(() => {

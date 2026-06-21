@@ -13,15 +13,9 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
-import { dashboardFiltersJs } from '../code-paths/filters.js';
-import { dashboardFunctionRowJs } from '../code-paths/function-row.js';
-import { dashboardHelpDrawerJs } from '../code-paths/help-drawer.js';
-import { dashboardIndexesJs } from '../code-paths/indexes.js';
-import { dashboardPathUtilsJs } from '../code-paths/path-utils.js';
-import { dashboardSearchJs } from '../code-paths/search.js';
 import { dashboardViewGraphJs } from '../code-paths/view-graph.js';
-import { dashboardViewsRegistryJs } from '../code-paths/views-registry.js';
 
 interface GraphView {
   id: string;
@@ -35,38 +29,24 @@ interface Env {
 }
 
 function loadEnv(withVendor: boolean): Env {
-  const elSrc = `
-function el(tag, attrs, children) {
-  const e = document.createElement(tag);
-  if (attrs) Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'text') e.textContent = v;
-    else if (k === 'class') e.className = v;
-    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
-    else e.setAttribute(k, v);
-  });
-  if (children) children.forEach(c => { if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else if (c) e.appendChild(c); });
-  return e;
-}
+  // The Code Paths prelude (path-utils, indexes, filters, search, function-row's
+  // makeSectionHeading, help-drawer's openHelpDrawer, views-registry) now lives in
+  // the typed client bundle (L4) and is exposed as page globals; the
+  // still-string-emitted Visualization view runs `views.push(...)` against the
+  // bundle's `views` global. The cytoscape vendor blob is NOT in the bundle (it
+  // stays string-emitted ahead of the view in code-paths.ts), so it is prepended
+  // separately when requested. Declare the page globals the bundle reads; reset
+  // `views` so this load's render closure wins.
+  const head = `
+var sessions = [];
+var EDITOR_PROTOCOL = null;
 var graphCatalog = null;
 var graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 `;
-  const tail = `
-return { views };
-`;
-  const parts = [elSrc];
+  const parts = [head, DASHBOARD_CLIENT_BUNDLE, 'views.length = 0;'];
   if (withVendor) parts.push(dashboardCytoscapeVendorJs());
-  parts.push(
-    dashboardPathUtilsJs(),
-    dashboardIndexesJs(),
-    dashboardViewsRegistryJs(),
-    dashboardFiltersJs(),
-    dashboardSearchJs(),
-    dashboardFunctionRowJs(), // declares makeSectionHeading (the ⓘ heading helper)
-    dashboardHelpDrawerJs(), // declares openHelpDrawer (so the ⓘ button renders)
-    dashboardViewGraphJs(),
-    tail,
-  );
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source.
+  parts.push(dashboardViewGraphJs(), 'return { views };');
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
   const factory = new Function(parts.join('\n'));
   return factory() as Env;
 }

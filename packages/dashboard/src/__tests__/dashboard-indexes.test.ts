@@ -1,14 +1,17 @@
+/// <reference lib="dom" />
 /**
- * Unit tests for the v0.3 browser-side `buildIndexes` JS emitter.
+ * @vitest-environment jsdom
  *
- * The emitter produces a JS string that defines `function buildIndexes`.
- * We evaluate it in a fresh function scope, then exercise the resulting
- * function against synthetic catalogs.
+ * Unit tests for the browser-side `buildIndexes` builder.
+ *
+ * `buildIndexes` now lives in the typed client bundle (L4) and is exposed as a
+ * page global; the test loads the bundle and reads it off the eval scope, then
+ * exercises the function against synthetic catalogs.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { dashboardIndexesJs } from '../code-paths/indexes.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -20,8 +23,10 @@ type BuildIndexesFn = (catalog: GraphCatalog | null) => {
 };
 
 function loadBuildIndexes(): BuildIndexesFn {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Sandbox-evaluating the emitted JS string is the test contract; trusted source.
-  const factory = new Function(dashboardIndexesJs() + '\nreturn buildIndexes;');
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const factory = new Function(
+    'var sessions = [];\n' + DASHBOARD_CLIENT_BUNDLE + '\nreturn buildIndexes;',
+  );
   return factory() as BuildIndexesFn;
 }
 
