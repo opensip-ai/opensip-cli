@@ -3,7 +3,7 @@ import { initParseCache, clearParseCache } from '@opensip-cli/core/languages/par
 import { nameOf, walkNodes } from '@opensip-cli/tree-sitter';
 import { describe, expect, it } from 'vitest';
 
-import { findEnclosingFunction, getEnclosingFunctionName, isMethod } from '../enclosing.js';
+import { findEnclosingFunction, getEnclosingFunctionName } from '../enclosing.js';
 import { parseRust } from '../parse.js';
 import {
   isComment,
@@ -11,6 +11,7 @@ import {
   isFunction,
   isImpl,
   isLoop,
+  isMethod,
   isString,
   isStruct,
 } from '../predicates.js';

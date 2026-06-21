@@ -38,6 +38,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-cli/core": "workspace:*",
     "web-tree-sitter": "0.26.9"
   },
   "devDependencies": {

@@ -3,12 +3,13 @@
  * Composed enclosing-scope helpers for Python (ADR-0010) — the per-language
  * layer over the generic `findEnclosing`/`nameOf` from
  * `@opensip-cli/tree-sitter`. Mirrors `lang-typescript`'s
- * `findEnclosingFunction` / `getEnclosingFunctionName`.
+ * `findEnclosingFunction` / `getEnclosingFunctionName`. `isMethod` lives in
+ * predicates.ts (normalized in M10), alongside the other node-kind predicates.
  */
 
 import { findEnclosing, nameOf, type Node } from '@opensip-cli/tree-sitter';
 
-import { isClass, isFunction } from './predicates.js';
+import { isFunction } from './predicates.js';
 
 /** The nearest enclosing `def` of `node`, or `null` at module scope. */
 export function findEnclosingFunction(node: Node): Node | null {
@@ -19,15 +20,4 @@ export function findEnclosingFunction(node: Node): Node | null {
 export function getEnclosingFunctionName(node: Node): string | null {
   const fn = findEnclosingFunction(node);
   return fn ? nameOf(fn) : null;
-}
-
-/**
- * True when `node` is a method — a `function_definition` whose *nearest*
- * enclosing function-or-class is a class. A function nested inside another
- * function is therefore not a method (its nearest enclosing scope is a `def`).
- */
-export function isMethod(node: Node): boolean {
-  if (!isFunction(node)) return false;
-  const enclosing = findEnclosing(node, (n) => isFunction(n) || isClass(n));
-  return enclosing !== null && isClass(enclosing);
 }

@@ -2,8 +2,10 @@ export { pythonAdapter, adapters } from './adapter.js';
 export { parsePython, type PythonTree } from './parse.js';
 export { getSharedTree } from './shared-tree.js';
 export { stripStrings, stripComments } from './strip.js';
+export { pythonQuery } from './query.js';
 export {
   isFunction,
+  isMethod,
   isClass,
   isComment,
   isString,
@@ -11,7 +13,7 @@ export {
   isConditional,
   isLoop,
 } from './predicates.js';
-export { findEnclosingFunction, getEnclosingFunctionName, isMethod } from './enclosing.js';
+export { findEnclosingFunction, getEnclosingFunctionName } from './enclosing.js';
 
 // Generic tree-sitter traversal/position vocabulary, re-exported so check
 // packs reach the parser substrate THROUGH the language adapter (ADR-0039):

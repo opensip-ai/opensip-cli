@@ -6,7 +6,7 @@
  * Node types are from the tree-sitter-python grammar.
  */
 
-import type { Node } from '@opensip-cli/tree-sitter';
+import { findEnclosing, type Node } from '@opensip-cli/tree-sitter';
 
 /** A `def` — both top-level functions and methods are `function_definition`. */
 export const isFunction = (node: Node): boolean => node.type === 'function_definition';
@@ -29,3 +29,16 @@ export const isConditional = (node: Node): boolean => node.type === 'if_statemen
 /** A `for` or `while` loop. */
 export const isLoop = (node: Node): boolean =>
   node.type === 'for_statement' || node.type === 'while_statement';
+
+/**
+ * True when `node` is a method — a `function_definition` whose *nearest*
+ * enclosing function-or-class is a class. A function nested inside another
+ * function is therefore not a method (its nearest enclosing scope is a `def`).
+ * Normalized into predicates.ts (M10): `isMethod` lives in predicates.ts in
+ * every tree-sitter adapter.
+ */
+export const isMethod = (node: Node): boolean => {
+  if (!isFunction(node)) return false;
+  const enclosing = findEnclosing(node, (n) => isFunction(n) || isClass(n));
+  return enclosing !== null && isClass(enclosing);
+};
