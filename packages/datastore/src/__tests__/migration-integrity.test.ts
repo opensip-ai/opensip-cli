@@ -14,9 +14,10 @@ import { DataStoreFactory, requireDrizzleDataStore } from '../index.js';
  * ONLY the migrations registered in `meta/_journal.json`; a `.sql` file that is
  * not in the journal is silently ignored. That gap let three hand-authored
  * migrations (0009/0010/0011) ship without journal entries — so the columns
- * they add (`stable_id`, `timestamp_iso`, `payload_version`) never reached any
- * database, and every datastore read failed with `no such column`. These tests
- * make that class of drift fail loudly in CI instead of at a user's terminal.
+ * they add (`timestamp_iso`, `payload_version`; `stable_id` has since been
+ * removed as dead) never reached any database, and every datastore read failed
+ * with `no such column`. These tests make that class of drift fail loudly in CI
+ * instead of at a user's terminal.
  */
 
 const MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));
@@ -95,9 +96,11 @@ describe('fresh database fully realizes the ORM schema', () => {
 
       expect(cols('sessions').has('timestamp_iso')).toBe(true); // 0010
       expect(cols('session_tool_payload').has('payload_version')).toBe(true); // 0010
-      expect(cols('tool_state').has('stable_id')).toBe(true); // 0009
-      expect(cols('tool_baseline_entries').has('stable_id')).toBe(true); // 0009
-      expect(cols('tool_baseline_meta').has('stable_id')).toBe(true); // 0009
+      // `stable_id` was added (ADR-0048) but never read/written; removed as dead.
+      // Assert the squashed migration no longer carries it (no accidental reintro).
+      expect(cols('tool_state').has('stable_id')).toBe(false);
+      expect(cols('tool_baseline_entries').has('stable_id')).toBe(false);
+      expect(cols('tool_baseline_meta').has('stable_id')).toBe(false);
     } finally {
       ds.close();
     }

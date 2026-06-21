@@ -45,8 +45,12 @@ export const LEGACY_PRE_SQUASH_MAX_USER_VERSION = 14;
  */
 export const SCHEMA_VERSION_OFFSET = LEGACY_PRE_SQUASH_MAX_USER_VERSION;
 
-/** Current logical schema stamp for the bundled one-entry post-squash journal. */
-export const LOGICAL_SCHEMA_VERSION = SCHEMA_VERSION_OFFSET + 1;
+/**
+ * Current logical schema stamp for the bundled post-squash journal. Two entries:
+ * the squash (0000) + the `stable_id` drop (0001). Bump this in lockstep with
+ * the bundled journal entry count (or fold into the offset on the next squash).
+ */
+export const LOGICAL_SCHEMA_VERSION = SCHEMA_VERSION_OFFSET + 2;
 
 /**
  * The DB schema version this CLI supports = offset + bundled journal entries.

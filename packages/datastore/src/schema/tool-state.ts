@@ -14,8 +14,7 @@ import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 export const toolState = sqliteTable(
   'tool_state',
   {
-    tool: text('tool').notNull(), // human `name` value (for compat + current queries)
-    stableId: text('stable_id'), // tool stable UUID (additive per ADR-0048; null for legacy)
+    tool: text('tool').notNull(), // human `name` value — the scoping key
     key: text('key').notNull(),
     payload: text('payload', { mode: 'json' }),
     updatedAt: integer('updated_at').notNull(),
