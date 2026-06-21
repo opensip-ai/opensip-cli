@@ -64,15 +64,37 @@ function renderFitnessTab() {
   );
 }
 
+// Render the registered sim scenarios as simple rows (name + kind badge +
+// description + tags). Only invoked when the catalog is non-empty (renderToolTab
+// shows a graceful empty state otherwise).
+function renderScenariosCatalog(container, catalogData) {
+  const table = el('table', {class:'session-table'});
+  const tbody = el('tbody');
+  [...catalogData].sort(function(a, b) { return a.name.localeCompare(b.name); }).forEach(function(s) {
+    const row = el('tr');
+    const nameCell = el('td');
+    nameCell.appendChild(el('strong', {text: s.name}));
+    if (s.kind) nameCell.appendChild(el('span', {class:'badge', text: s.kind, style:'margin-left:8px'}));
+    if (s.description) nameCell.appendChild(el('div', {class:'muted', style:'font-size:12px', text: s.description}));
+    row.appendChild(nameCell);
+    const tagsCell = el('td');
+    (s.tags || []).slice(0, 4).forEach(function(t) { tagsCell.appendChild(el('span', {class:'tag-badge', text: t})); });
+    row.appendChild(tagsCell);
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
 function renderSimulationTab() {
   renderToolTab(
     'panel-simulation',
     simSessions,
     'var(--accent-sim)',
     'Scenarios',
-    [],  // No scenarios yet
-    function(container, data) {},
-    recipeCatalog
+    simScenarioCatalog,
+    function(container, data) { renderScenariosCatalog(container, data); },
+    simRecipeCatalog
   );
 }
 

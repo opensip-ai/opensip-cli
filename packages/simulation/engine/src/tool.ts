@@ -15,6 +15,7 @@ import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/c
 import { createToolScope, defineCommand, defineTool, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
+import { collectSimulationReportData } from './cli/report-data.js';
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { simRecipesCommandSpec } from './cli/sim-recipes.js';
 import { renderSimLive } from './cli/sim-runner.js';
@@ -378,6 +379,7 @@ export const simulationTool: Tool = defineTool({
   extensionPoints: {
     simulationContractVersion: SIMULATION_CONTRACT_VERSION,
     contributeScope: simulationScope.contributeScope,
+    collectReportData: collectSimulationReportData,
     sessionReplay: {
       tool: 'sim',
       replaySession: simReplayFromSession,

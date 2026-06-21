@@ -50,6 +50,11 @@ export interface DashboardInput {
   // vocabulary owned by @opensip-cli/graph, not contracts).
   graphRuleCatalog?: readonly unknown[];
   graphRecipeCatalog?: readonly unknown[];
+  // Simulation-owned catalog data (L6). DISTINCT keys (sim prefix) for the same
+  // Object.assign-merge reason; the dashboard's Simulation tab reads them
+  // structurally (entry shapes are sim domain vocabulary owned by the sim tool).
+  simScenarioCatalog?: readonly unknown[];
+  simRecipeCatalog?: readonly unknown[];
   editorProtocol?: string | null;
 }
 
@@ -109,6 +114,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
     graphCatalog = null,
     graphRuleCatalog = [],
     graphRecipeCatalog = [],
+    simScenarioCatalog = [],
+    simRecipeCatalog = [],
     editorProtocol = null,
   } = input;
 
@@ -124,6 +131,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog));
   const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog));
   const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog));
+  const safeSimScenarioCatalogJson = escapeForScriptContext(JSON.stringify(simScenarioCatalog));
+  const safeSimRecipeCatalogJson = escapeForScriptContext(JSON.stringify(simRecipeCatalog));
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
@@ -187,6 +196,8 @@ const checkCatalog = ${safeCatalogJson};
 const recipeCatalog = ${safeRecipeJson};
 const graphRuleCatalog = ${safeGraphRuleCatalogJson};
 const graphRecipeCatalog = ${safeGraphRecipeCatalogJson};
+const simScenarioCatalog = ${safeSimScenarioCatalogJson};
+const simRecipeCatalog = ${safeSimRecipeCatalogJson};
 ${editorProtocolJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
