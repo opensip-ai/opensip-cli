@@ -26,6 +26,16 @@ export default mergeConfig(
           // Excluding genuinely-uninstrumentable vendored code is correct; the
           // thresholds below scope to node-instrumentable first-party logic.
           'src/vendor/**',
+          // Browser client modules (L4): real, DOM-typed TS bundled by esbuild
+          // and executed in jsdom via the eval'd bundle string — never imported
+          // or executed in node, so v8 node-coverage reports them 0% (same case
+          // as the vendor blob above). They ARE behaviourally covered by the
+          // jsdom tests that build fixtures from the bundle; they gain type
+          // (src/client/tsconfig.json) + lint checking the prior String.raw
+          // emitters never had. Pre-migration the equivalent JS lived inside
+          // template-literal strings and was likewise never line-instrumented.
+          'src/client/**',
+          'src/client-bundle.generated.ts',
         ],
         thresholds: {
           statements: 90,
