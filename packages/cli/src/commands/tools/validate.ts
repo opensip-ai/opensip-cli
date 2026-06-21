@@ -164,7 +164,7 @@ function skippedRuntimeSections(): ToolsValidateSection[] {
  * verb (`fit`/`sim`), while the config namespace is a hardcoded
  * `ToolConfigDeclaration.namespace` literal (`fitness`/`simulation`/`graph`).
  * They are intentionally allowed to differ (the long config key is retained as
- * the sole valid namespace until Q6 flips the literal), so this section no
+ * the sole valid namespace — Q6 decided to keep the long keys), so this section no
  * longer requires `namespace === toolId` — that coupling was the pre-rename
  * assumption. The unclaimed-namespace policy (`config-and-capabilities.ts`)
  * still rejects a user-typed block that no loaded tool claims.

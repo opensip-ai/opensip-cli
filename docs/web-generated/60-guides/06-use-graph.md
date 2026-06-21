@@ -96,9 +96,11 @@ Emit an editor-friendly symbol index:
 
 ```bash
 opensip graph index --out symbolindex.json
+opensip graph index --build --out symbolindex.json
 ```
 
-Both commands read the persisted catalog. Run `opensip graph` first.
+Both commands read the persisted catalog by default. Use `--build` on `graph index`
+to refresh the catalog first, or run `opensip graph` before querying.
 
 ## 5. Gate on new graph findings
 

@@ -328,19 +328,23 @@ The command reads from the catalog stored in `<project>/opensip-cli/.runtime/dat
 
 ## `graph index` — emit symbol index artifact
 
-Tool-owned (graph Tool). Writes a `symbolindex.json` file built from the persisted catalog: two maps — `name → [{ file, line }, …]` and `file → [name, …]`. Intended for editor tooling and offline cross-reference.
+Tool-owned (graph Tool). Writes a `symbolindex.json` file: two maps — `name → [{ file, line }, …]` and `file → [name, …]`. Intended for editor tooling and offline cross-reference.
+
+By default the command **queries** the persisted catalog only (like `graph lookup`, it does not run analysis). Pass `--build` to run the graph pipeline first and refresh the catalog before emitting.
 
 ```
 opensip graph index
 opensip graph index --out path/to/symbolindex.json
+opensip graph index --build
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
+| `--build` | bool | `false` | Run the graph pipeline to refresh the catalog before emitting the index. |
 | `--cwd <path>` | path | `process.cwd()` | Target directory; `--out` resolves against this. |
 | `--out <path>` | path | `symbolindex.json` | Output file path. |
 
-Reads from the persisted catalog; run `opensip graph` first to populate it.
+Without `--build`, reads from the persisted catalog; run `opensip graph` or `opensip graph index --build` first if no catalog exists.
 
 ---
 

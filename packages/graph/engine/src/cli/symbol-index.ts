@@ -30,6 +30,7 @@ import { dirname, resolve } from 'node:path';
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { ConfigurationError, logger } from '@opensip-cli/core';
 
+import { loadGraphConfig, runGraph } from './orchestrate.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
 import type { Catalog } from '../types.js';
@@ -39,6 +40,11 @@ import type { DataStore } from '@opensip-cli/datastore';
 export interface SymbolIndexCommandOptions {
   readonly cwd: string;
   readonly out: string;
+  /**
+   * When true, run the graph pipeline first to refresh the persisted catalog
+   * (Q7: build path). When false/absent, query the existing catalog only.
+   */
+  readonly build?: boolean;
 }
 
 interface SymbolEntry {
@@ -59,17 +65,26 @@ interface SymbolIndexArtifact {
   readonly fileSymbols: Record<string, readonly string[]>;
 }
 
-export function executeSymbolIndex(opts: SymbolIndexCommandOptions, cli: ToolCliContext): void {
-  logger.info({ evt: 'graph.cli.symbol-index.start', module: 'graph:cli' });
+export async function executeSymbolIndex(
+  opts: SymbolIndexCommandOptions,
+  cli: ToolCliContext,
+): Promise<void> {
+  logger.info({
+    evt: 'graph.cli.symbol-index.start',
+    module: 'graph:cli',
+    build: opts.build === true,
+  });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
       throw new ConfigurationError('graph symbol-index requires a DataStore on ToolCliContext.');
     }
-    const catalog = new CatalogRepo(datastore).loadFullCatalog();
+    const catalog = await resolveCatalogForIndex(opts, datastore);
     if (!catalog) {
       throw new ConfigurationError(
-        'No graph catalog found. Run `opensip graph` first to build the catalog.',
+        opts.build === true
+          ? 'graph index --build produced no catalog.'
+          : 'No graph catalog found. Run `opensip graph` or `opensip graph index --build` first.',
       );
     }
     const artifact = buildArtifact(catalog);
@@ -106,6 +121,21 @@ export function executeSymbolIndex(opts: SymbolIndexCommandOptions, cli: ToolCli
       `graph symbol-index: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
+}
+
+async function resolveCatalogForIndex(
+  opts: SymbolIndexCommandOptions,
+  datastore: DataStore,
+): Promise<Catalog | null> {
+  if (opts.build === true) {
+    const result = await runGraph({
+      cwd: opts.cwd,
+      datastore,
+      config: loadGraphConfig(opts.cwd),
+    });
+    return result.catalog;
+  }
+  return new CatalogRepo(datastore).loadFullCatalog();
 }
 
 export function buildArtifact(catalog: Catalog): SymbolIndexArtifact {

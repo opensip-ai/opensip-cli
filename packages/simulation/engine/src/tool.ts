@@ -368,7 +368,7 @@ export const simulationTool: Tool = defineTool({
     // the DECOUPLED `simulationConfigDeclaration.namespace = 'simulation'`
     // literal, NOT metadata.name, so existing `simulation:` config blocks keep
     // validating. The session `tool` column is already `'sim'`, so aligning the
-    // name REDUCES mismatch. Q6 (flipping the literal to `sim:`) stays open — no
+    // name REDUCES mismatch. Q6 (decided): keep the `simulation:` namespace — no
     // `sim:` config alias is added.
     name: 'sim', // command verb + human key (was 'simulation')
     version: readPackageVersion(import.meta.url),

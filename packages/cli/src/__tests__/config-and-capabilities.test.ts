@@ -194,8 +194,8 @@ describe('composeAndValidateToolConfig', () => {
       // claims the `fitness` namespace — no tool claims `fit`. The
       // unclaimed-namespace policy hard-fails a block whose key equals a loaded
       // tool's name that contributes no matching config. This is the explicit
-      // guard that the short config key is NOT a back-compat alias (Q6 timing
-      // stays open; no `fit:` alias is added).
+      // guard that the short config key is NOT a back-compat alias (Q6 decided:
+      // keep `fitness:`; no `fit:` alias).
       const configPath = writeConfig('fit:\n  failOnErrors: 3\n');
       expect(() =>
         composeAndValidateToolConfig({

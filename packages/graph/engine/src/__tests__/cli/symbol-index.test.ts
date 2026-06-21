@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
+import * as orchestrate from '../../cli/orchestrate.js';
 import { buildArtifact, executeSymbolIndex } from '../../cli/symbol-index.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import { occ } from '../rules/_helpers.js';
@@ -101,7 +102,7 @@ describe('graph symbol-index', () => {
   });
 
   describe('executeSymbolIndex', () => {
-    it('writes a JSON artifact and reports symbol/file counts', () => {
+    it('writes a JSON artifact and reports symbol/file counts', async () => {
       new CatalogRepo(datastore).replaceAll(
         makeCatalog([
           occ({ bodyHash: 'h1', simpleName: 'fnA', filePath: 'src/a.ts' }),
@@ -109,7 +110,7 @@ describe('graph symbol-index', () => {
         ]),
       );
       const { cli, setExitCode } = mockCli(datastore);
-      executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);
+      await executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
       const payload = JSON.parse(readFileSync(join(workDir, 'out.json'), 'utf8')) as {
         symbols: Record<string, unknown[]>;
@@ -119,12 +120,12 @@ describe('graph symbol-index', () => {
       expect(Object.keys(payload.fileSymbols).sort()).toEqual(['src/a.ts', 'src/b.ts']);
     });
 
-    it('creates the parent directory when --out is nested', () => {
+    it('creates the parent directory when --out is nested', async () => {
       new CatalogRepo(datastore).replaceAll(
         makeCatalog([occ({ bodyHash: 'h1', simpleName: 'fnA', filePath: 'src/a.ts' })]),
       );
       const { cli, setExitCode } = mockCli(datastore);
-      executeSymbolIndex({ cwd: workDir, out: join('nested', 'deep', 'out.json') }, cli);
+      await executeSymbolIndex({ cwd: workDir, out: join('nested', 'deep', 'out.json') }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
       const payload = JSON.parse(
         readFileSync(join(workDir, 'nested', 'deep', 'out.json'), 'utf8'),
@@ -132,16 +133,39 @@ describe('graph symbol-index', () => {
       expect(Object.keys(payload.symbols)).toEqual(['fnA']);
     });
 
-    it('errors with CONFIGURATION_ERROR when no catalog has been built', () => {
+    it('errors with CONFIGURATION_ERROR when no catalog has been built', async () => {
       const { cli, setExitCode } = mockCli(datastore);
-      executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);
+      await executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);
       expect(setExitCode).toHaveBeenCalledWith(2);
     });
 
-    it('errors with CONFIGURATION_ERROR when no DataStore is wired', () => {
+    it('errors with CONFIGURATION_ERROR when no DataStore is wired', async () => {
       const { cli, setExitCode } = mockCli(undefined);
-      executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);
+      await executeSymbolIndex({ cwd: workDir, out: 'out.json' }, cli);
       expect(setExitCode).toHaveBeenCalledWith(2);
+    });
+
+    it('with --build runs the graph pipeline before emitting the artifact', async () => {
+      const catalog = makeCatalog([
+        occ({ bodyHash: 'h1', simpleName: 'builtFn', filePath: 'src/built.ts' }),
+      ]);
+      const runGraph = vi.spyOn(orchestrate, 'runGraph').mockResolvedValue({
+        catalog,
+        indexes: null,
+        signals: [],
+        resolutionStats: null,
+        cacheHit: false,
+        features: null,
+      });
+      const { cli, setExitCode } = mockCli(datastore);
+      await executeSymbolIndex({ cwd: workDir, out: 'out.json', build: true }, cli);
+      expect(runGraph).toHaveBeenCalledOnce();
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const payload = JSON.parse(readFileSync(join(workDir, 'out.json'), 'utf8')) as {
+        symbols: Record<string, unknown[]>;
+      };
+      expect(Object.keys(payload.symbols)).toEqual(['builtFn']);
+      runGraph.mockRestore();
     });
   });
 });

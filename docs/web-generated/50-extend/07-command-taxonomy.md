@@ -52,7 +52,8 @@ Each Tool exposes exactly one **primary** command. Its `CommandSpec.name` equals
 
 The command verb and config namespace are **decoupled**. Existing
 `opensip-cli.config.yml` blocks keep using `fitness:` / `simulation:` / `graph:`.
-There is no `fit:` or `sim:` config alias today (see [Open decisions](#open-decisions)).
+Config namespaces stay `fitness:` / `simulation:` / `graph:` permanently — command
+verbs (`fit`, `sim`, `graph`) do not drive config keys (see [Resolved decisions](#resolved-decisions)).
 
 ### Nested discoverability children
 
@@ -84,7 +85,7 @@ they no longer resolve.
 | `recipes` | Enumerate named run lineups | `fit recipes`, `graph recipes`, `sim recipes` |
 | `export` | Write a file artifact (`--format` selects the shape) | `fit export`, `graph export` |
 | `lookup` | Point query against a built index | `graph lookup` |
-| `index` | Build or query a symbol index | `graph index` |
+| `index` | Query persisted catalog; `--build` refreshes first | `graph index`, `graph index --build` |
 
 A tool with only one user-facing action needs only the primary — nested children
 are optional discoverability and export surfaces.
@@ -197,17 +198,17 @@ At load, `assertManifestMatchesTool` compares the manifest name set to the
 runtime descriptors derived from `commandSpecs`. All three surfaces — manifest,
 derived `commands`, and `commandSpecs` — must agree.
 
-## Open decisions
+## Resolved decisions
 
-These are intentionally unresolved; the taxonomy doc records current behavior only.
+**Q6 — Config namespace (decided: keep as-is).** Config keys remain `fitness:`,
+`simulation:`, and `graph:`. Command verbs (`fit`, `sim`, `graph`) are decoupled
+from config namespaces and will not be aliased (`fit:`, `sim:`) or migrated.
 
-**Q6 — Config namespace migration.** When (if ever) to rename config keys from
-`fitness:` / `simulation:` to `fit:` / `sim:`. No migration or alias ships until
-a dedicated ADR and schema change land.
-
-**Q7 — `graph index` semantics.** `graph index` is a single command today. A
-future split into `graph index build` / `graph index query`, or a `--build`
-flag, would be additive under the same nested grammar.
+**Q7 — `graph index` semantics (decided: single command + `--build`).** Default
+behavior queries the persisted catalog and writes `symbolindex.json` (same as
+`graph lookup` — never triggers an analysis run). Pass `--build` to run the
+graph pipeline first, refresh the catalog, then emit the artifact. A nested
+`graph index build` / `graph index query` split is not planned.
 
 ## Authoring checklist
 

@@ -540,12 +540,8 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
 
 /**
  * `graph index` — emit a `symbolindex.json` artifact (name→file:line and
- * file→names) from the persisted catalog. It BOTH builds and queries the symbol
- * index.
- *
- * Q7 (open): `graph index` currently both builds and queries; the build/query
- * verb split (`graph index build` | `graph index query`) is deferred. Do NOT add
- * a `--build` flag here without resolving Q7.
+ * file→names). Default (query): read the persisted catalog only. `--build`:
+ * run the graph pipeline first, then emit from the refreshed catalog (Q7).
  */
 export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
   unknown,
@@ -554,9 +550,14 @@ export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> 
   name: 'index',
   parent: 'graph',
   description:
-    'Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog',
+    'Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first',
   commonFlags: [],
   options: [
+    {
+      flag: '--build',
+      description: 'Run the graph pipeline to refresh the catalog before emitting the index',
+      default: false,
+    },
     // --cwd keeps its command-specific description (the out path resolves
     // against it), so it is declared as a tool option rather than the common
     // flag. The literal default is `process.cwd()`, evaluated once at module
@@ -576,9 +577,9 @@ export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> 
   scope: 'project',
   output: RAW_STREAM,
   rawStreamReason: REASON_FILE_EXPORT,
-  handler: (rawOpts, cli): void => {
-    const opts = rawOpts as { cwd: string; out: string };
-    executeSymbolIndex({ cwd: opts.cwd, out: opts.out }, cli);
+  handler: async (rawOpts, cli): Promise<void> => {
+    const opts = rawOpts as { cwd: string; out: string; build?: boolean };
+    await executeSymbolIndex({ cwd: opts.cwd, out: opts.out, build: opts.build }, cli);
   },
 });
 

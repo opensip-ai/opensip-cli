@@ -74,7 +74,7 @@
       },
       {
         "name": "index",
-        "description": "Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog"
+        "description": "Emit a symbolindex.json artifact; --build refreshes the catalog first"
       },
       {
         "name": "list",
