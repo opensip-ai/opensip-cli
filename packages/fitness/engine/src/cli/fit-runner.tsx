@@ -68,6 +68,11 @@ import React, { useEffect, useState } from 'react';
 
 import { envelopeToFitRows } from './fit/envelope-view.js';
 import { buildFitnessSessionPayload } from './fit/result-builders.js';
+import {
+  checkCountLabel,
+  firstUnitCount,
+  withCheckCountFromProgress,
+} from './fit-runner-progress.js';
 import { ResultsTable, WarningsBlock } from './fit-runner-views.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
@@ -114,7 +119,12 @@ function executeFitWithProgress(
 
 type FitState =
   | { phase: 'loading' }
-  | { phase: 'running'; checkCount: number; subscribe: (cb: ProgressCallback) => void }
+  | {
+      phase: 'running';
+      checkCount: number | null;
+      availableCount: number;
+      subscribe: (cb: ProgressCallback) => void;
+    }
   // durationMs dropped (host-owned run timing); the RunTimingProvider + RunSummary
   // (or internal clock for live progress) supply timing. Keep only internal recipe
   // makespan if the component needs it for non-summary UI.
@@ -124,8 +134,20 @@ type FitState =
   // path renders. `warnings` is NOT on the presentation; it rides on the
   // executeFit result bundle, so the runner carries it as a sibling state field
   // and renders it in the summary block (parity with the static stderr path).
-  | { phase: 'done'; result: RunPresentation; warnings: readonly string[]; checkCount: number }
+  | {
+      phase: 'done';
+      result: RunPresentation;
+      warnings: readonly string[];
+      checkCount: number;
+      availableCount: number;
+    }
   | { phase: 'error'; result: ErrorResult };
+
+function rememberCheckCount(current: FitState, checkCount: number): FitState {
+  if (current.phase !== 'running') return current;
+  if (current.checkCount === checkCount) return current;
+  return { ...current, checkCount };
+}
 
 interface FitRunnerProps {
   readonly args: FitOptions;
@@ -151,14 +173,20 @@ function FitRunner({
 }: FitRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<FitState>({ phase: 'loading' });
+  const rememberProgressTotal = (total: number): void => {
+    setState((current) => rememberCheckCount(current, total));
+  };
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
-      // Phase 1: Load checks to get count for header
+      // Phase 1: Load checks so the worker has a populated registry. Do not use
+      // the registry count for the header: it is the available enabled-check
+      // count, before recipe/config runtime filters such as disabledChecks.
+      // The authoritative run count arrives on the first progress event.
       await ensureChecksLoaded(args.cwd);
-      const checkCount = getEnabledCheckCount();
+      const availableCount = getEnabledCheckCount();
 
       if (cancelled) return;
 
@@ -187,7 +215,9 @@ function FitRunner({
         inProcess: (emit) => executeFitWithProgress(args, emit),
       });
 
-      setState({ phase: 'running', checkCount, subscribe: run.onProgress });
+      const subscribe = withCheckCountFromProgress(run.onProgress, rememberProgressTotal);
+
+      setState({ phase: 'running', checkCount: null, availableCount, subscribe });
 
       let fitResult: Awaited<ReturnType<typeof executeFit>>;
       try {
@@ -231,7 +261,13 @@ function FitRunner({
       // `registerLiveView` callback delivers it once the Ink app exits.
       onEnvelope?.(result.envelope);
 
-      setState({ phase: 'done', result, warnings, checkCount });
+      setState({
+        phase: 'done',
+        result,
+        warnings,
+        checkCount: firstUnitCount(result.envelope),
+        availableCount,
+      });
       setTimeout(() => exit(), 100);
     })();
 
@@ -256,6 +292,8 @@ function FitRunner({
   // known. RunHeader's metadata only changes once (when loading→running), and
   // after that it's stable for the rest of the run — perfect Static fit.
   const checkCount = state.phase === 'running' || state.phase === 'done' ? state.checkCount : null;
+  const availableCount =
+    state.phase === 'running' || state.phase === 'done' ? state.availableCount : null;
   const staticItems = computeStaticItems(args.quiet === true, checkCount);
 
   // Presentation settings resolved once in the pre-action hook. The live
@@ -287,7 +325,14 @@ function FitRunner({
     }
     const metadata = [
       { label: 'Recipe', value: recipe },
-      { label: 'Checks', value: String(checkCount) },
+      {
+        label: 'Checks',
+        value: checkCountLabel({
+          running: checkCount ?? 0,
+          available: availableCount ?? checkCount ?? 0,
+          verbose: args.verbose === true,
+        }),
+      },
     ];
     return (
       <RunHeader
