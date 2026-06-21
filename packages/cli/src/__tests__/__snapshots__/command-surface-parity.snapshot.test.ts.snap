@@ -963,6 +963,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "options": [
             {
               "choices": undefined,
+              "defaultValue": false,
+              "description": "Run the graph pipeline to refresh the catalog before emitting the index",
+              "flags": "--build",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
               "defaultValue": "<cwd>",
               "description": "Target directory (out path resolves against this)",
               "flags": "--cwd <path>",
@@ -983,7 +993,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             },
           ],
           "subcommands": [],
-          "synopsis": "Emit a symbolindex.json artifact (name→file:line and file→names) from the persisted catalog",
+          "synopsis": "Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first",
           "usage": "[options]",
         },
         {

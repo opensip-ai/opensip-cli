@@ -85,6 +85,9 @@ const EXPECTED: Record<string, string[]> = {
     // `--budget` (committed budget path) and `--update-budget` (capture/tighten).
     '--api-key',
     '--budget',
+    // `graph index` gained `--build` (build/persist the symbol index) in the
+    // tool-command taxonomy work.
+    '--build',
     '--catalog-output',
     '--changed-file',
     '--concurrency',
