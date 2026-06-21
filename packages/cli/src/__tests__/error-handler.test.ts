@@ -68,6 +68,17 @@ describe('handleParseError', () => {
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
   });
 
+  it('typed mapper wins over a coincidental substring match (M7: typed is authoritative)', async () => {
+    const opts = makeOpts();
+    // The message contains 'fetch', which getErrorSuggestion's network rule would
+    // otherwise map to REPORT_FAILED (4). Because this is a typed ValidationError,
+    // the typed mapper must win → CONFIGURATION_ERROR (2). This guards the
+    // `typed ?? getErrorSuggestion` precedence against regression.
+    await handleParseError(new ValidationError('could not fetch the manifest'), opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(opts.rendered[0]?.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+  });
+
   it('falls back to getErrorSuggestion for substring-shaped errors (Unknown recipe)', async () => {
     const opts = makeOpts();
     await handleParseError(new Error("Unknown recipe 'foo'"), opts);

@@ -213,7 +213,14 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
   },
 ];
 
-/** Matches an arbitrary error against the suggestion-rule table; returns null if no rule fires. */
+/**
+ * LAST-RESORT exit-code + suggestion derivation for UNSTRUCTURED errors — a bare
+ * `Error`/string with no type to map from. The typed {@link mapToolErrorToExitCode}
+ * is authoritative for any `ToolError`; the CLI error-handler applies the typed
+ * path FIRST (`typed ?? getErrorSuggestion`), so a coincidental substring match
+ * here can never override a typed error's exit code (locked by the error-handler
+ * "typed mapper wins" test). Returns null if no rule fires.
+ */
 export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
   const message = err instanceof Error ? err.message : String(err);
 
