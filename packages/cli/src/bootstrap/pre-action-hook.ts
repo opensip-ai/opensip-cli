@@ -11,6 +11,7 @@ import { currentScope, exitScope, generatePrefixedId } from '@opensip-cli/core';
 
 import { commandPath } from '../commands/command-scope-index.js';
 import { hostEnv } from '../env/host-env-specs.js';
+import { setResolvedCommandLabel } from '../telemetry/command-label.js';
 
 import { executePostBailoutBootstrap } from './execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from './plan-pre-action-bootstrap.js';
@@ -29,6 +30,10 @@ export function installPreActionHook(
   commandScopes: CommandScopeIndex,
 ): void {
   program.hook('preAction', async (_thisCommand, actionCommand) => {
+    // M12: stamp the RESOLVED command name for the duration metric's label
+    // (bounded cardinality) before any bootstrap that might throw — set as early
+    // as the matched command is known.
+    setResolvedCommandLabel(actionCommand.name());
     // B1 ("Child runId behavior"): resolve `runId` env-FIRST. A forked/spawned
     // child re-enters this hook and inherits its parent's run via `OPENSIP_RUN_ID`
     // (set in the child env by `correlationToEnv`); a top-level invocation, with

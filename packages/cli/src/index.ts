@@ -50,6 +50,7 @@ import {
 } from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
+import { resolvedCommandLabel } from './telemetry/command-label.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
 import { printWelcome } from './welcome.js';
 
@@ -199,13 +200,13 @@ async function main(): Promise<void> {
       }),
     ),
   );
-  // Phase 2: command duration histogram (low cardinality labels)
+  // Phase 2: command duration histogram. The label is the RESOLVED command name
+  // (stamped by the pre-action hook), not raw `process.argv[2]` — a typo, flag,
+  // or path as argv[2] would otherwise blow up the metric's label cardinality.
   const durationMs = Date.now() - commandStart;
-  getMeter('opensip-cli')
-    .createHistogram('opensip_cli.command.duration_ms')
-    .record(durationMs, {
-      command: process.argv[2] || 'welcome', // rough; real commands go through pre-action
-    });
+  getMeter('opensip-cli').createHistogram('opensip_cli.command.duration_ms').record(durationMs, {
+    command: resolvedCommandLabel(),
+  });
 }
 
 // Top-level fatal handler. Errors that escape `main` predate Commander's

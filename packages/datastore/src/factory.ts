@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ConfigurationError } from '@opensip-cli/core';
+import { ConfigurationError, withSpan } from '@opensip-cli/core';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 import { openMemoryBackend } from './backends/memory.js';
@@ -64,7 +64,12 @@ export const DataStoreFactory = {
     }
 
     try {
-      migrate(handle.db, { migrationsFolder });
+      // M12: span the migrate — the prime datastore-open latency source (schema
+      // apply on first run). No-op tracer unless OTEL is configured; the span
+      // records the exception on failure before we remap it below.
+      withSpan('datastore', 'datastore.migrate', () => migrate(handle.db, { migrationsFolder }), {
+        'datastore.backend': 'sqlite',
+      });
     } catch (error) {
       handle.close();
       throw new DataStoreMigrationError(migrateFailureMessage(opts), { cause: error });
