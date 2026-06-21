@@ -32,7 +32,7 @@ distinct from:
 ## Index (most recent first)
 
 - [ADR-0055](ADR-0055-core-kernel-sub-boundaries.md) — Core Kernel Sub-Boundaries (core remains one publishable package, but its internal ownership areas are documented with extraction triggers).
-- [ADR-0054](ADR-0054-tool-fault-isolation-boundary.md) — External Tool Fault-Isolation Boundary (target policy for external-provenance tools; this change only applies worker isolation to first-party graph live runs).
+- [ADR-0054](ADR-0054-tool-fault-isolation-boundary.md) — External Tool Fault-Isolation Boundary (target policy for external-provenance tools; this change only applies worker isolation to first-party graph live runs). Includes the sequenced M4 Build Plan (increments M4-A…M4-G: provenance threading, IPC protocol, seam→RPC mapping, supervisor + worker entry, config two-pass, capability/lifecycle RPC, capstone guardrail).
   - **Readiness (2026-06-18):** a future external-tool worker spawn MUST reuse the
     same `RunCorrelation` + `TRACEPARENT` pattern the first-party spawn/fork sites
     use (`correlationToEnv` into the child env + a `correlation` field on the worker
