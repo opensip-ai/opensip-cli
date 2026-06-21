@@ -40,9 +40,12 @@ describe('data-table cell containment contract', () => {
 
   it('the session timestamp cell opts out via .cell-nowrap', () => {
     // Guards the view wiring: short, space-containing cells (timestamps)
-    // must stay on one line under the wrap-by-default contract.
+    // must stay on one line under the wrap-by-default contract. The session /
+    // overview renderers now live in the bundled, esbuild-emitted client modules
+    // (L4) — the timestamp cell is `el('td', { class: 'cell-nowrap', … })`, so
+    // match the key/value rather than the legacy single-quote spelling.
     const html = generateDashboardHtml({ sessions: [] });
-    expect(html).toContain("class:'cell-nowrap'");
+    expect(html).toContain('class: "cell-nowrap"');
   });
 
   it('the coupling matrix (the one non-.data-table table) stays contained by its own scroll wrapper', () => {

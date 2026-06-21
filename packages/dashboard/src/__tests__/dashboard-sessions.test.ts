@@ -15,7 +15,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
-import { dashboardSessionsJs } from '../sessions.js';
 
 interface StoredSessionLike {
   id: string;
@@ -35,21 +34,26 @@ interface Env {
 }
 
 function loadEnv(): Env {
+  // The bundle now contains every renderer, so loading it runs each module's
+  // top-level code — including checks.ts's `computeCheckStats()`, which reads the
+  // page-global `sessions` at load. Define the data globals the generated page's
+  // <script> const block would provide before the bundle runs.
+  const dataPrelude = `var sessions = [];\n`;
   const tail = `
 return {
-  render: function(sessions) {
+  render: function(toolSessions) {
     const panel = document.createElement('div');
-    renderSessionTable(panel, sessions, 'var(--accent)');
+    renderSessionTable(panel, toolSessions, 'var(--accent)');
     return panel;
   },
 };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own emitted dashboard JS.
   const factory = new Function(
-    // `el`, `paginateTable`, `paginateGroupedRows` and `makeSortable` now come
-    // from the bundled client modules (exposed as page globals); the legacy
-    // sessions emitter still references them by bare name.
-    DASHBOARD_CLIENT_BUNDLE + '\n' + dashboardSessionsJs() + tail,
+    // `renderSessionTable` (with `el`, the paginators and `makeSortable`) now all
+    // live in the bundled client modules and are exposed as page globals; the
+    // session table is built entirely from the bundle.
+    dataPrelude + DASHBOARD_CLIENT_BUNDLE + '\n' + tail,
   );
   return factory() as Env;
 }
