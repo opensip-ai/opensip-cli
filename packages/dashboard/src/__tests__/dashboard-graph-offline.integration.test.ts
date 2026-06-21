@@ -50,7 +50,9 @@ describe('Graph view — offline render guarantee', () => {
   });
 
   it('registers the Graph view', () => {
-    expect(html).toContain("id: 'graph'");
+    // The view registers from the typed client bundle (L4) — esbuild emits
+    // double-quoted object keys/values, so the marker is the bundled form.
+    expect(html).toContain('id: "graph"');
     expect(html).toContain('code-paths-graph-canvas');
   });
 

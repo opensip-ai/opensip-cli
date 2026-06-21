@@ -24,6 +24,7 @@
  */
 
 import type { CatalogLike, IndexesLike } from './code-paths-types.js';
+import type { CytoscapeFactory } from './cytoscape-types.js';
 
 declare global {
   /** A persisted run row, as inlined by `generator.ts` (read structurally). */
@@ -60,6 +61,16 @@ declare global {
   const simRecipeCatalog: readonly unknown[];
 
   /**
+   * Graph-owned rule/recipe catalogs (Plan B), emitted by generator.ts as
+   * `const graphRuleCatalog = …;` / `const graphRecipeCatalog = …;`. The Code
+   * Paths panel's Catalog/Recipes subtabs read them structurally. Read via
+   * `typeof graphRuleCatalog !== 'undefined'` at the call site, so they may be
+   * absent in test-eval scopes that don't declare them.
+   */
+  const graphRuleCatalog: readonly unknown[];
+  const graphRecipeCatalog: readonly unknown[];
+
+  /**
    * Overview's `tool → inline badge style` and `tool → tab id` maps. Derived
    * from the `defineToolTab` registry in `generator.ts` and emitted as page
    * globals so the registry derivation stays type-checked Node code rather than a
@@ -91,6 +102,18 @@ declare global {
    * orchestrator at Explore-render time. The bundle only reads it.
    */
   const graphIndexes: IndexesLike;
+
+  // ---- Vendored Cytoscape runtime (the Visualization view) ----
+
+  /**
+   * The vendored `cytoscape` UMD global + its `cytoscape-dagre` layout
+   * extension, both inlined ahead of the bundle by `dashboardCytoscapeVendorJs()`
+   * (a 493KB third-party blob that is NOT part of this typed bundle). The
+   * Visualization view (view-graph.ts) consumes them; guarded with
+   * `typeof cytoscape === 'function'` since a non-graph report omits the blob.
+   */
+  const cytoscape: CytoscapeFactory;
+  const cytoscapeDagre: unknown;
 }
 
 export {};

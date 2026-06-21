@@ -15,14 +15,14 @@
 import { el } from './el.js';
 
 /** A graph rule catalog entry, read structurally. */
-interface RuleEntry {
+export interface GraphRuleEntry {
   slug: string;
   defaultSeverity: string;
   source: string;
 }
 
 /** A graph recipe catalog entry, read structurally. */
-interface RecipeEntry {
+export interface GraphRecipeEntry {
   name: string;
   displayName: string;
   description: string;
@@ -35,7 +35,7 @@ interface RecipeEntry {
 // =======================================================
 export function renderGraphRuleCatalog(
   container: HTMLElement,
-  rulesData: readonly RuleEntry[] | null | undefined,
+  rulesData: readonly GraphRuleEntry[] | null | undefined,
 ): void {
   if (!rulesData?.length) {
     container.append(el('div', { class: 'empty', text: 'No rules available.' }));
@@ -79,7 +79,7 @@ export function renderGraphRuleCatalog(
 // =======================================================
 export function renderGraphRecipeCatalog(
   container: HTMLElement,
-  recipesData: readonly RecipeEntry[] | null | undefined,
+  recipesData: readonly GraphRecipeEntry[] | null | undefined,
 ): void {
   if (!recipesData?.length) {
     container.append(el('div', { class: 'empty', text: 'No recipes available.' }));

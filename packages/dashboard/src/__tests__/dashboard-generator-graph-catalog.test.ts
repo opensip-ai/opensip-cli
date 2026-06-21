@@ -78,8 +78,10 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
 
   it('embeds the restructured view ids via the views[] registry', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    // The views register from the typed client bundle (L4); esbuild emits
+    // double-quoted object values, so the marker is the bundled form.
     for (const id of ['graph', 'coupling', 'distribution']) {
-      expect(html).toContain(`id: '${id}'`);
+      expect(html).toContain(`id: "${id}"`);
     }
   });
 });

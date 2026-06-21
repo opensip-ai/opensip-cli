@@ -15,7 +15,6 @@ import { describe, expect, it, beforeEach } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
-import { dashboardViewGraphJs } from '../code-paths/view-graph.js';
 
 interface GraphView {
   id: string;
@@ -29,23 +28,24 @@ interface Env {
 }
 
 function loadEnv(withVendor: boolean): Env {
-  // The Code Paths prelude (path-utils, indexes, filters, search, function-row's
-  // makeSectionHeading, help-drawer's openHelpDrawer, views-registry) now lives in
-  // the typed client bundle (L4) and is exposed as page globals; the
-  // still-string-emitted Visualization view runs `views.push(...)` against the
-  // bundle's `views` global. The cytoscape vendor blob is NOT in the bundle (it
-  // stays string-emitted ahead of the view in code-paths.ts), so it is prepended
-  // separately when requested. Declare the page globals the bundle reads; reset
-  // `views` so this load's render closure wins.
+  // The Visualization view (and the whole Code Paths panel + prelude) now lives
+  // in the typed client bundle (L4): loading the bundle registers the view into
+  // the bundle's `views` global at IIFE eval. The cytoscape vendor blob is NOT
+  // in the bundle (it stays a string-emitted vendor blob, inlined AHEAD of the
+  // bundle in production); the bundle registers the dagre layout lazily at first
+  // render, so the vendor can be prepended here when requested. Declare the page
+  // globals the bundle reads.
   const head = `
 var sessions = [];
 var EDITOR_PROTOCOL = null;
 var graphCatalog = null;
 var graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: new Map(), callers: new Map() };
 `;
-  const parts = [head, DASHBOARD_CLIENT_BUNDLE, 'views.length = 0;'];
+  const parts: string[] = [head];
+  // Vendor blob FIRST so the cytoscape global is defined before the bundle's
+  // lazy dagre registration runs at render time.
   if (withVendor) parts.push(dashboardCytoscapeVendorJs());
-  parts.push(dashboardViewGraphJs(), 'return { views };');
+  parts.push(DASHBOARD_CLIENT_BUNDLE, 'return { views };');
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
   const factory = new Function(parts.join('\n'));
   return factory() as Env;
@@ -73,30 +73,17 @@ beforeEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('dashboardViewGraphJs (emitter)', () => {
-  it('matches the snapshot', () => {
-    expect(dashboardViewGraphJs()).toMatchSnapshot();
-  });
-
-  it('imports nothing from @opensip-cli/graph', () => {
-    expect(dashboardViewGraphJs()).not.toContain('@opensip-cli/graph');
-  });
-});
-
 describe('View 8 — Visualization', () => {
   it('registers a view with id "graph" and label "Visualization"', () => {
+    // The label may evolve but the id must NOT churn (deep-link hashes depend
+    // on it). view-graph.ts is now a typed bundle module rather than a snapshot-
+    // tested JS-string emitter, so the registered descriptor IS the assertion.
     const env = loadEnv(false);
     const view = env.views.find((v) => v.id === 'graph');
     expect(view).toBeDefined();
     expect(view!.label).toBe('Visualization');
     expect(typeof view!.render).toBe('function');
     expect(typeof view!.onActivate).toBe('function');
-  });
-
-  it('keeps the view id stable as "graph" for deep-link hashes', () => {
-    // The label changed (item 11) but the id must NOT churn.
-    expect(dashboardViewGraphJs()).toContain("id: 'graph'");
-    expect(dashboardViewGraphJs()).toContain("label: 'Visualization'");
   });
 
   it('renders the empty state when no view-model blob is present', () => {
@@ -175,31 +162,17 @@ describe('View 8 — Visualization', () => {
     expect(input!.getAttribute('placeholder')).toContain('package');
   });
 
-  it('reuses the shared fuzzyMatch index for search (no separate index)', () => {
-    expect(dashboardViewGraphJs()).toContain('fuzzyMatch');
-  });
-
-  it('sizes nodes by totalCoupling and edges by weight (package encoding)', () => {
-    const js = dashboardViewGraphJs();
-    expect(js).toContain("ele.data('totalCoupling')");
-    expect(js).toContain("ele.data('weight')");
-  });
-
-  it('drives impact highlight off live package adjacency and clears on Esc', () => {
-    const js = dashboardViewGraphJs();
-    // Package-level impact uses the live cytoscape neighborhood, not the
-    // function-level graphIndexes adjacency.
-    expect(js).toContain("incomers('node')");
-    expect(js).toContain("outgoers('node')");
-    expect(js).toContain("e.key === 'Escape'");
-  });
-
   it('does not consult the shared Explore filterState (the view owns its controls)', () => {
-    const js = dashboardViewGraphJs();
-    // The view never calls the shared passesFilter; package level is whole-graph
-    // and function level applies its OWN Scope/Kind filter inside the projector.
-    expect(js).not.toContain('passesFilter');
-    expect(js).not.toContain('No nodes match the active filters');
+    // The view renders fully with a null filterState — it owns its own Scope/Kind
+    // controls and never reads the shared Explore filter. (Package level is
+    // whole-graph; function level applies its OWN filter inside the projector.)
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
+    expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
+    expect(c.textContent).not.toContain('No nodes match the active filters');
   });
 
   it('renders Level/Scope/Package/Kind/Edges, with Package, Kind & Edges disabled (not hidden) at package level', () => {

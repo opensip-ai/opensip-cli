@@ -23,6 +23,7 @@
 import { renderCatalogProvenance } from './catalog-provenance.js';
 import { renderGraphRecipeCatalog, renderGraphRuleCatalog } from './catalog-recipes-tables.js';
 import { renderChecksCatalog } from './checks.js';
+import { openCodePathsSession, renderCodePathsTab } from './code-paths-panel.js';
 import { el } from './el.js';
 import { filterState, KIND_LIST, packagesInCatalog, passesFilter } from './filters.js';
 import { closeFunctionCard, openFunctionCard } from './function-card.js';
@@ -39,6 +40,7 @@ import { makeSortable } from './sortable.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { activateTabForSession, registerTabActivator } from './tab-activators.js';
 import { renderFitnessTab, renderSimulationTab } from './tool-tabs.js';
+import { defineRankedView } from './view-template.js';
 import { activateView, views } from './views-registry.js';
 // Side-effect-only module: tab-bar wires the #tab-bar click handler at load.
 // (sortable also schedules its setTimeout(0) `.data-table.sortable` activation
@@ -66,9 +68,16 @@ interface ClientGlobals {
   renderOverview: typeof renderOverview;
   renderFitnessTab: typeof renderFitnessTab;
   renderSimulationTab: typeof renderSimulationTab;
-  // Code Paths prelude (L4): consumed by the still-string-emitted view modules
-  // (view-coupling / view-distribution / view-graph + their graph-* helpers and
-  // view-template) and the panel orchestrator (code-paths.ts).
+  // Code Paths panel entry (L4): `renderCodePathsTab` is invoked by name in
+  // generator.ts's render block (the registry-derived `renderCodePathsTab();`
+  // call), and `openCodePathsSession` is read by the end-to-end validation test
+  // through the booted page scope.
+  renderCodePathsTab: typeof renderCodePathsTab;
+  openCodePathsSession: typeof openCodePathsSession;
+  // Code Paths prelude (L4): the views (view-coupling / view-distribution /
+  // view-graph + view-template) and the panel now live in the bundle, so these
+  // helpers are imported directly there. They stay exposed because the jsdom
+  // test harnesses build fixtures from the bundle and read them as page globals.
   packageOfPath: typeof packageOfPath;
   shortPkg: typeof shortPkg;
   pkgOf: typeof pkgOf;
@@ -86,6 +95,9 @@ interface ClientGlobals {
   closeFunctionCard: typeof closeFunctionCard;
   views: typeof views;
   activateView: typeof activateView;
+  // The ranked-view extension point: third-party tabs can register a ranked-list
+  // view (and the jsdom tests exercise its config branches through it).
+  defineRankedView: typeof defineRankedView;
   openHelpDrawer: typeof openHelpDrawer;
   renderCatalogProvenance: typeof renderCatalogProvenance;
   renderGraphRuleCatalog: typeof renderGraphRuleCatalog;
@@ -104,7 +116,9 @@ g.renderRecipesPanel = renderRecipesPanel;
 g.renderOverview = renderOverview;
 g.renderFitnessTab = renderFitnessTab;
 g.renderSimulationTab = renderSimulationTab;
-// Code Paths prelude bridge globals (L4).
+// Code Paths panel entry + prelude bridge globals (L4).
+g.renderCodePathsTab = renderCodePathsTab;
+g.openCodePathsSession = openCodePathsSession;
 g.packageOfPath = packageOfPath;
 g.shortPkg = shortPkg;
 g.pkgOf = pkgOf;
@@ -122,6 +136,7 @@ g.openFunctionCard = openFunctionCard;
 g.closeFunctionCard = closeFunctionCard;
 g.views = views;
 g.activateView = activateView;
+g.defineRankedView = defineRankedView;
 g.openHelpDrawer = openHelpDrawer;
 g.renderCatalogProvenance = renderCatalogProvenance;
 g.renderGraphRuleCatalog = renderGraphRuleCatalog;

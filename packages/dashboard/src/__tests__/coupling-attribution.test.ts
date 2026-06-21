@@ -10,7 +10,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
-import { dashboardViewCouplingJs } from '../code-paths/view-coupling.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -27,11 +26,9 @@ interface CouplingEnv {
 }
 
 function loadCouplingEnv(): CouplingEnv {
-  // `buildIndexes` / `resolveCalleeOcc` (and `el`, `makeSectionHeading`,
-  // `openFunctionCard`, `passesFilter`, `views`, …) now live in the typed client
-  // bundle (L4) and are exposed as page globals. The still-string-emitted
-  // coupling view runs `views.push(...)` at eval time against the bundle's `views`
-  // global. `var sessions = []` / `var EDITOR_PROTOCOL = null` satisfy the bundle's
+  // `buildIndexes` / `resolveCalleeOcc` (and the whole Code Paths panel + views)
+  // now live in the typed client bundle (L4) and are exposed as page globals.
+  // `var sessions = []` / `var EDITOR_PROTOCOL = null` satisfy the bundle's
   // load-time reads.
   const head = `
 var sessions = [];
@@ -39,7 +36,7 @@ var EDITOR_PROTOCOL = null;
 `;
   const tail = `return { buildIndexes, resolveCalleeOcc };`;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
-  const factory = new Function(head + DASHBOARD_CLIENT_BUNDLE + dashboardViewCouplingJs() + tail);
+  const factory = new Function(head + DASHBOARD_CLIENT_BUNDLE + tail);
   return factory() as CouplingEnv;
 }
 

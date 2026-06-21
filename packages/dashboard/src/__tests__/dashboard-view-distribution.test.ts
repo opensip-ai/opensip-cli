@@ -11,7 +11,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
-import { dashboardViewDistributionJs } from '../code-paths/view-distribution.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -26,11 +25,10 @@ interface Env {
 }
 
 function loadEnv(catalog: GraphCatalog): Env {
-  // The Code Paths prelude now lives in the typed client bundle (L4) and is
-  // exposed as page globals; the still-string-emitted distribution view runs
-  // `views.push(...)` against the bundle's `views` global. Declare the page
-  // globals the bundle reads (sessions, EDITOR_PROTOCOL, graphCatalog,
-  // graphIndexes); reset `views` so this load's render closure wins; seed
+  // The distribution view (and the whole Code Paths panel + prelude) now lives
+  // in the typed client bundle (L4): loading the bundle registers the view into
+  // the bundle's `views` global at IIFE eval. Declare the page globals the
+  // bundle reads (sessions, EDITOR_PROTOCOL, graphCatalog, graphIndexes); seed
   // graphCatalog/graphIndexes after the bundle has defined `buildIndexes`.
   const head = `
 var sessions = [];
@@ -38,16 +36,13 @@ var EDITOR_PROTOCOL = null;
 var graphCatalog = null;
 var graphIndexes = null;
 `;
-  const resetViews = `views.length = 0;\n`;
   const tail = `
 graphCatalog = ${JSON.stringify(catalog)};
 graphIndexes = buildIndexes(graphCatalog);
 return { views, graphCatalog, graphIndexes, filterState };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
-  const factory = new Function(
-    head + DASHBOARD_CLIENT_BUNDLE + resetViews + dashboardViewDistributionJs() + tail,
-  );
+  const factory = new Function(head + DASHBOARD_CLIENT_BUNDLE + tail);
   return factory() as Env;
 }
 

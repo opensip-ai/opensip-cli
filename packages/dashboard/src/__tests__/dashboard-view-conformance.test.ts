@@ -13,7 +13,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
-import { dashboardCodePathsJs } from '../code-paths.js';
 
 const expectedIds = new Set(['graph', 'coupling', 'distribution']);
 
@@ -22,13 +21,10 @@ interface Probe {
 }
 
 function loadViews(): Probe['views'] {
-  // The Code Paths prelude now lives in the typed client bundle (L4) and is
-  // exposed as page globals; `dashboardCodePathsJs()` emits the cytoscape vendor
-  // blob + the three string view emitters (which push into the bundle's `views`)
-  // + the panel orchestrator. The orchestrator declares its own `let graphCatalog`
-  // / `graphIndexes`, so only `sessions` + `EDITOR_PROTOCOL` are declared here
-  // (declaring graphCatalog again would be a duplicate-binding SyntaxError). Reset
-  // `views` so only this load's emitters register.
+  // The whole Code Paths panel + its three views now live in the typed client
+  // bundle (L4): loading the bundle registers coupling / distribution / graph
+  // into the bundle's `views` global at IIFE eval. Declare the page globals the
+  // bundle reads at load.
   const head = `
 var sessions = [];
 var EDITOR_PROTOCOL = null;
@@ -37,9 +33,7 @@ var EDITOR_PROTOCOL = null;
 return { views };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
-  const factory = new Function(
-    head + DASHBOARD_CLIENT_BUNDLE + 'views.length = 0;\n' + dashboardCodePathsJs() + tail,
-  );
+  const factory = new Function(head + DASHBOARD_CLIENT_BUNDLE + tail);
   return (factory() as Probe).views;
 }
 

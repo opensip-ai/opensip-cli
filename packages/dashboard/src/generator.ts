@@ -13,7 +13,7 @@
 // live in that bundle (src/client/*.ts).
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
 import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
-import { dashboardCodePathsJs } from './code-paths.js';
+import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
 import { listToolTabs } from './tool-tab-registry.js';
 import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
@@ -214,8 +214,11 @@ const simSessions = sessions.filter(s => s.tool === 'sim');
 const toolBadgeStyles = ${toolBadgeStylesJson};
 const tabMap = ${tabMapJson};
 
+// The vendored Cytoscape renderer (defines the cytoscape / cytoscapeDagre
+// browser globals the Visualization view consumes). Inlined BEFORE the bundle so
+// those globals are present; it is a third-party UMD blob, not our client JS.
+${dashboardCodePathsVendorJs()}
 ${DASHBOARD_CLIENT_BUNDLE}
-${dashboardCodePathsJs()}
 
 // =======================================================
 // RENDER TABS

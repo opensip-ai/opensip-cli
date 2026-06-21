@@ -8,7 +8,6 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
-import { dashboardViewCouplingJs } from '../code-paths/view-coupling.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
@@ -23,33 +22,24 @@ interface Env {
 }
 
 function loadEnv(catalog: GraphCatalog): Env {
-  // The Code Paths prelude (el, path-utils, indexes, filters, function-row,
-  // editor-link, trace, function-card, views-registry) now lives in the typed
-  // client bundle (L4) and is exposed as page globals; the still-string-emitted
-  // coupling view runs `views.push(...)` against the bundle's `views` global.
-  // Declare the page globals the bundle reads (sessions, EDITOR_PROTOCOL,
-  // graphCatalog, graphIndexes); seed graphCatalog/graphIndexes after the bundle
-  // has defined `buildIndexes`.
+  // The coupling view (and the whole Code Paths panel + prelude) now lives in
+  // the typed client bundle (L4): loading the bundle registers the view into the
+  // bundle's `views` global at IIFE eval. Declare the page globals the bundle
+  // reads (sessions, EDITOR_PROTOCOL, graphCatalog, graphIndexes); seed
+  // graphCatalog/graphIndexes after the bundle has defined `buildIndexes`.
   const head = `
 var sessions = [];
 var EDITOR_PROTOCOL = null;
 var graphCatalog = null;
 var graphIndexes = null;
 `;
-  // The bundle's `views` is a persistent page global; each load re-pushes the
-  // coupling view, so reset it before this load's emitter runs so `views.find`
-  // resolves to THIS load's render closure (which closes over this scope's
-  // graphCatalog), not an earlier load's.
-  const resetViews = `views.length = 0;\n`;
   const tail = `
 graphCatalog = ${JSON.stringify(catalog)};
 graphIndexes = buildIndexes(graphCatalog);
 return { views, graphCatalog, graphIndexes, filterState };
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
-  const factory = new Function(
-    head + DASHBOARD_CLIENT_BUNDLE + resetViews + dashboardViewCouplingJs() + tail,
-  );
+  const factory = new Function(head + DASHBOARD_CLIENT_BUNDLE + tail);
   return factory() as Env;
 }
 

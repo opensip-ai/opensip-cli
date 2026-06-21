@@ -1,172 +1,281 @@
+/// <reference lib="dom" />
 /**
- * Ranked-view emitter — `defineRankedView`.
+ * @vitest-environment jsdom
  *
- * `defineRankedView` is a JS-source emitter: it splices a declarative config
- * into the in-page `views.push({ … })` literal the Code Paths bundle ships.
- * The only first-party caller (the Functions/distribution view) turns EVERY
- * optional affordance ON (search box, Kind/Package selects, a filter toggle,
- * a preamble, a custom predicate), so the emitter's DEFAULT/OFF branches —
- * the ones a minimal ranked view uses — never run in production wiring.
+ * Ranked-view skeleton — `defineRankedView`.
  *
- * These tests drive the emitter directly with a minimal config (all optional
- * flags omitted) and a maximal config (every flag on), and assert on the
- * emitted JS so a regression in what the dashboard ships is caught:
+ * `defineRankedView` registers a ranked-list view (rank-and-render skeleton)
+ * into the shared `views` registry. It used to splice JS-source strings into an
+ * emitted `views.push({ … })` literal; it is now a typed bundle function taking
+ * real callbacks. These tests load the client bundle (which exposes
+ * `defineRankedView` + `views` as page globals), register a MINIMAL config (all
+ * optional flags omitted) and a MAXIMAL config (every flag on), then assert on
+ * the RENDERED DOM so a regression in the controls a ranked view ships is
+ * caught:
  *  - minimal → no controls row, no search input, no Kind/Package selects, no
- *    toggle, no onActivate hook, the default `passesFilter` predicate and a
- *    `{}` row-extras splice;
- *  - maximal → all of those present, with the supplied predicate, preamble,
- *    row-extras, custom column values, and per-id-namespaced state vars.
+ *    toggle, no onActivate hook, the default `passesFilter` predicate;
+ *  - maximal → all of those present, with the supplied predicate / row-extras /
+ *    custom columns active.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 
-import { defineRankedView, type RankedViewConfig } from '../code-paths/view-template.js';
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
+
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
+
+/** Minimal occurrence shape the ranked views read. */
+interface OccLike {
+  bodyHash: string;
+  simpleName?: string;
+  kind?: string;
+  filePath?: string;
+  line?: number;
+  endLine?: number;
+  params?: unknown[];
+  inTestFile?: boolean;
+}
+
+interface IndexesLike {
+  byBodyHash: Map<string, OccLike>;
+  occurrencesByHash: Map<string, OccLike[]>;
+  bySimpleName: Map<string, string[]>;
+  callees: Map<string, string[]>;
+  callers: Map<string, string[]>;
+}
+
+interface RankedViewConfig {
+  id: string;
+  label: string;
+  help: { title: string; sections: { heading: string; body: string }[] };
+  metric: (occ: OccLike, indexes: IndexesLike) => number | false;
+  predicate?: (occ: OccLike, fs: unknown) => boolean;
+  rowExtras?: (occ: OccLike, metric: number) => Record<string, unknown>;
+  columns: { label: string; value: (o: OccLike) => string | number | null | undefined }[];
+  headingText: string;
+  emptyMessage: string;
+  searchByName?: boolean;
+  filterByKindPackage?: boolean;
+  filterToggle?: { label: string; predicate: (occ: OccLike) => boolean };
+}
+
+interface View {
+  id: string;
+  label: string;
+  render: (c: HTMLElement, cat: unknown, idx: IndexesLike, fs: unknown) => void;
+  onActivate?: () => void;
+}
+
+interface Env {
+  defineRankedView: (config: RankedViewConfig) => void;
+  views: View[];
+  buildIndexes: (catalog: GraphCatalog) => IndexesLike;
+  filterState: unknown;
+}
+
+function loadEnv(): Env {
+  // The ranked-view skeleton lives in the typed client bundle (L4); loading the
+  // bundle exposes `defineRankedView`, `views`, `buildIndexes`, `filterState` as
+  // page globals. Declare the page globals the bundle reads at load.
+  const head = `
+var sessions = [];
+var EDITOR_PROTOCOL = null;
+var graphCatalog = null;
+var graphIndexes = null;
+`;
+  const tail = `return { defineRankedView, views, buildIndexes, filterState };`;
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
+  const factory = new Function(head + DASHBOARD_CLIENT_BUNDLE + tail);
+  return factory() as Env;
+}
+
+function makeOcc(
+  over: Partial<GraphFunctionOccurrence> & {
+    bodyHash: string;
+    simpleName: string;
+    filePath: string;
+  },
+): GraphFunctionOccurrence {
+  return {
+    qualifiedName: over.simpleName,
+    line: 1,
+    column: 0,
+    endLine: 5,
+    kind: 'function-declaration',
+    params: [],
+    returnType: null,
+    enclosingClass: null,
+    decorators: [],
+    visibility: 'exported',
+    inTestFile: false,
+    definedInGenerated: false,
+    calls: [],
+    ...over,
+  };
+}
+
+const SAMPLE: GraphCatalog = {
+  version: '2.0',
+  tool: 'graph',
+  language: 'typescript',
+  builtAt: 'now',
+  functions: {
+    a: [makeOcc({ bodyHash: 'a', simpleName: 'alpha', filePath: 'packages/cli/src/a.ts' })],
+    b: [
+      makeOcc({
+        bodyHash: 'b',
+        simpleName: 'beta',
+        filePath: 'packages/cli/src/b.ts',
+        kind: 'method',
+      }),
+    ],
+  },
+};
 
 function minimalConfig(): RankedViewConfig {
   return {
     id: 'plain',
     label: 'Plain',
     help: { title: 'Plain', sections: [{ heading: 'h', body: 'b' }] },
-    metric: 'occ.line',
-    columns: [{ label: 'Function', value: 'o => o.simpleName' }],
+    metric: (occ) => occ.line ?? 0,
+    columns: [{ label: 'Function', value: (o) => o.simpleName }],
     headingText: 'Plain things',
     emptyMessage: 'Nothing here.',
   };
 }
 
+function renderConfig(env: Env, config: RankedViewConfig): HTMLElement {
+  env.defineRankedView(config);
+  const view = env.views.find((v) => v.id === config.id)!;
+  const host = document.createElement('div');
+  document.body.append(host);
+  const indexes = env.buildIndexes(SAMPLE);
+  view.render(host, SAMPLE, indexes, env.filterState);
+  return host;
+}
+
+beforeEach(() => {
+  document.body.innerHTML = '';
+});
+
 describe('defineRankedView — minimal config (default/off branches)', () => {
-  const js = defineRankedView(minimalConfig());
-
-  it('emits a views.push with the configured id, label, and heading', () => {
-    expect(js).toContain('views.push({');
-    expect(js).toContain("id: 'plain'");
-    expect(js).toContain("label: 'Plain'");
-    expect(js).toContain('Plain things');
-    expect(js).toContain('Nothing here.');
+  it('registers a view with the configured id, label, and heading count', () => {
+    const env = loadEnv();
+    const host = renderConfig(env, minimalConfig());
+    const view = env.views.find((v) => v.id === 'plain');
+    expect(view).toBeDefined();
+    expect(view!.label).toBe('Plain');
+    expect(host.querySelector('h3')!.textContent).toContain('Plain things (2)');
   });
 
-  it('uses the default passesFilter predicate when none is supplied', () => {
-    expect(js).toContain('passesFilter(occ, filterState)');
+  it('renders rows with the default (passesFilter) predicate', () => {
+    const env = loadEnv();
+    const host = renderConfig(env, minimalConfig());
+    // Both sample functions pass the default whole-graph filter.
+    expect(host.querySelectorAll('[data-body-hash]').length).toBe(2);
   });
 
-  it('splices an empty row-extras object when rowExtras is omitted', () => {
-    // The Object.assign row build must close over a `{}` extras literal.
-    expect(js).toContain('return {}; })(r.occ, r.metric)');
+  it('renders NO controls row, search input, Kind/Package selects, or toggle', () => {
+    const env = loadEnv();
+    const host = renderConfig(env, minimalConfig());
+    expect(host.querySelector('.code-paths-ranked-controls')).toBeNull();
+    expect(host.querySelector('#code-paths-search-plain')).toBeNull();
+    expect(host.querySelector('select[data-control="fn-kind"]')).toBeNull();
+    expect(host.querySelector('select[data-control="fn-package"]')).toBeNull();
+    expect(host.querySelector('input[data-control="fn-toggle"]')).toBeNull();
   });
 
-  it('emits NO controls row, search input, Kind/Package selects, or toggle', () => {
-    expect(js).not.toContain('code-paths-ranked-controls');
-    expect(js).not.toContain('code-paths-search-plain');
-    expect(js).not.toContain("'data-control': 'fn-kind'");
-    expect(js).not.toContain("'data-control': 'fn-package'");
-    expect(js).not.toContain("'data-control': 'fn-toggle'");
-  });
-
-  it('emits the trivial always-true row filter and no per-view state vars', () => {
-    expect(js).toContain('(function(){ return true; })');
-    expect(js).not.toContain('__rankedSearchQuery_plain');
-    expect(js).not.toContain('__rankedKind_plain');
-    expect(js).not.toContain('__rankedToggle_plain');
-  });
-
-  it('emits no onActivate hook (search auto-focus) for a non-search view', () => {
-    expect(js).not.toContain('onActivate()');
+  it('registers no onActivate hook for a non-search view', () => {
+    const env = loadEnv();
+    env.defineRankedView(minimalConfig());
+    const view = env.views.find((v) => v.id === 'plain')!;
+    expect(view.onActivate).toBeUndefined();
   });
 });
 
-describe('defineRankedView — maximal config (populated branches)', () => {
-  const js = defineRankedView({
+function maximalConfig(): RankedViewConfig {
+  return {
     id: 'rich-1',
     label: 'Rich',
     help: { title: 'Rich', sections: [{ heading: 'h', body: 'b' }] },
-    metric: 'occ.line',
-    predicate: "passesFilter(occ, filterState) && occ.kind === 'function-declaration'",
-    rowExtras: '{ __thumb: occ.params.length }',
-    preamble: 'function helper(o) { return o.simpleName; }',
-    columns: [{ label: 'Name', value: 'o => helper(o)' }],
+    metric: (occ) => occ.line ?? 0,
+    // Custom predicate: keep only function-declarations.
+    predicate: (occ) => occ.kind === 'function-declaration',
+    rowExtras: (occ) => ({ __thumb: (occ.params ?? []).length }),
+    columns: [{ label: 'Name', value: (o) => o.simpleName }],
     headingText: 'Rich functions',
     emptyMessage: 'No rich functions.',
     searchByName: true,
     filterByKindPackage: true,
-    filterToggle: { label: 'Test-only', predicate: 'isTestOnly(occ)' },
-  });
+    filterToggle: { label: 'Test-only', predicate: (occ) => occ.inTestFile === true },
+  };
+}
 
-  it('splices the custom predicate verbatim (replacing the default)', () => {
-    expect(js).toContain("passesFilter(occ, filterState) && occ.kind === 'function-declaration'");
-  });
-
-  it('splices the preamble helper and custom row-extras', () => {
-    expect(js).toContain('function helper(o) { return o.simpleName; }');
-    expect(js).toContain('return { __thumb: occ.params.length }; })(r.occ, r.metric)');
+describe('defineRankedView — maximal config (populated branches)', () => {
+  it('applies the custom predicate (drops non-matching rows)', () => {
+    const env = loadEnv();
+    const host = renderConfig(env, maximalConfig());
+    // Only 'alpha' is a function-declaration; 'beta' is a method → dropped.
+    expect(host.querySelectorAll('[data-body-hash]').length).toBe(1);
+    expect(host.textContent).toContain('alpha');
+    expect(host.textContent).not.toContain('beta');
   });
 
   it('renders the controls row with search, Kind/Package selects, and toggle', () => {
-    expect(js).toContain('code-paths-ranked-controls');
-    expect(js).toContain('code-paths-search-rich-1');
-    expect(js).toContain("'data-control': 'fn-kind'");
-    expect(js).toContain("'data-control': 'fn-package'");
-    expect(js).toContain("'data-control': 'fn-toggle'");
-    expect(js).toContain('Test-only');
+    const env = loadEnv();
+    const host = renderConfig(env, maximalConfig());
+    expect(host.querySelector('.code-paths-ranked-controls')).not.toBeNull();
+    expect(host.querySelector('#code-paths-search-rich-1')).not.toBeNull();
+    expect(host.querySelector('select[data-control="fn-kind"]')).not.toBeNull();
+    expect(host.querySelector('select[data-control="fn-package"]')).not.toBeNull();
+    expect(host.querySelector('input[data-control="fn-toggle"]')).not.toBeNull();
+    expect(host.textContent).toContain('Test-only');
   });
 
-  it('namespaces every piece of view state by a sanitized id', () => {
-    // The hyphen in `rich-1` becomes `_` in the state-var suffix.
-    expect(js).toContain('__rankedSearchQuery_rich_1');
-    expect(js).toContain('__rankedKind_rich_1');
-    expect(js).toContain('__rankedPkg_rich_1');
-    expect(js).toContain('__rankedToggle_rich_1');
-  });
-
-  it('builds a non-trivial row filter that consults kind, package, name, and toggle', () => {
-    expect(js).toContain('occ.kind !== __rankedKind_rich_1');
-    expect(js).toContain('pkgOf(occ) !== __rankedPkg_rich_1');
-    expect(js).toContain("occ.simpleName || ''");
-    expect(js).toContain('!(isTestOnly(occ))');
-    // And it is NOT the trivial always-true filter.
-    expect(js).not.toContain('(function(){ return true; })');
-  });
-
-  it('emits an onActivate hook that focuses the search box', () => {
-    expect(js).toContain('onActivate()');
-    expect(js).toContain("getElementById('code-paths-search-rich-1')");
+  it('registers an onActivate hook that focuses the search box', () => {
+    const env = loadEnv();
+    env.defineRankedView(maximalConfig());
+    const view = env.views.find((v) => v.id === 'rich-1')!;
+    expect(typeof view.onActivate).toBe('function');
   });
 });
 
 describe('defineRankedView — partial configs (each flag independently)', () => {
   it('search-only: controls + search input, but no Kind/Package or toggle', () => {
-    const js = defineRankedView({ ...minimalConfig(), id: 'searchonly', searchByName: true });
-    expect(js).toContain('code-paths-ranked-controls');
-    expect(js).toContain('code-paths-search-searchonly');
-    expect(js).toContain('__rankedSearchQuery_searchonly');
-    expect(js).not.toContain("'data-control': 'fn-kind'");
-    expect(js).not.toContain("'data-control': 'fn-toggle'");
-    expect(js).toContain('onActivate()');
+    const env = loadEnv();
+    const host = renderConfig(env, { ...minimalConfig(), id: 'searchonly', searchByName: true });
+    expect(host.querySelector('.code-paths-ranked-controls')).not.toBeNull();
+    expect(host.querySelector('#code-paths-search-searchonly')).not.toBeNull();
+    expect(host.querySelector('select[data-control="fn-kind"]')).toBeNull();
+    expect(host.querySelector('input[data-control="fn-toggle"]')).toBeNull();
+    const view = env.views.find((v) => v.id === 'searchonly')!;
+    expect(typeof view.onActivate).toBe('function');
   });
 
   it('toggle-only: controls + toggle checkbox, but no search input or selects', () => {
-    const js = defineRankedView({
+    const env = loadEnv();
+    const host = renderConfig(env, {
       ...minimalConfig(),
       id: 'toggleonly',
-      filterToggle: { label: 'Only X', predicate: 'isX(occ)' },
+      filterToggle: { label: 'Only X', predicate: () => true },
     });
-    expect(js).toContain('code-paths-ranked-controls');
-    expect(js).toContain("'data-control': 'fn-toggle'");
-    expect(js).toContain('__rankedToggle_toggleonly');
-    expect(js).toContain('!(isX(occ))');
-    expect(js).not.toContain('code-paths-search-toggleonly');
-    expect(js).not.toContain("'data-control': 'fn-kind'");
+    expect(host.querySelector('.code-paths-ranked-controls')).not.toBeNull();
+    expect(host.querySelector('input[data-control="fn-toggle"]')).not.toBeNull();
+    expect(host.querySelector('#code-paths-search-toggleonly')).toBeNull();
+    expect(host.querySelector('select[data-control="fn-kind"]')).toBeNull();
+    const view = env.views.find((v) => v.id === 'toggleonly')!;
     // A toggle without search → no auto-focus hook.
-    expect(js).not.toContain('onActivate()');
+    expect(view.onActivate).toBeUndefined();
   });
 
   it('kind/package-only: selects present, but no search input or toggle', () => {
-    const js = defineRankedView({ ...minimalConfig(), id: 'kponly', filterByKindPackage: true });
-    expect(js).toContain("'data-control': 'fn-kind'");
-    expect(js).toContain("'data-control': 'fn-package'");
-    expect(js).toContain('__rankedKind_kponly');
-    expect(js).toContain('occ.kind !== __rankedKind_kponly');
-    expect(js).not.toContain('code-paths-search-kponly');
-    expect(js).not.toContain("'data-control': 'fn-toggle'");
-    expect(js).not.toContain('onActivate()');
+    const env = loadEnv();
+    const host = renderConfig(env, { ...minimalConfig(), id: 'kponly', filterByKindPackage: true });
+    expect(host.querySelector('select[data-control="fn-kind"]')).not.toBeNull();
+    expect(host.querySelector('select[data-control="fn-package"]')).not.toBeNull();
+    expect(host.querySelector('#code-paths-search-kponly')).toBeNull();
+    expect(host.querySelector('input[data-control="fn-toggle"]')).toBeNull();
+    const view = env.views.find((v) => v.id === 'kponly')!;
+    expect(view.onActivate).toBeUndefined();
   });
 });

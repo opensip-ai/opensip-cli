@@ -6,10 +6,17 @@
  * grows past the Phase 0 budget, so a careless dependency bump or schema
  * bloat is caught before it lands in every generated report.
  *
+ * The Visualization view's JS now lives in the typed client bundle (L4,
+ * `DASHBOARD_CLIENT_BUNDLE`) rather than a standalone `dashboardViewGraphJs()`
+ * emitter, so the "our own JS" budget is measured against the WHOLE client
+ * bundle (every migrated module) rather than the single view's string.
+ *
  * Budgets (Phase 0 §1 / §4.5):
  *   - vendor bundle raw:           <= 600 KB
- *   - vendor + view emitter JS:    <= 650 KB (BUDGET_KB + 50, accounts for
- *                                    view-graph.ts's own emitted JS string)
+ *   - vendor + our client bundle:  <= 700 KB (BUDGET_KB + 100, accounts for the
+ *                                    whole migrated client bundle)
+ *   - client bundle alone:         < 200 KB (guards against a data blob sneaking
+ *                                    into our hand-written JS)
  *   - view-model JSON per element: within the §4.5 per-node/edge estimates
  */
 
@@ -19,9 +26,9 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
 import { projectCatalogToGraphViewModel } from '../code-paths/graph-view-model.js';
-import { dashboardViewGraphJs } from '../code-paths/view-graph.js';
 
 import type { GraphCatalog } from '@opensip-cli/contracts';
 
@@ -59,21 +66,21 @@ describe('bundle weight gate', () => {
     );
   });
 
-  it('vendor + Graph view emitter together stay within budget + 50 KB', () => {
-    const bytes = size(dashboardCytoscapeVendorJs()) + size(dashboardViewGraphJs());
+  it('vendor + our client bundle together stay within budget + 100 KB', () => {
+    const bytes = size(dashboardCytoscapeVendorJs()) + size(DASHBOARD_CLIENT_BUNDLE);
     const kb = Math.round(bytes / KB);
-    const limit = (BUDGET_KB + 50) * KB;
+    const limit = (BUDGET_KB + 100) * KB;
     expect(
       bytes,
-      `vendor + view JS ${kb} KB exceeds ${BUDGET_KB + 50} KB budget`,
+      `vendor + client bundle ${kb} KB exceeds ${BUDGET_KB + 100} KB budget`,
     ).toBeLessThanOrEqual(limit);
   });
 
-  it('the Graph view emitter JS is a small fraction of the bundle', () => {
-    // Guard against the view emitter itself ballooning (e.g. an accidental
-    // inlined data blob). It is hand-written JS; tens of KB, not hundreds.
-    const viewKb = size(dashboardViewGraphJs()) / KB;
-    expect(viewKb).toBeLessThan(50);
+  it('our client bundle is a small fraction of the vendor weight', () => {
+    // Guard against our hand-written client JS ballooning (e.g. an accidental
+    // inlined data blob). The whole migrated bundle is tens of KB, not hundreds.
+    const bundleKb = size(DASHBOARD_CLIENT_BUNDLE) / KB;
+    expect(bundleKb).toBeLessThan(200);
   });
 
   it('projected (package-level) view-model JSON stays within the per-node/edge byte budget', () => {
