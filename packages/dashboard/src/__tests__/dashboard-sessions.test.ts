@@ -16,8 +16,6 @@ import { describe, expect, it, beforeEach } from 'vitest';
 
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardSessionsJs } from '../sessions.js';
-import { dashboardPaginationJs } from '../shared/pagination.js';
-import { dashboardSortableJs } from '../shared/sortable.js';
 
 interface StoredSessionLike {
   id: string;
@@ -48,14 +46,10 @@ return {
 `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own emitted dashboard JS.
   const factory = new Function(
-    // `el` now comes from the bundled client modules (exposes window.el); the
-    // legacy pagination/sortable/sessions emitters still reference it as a global.
-    DASHBOARD_CLIENT_BUNDLE +
-      '\n' +
-      dashboardPaginationJs() +
-      dashboardSortableJs() +
-      dashboardSessionsJs() +
-      tail,
+    // `el`, `paginateTable`, `paginateGroupedRows` and `makeSortable` now come
+    // from the bundled client modules (exposed as page globals); the legacy
+    // sessions emitter still references them by bare name.
+    DASHBOARD_CLIENT_BUNDLE + '\n' + dashboardSessionsJs() + tail,
   );
   return factory() as Env;
 }

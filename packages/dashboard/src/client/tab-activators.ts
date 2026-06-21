@@ -11,22 +11,29 @@
  * `registerTabActivator(<session.tool>, fn)` at the top of their
  * JS-string emitter — the same place `dashboardCodePathsJs()` does
  * for `'graph'`.
+ *
+ * Migrated out of the legacy String.raw emitter (L4): real, type-checked
+ * TypeScript (DOM lib) bundled into the inlined client `<script>`.
  */
-export function dashboardTabActivatorsJs(): string {
-  return String.raw`
-// =======================================================
-// TAB ACTIVATOR REGISTRY
-// =======================================================
-const tabActivators = {};
-function registerTabActivator(key, fn) {
+
+/** The minimal session shape the activator registry reads. */
+interface ActivatableSession {
+  id: string;
+  tool: string;
+}
+
+type TabActivator = (sessionId: string) => void;
+
+const tabActivators: Record<string, TabActivator> = {};
+
+export function registerTabActivator(key: string, fn: TabActivator): void {
   tabActivators[key] = fn;
 }
-function activateTabForSession(session) {
+
+export function activateTabForSession(session: ActivatableSession | null | undefined): boolean {
   if (!session) return false;
   const fn = tabActivators[session.tool];
   if (typeof fn !== 'function') return false;
   fn(session.id);
   return true;
-}
-`;
 }
