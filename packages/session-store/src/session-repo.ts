@@ -11,7 +11,7 @@ import {
   type DataStore,
   type DrizzleDataStore,
 } from '@opensip-cli/datastore';
-import { desc, eq, lt } from 'drizzle-orm';
+import { count, desc, eq, inArray, lt } from 'drizzle-orm';
 
 import { sessionHostMetrics, sessions, sessionToolPayload } from './schema/sessions.js';
 
@@ -19,6 +19,12 @@ import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contr
 import type { ToolShortId } from '@opensip-cli/core';
 
 const MODULE_NAME = 'session-store:session-repo';
+
+/** The stored tool-payload projection (opaque blob + its outer schema version). */
+interface StoredPayloadRow {
+  readonly payload: unknown;
+  readonly payload_version: number | null;
+}
 
 /** Filters for {@link SessionRepo.list}: tool short-id and/or max row count. */
 export interface SessionListOptions {
@@ -137,10 +143,15 @@ export class SessionRepo {
         : this.datastore.db.select().from(sessions);
       const ordered = baseQuery.orderBy(desc(sessions.timestamp));
       const sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
-      const results: StoredSession[] = [];
-      for (const row of sessionRows) {
-        results.push(this.hydrateSession(row));
-      }
+
+      // Batch-load payload + host-metrics for the page in two `IN (...)` queries
+      // (was two point queries per row — a 1 + 2N N+1).
+      const ids = sessionRows.map((row) => row.id);
+      const payloadsById = this.payloadsBySessionId(ids);
+      const metricsById = this.hostMetricsBySessionId(ids);
+      const results = sessionRows.map((row) =>
+        this.buildSession(row, payloadsById.get(row.id), metricsById.get(row.id)),
+      );
       logger.info({
         evt: 'session.list.complete',
         module: MODULE_NAME,
@@ -170,8 +181,8 @@ export class SessionRepo {
   }
 
   count(): number {
-    const rows = this.datastore.db.select({ id: sessions.id }).from(sessions).all();
-    return rows.length;
+    const row = this.datastore.db.select({ value: count() }).from(sessions).get();
+    return row?.value ?? 0;
   }
 
   /** Delete sessions older than the given Date. Returns affected rowcount. */
@@ -231,20 +242,10 @@ export class SessionRepo {
     return removed.changes;
   }
 
+  /** Hydrate one session via point queries — the single-row get() path. */
   private hydrateSession(row: typeof sessions.$inferSelect): StoredSession {
-    // Validate row.tool against the documented union — the SQLite column
-    // is plain text with no CHECK constraint, so a legacy or hand-edited
-    // row could carry a value outside the type. Casting blindly would
-    // silently misroute downstream consumers that branch on `tool`.
-    if (!isToolShortId(row.tool)) {
-      throw new SystemError(
-        `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
-        { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
-      );
-    }
-    // Tool-owned opaque detail. drizzle returns the JSON column already
-    // parsed; contracts does not inspect or validate the shape — that is
-    // the owning tool's responsibility.
+    // Tool-owned opaque detail — drizzle returns the JSON pre-parsed; the owning
+    // tool (not persistence) validates its shape.
     const payloadRow = this.datastore.db
       .select({
         payload: sessionToolPayload.payload,
@@ -253,6 +254,61 @@ export class SessionRepo {
       .from(sessionToolPayload)
       .where(eq(sessionToolPayload.sessionId, row.id))
       .get();
+    return this.buildSession(row, payloadRow, this.readHostMetrics(row.id));
+  }
+
+  /** Batch-load tool payloads for a page of session ids (avoids list()'s N+1). */
+  private payloadsBySessionId(ids: readonly string[]): Map<string, StoredPayloadRow> {
+    const byId = new Map<string, StoredPayloadRow>();
+    if (ids.length === 0) return byId;
+    const rows = this.datastore.db
+      .select({
+        sessionId: sessionToolPayload.sessionId,
+        payload: sessionToolPayload.payload,
+        payload_version: sessionToolPayload.payload_version,
+      })
+      .from(sessionToolPayload)
+      .where(inArray(sessionToolPayload.sessionId, ids))
+      .all();
+    for (const r of rows) {
+      byId.set(r.sessionId, { payload: r.payload, payload_version: r.payload_version });
+    }
+    return byId;
+  }
+
+  /** Batch-load host-metrics for a page of session ids (avoids list()'s N+1). */
+  private hostMetricsBySessionId(ids: readonly string[]): Map<string, StoredSessionHostMetrics> {
+    const byId = new Map<string, StoredSessionHostMetrics>();
+    if (ids.length === 0) return byId;
+    const rows = this.datastore.db
+      .select()
+      .from(sessionHostMetrics)
+      .where(inArray(sessionHostMetrics.sessionId, ids))
+      .all();
+    for (const row of rows) {
+      const metrics = this.projectHostMetrics(row);
+      if (metrics) byId.set(row.sessionId, metrics);
+    }
+    return byId;
+  }
+
+  /**
+   * Assemble a StoredSession from its base row + already-fetched payload and
+   * host-metrics. Shared by the single-row hydrate and batch list paths.
+   */
+  private buildSession(
+    row: typeof sessions.$inferSelect,
+    payloadRow: StoredPayloadRow | undefined,
+    hostMetrics: StoredSessionHostMetrics | undefined,
+  ): StoredSession {
+    // The SQLite `tool` column is plain text (no CHECK constraint); validate it
+    // against the documented union so a legacy/hand-edited value can't misroute.
+    if (!isToolShortId(row.tool)) {
+      throw new SystemError(
+        `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
+        { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
+      );
+    }
 
     const outerVersion = payloadRow?.payload_version ?? 1;
     const innerVersion = extractPayloadVersion(payloadRow?.payload);
@@ -267,8 +323,7 @@ export class SessionRepo {
         msg: 'Payload schema version newer than this CLI knows; treating as opaque (may lose fields on display).',
       });
 
-      // Emit on the per-run DiagnosticsBus for --json / CommandOutcome consumers (cross-cutting observability).
-      // Uses currentScope per RunScope rules; safe no-op when no scope (e.g. some tests).
+      // Mirror to the per-run DiagnosticsBus for --json consumers (no-op without a scope).
       const scope = currentScope();
       scope?.diagnostics?.event(
         'load',
@@ -290,7 +345,6 @@ export class SessionRepo {
       (row.completed_at == null
         ? new Date(row.timestamp + row.durationMs).toISOString() // legacy synth
         : new Date(row.completed_at).toISOString());
-    const hostMetrics = this.readHostMetrics(row.id);
 
     return {
       id: row.id,
@@ -318,7 +372,13 @@ export class SessionRepo {
       .from(sessionHostMetrics)
       .where(eq(sessionHostMetrics.sessionId, sessionId))
       .get();
-    if (!row) return undefined;
+    return row ? this.projectHostMetrics(row) : undefined;
+  }
+
+  /** Project a raw host-metrics row, dropping null columns (only captured metrics). */
+  private projectHostMetrics(
+    row: typeof sessionHostMetrics.$inferSelect,
+  ): StoredSessionHostMetrics | undefined {
     const metrics: Record<string, number> = {};
     if (row.ttyBusyMs != null) metrics.ttyBusyMs = row.ttyBusyMs;
     if (row.renderMs != null) metrics.renderMs = row.renderMs;
