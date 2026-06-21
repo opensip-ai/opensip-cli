@@ -111,7 +111,9 @@ export function warnIfInsecureOtlpEndpoint(endpoint: string): void {
     // @fitness-ignore-next-line error-handling-quality -- a malformed endpoint is the exporter's failure to surface; nothing actionable to warn here.
     return;
   }
-  if (url.protocol === 'https:') return;
+  // Only plaintext http is the leak we warn on. https is secure; any other scheme
+  // (e.g. grpc) is not what the OTLP-http exporter speaks and isn't our concern.
+  if (url.protocol !== 'http:') return;
   const host = url.hostname.replace(/^\[|\]$/g, ''); // strip IPv6 brackets
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
   logger.warn('telemetry.endpoint.insecure', {

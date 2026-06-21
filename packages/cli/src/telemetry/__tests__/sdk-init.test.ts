@@ -156,6 +156,7 @@ describe('warnIfInsecureOtlpEndpoint', () => {
     // eslint-disable-next-line sonarjs/no-clear-text-protocols -- IPv6 loopback test fixture: exercises the ::1 exemption in the helper.
     ['loopback ::1', 'http://[::1]:4318'],
     ['malformed url', 'not a url'],
+    ['non-http scheme (grpc)', 'grpc://collector.example.com:4317'],
   ])('does not warn for %s', (_label, endpoint) => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     warnIfInsecureOtlpEndpoint(endpoint);
