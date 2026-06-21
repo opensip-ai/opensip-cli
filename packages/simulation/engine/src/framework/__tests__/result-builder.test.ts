@@ -5,6 +5,7 @@ import { ASSERTIONS } from '../assertions.js';
 import { ScenarioResultBuilder, createEmptyMetrics, mergeMetrics } from '../result-builder.js';
 
 import type { SimulationMetrics } from '../../types/base-types.js';
+import type { ScenarioMetricKey } from '../scenario-metric-key.js';
 
 const baseMetrics = (overrides: Partial<SimulationMetrics> = {}): SimulationMetrics => ({
   ...createEmptyMetrics(),
@@ -144,12 +145,16 @@ describe('ScenarioResultBuilder', () => {
       expect(out.passed).toBe(true);
     });
 
-    it('returns 0 for unknown metrics', () => {
+    it('returns 0 for an unknown metric key (type-bypassed)', () => {
       const out = ScenarioResultBuilder.create('s1')
         .withMetrics(baseMetrics())
-        .evaluateAssertions([ASSERTIONS.custom('cpu_percent', 'lt', 100)])
+        // `custom` is typed to ScenarioMetricKey; bypass it to exercise the
+        // resolver's defensive default branch for a key it doesn't recognise.
+        .evaluateAssertions([
+          ASSERTIONS.custom('nonexistent_metric' as ScenarioMetricKey, 'lt', 100),
+        ])
         .build();
-      expect(out.passed).toBe(true); // 0 < 100
+      expect(out.passed).toBe(true); // unknown → 0; 0 < 100
     });
   });
 });

@@ -49,6 +49,9 @@ export interface ChaosScenarioConfig {
   readonly steadyStateAssertions: readonly ScenarioAssertion[];
   /** Assertions evaluated on the recovery (faults-lifted) metrics. */
   readonly recoveryAssertions: readonly ScenarioAssertion[];
-  /** Recovery window in milliseconds after faults lift. */
-  readonly recoveryWindow: number;
+  /**
+   * Recovery window after faults lift, in **milliseconds** (the `Ms` suffix is
+   * explicit so it doesn't read as the seconds-valued `duration` above).
+   */
+  readonly recoveryWindowMs: number;
 }

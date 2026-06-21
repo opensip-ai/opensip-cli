@@ -107,7 +107,7 @@ export default defineChaosScenario({
   // Two assertion sets — one per phase the executor runs.
   steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.05), ASSERTIONS.lowLatency('p95', 1500)],
   recoveryAssertions:    [ASSERTIONS.lowErrorRate(0.01), ASSERTIONS.lowLatency('p95', 500)],
-  recoveryWindow: 10_000,             // ms after faults lift
+  recoveryWindowMs: 10_000,           // ms after faults lift
 });
 ```
 

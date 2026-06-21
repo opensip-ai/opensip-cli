@@ -33,19 +33,6 @@
  *   - `failed_requests`                         → `failedRequests`
  *   - `errors_generated`                        → `errorsGenerated`
  *
- * Reserved keys (recognised at type-level, not yet populated by any executor;
- * resolver returns `0`):
- *
- *   - `max_latency_ms`     — produced by `ASSERTIONS.maxLatency()`.
- *   - `memory_mb`          — produced by `ASSERTIONS.memoryUsage()`.
- *   - `cpu_percent`        — produced by `ASSERTIONS.cpuUsage()`.
- *
- * These exist so the standard ASSERTIONS factories continue to type-check.
- * Until an executor records the underlying field on `SimulationMetrics`, the
- * resolver returns `0` (assertions like `cpuUsage(80)` with operator `lt`
- * therefore pass trivially). Promote a reserved key to a real one by adding
- * the underlying field to `SimulationMetrics` and a case here.
- *
  * ## Note: `success_rate` with no requests
  *
  * When `totalRequests === 0`, `successfulRequests / totalRequests` is `0/0`.
@@ -133,12 +120,6 @@ export function resolveMetric(
     }
     case 'errors_generated': {
       return metrics.errorsGenerated;
-    }
-    case 'max_latency_ms':
-    case 'memory_mb':
-    case 'cpu_percent': {
-      // Reserved: no underlying field on SimulationMetrics yet.
-      return 0;
     }
     default: {
       // Exhaustive — `ScenarioMetricKey` should narrow to never here. This

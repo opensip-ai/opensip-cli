@@ -24,7 +24,7 @@ const base = (o: Partial<ChaosScenarioConfig> = {}): ChaosScenarioConfig => ({
   fault: fault.of([fault.drop()], { probability: 1 }),
   steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.5)],
   recoveryAssertions: [ASSERTIONS.lowErrorRate(0.5)],
-  recoveryWindow: 100,
+  recoveryWindowMs: 100,
   ...o,
 });
 
@@ -117,12 +117,12 @@ describe('validateChaosScenarioConfig', () => {
       /recovery assertion/i,
     );
   });
-  it('rejects an invalid recoveryWindow (negative / non-number)', () => {
-    expect(() => validateChaosScenarioConfig(base({ recoveryWindow: -1 }))).toThrow(
-      /recoveryWindow/,
+  it('rejects an invalid recoveryWindowMs (negative / non-number)', () => {
+    expect(() => validateChaosScenarioConfig(base({ recoveryWindowMs: -1 }))).toThrow(
+      /recoveryWindowMs/,
     );
-    expect(() => validateChaosScenarioConfig(base({ recoveryWindow: 'soon' as never }))).toThrow(
-      /recoveryWindow/,
+    expect(() => validateChaosScenarioConfig(base({ recoveryWindowMs: 'soon' as never }))).toThrow(
+      /recoveryWindowMs/,
     );
   });
   it('rejects a negative rampUp', () => {

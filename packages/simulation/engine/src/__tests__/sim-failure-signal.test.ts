@@ -44,7 +44,7 @@ const chaosCfg = (o: Partial<ChaosScenarioConfig> = {}): ChaosScenarioConfig => 
   fault: fault.of([fault.drop()], { probability: 1 }),
   steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.1)],
   recoveryAssertions: [ASSERTIONS.lowErrorRate(0.5)],
-  recoveryWindow: 100,
+  recoveryWindowMs: 100,
   ...o,
 });
 

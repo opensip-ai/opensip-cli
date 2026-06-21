@@ -60,7 +60,7 @@ function defineOneOfEachKind(): void {
       fault: fault.of([fault.drop()], { probability: 0.1 }),
       steadyStateAssertions: [ASSERTIONS.lowErrorRate(1)],
       recoveryAssertions: [ASSERTIONS.lowErrorRate(1)],
-      recoveryWindow: 100,
+      recoveryWindowMs: 100,
     }),
   );
 }

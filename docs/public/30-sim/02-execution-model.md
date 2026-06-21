@@ -82,7 +82,7 @@ A load scenario that's interrupted (signal abort, timeout) drains in-flight requ
 The chaos executor drives the same shared `runLoadWindow` driver, but wraps the target with the **fault model** ([`packages/simulation/engine/src/framework/execution/fault-model.ts`](../../../packages/simulation/engine/src/framework/execution/fault-model.ts)) for the steady-state window. The full sequence:
 
 1. Build the fault model from `config.fault` (with an injectable RNG — `Math.random` in production, a stub in tests). Run the steady-state window: `runLoadWindow({ workload }, ctx, { windowMs: duration*1000, target: faultModel.wrap(config.target) })`. Per request, at `fault.probability` the model perturbs the **real** call — adds latency, aborts it, or drops it (recording a `ChaosEvent`); otherwise the call passes through unperturbed.
-2. Run the recovery window: `runLoadWindow({ workload }, ctx, { windowMs: recoveryWindow, target: config.target })` — the **bare** target, faults lifted.
+2. Run the recovery window: `runLoadWindow({ workload }, ctx, { windowMs: recoveryWindowMs, target: config.target })` — the **bare** target, faults lifted.
 3. Evaluate the `steadyStateAssertions` against the steady window's measured metrics.
 4. Evaluate the `recoveryAssertions` against the recovery window's measured metrics.
 

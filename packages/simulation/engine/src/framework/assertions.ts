@@ -84,17 +84,6 @@ export const ASSERTIONS = {
     message: `Average latency must be < ${thresholdMs}ms`,
   }),
 
-  /**
-   * Assert that max latency is below threshold.
-   * @param thresholdMs - Maximum latency in milliseconds
-   */
-  maxLatency: (thresholdMs = 2000): ScenarioAssertion => ({
-    metric: 'max_latency_ms',
-    operator: 'lt',
-    value: thresholdMs,
-    message: `Max latency must be < ${thresholdMs}ms`,
-  }),
-
   // ===========================================================================
   // THROUGHPUT
   // ===========================================================================
@@ -144,32 +133,6 @@ export const ASSERTIONS = {
     operator: 'eq',
     value: 1,
     message: 'Success rate must be 100%',
-  }),
-
-  // ===========================================================================
-  // RESOURCE USAGE
-  // ===========================================================================
-
-  /**
-   * Assert memory usage is below threshold.
-   * @param thresholdMb - Maximum memory in megabytes
-   */
-  memoryUsage: (thresholdMb: number): ScenarioAssertion => ({
-    metric: 'memory_mb',
-    operator: 'lt',
-    value: thresholdMb,
-    message: `Memory usage must be < ${thresholdMb}MB`,
-  }),
-
-  /**
-   * Assert CPU usage is below threshold.
-   * @param threshold - Maximum CPU percentage (0-100)
-   */
-  cpuUsage: (threshold: number): ScenarioAssertion => ({
-    metric: 'cpu_percent',
-    operator: 'lt',
-    value: threshold,
-    message: `CPU usage must be < ${threshold}%`,
   }),
 
   // ===========================================================================

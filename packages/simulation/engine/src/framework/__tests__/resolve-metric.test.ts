@@ -117,13 +117,6 @@ describe('resolveMetric symmetry', () => {
     expect(actualFromValidateAssertions(m, 'requests_per_second')).toBe(0);
   });
 
-  it('reserved keys (cpu_percent, memory_mb, max_latency_ms) resolve to 0', () => {
-    const m = baseMetrics();
-    expect(resolveMetric('cpu_percent', m)).toBe(0);
-    expect(resolveMetric('memory_mb', m)).toBe(0);
-    expect(resolveMetric('max_latency_ms', m)).toBe(0);
-  });
-
   it('resolves the raw count metric keys directly off SimulationMetrics', () => {
     const m = baseMetrics({
       successfulRequests: 95,

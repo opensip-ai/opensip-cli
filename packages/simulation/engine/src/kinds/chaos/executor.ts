@@ -87,7 +87,7 @@ export function createChaosScenarioRunner(
 
           // Recovery window: faults lifted — drive the bare target.
           const recovery = await runLoadWindow({ workload: config.workload }, context, {
-            windowMs: config.recoveryWindow,
+            windowMs: config.recoveryWindowMs,
             target: config.target,
           });
 
@@ -100,7 +100,7 @@ export function createChaosScenarioRunner(
           const recoveryVerdict = evaluateAssertionsForWindow(
             config.id,
             recovery.metrics,
-            config.recoveryWindow / 1000,
+            config.recoveryWindowMs / 1000,
             config.recoveryAssertions,
           );
 
@@ -135,7 +135,7 @@ export function createChaosScenarioRunner(
               steadyStateAssertions: steadyVerdict,
               recoveryAssertions: recoveryVerdict,
               chaosEvents,
-              recoveryWindowMs: config.recoveryWindow,
+              recoveryWindowMs: config.recoveryWindowMs,
             }),
           });
         } catch (error) {

@@ -7,7 +7,7 @@
  *   - a `fault` spec (client-side faults + probability)
  *   - `steadyStateAssertions` evaluated while faults are active
  *   - `recoveryAssertions` evaluated during the post-fault recovery window
- *   - `recoveryWindow` (ms) — how long after faults lift to evaluate recovery
+ *   - `recoveryWindowMs` (ms) — how long after faults lift to evaluate recovery
  */
 
 import {
@@ -98,10 +98,10 @@ function validateAssertions(config: ChaosScenarioConfig, errors: ScenarioValidat
       message: 'at least one recovery assertion is required',
     });
   }
-  if (typeof config.recoveryWindow !== 'number' || config.recoveryWindow < 0) {
+  if (typeof config.recoveryWindowMs !== 'number' || config.recoveryWindowMs < 0) {
     errors.push({
-      field: 'recoveryWindow',
-      message: 'recoveryWindow must be a non-negative number (milliseconds)',
+      field: 'recoveryWindowMs',
+      message: 'recoveryWindowMs must be a non-negative number (milliseconds)',
     });
   }
 }

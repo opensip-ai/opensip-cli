@@ -24,8 +24,6 @@ describe('ASSERTIONS factories', () => {
     ],
     ['avgLatency', () => ASSERTIONS.avgLatency(), 'avg_latency_ms', 'lt', 200],
     ['avgLatency(custom)', () => ASSERTIONS.avgLatency(50), 'avg_latency_ms', 'lt', 50],
-    ['maxLatency', () => ASSERTIONS.maxLatency(), 'max_latency_ms', 'lt', 2000],
-    ['maxLatency(custom)', () => ASSERTIONS.maxLatency(5000), 'max_latency_ms', 'lt', 5000],
     ['minThroughput', () => ASSERTIONS.minThroughput(100), 'requests_per_second', 'gte', 100],
     ['maxThroughput', () => ASSERTIONS.maxThroughput(50), 'requests_per_second', 'lte', 50],
     ['highSuccessRate(default)', () => ASSERTIONS.highSuccessRate(), 'success_rate', 'gte', 0.95],
@@ -37,8 +35,6 @@ describe('ASSERTIONS factories', () => {
       0.99,
     ],
     ['perfectSuccessRate', () => ASSERTIONS.perfectSuccessRate(), 'success_rate', 'eq', 1],
-    ['memoryUsage', () => ASSERTIONS.memoryUsage(512), 'memory_mb', 'lt', 512],
-    ['cpuUsage', () => ASSERTIONS.cpuUsage(80), 'cpu_percent', 'lt', 80],
   ])('%s produces expected ScenarioAssertion', (_name, factory, metric, operator, value) => {
     const a = factory();
     expect(a.metric).toBe(metric);
