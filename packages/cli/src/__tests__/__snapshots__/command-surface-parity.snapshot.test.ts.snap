@@ -1278,13 +1278,9 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "variadic": false,
             },
             {
-              "choices": [
-                "fit",
-                "graph",
-                "sim",
-              ],
+              "choices": undefined,
               "defaultValue": undefined,
-              "description": "Filter to one tool",
+              "description": "Filter to one tool (any registered tool id)",
               "flags": "--tool <name>",
               "negate": false,
               "optional": false,
@@ -1378,13 +1374,9 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "variadic": false,
             },
             {
-              "choices": [
-                "fit",
-                "graph",
-                "sim",
-              ],
+              "choices": undefined,
               "defaultValue": undefined,
-              "description": "Tool for latest, or an optional id sanity check",
+              "description": "Tool for latest, or an optional id sanity check (any registered tool id)",
               "flags": "--tool <name>",
               "negate": false,
               "optional": false,

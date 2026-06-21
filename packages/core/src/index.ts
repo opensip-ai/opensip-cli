@@ -250,10 +250,15 @@ export {
   TOOL_LONG_TO_SHORT,
   TOOL_SHORT_IDS,
   TOOL_SHORT_TO_LONG,
+  isBundledToolShortId,
+  isRegisteredToolId,
   isToolLongId,
   isToolShortId,
+  registeredToolShortIds,
 } from './tools/index.js';
-export type { ToolLongId, ToolShortId } from './tools/index.js';
+export type { BundledToolShortId, ToolLongId, ToolShortId } from './tools/index.js';
+// (isRegisteredToolId / registeredToolShortIds re-exported above via tools barrel;
+//  they live in tools/registered-ids.ts to keep tools/ids.ts a cycle-free leaf.)
 
 // Recipes — generic recipe registry shared by fitness + simulation.
 export { RecipeRegistry } from './recipes/registry.js';

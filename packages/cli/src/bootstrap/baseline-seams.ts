@@ -147,7 +147,7 @@ export function buildBaselineSeams(deps: {
       // are not recoverable without storing the full original envelope).
       const synthetic: SignalEnvelope = {
         schemaVersion: 2,
-        tool: tool as SignalEnvelope['tool'],
+        tool,
         runId: `baseline:${tool}`,
         createdAt: new Date(capturedAt).toISOString(),
         verdict: {

@@ -44,7 +44,7 @@ import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, sep } from 'node:path';
 
-import type { ToolShortId } from '../tools/ids.js';
+import type { BundledToolShortId } from '../tools/ids.js';
 
 // =============================================================================
 // PROJECT PATHS
@@ -90,16 +90,19 @@ export interface ProjectPaths {
 
 /**
  * Path-resolver domain set for FIRST-PARTY tools — the storage/path
- * discriminator (`'fit' | 'sim' | 'graph'`). Aliased to `ToolShortId`
- * from the central registry (audit-round-3 Finding H) so first-party
- * path/storage sites stay in sync.
+ * discriminator (`'fit' | 'sim' | 'graph'`). Aliased to
+ * `BundledToolShortId` from the central registry (audit-round-3 Finding
+ * H) so first-party path/storage sites stay in sync. This stays the
+ * CLOSED bundled union even after the M3 widening of the open session
+ * `ToolShortId`: the project path layout only knows the bundled tool
+ * directories, so type-safety here is correct.
  *
  * Note this is tool *identity*, a separate concern from plugin
  * *discovery*: `pluginsDir` / `userPluginDir` take a plain `string` so
  * third-party tools can host project-local plugins without being listed
  * here (ADR-0009 corollary 1).
  */
-export type PathDomain = ToolShortId;
+export type PathDomain = BundledToolShortId;
 
 /** Resolve the project path layout for a given project directory. */
 export function resolveProjectPaths(projectDir: string): ProjectPaths {

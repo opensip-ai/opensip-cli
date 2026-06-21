@@ -108,4 +108,32 @@ describe('resolveSession', () => {
       expect(result.detail).toContain('is a graph session, not fit');
     }
   });
+
+  // Third-party session parity (M3): the `sessions show` resolution path
+  // (latest --tool <id> and by-id) must work for a non-bundled tool, exactly
+  // as it does for fit/graph/sim above.
+  it('resolves latest for a third-party tool id', () => {
+    repo.save(makeSession({ id: 'AUDIT_OLD', tool: 'audit' }));
+    repo.save(
+      makeSession({
+        id: 'AUDIT_NEW',
+        tool: 'audit',
+        startedAt: '2026-06-01T00:00:00.000Z',
+        completedAt: '2026-06-01T00:00:00.000Z',
+      }),
+    );
+    const result = resolveSession(datastore, { ref: 'latest', tool: 'audit' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.session.id).toBe('AUDIT_NEW');
+      expect(result.session.tool).toBe('audit');
+    }
+  });
+
+  it('resolves a third-party session by id with payload hydrated', () => {
+    repo.save(makeSession({ id: 'AUDIT_BY_ID', tool: 'audit', payload: { audit: true } }));
+    const result = resolveSession(datastore, { ref: 'AUDIT_BY_ID', tool: 'audit' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.session.payload).toEqual({ audit: true });
+  });
 });

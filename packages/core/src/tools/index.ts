@@ -96,7 +96,9 @@ export {
   TOOL_LONG_TO_SHORT,
   TOOL_SHORT_IDS,
   TOOL_SHORT_TO_LONG,
+  isBundledToolShortId,
   isToolLongId,
   isToolShortId,
 } from './ids.js';
-export type { ToolLongId, ToolShortId } from './ids.js';
+export type { BundledToolShortId, ToolLongId, ToolShortId } from './ids.js';
+export { isRegisteredToolId, registeredToolShortIds } from './registered-ids.js';

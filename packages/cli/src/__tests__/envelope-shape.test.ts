@@ -67,7 +67,7 @@ function topLevelKeys(env: SignalEnvelope): string[] {
 }
 
 describe('cross-tool envelope shape', () => {
-  const tools = Object.keys(ENVELOPES) as ToolShortId[];
+  const tools = Object.keys(ENVELOPES);
 
   it('all three tools emit the same top-level key set', () => {
     const shapes = tools.map((t) => topLevelKeys(ENVELOPES[t]));

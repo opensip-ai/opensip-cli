@@ -327,20 +327,81 @@ describe('SessionRepo — optional recipe', () => {
 
 // ---------------------------------------------------------------------------
 // Hydration guard — row.tool is stored as plain text (no SQLite CHECK
-// constraint), so a legacy or hand-edited row could carry a value outside
-// the declared union. The guard turns that silent corruption into an
-// explicit throw. (The prior summary-shape guard was removed with the
-// session split: contracts no longer knows or validates the payload shape.)
+// constraint). Post-M3 the discriminant is the OPEN `ToolShortId`, so the
+// datastore-layer guard validates SHAPE only (a non-empty string), NOT closed-
+// set membership: a third-party tool's id MUST hydrate (session parity). A
+// NULL/empty value is still a hard data-integrity fault. Registry-validated
+// membership is the host's job, not the tool-vocabulary-free store.
 // ---------------------------------------------------------------------------
 
 describe('SessionRepo — hydration guards', () => {
-  it('throws on a session row whose tool value is outside the union', () => {
+  it('throws on a session row whose tool value is empty (data-integrity fault)', () => {
     repo.save(makeSession({ id: 'tool-corrupt' }));
     // Drizzle's `update` lets us poison the row without going through repo.save,
     // which is the only way to simulate a hand-edited / legacy-schema row.
-    datastore.db.update(sessions).set({ tool: 'not-a-real-tool' }).run();
-    expect(() => repo.get('tool-corrupt')).toThrow(/unknown tool value/);
-    expect(() => repo.list()).toThrow(/unknown tool value/);
+    datastore.db.update(sessions).set({ tool: '' }).run();
+    expect(() => repo.get('tool-corrupt')).toThrow(/invalid tool value/);
+    expect(() => repo.list()).toThrow(/invalid tool value/);
+  });
+
+  it('accepts an arbitrary (third-party) tool discriminant — does not re-close the set (M3)', () => {
+    repo.save(makeSession({ id: 'tp-row' }));
+    datastore.db.update(sessions).set({ tool: 'audit' }).run();
+    // No throw: the store holds zero tool vocabulary and hydrates any shape-valid id.
+    expect(repo.get('tp-row')?.tool).toBe('audit');
+    expect(repo.list().map((s) => s.tool)).toContain('audit');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Third-party session parity (M3). The closed TOOL_SHORT_IDS union used to be
+// the session/storage discriminant, so an installed/authored tool got command
+// parity but NOT session parity: its runs couldn't save → list → replay the way
+// fit/sim/graph do. This mirrors the bundled fit/sim/graph round-trip suites
+// above for a non-bundled tool id, proving the seam now accepts it end to end.
+// ---------------------------------------------------------------------------
+
+describe('SessionRepo — third-party tool session parity', () => {
+  const auditPayload = { __version: 1, summary: { total: 7, passed: 7 }, findings: [] };
+
+  it('round-trips a third-party tool session save → get unchanged', () => {
+    const session = makeSession({ id: 'audit-1', tool: 'audit', payload: auditPayload });
+    repo.save(session);
+    const fetched = repo.get('audit-1');
+    expect(fetched).not.toBeNull();
+    expect(fetched).toEqual(session); // identical to the bundled-tool assertion
+  });
+
+  it('lists a third-party tool session and honors the --tool filter', () => {
+    repo.save(makeSession({ id: 'fit-x', tool: 'fit' }));
+    repo.save(makeSession({ id: 'audit-x', tool: 'audit', payload: auditPayload }));
+    expect(repo.list().map((s) => s.id)).toContain('audit-x');
+    const onlyAudit = repo.list({ tool: 'audit' });
+    expect(onlyAudit).toHaveLength(1);
+    expect(onlyAudit[0]?.id).toBe('audit-x');
+    expect(onlyAudit[0]?.tool).toBe('audit');
+  });
+
+  it('resolves latest for a third-party tool (the replay/show entry point)', () => {
+    repo.save(
+      makeSession({
+        id: 'audit-old',
+        tool: 'audit',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+        payload: auditPayload,
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'audit-new',
+        tool: 'audit',
+        startedAt: '2026-05-09T00:00:00.000Z',
+        completedAt: '2026-05-09T00:00:00.000Z',
+        payload: auditPayload,
+      }),
+    );
+    expect(repo.latest({ tool: 'audit' })?.id).toBe('audit-new');
   });
 });
 

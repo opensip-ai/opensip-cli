@@ -301,11 +301,11 @@ export class SessionRepo {
     payloadRow: StoredPayloadRow | undefined,
     hostMetrics: StoredSessionHostMetrics | undefined,
   ): StoredSession {
-    // The SQLite `tool` column is plain text (no CHECK constraint); validate it
-    // against the documented union so a legacy/hand-edited value can't misroute.
+    // SHAPE-only guard (M3): the tool-vocabulary-free store validates the open
+    // `ToolShortId` is a non-empty string, NOT closed membership (host's job; parity).
     if (!isToolShortId(row.tool)) {
       throw new SystemError(
-        `Session ${row.id} has unknown tool value: ${JSON.stringify(row.tool)}`,
+        `Session ${row.id} has an invalid tool value: ${JSON.stringify(row.tool)}`,
         { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
       );
     }

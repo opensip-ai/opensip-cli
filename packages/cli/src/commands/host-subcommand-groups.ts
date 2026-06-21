@@ -27,9 +27,11 @@
  * `--domain` flag). Whole Tool plugins remain `opensip tools …`.
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   currentScope,
   defineCommand,
+  registeredToolShortIds,
   type CommandScopeRequirement,
   type CommandSpec,
   type PluginLayout,
@@ -69,6 +71,39 @@ export function effectiveCwd(opts: { cwd?: string; projectContext?: ProjectConte
 // sessions list / purge
 // ---------------------------------------------------------------------------
 
+/**
+ * Validate a user-supplied `--tool` filter against the live tool registry (M3).
+ *
+ * The session/persistence discriminant is the OPEN `ToolShortId`, so a
+ * registered third-party tool's id is a legitimate filter — the former static
+ * `choices: ['fit','graph','sim']` Commander enum re-closed that set and denied
+ * third-party tools session-list parity. Membership is therefore validated at
+ * RUNTIME against the per-run `ToolRegistry` (always entered for host commands)
+ * rather than a compile-time enum. Returns `undefined` (valid) or an error
+ * detail the caller emits.
+ */
+function validateToolFilter(
+  tool: string | undefined,
+): { message: string; code: string } | undefined {
+  if (tool === undefined) return undefined;
+  const registry = currentScope()?.tools;
+  // No registry (isolated tests): fall back to accepting any non-empty id — the
+  // datastore simply returns rows for that discriminant (empty when none).
+  if (registry === undefined) return undefined;
+  // Membership against the registry's session short ids (the set the
+  // `isRegisteredToolId` guard reads); used directly here so the unknown-id
+  // branch keeps `tool` typed as the original string for the message below.
+  const known = registeredToolShortIds(registry);
+  if (known.has(tool)) return undefined;
+  const knownList = [...known].sort();
+  return {
+    code: 'unknown-tool',
+    message:
+      `unknown tool '${tool}'` +
+      (knownList.length > 0 ? `; registered tools: ${knownList.join(', ')}` : ''),
+  };
+}
+
 function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'list',
@@ -78,8 +113,7 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
       {
         flag: '--tool',
         value: '<name>',
-        description: 'Filter to one tool',
-        choices: ['fit', 'graph', 'sim'],
+        description: 'Filter to one tool (any registered tool id)',
       },
       {
         flag: '--limit',
@@ -98,6 +132,15 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as { tool?: ToolShortId; limit?: number; summaryOnly?: boolean };
+      const invalid = validateToolFilter(opts.tool);
+      if (invalid) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return {
+          type: 'error',
+          message: invalid.message,
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+        };
+      }
       return showHistory(ctx.datastore() as DataStore, {
         tool: opts.tool,
         limit: opts.limit,
@@ -117,8 +160,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
       {
         flag: '--tool',
         value: '<name>',
-        description: 'Tool for latest, or an optional id sanity check',
-        choices: ['fit', 'graph', 'sim'],
+        description: 'Tool for latest, or an optional id sanity check (any registered tool id)',
       },
       {
         flag: '--filter',
@@ -148,6 +190,24 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         raw?: boolean;
       };
       const ref = opts._args[0];
+      const invalid = validateToolFilter(opts.tool);
+      if (invalid) {
+        if (opts.json === true) {
+          ctx.emitError({
+            message: invalid.message,
+            exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+            code: invalid.code,
+          });
+          return;
+        }
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        await ctx.render({
+          type: 'error',
+          message: invalid.message,
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+        });
+        return;
+      }
       const filters = normalizeFilterOption(opts.filter);
       await executeSessionShow({
         replayRegistry: ctx.sessionReplayRegistry,

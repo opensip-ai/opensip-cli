@@ -15,8 +15,8 @@
  */
 
 import {
+  isBundledToolShortId,
   isToolLongId,
-  isToolShortId,
   TOOL_LONG_TO_SHORT,
   TOOL_SHORT_TO_LONG,
 } from '@opensip-cli/core';
@@ -35,7 +35,7 @@ import type { ToolsDataPurgeResult } from '@opensip-cli/contracts';
  */
 function idFormsFor(toolId: string): readonly string[] {
   if (isToolLongId(toolId)) return [...new Set([toolId, TOOL_LONG_TO_SHORT[toolId]])];
-  if (isToolShortId(toolId)) return [...new Set([toolId, TOOL_SHORT_TO_LONG[toolId]])];
+  if (isBundledToolShortId(toolId)) return [...new Set([toolId, TOOL_SHORT_TO_LONG[toolId]])];
   return [toolId];
 }
 

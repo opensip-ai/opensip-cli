@@ -55,7 +55,7 @@ export function buildToyEnvelope(extra: readonly Signal[] = []): SignalEnvelope 
   const signals = stampFingerprints([...base, ...extra], defaultFingerprintStrategy);
   return {
     schemaVersion: 2,
-    tool: TOY_TOOL_ID as SignalEnvelope['tool'],
+    tool: TOY_TOOL_ID,
     runId: 'toy-run',
     createdAt: '1970-01-01T00:00:00.000Z',
     verdict: {
