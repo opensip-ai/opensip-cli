@@ -39,63 +39,59 @@ const httpsUrlSchema = z.string().refine(
 );
 
 /**
- * Shape of the `cli:` block in `opensip-cli.config.yml` as the CLI pre-action
- * hook reads it. The structural mirror of {@link cliConfigSchema}.
+ * `--report-to` is dual-mode: a LOCAL FILE PATH (written to disk) or a URL (the
+ * report is POSTed). A file path is accepted as-is; a URL target must be https
+ * (the report can carry findings) — so a plaintext http URL is rejected, but a
+ * bare path is not mistaken for an insecure URL.
  */
-export interface CliDefaults {
-  readonly exclude?: readonly string[];
-  readonly verbose?: boolean;
-  readonly json?: boolean;
-  readonly reportTo?: string;
-  readonly apiKey?: string;
-  readonly fileTypes?: readonly string[];
-  readonly ignore?: readonly string[];
-  readonly debug?: boolean;
-  /**
-   * Presentation settings (the `cli.ui:` sub-block). Currently just the
-   * banner size shown above each command. Unlike the other defaults this
-   * does NOT map onto a Commander flag — there is no `--banner`; it rides
-   * on `RunScope.ui` and is read by the render paths directly.
-   */
-  readonly ui?: {
-    /** Banner art: `mini` (default) | `lg` | `md` | `sm`. */
-    readonly banner?: 'lg' | 'md' | 'sm' | 'mini';
-  };
-  /**
-   * OpenSIP Cloud signal sync (ADR-0008). When the customer has an API key
-   * and is entitled to the storage tier, each run additionally emits its
-   * signals to OpenSIP Cloud (best-effort; local SQLite is unaffected).
-   * `sync` defaults to `true` when entitled — set `false` to opt out.
-   * `endpoint` overrides the built-in OpenSIP Cloud URL (must be https).
-   */
-  readonly cloud?: {
-    readonly sync?: boolean;
-    readonly endpoint?: string;
-  };
-}
+const reportToSchema = z.string().refine(
+  (value) => {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      // @fitness-ignore-next-line error-handling-quality -- not a URL ⇒ a local file path, which is a valid report target (no error to log).
+      return true;
+    }
+    return url.protocol === 'https:';
+  },
+  { message: 'a URL report target must use https:// (a local file path is also accepted)' },
+);
 
 /**
- * The Zod schema for the `cli:` document-level block. A superset of the legacy
- * fitness `CliDefaultsSchema` (it additionally claims `debug` and the
- * `cli.cloud` sub-block the permissive loader always read) so the composed
- * STRICT validation never rejects a key the loader honours. Strictness is
- * applied at the document level by the composer (`.strict()` on the namespace),
- * so nested `ui`/`cloud` objects stay lenient — matching prior behaviour.
+ * The Zod schema for the `cli:` document-level block — the SINGLE SOURCE OF TRUTH
+ * (M8) for both the {@link CliDefaults} TYPE (via `z.infer`) and validation. A
+ * superset of the legacy fitness `CliDefaultsSchema` (it additionally claims
+ * `debug` and the `cli.cloud` sub-block the permissive loader always read) so the
+ * composed STRICT validation never rejects a key the loader honours. Strictness
+ * is applied at the document level by the composer (`.strict()` on the
+ * namespace), so nested `ui`/`cloud` objects stay lenient — matching prior
+ * behaviour.
  */
 export const cliConfigSchema = z.object({
   exclude: z.array(z.string()).optional(),
   verbose: z.boolean().optional(),
   json: z.boolean().optional(),
-  reportTo: httpsUrlSchema.optional(),
+  // Dual-mode (file path | https URL) — see reportToSchema. The prior https-only
+  // schema silently disagreed with the loader (which accepted any string) AND
+  // rejected valid file paths: the M8 drift this single-sourcing exposed.
+  reportTo: reportToSchema.optional(),
   apiKey: z.string().min(1).optional(),
   fileTypes: z.array(z.string()).optional(),
   ignore: z.array(z.string()).optional(),
   debug: z.boolean().optional(),
+  // Presentation (`cli.ui:`). `banner` is the only key, and unlike the other
+  // defaults it does NOT map onto a Commander flag (there is no `--banner`) — it
+  // rides on RunScope.ui and the render paths read it directly.
   ui: z
     .object({
       banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
     })
     .optional(),
+  // OpenSIP Cloud signal sync (ADR-0008): with an API key + entitlement, each run
+  // also emits its signals to OpenSIP Cloud (best-effort; local SQLite unaffected).
+  // `sync` defaults to true when entitled — set false to opt out. `endpoint`
+  // overrides the built-in URL (must be https — enforced by httpsUrlSchema).
   cloud: z
     .object({
       sync: z.boolean().optional(),
@@ -104,8 +100,12 @@ export const cliConfigSchema = z.object({
     .optional(),
 });
 
-/** Valid `ui.banner` values; anything else is dropped (→ default applies). */
-const BANNER_VALUES: ReadonlySet<string> = new Set(['lg', 'md', 'sm', 'mini']);
+/**
+ * Shape of the `cli:` block as the CLI pre-action hook reads it — INFERRED from
+ * {@link cliConfigSchema} so the type and the validator can never drift (M8 — was
+ * previously a hand-maintained interface mirroring the schema).
+ */
+export type CliDefaults = z.infer<typeof cliConfigSchema>;
 
 /**
  * Type guard for permissive YAML reading. We accept anything that
@@ -115,52 +115,33 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** Coerce a YAML value into a `string[]` if it is one; otherwise drop it. */
-function asStringArray(value: unknown): readonly string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  if (!value.every((v) => typeof v === 'string')) return undefined;
-  return value;
-}
-
-/** Project an arbitrary YAML object into the typed `CliDefaults` shape. */
+/**
+ * Project a raw `cli:` YAML object into {@link CliDefaults} by validating each key
+ * against its OWN {@link cliConfigSchema} field (M8 — the projector is now DERIVED
+ * from the schema, not a hand-maintained third representation alongside the type
+ * and the schema).
+ *
+ * Per-field permissive, matching the long-standing loader contract + tests: a
+ * field that fails its sub-schema is dropped while the rest are kept, so one bad
+ * key never discards a whole valid block. A nested object (`ui`/`cloud`) that
+ * validates to `{}` (only unrecognised keys, which Zod strips) collapses to
+ * absent. Strict whole-document validation (typo rejection) stays the composer's
+ * job, via this same schema.
+ */
 function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
-  const out: { -readonly [K in keyof CliDefaults]: CliDefaults[K] } = {};
-  const exclude = asStringArray(raw.exclude);
-  if (exclude) out.exclude = exclude;
-  if (typeof raw.verbose === 'boolean') out.verbose = raw.verbose;
-  if (typeof raw.json === 'boolean') out.json = raw.json;
-  if (typeof raw.reportTo === 'string') out.reportTo = raw.reportTo;
-  if (typeof raw.apiKey === 'string') out.apiKey = raw.apiKey;
-  const fileTypes = asStringArray(raw.fileTypes);
-  if (fileTypes) out.fileTypes = fileTypes;
-  const ignore = asStringArray(raw.ignore);
-  if (ignore) out.ignore = ignore;
-  if (typeof raw.debug === 'boolean') out.debug = raw.debug;
-  const ui = projectUiDefaults(raw.ui);
-  if (ui) out.ui = ui;
-  const cloud = projectCloudDefaults(raw.cloud);
-  if (cloud) out.cloud = cloud;
-  return out;
-}
-
-/** Project the `cli.cloud:` sub-block (sync flag + endpoint override) into the typed shape. */
-function projectCloudDefaults(raw: unknown): CliDefaults['cloud'] | undefined {
-  if (!isPlainObject(raw)) return undefined;
-  const out: {
-    -readonly [K in keyof NonNullable<CliDefaults['cloud']>]: NonNullable<CliDefaults['cloud']>[K];
-  } = {};
-  if (typeof raw.sync === 'boolean') out.sync = raw.sync;
-  if (typeof raw.endpoint === 'string') out.endpoint = raw.endpoint;
-  return out.sync === undefined && out.endpoint === undefined ? undefined : out;
-}
-
-/** Project the `cli.ui:` sub-block into the typed shape; drop unknown banner values. */
-function projectUiDefaults(raw: unknown): CliDefaults['ui'] | undefined {
-  if (!isPlainObject(raw)) return undefined;
-  if (typeof raw.banner === 'string' && BANNER_VALUES.has(raw.banner)) {
-    return { banner: raw.banner as NonNullable<CliDefaults['ui']>['banner'] };
+  const out: Record<string, unknown> = {};
+  for (const [key, fieldSchema] of Object.entries(cliConfigSchema.shape)) {
+    if (!(key in raw)) continue;
+    const result = fieldSchema.safeParse(raw[key]);
+    if (!result.success) continue;
+    const value: unknown = result.data;
+    if (value === undefined) continue;
+    // A nested object that validated to {} (e.g. `cloud: { bogus: 1 }`) reads as
+    // absent, not an empty object — preserves the prior projector's behaviour.
+    if (isPlainObject(value) && Object.keys(value).length === 0) continue;
+    out[key] = value;
   }
-  return undefined;
+  return out;
 }
 
 /**
