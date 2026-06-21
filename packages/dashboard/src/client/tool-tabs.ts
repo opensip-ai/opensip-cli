@@ -22,21 +22,40 @@ import { renderSubtabBar } from './subtab-bar.js';
 /** Renders a tool's catalog data (checks, scenarios, …) into a subpanel. */
 type CatalogRenderer = (container: HTMLElement, data: readonly unknown[]) => void;
 
+/** Options for {@link renderToolTab}. */
+interface ToolTabOptions {
+  /** DOM id of the tool's panel element (without the leading '#'). */
+  panelId: string;
+  /** The tool's sessions, rendered in the Sessions subtab. */
+  toolSessions: readonly DashboardSession[];
+  /** CSS accent color used by the session table. */
+  accentColor: string;
+  /** Label for the catalog subtab (e.g. 'Checks', 'Scenarios'). */
+  catalogLabel: string;
+  /** Catalog rows; empty shows a graceful empty state. */
+  catalogData: readonly unknown[];
+  /** Renderer for the catalog data into the catalog subpanel. */
+  renderCatalogFn: CatalogRenderer;
+  /** The tool's recipe-catalog rows (each tool carries its own namespace). */
+  recipesData: readonly unknown[];
+}
+
 /**
  * Render a tool tab with subtabs: Sessions | Catalog | Recipes (the first subtab
  * keeps the stable id 'overview' for routing). `recipesData` is passed in so each
  * tool can carry its own recipe namespace; today fit and sim pass their global
  * recipe catalog through.
  */
-function renderToolTab(
-  panelId: string,
-  toolSessions: readonly DashboardSession[],
-  accentColor: string,
-  catalogLabel: string,
-  catalogData: readonly unknown[],
-  renderCatalogFn: CatalogRenderer,
-  recipesData: readonly unknown[],
-): void {
+function renderToolTab(options: ToolTabOptions): void {
+  const {
+    panelId,
+    toolSessions,
+    accentColor,
+    catalogLabel,
+    catalogData,
+    renderCatalogFn,
+    recipesData,
+  } = options;
   const panel = document.querySelector<HTMLElement>('#' + panelId);
   if (!panel) return;
   renderSubtabBar(panel, [
@@ -74,15 +93,15 @@ function renderToolTab(
 }
 
 export function renderFitnessTab(): void {
-  renderToolTab(
-    'panel-fitness',
-    fitSessions,
-    'var(--accent-fitness)',
-    'Checks',
-    checkCatalog,
-    (container, data) => renderChecksCatalog(container, data),
-    recipeCatalog,
-  );
+  renderToolTab({
+    panelId: 'panel-fitness',
+    toolSessions: fitSessions,
+    accentColor: 'var(--accent-fitness)',
+    catalogLabel: 'Checks',
+    catalogData: checkCatalog,
+    renderCatalogFn: (container, data) => renderChecksCatalog(container, data),
+    recipesData: recipeCatalog,
+  });
 }
 
 /** A sim scenario catalog entry (sim domain vocabulary, read structurally). */
@@ -125,13 +144,13 @@ function renderScenariosCatalog(container: HTMLElement, catalogData: readonly un
 }
 
 export function renderSimulationTab(): void {
-  renderToolTab(
-    'panel-simulation',
-    simSessions,
-    'var(--accent-sim)',
-    'Scenarios',
-    simScenarioCatalog,
-    (container, data) => renderScenariosCatalog(container, data),
-    simRecipeCatalog,
-  );
+  renderToolTab({
+    panelId: 'panel-simulation',
+    toolSessions: simSessions,
+    accentColor: 'var(--accent-sim)',
+    catalogLabel: 'Scenarios',
+    catalogData: simScenarioCatalog,
+    renderCatalogFn: (container, data) => renderScenariosCatalog(container, data),
+    recipesData: simRecipeCatalog,
+  });
 }

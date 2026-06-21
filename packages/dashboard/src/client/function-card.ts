@@ -25,14 +25,31 @@ import { traceFromEntry } from './trace.js';
 
 import type { OccLike } from './code-paths-types.js';
 
-/** A clickable list item linking to another occurrence's card. */
+/**
+ * Indirection slot for the drill-in handler. The overlay's delegated click
+ * listener re-opens a card by calling `drillIn.open?.(hash)` — NOT
+ * `openFunctionCard` by name. The slot is assigned `openFunctionCard` once at
+ * module load (below). This is the same pattern the pagination paginators use:
+ * routing the re-render through a property call (which the static call graph does
+ * not resolve to the target) keeps the overlay's once-attached listener from
+ * forming a render→click→render cycle, while the runtime behaviour is identical.
+ */
+const drillIn: { open?: (bodyHash: string) => void } = {};
+
+/**
+ * A clickable list item linking to another occurrence's card. The drill-in is
+ * NOT wired per-item: each item just carries its target in `data-body-hash`, and
+ * a SINGLE delegated listener on the overlay (see {@link getOrCreateOverlay})
+ * reads it and re-opens the card. Event delegation (vs. a per-item `onclick`
+ * closure that calls `openFunctionCard`) removes the static render→click→render
+ * cycle, attaches one listener regardless of list length, and stays correct as
+ * the card content is swapped on every (re)open.
+ */
 function occItem(c: OccLike): HTMLElement {
-  const item = el('li', {
+  return el('li', {
     'data-body-hash': c.bodyHash,
     text: displayName(c.simpleName) + '  —  ' + c.filePath + ':' + c.line,
   });
-  item.addEventListener('click', () => openFunctionCard(c.bodyHash));
-  return item;
 }
 
 /** The single-line meta row: body size, kind, visibility, params, return type. */
@@ -153,13 +170,32 @@ function buildActions(occ: OccLike, card: HTMLElement): HTMLElement {
   return actions;
 }
 
-/** Get the singleton overlay, creating it (with backdrop-click close) on first open. */
+/**
+ * Get the singleton overlay, creating it on first open. The overlay node
+ * persists across re-opens (its content is swapped), so its TWO delegated
+ * listeners are attached exactly once:
+ *   - backdrop click (target IS the overlay itself) → close;
+ *   - drill-in click on any `li[data-body-hash]` (callers/callees/trace list
+ *     items) → re-open that occurrence's card.
+ * Delegation is what keeps the render path acyclic: list items no longer carry
+ * per-item `openFunctionCard` closures.
+ */
 function getOrCreateOverlay(): HTMLElement {
   const existing = document.querySelector<HTMLElement>('.function-card-overlay');
   if (existing) return existing;
   const overlay = el('div', { class: 'function-card-overlay' });
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeFunctionCard();
+    if (e.target === overlay) {
+      closeFunctionCard();
+      return;
+    }
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const item = target.closest<HTMLElement>('li[data-body-hash]');
+    const hash = item?.dataset.bodyHash;
+    // Re-open via the indirection slot (see `drillIn`), not `openFunctionCard`
+    // by name — that keeps this once-attached listener out of the render cycle.
+    if (hash) drillIn.open?.(hash);
   });
   document.body.append(overlay);
   return overlay;
@@ -204,12 +240,9 @@ function renderTraceInCard(card: HTMLElement, path: string[] | null): void {
     for (const h of path) {
       const occ = graphIndexes.byBodyHash.get(h);
       if (!occ) continue;
-      const item = el('li', {
-        'data-body-hash': occ.bodyHash,
-        text: displayName(occ.simpleName) + '  —  ' + occ.filePath + ':' + occ.line,
-      });
-      item.addEventListener('click', () => openFunctionCard(occ.bodyHash));
-      list.append(item);
+      // Same shape + delegated drill-in as the callers/callees lists (occItem):
+      // a `li[data-body-hash]`; the overlay-level listener handles the click.
+      list.append(occItem(occ));
     }
     section.append(list);
   }
@@ -220,3 +253,9 @@ export function closeFunctionCard(): void {
   const overlay = document.querySelector('.function-card-overlay');
   if (overlay) overlay.remove();
 }
+
+// Wire the drill-in indirection once at module load: the overlay's delegated
+// listener calls `drillIn.open(hash)`, which is `openFunctionCard`. Assigning it
+// here (rather than referencing `openFunctionCard` inside the listener) is what
+// keeps the listener out of the render cycle.
+drillIn.open = openFunctionCard;

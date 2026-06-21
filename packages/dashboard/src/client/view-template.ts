@@ -237,16 +237,15 @@ export function defineRankedView(config: RankedViewConfig): void {
           rowsHost.append(el('div', { class: 'empty', text: config.emptyMessage }));
           return;
         }
-        renderFunctionRows(
-          rowsHost,
-          filtered.map(
+        renderFunctionRows(rowsHost, {
+          occurrences: filtered.map(
             (r): RankedOcc => ({ ...r.occ, __metric: r.metric, ...rowExtras(r.occ, r.metric) }),
           ),
-          config.columns,
-          config.headingText,
-          config.id,
-          true,
-        );
+          columns: config.columns,
+          heading: config.headingText,
+          viewId: config.id,
+          skipHeading: true,
+        });
       }
 
       if (hasControls) {

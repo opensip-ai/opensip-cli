@@ -30,6 +30,20 @@ export interface RowColumn {
   value: (occ: OccLike) => string | number | null | undefined;
 }
 
+/** Options for {@link renderFunctionRows}. */
+export interface FunctionRowsOptions {
+  /** The rows to render. `null`/`undefined`/empty renders the empty state. */
+  occurrences: readonly OccLike[] | null | undefined;
+  /** Column descriptors (header label + per-row value accessor). */
+  columns: readonly RowColumn[];
+  /** Section heading text; empty/missing falls back to 'Results' (count appended). */
+  heading?: string;
+  /** When set, attaches the help-drawer ⓘ button to the heading. */
+  viewId?: string;
+  /** When true, the caller renders the heading itself (helper skips it). */
+  skipHeading?: boolean;
+}
+
 export function makeSectionHeading(text: string, viewId?: string): HTMLElement {
   // Heading + optional ⓘ button that opens the help drawer for this
   // view. Coupling uses the same shape inline.
@@ -51,14 +65,8 @@ export function makeSectionHeading(text: string, viewId?: string): HTMLElement {
   return h3;
 }
 
-export function renderFunctionRows(
-  container: HTMLElement,
-  occurrences: readonly OccLike[] | null | undefined,
-  columns: readonly RowColumn[],
-  heading?: string,
-  viewId?: string,
-  skipHeading?: boolean,
-): void {
+export function renderFunctionRows(container: HTMLElement, options: FunctionRowsOptions): void {
+  const { occurrences, columns, heading, viewId, skipHeading } = options;
   while (container.firstChild) container.firstChild.remove();
   if (!occurrences || occurrences.length === 0) {
     container.append(el('div', { class: 'empty', text: 'No functions to show.' }));

@@ -80,15 +80,22 @@ function repaginate(table: HTMLElement, tbody: HTMLElement, groups: HTMLElement[
   }
 }
 
+/** Arguments for {@link sortByColumn}: the table parts + the clicked column + sort state. */
+interface SortByColumnOptions {
+  table: HTMLElement;
+  tbody: HTMLElement;
+  headers: HTMLElement[];
+  /** The clicked `<th>` (receives the asc/desc indicator). */
+  th: HTMLElement;
+  /** Zero-based index of the clicked column. */
+  colIdx: number;
+  /** Mutable sort state, toggled in place. */
+  state: SortState;
+}
+
 /** Sort the table body by `colIdx`, toggling direction when the same column repeats. */
-function sortByColumn(
-  table: HTMLElement,
-  tbody: HTMLElement,
-  headers: HTMLElement[],
-  th: HTMLElement,
-  colIdx: number,
-  state: SortState,
-): void {
+function sortByColumn(options: SortByColumnOptions): void {
+  const { table, tbody, headers, th, colIdx, state } = options;
   if (state.col === colIdx) {
     state.asc = !state.asc;
   } else {
@@ -119,7 +126,7 @@ export function makeSortable(table: HTMLElement): void {
     th.style.cursor = 'pointer';
     th.style.userSelect = 'none';
     th.addEventListener('click', () => {
-      sortByColumn(table, tbody, headers, th, colIdx, state);
+      sortByColumn({ table, tbody, headers, th, colIdx, state });
     });
   });
 }

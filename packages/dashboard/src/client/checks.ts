@@ -12,7 +12,7 @@
  */
 
 import { el } from './el.js';
-import { paginateGroupedRows, renderPageButtons } from './pagination.js';
+import { paginateGroupedRows, renderPageButtons, wirePagination } from './pagination.js';
 
 /** A check catalog entry (tool domain vocabulary, read structurally). */
 interface CheckEntry {
@@ -74,15 +74,19 @@ function renderFilteredPage(
     }),
   );
   const btns = el('div', { class: 'pagination-btns' });
-  renderPageButtons(btns, currentPage, totalPages, (p) =>
-    renderFilteredPage(pag, groups, p, totalPages),
-  );
+  // PURE renderer: buttons carry `data-page-target`; navigation is handled by the
+  // delegated listener wired once in `paginateFilteredGroups`.
+  renderPageButtons(btns, currentPage, totalPages);
   pag.append(btns);
 }
 
 /** Custom paginator for the filtered subset (only matching groups). */
 function paginateFilteredGroups(pag: HTMLElement, groups: HTMLElement[][]): void {
   const totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
+  // ONE delegated listener for the lifetime of this pagination container, set up
+  // before the first render (idempotent — re-filtering re-renders the buttons but
+  // never re-attaches the listener).
+  wirePagination(pag, (p) => renderFilteredPage(pag, groups, p, totalPages));
   renderFilteredPage(pag, groups, 0, totalPages);
 }
 

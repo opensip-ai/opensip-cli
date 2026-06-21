@@ -382,6 +382,67 @@ describe('Function Card overlay', () => {
     expect(document.querySelector('.function-card-overlay')!.textContent).toContain('caller');
   });
 
+  it('clicking a caller list item drills into that function (delegated listener)', () => {
+    // Drill-in is now handled by ONE delegated listener on the overlay (the
+    // graph:cycle break), not per-item onclick closures — this proves a real
+    // click on a `li[data-body-hash]` still re-opens the target's card.
+    bootDashboard({
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        target: [makeOcc({ bodyHash: 't1', simpleName: 'target' })],
+        theCaller: [
+          makeOcc({
+            bodyHash: 'cr',
+            simpleName: 'theCaller',
+            filePath: 'packages/cli/src/cr.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 1,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+      },
+    });
+    w().openFunctionCard('t1');
+    const overlay = document.querySelector('.function-card-overlay')!;
+    expect(overlay.querySelector('.function-card h3')!.textContent).toBe('target');
+
+    // The Callers section lists the caller as a clickable li[data-body-hash].
+    const callerItem = overlay.querySelector<HTMLElement>('li[data-body-hash="cr"]');
+    expect(callerItem).not.toBeNull();
+    callerItem!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // Still a single overlay (singleton), now showing the caller's card.
+    expect(document.querySelectorAll('.function-card-overlay').length).toBe(1);
+    expect(document.querySelector('.function-card h3')!.textContent).toBe('theCaller');
+  });
+
+  it('clicking a non-item region inside the card does NOT close or drill', () => {
+    bootDashboard({
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: { f: [makeOcc({ bodyHash: 'h', simpleName: 'f' })] },
+    });
+    w().openFunctionCard('h');
+    const meta = document.querySelector<HTMLElement>('.fc-meta')!;
+    meta.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // Card stays open and unchanged (the click bubbled to the overlay but matched
+    // neither the backdrop nor a li[data-body-hash]).
+    expect(document.querySelector('.function-card-overlay')).not.toBeNull();
+    expect(document.querySelector('.function-card h3')!.textContent).toBe('f');
+  });
+
   it('closeFunctionCard removes the overlay node', () => {
     bootDashboard({
       version: '2.0',

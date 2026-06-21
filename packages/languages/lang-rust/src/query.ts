@@ -86,48 +86,7 @@ function extractImport(node: Node): readonly ExtractedImport[] {
   }
   /* v8 ignore next -- a use_declaration always has a path-bearing body */
   if (!body) return [];
-  return expandUseSegment(body, '');
-}
-
-function expandUseSegment(node: Node, prefix: string): readonly ExtractedImport[] {
-  const join = (seg: string): string => (prefix ? `${prefix}::${seg}` : seg);
-  const simple = pathText(node);
-  if (simple !== null) {
-    const full = join(simple);
-    return [{ specifier: full, names: [leafName(full)] }];
-  }
-  if (node.type === 'use_as_clause') {
-    const inner = node.namedChild(0);
-    /* v8 ignore next -- a use_as_clause always wraps a path node */
-    return inner ? expandUseSegment(inner, prefix) : [];
-  }
-  if (node.type === 'use_wildcard') {
-    const inner = node.namedChild(0);
-    const base = inner ? pathText(inner) : null;
-    const full = base === null ? join('*') : `${join(base)}::*`;
-    return [{ specifier: full, names: [] }];
-  }
-  if (node.type === 'scoped_use_list') {
-    return expandScopedUseList(node, prefix);
-  }
-  /* v8 ignore next 3 -- bare top-level use_list / unknown shapes are not
-     produced for well-formed source the walker reaches */
-  if (node.type === 'use_list') {
-    return expandUseListItems(node, prefix);
-  }
-  return [];
-}
-
-function expandScopedUseList(node: Node, prefix: string): readonly ExtractedImport[] {
-  let pathSeg = '';
-  let list: Node | null = null;
-  for (const c of namedChildrenOf(node)) {
-    if (c.type === 'use_list') list = c;
-    else if (list === null) pathSeg = pathText(c) ?? '';
-  }
-  /* v8 ignore next -- a scoped_use_list always contains its use_list */
-  if (!list) return [];
-  return expandUseListItems(list, joinPath(prefix, pathSeg));
+  return expandUseTree(body, '');
 }
 
 /** Join a path prefix and a segment with `::`, dropping empty parts. */
@@ -137,16 +96,93 @@ function joinPath(prefix: string, segment: string): string {
   return `${prefix}::${segment}`;
 }
 
-function expandUseListItems(list: Node, prefix: string): readonly ExtractedImport[] {
+/**
+ * Single self-recursive walker over a `use`-tree node. Mirrors the Rust
+ * grammar's nesting (`use a::{b, c::{d}}`) by dispatching on the node type and
+ * recursing into list items / aliased inner paths with the accumulated `prefix`:
+ *
+ *   - simple path (`identifier`/`crate`/`super`/`self`/`scoped_identifier`)
+ *     → one import `prefix::<path>` named by its terminal segment.
+ *   - `use_as_clause` (`p as q`) → recurse into the underlying path (the alias
+ *     name is dropped; the terminal segment of the path is the import name).
+ *   - `use_wildcard` (`p::*`) → one glob import with no names.
+ *   - `scoped_use_list` (`p::{…}`) → recurse each list item under `prefix::p`.
+ *   - bare `use_list` (`{…}`) → recurse each list item under `prefix`.
+ *   - `self` AS A LIST ITEM refers to the enclosing prefix path itself.
+ *
+ * Consolidated from the former mutual recursion (`expandUseSegment` ↔
+ * `expandScopedUseList` ↔ `expandUseListItems`) into one function so the static
+ * call graph sees a single self-recursive walker (no inter-function cycle); the
+ * behaviour is byte-identical.
+ */
+function expandUseTree(node: Node, prefix: string): readonly ExtractedImport[] {
+  const join = (seg: string): string => (prefix ? `${prefix}::${seg}` : seg);
+
+  const simple = pathText(node);
+  if (simple !== null) {
+    const full = join(simple);
+    return [{ specifier: full, names: [leafName(full)] }];
+  }
+
+  if (node.type === 'use_as_clause') {
+    const inner = node.namedChild(0);
+    /* v8 ignore next -- a use_as_clause always wraps a path node */
+    return inner ? expandUseTree(inner, prefix) : [];
+  }
+
+  if (node.type === 'use_wildcard') {
+    const inner = node.namedChild(0);
+    const base = inner ? pathText(inner) : null;
+    const full = base === null ? join('*') : `${join(base)}::*`;
+    return [{ specifier: full, names: [] }];
+  }
+
+  // Both list shapes resolve to (a `use_list` node, the prefix its items extend)
+  // and then iterate those items — recursing into each via this same walker.
+  // `scoped_use_list` (`p::{…}`) carries a path segment ahead of its list, so its
+  // items extend `prefix::p`; a bare `use_list` (`{…}`) extends `prefix` unchanged.
+  // The list iteration is inlined (no helper) so the call graph sees ONE
+  // self-recursive walker rather than the former mutual recursion.
+  const { list, listPrefix } = resolveUseList(node, prefix);
+  if (!list) return [];
+
+  // `self` AS A LIST ITEM refers to the enclosing prefix path itself
+  // (`use a::{self}` → import `a`); every other item recurses under `listPrefix`.
   const out: ExtractedImport[] = [];
   for (const item of namedChildrenOf(list)) {
     if (item.type === 'self') {
-      out.push({ specifier: prefix, names: [leafName(prefix)] });
+      out.push({ specifier: listPrefix, names: [leafName(listPrefix)] });
       continue;
     }
-    out.push(...expandUseSegment(item, prefix));
+    out.push(...expandUseTree(item, listPrefix));
   }
   return out;
+}
+
+/**
+ * Resolve a use-tree node to its `use_list` and the prefix that list's items
+ * extend, or `{ list: null }` for a non-list node. Split out (a pure node→data
+ * helper that does NOT recurse) so {@link expandUseTree} stays a single
+ * self-recursive walker with no cross-function cycle.
+ */
+function resolveUseList(node: Node, prefix: string): { list: Node | null; listPrefix: string } {
+  if (node.type === 'scoped_use_list') {
+    let pathSeg = '';
+    let list: Node | null = null;
+    for (const c of namedChildrenOf(node)) {
+      if (c.type === 'use_list') list = c;
+      else if (list === null) pathSeg = pathText(c) ?? '';
+    }
+    /* v8 ignore next -- a scoped_use_list always contains its use_list */
+    if (!list) return { list: null, listPrefix: prefix };
+    return { list, listPrefix: joinPath(prefix, pathSeg) };
+  }
+  /* v8 ignore next 3 -- a bare top-level use_list (or any other shape) is not
+     produced for well-formed source the walker reaches */
+  if (node.type === 'use_list') {
+    return { list: node, listPrefix: prefix };
+  }
+  return { list: null, listPrefix: prefix };
 }
 
 const FUNCTION_NODE_TYPES = new Set(['function_item', 'closure_expression']);
