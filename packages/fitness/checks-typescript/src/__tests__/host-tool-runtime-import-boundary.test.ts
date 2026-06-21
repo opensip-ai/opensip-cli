@@ -10,6 +10,7 @@ import { checks } from '../index.js';
 
 const DISCOVERY_PATH = 'packages/cli/src/bootstrap/register-tools.ts';
 const ADMISSION_PATH = 'packages/cli/src/bootstrap/admit-tool-package.ts';
+const WORKER_ENTRY_PATH = 'packages/cli/src/bootstrap/tool-command-worker-entry.ts';
 const OTHER_CLI_PATH = 'packages/cli/src/commands/plugin.ts';
 
 function check() {
@@ -63,6 +64,36 @@ describe('analyzeHostToolRuntimeImportBoundary (AST)', () => {
     );
     expect(v).toHaveLength(1);
     expect(v[0]?.message).toContain('admission/discovery boundary');
+  });
+
+  it('allows the ADR-0054 worker-owned dispatch plane (worker entry) with policy', () => {
+    // The worker entry runs in the FORKED worker process; importing the external
+    // runtime there is the isolation goal, not a host-process import. Allowed,
+    // but still requires an explicit source policy.
+    const v = analyzeHostToolRuntimeImportBoundary(
+      [
+        "import { hostRuntimeImportPolicyFor, importToolRuntime } from './admit-tool-package.js';",
+        'export async function run(dir: string, source: ToolSource) {',
+        '  return importToolRuntime(dir, hostRuntimeImportPolicyFor(source));',
+        '}',
+      ].join('\n'),
+      WORKER_ENTRY_PATH,
+    );
+    expect(v).toEqual([]);
+  });
+
+  it('flags a missing policy in the worker entry too', () => {
+    const v = analyzeHostToolRuntimeImportBoundary(
+      [
+        "import { importToolRuntime } from './admit-tool-package.js';",
+        'export async function run(dir: string) {',
+        '  return importToolRuntime(dir);',
+        '}',
+      ].join('\n'),
+      WORKER_ENTRY_PATH,
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain('explicit source policy');
   });
 
   it('allows the defining module to call its local function with policy', () => {

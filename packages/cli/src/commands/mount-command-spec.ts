@@ -157,6 +157,19 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
     // runs. No-op for host commands whose leaner context carries no run plane.
     ctx.beginRun?.();
     try {
+      // ADR-0054 out-of-process dispatch: for an EXTERNAL-provenance tool the
+      // host forks a worker that imports the untrusted runtime and runs the
+      // handler, instead of importing + invoking it in-process. The hook (bound
+      // per-tool by `mountOneTool`) returns `true` when it dispatched — the
+      // action then skips the in-process handler + output dispatch entirely (the
+      // hook already replayed the worker's result through the host seams).
+      // Bundled tools (and host commands with no hook) fall through to the
+      // in-process path below, byte-identical to before.
+      const dispatched = await ctx.maybeDispatchExternal?.(spec.name, optsWithArgs, positionals);
+      if (dispatched === true) {
+        diagnostics?.event('execute', 'debug', `command '${spec.name}' dispatched out-of-process`);
+        return;
+      }
       const result = await spec.handler(optsWithArgs, ctx);
       diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
       // Static-path completion: if the handler returned a ToolRunCompletion with

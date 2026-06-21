@@ -7,6 +7,7 @@ import {
 } from '../commands/internal-command-visibility.js';
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
+import { buildMaybeDispatchExternal } from './bind-external-dispatch.js';
 import { bindToolCliContext } from './bind-tool-context.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { decorateToolPrimary } from './decorate-tool-primary.js';
@@ -130,7 +131,17 @@ export function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContex
     return;
   }
 
-  const toolCtx = bindToolCliContext(tool, ctx);
+  // ADR-0054: the bound per-tool context carries the out-of-process dispatch
+  // hook. The action body calls `maybeDispatchExternal`; for an external-
+  // provenance tool it forks a worker (importing the untrusted runtime there)
+  // instead of running the handler in-host, then replays the worker's result
+  // through the SAME bound (tool-scoped) seams. Bundled tools fall through to
+  // the in-process path. Merged here so host commands (lean context) never
+  // carry it.
+  const boundCtx = bindToolCliContext(tool, ctx);
+  const toolCtx: ToolCliContext = Object.assign(boundCtx, {
+    maybeDispatchExternal: buildMaybeDispatchExternal(tool, boundCtx),
+  });
   const mountedByName = mountFlatSpecs(program, tool, toolCtx);
 
   // Host-owned uniform decoration of the tool PRIMARY (the flat run command

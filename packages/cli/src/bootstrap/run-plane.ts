@@ -93,6 +93,21 @@ export interface RunActionHooks {
    * is no transitional generic-session writer left on the launch surface.
    */
   readonly completeRun?: (result: unknown) => void;
+  /**
+   * ADR-0054 out-of-process dispatch seam. When present AND the owning tool is
+   * EXTERNAL-provenance, the command action calls this INSTEAD of invoking
+   * `spec.handler(...)` in-process — the worker imports the untrusted runtime,
+   * runs the handler, and this seam replays the slim result through the host
+   * seams. Returns `true` when it dispatched (the action skips the in-process
+   * path); `false`/absent when the tool is bundled (the action runs the handler
+   * in-process as today). Bound per-tool by `mountOneTool` with the tool's
+   * provenance; absent for host commands (whose lean context has no run plane).
+   */
+  readonly maybeDispatchExternal?: (
+    commandName: string,
+    opts: Record<string, unknown>,
+    positionals: readonly unknown[],
+  ) => Promise<boolean>;
 }
 
 /**

@@ -6,7 +6,13 @@
  * metadata, not executable CommandSpec/RPC descriptors. That exception must
  * remain explicit: every importToolRuntime call needs a source policy, and no
  * new production call sites should appear outside the admission/discovery
- * boundary.
+ * boundary OR the worker-owned dispatch plane.
+ *
+ * The worker entry (`tool-command-worker-entry.ts`) is a sanctioned call site:
+ * it runs in the FORKED worker process, not the host — importing the untrusted
+ * runtime there is the ADR-0054 isolation goal, not a host-process import. It is
+ * allowlisted alongside the admission/discovery boundary; both still require an
+ * explicit source policy so external runtime execution stays visible.
  */
 // @fitness-ignore-file shipped-checks-must-be-generic -- dogfood check for this repo's ADR-0054 migration boundary; AST precision keeps the temporary import exception mechanically narrow.
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
@@ -21,6 +27,10 @@ const ALLOWED_CALLSITE_SUFFIXES = new Set([
   'packages/cli/src/bootstrap/admit-tool-package.ts',
   'packages/cli/src/bootstrap/register-tools.ts',
   'packages/cli/src/bootstrap/register-tools-discovery.ts',
+  // ADR-0054 worker-owned dispatch plane: this entry runs in the FORKED worker
+  // process (not the host), so importing the external runtime here is the
+  // isolation goal. Still requires an explicit source policy.
+  'packages/cli/src/bootstrap/tool-command-worker-entry.ts',
 ]);
 
 function normalized(path: string): string {

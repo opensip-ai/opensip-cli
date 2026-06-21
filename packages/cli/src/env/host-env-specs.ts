@@ -102,6 +102,27 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'incident response (kill switch wins).',
   },
   {
+    canonical: 'OPENSIP_CLI_EXTERNAL_WORKER',
+    // Strict `=1` gate. Opt-in for the ADR-0054 out-of-process dispatch plane
+    // (M4 vertical slice): when on, an EXTERNAL-provenance tool command runs in
+    // a forked worker (the worker imports the untrusted runtime) instead of
+    // in-process. Default OFF so production behaviour — and the bundled ≡
+    // installed parity invariant (ADR-0027) — is byte-identical: the slice only
+    // marshals the final-result-return seam subset, so it is not the default for
+    // arbitrary tools until the host-RPC seams land (ADR-0054 M4-E).
+    coerce: (raw) => raw === '1',
+    default: false,
+    docs:
+      'Set to 1 to enable the ADR-0054 out-of-process dispatch plane: external ' +
+      '(installed / project-local / user-global) tool commands run in a forked ' +
+      'worker that imports the untrusted runtime, instead of in the host process. ' +
+      'Default off (external tools run in-process, byte-identical to bundled). ' +
+      'Experimental: the current slice marshals only the final-result-return ' +
+      'context seams (render / json / envelope / raw / error / exit code); a tool ' +
+      'command that calls a host-RPC seam (datastore / egress / SARIF / baselines ' +
+      '/ toolState) under this flag fails loudly rather than silently no-op.',
+  },
+  {
     canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     // Mirror parseAllowlist's split (whitespace AND comma) so the registry value
     // and tool-trust's set agree exactly — including the `*` token, which passes

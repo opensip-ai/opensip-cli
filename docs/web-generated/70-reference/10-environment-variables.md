@@ -52,6 +52,7 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
+| `OPENSIP_CLI_EXTERNAL_WORKER` | Set to `1` to enable the ADR-0054 out-of-process dispatch plane: external (installed / project-local / user-global) tool commands run in a forked worker that imports the untrusted runtime, instead of in the host process. Default off (external tools run in-process, byte-identical to bundled). Experimental: the current slice marshals only the final-result-return context seams (`render` / `emitJson` / `emitEnvelope` / `emitRaw` / `emitError` / exit code); a tool command that calls a host-RPC seam (datastore / egress / SARIF / baselines / `toolState`) under this flag fails loudly rather than silently no-op. |
 
 ## Command surface
 

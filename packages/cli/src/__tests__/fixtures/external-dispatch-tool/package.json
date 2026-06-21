@@ -1,0 +1,19 @@
+{
+  "name": "@opensip-cli-fixture/external-dispatch-tool",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "external-dispatch-tool",
+    "stableId": "f1e2d3c4-b5a6-4789-90ab-cdef01234567",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "ext-run",
+        "description": "fixture external command exercising the ADR-0054 dispatch boundary"
+      }
+    ]
+  }
+}
