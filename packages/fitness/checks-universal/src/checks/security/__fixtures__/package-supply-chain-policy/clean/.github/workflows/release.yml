@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC token for npm trusted publishing
+    steps:
+      - run: pnpm install --frozen-lockfile
+
+      # OIDC trusted publishing covers `npm publish` (no long-lived token here).
+      - run: npm publish --provenance --access public
+
+      # `npm dist-tag` is NOT covered by OIDC, so the staged→latest promotion
+      # legitimately needs a classic token. A token confined to this step is
+      # acceptable and must NOT trip publish-token-exposure.
+      - name: Promote staged release to latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm dist-tag add my-pkg@1.0.0 latest

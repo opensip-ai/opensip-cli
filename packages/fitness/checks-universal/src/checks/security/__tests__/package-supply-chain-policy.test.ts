@@ -138,6 +138,123 @@ describe('package-supply-chain-policy', () => {
     }
   });
 
+  it('does not flag a dist-tag promotion token in an OIDC publish workflow', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'oidc-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      // The release.yml pattern: OIDC publish (`id-token: write` +
+      // `npm publish --provenance`) plus a classic token used solely for the
+      // OIDC-uncovered `npm dist-tag add` promotion step.
+      writeFixture(
+        cwd,
+        '.github/workflows/release.yml',
+        [
+          'name: Release',
+          'jobs:',
+          '  publish:',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm install --frozen-lockfile',
+          '      - run: npm publish --provenance --access public',
+          '      - name: Promote staged release to latest',
+          '        env:',
+          '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}',
+          '        run: npm dist-tag add my-pkg@1.0.0 latest',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).not.toContain('publish-token-exposure');
+      expect(types).not.toContain('trusted-publishing-missing-oidc');
+      expect(types).not.toContain('publish-provenance-missing');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('still flags a publish token when the workflow has no dist-tag justification', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'oidc-no-disttag-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      // OIDC publish + token but NO `npm dist-tag` — there is no
+      // OIDC-uncovered operation to justify the token, so it is still flagged.
+      writeFixture(
+        cwd,
+        '.github/workflows/release.yml',
+        [
+          'name: Release',
+          'jobs:',
+          '  publish:',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm install --frozen-lockfile',
+          '      - run: npm publish --provenance --access public',
+          '        env:',
+          '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).toContain('publish-token-exposure');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('flags remote package-lock entries that lack integrity', async () => {
     const cwd = makeProject();
     try {

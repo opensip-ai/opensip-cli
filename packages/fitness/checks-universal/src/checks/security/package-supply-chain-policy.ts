@@ -581,14 +581,25 @@ function checkTrustedPublishing(snapshot: ProjectSnapshot, violations: CheckViol
       });
     }
     if (/(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(workflow.content)) {
-      pushViolation(violations, {
-        filePath: workflow.filePath,
-        type: 'publish-token-exposure',
-        message: `${workflow.relPath} references a long-lived npm publish token`,
-        suggestion:
-          'Prefer npm trusted publishing/OIDC. Remove NPM_TOKEN/NODE_AUTH_TOKEN from publish jobs after migration.',
-        line: lineOf(workflow.content, /NPM_TOKEN|NODE_AUTH_TOKEN/),
-      });
+      // OIDC trusted publishing covers `npm publish` only — it does NOT cover
+      // `npm dist-tag`. A staged-publish→promote lane that publishes via OIDC
+      // but uses a classic token solely for `npm dist-tag add` (e.g. promoting
+      // a release-candidate tag to `latest`) is the legitimate, OIDC-uncovered
+      // exception, so we do not flag its token. We still flag token-based
+      // publish (a token with no `id-token: write`) and a token alongside
+      // `npm publish` with no `npm dist-tag` justification.
+      const usesDistTag = /\bnpm\s+dist-tag\b/.test(workflow.content);
+      const usesOidc = /id-token:\s*write/.test(workflow.content);
+      if (!(usesDistTag && usesOidc)) {
+        pushViolation(violations, {
+          filePath: workflow.filePath,
+          type: 'publish-token-exposure',
+          message: `${workflow.relPath} references a long-lived npm publish token`,
+          suggestion:
+            'Prefer npm trusted publishing/OIDC. Remove NPM_TOKEN/NODE_AUTH_TOKEN from publish jobs after migration. A token confined to `npm dist-tag` promotion in an OIDC publish workflow is acceptable (OIDC does not cover dist-tag).',
+          line: lineOf(workflow.content, /NPM_TOKEN|NODE_AUTH_TOKEN/),
+        });
+      }
     }
   }
 }
@@ -637,7 +648,7 @@ export const packageSupplyChainPolicy = defineCheck({
 - Install-time lifecycle scripts and missing install-script allowlists
 - Missing dependency release-age gates
 - CI install commands that can rewrite lockfiles
-- npm publish workflows that lack OIDC/provenance or still use long-lived tokens
+- npm publish workflows that lack OIDC/provenance or still use long-lived tokens (a token confined to \`npm dist-tag\` promotion in an OIDC publish workflow is exempt — OIDC covers \`npm publish\`, not \`npm dist-tag\`)
 
 **Why it matters:** Modern npm-family attacks often execute during installation, exploit fresh compromised versions before takedown, or bypass weakened lockfile/install-script policy. These checks keep the project in a fail-closed posture before dependency code runs in CI or developer machines.
 
