@@ -6,7 +6,15 @@
  * these tests (pnpm --filter=opensip-cli build).
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -281,30 +289,44 @@ describe('CLI e2e', () => {
     // by the host RunTimer (the tool supplies none), with host-side overhead on
     // a sibling metrics record — proven end-to-end, not just at the unit level.
     it('a real fit run persists a host-stamped StoredSession (new timing fields + host metrics)', () => {
-      // Human path (no --json) persists the session via the host run plane.
-      const fit = cli.run(['fit', '--check', 'no-eval'], { cwd: FIXTURE });
-      expect([0, 1]).toContain(fit.exitCode);
+      // This test is STATE-DEPENDENT: the session written by the first invocation
+      // must survive to the second (`sessions list`). The shared in-tree fixture
+      // is wiped by `beforeEach` AND used concurrently by tool-initialize-lifecycle
+      // .test.ts, so under parallel workers a wipe/write could clobber the DB
+      // across the fit→list window. Run against an ISOLATED temp copy so the
+      // round-trip is deterministic.
+      const proj = mkdtempSync(join(tmpdir(), 'opensip-e2e-session-'));
+      try {
+        cpSync(FIXTURE, proj, { recursive: true });
+        rmSync(join(proj, 'opensip-cli', '.runtime'), { recursive: true, force: true });
 
-      const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], { cwd: FIXTURE });
-      expect(exitCode).toBe(0);
-      const outcome = JSON.parse(stdout) as { data?: { sessions?: Record<string, unknown>[] } };
-      const sessions = outcome.data?.sessions ?? [];
-      expect(sessions.length).toBeGreaterThanOrEqual(1);
+        // Human path (no --json) persists the session via the host run plane.
+        const fit = cli.run(['fit', '--check', 'no-eval'], { cwd: proj });
+        expect([0, 1]).toContain(fit.exitCode);
 
-      const s = sessions[0];
-      expect(s.tool).toBe('fit');
-      // Host-stamped lifecycle timing (the tool never supplies these).
-      expect(typeof s.startedAt).toBe('string');
-      expect(typeof s.completedAt).toBe('string');
-      expect(typeof s.durationMs).toBe('number');
-      expect(s.durationMs as number).toBeGreaterThanOrEqual(0);
-      // The legacy single `timestamp` field is gone (split into startedAt/completedAt).
-      expect(s).not.toHaveProperty('timestamp');
-      // Sibling host-metrics record is hydrated onto the session, separate from
-      // the canonical durationMs (host write cost lives in persistMs).
-      const hostMetrics = s.hostMetrics as Record<string, unknown> | undefined;
-      expect(hostMetrics).toBeDefined();
-      expect(typeof hostMetrics?.persistMs).toBe('number');
+        const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], { cwd: proj });
+        expect(exitCode).toBe(0);
+        const outcome = JSON.parse(stdout) as { data?: { sessions?: Record<string, unknown>[] } };
+        const sessions = outcome.data?.sessions ?? [];
+        expect(sessions.length).toBeGreaterThanOrEqual(1);
+
+        const s = sessions[0];
+        expect(s.tool).toBe('fit');
+        // Host-stamped lifecycle timing (the tool never supplies these).
+        expect(typeof s.startedAt).toBe('string');
+        expect(typeof s.completedAt).toBe('string');
+        expect(typeof s.durationMs).toBe('number');
+        expect(s.durationMs as number).toBeGreaterThanOrEqual(0);
+        // The legacy single `timestamp` field is gone (split into startedAt/completedAt).
+        expect(s).not.toHaveProperty('timestamp');
+        // Sibling host-metrics record is hydrated onto the session, separate from
+        // the canonical durationMs (host write cost lives in persistMs).
+        const hostMetrics = s.hostMetrics as Record<string, unknown> | undefined;
+        expect(hostMetrics).toBeDefined();
+        expect(typeof hostMetrics?.persistMs).toBe('number');
+      } finally {
+        rmSync(proj, { recursive: true, force: true });
+      }
     });
   });
 
