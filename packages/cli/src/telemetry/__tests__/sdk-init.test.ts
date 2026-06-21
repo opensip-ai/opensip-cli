@@ -1,6 +1,6 @@
-import { TimeoutError } from '@opensip-cli/core';
+import { TimeoutError, logger } from '@opensip-cli/core';
 import { trace } from '@opentelemetry/api';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   initTelemetry,
@@ -9,6 +9,7 @@ import {
   resetTelemetryForTests,
   runWithTelemetryContext,
   shutdownTelemetry,
+  warnIfInsecureOtlpEndpoint,
 } from '../sdk-init.js';
 
 /**
@@ -137,5 +138,28 @@ describe('raceWithTimeout (fail-safe shutdown bound)', () => {
       /* intentionally pending */
     });
     await expect(raceWithTimeout(neverSettles, 10)).rejects.toBeInstanceOf(TimeoutError);
+  });
+});
+
+describe('warnIfInsecureOtlpEndpoint', () => {
+  it('warns for a remote plaintext http endpoint (identity may egress unencrypted)', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    warnIfInsecureOtlpEndpoint('http://collector.example.com:4318/v1/traces');
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it.each([
+    ['https remote', 'https://collector.example.com/v1/traces'],
+    ['loopback localhost', 'http://localhost:4318/v1/traces'],
+    ['loopback 127.0.0.1', 'http://127.0.0.1:4318'],
+    // eslint-disable-next-line sonarjs/no-clear-text-protocols -- IPv6 loopback test fixture: exercises the ::1 exemption in the helper.
+    ['loopback ::1', 'http://[::1]:4318'],
+    ['malformed url', 'not a url'],
+  ])('does not warn for %s', (_label, endpoint) => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    warnIfInsecureOtlpEndpoint(endpoint);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

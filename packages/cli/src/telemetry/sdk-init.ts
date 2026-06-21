@@ -96,6 +96,33 @@ let meterProvider: MeterProvider | undefined;
 let parentContext: Context | undefined;
 
 /**
+ * Warn when the OTLP endpoint targets a non-loopback host over plaintext http.
+ * Traces can carry identity (`tenant_id`/`run_id` via OTEL_RESOURCE_ATTRIBUTES),
+ * so a remote plaintext collector leaks it on the wire — the same risk the cloud
+ * signal/report egress refuses outright. Loopback dev collectors
+ * (localhost/127.0.0.1/::1) are exempt; https is the fix for remote ones. We warn
+ * rather than refuse — telemetry is strictly opt-in. Exported for tests.
+ */
+export function warnIfInsecureOtlpEndpoint(endpoint: string): void {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- a malformed endpoint is the exporter's failure to surface; nothing actionable to warn here.
+    return;
+  }
+  if (url.protocol === 'https:') return;
+  const host = url.hostname.replace(/^\[|\]$/g, ''); // strip IPv6 brackets
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
+  logger.warn('telemetry.endpoint.insecure', {
+    evt: 'telemetry.endpoint.insecure',
+    module: 'cli:telemetry',
+    endpoint,
+    msg: `OTLP endpoint '${endpoint}' uses plaintext ${url.protocol}// to a non-loopback host; traces can carry identity (tenant_id/run_id from OTEL_RESOURCE_ATTRIBUTES) and will egress unencrypted. Use https:// for remote collectors.`,
+  });
+}
+
+/**
  * Initialize OpenTelemetry tracing, gated on `OTEL_EXPORTER_OTLP_ENDPOINT`.
  *
  * No-op when the endpoint env var is falsy, or when already started (idempotent
@@ -109,6 +136,7 @@ export function initTelemetry(cliEntryUrl: string): void {
   if (started) return;
   const endpoint = hostEnv.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT');
   if (!endpoint) return;
+  warnIfInsecureOtlpEndpoint(endpoint);
 
   // Resource: explicit service identity merged with consumer-supplied
   // attributes from OTEL_RESOURCE_ATTRIBUTES (via the env detector), e.g.
