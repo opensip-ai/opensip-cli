@@ -27,8 +27,41 @@ import { logger, type RunScope } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
 
+/**
+ * The slice of `node:inspector`'s {@link Session} this module actually drives:
+ * `connect`/`disconnect` plus the two `post` overloads we issue
+ * (`Profiler.enable`/`Profiler.start` and `Profiler.stop`). Narrowing to this
+ * interface lets {@link __setInspectorSessionFactoryForTests} inject a fake
+ * whose `post` invokes the callback SYNCHRONOUSLY — so the inner
+ * `Profiler.start`/`Profiler.stop` callback arms (label-sidecar write, profile
+ * write, and their error branches) are exercised deterministically, independent
+ * of the real V8 profiler's async callback timing. That timing is non-
+ * deterministic under the coverage lane (the `@vitest/coverage-v8` provider
+ * holds its own inspector session), which previously made this file's branch
+ * coverage flaky. Production keeps the real `new Session()` factory verbatim.
+ */
+export interface InspectorSession {
+  connect(): void;
+  disconnect(): void;
+  post(
+    method: 'Profiler.enable' | 'Profiler.start',
+    callback?: (err: Error | null, params?: unknown) => void,
+  ): void;
+  post(
+    method: 'Profiler.stop',
+    callback?: (err: Error | null, params: { profile?: unknown }) => void,
+  ): void;
+}
+
+type InspectorSessionFactory = () => InspectorSession;
+
+/** Production factory: a real Node inspector session (structurally an InspectorSession). */
+const realInspectorSessionFactory: InspectorSessionFactory = () => new Session();
+
+let inspectorSessionFactory: InspectorSessionFactory = realInspectorSessionFactory;
+
 interface ProfilingState {
-  session: Session | null;
+  session: InspectorSession | null;
   isProfiling: boolean;
   profilePath: string | null;
   labelsPath: string | null;
@@ -121,7 +154,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
   try {
     if (!isProfilingEnabled()) return;
     warnIfOtelOnlyProfilingMode();
-    state.session = new Session();
+    state.session = inspectorSessionFactory();
     state.session.connect();
     state.isProfiling = true;
     activeProfilingState = state;
@@ -244,4 +277,17 @@ export function resetProfilingForTests(): void {
   if (activeProfilingState !== null) cleanup(activeProfilingState);
   cleanup(fallbackProfilingState);
   warnedOtelOnlyProfiling = false;
+  inspectorSessionFactory = realInspectorSessionFactory;
+}
+
+/**
+ * Test-only: swap the inspector-session factory so the start/stop callback
+ * bodies can be driven deterministically (see {@link InspectorSession}). Pass
+ * `undefined` to restore the real `new Session()` factory. Always restore in an
+ * `afterEach` — {@link resetProfilingForTests} also restores it as a backstop.
+ */
+export function __setInspectorSessionFactoryForTests(
+  factory: InspectorSessionFactory | undefined,
+): void {
+  inspectorSessionFactory = factory ?? realInspectorSessionFactory;
 }
