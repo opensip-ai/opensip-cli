@@ -7,6 +7,7 @@ import type { CheckDisplayEntry } from './types.js';
 /** Architecture check display entries (TS_AST only) */
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
   'circular-import-detection': ['🔁', 'Circular Import Detection'],
+  'command-handler-host-owned-output': ['🚪', 'Command Handler Host-Owned Output'],
   'contracts-schema-consistency': ['📋', 'Contracts Schema Consistency'],
   'drizzle-orm-migration-guardrails': ['🛡️', 'Drizzle ORM Migration Guardrails'],
   'host-tool-runtime-import-boundary': ['🧱', 'Host Tool Runtime Import Boundary'],
