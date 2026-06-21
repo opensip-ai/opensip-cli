@@ -20,12 +20,18 @@
  * wires them into `resolveCrossBoundaryCalls`.
  *
  * Package-key alignment (the linchpin Phase 2 depends on): the boundary
- * resolver buckets occurrences by `packageOf(occ.filePath)` — the path segment
- * under `packages/` (e.g. `core`, `graph`, `languages`), NOT the package.json
- * `name`. So {@link buildExportIndex} keys by exactly that, and
- * {@link resolveSpecifierToPackage} returns a `packageGroup` derived by running
- * `packageOf` over the manifest's project-relative dir — so a specifier's
- * resolved group matches the `ExportIndex` keys verbatim.
+ * resolver buckets occurrences, and {@link resolveSpecifierToPackage} returns a
+ * `packageGroup`, by ONE shared key function — {@link packageGroupOf}. With a
+ * {@link PackageManifestIndex} (the production path — every real caller passes
+ * one) the key is the OWNING package's `name`, found by the longest manifest-dir
+ * prefix of the file path. That is layout-AGNOSTIC: it works for `apps/`, `libs/`,
+ * `crates/`, nested `packages/<ns>/<pkg>/`, or a single-package repo — anywhere a
+ * `package.json` lives — not just a flat `packages/<seg>/` tree. Without a
+ * manifest (legacy / unit-test callers only) it falls back to the historical
+ * `packages/<segment>` path heuristic. Both {@link buildExportIndex} and
+ * {@link resolveSpecifierToPackage} use the SAME function with the SAME manifest,
+ * so a specifier's resolved group matches the `ExportIndex` keys verbatim — the
+ * linchpin holds on any layout.
  */
 
 import { readFileSync } from 'node:fs';
@@ -33,23 +39,31 @@ import { posix, relative } from 'node:path';
 
 import { logger } from '@opensip-cli/core';
 
-import { packageOf } from '../resolve-callee.js';
-
+import { packageGroupOf } from './package-group.js';
 import { toPosixPath } from './posix-path.js';
 
+import type { PackageManifest, PackageManifestIndex } from './package-group.js';
 import type { Shard } from '../cli/orchestrate/shard-model.js';
 import type { Catalog, FunctionOccurrence, ReExportRecord } from '../types.js';
+
+// The package-attribution types + key function live in `package-group.js`;
+// re-exported here so every existing `from './export-index.js'` import keeps
+// working (and the public API surface is unchanged).
+export { packageGroupOf } from './package-group.js';
+export type { PackageManifest, PackageManifestIndex } from './package-group.js';
 
 // ── Task 1.1: per-package export symbol index ─────────────────────
 
 /**
  * Per-package export symbol table: `package` → (`name` → exported occurrences).
  *
- * The outer key is `packageOf(filePath)` (the `packages/<segment>` group),
- * matching the bucketing the boundary resolver uses; the inner key is a
- * function's `simpleName`. Only `visibility === 'exported'` occurrences are
- * present — module-local and private occurrences are excluded, since an import
- * specifier can only reach a package's exports.
+ * The outer key is {@link packageGroupOf}`(filePath, manifestIndex)` — the
+ * owning package's `name` when a manifest is supplied (layout-agnostic), else
+ * the `packages/<segment>` heuristic — matching the bucketing the boundary
+ * resolver uses; the inner key is a function's `simpleName`. Only
+ * `visibility === 'exported'` occurrences are present — module-local and private
+ * occurrences are excluded, since an import specifier can only reach a package's
+ * exports.
  *
  * Insertion order follows catalog iteration. Consumers MUST match by name, not
  * order; the inner arrays are the deterministic candidate set for a name.
@@ -64,10 +78,12 @@ export type ExportIndex = ReadonlyMap<
  * its simple name. Deterministic and allocation-lean: one pass over
  * `catalog.functions`, no sorting (matching is by name, not order).
  *
- * The package key is `packageOf(occ.filePath)` — identical to what the
- * cross-shard resolver buckets by — so Phase 2 can look up
+ * The package key is `packageGroupOf(occ.filePath, manifestIndex)` — identical
+ * to what the cross-shard resolver buckets by — so Phase 2 can look up
  * `exportIndex.get(packageGroup)` where `packageGroup` comes from
- * {@link resolveSpecifierToPackage}.
+ * {@link resolveSpecifierToPackage} (with the SAME manifest). Passing the
+ * manifest is what makes the index layout-agnostic (keyed by package `name`);
+ * omitting it falls back to the `packages/<segment>` heuristic.
  */
 export function buildExportIndex(
   catalog: Catalog,
@@ -78,7 +94,7 @@ export function buildExportIndex(
     if (!occs) continue;
     for (const occ of occs) {
       if (occ.visibility !== 'exported') continue;
-      const pkg = packageOf(occ.filePath);
+      const pkg = packageGroupOf(occ.filePath, manifestIndex);
       const byName: Map<string, FunctionOccurrence[]> = getOrCreateMap(index, pkg);
       const bucket = byName.get(occ.simpleName);
       if (bucket) bucket.push(occ);
@@ -133,14 +149,15 @@ function applyOneReExport(
   manifestIndex: PackageManifestIndex,
 ): boolean {
   // Relative re-export stays in-package (already indexed); workspace specifier
-  // resolves to its package group. External / untracked → skip.
+  // resolves to its package group. External / untracked → skip. Both branches
+  // use the SAME manifest-aware key so they align with the base index keys.
   const sourcePkg = r.specifier.startsWith('.')
-    ? packageOf(r.fromFile)
+    ? packageGroupOf(r.fromFile, manifestIndex)
     : resolveSpecifierToPackage(r.specifier, manifestIndex)?.packageGroup;
   if (sourcePkg === undefined) return false; // @silent-ok — external/untracked specifier; decline
   const sourceBucket = index.get(sourcePkg);
   if (sourceBucket === undefined) return false; // @silent-ok — source package has no indexed exports
-  const fromBucket = getOrCreateMap(index, packageOf(r.fromFile));
+  const fromBucket = getOrCreateMap(index, packageGroupOf(r.fromFile, manifestIndex));
   return r.exportedName === '*'
     ? expandStarReExport(sourceBucket, fromBucket)
     : addNamedReExport(r, sourceBucket, fromBucket);
@@ -192,23 +209,8 @@ function getOrCreateMap<K, IK, IV>(outer: Map<K, Map<IK, IV>>, key: K): Map<IK, 
 }
 
 // ── Task 1.2: package-name → package(+exports) manifest index ─────
-
-/**
- * One workspace package's manifest facts the specifier resolver needs.
- *
- * `dir` is the package's PROJECT-RELATIVE root (e.g. `packages/core`) — the
- * form `packageOf` expects — derived from the shard's absolute `rootDir`
- * against the common project root. `exportsMap` is the raw `exports` field
- * (when an object), used to gate subpath resolution.
- */
-export interface PackageManifest {
-  readonly name: string;
-  readonly dir: string;
-  readonly exportsMap?: Record<string, unknown>;
-}
-
-/** Package `name` → its {@link PackageManifest}. */
-export type PackageManifestIndex = ReadonlyMap<string /* package name */, PackageManifest>;
+// (`PackageManifest` / `PackageManifestIndex` are defined in `package-group.js`
+//  and re-exported at the top of this module.)
 
 /**
  * Read each shard's `package.json` (`name`, `exports`) and index it by package
@@ -218,7 +220,7 @@ export type PackageManifestIndex = ReadonlyMap<string /* package name */, Packag
  *
  * `projectRoot` is the common root all shard file paths are relativized
  * against, so each manifest's `dir` is in the same project-relative form
- * `packageOf` consumes.
+ * `packageGroupOf` matches against.
  */
 export function buildPackageManifestIndex(
   shards: readonly Shard[],
@@ -294,14 +296,17 @@ function readManifest(rootDirAbs: string, projectRoot: string): PackageManifest 
   return { name, dir: relativeDir(rootDirAbs, projectRoot), exportsMap };
 }
 
-/** Project-relative POSIX dir for a shard's absolute rootDir (the `packageOf` form). */
+/** Project-relative POSIX dir for a shard's absolute rootDir — the prefix
+ *  {@link packageGroupOf} matches file paths against (`''` when the package IS
+ *  the project root, i.e. a single-package repo). */
 function relativeDir(rootDirAbs: string, projectRoot: string): string {
   return toPosixPath(relative(projectRoot, rootDirAbs));
 }
 
 /** The outcome of resolving a bare import specifier to a workspace package. */
 export interface ResolvedSpecifier {
-  /** The `packageOf`-aligned group key — looks up into an {@link ExportIndex}. */
+  /** The {@link packageGroupOf}-aligned group key (the package `name`) — looks
+   *  up into an {@link ExportIndex} built with the same manifest. */
   readonly packageGroup: string;
   /** The `exports` subpath (`./errors`) when the specifier addressed one. */
   readonly subpath?: string;
@@ -340,7 +345,12 @@ export function resolveSpecifierToPackage(
     return undefined; // unmappable subpath → decline
   }
 
-  const packageGroup = packageOf(`${manifest.dir}/`);
+  // The group key is the package's own `name` — identical to what
+  // `packageGroupOf` (and therefore `buildExportIndex`) keys this package's
+  // files by when given the SAME manifest index. This is the layout-agnostic
+  // linchpin: the resolved group keys straight into the export index regardless
+  // of where the package's dir sits in the tree.
+  const packageGroup = manifest.name;
   return subpath === undefined ? { packageGroup } : { packageGroup, subpath };
 }
 

@@ -1,0 +1,8 @@
+{
+  "name": "@eq/app",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/run.js"
+  }
+}

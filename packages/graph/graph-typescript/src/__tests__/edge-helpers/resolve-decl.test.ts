@@ -86,9 +86,12 @@ describe('resolveDeclToHash — cross-package (.d.ts) boundary resolution', () =
         helper: [occ('helper', 'packages/lib/src/helper.ts', EXPORTED_HASH)],
       },
     };
+    const manifestIndex = buildPackageManifestIndexFromRoots([libDir, appDir], root);
     crossPackage = {
-      exportIndex: buildExportIndex(catalog),
-      manifestIndex: buildPackageManifestIndexFromRoots([libDir, appDir], root),
+      // Key the export index by package NAME (pass the manifest) so it aligns
+      // with the group `resolveSpecifierToPackage` returns — the production pairing.
+      exportIndex: buildExportIndex(catalog, manifestIndex),
+      manifestIndex,
     };
   });
 
@@ -162,9 +165,10 @@ describe('resolveDeclToHash — intra-package .d.ts→source method pin', () => 
       cacheKey: 'k',
       functions: { getAll: [occ('getAll', 'packages/lib/src/registry.ts', GETALL_HASH)] },
     };
+    const manifestIndex = buildPackageManifestIndexFromRoots([libDir, appDir], root);
     crossPackage = {
-      exportIndex: buildExportIndex(catalog),
-      manifestIndex: buildPackageManifestIndexFromRoots([libDir, appDir], root),
+      exportIndex: buildExportIndex(catalog, manifestIndex),
+      manifestIndex,
     };
   });
 

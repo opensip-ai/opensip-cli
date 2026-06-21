@@ -328,11 +328,14 @@ function resolveFixtureEdges(
   input: ResolveInput<FixtureProject>,
   deps: AdapterDeps,
 ): ResolveOutput {
-  const exportIndex = buildExportIndex(input.catalog);
   // ALL package manifests are always in scope: even a single-package shard must
   // resolve a bare specifier to a package group (the imported package's own
   // occurrences may be absent from THIS shard — when the call becomes boundary).
   const manifestIndex = buildPackageManifestIndex(deps.shards, deps.fixtureRoot);
+  // Pass the manifest so the export index keys by package NAME (layout-agnostic),
+  // exactly aligning with the group `resolveSpecifierToPackage` returns below —
+  // the same pairing production uses (`resolveCrossBoundaryCalls`).
+  const exportIndex = buildExportIndex(input.catalog, manifestIndex);
   const fileByRel = new Map(input.project.files.map((f) => [f.projectRel, f]));
 
   const edgesByOwner = new Map<string, CallEdge[]>();

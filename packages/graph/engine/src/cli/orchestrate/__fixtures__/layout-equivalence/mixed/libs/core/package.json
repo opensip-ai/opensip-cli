@@ -1,0 +1,8 @@
+{
+  "name": "@eq/core",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/base.js"
+  }
+}

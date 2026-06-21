@@ -16,6 +16,10 @@ export default mergeConfig(
         exclude: [
           'src/**/*.test.ts',
           'src/**/__tests__/**',
+          // Test fixtures (sample repos read as TEXT by the equivalence
+          // harnesses, plus their READMEs) — never imported as modules, and the
+          // `.md` files are unparseable by the v8 coverage remapper.
+          'src/**/__fixtures__/**',
           // Pure type-definition files — no executable code.
           'src/**/types.ts',
           // Top-level barrel — re-exports only.
