@@ -36,9 +36,8 @@ export async function resolveGraphEvidence(
     };
   }
 
-  const repo = new CatalogRepo(datastore);
-
   if (mode === 'reuse') {
+    const repo = new CatalogRepo(datastore);
     const catalog = repo.loadCatalogContract();
     return {
       catalog,
@@ -49,7 +48,7 @@ export async function resolveGraphEvidence(
   }
 
   if (mode === 'build') {
-    const built = await buildGraphCatalog(cwd, cli);
+    const built = await buildGraphCatalog(cwd, cli, { force: true });
     return {
       catalog: built,
       mode,
@@ -58,27 +57,23 @@ export async function resolveGraphEvidence(
     };
   }
 
-  // auto: reuse when warm, otherwise build.
-  const cached = repo.loadCatalogContract();
-  if (cached !== null) {
-    return {
-      catalog: cached,
-      mode,
-      built: false,
-      detail: 'auto reused cached catalog',
-    };
-  }
-  const built = await buildGraphCatalog(cwd, cli);
+  // auto: delegate to graph's cache invalidation path so stale persisted rows
+  // are rebuilt or incrementally refreshed instead of blindly reused.
+  const catalog = await buildGraphCatalog(cwd, cli, { force: false });
   return {
-    catalog: built,
+    catalog,
     mode,
-    built: built !== null,
-    detail: built === null ? 'auto build produced no catalog' : 'auto built fresh catalog',
+    built: false,
+    detail: catalog === null ? 'auto build produced no catalog' : 'auto resolved graph catalog',
   };
 }
 
-async function buildGraphCatalog(cwd: string, cli: ToolCliContext): Promise<GraphCatalog | null> {
-  await executeGraph({ cwd, json: true, noCache: false }, cli);
+async function buildGraphCatalog(
+  cwd: string,
+  cli: ToolCliContext,
+  opts: { readonly force: boolean },
+): Promise<GraphCatalog | null> {
+  await executeGraph({ cwd, json: true, noCache: opts.force }, cli);
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) return null;
   return new CatalogRepo(datastore).loadCatalogContract();

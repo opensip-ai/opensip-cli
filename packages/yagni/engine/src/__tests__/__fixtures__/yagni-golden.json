@@ -23,7 +23,7 @@
       "ruleId": "yagni:unused-config-surface",
       "message": "Unused public config key 'orphanKnob' in AppConfig (high confidence)",
       "severity": "medium",
-      "filePath": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-yagni/packages/yagni/engine/src/__tests__/fixtures/unused-config-surface/pkg/src/app-config.ts",
+      "filePath": "<fixture>/src/app-config.ts",
       "line": 3,
       "metadata": {
         "yagni": {

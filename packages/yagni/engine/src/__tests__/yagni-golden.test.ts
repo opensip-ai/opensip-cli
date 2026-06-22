@@ -3,7 +3,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -17,6 +17,11 @@ import type { ToolCliContext } from '@opensip-cli/core';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = join(HERE, 'fixtures', 'unused-config-surface', 'pkg');
 const GOLDEN_PATH = join(HERE, '__fixtures__', 'yagni-golden.json');
+
+function normalizeFixturePath(value: string): string {
+  if (!value.startsWith(FIXTURE_ROOT)) return value;
+  return `<fixture>/${relative(FIXTURE_ROOT, value).split('\\').join('/')}`;
+}
 
 function stubCli(): ToolCliContext {
   return {
@@ -42,6 +47,7 @@ function stableJson(value: unknown): unknown {
       if (key === 'id' && typeof v === 'string' && v.startsWith('sig_')) return '<signalId>';
       if (typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)) return '<runId>';
       if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) return '<createdAt>';
+      if (typeof v === 'string') return normalizeFixturePath(v);
       return v;
     }),
   );
@@ -53,7 +59,7 @@ describe('yagni golden snapshots', () => {
       cwd: FIXTURE_ROOT,
       config: { defaultMinConfidence: 'low' },
       graphCatalog: null,
-      includeTests: false,
+      includeTests: true,
     });
     expect(result.signals).toHaveLength(1);
     expect(result.signals[0]?.ruleId).toBe('yagni:unused-config-surface');
@@ -81,6 +87,7 @@ describe('yagni golden snapshots', () => {
           defaultMinConfidence: 'low',
         },
         graphMode: 'off',
+        includeTests: true,
       },
       stubCli(),
       [unusedConfigSurfaceDetector, duplicateBodyCandidateDetector],
@@ -124,6 +131,7 @@ describe('yagni golden snapshots', () => {
       cwd: FIXTURE_ROOT,
       config: { graphMode: 'off' as const, defaultMinConfidence: 'low' as const },
       graphMode: 'off' as const,
+      includeTests: true,
     };
     const firstRun = await executeYagni(opts, stubCli(), [
       unusedConfigSurfaceDetector,

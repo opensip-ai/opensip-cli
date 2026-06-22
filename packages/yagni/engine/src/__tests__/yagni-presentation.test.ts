@@ -23,6 +23,7 @@ describe('yagni presentation', () => {
         cwd: FIXTURE_ROOT,
         config: { graphMode: 'off', defaultMinConfidence: 'low' },
         graphMode: 'off',
+        includeTests: true,
       },
       stubCli(),
       [unusedConfigSurfaceDetector, duplicateBodyCandidateDetector],

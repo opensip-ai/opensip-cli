@@ -46,7 +46,6 @@ export function walkTypeScriptFiles(
 }
 
 function isTestPath(filePath: string): boolean {
-  if (/[/\\]__tests__[/\\](?:fixtures|__fixtures__)[/\\]/.test(filePath)) return false;
   return (
     /[/\\]__tests__[/\\]/.test(filePath) ||
     /\.test\.(ts|tsx|mts|cts)$/.test(filePath) ||

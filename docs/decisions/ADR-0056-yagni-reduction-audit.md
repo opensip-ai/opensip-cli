@@ -39,4 +39,4 @@ enforcement-reason: >
 - CI dogfood pins `yagni.graphMode: build` (not `auto`) for determinism.
 - Dashboard accepts optional `yagniSummary` / `yagniCatalog` keys from `collectReportData`.
 
-**Related specs / ADRs:** `docs/plans/ready/yagni-audit.md`, ADR-0014 (suppressions), ADR-0036 (baseline fingerprints).
+**Related specs / ADRs:** `docs/plans/ready/yagni-reduction-audit/plan.md`, ADR-0014 (suppressions), ADR-0036 (baseline fingerprints).
