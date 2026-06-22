@@ -13,6 +13,7 @@ export const QUALITY_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>(
   'expo-vector-icons': ['📱', 'Expo Vector Icons'],
   'fitness-ignore-hygiene': ['🧹', 'Fitness Ignore Hygiene'],
   'graph-ignore-hygiene': ['🧹', 'Graph Ignore Hygiene'],
+  'yagni-ignore-hygiene': ['🧹', 'Yagni Ignore Hygiene'],
   'graphql-offset-pagination': ['🔌', 'GraphQL Offset Pagination'],
   'image-optimization': ['🖼️', 'Image Optimization'],
   'navigation-typing': ['📱', 'Navigation Typing'],
