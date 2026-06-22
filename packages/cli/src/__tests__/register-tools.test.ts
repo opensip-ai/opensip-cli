@@ -848,6 +848,7 @@ describe('bundled-tools manifest (data-driven)', () => {
       '@opensip-cli/fitness',
       '@opensip-cli/simulation',
       '@opensip-cli/graph',
+      '@opensip-cli/yagni',
     ]);
     expect(BUNDLED_TOOL_PACKAGES).toContain('@opensip-cli/fitness');
   });

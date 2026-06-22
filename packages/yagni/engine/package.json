@@ -1,0 +1,67 @@
+{
+  "name": "@opensip-cli/yagni",
+  "version": "0.1.8",
+  "license": "Apache-2.0",
+  "description": "YAGNI reduction audit for OpenSIP CLI",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "yagni",
+    "maintainability"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/yagni/engine"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "yagni",
+    "stableId": "3aba9195-2297-4f20-99d5-906945092dfc",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "yagni",
+        "description": "Run YAGNI reduction audit detectors"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/config": "workspace:*",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/lang-typescript": "workspace:*",
+    "commander": "^15.0.0",
+    "glob": "^13.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  }
+}
