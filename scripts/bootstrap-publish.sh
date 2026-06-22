@@ -33,6 +33,9 @@
 #        environment: (leave empty)
 #   2. Delete the npm token you just used.
 #   3. Future releases follow the normal tag-driven flow in RELEASING.md.
+#
+# Full operator runbook (repo prep, token safety, OIDC, removal):
+#   RELEASING.md → "Adding A Publishable Package" / "Removing A Publishable Package"
 
 set -euo pipefail
 

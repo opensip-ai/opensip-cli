@@ -220,16 +220,146 @@ Do not hand-edit package order in the workflow. Update
 `scripts/release-package-order.mjs` and let the contract tests tell you which
 surfaces need to change.
 
-## Bootstrapping A New Package
+## Adding A Publishable Package
 
-New npm package names need trusted publishing enabled before the tag-driven
-release can publish them.
+A new workspace package is not releasable until it is registered in the repo **and**
+its npm **name** exists on the registry with a trusted publisher configured. OIDC
+trusted publishing (what `.github/workflows/release.yml` uses) requires the
+package to already exist on npm — there is no "pending trusted publisher" slot.
 
-1. Create the package in npm with provenance/trusted publishing enabled for the
-   release workflow.
-2. Add it to `scripts/release-package-order.mjs`.
-3. Add it to the table and verification loop above.
-4. Run `pnpm test --filter opensip-cli -- release-package-order`.
+**Single source of truth:** `scripts/release-package-order.mjs`. The release
+workflow, `bootstrap-publish.sh`, `release-preflight`, and
+`verify-release` all derive from or verify against it. Do not hand-list packages
+in `release.yml` or `bootstrap-publish.sh`.
+
+### 1. Repo changes (before any npm publish)
+
+1. **Create the workspace package** under `packages/`. Its `package.json` `name`
+   must be `opensip-cli` or `@opensip-cli/*`, and it must **not** set
+   `"private": true`. Include a `files` field (typically `["dist"]`), correct
+   layer dependencies (dependency-cruiser enforces the DAG), and LICENSE/NOTICE
+   (propagated from the repo root — see `pnpm licenses:sync` below).
+2. **Add an entry** to `RELEASE_PACKAGE_ORDER` in
+   `scripts/release-package-order.mjs` — correct **dependency/publish order**
+   (downstream packages publish after their deps), plus `publishReason`, `dir`,
+   and `filter`.
+3. **Update this file (`RELEASING.md`)** — CI's release-package-order contract
+   test enforces the prose:
+   - Add a row to [The 33 packages](#the-33-packages) (update the section title
+     count when the set size changes).
+   - Add the unscoped name to the [npm verify loop](#cutting-a-release) `for p in …`
+     block (scoped packages only; `opensip-cli` stays on its own line).
+4. **Update other package-count prose** if the set size changed (e.g. `CLAUDE.md`,
+   `docs/public/10-concepts/03-modular-monolith.md`). Run `pnpm docs:build` and
+   commit `docs/web-generated/` if you edit `docs/public/`.
+5. **Regenerate derived package metadata:**
+
+   ```bash
+   pnpm docs:readmes && pnpm docs:keywords && pnpm licenses:sync
+   ```
+
+6. **Verify the contract test:**
+
+   ```bash
+   pnpm test --filter opensip-cli -- release-package-order
+   ```
+
+### 2. One-time npm bootstrap (brand-new names only)
+
+Trusted publishers can only be attached to a package **after** its name exists
+on npm. Brand-new names are bootstrapped once with a **temporary granular token**.
+The bootstrap publish ships **without provenance**; every subsequent version is
+published by OIDC **with** provenance. Do **not** run bootstrap for a name that
+already exists on npm at any version — that would publish the current version
+without provenance and permanently block OIDC from re-publishing it (npm versions
+are immutable).
+
+**Operator roles:**
+
+| Step | Who |
+| ---- | --- |
+| Create a short-lived granular npm token | Human |
+| Run `bootstrap-publish.sh` | Human or agent (token via env var only) |
+| Configure trusted publishing on npmjs.com | Human |
+| Delete the npm token | Human |
+| All future releases | Tag-driven OIDC (`release.yml`) |
+
+**Token:** create a **granular access token** at npm → Account → Access Tokens
+(scope `@opensip-cli/*`, publish permission). Provide it only in the shell
+environment for the bootstrap run; never commit it or write it to a tracked
+file.
+
+```bash
+NPM_TOKEN=npm_xxx ./scripts/bootstrap-publish.sh
+```
+
+The script reads the package list from `release-package-order.mjs --print names`,
+packs each brand-new name at the current `packages/core/package.json#version`,
+and publishes via `npm publish <tarball>`. Names already on the registry are
+skipped (their next version is published by the OIDC release).
+
+When bootstrap completes, configure **trusted publishing** for each package
+marked **NEW** in the output:
+
+| Field | Value |
+| ----- | ----- |
+| Organization | `opensip-ai` |
+| Repository | `opensip-cli` |
+| Workflow file | `release.yml` |
+| Environment | *(leave empty)* |
+
+Direct link pattern: `https://www.npmjs.com/package/<encoded-name>/access`
+(e.g. `@opensip-cli/foo` → `%40opensip-cli%2Ffoo`).
+
+**Delete the npm token** when OIDC is configured for every new name. Future
+releases follow [Cutting A Release](#cutting-a-release) — no token required.
+
+## Removing A Publishable Package
+
+npm versions are **immutable**. Removal means: stop shipping the package from
+this repo and **deprecate** it on the registry. Do not unpublish published
+versions or bump a patch version to "fix" a mistaken publish — see
+[Partial publish recovery](#partial-publish-recovery).
+
+### 1. Repo changes
+
+1. **Migrate or remove consumers** — workspace dependencies, tool registrations,
+   and docs references.
+2. **Retire the package** — delete its directory **or** set `"private": true` in
+   its `package.json` (private packages are excluded from the publishable set).
+3. **Remove its entry** from `scripts/release-package-order.mjs`.
+4. **Update this file (`RELEASING.md`)** — remove the table row, decrement the
+   stated package count in the section title, and remove the unscoped name from
+   the npm-verify `for p in …` loop.
+5. **Update other package-count prose** if the set size changed; regenerate web
+   docs if `docs/public/` changed.
+6. **Regenerate derived package metadata:**
+
+   ```bash
+   pnpm docs:readmes && pnpm docs:keywords && pnpm licenses:sync
+   ```
+
+7. **Verify:**
+
+   ```bash
+   pnpm test --filter opensip-cli -- release-package-order
+   ```
+
+   Before the next tag, run `pnpm release:preflight` as usual —
+   `verify-release` check #10 fails if the order file and discovered workspace
+   set diverge.
+
+### 2. npm registry
+
+Deprecate the retired package so consumers see a migration message:
+
+```bash
+npm deprecate @opensip-cli/<name>@'*' \
+  "Package removed in opensip-cli vX.Y.Z — use <replacement>"
+```
+
+Document the removal in `CHANGELOG.md` under the release that stops shipping the
+package.
 
 ## Data Store Changes
 
