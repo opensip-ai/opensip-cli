@@ -1,14 +1,12 @@
 {
   "name": "@opensip-cli/yagni",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "license": "Apache-2.0",
   "description": "YAGNI reduction audit for OpenSIP CLI",
   "keywords": [
     "opensip-cli",
     "static-analysis",
-    "code-quality",
-    "yagni",
-    "maintainability"
+    "code-quality"
   ],
   "repository": {
     "type": "git",

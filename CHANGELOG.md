@@ -74,11 +74,6 @@ language layers become layout- and language-agnostic.
 - Resolved graph dogfood warnings and stabilized a flaky coverage measurement in
   the CLI profiling-telemetry tests.
 
-## [0.1.8] - 2026-06-21
-
-A release-hardening update focused on audit remediation, stronger type-aware
-analysis, safer publishing, and improved install/reporting feedback.
-
 ### Changed
 
 - Added a staged release publish lane with version-scoped candidate dist-tags,

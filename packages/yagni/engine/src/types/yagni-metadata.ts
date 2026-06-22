@@ -4,6 +4,7 @@
 
 export type YagniConfidence = 'low' | 'medium' | 'high';
 
+/** Reduction class used to group YAGNI findings by intended simplification. */
 export type YagniReductionCategory =
   | 'delete'
   | 'collapse'
@@ -15,8 +16,10 @@ export type YagniReductionCategory =
   | 'config'
   | 'shrink';
 
+/** Confidence level for the LOC estimate attached to a finding. */
 export type YagniEstimateKind = 'exact' | 'lower-bound' | 'heuristic';
 
+/** Estimated line-count impact for applying a reduction candidate. */
 export interface YagniLocDelta {
   readonly remove: number;
   readonly add: number;
@@ -24,6 +27,7 @@ export interface YagniLocDelta {
   readonly estimateKind: YagniEstimateKind;
 }
 
+/** Evidence item supporting a YAGNI reduction candidate. */
 export interface YagniEvidence {
   readonly id: string;
   readonly kind: string;
@@ -31,6 +35,7 @@ export interface YagniEvidence {
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
+/** Metadata payload carried on each YAGNI signal. */
 export interface YagniFindingMetadata {
   readonly detector: string;
   readonly reductionCategory: YagniReductionCategory;
@@ -43,6 +48,7 @@ export interface YagniFindingMetadata {
   readonly evidence: readonly YagniEvidence[];
 }
 
+/** Aggregate summary persisted with a YAGNI run session. */
 export interface YagniRunSummary {
   readonly totalCandidates: number;
   readonly byConfidence: {

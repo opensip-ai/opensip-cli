@@ -8,11 +8,11 @@ purpose: "The HTML report — what it shows, when it opens, how it's generated, 
 source-files:
   - packages/dashboard/src/generator.ts
   - packages/dashboard/src/index.ts
-  - packages/dashboard/src/overview.ts
-  - packages/dashboard/src/checks.ts
-  - packages/dashboard/src/sessions.ts
+  - packages/dashboard/src/client/overview.ts
+  - packages/dashboard/src/client/checks.ts
+  - packages/dashboard/src/client/sessions.ts
   - packages/dashboard/src/code-paths.ts
-  - packages/dashboard/src/code-paths/
+  - packages/dashboard/src/client/
   - packages/cli/src/open-report.ts
   - packages/fitness/engine/src/cli/report-data.ts
 related-docs:
@@ -53,7 +53,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. The Code Paths (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). Every panel module lives under [`packages/dashboard/src/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/tool-tabs.ts).
+Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. The Code Paths (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). Browser panel modules live under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/tool-tabs.ts).
 
 ### Overview
 
@@ -64,7 +64,7 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/dashboard/src/overview.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/overview.ts).
+Source: [`packages/dashboard/src/client/overview.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/overview.ts).
 
 ### Sessions list (per-tool Overview subtab)
 
@@ -72,7 +72,7 @@ A list of every past run, sorted reverse-chronological. Click into one to see it
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/dashboard/src/sessions.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/tool-tabs.ts).
+Source: [`packages/dashboard/src/client/sessions.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/tool-tabs.ts).
 
 ### Catalog (per-tool Catalog subtab)
 
@@ -84,13 +84,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/dashboard/src/checks.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/checks.ts).
+Source: [`packages/dashboard/src/client/checks.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/checks.ts).
 
 ### Recipes (per-tool Recipes subtab)
 
 The configured recipes, with per-recipe stats. Same shape as the catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/dashboard/src/recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/recipes.ts).
+Source: [`packages/dashboard/src/client/recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/recipes.ts).
 
 ### Code Paths panel
 
@@ -128,11 +128,11 @@ The **Universal Function Card** is the cross-cutting drill-down: every clickable
 
 Filter chips apply across the Explore views: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
-Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/code-paths.ts) and the per-view files under [`packages/dashboard/src/code-paths/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/code-paths/) (`view-graph.ts`, `view-coupling.ts`, `view-distribution.ts`).
+Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/code-paths.ts) and the per-view browser modules under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/) (`view-graph.ts`, `view-coupling.ts`, `view-distribution.ts`).
 
 ### Tool tabs
 
-The report supports fit, sim, and graph runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/tool-tabs.ts).
+The report supports fit, sim, and graph runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/tool-tabs.ts).
 
 ---
 
@@ -186,7 +186,7 @@ rank-and-render skeleton: walk `indexes.byBodyHash.values()`, apply
 chip filters and an optional view-specific predicate, compute a
 numeric metric, sort descending, and hand the result to
 `renderFunctionRows`. That skeleton lives in
-[`code-paths/view-template.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/code-paths/view-template.ts);
+[`client/view-template.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/view-template.ts);
 the view file is declarative config (`id`, `label`, `help`, `metric`,
 optional `predicate` / `preamble` / `searchByName` / `filterToggle`,
 `columns`, `headingText`, `emptyMessage`). The Functions view uses this
@@ -220,8 +220,8 @@ the same way — the registry decouples Overview from "tab X happens
 to be loaded into this page".
 
 The registry helpers (`registerTabActivator`,
-`activateTabForSession`) are declared in the shared JS emitted by
-[`shared.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/shared.ts) and
+`activateTabForSession`) are declared in
+[`tab-activators.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/dashboard/src/client/tab-activators.ts) and
 are available wherever any tab JS runs.
 
 ---

@@ -40,6 +40,12 @@ function cliWithDatastore(exit?: { prior?: number; current?: number }): ToolCliC
   } as unknown as ToolCliContext & { _exitState: { code?: number } };
 }
 
+function cliWithoutDatastore(): ToolCliContext {
+  return {
+    scope: { datastore: () => undefined },
+  } as unknown as ToolCliContext;
+}
+
 describe('resolveGraphEvidence', () => {
   beforeEach(() => {
     graphMocks.CatalogRepo.mockClear();
@@ -126,6 +132,56 @@ describe('resolveGraphEvidence', () => {
       mode: 'reuse',
       built: false,
       detail: 'reused cached catalog',
+    });
+  });
+
+  it('returns explicit details for disabled, unavailable, and missing cached graph evidence', async () => {
+    await expect(
+      resolveGraphEvidence('/repo', 'off', cliWithoutDatastore()),
+    ).resolves.toMatchObject({
+      catalog: null,
+      mode: 'off',
+      built: false,
+      detail: 'graph disabled',
+    });
+
+    await expect(
+      resolveGraphEvidence('/repo', 'reuse', cliWithoutDatastore()),
+    ).resolves.toMatchObject({
+      catalog: null,
+      mode: 'reuse',
+      built: false,
+      detail: 'datastore unavailable',
+    });
+
+    graphMocks.loadCatalogContract.mockReturnValue(null);
+    await expect(resolveGraphEvidence('/repo', 'reuse', cliWithDatastore())).resolves.toMatchObject(
+      {
+        catalog: null,
+        mode: 'reuse',
+        built: false,
+        detail: 'no cached catalog',
+      },
+    );
+  });
+
+  it('reports null catalog outcomes from build and auto modes', async () => {
+    graphMocks.loadCatalogContract.mockReturnValue(null);
+
+    await expect(resolveGraphEvidence('/repo', 'build', cliWithDatastore())).resolves.toMatchObject(
+      {
+        catalog: null,
+        mode: 'build',
+        built: false,
+        detail: 'graph build produced no catalog',
+      },
+    );
+
+    await expect(resolveGraphEvidence('/repo', 'auto', cliWithDatastore())).resolves.toMatchObject({
+      catalog: null,
+      mode: 'auto',
+      built: false,
+      detail: 'auto build produced no catalog',
     });
   });
 });

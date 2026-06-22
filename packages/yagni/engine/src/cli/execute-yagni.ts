@@ -20,6 +20,7 @@ import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
 
+/** Runtime options for one YAGNI detector pass. */
 export interface ExecuteYagniOptions {
   readonly cwd: string;
   readonly config?: YagniConfig;
@@ -31,6 +32,7 @@ export interface ExecuteYagniOptions {
   readonly pathRoots?: readonly string[];
 }
 
+/** Envelope plus session payload returned to the host command runner. */
 export interface ExecuteYagniResult {
   readonly envelope: SignalEnvelope;
   readonly session: {
@@ -94,6 +96,7 @@ function planDetectors(
   return { run, skipped };
 }
 
+/** Run the selected YAGNI detectors and build the persisted signal envelope. */
 export async function executeYagni(
   opts: ExecuteYagniOptions,
   cli: ToolCliContext,

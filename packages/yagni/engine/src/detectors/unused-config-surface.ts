@@ -1,3 +1,5 @@
+// @fitness-ignore-file batch-operation-limits -- walks a bounded, already-discovered source file list synchronously; no DB, network, async fanout, or unbounded external batch.
+// @fitness-ignore-file toctou-race-condition -- property counts are local in-memory Map updates inside one synchronous detector run; no shared concurrent state.
 /**
  * unused-config-surface — flags required config properties on the public API
  * surface that are never read anywhere in the project.
@@ -6,10 +8,10 @@
  * files reachable from `package.json#exports` via re-export chains.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import { isInPublicApiSurface } from '@opensip-cli/core';
+import { isInPublicApiSurface, withSpan } from '@opensip-cli/core';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
@@ -22,6 +24,7 @@ import type { YagniDetector, YagniDetectorContext, YagniDetectorResult } from '.
 
 const DETECTOR_ID = 'unused-config-surface';
 const SLUG = 'yagni:unused-config-surface';
+const MAX_SOURCE_FILE_BYTES = 1_000_000;
 
 const COMMON_PROPERTY_NAMES = new Set([
   'enabled',
@@ -55,12 +58,23 @@ interface ConfigProperty {
   readonly isOptional: boolean;
 }
 
-function isConfigInterface(name: string): boolean {
-  return name.includes('Config') || name.includes('Options');
+function isPublicConfigSurfaceInterface(interfaceName: string): boolean {
+  return /\b(?:\w*Config|\w*Options)\b/.test(interfaceName);
 }
 
-function isConfigFilePath(filePath: string): boolean {
-  return filePath.includes('config') || filePath.includes('Config');
+function mayContainConfigSurface(filePath: string): boolean {
+  return filePath.toLowerCase().includes('config');
+}
+
+function readBoundedSourceFile(filePath: string): string | undefined {
+  try {
+    const stats = statSync(filePath);
+    if (!stats.isFile() || stats.size > MAX_SOURCE_FILE_BYTES) return undefined;
+    return readFileSync(filePath, 'utf8');
+  } catch {
+    // @swallow-ok unreadable files are skipped; callers treat undefined as "no source available".
+    return undefined;
+  }
 }
 
 function extractPropertyFromMember(
@@ -98,18 +112,15 @@ function extractInterfaceProperties(
 function collectConfigProperties(filePaths: readonly string[]): ConfigProperty[] {
   const properties: ConfigProperty[] = [];
   for (const filePath of filePaths) {
-    if (!isConfigFilePath(filePath) || !isInPublicApiSurface(filePath)) continue;
-    let content: string;
-    try {
-      content = readFileSync(filePath, 'utf8');
-    } catch {
-      continue;
-    }
+    if (!mayContainConfigSurface(filePath) || !isInPublicApiSurface(filePath)) continue;
+    const content = readBoundedSourceFile(filePath);
+    if (content === undefined) continue;
     const sourceFile = getSharedSourceFile(filePath, content);
     if (!sourceFile) continue;
     const visit = (node: ts.Node): void => {
       ts.forEachChild(node, visit);
-      if (!ts.isInterfaceDeclaration(node) || !isConfigInterface(node.name.text)) return;
+      if (!ts.isInterfaceDeclaration(node) || !isPublicConfigSurfaceInterface(node.name.text))
+        return;
       properties.push(...extractInterfaceProperties(node, sourceFile, filePath));
     };
     visit(sourceFile);
@@ -120,12 +131,8 @@ function collectConfigProperties(filePaths: readonly string[]): ConfigProperty[]
 function countPropertyAccesses(filePaths: readonly string[]): Map<string, number> {
   const accessCounts = new Map<string, number>();
   for (const filePath of filePaths) {
-    let content: string;
-    try {
-      content = readFileSync(filePath, 'utf8');
-    } catch {
-      continue;
-    }
+    const content = readBoundedSourceFile(filePath);
+    if (content === undefined) continue;
     const sourceFile = getSharedSourceFile(filePath, content);
     if (!sourceFile) continue;
     // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over per-file sourceFile; hoisting would thread extra params through every callsite
@@ -146,65 +153,74 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
 }
 
 function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetectorResult> {
-  const started = Date.now();
-  const filePaths = walkTypeScriptFiles(ctx.cwd, ctx.includeTests, ctx.pathRoots);
-  const configProperties = collectConfigProperties(filePaths);
-  const accessCounts = countPropertyAccesses(filePaths);
+  const result = withSpan(
+    'opensip-cli-yagni',
+    'yagni.unused_config_surface',
+    () => {
+      const started = Date.now();
+      const filePaths = walkTypeScriptFiles(ctx.cwd, ctx.includeTests, ctx.pathRoots);
+      const configProperties = collectConfigProperties(filePaths);
+      const accessCounts = countPropertyAccesses(filePaths);
 
-  const signals = [];
-  for (const prop of configProperties) {
-    if (prop.isOptional) continue;
-    if ((accessCounts.get(prop.name) ?? 0) > 0) continue;
-    const relPath = relative(ctx.cwd, prop.filePath).split('\\').join('/');
-    const confidence = 'high' as const;
-    const evidenceId = `unused-config:${relPath}:${String(prop.line)}:${prop.name}`;
-    signals.push(
-      createYagniSignal({
-        source: SLUG,
-        ruleId: SLUG,
-        severity: severityForConfidence(confidence),
-        category: 'quality',
-        message: `Unused public config key '${prop.name}' in ${prop.interfaceName} (${confidence} confidence)`,
-        suggestion: `Remove '${prop.name}' from ${prop.interfaceName} or wire it into runtime behavior`,
-        code: { file: prop.filePath, line: prop.line, column: 0 },
-        yagni: {
-          detector: DETECTOR_ID,
-          reductionCategory: 'config',
-          confidence,
-          locDelta: {
-            remove: 1,
-            add: 0,
-            netEstimate: 1,
-            estimateKind: 'exact',
-          },
-          preservationArgument:
-            'The property is declared on a public config interface but has zero read sites in the project.',
-          suggestedAction: `Remove unused key \`${prop.name}\` from ${prop.interfaceName}.`,
-          validationRequired: [
-            'Confirm no dynamic property access reads this key.',
-            'Run the package test suite after removal.',
-          ],
-          riskTags: ['public-api-surface'],
-          evidence: [
-            {
-              id: evidenceId,
-              kind: 'unused-config-property',
-              summary: `Required property '${prop.name}' on ${prop.interfaceName} has no read sites.`,
-              data: {
-                property: prop.name,
-                interfaceName: prop.interfaceName,
-                filePath: relPath,
-                line: prop.line,
-                publicApiSurface: true,
+      const signals = [];
+      for (const prop of configProperties) {
+        if (prop.isOptional) continue;
+        if ((accessCounts.get(prop.name) ?? 0) > 0) continue;
+        const relPath = relative(ctx.cwd, prop.filePath).split('\\').join('/');
+        const confidence = 'high' as const;
+        const evidenceId = `unused-config:${relPath}:${String(prop.line)}:${prop.name}`;
+        signals.push(
+          createYagniSignal({
+            source: SLUG,
+            ruleId: SLUG,
+            severity: severityForConfidence(confidence),
+            category: 'quality',
+            message: `Unused public config key '${prop.name}' in ${prop.interfaceName} (${confidence} confidence)`,
+            suggestion: `Remove '${prop.name}' from ${prop.interfaceName} or wire it into runtime behavior`,
+            code: { file: prop.filePath, line: prop.line, column: 0 },
+            yagni: {
+              detector: DETECTOR_ID,
+              reductionCategory: 'config',
+              confidence,
+              locDelta: {
+                remove: 1,
+                add: 0,
+                netEstimate: 1,
+                estimateKind: 'exact',
               },
+              preservationArgument:
+                'The property is declared on a public config interface but has zero read sites in the project.',
+              suggestedAction: `Remove unused key \`${prop.name}\` from ${prop.interfaceName}.`,
+              validationRequired: [
+                'Confirm no dynamic property access reads this key.',
+                'Run the package test suite after removal.',
+              ],
+              riskTags: ['public-api-surface'],
+              evidence: [
+                {
+                  id: evidenceId,
+                  kind: 'unused-config-property',
+                  summary: `Required property '${prop.name}' on ${prop.interfaceName} has no read sites.`,
+                  data: {
+                    property: prop.name,
+                    interfaceName: prop.interfaceName,
+                    filePath: relPath,
+                    line: prop.line,
+                    publicApiSurface: true,
+                  },
+                },
+              ],
             },
-          ],
-        },
-      }),
-    );
-  }
+          }),
+        );
+      }
 
-  return Promise.resolve({ signals, durationMs: Date.now() - started });
+      return { signals, durationMs: Date.now() - started };
+    },
+    { 'yagni.detector': DETECTOR_ID },
+  );
+
+  return Promise.resolve(result);
 }
 
 export const unusedConfigSurfaceDetector: YagniDetector = {

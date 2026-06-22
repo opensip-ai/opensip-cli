@@ -13,7 +13,7 @@ import type { Signal } from '@opensip-cli/core';
 
 const CONFIDENCE_SECTION_ORDER: readonly YagniConfidence[] = ['high', 'medium', 'low'];
 
-function formatLocation(signal: Signal, cwd: string): string {
+function formatYagniSignalLocation(signal: Signal, cwd: string): string {
   if (signal.filePath === '') return '<unknown>';
   const rel = relative(cwd, signal.filePath).split('\\').join('/');
   return signal.line === undefined ? rel : `${rel}:${String(signal.line)}`;
@@ -29,7 +29,7 @@ function formatLocSuffix(signal: Signal): string {
 function formatCandidateBlock(signal: Signal, cwd: string, verbose: boolean): string[] {
   const meta = readYagniMetadata(signal);
   if (meta === undefined) return [];
-  const loc = formatLocation(signal, cwd);
+  const loc = formatYagniSignalLocation(signal, cwd);
   const block = [
     `  ${meta.reductionCategory.padEnd(6)} ${meta.detector.padEnd(28)} ${loc}`,
     `           → ${meta.suggestedAction.padEnd(44)} ${formatLocSuffix(signal)}`,

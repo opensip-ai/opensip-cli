@@ -4,8 +4,10 @@
 
 import type { YagniConfidence } from './yagni-metadata.js';
 
+/** Graph evidence strategy used by YAGNI graph-backed detectors. */
 export type YagniGraphMode = 'auto' | 'reuse' | 'build' | 'off';
 
+/** Validated values from the `yagni:` config namespace. */
 export interface YagniConfig {
   readonly failOnErrors?: number;
   readonly failOnWarnings?: number;
