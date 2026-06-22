@@ -192,6 +192,20 @@ graph:
   minCrossPackageDuplicateBodySize: 200
 
 # =============================================================================
+# YAGNI Configuration
+# =============================================================================
+#
+# Advisory reduction audit. CI pins graphMode to build (never auto) for
+# deterministic dogfood runs; findings do not gate merges.
+
+yagni:
+  failOnErrors: 0
+  failOnWarnings: 0
+  defaultMinConfidence: medium
+  graphMode: build
+  includeTests: false
+
+# =============================================================================
 # Fitness Configuration
 # =============================================================================
 
