@@ -1,0 +1,64 @@
+{
+  "verdict": {
+    "score": 100,
+    "passed": true,
+    "summary": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 1
+    }
+  },
+  "units": [
+    {
+      "slug": "yagni:unused-config-surface",
+      "passed": true,
+      "violationCount": 1,
+      "durationMs": 0
+    }
+  ],
+  "signals": [
+    {
+      "ruleId": "yagni:unused-config-surface",
+      "message": "Public config property 'orphanKnob' in AppConfig is never accessed",
+      "severity": "low",
+      "filePath": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-yagni/packages/yagni/engine/src/__tests__/fixtures/unused-config-surface/pkg/src/app-config.ts",
+      "line": 3,
+      "metadata": {
+        "yagni": {
+          "detector": "unused-config-surface",
+          "confidence": 0.85,
+          "category": "config-surface",
+          "evidenceKind": "unused-config-property",
+          "evidence": {
+            "property": "orphanKnob",
+            "interfaceName": "AppConfig",
+            "filePath": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-yagni/packages/yagni/engine/src/__tests__/fixtures/unused-config-surface/pkg/src/app-config.ts",
+            "line": 3,
+            "publicApiSurface": true
+          },
+          "recommendation": "Delete the unused public config knob or wire it into runtime behavior."
+        }
+      }
+    }
+  ],
+  "sessionSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 1,
+    "skippedDetectors": [
+      {
+        "id": "duplicate-body-candidate",
+        "slug": "yagni:duplicate-body-candidate",
+        "reason": "graph-required",
+        "detail": "graph evidence unavailable"
+      }
+    ],
+    "graphMode": "off",
+    "graphBuilt": false,
+    "graphDetail": "graph disabled"
+  }
+}

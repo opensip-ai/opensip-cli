@@ -1,0 +1,7 @@
+{
+  "name": "fixture-unused-config",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
