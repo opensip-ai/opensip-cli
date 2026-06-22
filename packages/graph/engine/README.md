@@ -4,7 +4,7 @@
 
 # @opensip-cli/graph
 
-> Static call-graph + dead-end analysis (six-stage pipeline)
+> Static call-graph + dead-end analysis (seven-stage pipeline)
 
 This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.
 

@@ -25,7 +25,7 @@ export interface RuleHints {
 }
 
 /**
- * @fileoverview Core type shapes for the graph tool's six-stage pipeline.
+ * @fileoverview Core type shapes for the graph tool's seven-stage pipeline.
  *
  * Stage 1 (inventory) emits a Catalog of FunctionOccurrence entries with
  * empty `calls`. Stage 2 (edges) populates `calls` with CallEdge entries

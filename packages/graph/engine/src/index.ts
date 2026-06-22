@@ -2,8 +2,9 @@
 /**
  * @opensip-cli/graph — public barrel.
  *
- * The graph tool implements a strict six-stage pipeline:
- * discover → inventory → edges → indexes → rules → render.
+ * The graph tool implements a strict seven-stage pipeline (the canonical
+ * `GRAPH_STAGES` execution order):
+ * discover → parse → walk → resolve → index → features → rules.
  */
 
 // Side-effect import: surfaces the `scope.graph` augmentation on
