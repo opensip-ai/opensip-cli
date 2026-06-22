@@ -24,7 +24,16 @@
  */
 
 import type { ToolCapabilityDeclaration } from './capability.js';
+import type {
+  ArgSpec,
+  CommandOutputMode,
+  CommandScopeRequirement,
+  CommonFlagKey,
+  OptionSpec,
+  RawStreamReason,
+} from './command-spec.js';
 import type { ToolConfigManifestDescriptor } from './manifest-config.js';
+import type { PluginLayout } from '../plugins/types.js'; // leaf import — manifest must not pull the plugins barrel
 
 /**
  * The plugin-API epoch the running engine implements.
@@ -61,15 +70,56 @@ export const PLUGIN_API_VERSION = 1;
 export type ToolSource = 'bundled' | 'installed' | 'user-global' | 'project-local';
 
 /**
- * Identity of a command a tool contributes, as declared in the static
- * manifest. Mirrors the runtime `ToolCommandDescriptor` (`types.ts`) so
- * the bundled path can assert manifest⇔`Tool.commands` equality (Phase 1).
+ * The serializable subset of {@link OptionSpec} a tool may declare in its static
+ * manifest — every field EXCEPT the `parse` coercion closure (ADR-0054 M4-G).
+ *
+ * `OptionSpec.parse` is a runtime closure (a `(raw, previous) => next` reducer
+ * Commander runs at parse time, e.g. `--concurrency` → Number). It cannot be
+ * serialized, so it is the ONE thing the manifest cannot express. When the host
+ * mounts an EXTERNAL tool's command shell from this descriptor, the option is
+ * mounted WITHOUT a parse reducer — Commander passes the raw string/array
+ * through, and the WORKER (which holds the tool's real spec) coerces in its
+ * handler. A documented, deliberate narrowing — not a silent gap.
+ */
+export type ManifestOptionDescriptor = Omit<OptionSpec, 'parse'>;
+
+/**
+ * The serializable command SHELL a tool contributes, as declared in the static
+ * manifest (ADR-0054 M4-G). Mirrors the runtime {@link CommandSpec} MINUS the
+ * `handler` function and the non-serializable `OptionSpec.parse` closure, so the
+ * host can mount an EXTERNAL tool's commands from the manifest ALONE — no runtime
+ * import. The handler stays worker-owned and loads only at dispatch time.
+ *
+ * `name`/`description`/`aliases` are the historical identity subset (used for
+ * `--help` + drift/conflict detection). The remaining fields are the M4-G shell:
+ * the host synthesizes a {@link CommandSpec} from them to mount an external
+ * command. All optional — a manifest that omits them gets the runtime
+ * {@link CommandSpec} defaults (`commonFlags: []`, `scope: 'project'`,
+ * `output: 'command-result'`, `visibility: 'public'`).
  */
 export interface ToolCommandManifest {
   /** CLI subcommand name — 'fit', 'sim', 'fit-list', etc. */
   readonly name: string;
   readonly description: string;
   readonly aliases?: readonly string[];
+
+  // ── ADR-0054 M4-G: the serializable command SHELL ────────────────────────
+  /** Command visibility tier (mirrors {@link CommandSpec.visibility}). */
+  readonly visibility?: 'public' | 'internal';
+  /** Parent verb for `<tool> <verb>` nesting (mirrors {@link CommandSpec.parent}). */
+  readonly parent?: string;
+  /** The common flags this command exposes (mirrors {@link CommandSpec.commonFlags}). */
+  readonly commonFlags?: readonly CommonFlagKey[];
+  /** Tool-specific options, MINUS the `parse` closure (see {@link ManifestOptionDescriptor}). */
+  readonly options?: readonly ManifestOptionDescriptor[];
+  /** Positional arguments (mirrors {@link CommandSpec.args}; already plain data). */
+  readonly args?: readonly ArgSpec[];
+  /** Whether the host enters a project scope before dispatch (mirrors {@link CommandSpec.scope}). */
+  readonly scope?: CommandScopeRequirement;
+  /** How the host dispatches the handler's return (mirrors {@link CommandSpec.output}). */
+  readonly output?: CommandOutputMode;
+  /** Required when `output` is `raw-stream` (mirrors {@link CommandSpec.rawStreamReason}). */
+  readonly rawStreamReason?: RawStreamReason;
 }
 
 /**
@@ -139,6 +189,15 @@ interface ToolPluginManifestBase {
    * declares no descriptor defers ALL of its config validation to the worker.
    */
   readonly config?: ToolConfigManifestDescriptor;
+  /**
+   * ADR-0054 M4-G: the tool's serializable plugin layout (`{ domain, userSubdirs }`,
+   * mirroring the runtime {@link Tool.pluginLayout}). The host reads it to mount
+   * the domain-bound `<tool> plugin …` extension-pack group + to drive `init`
+   * scaffolding — WITHOUT importing the tool's runtime. A pack-supporting EXTERNAL
+   * tool declares it so the host synthesizes the same plugin surface a bundled tool
+   * gets. Omitted ⇒ the tool hosts no extension packs (no `plugin` subgroup).
+   */
+  readonly pluginLayout?: PluginLayout;
   /** Later: dashboard-contribution descriptor. */
   readonly dashboard?: unknown;
   /** Later: sessions-contribution descriptor. */

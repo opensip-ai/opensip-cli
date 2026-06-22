@@ -46,23 +46,140 @@
     "commands": [
       {
         "name": "fit",
-        "description": "Run fitness checks"
+        "description": "Run fitness checks",
+        "commonFlags": [
+          "cwd",
+          "json",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--recipe",
+            "value": "<name>",
+            "description": "Use a named recipe (default, quick-smoke, backend, etc.)"
+          },
+          {
+            "flag": "--check",
+            "value": "<slug>",
+            "description": "Run a single check by slug"
+          },
+          {
+            "flag": "--tags",
+            "value": "<tags>",
+            "description": "Filter checks by tags (repeatable or comma-separated)",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--list",
+            "description": "List available checks",
+            "default": false
+          },
+          {
+            "flag": "--recipes",
+            "description": "List available recipes",
+            "default": false
+          },
+          {
+            "flag": "--exclude",
+            "value": "<slug>",
+            "description": "Exclude check (repeatable)",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--config",
+            "value": "<path>",
+            "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)"
+          },
+          {
+            "flag": "--show",
+            "value": "<session>",
+            "description": "Replay a stored fit session by id, or latest for the latest fit session"
+          },
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch"
       },
       {
         "name": "list",
-        "description": "List available fitness checks"
+        "description": "List available fitness checks",
+        "parent": "fit",
+        "commonFlags": [
+          "cwd",
+          "json"
+        ],
+        "scope": "project",
+        "output": "command-result"
       },
       {
         "name": "recipes",
-        "description": "List available fitness recipes"
+        "description": "List available fitness recipes",
+        "parent": "fit",
+        "commonFlags": [
+          "cwd",
+          "json"
+        ],
+        "scope": "project",
+        "output": "command-result"
       },
       {
         "name": "export",
-        "description": "Export fit artifacts (--format baseline)"
+        "description": "Export fit artifacts: --format baseline (the SARIF-shaped gate baseline)",
+        "parent": "fit",
+        "commonFlags": [
+          "cwd",
+          "json"
+        ],
+        "options": [
+          {
+            "flag": "--format",
+            "value": "<fmt>",
+            "description": "Export artifact: baseline (the SARIF-shaped gate baseline)",
+            "required": true,
+            "choices": [
+              "baseline"
+            ]
+          },
+          {
+            "flag": "--out",
+            "value": "<path>",
+            "description": "Output file path for the SARIF baseline",
+            "required": true
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "file-export"
       },
       {
         "name": "fit-run-worker",
-        "description": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)"
+        "description": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)",
+        "visibility": "internal",
+        "commonFlags": [],
+        "args": [
+          {
+            "name": "specPath",
+            "description": "Path to a JSON FitOptions spec file"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "worker-ipc"
       }
     ],
     "capabilities": [
@@ -108,7 +225,14 @@
           ]
         }
       }
-    ]
+    ],
+    "pluginLayout": {
+      "domain": "fit",
+      "userSubdirs": [
+        "checks",
+        "recipes"
+      ]
+    }
   },
   "scripts": {
     "build": "tsc",

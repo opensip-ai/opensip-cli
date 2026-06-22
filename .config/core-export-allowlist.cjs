@@ -139,6 +139,10 @@ const EXPORT_ALLOWLIST = {
   HostEntitlements: 'tool-plugin-contract',
   LiveViewContext: 'tool-plugin-contract',
   LiveViewRenderer: 'tool-plugin-contract',
+  // ADR-0054 M4-G: the serializable command-option shape (OptionSpec minus the
+  // non-serializable `parse` closure) a tool declares in its static manifest, so
+  // the host mounts an external command's options from the manifest alone.
+  ManifestOptionDescriptor: 'tool-plugin-contract',
   OptionSpec: 'tool-plugin-contract',
   PLUGIN_API_VERSION: 'tool-plugin-contract',
   PatternSelector: 'tool-plugin-contract',

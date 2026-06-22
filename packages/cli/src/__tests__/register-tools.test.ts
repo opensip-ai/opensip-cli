@@ -355,6 +355,18 @@ const WALK_UP_SOURCES = {
   sources: WALK_UP_SOURCE_LIST,
   env: ALLOW_ALL_INSTALLED,
 };
+/**
+ * ADR-0054 M4-G: discovery in the dispatch WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`).
+ * The host NEVER imports an external runtime (it synthesizes a manifest-derived
+ * Tool); the WORKER is the isolation boundary where the runtime import + the
+ * runtime-shape checks (drift / malformed export / no-entry / import-throw) run.
+ * Tests that assert those import-path skip behaviors therefore exercise the worker
+ * path. Trust is still required (deny-by-default), so the allowlist stays `*`.
+ */
+const WALK_UP_SOURCES_WORKER = {
+  sources: WALK_UP_SOURCE_LIST,
+  env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*', OPENSIP_CLI_IN_TOOL_WORKER: '1' },
+};
 
 interface Fixture {
   readonly name: string;
@@ -489,9 +501,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.get('fixture-trust-allowed')).toBeDefined();
   });
 
-  it('skips a discovered package whose manifest drifted from its runtime commands', async () => {
-    // The drift guard (assertManifestMatchesTool) runs on the installed leg
-    // exactly as on the bundled/authored legs. An installed tool's mismatch
+  it('skips a discovered package whose manifest drifted from its runtime commands (worker path)', async () => {
+    // ADR-0054 M4-G: the drift guard (assertManifestMatchesTool) runs only where
+    // the runtime is imported — the dispatch WORKER (the host synthesizes from the
+    // manifest and never imports). In the worker an installed tool's mismatch
     // skips-with-diagnostic (it must not take fit/graph/sim down).
     staged.push(
       stageFixture('drifted-manifest', {
@@ -521,7 +534,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const restore = silenceStderr();
     try {
       await expect(
-        discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS, provenance),
+        discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES_WORKER, BUILTIN_IDS, provenance),
       ).resolves.toBeUndefined();
     } finally {
       restore();
@@ -530,7 +543,52 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(provenance.some((p) => p.id === 'fixture-drift')).toBe(false);
   });
 
-  it('skips a discovered package whose `tool` export is malformed', async () => {
+  it('HOST synthesizes a discovered external tool from its manifest (no runtime import)', async () => {
+    // ADR-0054 M4-G capstone: in the HOST (no OPENSIP_CLI_IN_TOOL_WORKER) the
+    // discovery leg NEVER imports the runtime — it registers a manifest-derived
+    // synthetic Tool. The fixture's runtime would THROW on import, so a successful
+    // registration proves the host never imported it (the manifest is the source
+    // of truth host-side; the worker imports the real runtime at dispatch).
+    staged.push(
+      stageFixture('host-synth', {
+        packageJson: {
+          name: '@opensip-cli-fixture/host-synth',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fixture-host-synth',
+            apiVersion: 1,
+            commands: [
+              {
+                name: 'fixture-host-synth',
+                description: 'x',
+                commonFlags: [],
+                scope: 'project',
+                output: 'command-result',
+              },
+            ],
+          },
+        },
+        indexJs: "throw new Error('host must never import the external runtime (ADR-0054 M4-G)');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const provenance: ToolProvenance[] = [];
+    await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS, provenance);
+    const tool = registry.get('fixture-host-synth');
+    expect(tool).toBeDefined();
+    // Synthetic: command shell present from the manifest, NO runtime extensionPoints.
+    expect(tool?.commandSpecs.map((s) => s.name)).toEqual(['fixture-host-synth']);
+    expect(tool?.extensionPoints).toBeUndefined();
+    expect(provenance.some((p) => p.id === 'fixture-host-synth')).toBe(true);
+  });
+
+  it('skips a discovered package whose `tool` export is malformed (worker path)', async () => {
+    // ADR-0054 M4-G: the exported-symbol shape gate runs only where the runtime
+    // is imported — the WORKER. (The host synthesizes from the manifest and never
+    // touches the export.)
     staged.push(
       stageFixture('bad-shape', {
         packageJson: {
@@ -551,17 +609,20 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
+      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES_WORKER, BUILTIN_IDS);
     } finally {
       restore();
     }
     expect(registry.list()).toHaveLength(0);
   });
 
-  it('skips a discovered package with no resolvable entry point (no-entry)', async () => {
-    // A package.json that declares a tool but ships no main/exports and no
-    // index.js: `resolvePackageEntryPoint` → undefined, so `importToolRuntime`
-    // returns the 'no-entry' reason and the loader skips it (3.0.0 shared path).
+  it('skips a discovered package with no resolvable entry point (no-entry, worker path)', async () => {
+    // ADR-0054 M4-G: a package.json that declares a tool but ships no main/exports
+    // and no index.js fails only where the runtime import is attempted — the
+    // WORKER. `resolvePackageEntryPoint` → undefined, so `importToolRuntime`
+    // returns the 'no-entry' reason and the worker leg skips it. (The host would
+    // synthesize from the manifest, which is valid — no entry point is needed to
+    // mount the command shell.)
     const dir = join(FIXTURE_SCOPE, 'no-entry');
     mkdirSync(dir, { recursive: true });
     writeFileSync(
@@ -583,7 +644,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     const registry = new ToolRegistryClass();
     const restore = silenceStderr();
     try {
-      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES, BUILTIN_IDS);
+      await discoverAndRegisterToolPackages(registry, WALK_UP_SOURCES_WORKER, BUILTIN_IDS);
     } finally {
       restore();
     }
@@ -591,22 +652,26 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
   });
 
   it('skips a discovered package whose tool id collides with a built-in', async () => {
+    // ADR-0054 M4-G: the built-in skip is a STATIC manifest check (admitInstalledTool
+    // returns undefined when `manifest.id` is a built-in), so it fires in the HOST
+    // before any synthesize OR import — no runtime needed. The fixture uses the real
+    // built-in id `fit`; its runtime would throw on import, proving the static skip
+    // precedes (and obviates) the runtime entirely.
     staged.push(
-      stageFixture('shadow-fitness', {
+      stageFixture('shadow-fit', {
         packageJson: {
-          name: '@opensip-cli-fixture/shadow-fitness',
+          name: '@opensip-cli-fixture/shadow-fit',
           version: '0.0.0',
           type: 'module',
           main: './index.js',
           opensipTools: {
             kind: 'tool',
-            id: 'fitness',
+            id: 'fit',
             apiVersion: 1,
-            commands: [{ name: 'fitness', description: 'x' }],
+            commands: [{ name: 'fit', description: 'x' }],
           },
         },
-        indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000f4', name: 'fitness', version: '0.0.0' }, commands: [], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
+        indexJs: "throw new Error('a built-in-colliding tool must never be imported');",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -730,12 +795,12 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.list()).toHaveLength(0);
   });
 
-  it('records no provenance or manifest for an admitted tool whose import fails', async () => {
-    // Parity regression: provenance + manifest are recorded only AFTER the
-    // runtime actually registered. An installed tool that admits on its static
-    // manifest but throws on import must leave NO trace in the collectors —
-    // otherwise `plugin list` would show a tool that never loaded and the
-    // capability registry would be seeded with its domains.
+  it('records no provenance or manifest for an admitted tool whose import fails (worker path)', async () => {
+    // Parity regression: in the WORKER (the only place the runtime imports — the
+    // host synthesizes), provenance + manifest are recorded only AFTER the runtime
+    // actually registered. An installed tool that admits on its static manifest but
+    // throws on import must leave NO trace in the collectors — otherwise the worker
+    // registry would carry a tool that never loaded and seed its capability domains.
     staged.push(
       stageFixture('admits-then-throws', {
         packageJson: {
@@ -761,7 +826,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          WALK_UP_SOURCES,
+          WALK_UP_SOURCES_WORKER,
           BUILTIN_IDS,
           provenance,
           manifests,

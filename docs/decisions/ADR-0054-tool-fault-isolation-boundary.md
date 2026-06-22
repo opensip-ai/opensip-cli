@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-06-21
+last_verified: 2026-06-22
 owner: opensip-cli
 ---
 
@@ -15,15 +15,21 @@ supersedes: []
 superseded_by: null
 related: [ADR-0023, ADR-0027, ADR-0028, ADR-0029, ADR-0030, ADR-0052]
 tags: [tools, plugins, isolation, cli, architecture, config, saas]
-enforcement: partially-mechanizable
+enforcement: mechanizable
 enforcement-reason: >
-  The graph live worker tests mechanize the first first-party application of the
-  worker primitive: exact and sharded live engines run outside the Ink render
-  process. The external-tool boundary is not enforced repo-wide yet. Its future
-  capstone invariant is mechanizable: no external-provenance tool runtime may be
-  imported in the host process. Add a fitness check / bootstrap test that rejects
-  `importToolRuntime(...)` on installed, project-local, or user-global tool paths
-  outside the worker-owned dispatch plane.
+  The capstone (M4-G) has landed: external-provenance tool runtime NEVER imports
+  in the host process. The boundary is enforced repo-wide on every PR.
+  `hostRuntimeImportPolicyFor` is narrowed to `{ source: 'bundled' }` — a
+  non-bundled host import is a COMPILE error, not a runtime guard; external
+  runtimes load only behind the worker-owned dispatch plane via the distinct
+  `workerRuntimeImportPolicyFor`. The strengthened `host-tool-runtime-import-boundary`
+  fitness check (run by `pnpm fit:ci`) asserts: `importToolRuntime` stays in the
+  admission/discovery boundary, host imports pass a bundled policy, and the worker
+  policy is confined to the worker plane. A bootstrap test
+  (`host-no-external-runtime-import.test.ts`) proves host discovery synthesizes a
+  manifest-derived Tool with no runtime import (a sentinel confirms non-import)
+  while the worker imports the real runtime, plus a `@ts-expect-error` proves the
+  bundled-only policy type.
 ```
 
 **Decision:** External-provenance tool runtime code must not load or execute in
@@ -83,13 +89,18 @@ authored Tool packages. It also does not move capability discovery or lifecycle
 hooks behind worker RPC, or disable unsafe in-process fallback for external
 provenance. Those are the migration workstreams below.
 
-**2026-06-17 transition guard:** until the manifest/RPC contract can carry
-executable command specs across a worker boundary, host-side runtime imports are
-still required for admitted tools. The host now requires an explicit
-`hostRuntimeImportPolicyFor(source)` policy at every `importToolRuntime` call,
-and the `host-tool-runtime-import-boundary` fitness check confines those calls
-to the admission/discovery boundary. This is a staging guardrail, not the final
-fault-isolation boundary.
+**2026-06-22 capstone (M4-G):** the transition guard is RETIRED — the boundary is
+now final. The host NEVER imports an external-provenance tool runtime: discovery
+registers a manifest-derived synthetic `Tool` (command shells lifted into the
+serializable `ToolCommandManifest` + `pluginLayout` on the static manifest), and
+the forked dispatch worker imports the real runtime when a command dispatches.
+`hostRuntimeImportPolicyFor` is narrowed to `{ source: 'bundled' }` (a non-bundled
+host import is a compile error); the worker-owned import uses the distinct
+`workerRuntimeImportPolicyFor`. The `host-tool-runtime-import-boundary` fitness
+check is now the capstone invariant guard (host imports bundled-only; the worker
+policy confined to the worker plane), not a staging guardrail. The
+`2026-06-17 transition guard` (host runtime imports under a named
+`adr0054Transition` exception) is superseded — that exception no longer exists.
 
 **Config semantics:** Config validation is a two-pass contract.
 
@@ -452,7 +463,17 @@ worker-owned and loads only at dispatch time.
 **Entry:** external runtime still imported in-host at discovery. **Exit:** the
 capstone invariant holds and is mechanized; `pnpm fit:ci` enforces it; the ADR's
 `enforcement` upgrades from `partially-mechanizable` to `mechanizable` for the
-capstone.
+capstone. **LANDED (2026-06-22):** the command-shell descriptor +
+`pluginLayout` are serializable on `ToolCommandManifest`; discovery synthesizes a
+manifest-derived `Tool` in the host (no import) and imports the runtime only in
+the worker; `hostRuntimeImportPolicyFor` is bundled-only (type-enforced);
+`workerRuntimeImportPolicyFor` carries the external worker import; the
+strengthened fitness check + `host-no-external-runtime-import.test.ts` bootstrap
+test mechanize the invariant. The bundled tools' manifests carry the full command
+shell, generated from their runtime `commandSpecs` by
+`scripts/build-tool-command-manifests.mjs` with a `pnpm tool-manifests:check`
+drift gate (in `pnpm lint`), so bundled≡installed parity (the GA acceptance bar)
+holds when a bundled package is presented as installed.
 
 ### Sequencing summary
 
@@ -468,6 +489,9 @@ M4-G command-shell descriptor + capstone guardrail  → invariant mechanized
 
 A-D are the dispatch plane; E-F remove the remaining host-import consumers; G is
 the capstone. Each increment is independently green and never leaves the boundary
-half-built: until G lands, external runtimes still import in-host under the
-named, fitness-confined `adr0054Transition` exception — a valid staging state,
-not a broken boundary.
+half-built. **G has landed (2026-06-22):** external runtimes no longer import
+in-host at all — the host synthesizes a manifest-derived `Tool` and the worker is
+the only external import path. The named `adr0054Transition` exception is gone
+(replaced by the bundled-only host policy + the worker-plane `inDispatchWorker`
+policy); the boundary is now the final fault-isolation boundary, mechanized by the
+fitness check + bootstrap test.

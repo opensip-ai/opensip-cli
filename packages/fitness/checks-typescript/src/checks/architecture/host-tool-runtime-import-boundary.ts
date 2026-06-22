@@ -1,35 +1,71 @@
 /**
- * @fileoverview Keep ADR-0054's host-process runtime import exception narrow.
+ * @fileoverview Mechanize the ADR-0054 M4-G CAPSTONE invariant: no
+ * `importToolRuntime(...)` for external-provenance tools in the HOST process.
  *
- * External Tool runtimes still execute in the host process during the
- * ADR-0054 migration because the current manifest only carries command
- * metadata, not executable CommandSpec/RPC descriptors. That exception must
- * remain explicit: every importToolRuntime call needs a source policy, and no
- * new production call sites should appear outside the admission/discovery
- * boundary OR the worker-owned dispatch plane.
+ * After the capstone, external tool runtime code NEVER loads in the host. The
+ * host registers a manifest-derived synthetic Tool (command shells from the
+ * static manifest) and mounts its commands without importing the runtime; the
+ * forked dispatch WORKER imports the untrusted runtime when a command actually
+ * dispatches. This is no longer a transition guardrail — it is the enforced
+ * boundary. The check asserts three things across the CLI host package:
  *
- * The worker entry (`tool-command-worker-entry.ts`) is a sanctioned call site:
- * it runs in the FORKED worker process, not the host — importing the untrusted
- * runtime there is the ADR-0054 isolation goal, not a host-process import. It is
- * allowlisted alongside the admission/discovery boundary; both still require an
- * explicit source policy so external runtime execution stays visible.
+ *   1. `importToolRuntime` may be called only from the admission/discovery
+ *      boundary or the worker-owned dispatch plane (the allowlisted files).
+ *      Any other host-process call site is a violation.
+ *   2. A HOST import must pass a BUNDLED policy — `hostRuntimeImportPolicyFor(...)`
+ *      (type-narrowed to `'bundled'`) or a literal `{ source: 'bundled' }`. A
+ *      non-bundled host policy is a violation (the type already forbids it; this
+ *      catches a hand-rolled literal that bypasses the constructor).
+ *   3. `workerRuntimeImportPolicyFor(...)` — the policy that authorizes loading an
+ *      EXTERNAL runtime — is permitted only on the worker-owned plane (the
+ *      discovery leg gated behind `isHostRuntimeImportForbidden`, the worker entry,
+ *      and the admission module that defines it). Using it elsewhere would import
+ *      an external runtime in the host.
+ *
+ * The `adr0054Transition` exception is gone: the worker is now the only path for
+ * external runtime import, and the host import policy is bundled-only.
  */
-// @fitness-ignore-file shipped-checks-must-be-generic -- dogfood check for this repo's ADR-0054 migration boundary; AST precision keeps the temporary import exception mechanically narrow.
+// @fitness-ignore-file shipped-checks-must-be-generic -- dogfood check for this repo's ADR-0054 capstone boundary; AST precision keeps the host/worker import distinction mechanically exact.
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 const CLI_HOST_PATH = 'packages/cli/src/';
 const IMPORT_RUNTIME = 'importToolRuntime';
-const POLICY_HELPER = 'hostRuntimeImportPolicyFor';
+const HOST_POLICY_HELPER = 'hostRuntimeImportPolicyFor';
+const WORKER_POLICY_HELPER = 'workerRuntimeImportPolicyFor';
 
+/**
+ * The files permitted to call `importToolRuntime` at all (admission/discovery +
+ * the worker-owned dispatch plane). Any other host file is a hard violation.
+ */
 const ALLOWED_CALLSITE_SUFFIXES = new Set([
   'packages/cli/src/bootstrap/admit-tool-package.ts',
   'packages/cli/src/bootstrap/register-tools.ts',
   'packages/cli/src/bootstrap/register-tools-discovery.ts',
+  // Authored (project-local / user-global) tool registration: same host-vs-worker
+  // discovery split as register-tools-discovery (the import runs only in the
+  // worker, gated by isHostRuntimeImportForbidden).
+  'packages/cli/src/bootstrap/register-authored-tools.ts',
   // ADR-0054 worker-owned dispatch plane: this entry runs in the FORKED worker
   // process (not the host), so importing the external runtime here is the
-  // isolation goal. Still requires an explicit source policy.
+  // isolation goal. It uses the worker policy.
+  'packages/cli/src/bootstrap/tool-command-worker-entry.ts',
+]);
+
+/**
+ * The files permitted to construct/pass the WORKER policy
+ * (`workerRuntimeImportPolicyFor`) — the policy that authorizes loading an
+ * EXTERNAL runtime. This is the worker-owned plane: the discovery leg (which
+ * gates the import behind `isHostRuntimeImportForbidden`, so it runs only inside
+ * the worker), the worker entry, and the admission module that defines the
+ * constructor + runs the bundled/probe runtime-load section. Using the worker
+ * policy anywhere else would import an external runtime in the host.
+ */
+const ALLOWED_WORKER_POLICY_SUFFIXES = new Set([
+  'packages/cli/src/bootstrap/admit-tool-package.ts',
+  'packages/cli/src/bootstrap/register-tools-discovery.ts',
+  'packages/cli/src/bootstrap/register-authored-tools.ts',
   'packages/cli/src/bootstrap/tool-command-worker-entry.ts',
 ]);
 
@@ -37,12 +73,20 @@ function normalized(path: string): string {
   return path.replaceAll('\\', '/');
 }
 
-function isAllowedCallsite(filePath: string): boolean {
+function endsWithAny(filePath: string, suffixes: ReadonlySet<string>): boolean {
   const p = normalized(filePath);
-  for (const suffix of ALLOWED_CALLSITE_SUFFIXES) {
+  for (const suffix of suffixes) {
     if (p.endsWith(suffix)) return true;
   }
   return false;
+}
+
+function isAllowedCallsite(filePath: string): boolean {
+  return endsWithAny(filePath, ALLOWED_CALLSITE_SUFFIXES);
+}
+
+function isWorkerPolicyAllowed(filePath: string): boolean {
+  return endsWithAny(filePath, ALLOWED_WORKER_POLICY_SUFFIXES);
 }
 
 function propertyNameText(name: ts.PropertyName): string | undefined {
@@ -52,27 +96,37 @@ function propertyNameText(name: ts.PropertyName): string | undefined {
   return undefined;
 }
 
-function isTrueLiteral(node: ts.Expression): boolean {
-  return node.kind === ts.SyntaxKind.TrueKeyword;
+/** The kind of policy a runtime-import argument expresses (capstone discrimination). */
+type PolicyKind = 'host-bundled' | 'worker' | 'other';
+
+/** A call to a named policy helper, e.g. `hostRuntimeImportPolicyFor(source)`. */
+function helperCallName(arg: ts.Expression): string | undefined {
+  if (ts.isCallExpression(arg) && ts.isIdentifier(arg.expression)) return arg.expression.text;
+  return undefined;
 }
 
-function isPolicyArg(arg: ts.Expression): boolean {
-  if (ts.isCallExpression(arg) && ts.isIdentifier(arg.expression)) {
-    return arg.expression.text === POLICY_HELPER;
-  }
+/** Whether an object literal is exactly `{ source: 'bundled' }` (the host policy). */
+function isBundledLiteral(arg: ts.Expression): boolean {
   if (!ts.isObjectLiteralExpression(arg)) return false;
-
-  let hasSource = false;
-  let hasTransition = false;
+  let bundled = false;
   for (const prop of arg.properties) {
-    if (!ts.isPropertyAssignment(prop)) continue;
+    if (!ts.isPropertyAssignment(prop)) return false;
     const name = propertyNameText(prop.name);
-    if (name === 'source') hasSource = true;
-    if (name === 'adr0054Transition' && isTrueLiteral(prop.initializer)) {
-      hasTransition = true;
-    }
+    if (name !== 'source') return false;
+    if (!ts.isStringLiteral(prop.initializer) || prop.initializer.text !== 'bundled') return false;
+    bundled = true;
   }
-  return hasSource && (hasTransition || arg.getText().includes("'bundled'"));
+  return bundled;
+}
+
+/** Classify the policy argument of an `importToolRuntime(dir, policy)` call. */
+function classifyPolicyArg(arg: ts.Expression | undefined): PolicyKind {
+  if (arg === undefined) return 'other';
+  const helper = helperCallName(arg);
+  if (helper === HOST_POLICY_HELPER) return 'host-bundled';
+  if (helper === WORKER_POLICY_HELPER) return 'worker';
+  if (isBundledLiteral(arg)) return 'host-bundled';
+  return 'other';
 }
 
 function localRuntimeImportNames(sourceFile: ts.SourceFile): Set<string> {
@@ -108,30 +162,48 @@ export function analyzeHostToolRuntimeImportBoundary(
   if (runtimeNames.size === 0) return violations;
 
   const allowedFile = isAllowedCallsite(filePath);
+  const workerPolicyAllowed = isWorkerPolicyAllowed(filePath);
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
       const callee = node.expression.text;
       if (runtimeNames.has(callee)) {
         const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+        const kind = classifyPolicyArg(node.arguments[1]);
         if (!allowedFile) {
           violations.push({
             message:
               `importToolRuntime may only be called from the tool admission/discovery boundary ` +
-              `(ADR-0054 transition). Found host-process runtime import in ${normalized(filePath)}.`,
+              `or the worker-owned dispatch plane (ADR-0054 M4-G capstone). Found host-process ` +
+              `runtime import in ${normalized(filePath)}.`,
             severity: 'error',
             line,
             suggestion:
-              'Route tool runtime loading through admit-tool-package/register-tools, or the ADR-0054 worker boundary.',
+              'External tool runtimes load ONLY behind the worker boundary. Register a ' +
+              'manifest-derived synthetic Tool in the host; import the runtime in the worker.',
           });
-        } else if (node.arguments.length < 2 || !isPolicyArg(node.arguments[1])) {
+        } else if (kind === 'other') {
           violations.push({
             message:
-              'importToolRuntime host-process imports must pass an explicit source policy ' +
-              '(bundled or adr0054Transition) so external runtime execution remains visible.',
+              'importToolRuntime must pass an explicit policy — a bundled HOST policy ' +
+              "(hostRuntimeImportPolicyFor or { source: 'bundled' }) or workerRuntimeImportPolicyFor " +
+              'on the worker-owned plane (ADR-0054 M4-G).',
             severity: 'error',
             line,
             suggestion:
-              'Pass hostRuntimeImportPolicyFor(source), or an explicit policy object for bundled/ADR-0054 transition imports.',
+              'Pass hostRuntimeImportPolicyFor(...) for a bundled host import, or ' +
+              'workerRuntimeImportPolicyFor(source) on the worker plane.',
+          });
+        } else if (kind === 'worker' && !workerPolicyAllowed) {
+          violations.push({
+            message:
+              `workerRuntimeImportPolicyFor authorizes loading an EXTERNAL tool runtime; it is ` +
+              `permitted only on the worker-owned dispatch plane, not in ${normalized(filePath)} ` +
+              `(ADR-0054 M4-G capstone: external runtimes never import in the host).`,
+            severity: 'error',
+            line,
+            suggestion:
+              'In the host, register a manifest-derived synthetic Tool instead. Import the ' +
+              'external runtime only in the dispatch worker.',
           });
         }
       }
@@ -146,7 +218,7 @@ export const hostToolRuntimeImportBoundary = defineCheck({
   id: 'b7554963-e24e-4d80-b3e0-edbb97bbdba3',
   slug: 'host-tool-runtime-import-boundary',
   description:
-    'Host-process tool runtime imports must stay in the admission boundary and carry an explicit ADR-0054 transition policy',
+    'External tool runtimes never import in the host: importToolRuntime stays in the admission/discovery boundary, host imports are bundled-only, and the external worker policy is confined to the worker plane (ADR-0054 M4-G capstone)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture'],
   fileTypes: ['ts', 'tsx'],

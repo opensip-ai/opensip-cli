@@ -49,6 +49,7 @@ import { PLUGIN_API_VERSION } from '../tools/manifest.js';
 import { isRecord, isStringArray } from './json-guards.js';
 import { normalizeDiscovery } from './manifest-discovery.js';
 
+import type { PluginLayout } from './types.js';
 import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
 import type {
   RawToolPluginManifest,
@@ -326,30 +327,37 @@ function validateManifest(
   const capabilities = validateOptionalCapabilities(block.capabilities);
   if (capabilities === 'invalid') return undefined;
 
-  // Reserved for future community/catalog (see ToolPluginManifestBase).
-  // We explicitly copy them through as `unknown` (additive) so they survive
-  // load → admit without loss. This is the lightweight consumer hygiene
-  // (roadmap item 3) — authors get structural round-tripping now; future
-  // releases can add non-fatal warnings or concrete schemas without
-  // breaking GA-era manifests. The admission gate already treats extra
-  // fields permissively; this just makes the intent explicit.
-  const compatibility = block.compatibility;
-  const distribution = block.distribution;
-  const extensionMetadata = block.extensionMetadata;
+  // ADR-0054 M4-G: the serializable `pluginLayout` (`{ domain, userSubdirs }`).
+  // Absent ⇒ no extension-pack surface; present-but-malformed ⇒ the whole
+  // manifest is invalid (mirroring the strict `commands`/`capabilities` parse).
+  const pluginLayout = normalizePluginLayout(block.pluginLayout);
+  if (pluginLayout === 'invalid') return undefined;
 
   return {
     kind: 'tool',
     id: block.id,
-    ...(stableId === undefined ? {} : { stableId }),
+    ...opt('stableId', stableId),
     name,
     version,
-    ...(apiVersion === undefined ? {} : { apiVersion }),
+    ...opt('apiVersion', apiVersion),
     commands,
-    ...(capabilities === undefined ? {} : { capabilities }),
-    ...(compatibility === undefined ? {} : { compatibility }),
-    ...(distribution === undefined ? {} : { distribution }),
-    ...(extensionMetadata === undefined ? {} : { extensionMetadata }),
+    ...opt('capabilities', capabilities),
+    ...opt('pluginLayout', pluginLayout),
+    // Reserved for future community/catalog (see ToolPluginManifestBase): copied
+    // through as `unknown` (additive) so they survive load → admit without loss.
+    ...opt('compatibility', block.compatibility),
+    ...opt('distribution', block.distribution),
+    ...opt('extensionMetadata', block.extensionMetadata),
   };
+}
+
+/** Spread helper: `{}` when `value` is undefined, else `{ [key]: value }`. Keeps
+ *  the manifest assembly flat (one expression per optional field). */
+function opt<K extends string, V>(
+  key: K,
+  value: V | undefined,
+): Record<K, V> | Record<string, never> {
+  return value === undefined ? {} : ({ [key]: value } as Record<K, V>);
 }
 
 /** Closed set of valid `contributionKind` values for a capability declaration. */
@@ -400,10 +408,72 @@ function isContributionKind(value: unknown): value is CapabilityContributionKind
   return typeof value === 'string' && (CONTRIBUTION_KINDS as readonly string[]).includes(value);
 }
 
+/** Closed set of valid command `output` modes (mirrors core's `CommandOutputMode`). */
+const COMMAND_OUTPUT_MODES = new Set([
+  'signal-envelope',
+  'command-result',
+  'raw-stream',
+  'live-view',
+]);
+/** Closed set of valid command `scope` requirements (mirrors core's `CommandScopeRequirement`). */
+const COMMAND_SCOPE_REQUIREMENTS = new Set(['project', 'none']);
+
+/** Is `v` an array of plain-object records (the shape options/args round-trip as)? */
+function isRecordArray(v: unknown): boolean {
+  return Array.isArray(v) && v.every((e) => isRecord(e));
+}
+
+/**
+ * Per-field validators for the ADR-0054 M4-G serializable command SHELL. Each
+ * entry validates ONE optional field; a present-but-malformed value fails the
+ * whole manifest (mirroring the strict `commands`/`capabilities` parse). Keeping
+ * the validators table-driven keeps {@link normalizeCommandShell} a flat loop
+ * (low cognitive complexity) and the field set self-documenting.
+ *
+ * `options`/`args` pass through as opaque object arrays — the host's
+ * `assertCommandSpec` re-validates the synthesized spec and Commander validates
+ * flag syntax at mount, so this stays a shallow structural guard. The
+ * non-serializable `OptionSpec.parse` closure is intentionally not modelled.
+ */
+const COMMAND_SHELL_VALIDATORS: Readonly<Record<string, (v: unknown) => boolean>> = {
+  visibility: (v) => v === 'public' || v === 'internal',
+  parent: (v) => typeof v === 'string' && v !== '',
+  commonFlags: (v) => isStringArray(v),
+  options: isRecordArray,
+  args: isRecordArray,
+  scope: (v) => typeof v === 'string' && COMMAND_SCOPE_REQUIREMENTS.has(v),
+  output: (v) => typeof v === 'string' && COMMAND_OUTPUT_MODES.has(v),
+  rawStreamReason: (v) => typeof v === 'string',
+};
+
+/**
+ * Round-trip the ADR-0054 M4-G serializable command SHELL fields onto a
+ * normalized {@link ToolCommandManifest}. The host mounts an EXTERNAL tool's
+ * command from this shell (no runtime import). Absent fields are omitted — the
+ * host synthesizer applies the runtime `CommandSpec` defaults.
+ *
+ * @returns the shell fields to merge, or `'invalid'` when a present field is
+ *   malformed.
+ */
+function normalizeCommandShell(
+  entry: Record<string, unknown>,
+): Partial<ToolCommandManifest> | 'invalid' {
+  const shell: Record<string, unknown> = {};
+  for (const [field, isValid] of Object.entries(COMMAND_SHELL_VALIDATORS)) {
+    const value = entry[field];
+    if (value === undefined) continue;
+    if (!isValid(value)) return 'invalid';
+    shell[field] = value;
+  }
+  return shell;
+}
+
 /**
  * Validate + normalize the `commands` array to `ToolCommandManifest[]`.
  * Each entry must carry a string `name` + `description`; optional
- * `aliases` must be a string array. Returns `undefined` on any violation.
+ * `aliases` must be a string array. The ADR-0054 M4-G serializable command
+ * SHELL fields round-trip via {@link normalizeCommandShell}. Returns
+ * `undefined` on any violation.
  */
 function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -414,13 +484,36 @@ function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | und
     if (typeof entry.description !== 'string') return undefined;
     const { aliases } = entry;
     if (aliases !== undefined && !isStringArray(aliases)) return undefined;
+    const shell = normalizeCommandShell(entry);
+    if (shell === 'invalid') return undefined;
     out.push({
       name: entry.name,
       description: entry.description,
       ...(aliases === undefined ? {} : { aliases }),
+      ...shell,
     });
   }
   return out;
+}
+
+/**
+ * Validate + normalize the ADR-0054 M4-G `pluginLayout` descriptor
+ * (`{ domain, userSubdirs }`, mirroring the runtime {@link Tool.pluginLayout}).
+ * The host reads it to mount the domain-bound `<tool> plugin …` extension-pack
+ * group + drive `init` scaffolding for an EXTERNAL tool WITHOUT importing its
+ * runtime. A present-but-malformed layout fails the whole manifest (mirroring the
+ * strict `commands`/`capabilities` parse); absent ⇒ the tool hosts no packs.
+ *
+ * @returns the validated layout, `undefined` when absent, or `'invalid'` when
+ *   present-but-malformed.
+ */
+function normalizePluginLayout(value: unknown): PluginLayout | undefined | 'invalid' {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return 'invalid';
+  const { domain, userSubdirs } = value;
+  if (typeof domain !== 'string' || domain === '') return 'invalid';
+  if (!isStringArray(userSubdirs)) return 'invalid';
+  return { domain, userSubdirs };
 }
 
 function hashManifest(manifest: RawToolPluginManifest): string {

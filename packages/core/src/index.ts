@@ -199,6 +199,7 @@ export type {
   RawToolPluginManifest,
   ToolPluginManifest,
   ToolCommandManifest,
+  ManifestOptionDescriptor,
   ToolProvenance,
   ToolSource,
 } from './tools/index.js';

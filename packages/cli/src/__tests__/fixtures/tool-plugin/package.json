@@ -11,7 +11,11 @@
     "commands": [
       {
         "name": "audit-demo",
-        "description": "Demo audit command contributed by a tool plugin"
+        "description": "Demo audit command contributed by a tool plugin",
+        "commonFlags": [],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "lookup"
       }
     ]
   }

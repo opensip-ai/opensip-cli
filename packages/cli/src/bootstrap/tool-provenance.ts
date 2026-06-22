@@ -46,6 +46,22 @@ export function isExternalHookHostSkipActive(env: NodeJS.ProcessEnv = process.en
 }
 
 /**
+ * Must this process REFUSE to import external tool runtimes (ADR-0054 M4-G
+ * capstone)? `true` in the HOST — the host registers a manifest-derived synthetic
+ * Tool for external provenance and NEVER loads its runtime; `false` inside a
+ * dispatch worker (`OPENSIP_CLI_IN_TOOL_WORKER=1`) — the worker IS the isolation
+ * boundary, where the untrusted external runtime legitimately loads + runs.
+ *
+ * This is the same host-vs-worker hinge as the M4-F lifecycle gate (the worker
+ * re-runs the SAME bootstrap, so discovery must branch on which process it is),
+ * named for the capstone's discovery decision. Reads the injected env (defaults
+ * to `process.env`) so tests flip it deterministically without a fork.
+ */
+export function isHostRuntimeImportForbidden(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isExternalHookHostSkipActive(env);
+}
+
+/**
  * Resolve a tool's provenance source from the per-run provenance array. Mirrors
  * the dispatch/config matchers: prefer the stable-id match (UUID → `metadata.id`),
  * fall back to the human key (`ToolProvenance.id` → `metadata.name`). A tool with

@@ -122,6 +122,88 @@ describe('loadToolManifest', () => {
     });
   });
 
+  it('round-trips the ADR-0054 M4-G command SHELL + pluginLayout (host mounts from the manifest)', () => {
+    writePackageManifest(testDir, {
+      name: '@my-co/ext',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'ext',
+        apiVersion: 1,
+        pluginLayout: { domain: 'ext', userSubdirs: ['checks', 'recipes'] },
+        commands: [
+          {
+            name: 'ext',
+            description: 'run ext',
+            commonFlags: ['cwd', 'json'],
+            options: [{ flag: '--mode', value: '<m>', description: 'mode' }],
+            args: [{ name: 'path', description: 'p' }],
+            scope: 'project',
+            output: 'signal-envelope',
+            visibility: 'public',
+          },
+          {
+            name: 'ext-worker',
+            description: '[internal] worker',
+            commonFlags: [],
+            scope: 'none',
+            output: 'raw-stream',
+            rawStreamReason: 'worker-ipc',
+            visibility: 'internal',
+          },
+        ],
+      },
+    });
+
+    const manifest = loadToolManifest('installed', testDir);
+    expect(manifest?.pluginLayout).toEqual({ domain: 'ext', userSubdirs: ['checks', 'recipes'] });
+    expect(manifest?.commands[0]).toEqual({
+      name: 'ext',
+      description: 'run ext',
+      commonFlags: ['cwd', 'json'],
+      options: [{ flag: '--mode', value: '<m>', description: 'mode' }],
+      args: [{ name: 'path', description: 'p' }],
+      scope: 'project',
+      output: 'signal-envelope',
+      visibility: 'public',
+    });
+    expect(manifest?.commands[1]).toMatchObject({
+      name: 'ext-worker',
+      output: 'raw-stream',
+      rawStreamReason: 'worker-ipc',
+      visibility: 'internal',
+    });
+  });
+
+  it('rejects a manifest with a malformed M4-G command-shell field (bad output mode)', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        apiVersion: 1,
+        commands: [{ name: 'x', description: 'x', output: 'not-a-mode' }],
+      },
+    });
+    expect(loadToolManifest('installed', testDir)).toBeUndefined();
+  });
+
+  it('rejects a manifest with a malformed pluginLayout (missing userSubdirs)', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        apiVersion: 1,
+        pluginLayout: { domain: 'x' },
+        commands: [{ name: 'x', description: 'x' }],
+      },
+    });
+    expect(loadToolManifest('installed', testDir)).toBeUndefined();
+  });
+
   it('returns undefined when the manifest file is missing', () => {
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
     expect(loadToolManifest('project-local', testDir)).toBeUndefined();

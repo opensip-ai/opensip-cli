@@ -21,12 +21,16 @@
  * not-yet-trusted package) pass `staticOnly: true` here and run the runtime
  * sections in a child-process probe instead.
  *
- * ADR-0054 transition: external runtimes still import in the host process until
- * the manifest/RPC contract can carry executable command specs across a worker
- * boundary. Every host-process import must therefore pass an explicit policy:
- * bundled imports are normal, non-bundled imports are named as temporary
- * `adr0054Transition` exceptions so the fitness check can keep the boundary
- * visible and narrow.
+ * ADR-0054 M4-G (capstone): external tool runtimes NEVER import in the host
+ * process. The capstone invariant is mechanized at the type level: a HOST import
+ * policy ({@link ToolRuntimeImportPolicy}) is `{ source: 'bundled' }` ONLY —
+ * `hostRuntimeImportPolicyFor` accepts only `'bundled'`, so a non-bundled host
+ * import is a COMPILE error, not a runtime guard. The forked dispatch worker (the
+ * isolation boundary) imports the untrusted external runtime via the distinct
+ * {@link workerRuntimeImportPolicyFor} (`{ source, inDispatchWorker: true }`),
+ * named for what it is. The host registers a manifest-derived synthetic Tool for
+ * external provenance (see `synthesize-external-tool.ts`) and never loads its
+ * runtime; the worker imports it when a command dispatches.
  */
 
 import { pathToFileURL } from 'node:url';
@@ -60,16 +64,58 @@ export type ToolRuntimeLoad =
       readonly detail?: string;
     };
 
-export type ToolRuntimeImportPolicy =
-  | { readonly source: 'bundled' }
+/**
+ * The HOST import policy (ADR-0054 M4-G capstone). A host-process tool runtime
+ * import is `{ source: 'bundled' }` ONLY — bundled tools are the trusted
+ * computing base. External provenance can NOT produce a host policy: the type
+ * makes the external host-import unrepresentable (a compile error), not merely a
+ * runtime guard. External runtimes load only behind the worker boundary (see
+ * {@link WorkerRuntimeImportPolicy}).
+ */
+export interface ToolRuntimeImportPolicy {
+  readonly source: 'bundled';
+}
+
+/**
+ * The WORKER import policy (ADR-0054 M4-G). Inside the forked dispatch worker —
+ * the isolation boundary — importing the untrusted external runtime IS the goal.
+ * A worker import is either the bundled host policy (the worker re-runs the same
+ * bootstrap, which imports bundled tools too) or the named external worker policy
+ * (`{ source, inDispatchWorker: true }`). It is constructed ONLY by
+ * {@link workerRuntimeImportPolicyFor} on the worker-owned discovery path; the
+ * fitness check confines its use to the worker plane.
+ */
+export type WorkerRuntimeImportPolicy =
+  | ToolRuntimeImportPolicy
   | {
       readonly source: Exclude<ToolSource, 'bundled'>;
-      readonly adr0054Transition: true;
+      readonly inDispatchWorker: true;
     };
 
-export function hostRuntimeImportPolicyFor(source: ToolSource): ToolRuntimeImportPolicy {
+/**
+ * The bundled-only HOST import policy constructor. Accepts ONLY `'bundled'` — a
+ * `hostRuntimeImportPolicyFor('installed')` is a COMPILE error (the capstone
+ * invariant, type-enforced). External provenance never reaches a host import.
+ */
+export function hostRuntimeImportPolicyFor(source: 'bundled'): ToolRuntimeImportPolicy {
+  return { source };
+}
+
+/**
+ * The WORKER import policy constructor (ADR-0054 M4-G). Used ONLY on the
+ * worker-owned discovery path (inside the forked `__tool-command-worker`, gated
+ * on `OPENSIP_CLI_IN_TOOL_WORKER`). A bundled source produces the plain host
+ * policy; an external source produces the named `inDispatchWorker` policy — the
+ * legitimate place untrusted external runtime loads.
+ */
+export function workerRuntimeImportPolicyFor(source: ToolSource): WorkerRuntimeImportPolicy {
   if (source === 'bundled') return { source };
-  return { source, adr0054Transition: true };
+  return { source, inDispatchWorker: true };
+}
+
+/** Whether a runtime import policy authorizes loading the runtime (defense-in-depth). */
+function isAuthorizedImportPolicy(policy: WorkerRuntimeImportPolicy): boolean {
+  return policy.source === 'bundled' || policy.inDispatchWorker === true;
 }
 
 /**
@@ -82,19 +128,24 @@ export function hostRuntimeImportPolicyFor(source: ToolSource): ToolRuntimeImpor
  * module-resolution path still loads. A third-party tool is an untrusted
  * boundary, so `isValidTool` gates the exported symbol before it is touched.
  *
+ * ADR-0054 M4-G: the `policy` is `{ source: 'bundled' }` for a HOST import or the
+ * `inDispatchWorker` worker policy for an external import inside the dispatch
+ * worker. A bare external source can no longer be expressed (the type forbids it);
+ * the runtime check is defense-in-depth.
+ *
  * Never throws: returns a discriminated result the caller acts on.
  */
 export async function importToolRuntime(
   dir: string,
-  policy: ToolRuntimeImportPolicy,
+  policy: WorkerRuntimeImportPolicy,
 ): Promise<ToolRuntimeLoad> {
-  if (policy.source !== 'bundled' && policy.adr0054Transition !== true) {
+  if (!isAuthorizedImportPolicy(policy)) {
     return {
       ok: false,
       reason: 'import-failed',
       detail:
-        'external tool runtime import attempted without ADR-0054 transition policy; ' +
-        'load through the worker boundary instead',
+        'external tool runtime import attempted without a bundled or worker policy; ' +
+        'load through the worker boundary instead (ADR-0054 M4-G capstone)',
     };
   }
   const meta = readToolPackageMetadata(dir);
@@ -246,8 +297,14 @@ export async function admitToolPackage(opts: AdmitToolPackageOptions): Promise<A
   }
 
   // Section 3+4 — runtime load + tool shape: dynamic import (UNTRUSTED code
-  // executes here) and the exported-symbol gate.
-  const load = await importToolRuntime(opts.dir, hostRuntimeImportPolicyFor(opts.source));
+  // executes here) and the exported-symbol gate. ADR-0054 M4-G: this section
+  // runs ONLY in an isolation context — the bundled host bootstrap (source
+  // `'bundled'`) or the child-process `runtime-probe-entry` for `tools validate`
+  // (a separate process, like the dispatch worker). `workerRuntimeImportPolicyFor`
+  // produces the bundled host policy for `'bundled'` and the named
+  // `inDispatchWorker` policy for an external candidate in the probe child — never
+  // a bare external host import (the type forbids that).
+  const load = await importToolRuntime(opts.dir, workerRuntimeImportPolicyFor(opts.source));
   if (!load.ok) {
     if (load.reason === 'invalid-shape') {
       sections.push(

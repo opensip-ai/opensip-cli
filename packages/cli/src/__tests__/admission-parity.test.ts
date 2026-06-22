@@ -42,11 +42,13 @@ describe('admitToolPackage — section verdicts per fixture', () => {
     ]);
     const reported = report.tool?.metadata;
     // ADR-0048 split tool identity into a stable `id` and a human `name`.
-    // Assert the stable id (the manifest⇔runtime coherence key) plus the
-    // display name explicitly, rather than the old `name ?? id` fallback which
-    // now resolves to the display name.
+    // ADR-0054 M4-G: the runtime `metadata.name` (the human key) must EQUAL the
+    // manifest `id` — the host synthesizes the external registry entry from the
+    // manifest `id`, so a divergent display name would break provenance matching
+    // (the dispatch hook keys on it). The fixture aligns them: both are
+    // `audit-demo-tool` (the legacy display-name divergence was paid down).
     expect(reported?.id).toBe('audit-demo-tool');
-    expect(reported?.name).toBe('Audit Demo');
+    expect(reported?.name).toBe('audit-demo-tool');
     expect(report.provenance?.source).toBe('installed');
   });
 

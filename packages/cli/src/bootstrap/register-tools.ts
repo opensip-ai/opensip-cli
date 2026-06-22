@@ -240,11 +240,13 @@ function throwBundledAdmissionFailure(packageName: string, report: AdmissionRepo
 export {
   admitProjectLocalTool,
   admitUserGlobalTool,
-  buildToolDiscoverySources,
   discoverAndRegisterAuthoredTools,
+  type AuthoredAdmission,
+} from './register-authored-tools.js';
+export {
+  buildToolDiscoverySources,
   discoverAndRegisterToolPackages,
   emitInstalledLoadFailure,
-  type AuthoredAdmission,
   type DiscoveryOptions,
 } from './register-tools-discovery.js';
 

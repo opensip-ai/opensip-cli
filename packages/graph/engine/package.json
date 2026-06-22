@@ -46,39 +46,307 @@
     "commands": [
       {
         "name": "graph",
-        "description": "Run static call-graph analysis (rules, entry points, catalog summary in one report)"
+        "description": "Run static call-graph analysis (rules, entry points, catalog summary in one report)",
+        "commonFlags": [
+          "cwd",
+          "json",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey"
+        ],
+        "options": [
+          {
+            "flag": "--no-cache",
+            "description": "Skip catalog cache (force full rebuild)",
+            "negatable": true
+          },
+          {
+            "flag": "--resolution",
+            "value": "<mode>",
+            "description": "Edge resolution tier: exact (semantic) or fast (syntactic, no type checker)",
+            "default": "exact",
+            "choices": [
+              "exact",
+              "fast"
+            ]
+          },
+          {
+            "flag": "--recipe",
+            "value": "<name>",
+            "description": "Run a named recipe (a subset of graph rules). Default: all rules"
+          },
+          {
+            "flag": "--show",
+            "value": "<session>",
+            "description": "Replay a stored graph session by id, or latest for the latest graph session"
+          },
+          {
+            "flag": "--gate-save",
+            "description": "Save current Signal set as the gate baseline",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Compare current Signals to the gate baseline",
+            "default": false
+          },
+          {
+            "flag": "--profile",
+            "value": "<path>",
+            "description": "Write graph performance profile JSON to path"
+          },
+          {
+            "flag": "--workspace",
+            "description": "Fan out across detected workspace units (memory-isolated; polyglot)",
+            "default": false
+          },
+          {
+            "flag": "--exact",
+            "description": "Use the single-program exact build engine instead of the default parallel sharded engine (both resolve through one shared model — exact = the 1-shard case — held equivalent by the directional equivalence guardrail; --exact suits small/single-package repos).",
+            "default": false
+          },
+          {
+            "flag": "--concurrency",
+            "value": "<n>",
+            "description": "Concurrency cap for --workspace and the sharded build (default: cpus()-1)"
+          },
+          {
+            "flag": "--language",
+            "value": "<name>",
+            "description": "Force a specific language adapter (suppresses auto-detection)"
+          },
+          {
+            "flag": "--list-files",
+            "description": "List the source files graph would discover for this scope and exit (no build; honors [paths...], --workspace, --language, --json)",
+            "default": false
+          },
+          {
+            "flag": "--sarif",
+            "value": "<path>",
+            "description": "Also write this run’s findings as a SARIF 2.1.0 file (for GitHub Code Scanning). Composes with --gate-save; written even when the gate fails."
+          }
+        ],
+        "args": [
+          {
+            "name": "paths",
+            "variadic": true,
+            "optional": true,
+            "description": "Subtrees to analyze (default: whole project)"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch"
       },
       {
         "name": "graph-shard-worker",
-        "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)"
-      },
-      {
-        "name": "graph-equivalence-check",
-        "description": "[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)"
+        "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)",
+        "visibility": "internal",
+        "commonFlags": [],
+        "args": [
+          {
+            "name": "specPath",
+            "description": "Path to a JSON ShardWorkerSpec file"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "worker-ipc"
       },
       {
         "name": "graph-run-worker",
-        "description": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)"
+        "description": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)",
+        "visibility": "internal",
+        "commonFlags": [],
+        "args": [
+          {
+            "name": "specPath",
+            "description": "Path to a JSON graph build-spec file"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "worker-ipc"
       },
       {
         "name": "export",
-        "description": "Export graph analysis artifacts (--format sarif | catalog | baseline)"
+        "description": "Export graph analysis artifacts: --format sarif (SARIF v2.1.0 findings), catalog (CatalogExport JSON), or baseline (gate fingerprint JSON)",
+        "parent": "graph",
+        "commonFlags": [
+          "cwd",
+          "json"
+        ],
+        "options": [
+          {
+            "flag": "--format",
+            "value": "<fmt>",
+            "description": "Export artifact: sarif | catalog | baseline",
+            "required": true,
+            "choices": [
+              "sarif",
+              "catalog",
+              "baseline"
+            ]
+          },
+          {
+            "flag": "--output-sarif",
+            "value": "<path>",
+            "description": "Output file path for the SARIF v2.1.0 document"
+          },
+          {
+            "flag": "--catalog-output",
+            "value": "<path>",
+            "description": "Output file path for the CatalogExport JSON"
+          },
+          {
+            "flag": "--tenant-id",
+            "value": "<id>",
+            "description": "Tenant scope stamped on every row + provenance"
+          },
+          {
+            "flag": "--repo-id",
+            "value": "<id>",
+            "description": "Repository scope stamped on every row"
+          },
+          {
+            "flag": "--git-sha",
+            "value": "<sha>",
+            "description": "Commit SHA the catalog was extracted at"
+          },
+          {
+            "flag": "--run-id",
+            "value": "<uuid>",
+            "description": "Run id for provenance (auto-generated if absent)"
+          },
+          {
+            "flag": "--mode",
+            "value": "<mode>",
+            "description": "'initial' (full rebuild) or 'incremental' (reuse cache when present)",
+            "default": "initial"
+          },
+          {
+            "flag": "--changed-file",
+            "value": "<relPath>",
+            "description": "Changed file (repeatable). Advisory today — the engine derives the true changed set from fingerprint diffs; recorded for observability.",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--language",
+            "value": "<name>",
+            "description": "Force a specific language adapter (suppresses auto-detection)"
+          },
+          {
+            "flag": "--resolution",
+            "value": "<mode>",
+            "description": "Edge resolution tier: exact (semantic) or fast (syntactic, no type checker)",
+            "default": "exact",
+            "choices": [
+              "exact",
+              "fast"
+            ]
+          },
+          {
+            "flag": "--out",
+            "value": "<path>",
+            "description": "Output file path for the JSON baseline"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "file-export"
       },
       {
         "name": "recipes",
-        "description": "List available graph recipes"
+        "description": "List available graph recipes",
+        "parent": "graph",
+        "commonFlags": [
+          "json"
+        ],
+        "scope": "project",
+        "output": "command-result"
       },
       {
         "name": "lookup",
-        "description": "Look up function occurrences by simple name from the persisted catalog"
+        "description": "Look up function occurrences by simple name from the persisted catalog",
+        "parent": "graph",
+        "commonFlags": [
+          "json"
+        ],
+        "args": [
+          {
+            "name": "name",
+            "description": "Function simple name to look up (e.g. \"saveBaseline\")"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "lookup"
       },
       {
         "name": "index",
-        "description": "Emit a symbolindex.json artifact; --build refreshes the catalog first"
+        "description": "Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first",
+        "parent": "graph",
+        "commonFlags": [],
+        "options": [
+          {
+            "flag": "--build",
+            "description": "Run the graph pipeline to refresh the catalog before emitting the index",
+            "default": false
+          },
+          {
+            "flag": "--cwd <path>",
+            "description": "Target directory (out path resolves against this)",
+            "default": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-m4e"
+          },
+          {
+            "flag": "--out",
+            "value": "<path>",
+            "description": "Output file path",
+            "default": "symbolindex.json"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "file-export"
       },
       {
         "name": "list",
-        "description": "List available graph rules"
+        "description": "List available graph rules",
+        "parent": "graph",
+        "commonFlags": [
+          "cwd",
+          "json"
+        ],
+        "scope": "project",
+        "output": "command-result"
+      },
+      {
+        "name": "graph-equivalence-check",
+        "description": "[internal] Verify the sharded build is byte-equivalent to the exact build on a real repo (gates production edge divergence against a committed budget)",
+        "visibility": "internal",
+        "commonFlags": [],
+        "options": [
+          {
+            "flag": "--cwd <path>",
+            "description": "Target repo root to check (default: current directory)",
+            "default": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-m4e"
+          },
+          {
+            "flag": "--budget",
+            "value": "<path>",
+            "description": "Path to the committed budget JSON (relative to cwd or absolute)",
+            "default": ".config/graph-equivalence-budget.json"
+          },
+          {
+            "flag": "--update-budget",
+            "description": "Rewrite the budget file to the observed production divergence count (capture/tighten); always exits 0"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
       }
     ],
     "capabilities": [

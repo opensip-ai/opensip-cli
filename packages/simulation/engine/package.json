@@ -44,15 +44,58 @@
     "commands": [
       {
         "name": "sim",
-        "description": "Run simulation scenarios"
+        "description": "Run simulation scenarios",
+        "commonFlags": [
+          "cwd",
+          "json",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--recipe",
+            "value": "<name>",
+            "description": "Run a named sim recipe (default: built-in `default`)"
+          },
+          {
+            "flag": "--show",
+            "value": "<session>",
+            "description": "Replay a stored sim session by id, or latest for the latest sim session"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch"
       },
       {
         "name": "recipes",
-        "description": "List available simulation recipes"
+        "description": "List available simulation recipes",
+        "parent": "sim",
+        "commonFlags": [
+          "cwd",
+          "json"
+        ],
+        "scope": "project",
+        "output": "command-result"
       },
       {
         "name": "sim-run-worker",
-        "description": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)"
+        "description": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)",
+        "visibility": "internal",
+        "commonFlags": [],
+        "args": [
+          {
+            "name": "specPath",
+            "description": "Path to a JSON sim-args spec file"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "worker-ipc"
       }
     ],
     "capabilities": [
@@ -100,7 +143,14 @@
           ]
         }
       }
-    ]
+    ],
+    "pluginLayout": {
+      "domain": "sim",
+      "userSubdirs": [
+        "scenarios",
+        "recipes"
+      ]
+    }
   },
   "scripts": {
     "build": "tsc",
