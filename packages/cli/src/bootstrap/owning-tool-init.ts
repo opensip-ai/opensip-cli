@@ -12,11 +12,13 @@ import {
   resolveToolCommands,
   resolveToolHooks,
   type Tool,
+  type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-cli/core';
 
 import { BootstrapError } from './bootstrap-error.js';
 import { initializedToolIds } from './process-idempotency.js';
+import { shouldRunHookInHost } from './tool-provenance.js';
 
 const MODULE_TAG = 'cli:bootstrap';
 
@@ -47,6 +49,12 @@ export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | 
  * id is recorded only on success, so a transient failure can retry in a
  * long-lived host.
  *
+ * ADR-0054 M4-F: the host does NOT run an EXTERNAL owning tool's `initialize()`
+ * (executing untrusted runtime in the kernel is the load-time hole the ADR
+ * rejects). An external command dispatches to the worker (`maybeDispatchExternal`),
+ * and the worker entry runs the dispatched tool's `initialize()` there (the
+ * isolation boundary). Bundled owning tools initialize in-host exactly as before.
+ *
  * @throws {BootstrapError} (exit 1) when the owning tool's initialize() throws —
  *   the top-level boundary renders it (human stderr / structured `--json`).
  */
@@ -54,9 +62,12 @@ export async function maybeInitializeOwningTool(
   tools: ToolRegistry,
   cmdName: string,
   runId: string,
+  provenance: readonly ToolProvenance[] = [],
 ): Promise<void> {
   const owningTool = resolveOwningTool(tools, cmdName);
   if (!owningTool) return;
+  // M4-F: skip an external owning tool host-side — its initialize runs worker-side.
+  if (!shouldRunHookInHost(owningTool, provenance)) return;
   const hooks = resolveToolHooks(owningTool);
   if (!hooks.initialize) return;
   const toolHumanId = owningTool.metadata.name ?? owningTool.metadata.id;

@@ -463,4 +463,36 @@ describe('wireCapabilityRegistry', () => {
     });
     expect(registry.hasDomain('undeclared-domain')).toBe(false);
   });
+
+  // ADR-0054 M4-F: the host registers an EXTERNAL tool's manifest domain (pure
+  // data) but does NOT install its REAL registrar in-host (running the registrar
+  // is external runtime code). The domain keeps its deferred placeholder host-side.
+  it('M4-F: does NOT install an EXTERNAL tool real registrar in-host (placeholder kept)', () => {
+    const real = vi.fn();
+    const tool = makeTool({ id: 'ext', capabilityRegistrars: { 'ext-domain': real } });
+    const registry = wireCapabilityRegistry({
+      tools: registryWith([tool]),
+      manifests: [manifest('ext', 'ext-domain')],
+      registry: new CapabilityRegistry(),
+      provenance: [{ source: 'installed', id: 'ext', version: '0.0.0', manifestHash: 'h' }],
+    });
+    // The domain is registered (manifest data), but routing hits the THROWING
+    // placeholder, not the real registrar — the host never ran the external registrar.
+    expect(registry.hasDomain('ext-domain')).toBe(true);
+    expect(() => registry.routeContribution('ext-domain', { id: 'x' })).toThrow();
+    expect(real).not.toHaveBeenCalled();
+  });
+
+  it('M4-F: STILL installs a BUNDLED tool real registrar in-host (regression)', () => {
+    const real = vi.fn();
+    const tool = makeTool({ id: 'graph', capabilityRegistrars: { 'graph-adapter': real } });
+    const registry = wireCapabilityRegistry({
+      tools: registryWith([tool]),
+      manifests: [manifest('graph', 'graph-adapter')],
+      registry: new CapabilityRegistry(),
+      provenance: [{ source: 'bundled', id: 'graph', version: '0.0.0', manifestHash: 'h' }],
+    });
+    registry.routeContribution('graph-adapter', { id: 'ts' });
+    expect(real).toHaveBeenCalledOnce();
+  });
 });

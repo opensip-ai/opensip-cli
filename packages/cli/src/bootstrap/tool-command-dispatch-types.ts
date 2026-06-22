@@ -53,11 +53,31 @@ export interface ToolCommandWorkerSpec {
    * tiers). The worker passes this to `hostRuntimeImportPolicyFor`.
    */
   readonly source: Exclude<ToolSource, 'bundled'>;
-  /** Which of the tool's `commandSpecs` (by `name`) to run. */
-  readonly commandName: string;
-  /** The parsed Commander options for this invocation (serializable). */
+  /**
+   * Which of the tool's `commandSpecs` (by `name`) to run. Present for a COMMAND
+   * dispatch ({@link ToolCommandWorkerSpec} with no `hook`). Mutually exclusive
+   * with `hook`: a hook-mode spec runs a lifecycle hook, not a command.
+   */
+  readonly commandName?: string;
+  /**
+   * ADR-0054 M4-F: run a tool LIFECYCLE HOOK in the worker (instead of a command
+   * handler) and return its plain-data result in {@link ToolCommandResult.hookResult}.
+   * The host gathers an EXTERNAL tool's report/replay data this way so the hook's
+   * untrusted runtime code never executes in the host process. Mutually exclusive
+   * with `commandName`.
+   *
+   *   - `collectReportData` — runs `extensionPoints.collectReportData(workerScope)`;
+   *     `hookResult` is the contributed `Record<string, unknown>`.
+   *   - `sessionReplay`     — runs `extensionPoints.sessionReplay.replaySession(hookArg)`;
+   *     `hookArg` is the stored {@link ToolSessionRecord}; `hookResult` is the
+   *     `ToolSessionReplay`.
+   */
+  readonly hook?: 'collectReportData' | 'sessionReplay';
+  /** The serializable argument the hook needs (e.g. the stored session row for `sessionReplay`). */
+  readonly hookArg?: unknown;
+  /** The parsed Commander options for this invocation (serializable). Empty for hook-mode. */
   readonly opts: Record<string, unknown>;
-  /** The trailing positionals (`_args`) for this invocation (serializable). */
+  /** The trailing positionals (`_args`) for this invocation (serializable). Empty for hook-mode. */
   readonly positionals: readonly unknown[];
   /**
    * The tool's RAW config namespace block (coarse-validated by the host pre-fork;
@@ -137,6 +157,14 @@ export interface ToolCommandResult {
    * generic session row. `undefined` for a handler that produced no session.
    */
   readonly session?: ToolSessionContribution;
+  /**
+   * ADR-0054 M4-F: the plain-data result of a lifecycle HOOK run worker-side
+   * (when the spec set `hook`). For `collectReportData` it is the contributed
+   * `Record<string, unknown>`; for `sessionReplay` it is the `ToolSessionReplay`.
+   * The host merges/uses it without ever executing the external hook in-process.
+   * `undefined` for a normal command dispatch.
+   */
+  readonly hookResult?: unknown;
   /**
    * The handler's RAW return value for the RETURN-VALUED output modes
    * (`command-result` / `signal-envelope`). For these modes the in-process path's

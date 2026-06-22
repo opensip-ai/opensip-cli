@@ -33,24 +33,10 @@ import {
   type Tool,
   type ToolCliContext,
   type ToolPluginManifest,
-  type ToolProvenance,
 } from '@opensip-cli/core';
 
 import { dispatchExternalToolCommand } from './dispatch-external-tool-command.js';
-
-/**
- * Find the provenance recorded for `tool` this run. `ToolProvenance.stableId`
- * (optional UUID) maps to `tool.metadata.id`; `ToolProvenance.id` (human key)
- * maps to `tool.metadata.name`. Prefer the stable-id match, fall back to the
- * human key so a tool that declared no `stableId` still resolves.
- */
-function provenanceFor(tool: Tool): ToolProvenance | undefined {
-  const recorded = currentScope()?.toolProvenance ?? [];
-  return (
-    recorded.find((p) => p.stableId !== undefined && p.stableId === tool.metadata.id) ??
-    recorded.find((p) => p.id === tool.metadata.name)
-  );
-}
+import { provenanceRecordFor } from './tool-provenance.js';
 
 /** Find the admitted manifest for `tool` (same stable-id-then-name match). */
 function manifestFor(tool: Tool): ToolPluginManifest | undefined {
@@ -87,7 +73,7 @@ export function buildMaybeDispatchExternal(
   positionals: readonly unknown[],
 ) => Promise<boolean> {
   return async (commandName, opts, positionals) => {
-    const provenance = provenanceFor(tool);
+    const provenance = provenanceRecordFor(tool, currentScope()?.toolProvenance ?? []);
     if (provenance === undefined || provenance.source === 'bundled') {
       // No external provenance recorded (or bundled) → in-process (the trusted /
       // unknown path), byte-identical to before. ADR-0054 trust tiers: bundled

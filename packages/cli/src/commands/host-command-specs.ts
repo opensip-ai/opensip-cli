@@ -167,6 +167,8 @@ function buildReportSpec(): HostSpec {
       const opts = rawOpts as { open: boolean; json: boolean };
       // Commander stores `--no-open` as `opts.open === false`; default true.
       // In `--json` mode we never launch a browser (machine-output contract).
+      // ADR-0054 M4-F: composeAndWriteReport runs an EXTERNAL tool's
+      // collectReportData in a forked hook worker (its runtime never runs in-host).
       return composeAndWriteReport({ open: opts.open && !opts.json });
     },
   });

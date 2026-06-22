@@ -69,7 +69,10 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
 
   let replay: ToolSessionReplay<CommandResult>;
   try {
-    replay = contribution.replaySession(resolved.session);
+    // ADR-0054 M4-F: replaySession may be ASYNC — a BUNDLED tool resolves
+    // synchronously (in-host closure); an EXTERNAL tool forks a hook worker (its
+    // runtime never runs in-host). Await covers both.
+    replay = await contribution.replaySession(resolved.session);
   } catch (error) {
     // @handles — a corrupt/legacy stored payload is surfaced to the caller as a
     // structured `decode-error` outcome (not swallowed); see emitSessionShowError.

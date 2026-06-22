@@ -52,22 +52,11 @@ import {
   registerCapabilityDomainsFromManifest,
 } from '@opensip-cli/core';
 
+import { provenanceSourceFor, shouldRunHookInHost } from './tool-provenance.js';
+
 /** A plain-object guard that treats arrays and null as non-objects. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Resolve the provenance source for a tool (ADR-0054 trust tier). Mirrors the
- * dispatch hook's matcher: prefer the stable-id match, fall back to the human
- * key. A tool with no recorded provenance is treated as the trusted/unknown path
- * (`bundled` semantics) — its host-side Zod is folded, exactly as before.
- */
-function sourceFor(tool: Tool, provenance: readonly ToolProvenance[]): ToolProvenance['source'] {
-  const recorded =
-    provenance.find((p) => p.stableId !== undefined && p.stableId === tool.metadata.id) ??
-    provenance.find((p) => p.id === tool.metadata.name);
-  return recorded?.source ?? 'bundled';
 }
 
 /**
@@ -111,7 +100,7 @@ function collectDeclarations(
 ): readonly ToolConfigDeclaration[] {
   const declarations: ToolConfigDeclaration[] = [];
   for (const tool of tools.list()) {
-    if (sourceFor(tool, provenance) === 'bundled') {
+    if (provenanceSourceFor(tool, provenance) === 'bundled') {
       const config = resolveToolHooks(tool).config;
       if (config !== undefined) {
         declarations.push(config as ToolConfigDeclaration);
@@ -316,33 +305,49 @@ function reportUnclaimedNamespaces(args: {
 /**
  * Construct + populate the per-run capability registry (§5.3, Phase 4).
  *
- * Registers every admitted manifest's declared capability domains (each with
- * a deferred placeholder registrar), then replaces each placeholder with the
- * owning tool's REAL registrar from `tool.capabilityRegistrars`. A registrar
- * for a domain the tool's manifest did not declare is skipped (the host only
- * wires registrars for declared domains).
+ * Step 1 registers every admitted manifest's declared capability domains (each
+ * with a deferred placeholder registrar) — pure MANIFEST data: the manifest is
+ * serializable, the placeholder is a host-owned deferred stub (it throws if a
+ * domain is driven before a real registrar is installed); NO external runtime
+ * code runs here. Step 2 replaces each placeholder with the owning tool's REAL
+ * registrar from `tool.capabilityRegistrars`.
+ *
+ * ADR-0054 M4-F: step 2 is gated on {@link shouldRunHookInHost}. For an EXTERNAL
+ * tool in the HOST process the real registrar is NOT installed host-side (reading
+ * `tool.capabilityRegistrars` + invoking the registrar runs untrusted runtime
+ * code — the load-time hole the ADR rejects); the external domain keeps its
+ * deferred placeholder in the host registry. The real registrar is installed
+ * worker-side: the dispatch worker re-runs this SAME wiring with the host-skip
+ * INACTIVE, so the dispatched external tool's registrar IS installed there (the
+ * isolation boundary). Bundled tools install in-host exactly as before. A
+ * registrar whose domain id was not declared in any manifest is skipped
+ * (hasDomain false) — the host never invents a domain a tool didn't declare.
  *
  * @param tools The per-run tool registry (supplies each tool's real registrars).
  * @param manifests The admitted manifests (supply the declared domains).
+ * @param provenance The per-run provenance (drives the M4-F host/external gate).
  * @returns The populated registry, ready to attach to `scope.capabilities`.
  */
 export function wireCapabilityRegistry(args: {
   readonly tools: ToolRegistry;
   readonly manifests: readonly ToolPluginManifest[];
   readonly registry: CapabilityRegistry;
+  readonly provenance?: readonly ToolProvenance[];
 }): CapabilityRegistry {
-  const { tools, manifests, registry } = args;
+  const { tools, manifests, registry, provenance = [] } = args;
 
-  // 1. Register every manifest-declared domain with a deferred placeholder.
+  // 1. Register every manifest-declared domain with a deferred placeholder
+  //    (manifest data only — no external runtime code runs).
   for (const manifest of manifests) {
     registerCapabilityDomainsFromManifest(manifest, registry);
   }
 
-  // 2. Replace each placeholder with the owning tool's real registrar. A
-  //    registrar whose domain id was not declared in any manifest is skipped
-  //    (hasDomain false) — the host never invents a domain a tool didn't
-  //    declare.
+  // 2. Replace each placeholder with the owning tool's real registrar — IN-HOST
+  //    only for tools whose hooks may run in the host (bundled, or — inside the
+  //    dispatch worker — the dispatched external tool). External tools in the
+  //    host keep the deferred placeholder; their registrar installs worker-side.
   for (const tool of tools.list()) {
+    if (!shouldRunHookInHost(tool, provenance)) continue;
     const registrars = resolveToolHooks(tool).capabilityRegistrars;
     if (registrars === undefined) continue;
     for (const [domainId, registrar] of Object.entries(registrars)) {

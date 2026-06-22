@@ -15,10 +15,11 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ToolError, type ToolProvenance } from '@opensip-cli/core';
+import { ConfigurationError, ToolError, type ToolProvenance } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { dispatchExternalToolCommand } from '../bootstrap/dispatch-external-tool-command.js';
+import { dispatchExternalToolHook } from '../bootstrap/dispatch-external-tool-hook.js';
 
 import { makeDispatchHostCtx, type CapturedHostCtx } from './harness/dispatch-host-ctx.js';
 
@@ -84,5 +85,43 @@ describe('dispatchExternalToolCommand — replay + failure arms', () => {
     await expect(
       dispatch(cap, 'envelope', join(HERE, 'fixtures', 'this-entry-does-not-exist.mjs')),
     ).rejects.toThrow(/failed/);
+  });
+
+  // ADR-0054 M4-E/M4-F: a worker `config-invalid` error maps to the SAME typed
+  // ConfigurationError (exit 2) the host coarse pass throws (single config-error
+  // contract), not a generic SystemError.
+  it('maps a worker config-invalid error to a ConfigurationError', async () => {
+    const cap = makeDispatchHostCtx();
+    await expect(dispatch(cap, 'config-invalid')).rejects.toBeInstanceOf(ConfigurationError);
+  });
+});
+
+describe('dispatchExternalToolHook — M4-F lifecycle hook supervisor', () => {
+  it('forks the worker in hook mode and returns the worker hookResult', async () => {
+    const cap = makeDispatchHostCtx();
+    const result = await dispatchExternalToolHook({
+      provenance: PROVENANCE,
+      hook: 'collectReportData',
+      cwd: HERE,
+      ctx: cap.ctx,
+      cliScript: RESULT_WORKER,
+      timeoutMs: 5000,
+    });
+    expect(result).toEqual({ ok: true, n: 42 });
+  });
+
+  it('rejects with a structured ToolError when the hook worker cannot spawn', async () => {
+    const cap = makeDispatchHostCtx();
+    await expect(
+      dispatchExternalToolHook({
+        provenance: PROVENANCE,
+        hook: 'sessionReplay',
+        hookArg: { id: 's1' },
+        cwd: HERE,
+        ctx: cap.ctx,
+        cliScript: join(HERE, 'fixtures', 'this-entry-does-not-exist.mjs'),
+        timeoutMs: 5000,
+      }),
+    ).rejects.toBeInstanceOf(ToolError);
   });
 });

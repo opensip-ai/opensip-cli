@@ -45,6 +45,7 @@ import { buildDatastoreThunk } from '../cli-context.js';
 
 import { buildTargets } from './build-targets.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
+import { shouldRunHookInHost } from './tool-provenance.js';
 
 import type { loadCliDefaults } from './cli-defaults.js';
 
@@ -267,7 +268,16 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // --json consumers and the uniform diagnostics snapshot see the full
   // per-run construction (addresses architecture review findings on observability
   // of steps 6/7 and blast-radius files).
-  const contributing = tools.list().filter((t) => !!resolveToolHooks(t).contributeScope);
+  // ADR-0054 M4-F: the HOST process never executes an EXTERNAL tool's
+  // `contributeScope` (running its runtime closure is the load-time hole the ADR
+  // rejects). External subscopes are contributed worker-side — the dispatch
+  // worker re-runs this SAME builder with the host-skip INACTIVE, so the
+  // dispatched external tool's subscope is installed there (the isolation
+  // boundary). Bundled tools contribute in-host exactly as before. The
+  // diagnostics count only the tools whose hook actually runs in-host.
+  const contributing = tools
+    .list()
+    .filter((t) => !!resolveToolHooks(t).contributeScope && shouldRunHookInHost(t, provenance));
   scope.diagnostics.event('load', 'debug', `${contributing.length} tool(s) contributed subscope`, {
     tools: contributing.map((t) => t.metadata.id ?? t.metadata.name),
   });
@@ -283,7 +293,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // (`{ contribution, onDispose }`); we install `contribution` and register
   // `onDispose` on `scope.onDispose(...)` so `dispose()` reclaims the resource.
   // The bare-`ScopeContribution` form (graph/simulation) carries no disposer.
-  for (const tool of tools.list()) {
+  for (const tool of contributing) {
     const result = resolveToolHooks(tool).contributeScope?.();
     if (!result) continue;
     if (isContributionWithDisposer(result)) {
@@ -295,10 +305,13 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   }
 
   // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
+  // M4-F: pass provenance so the registry installs an external tool's REAL
+  // registrar in-host only when the host-skip is inactive (i.e. in the worker).
   const capabilities = wireCapabilityRegistry({
     tools,
     manifests,
     registry: createCapabilityRegistry(logger),
+    provenance,
   });
 
   const wired = capabilities.listDomains().map((d) => d.id);

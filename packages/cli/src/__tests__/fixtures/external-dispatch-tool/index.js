@@ -53,6 +53,13 @@ const deepConfigSchema = {
   },
 };
 
+/**
+ * ADR-0054 M4-F: module-level sentinels the lifecycle hooks set, so the
+ * `init-check` mode can prove `initialize` ran in the SAME (worker) process
+ * before the handler. `initPid` records the pid `initialize` ran in.
+ */
+const initSentinel = { initialized: false, initPid: undefined };
+
 export const tool = {
   metadata: {
     id: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567',
@@ -64,6 +71,64 @@ export const tool = {
     // ADR-0054 M4-E deep config pass: the tool's REAL (here, fixture) Zod-ish
     // schema, run IN THE WORKER after load against the coarse-validated block.
     config: { namespace: 'extdispatch', schema: deepConfigSchema },
+
+    // ADR-0054 M4-F initialize: runs once worker-side before the handler (the host
+    // never runs an external owning tool's initialize). Sets a sentinel the
+    // `init-check` mode echoes so a test can prove it ran in the worker process.
+    initialize: async () => {
+      initSentinel.initialized = true;
+      initSentinel.initPid = process.pid;
+    },
+
+    // ADR-0054 M4-F lifecycle/capability hooks. The host must NOT execute these
+    // for an external tool — they run worker-side (contributeScope / capability
+    // / initialize during the worker bootstrap; collectReportData / sessionReplay
+    // in a forked HOOK worker). Each stamps `process.pid` so a test can prove the
+    // hook ran in a DIFFERENT process than the host (the isolation boundary).
+
+    // contributeScope: installs a tool subscope worker-side (host skips it).
+    contributeScope: () => ({ extDispatchScope: { pid: process.pid } }),
+
+    // collectReportData: returns a keyed catalog the host merges into the report.
+    // Stamps the worker pid + the config it saw so the test can assert it ran in
+    // the worker (pid !== host pid) and read worker-local config.
+    collectReportData: () => ({
+      extDispatchReport: { ran: true, pid: process.pid, marker: 'report-from-worker' },
+    }),
+
+    // sessionReplay: rebuilds a ToolSessionReplay from a stored row, worker-side.
+    sessionReplay: {
+      tool: 'external-dispatch-tool',
+      replaySession: (stored) => ({
+        fidelity: 'projection',
+        envelope: {
+          schemaVersion: 2,
+          tool: 'external-dispatch-tool',
+          runId: stored?.id ?? 'replayed',
+          createdAt: new Date().toISOString(),
+          verdict: {
+            score: stored?.score ?? 0,
+            passed: stored?.passed ?? false,
+            summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+          },
+          units: [],
+          signals: [{ marker: 'replayed-in-worker', pid: process.pid }],
+        },
+      }),
+    },
+
+    // fingerprintStrategy: a non-default strategy. It is applied TOOL-SIDE at
+    // buildSignalEnvelope (which runs in the worker for an external tool), NEVER
+    // host-side; the host baseline plane only reads the stamped fingerprint.
+    fingerprintStrategy: (signal) =>
+      `extdispatch::${signal.ruleId ?? 'rule'}::${signal.filePath ?? 'file'}`,
+
+    // capabilityRegistrars: the REAL registrar for the manifest-declared domain.
+    // The host installs only the deferred placeholder for an external tool; the
+    // real registrar installs worker-side.
+    capabilityRegistrars: {
+      'extdispatch-domain': () => ({ contributions: [], pid: process.pid }),
+    },
   },
   commands: [
     {
@@ -122,6 +187,50 @@ export const tool = {
           // The host faults on this key; the structured error crosses back and is
           // caught here as a normal thrown error (fault-not-crash).
           await cli.toolState.get('external-dispatch-tool', 'boom');
+        }
+        if (mode === 'fp') {
+          // ADR-0054 M4-F: apply the tool's OWN fingerprintStrategy to the signal
+          // (exactly what buildSignalEnvelope does at construction time) — this
+          // runs HERE, in the worker, never host-side. The host replays the
+          // already-fingerprinted envelope and only reads signal.fingerprint.
+          const sig = { ruleId: 'r1', filePath: 'f1', marker: 'fp-ran' };
+          sig.fingerprint = tool.extensionPoints.fingerprintStrategy(sig);
+          cli.emitEnvelope({
+            schemaVersion: 2,
+            tool: 'external-dispatch-tool',
+            runId: cli.scope.runId,
+            createdAt: new Date().toISOString(),
+            verdict: {
+              score: 100,
+              passed: true,
+              summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+            },
+            units: [],
+            signals: [sig],
+          });
+          cli.setExitCode(0);
+          return;
+        }
+        if (mode === 'init-check') {
+          // Echo the initialize sentinel so a test can prove initialize ran in the
+          // worker (same process) BEFORE this handler.
+          cli.emitEnvelope({
+            schemaVersion: 2,
+            tool: 'external-dispatch-tool',
+            runId: cli.scope.runId,
+            createdAt: new Date().toISOString(),
+            verdict: {
+              score: 100,
+              passed: true,
+              summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+            },
+            units: [],
+            signals: [
+              { initialized: initSentinel.initialized, initPid: initSentinel.initPid ?? null },
+            ],
+          });
+          cli.setExitCode(0);
+          return;
         }
         // Happy path: build a minimal signal envelope and set a clean exit.
         cli.emitEnvelope({

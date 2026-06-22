@@ -127,7 +127,12 @@ async function main(): Promise<void> {
   // Extracted into a thin dedicated builder (roadmap item 2) to keep the
   // top-level composition root focused on sequencing. The builder returns the
   // exact shape consumed by `registerCliCommands`.
-  const registrationInput = buildCommandRegistrationInput(toolRegistry);
+  const registrationInput = buildCommandRegistrationInput(toolRegistry, {
+    // ADR-0054 M4-F: an EXTERNAL tool's session replay runs in a forked worker
+    // (its runtime never runs in-host); bundled replays in-host.
+    provenance,
+    cwd: process.cwd(),
+  });
   const commandCtx = {
     setExitCode: ctx.setExitCode,
     render: renderResult,

@@ -31,7 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as openReportMod from '../open-report.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
-import type { ProjectContext, Tool, ToolScope } from '@opensip-cli/core';
+import type { ProjectContext, Tool, ToolProvenance, ToolScope } from '@opensip-cli/core';
 
 let projectRoot: string;
 
@@ -54,7 +54,11 @@ function makeTool(id: string, contribution?: Record<string, unknown>): Tool {
   };
 }
 
-function makeScope(tools: Tool[], datastore?: DataStore): RunScope {
+function makeScope(
+  tools: Tool[],
+  datastore?: DataStore,
+  toolProvenance: readonly ToolProvenance[] = [],
+): RunScope {
   const registry = new ToolRegistry();
   for (const t of tools) registry.register(t);
   const projectContext: ProjectContext = {
@@ -70,6 +74,7 @@ function makeScope(tools: Tool[], datastore?: DataStore): RunScope {
     tools: registry,
     projectContext,
     runId: 'test-run',
+    toolProvenance,
     ...(datastore ? { datastore: () => datastore } : {}),
   });
 }
@@ -132,6 +137,34 @@ describe('composeAndWriteReport', () => {
     const html = readFileSync(result.path, 'utf8');
     expect(html).toContain('id="panel-fitness"');
     expect(result.opened).toBe(false);
+  });
+
+  it('ADR-0054 M4-F: does NOT run an EXTERNAL tool collectReportData in-host (forks a worker; a fork failure is best-effort)', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    // A tool whose collectReportData would THROW if the host ran it in-process —
+    // proving the host does NOT execute it: the external branch forks a worker
+    // instead (which fails here, since the test process is not the CLI binary), is
+    // caught best-effort, and the report still renders for the bundled tool.
+    const external: Tool = {
+      metadata: { id: 'ext-tool', name: 'ext-tool', version: '0.0.0', description: 'ext' },
+      commandSpecs: [],
+      extensionPoints: {
+        collectReportData: () => {
+          throw new Error('external collectReportData must NOT run in-host');
+        },
+      },
+    };
+    const bundled = makeTool('fitness', { checkCatalog: [{ slug: 'legit' }] });
+    const provenance: ToolProvenance[] = [
+      { source: 'installed', id: 'ext-tool', version: '0.0.0', manifestHash: 'h' },
+    ];
+
+    const scope = makeScope([external, bundled], undefined, provenance);
+    // No throw — the external hook never ran in-host (it would have thrown);
+    // the bundled tool's contribution still merges.
+    const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+    const html = readFileSync(result.path, 'utf8');
+    expect(html).toContain('legit');
   });
 
   it('ignores a reserved host key (`sessions`) returned from collectReportData', async () => {

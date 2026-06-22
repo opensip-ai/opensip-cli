@@ -7,7 +7,11 @@ import { DataStoreFactory } from '@opensip-cli/datastore';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildToolCliContext, createLiveViewRegistry } from '../cli-context.js';
+import {
+  buildHostDispatchCtx,
+  buildToolCliContext,
+  createLiveViewRegistry,
+} from '../cli-context.js';
 
 function makeLogger(): {
   log: Logger;
@@ -235,6 +239,30 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
       expect(() => completeRunOf(ctx)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
     });
     ds.close();
+  });
+});
+
+describe('buildHostDispatchCtx (ADR-0054 M4-F hook-worker host ctx)', () => {
+  it('wires the datastore-backed seams (toolState / baselines / hostPlanes) and runSession', () => {
+    const { log } = makeLogger();
+    const ctx = buildHostDispatchCtx(log);
+    expect(typeof ctx.toolState.get).toBe('function');
+    expect(typeof ctx.saveBaseline).toBe('function');
+    expect(typeof ctx.compareBaseline).toBe('function');
+    expect(ctx.hostPlanes).toBeDefined();
+    expect(ctx.runSession.timing).toBeDefined();
+  });
+
+  it('denies the output / render / egress seams a data-gathering hook has no business calling', () => {
+    const ctx = buildHostDispatchCtx();
+    expect(() => ctx.registerLiveView('k', () => undefined)).toThrow(/not available/);
+    expect(() => ctx.renderLive('k', {})).toThrow(/not available/);
+    expect(() => ctx.deliverSignals({}, { cwd: '.' })).toThrow(/not available/);
+    expect(() => ctx.writeSarif({}, 'p')).toThrow(/not available/);
+    expect(() => ctx.maybeOpenReport({ openRequested: true, jsonOutput: false })).toThrow(
+      /not available/,
+    );
+    expect(() => ctx.render({})).toThrow(/not available/);
   });
 });
 

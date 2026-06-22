@@ -18,6 +18,7 @@
  */
 
 import {
+  createRunTimer,
   type RunScope,
   logger as defaultLogger,
   type Logger,
@@ -157,5 +158,70 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   return {
     ctx,
     getExitCode: outputPlane.getExitCode,
+  };
+}
+
+/**
+ * Build the host {@link ToolCliContext} the ADR-0054 M4-F hook-worker supervisor
+ * serves host-RPC upcalls through, when running an EXTERNAL tool's
+ * `collectReportData` / `sessionReplay` out-of-process from a HOST command
+ * (`report` / `sessions show`) whose lean `CliCommandsContext` is not a full
+ * `ToolCliContext`.
+ *
+ * It wires the SAME datastore-backed host planes the real context uses (baseline
+ * / per-tool state / governance-audit-entitlements / egress + SARIF) against the
+ * current entered scope, so any privileged effect a hook legitimately upcalls is
+ * performed by the host through the real plane. The OUTPUT seams (render / emit*)
+ * and the live-view + report-open seams are NOT part of a data-gathering hook's
+ * contract; they throw loudly if a hook attempts them (fail loud, never a silent
+ * no-op) — the worker shim already denies the live-view seams, and a hook has no
+ * business rendering. This context is short-lived (one hook worker run).
+ */
+export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
+  const log = logger ?? defaultLogger;
+  const projectDatastore = createDatastoreResolver('project-seam', log);
+  const baselineSeams = buildBaselineSeams({ getDatastore: projectDatastore, logger: log });
+  const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
+  const hostPlanes = buildHostPlanes({ getDatastore: projectDatastore, logger: log });
+  const outputPlane = createOutputPlane({ render: deniedHookSeam('render'), logger: log });
+  const ctx: ToolCliContext = {
+    get scope(): RunScope {
+      return readScope();
+    },
+    render: deniedHookSeam('render'),
+    registerLiveView: deniedHookSeam('registerLiveView'),
+    renderLive: deniedHookSeam('renderLive'),
+    maybeOpenReport: deniedHookSeam('maybeOpenReport'),
+    logger: log,
+    setExitCode: outputPlane.setExitCode,
+    ...outputPlane.emits,
+    // Display-only timing seam (host-owned-run-timing); a hook never records a run.
+    runSession: { timing: createRunTimer() },
+    deliverSignals: deniedHookSeam('deliverSignals'),
+    writeSarif: deniedHookSeam('writeSarif'),
+    saveBaseline: baselineSeams.saveBaseline,
+    compareBaseline: baselineSeams.compareBaseline,
+    exportBaselineSarif: baselineSeams.exportBaselineSarif,
+    exportBaselineFingerprints: baselineSeams.exportBaselineFingerprints,
+    toolState: stateSeams,
+    hostPlanes,
+  };
+  return ctx;
+}
+
+/**
+ * A seam stub for {@link buildHostDispatchCtx} that throws loudly when a
+ * data-gathering hook worker attempts an output / render / egress seam it has no
+ * business calling — fail loud, never a silent no-op (the worker shim already
+ * denies the live-view seams; this is the host-side counterpart).
+ *
+ * @throws {Error} always — that is the point.
+ */
+function deniedHookSeam(seam: string): () => never {
+  // @fitness-ignore-next-line throws-documentation -- the throw is documented on the enclosing factory's @throws above; this is the one-line closure it returns.
+  return () => {
+    throw new Error(
+      `host dispatch ctx: seam '${seam}' is not available to a data-gathering hook worker`,
+    );
   };
 }

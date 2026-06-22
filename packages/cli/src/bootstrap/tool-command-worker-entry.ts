@@ -41,11 +41,13 @@ import {
   type ToolCliContext,
   type Tool,
   type ToolSessionContribution,
+  type ToolSessionRecord,
   type WorkerMessage,
 } from '@opensip-cli/core';
 
 import { type CliCommandsContext } from '../commands/shared.js';
 
+import { runDeepConfigPass } from './tool-command-worker-config-pass.js';
 import {
   buildWorkerContext,
   UnsupportedSeamError,
@@ -108,6 +110,23 @@ function findCommandSpec(tool: Tool, commandName: string): CommandSpec<unknown, 
     throw err;
   }
   return spec;
+}
+
+/**
+ * ADR-0054 M4-F: run the dispatched tool's `initialize()` once, worker-side,
+ * before its handler. The host no longer runs an EXTERNAL owning tool's
+ * `initialize` (that would execute untrusted runtime in the kernel) — and the
+ * worker bootstraps the host `__tool-command-worker` subcommand (owned by NO
+ * tool), so the worker's own preflight never resolves the dispatched tool as the
+ * "owning tool". Running it here is the only place an external tool's
+ * `initialize` runs under worker dispatch. A throw propagates to
+ * {@link runToolCommandWorker}'s catch → structured `tool-handler-throw`; the
+ * host survives (fail loud, never a half-initialised silent run).
+ */
+async function runWorkerInitialize(tool: Tool): Promise<void> {
+  const initialize = resolveToolHooks(tool).initialize;
+  if (initialize === undefined) return;
+  await initialize();
 }
 
 /** Build a structured `error` IPC message with a failure class (+ stack when present). */
@@ -182,67 +201,6 @@ function classifyThrow(error: unknown): ToolCommandFailureClass {
   return (error as { failureClass?: ToolCommandFailureClass }).failureClass ?? 'tool-handler-throw';
 }
 
-/** A Zod-ish schema: the worker checks for `safeParse` structurally (no zod import). */
-interface SafeParseable {
-  readonly safeParse: (value: unknown) => {
-    readonly success: boolean;
-    readonly error?: {
-      readonly issues?: readonly { path?: readonly unknown[]; message: string }[];
-    };
-  };
-}
-
-/** Structural guard: the loaded tool's config schema exposes a `safeParse` method. */
-function isSafeParseable(value: unknown): value is SafeParseable {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { safeParse?: unknown }).safeParse === 'function'
-  );
-}
-
-/**
- * The ADR-0054 M4-E DEEP config pass: run the dispatched tool's OWN Zod
- * `ToolConfigDeclaration` against its coarse-validated config namespace block —
- * the semantic, authoritative validation the host (which must not import the
- * tool's Zod) could not perform pre-fork. Legitimate inside the isolation
- * boundary: the runtime is already loaded HERE, in the worker.
- *
- * Returns `undefined` on success (or when there is nothing to validate); returns
- * a structured `config-invalid` {@link DispatchWorkerMessage} on a Zod failure —
- * the worker does NOT throw/crash; the supervisor maps it to the SAME typed
- * config error + exit code the host coarse pass uses (single config-error
- * contract).
- */
-function runDeepConfigPass(tool: Tool, config: unknown): DispatchWorkerMessage | undefined {
-  // No config block in the document for this tool's namespace → nothing to
-  // deep-validate (the host coarse pass already accepted its absence).
-  if (config === undefined) return undefined;
-  const declaration = resolveToolHooks(tool).config;
-  // No Zod declaration on the runtime → defer to the coarse pass's verdict (the
-  // host already accepted the block as an opaque object); nothing deeper to run.
-  if (declaration === undefined || !isSafeParseable(declaration.schema)) return undefined;
-
-  const result = declaration.schema.safeParse(config);
-  if (result.success) return undefined;
-
-  const summary = (result.error?.issues ?? [])
-    .map((issue) => {
-      const path =
-        issue.path !== undefined && issue.path.length > 0
-          ? issue.path.join('.')
-          : declaration.namespace;
-      return `${declaration.namespace}.${path}: ${issue.message}`;
-    })
-    .join('; ');
-  return errorMessage(
-    `Invalid configuration for '${tool.metadata.name ?? tool.metadata.id}': ${
-      summary.length > 0 ? summary : 'config did not satisfy the tool schema'
-    }`,
-    'config-invalid',
-  );
-}
-
 /**
  * Resolve the dispatched tool from the re-bootstrapped scope, run the deep config
  * pass, then run its command handler against the worker-side context shim, and
@@ -258,6 +216,21 @@ function runDeepConfigPass(tool: Tool, config: unknown): DispatchWorkerMessage |
  */
 async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWorkerMessage> {
   const tool = resolveTool(spec);
+
+  // ADR-0054 M4-F hook mode: when the spec names a lifecycle HOOK (not a command),
+  // run that hook worker-side and return its plain-data result. This is how the
+  // host gathers an external tool's `collectReportData` / `sessionReplay` without
+  // executing the untrusted runtime in the kernel process.
+  if (spec.hook !== undefined) {
+    return await runLoadedHook(tool, spec);
+  }
+
+  if (spec.commandName === undefined) {
+    return errorMessage(
+      `tool command worker: spec for tool '${spec.toolId}' names neither a command nor a hook`,
+      'bad-spec',
+    );
+  }
   const commandSpec = findCommandSpec(tool, spec.commandName);
 
   // ADR-0054 M4-E DEEP config pass: run the tool's REAL Zod against its config
@@ -267,7 +240,12 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
   // pass uses. Runs BEFORE building the context: a config failure must
   // short-circuit before any handler effect.
   const configFailure = runDeepConfigPass(tool, spec.config);
-  if (configFailure !== undefined) return configFailure;
+  if (configFailure !== undefined) return errorMessage(configFailure, 'config-invalid');
+
+  // ADR-0054 M4-F: run the dispatched tool's `initialize()` worker-side before the
+  // handler (the host no longer runs an external owning tool's initialize). A
+  // throw becomes a structured `tool-handler-throw` via the outer catch.
+  await runWorkerInitialize(tool);
 
   // The host-RPC upcall client over the live IPC channel (M4-C). `process` is the
   // duplex: requests post via `process.send`; replies arrive on
@@ -305,6 +283,50 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
     // @fitness-ignore-next-line detached-promises -- WorkerRpcClient.dispose() returns void (removes the reply listener + clears the pending map, synchronous); the name-based heuristic misfires inside this async fn.
     rpcClient.dispose();
   }
+}
+
+/**
+ * ADR-0054 M4-F: run a dispatched tool's LIFECYCLE HOOK worker-side and return its
+ * plain-data result in `hookResult`. This is how the host gathers an EXTERNAL
+ * tool's `collectReportData` / `sessionReplay` data WITHOUT executing the
+ * untrusted runtime in the kernel process. The hook runs against the worker's own
+ * re-bootstrapped scope (`currentScope()`), exactly the contract the in-host path
+ * gives a bundled tool — just inside the isolation boundary. The host owns the
+ * merge/render/replay-emit (privileged effect). A throw propagates to
+ * {@link runToolCommandWorker}'s catch → structured failure; the host survives.
+ *
+ * The hook's runtime is resolved from the re-bootstrapped registry (the worker
+ * `initialize()` does NOT run for a hook-mode dispatch — hooks read data; an
+ * external tool that needs `initialize` for its report/replay should run it in
+ * the hook body, which is OUT of M4-F's first-party scope).
+ */
+async function runLoadedHook(
+  tool: Tool,
+  spec: ToolCommandWorkerSpec,
+): Promise<DispatchWorkerMessage> {
+  const scope = currentScope();
+  if (scope === undefined) {
+    return errorMessage(
+      'tool command worker: no scope is entered for the hook run (bootstrap did not run)',
+      'runtime-load-failed',
+    );
+  }
+  const hooks = resolveToolHooks(tool);
+  // `collectReportData(scope)` takes the tool-facing ToolScope view; the worker
+  // RunScope IS a ToolScope (it extends it), so pass it directly — it returns a
+  // plain-data Record<string, unknown>. `sessionReplay` rebuilds the
+  // ToolSessionReplay from the stored row (`hookArg` is the serialized
+  // ToolSessionRecord the host read from the datastore).
+  const hookResult: unknown =
+    spec.hook === 'collectReportData'
+      ? await hooks.collectReportData?.(scope)
+      : hooks.sessionReplay?.replaySession(spec.hookArg as ToolSessionRecord);
+  return {
+    kind: 'result',
+    // `output` is required on the result; the host never replays output for a
+    // hook-mode dispatch (it reads `hookResult`), so a benign default suffices.
+    value: { output: 'command-result', ...(hookResult === undefined ? {} : { hookResult }) },
+  };
 }
 
 /**

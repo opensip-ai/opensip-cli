@@ -208,4 +208,46 @@ describe('runToolCommandWorker', () => {
     });
     expect(msg.kind).toBe('result');
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ADR-0054 M4-F: hook mode + worker-side initialize.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it('M4-F hook mode: runs collectReportData and returns its contribution as hookResult', async () => {
+    const msg = await runInScope(
+      writeSpec(specFor({ commandName: undefined, hook: 'collectReportData' })),
+    );
+    expect(msg.kind).toBe('result');
+    if (msg.kind !== 'result') throw new Error('expected result');
+    const r = msg.value.hookResult as { extDispatchReport?: { ran: boolean } };
+    expect(r.extDispatchReport?.ran).toBe(true);
+  });
+
+  it('M4-F hook mode: runs sessionReplay against the stored row and returns the replay as hookResult', async () => {
+    const stored = { id: 'sess-42', tool: 'external-dispatch-tool', score: 7, passed: true };
+    const msg = await runInScope(
+      writeSpec(specFor({ commandName: undefined, hook: 'sessionReplay', hookArg: stored })),
+    );
+    expect(msg.kind).toBe('result');
+    if (msg.kind !== 'result') throw new Error('expected result');
+    const r = msg.value.hookResult as { fidelity: string; envelope: { runId: string } };
+    expect(r.fidelity).toBe('projection');
+    expect(r.envelope.runId).toBe('sess-42');
+  });
+
+  it('M4-F: a spec naming neither a command nor a hook is a bad-spec error', async () => {
+    const msg = await runInScope(writeSpec(specFor({ commandName: undefined })));
+    expect(msg.kind).toBe('error');
+    if (msg.kind !== 'error') throw new Error('expected error');
+    expect(msg.failureClass).toBe('bad-spec');
+  });
+
+  it('M4-F: the dispatched tool initialize runs worker-side before the handler (init-check echoes the sentinel)', async () => {
+    const msg = await runInScope(writeSpec(specFor({ opts: { mode: 'init-check' } })));
+    expect(msg.kind).toBe('result');
+    if (msg.kind !== 'result') throw new Error('expected result');
+    const env = msg.value.envelope as { signals: { initialized?: boolean }[] };
+    // initialize ran (worker-side) before this handler, setting the sentinel.
+    expect(env.signals[0]?.initialized).toBe(true);
+  });
 });

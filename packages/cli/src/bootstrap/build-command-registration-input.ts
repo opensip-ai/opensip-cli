@@ -13,9 +13,11 @@
 
 import { logger, resolveToolHooks } from '@opensip-cli/core';
 
+import { buildHostDispatchCtx } from '../cli-context.js';
 import { internalCommandNames } from '../commands/internal-command-visibility.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
+import { dispatchExternalToolHook } from './dispatch-external-tool-hook.js';
 import { EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 
 import type {
@@ -24,7 +26,9 @@ import type {
   ScaffoldContext,
   ScaffoldFile,
   ToolCliContext,
+  ToolProvenance,
   ToolRegistry,
+  ToolSessionRecord,
 } from '@opensip-cli/core';
 
 /** The structured input consumed by `registerCliCommands`. */
@@ -53,7 +57,17 @@ export interface CommandRegistrationInput {
  * are absent (this warning is intentionally loud when a bundled tool is
  * missing, as it affects `init` scaffolding).
  */
-export function buildCommandRegistrationInput(registry: ToolRegistry): CommandRegistrationInput {
+export function buildCommandRegistrationInput(
+  registry: ToolRegistry,
+  /**
+   * ADR-0054 M4-F: the admitted-tool provenance + project cwd, threaded so the
+   * session-replay registry gives an EXTERNAL tool a WORKER-backed `replaySession`
+   * (its untrusted runtime never executes in the host). Bundled tools replay
+   * in-host. Defaulted so the registry stays buildable without them (replay then
+   * treats every tool as bundled — the pre-M4-F behavior).
+   */
+  opts?: { readonly provenance?: readonly ToolProvenance[]; readonly cwd?: string },
+): CommandRegistrationInput {
   // Source the plugin-supporting domains from the registered tools'
   // declared layouts — the kernel never enumerates them (ADR-0009).
   const pluginLayouts = registry
@@ -95,7 +109,25 @@ export function buildCommandRegistrationInput(registry: ToolRegistry): CommandRe
     }
   }
 
-  const sessionReplayRegistry = SessionReplayRegistry.fromTools(registry);
+  // ADR-0054 M4-F: inject the external-replay dispatcher (forks the replay HOOK
+  // worker) so `session-replay-registry.ts` need not import the dispatch chain
+  // (that would form a module cycle). Bundled tools replay in-host.
+  const cwd = opts?.cwd;
+  const sessionReplayRegistry = SessionReplayRegistry.fromTools(registry, {
+    provenance: opts?.provenance ?? [],
+    ...(cwd === undefined
+      ? {}
+      : {
+          dispatchExternalReplay: (provenance, stored: ToolSessionRecord) =>
+            dispatchExternalToolHook({
+              provenance,
+              hook: 'sessionReplay',
+              hookArg: stored,
+              cwd,
+              ctx: buildHostDispatchCtx(),
+            }),
+        }),
+  });
 
   // The live tool command surface, sourced from the populated registry so the
   // `completion` command derives its flags from the same specs the runtime

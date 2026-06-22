@@ -25,7 +25,9 @@ const subIdx = args.indexOf(WORKER_SUBCOMMAND);
 const specPath =
   subIdx >= 0 ? args[subIdx + 1] : (args.find((a) => a.endsWith('.json')) ?? args[0]);
 const spec = JSON.parse(readFileSync(specPath, 'utf8'));
-const mode = spec.opts?.mode ?? 'envelope';
+// A hook-mode spec (M4-F) carries `hook` instead of a command `mode`; route it to
+// the `hook-result` shape so the hook supervisor's hookResult extraction is covered.
+const mode = spec.hook !== undefined ? 'hook-result' : (spec.opts?.mode ?? 'envelope');
 const send = (msg) => process.send?.(msg);
 
 switch (mode) {
@@ -46,6 +48,22 @@ switch (mode) {
   }
   case 'error-msg': {
     send({ kind: 'error', message: 'worker reported failure', failureClass: 'tool-handler-throw' });
+    break;
+  }
+  case 'config-invalid': {
+    // M4-E/M4-F: a worker DEEP-pass config failure crosses as `config-invalid`;
+    // the supervisor maps it to the SAME typed ConfigurationError (exit 2).
+    send({
+      kind: 'error',
+      message: "Invalid configuration for 'x': x.k: bad",
+      failureClass: 'config-invalid',
+    });
+    break;
+  }
+  case 'hook-result': {
+    // M4-F hook mode: the worker returns a plain-data hookResult. The hook
+    // supervisor (dispatchExternalToolHook) extracts and returns it.
+    send({ kind: 'result', value: { output: 'command-result', hookResult: { ok: true, n: 42 } } });
     break;
   }
   case 'progress-then-result': {

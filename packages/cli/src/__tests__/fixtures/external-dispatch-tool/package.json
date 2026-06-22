@@ -14,6 +14,18 @@
         "name": "ext-run",
         "description": "fixture external command exercising the ADR-0054 dispatch boundary"
       }
+    ],
+    "capabilities": [
+      {
+        "id": "extdispatch-domain",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "contributions"
+          ]
+        }
+      }
     ]
   }
 }

@@ -187,7 +187,9 @@ export async function executePostBailoutBootstrap(
 
   record(PRE_ACTION_PHASES.toolPreflight);
 
-  await d.maybeInitializeOwningTool(tools, plan.commandName, plan.runId);
+  // ADR-0054 M4-F: pass provenance so an EXTERNAL owning tool's initialize is
+  // skipped in-host (it runs worker-side under dispatch); bundled runs in-host.
+  await d.maybeInitializeOwningTool(tools, plan.commandName, plan.runId, provenance);
 
   const driven = await d.loadOwningToolCapabilities({
     owningTool: d.resolveOwningTool(tools, plan.commandName),
