@@ -24,6 +24,7 @@
  */
 
 import type { ToolCapabilityDeclaration } from './capability.js';
+import type { ToolConfigManifestDescriptor } from './manifest-config.js';
 
 /**
  * The plugin-API epoch the running engine implements.
@@ -129,8 +130,15 @@ interface ToolPluginManifestBase {
    * Optional + additive.
    */
   readonly capabilities?: readonly ToolCapabilityDeclaration[];
-  /** §5.7 → 2.9.0: tool-owned config schema descriptor. */
-  readonly config?: unknown;
+  /**
+   * §5.7 → ADR-0054 M4-E: the tool-owned, serializable config-schema descriptor.
+   * For an EXTERNAL tool this is the COARSE schema the host validates the tool's
+   * config namespace against BEFORE forking — it never imports the tool's Zod
+   * (the deep pass runs in the worker). A {@link ToolConfigManifestDescriptor}:
+   * a namespace + a draft-07-subset JSON-Schema object. Optional; a tool that
+   * declares no descriptor defers ALL of its config validation to the worker.
+   */
+  readonly config?: ToolConfigManifestDescriptor;
   /** Later: dashboard-contribution descriptor. */
   readonly dashboard?: unknown;
   /** Later: sessions-contribution descriptor. */

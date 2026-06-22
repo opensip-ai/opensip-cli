@@ -26,13 +26,44 @@
  *
  * The id matches the manifest (`opensipTools.id` / `stableId`) so the
  * manifest-runtime coherence + provenance match resolve.
+ *
+ * ADR-0054 M4-E config two-pass: the tool also declares a `config` extension
+ * point whose `schema` is a structural Zod-ish `safeParse` stand-in (the worker
+ * deep pass duck-types `safeParse`, it does NOT import zod). The schema requires
+ * `config.deep === 'ok'`; any other value makes the worker DEEP pass reject with
+ * a `config-invalid` failure — surfaced host-side as the same typed config error
+ * the coarse pass uses. A fixture (not real zod) keeps the test self-contained
+ * while exercising the worker's `isSafeParseable` + `runDeepConfigPass` path.
  */
+
+/**
+ * A structural `safeParse`-able schema for the M4-E worker deep config pass. The
+ * worker checks for `safeParse` structurally (no zod import), so this fixture
+ * shape is all the deep pass needs to accept/reject a config block.
+ */
+const deepConfigSchema = {
+  safeParse(value) {
+    if (value !== null && typeof value === 'object' && value.deep === 'ok') {
+      return { success: true };
+    }
+    return {
+      success: false,
+      error: { issues: [{ path: ['deep'], message: "expected 'ok'" }] },
+    };
+  },
+};
+
 export const tool = {
   metadata: {
     id: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567',
     name: 'external-dispatch-tool',
     version: '0.0.0',
     description: 'fixture external tool for ADR-0054 dispatch',
+  },
+  extensionPoints: {
+    // ADR-0054 M4-E deep config pass: the tool's REAL (here, fixture) Zod-ish
+    // schema, run IN THE WORKER after load against the coarse-validated block.
+    config: { namespace: 'extdispatch', schema: deepConfigSchema },
   },
   commands: [
     {

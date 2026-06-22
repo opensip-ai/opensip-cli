@@ -37,13 +37,12 @@ import { fork, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
+  ConfigurationError,
   currentScope,
   SystemError,
   type ToolError,
-  type ToolCliContext,
   type ToolProvenance,
   type ToolSource,
   type WorkerMessage,
@@ -51,6 +50,7 @@ import {
 
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { handleHostRpc } from './dispatch-host-rpc-handler.js';
+import { replayResult, type DispatchHostCtx } from './dispatch-replay-result.js';
 
 import type {
   HostRpcRequest,
@@ -62,8 +62,8 @@ import type {
 /** Default supervisor wall-clock timeout for one dispatched command (ms). */
 const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
 
-/** The built worker entry module the supervisor forks (sibling of this file in dist/). */
-const WORKER_ENTRY = fileURLToPath(new URL('tool-command-worker-entry.js', import.meta.url));
+/** The internal worker subcommand the supervisor forks the CLI binary into. */
+const WORKER_SUBCOMMAND = '__tool-command-worker';
 
 /** The dispatch IPC binding: host-RPC requests stream on `progress`. */
 type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
@@ -80,12 +80,24 @@ export interface DispatchExternalToolCommandArgs {
   readonly opts: Record<string, unknown>;
   /** Trailing positionals (`_args`) for this invocation (serializable). */
   readonly positionals: readonly unknown[];
+  /**
+   * The tool's RAW config namespace block for the WORKER deep pass (ADR-0054
+   * M4-E Config two-pass). Forwarded into the spec so the worker runs the tool's
+   * real Zod after load. `undefined` when there is no block to validate.
+   */
+  readonly config?: unknown;
   /** The real host context the supervisor replays the worker result through. */
-  readonly ctx: ToolCliContext;
+  readonly ctx: DispatchHostCtx;
   /** Override the wall-clock timeout (tests use a short one). */
   readonly timeoutMs?: number;
-  /** Override the worker entry module path (tests fork a fixture). */
-  readonly workerEntry?: string;
+  /**
+   * Override the CLI entry script the supervisor forks (defaults to
+   * `process.argv[1]`). The worker runs as `node <cliScript> __tool-command-worker
+   * <specPath> --cwd <cwd>`, going through the full bootstrap so the dispatched
+   * tool's scope (config/registries/subscope) is worker-local (ADR-0054 M4-E).
+   * Tests point this at the built CLI dist entry.
+   */
+  readonly cliScript?: string;
 }
 
 /**
@@ -106,8 +118,27 @@ export async function dispatchExternalToolCommand(
     );
   }
 
+  // Lifecycle observability: the out-of-process dispatch is a major run phase, so
+  // emit a structured event onto the scope DiagnosticsBus (the same bus the
+  // in-process action emits `execute` events onto). A `--json` consumer reads
+  // `outcome.diagnostics.events` for context even without full OTEL.
+  const diagnostics = currentScope()?.diagnostics;
+  diagnostics?.event(
+    'execute',
+    'debug',
+    `dispatching external tool '${args.provenance.id}' command '${args.commandName}' out-of-process`,
+  );
   const result = await runWorker(args);
-  await replayResult(result, args.ctx);
+  diagnostics?.event(
+    'execute',
+    'debug',
+    `external tool '${args.provenance.id}' command '${args.commandName}' worker resolved`,
+  );
+  await replayResult(result, args.ctx, {
+    commandName: args.commandName,
+    opts: { ...args.opts, _args: args.positionals },
+    positionals: args.positionals,
+  });
 }
 
 /**
@@ -123,17 +154,24 @@ async function runWorker(args: DispatchExternalToolCommandArgs): Promise<ToolCom
     commandName: args.commandName,
     opts: args.opts,
     positionals: args.positionals,
+    // ADR-0054 M4-E: forward the coarse-validated config block so the worker can
+    // run the tool's real Zod deep pass after load. Omitted when no block exists.
+    ...(args.config === undefined ? {} : { config: args.config }),
   };
 
   const dir = mkdtempSync(join(tmpdir(), 'opensip-tool-dispatch-'));
   const specPath = join(dir, 'spec.json');
   writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
-  const entry = args.workerEntry ?? WORKER_ENTRY;
+  // Fork the CLI binary as the `__tool-command-worker` subcommand so the FULL
+  // bootstrap runs in the worker (the tool's scope is re-built worker-local;
+  // ADR-0054 M4-E). `--cwd` targets the same project the parent run resolved.
+  const cliScript = args.cliScript ?? process.argv[1] ?? '';
+  const cwd = typeof args.opts.cwd === 'string' ? args.opts.cwd : process.cwd();
   const timeoutMs = args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS;
 
   try {
-    return await forkAndAwait(entry, specPath, spec, timeoutMs, args.ctx);
+    return await forkAndAwait(cliScript, specPath, cwd, spec, timeoutMs, args.ctx);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -154,11 +192,12 @@ async function runWorker(args: DispatchExternalToolCommandArgs): Promise<ToolCom
  * indefinitely.
  */
 function forkAndAwait(
-  entry: string,
+  cliScript: string,
   specPath: string,
+  cwd: string,
   spec: ToolCommandWorkerSpec,
   timeoutMs: number,
-  ctx: ToolCliContext,
+  ctx: DispatchHostCtx,
 ): Promise<ToolCommandResult> {
   return new Promise<ToolCommandResult>((resolve, reject) => {
     const runId = currentScope()?.runId;
@@ -168,7 +207,22 @@ function forkAndAwait(
         : // @fitness-ignore-next-line env-secret-exposure -- fork() with an `env` set REPLACES the child env wholesale, so the parent env must be spread in to preserve PATH/HOME/etc.; only OPENSIP_RUN_ID (no secret) is added, and this object is passed to fork, never logged (parity with subprocess-transport's childEnv).
           { ...process.env, OPENSIP_RUN_ID: runId };
 
-    const child = fork(entry, [specPath], {
+    // Fork the CLI binary into the internal worker subcommand. The full bootstrap
+    // (preAction) re-builds the per-run scope in the worker before the worker
+    // handler runs.
+    //
+    // `cwd` is set on the CHILD PROCESS (not only passed as `--cwd`): the CLI
+    // bootstrap anchors TOOL DISCOVERY on `process.cwd()` (`bootstrapCli({ cwd:
+    // process.cwd() })`), while the `--cwd` flag only steers later PROJECT
+    // resolution in the pre-action hook. Forking the worker without setting the
+    // child's real cwd would discover tools from the SUPERVISOR's directory, so
+    // the dispatched external tool — installed under the target project's
+    // `node_modules` — would not be in the worker's registry and `resolveTool`
+    // would fail `runtime-load-failed`. Pinning the child cwd to the same project
+    // the `--cwd` flag names keeps discovery and project resolution coherent: the
+    // worker bootstraps exactly as an in-project invocation would.
+    const child = fork(cliScript, [WORKER_SUBCOMMAND, specPath, '--cwd', cwd], {
+      cwd,
       stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
       serialization: 'advanced',
       ...(childEnv === undefined ? {} : { env: childEnv }),
@@ -218,7 +272,18 @@ function forkAndAwait(
     });
     child.on('error', (err: Error) => {
       done(() => {
-        reject(dispatchError(spec, `worker failed to spawn: ${err.message}`, 'spawn'));
+        // ADR-0054 M4-E trust tier: an external tool that cannot fork is a HARD
+        // error — NEVER an in-host fallback (that would run untrusted code in the
+        // kernel process). A future explicitly-named developer override
+        // (OPENSIP_CLI_DANGEROUSLY_RUN_EXTERNAL_IN_HOST) is reserved, not built.
+        reject(
+          dispatchError(
+            spec,
+            `cannot isolate external tool '${spec.toolId}' (worker fork failed: ${err.message}); ` +
+              'refusing to run it in-process',
+            'spawn',
+          ),
+        );
       });
     });
     child.on('exit', (code: number | null) => {
@@ -281,6 +346,14 @@ function dispatchError(
     command: spec.commandName,
     failureClass,
   });
+  // ADR-0054 M4-E single config-error contract: a worker DEEP-pass config
+  // failure (`config-invalid`) maps to the SAME typed error + exit code
+  // (ConfigurationError → CONFIGURATION_ERROR, exit 2) the host COARSE pass
+  // throws, so the user sees a consistent "Invalid configuration …" regardless
+  // of which pass caught it. The worker's message already names the namespace+key.
+  if (failureClass === 'config-invalid') {
+    return new ConfigurationError(message, { code: 'CONFIGURATION_ERROR', failureClass });
+  }
   return new SystemError(
     `external tool '${spec.toolId}' command '${spec.commandName}' failed: ${message}`,
     { code: 'SYSTEM.DISPATCH.WORKER_FAILED', failureClass },
@@ -290,33 +363,4 @@ function dispatchError(
 /** Convert a worker `error` IPC message into a logged, structured {@link ToolError}. */
 function workerErrorToToolError(spec: ToolCommandWorkerSpec, msg: DispatchWorkerError): ToolError {
   return dispatchError(spec, msg.message, msg.failureClass ?? 'ipc_error');
-}
-
-/**
- * Replay the worker's slim {@link ToolCommandResult} through the REAL host
- * {@link ToolCliContext} seams. The host is the only process that performs the
- * privileged effect (render / stdout / exit code). Each final-result-return seam
- * the worker recorded is replayed through its host counterpart; the exit code is
- * applied LAST so it is the final word (matching the in-process dispatch path's
- * `setExitCode` semantics).
- */
-async function replayResult(result: ToolCommandResult, ctx: ToolCliContext): Promise<void> {
-  if (result.error !== undefined) {
-    ctx.emitError(result.error);
-  }
-  if (result.render !== undefined) {
-    await ctx.render(result.render);
-  }
-  if (result.envelope !== undefined) {
-    ctx.emitEnvelope(result.envelope);
-  }
-  if (result.json !== undefined) {
-    ctx.emitJson(result.json);
-  }
-  if (result.raw !== undefined) {
-    ctx.emitRaw(result.raw);
-  }
-  if (result.exitCode !== undefined) {
-    ctx.setExitCode(result.exitCode);
-  }
 }

@@ -31,7 +31,7 @@
  * (ADR-0054 M4-C mapping table; documented as a later increment).
  */
 
-import type { CommandOutputMode, ToolSource } from '@opensip-cli/core';
+import type { CommandOutputMode, ToolSessionContribution, ToolSource } from '@opensip-cli/core';
 
 /**
  * The request the host writes to a temp JSON spec file and forks the worker
@@ -59,6 +59,15 @@ export interface ToolCommandWorkerSpec {
   readonly opts: Record<string, unknown>;
   /** The trailing positionals (`_args`) for this invocation (serializable). */
   readonly positionals: readonly unknown[];
+  /**
+   * The tool's RAW config namespace block (coarse-validated by the host pre-fork;
+   * ADR-0054 M4-E Config two-pass). The worker runs the tool's REAL Zod
+   * `ToolConfigDeclaration` against this AFTER load — the deep, authoritative
+   * semantic pass that the host (which must not import the tool's Zod) cannot do.
+   * `undefined` when the document declares no block for the tool's namespace (no
+   * deep validation needed). Plain serializable data.
+   */
+  readonly config?: unknown;
 }
 
 /**
@@ -76,6 +85,12 @@ export interface ToolCommandWorkerSpec {
  *   - `command-not-found`    — `commandName` did not match any `commandSpecs`.
  *   - `runtime-load-failed`  — `importToolRuntime` failed in the worker.
  *   - `bad-spec`             — the spec file was missing or unparseable.
+ *   - `config-invalid`       — the tool's REAL Zod (the worker deep pass)
+ *                              rejected its config namespace block (ADR-0054 M4-E
+ *                              Config two-pass). The host maps this to the SAME
+ *                              typed config error + exit code as the host coarse
+ *                              pass, so the UX is identical regardless of which
+ *                              pass caught the failure.
  */
 export type ToolCommandFailureClass =
   | 'tool-handler-throw'
@@ -83,7 +98,8 @@ export type ToolCommandFailureClass =
   | 'host-rpc-failed'
   | 'command-not-found'
   | 'runtime-load-failed'
-  | 'bad-spec';
+  | 'bad-spec'
+  | 'config-invalid';
 
 /**
  * The final-result-return payload the worker posts back over IPC once the
@@ -114,6 +130,27 @@ export interface ToolCommandResult {
   };
   /** The last `ctx.setExitCode(...)` value (last-write-wins). */
   readonly exitCode?: number;
+  /**
+   * The session contribution a run-producing handler RETURNED (the `session` leg
+   * of its `ToolRunCompletion`). The host persists it after the worker resolves —
+   * the host owns run timing (host-owned-run-timing); the worker never writes the
+   * generic session row. `undefined` for a handler that produced no session.
+   */
+  readonly session?: ToolSessionContribution;
+  /**
+   * The handler's RAW return value for the RETURN-VALUED output modes
+   * (`command-result` / `signal-envelope`). For these modes the in-process path's
+   * single output-dispatch seam (`dispatchOutput`) routes the handler's RETURN —
+   * `--json` short-circuit vs. human `render` for `command-result`, envelope-vs-
+   * render for `signal-envelope` — so the worker must carry it back UNROUTED and
+   * the supervisor replays it through the SAME `dispatchOutput`, keeping the
+   * external (worker) and in-process output byte-identical (ADR-0027 parity). The
+   * FRR seam fields above (`render`/`json`/…) capture EXPLICIT `ctx.*` emitter
+   * calls; `raw-stream`/`live-view` produce no return payload. `undefined` when
+   * the handler returned nothing routable (e.g. a `raw-stream` command, or a void
+   * return).
+   */
+  readonly returned?: unknown;
 }
 
 // ───────────────────────────────────────────────────────────────────────────

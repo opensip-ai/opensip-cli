@@ -29,13 +29,23 @@ import { resolveToolCommands, type ToolRegistry } from '@opensip-cli/core';
 import { hostEnv } from '../env/host-env-specs.js';
 
 /**
- * Collect the names of every command a tool declares as
- * `visibility: 'internal'` (Tier-3), across all tools in `registry`. The single
- * host source for "which mounted commands are internal", read by the help hide
- * pass and the completion inventory so the two never drift.
+ * Host-owned internal command names — `visibility: 'internal'` commands the HOST
+ * mounts (not from a tool registry). Today just the ADR-0054 M4-E dispatch worker
+ * subcommand `__tool-command-worker` (forked by the supervisor; never a public
+ * surface). Unioned into {@link internalCommandNames} so the help hide pass +
+ * completion treat it as internal exactly like the tool workers.
+ */
+export const HOST_INTERNAL_COMMANDS: ReadonlySet<string> = new Set(['__tool-command-worker']);
+
+/**
+ * Collect the names of every command declared `visibility: 'internal'` (Tier-3):
+ * each tool's internal commands (from `registry`) PLUS the host-owned internal
+ * commands ({@link HOST_INTERNAL_COMMANDS}). The single host source for "which
+ * mounted commands are internal", read by the help hide pass and the completion
+ * inventory so the two never drift.
  */
 export function internalCommandNames(registry: ToolRegistry): ReadonlySet<string> {
-  const names = new Set<string>();
+  const names = new Set<string>(HOST_INTERNAL_COMMANDS);
   for (const tool of registry.list()) {
     for (const descriptor of resolveToolCommands(tool)) {
       if (descriptor.visibility === 'internal') names.add(descriptor.name);

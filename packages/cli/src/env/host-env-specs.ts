@@ -101,28 +101,12 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'Does not affect bundled or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for ' +
       'incident response (kill switch wins).',
   },
-  {
-    canonical: 'OPENSIP_CLI_EXTERNAL_WORKER',
-    // Strict `=1` gate. Opt-in for the ADR-0054 out-of-process dispatch plane:
-    // when on, an EXTERNAL-provenance tool command runs in a forked worker (the
-    // worker imports the untrusted runtime) instead of in-process. Default OFF
-    // so production behaviour — and the bundled ≡ installed parity invariant
-    // (ADR-0027) — is byte-identical. With M4-C the worker now marshals the FRR
-    // seams AND upcalls the host for the host-RPC seams; worker-by-default is a
-    // later increment (ADR-0054 M4-E).
-    coerce: (raw) => raw === '1',
-    default: false,
-    docs:
-      'Set to 1 to enable the ADR-0054 out-of-process dispatch plane: external ' +
-      '(installed / project-local / user-global) tool commands run in a forked ' +
-      'worker that imports the untrusted runtime, instead of in the host process. ' +
-      'Default off (external tools run in-process, byte-identical to bundled). ' +
-      'Experimental: the worker marshals the final-result-return context seams ' +
-      '(render / json / envelope / raw / error / exit code) and upcalls the host ' +
-      'for the host-RPC seams (datastore / egress / SARIF / baselines / toolState ' +
-      '/ hostPlanes / report-open); only the live-view seams stay host-only and ' +
-      'fail loud in the worker.',
-  },
+  // ADR-0054 M4-E: `OPENSIP_CLI_EXTERNAL_WORKER` (the opt-in gate for the
+  // out-of-process dispatch plane) was RETIRED. External (installed /
+  // project-local / user-global) tools now fork the worker BY DEFAULT — the gate
+  // is gone, not a no-op. `OPENSIP_CLI_NO_WORKER` is bundled-only (documented on
+  // its core spec in subprocess-transport.ts): it never lets an external tool run
+  // in-host; an external tool that cannot fork is a hard error.
   {
     canonical: 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     // Mirror parseAllowlist's split (whitespace AND comma) so the registry value

@@ -132,6 +132,12 @@ export type {
   ToolProvenance,
   ToolSource,
   CompatibilityVerdict,
+  // ADR-0054 M4-E: the serializable config descriptor a tool declares in its
+  // manifest (the coarse host pass for external tools) + its JSON-Schema shape.
+  ToolConfigManifestDescriptor,
+  JsonSchemaObject,
+  JsonSchemaNode,
+  JsonSchemaPrimitiveType,
   // Capability domain model (launch, §5.3) — the shape a tool's
   // manifest `capabilities` slot now carries, plus the runtime domain spec.
   CapabilityDomainSpec,

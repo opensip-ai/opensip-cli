@@ -92,7 +92,12 @@ describe('buildCommandRegistrationInput', () => {
       type: 'session',
     });
     expect(input.toolCommandSpecs).toEqual([fitRun, fitWorker, simRecipes]);
-    expect([...input.toolInternalCommands]).toEqual(['fit-run-worker']);
+    // The internal-command set is `HOST_INTERNAL_COMMANDS` (the ADR-0054 M4-E
+    // host-mounted `__tool-command-worker`) unioned with each tool's
+    // `visibility:'internal'` command names — the single source completion +
+    // help filter on. So the host worker is always present, plus the fixture's
+    // `fit-run-worker`.
+    expect([...input.toolInternalCommands]).toEqual(['__tool-command-worker', 'fit-run-worker']);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -104,7 +109,10 @@ describe('buildCommandRegistrationInput', () => {
     expect(input.pluginLayouts).toEqual([]);
     expect(input.toolScaffolds).toEqual([]);
     expect(input.toolCommandSpecs).toEqual([]);
-    expect([...input.toolInternalCommands]).toEqual([]);
+    // Even with an EMPTY tool registry the host-owned internal command
+    // (`__tool-command-worker`) is always in the set — it is host-mounted, not
+    // registry-derived (ADR-0054 M4-E).
+    expect([...input.toolInternalCommands]).toEqual(['__tool-command-worker']);
     expect(input.sessionReplayRegistry.get('fit')).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({

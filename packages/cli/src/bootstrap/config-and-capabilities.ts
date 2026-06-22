@@ -32,6 +32,7 @@ import {
   composeConfigSchema,
   decorateToolConfigDeclarationsWithGateKeys,
   hostConfigDeclarations,
+  jsonSchemaObjectToZod,
   resolveConfig,
   validateConfigDocument,
   type PluginConfigKeyDeclaration,
@@ -44,7 +45,9 @@ import {
   readYamlFileOrThrow,
   resolveToolHooks,
   type ResolvedToolConfig,
+  type Tool,
   type ToolPluginManifest,
+  type ToolProvenance,
   type ToolRegistry,
   registerCapabilityDomainsFromManifest,
 } from '@opensip-cli/core';
@@ -55,19 +58,76 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Collect the contributed config declarations from the registered tools. A
- * tool's `config` slot is the kernel-side `ToolConfigContribution` carrier; it
- * is structurally a `ToolConfigDeclaration` (the schema is `unknown` at the
- * kernel boundary, a Zod schema at the config layer), so narrowing it here —
- * the composition root, which DOES import `@opensip-cli/config` — is sound.
+ * Resolve the provenance source for a tool (ADR-0054 trust tier). Mirrors the
+ * dispatch hook's matcher: prefer the stable-id match, fall back to the human
+ * key. A tool with no recorded provenance is treated as the trusted/unknown path
+ * (`bundled` semantics) — its host-side Zod is folded, exactly as before.
  */
-function collectDeclarations(tools: ToolRegistry): readonly ToolConfigDeclaration[] {
+function sourceFor(tool: Tool, provenance: readonly ToolProvenance[]): ToolProvenance['source'] {
+  const recorded =
+    provenance.find((p) => p.stableId !== undefined && p.stableId === tool.metadata.id) ??
+    provenance.find((p) => p.id === tool.metadata.name);
+  return recorded?.source ?? 'bundled';
+}
+
+/**
+ * Find the manifest config descriptor for a tool, matching by stable id then by
+ * the manifest's human id. Returns `undefined` when no admitted manifest for the
+ * tool declares a `config` descriptor.
+ */
+function manifestDescriptorFor(
+  tool: Tool,
+  manifests: readonly ToolPluginManifest[],
+): ToolPluginManifest['config'] {
+  const manifest =
+    manifests.find((m) => m.stableId !== undefined && m.stableId === tool.metadata.id) ??
+    manifests.find((m) => m.id === tool.metadata.name);
+  return manifest?.config;
+}
+
+/**
+ * Collect the contributed config declarations from the registered tools —
+ * provenance-aware (ADR-0054 M4-E Config two-pass).
+ *
+ *   - **Bundled** (trusted computing base) → fold the tool's runtime Zod
+ *     `config` declaration host-side, exactly as before. A bundled tool's
+ *     `config` slot is the kernel-side `ToolConfigContribution` carrier,
+ *     structurally a `ToolConfigDeclaration` (schema `unknown` at the kernel
+ *     boundary, a Zod schema at the config layer), so narrowing it here — the
+ *     composition root, which DOES import `@opensip-cli/config` — is sound.
+ *   - **External** (installed / project-local / user-global) → NEVER import the
+ *     tool's Zod (executable code — the ADR-0054 load-time hole). Instead derive
+ *     a COARSE declaration from the tool's serializable manifest descriptor
+ *     ({@link ToolConfigManifestDescriptor}); the host validates the namespace's
+ *     top-level shape as pure data. An external tool that ships NO descriptor
+ *     contributes no declaration — its namespace (if present) passes through the
+ *     document catchall (rule-2) and ALL of its validation defers to the worker
+ *     deep pass.
+ */
+function collectDeclarations(
+  tools: ToolRegistry,
+  provenance: readonly ToolProvenance[],
+  manifests: readonly ToolPluginManifest[],
+): readonly ToolConfigDeclaration[] {
   const declarations: ToolConfigDeclaration[] = [];
   for (const tool of tools.list()) {
-    const config = resolveToolHooks(tool).config;
-    if (config !== undefined) {
-      declarations.push(config as ToolConfigDeclaration);
+    if (sourceFor(tool, provenance) === 'bundled') {
+      const config = resolveToolHooks(tool).config;
+      if (config !== undefined) {
+        declarations.push(config as ToolConfigDeclaration);
+      }
+      continue;
     }
+    // External: coarse, manifest-descriptor-derived schema only — no Zod import.
+    const descriptor = manifestDescriptorFor(tool, manifests);
+    if (descriptor !== undefined) {
+      declarations.push({
+        namespace: descriptor.namespace,
+        schema: jsonSchemaObjectToZod(descriptor.schema),
+      });
+    }
+    // No descriptor → defer entirely to the worker deep pass (catchall passes
+    // any present namespace block through; do NOT host-import its Zod to "help").
   }
   return declarations;
 }
@@ -145,11 +205,18 @@ function fileBlocksFor(
 export function composeAndValidateToolConfig(args: {
   readonly tools: ToolRegistry;
   readonly manifests?: readonly ToolPluginManifest[];
+  readonly provenance?: readonly ToolProvenance[];
   readonly configPath: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
 }): { readonly config: ResolvedToolConfig | undefined; readonly document: unknown } {
-  const { tools, configPath, env, manifests = [] } = args;
-  const toolDeclarations = decorateToolConfigDeclarationsWithGateKeys(collectDeclarations(tools));
+  const { tools, configPath, env, manifests = [], provenance = [] } = args;
+  // ADR-0054 M4-E: provenance-aware fold — bundled tools' Zod is composed
+  // host-side (trusted), external tools validate from their serializable
+  // manifest descriptor (coarse, NO Zod import); the deep Zod pass runs in the
+  // worker.
+  const toolDeclarations = decorateToolConfigDeclarationsWithGateKeys(
+    collectDeclarations(tools, provenance, manifests),
+  );
   // A run with no tools that declare config (e.g. a project-agnostic context)
   // carries no toolConfig — tools fall back to their in-tool defaults. The host
   // document-level blocks (cli/dashboard/schemaVersion) only need composing when

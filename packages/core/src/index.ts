@@ -202,6 +202,15 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './tools/index.js';
+// ADR-0054 M4-E: the serializable config descriptor a tool declares in its
+// manifest (the coarse host pass for external tools; the deep Zod pass runs in
+// the worker). Re-exported by @opensip-cli/contracts for the public surface.
+export type {
+  JsonSchemaPrimitiveType,
+  JsonSchemaNode,
+  JsonSchemaObject,
+  ToolConfigManifestDescriptor,
+} from './tools/index.js';
 // Command-plane types (launch, §5.4): the declarative CommandSpec a tool
 // exports for the host to mount, plus the pure CommonFlagKey key type. The
 // Commander-touching applyCommonFlags runtime stays in @opensip-cli/contracts,

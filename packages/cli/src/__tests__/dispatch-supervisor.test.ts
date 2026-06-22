@@ -4,6 +4,12 @@
  * tiny result-shape fixture worker (not the full worker entry) so every
  * final-result-return replay arm and the spawn/error paths are exercised in the
  * instrumented host process.
+ *
+ * The supervisor forks `node <cliScript> __tool-command-worker <specPath> --cwd
+ * <cwd>` (M4-E). Here `cliScript` is pointed at the tiny `dispatch-result-worker`
+ * fixture, which parses the spec path out of that argv shape and posts a chosen
+ * result shape — exercising the supervisor's replay arms without the full CLI
+ * bootstrap (discovery/config/scope), which the e2e suite covers separately.
  */
 
 import { dirname, join } from 'node:path';
@@ -29,14 +35,14 @@ const PROVENANCE: ToolProvenance = {
   manifestHash: 'h',
 };
 
-function dispatch(cap: CapturedHostCtx, mode: string, workerEntry = RESULT_WORKER): Promise<void> {
+function dispatch(cap: CapturedHostCtx, mode: string, cliScript = RESULT_WORKER): Promise<void> {
   return dispatchExternalToolCommand({
     provenance: PROVENANCE,
     commandName: 'ext-run',
     opts: { mode },
     positionals: [],
     ctx: cap.ctx,
-    workerEntry,
+    cliScript,
     timeoutMs: 5000,
   });
 }

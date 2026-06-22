@@ -52,7 +52,6 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
-| `OPENSIP_CLI_EXTERNAL_WORKER` | Set to `1` to enable the ADR-0054 out-of-process dispatch plane: external (installed / project-local / user-global) tool commands run in a forked worker that imports the untrusted runtime, instead of in the host process. Default off (external tools run in-process, byte-identical to bundled). Experimental: the current slice marshals only the final-result-return context seams (`render` / `emitJson` / `emitEnvelope` / `emitRaw` / `emitError` / exit code); a tool command that calls a host-RPC seam (datastore / egress / SARIF / baselines / `toolState`) under this flag fails loudly rather than silently no-op. |
 
 ## Command surface
 
@@ -70,7 +69,7 @@ bypasses the registry.
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. |
+| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.1.8/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
 
 ## Subprocess correlation
 

@@ -198,6 +198,10 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   const { config: toolConfig, document: configDocument } = composeAndValidateToolConfig({
     tools,
     manifests,
+    // ADR-0054 M4-E: provenance drives the two-pass fold — bundled tools' Zod is
+    // composed host-side; external tools validate from their manifest descriptor
+    // (coarse, no Zod import); the deep Zod pass runs in the worker.
+    provenance,
     configPath: project.scope === 'project' ? project.configPath : undefined,
     env: process.env,
   });

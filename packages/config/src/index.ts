@@ -37,7 +37,7 @@ export type { ResolveConfigInput, ResolvedConfig } from './precedence.js';
 // per-tool readers with the documented keys unchanged.
 export { resolveCapabilityPreferences } from './capability-preferences.js';
 export type { CapabilityPreferences } from './capability-preferences.js';
-export { toJsonSchema } from './json-schema.js';
+export { toJsonSchema, jsonSchemaObjectToZod } from './json-schema.js';
 export type { JsonSchema } from './json-schema.js';
 
 // Document-level config blocks (the tool-agnostic surface — ADR-0023).

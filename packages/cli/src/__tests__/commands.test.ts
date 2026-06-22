@@ -47,7 +47,12 @@ describe('registerCliCommands', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
 
+    // `__tool-command-worker` is the ADR-0054 M4-E host-mounted internal worker
+    // subcommand (the dispatch supervisor forks it). It is PRESENT in the mounted
+    // tree (invocable) but `visibility:'internal'`, so it is hidden from `--help`
+    // and completion — asserted in command-surface-parity.snapshot.test.ts.
     expect(topLevelNames(program)).toEqual([
+      '__tool-command-worker',
       'agent-catalog',
       'completion',
       'configure',

@@ -30,6 +30,32 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
   "subcommands": [
     {
       "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "__tool-command-worker",
+      "options": [
+        {
+          "choices": undefined,
+          "defaultValue": "<cwd>",
+          "description": "Target directory",
+          "flags": "--cwd <path>",
+          "negate": false,
+          "optional": false,
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "subcommands": [],
+      "synopsis": "[internal] Run one external tool command headless in a forked worker and stream the result over IPC (forked by the ADR-0054 dispatch supervisor)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [],
       "args": [],
       "name": "agent-catalog",
       "options": [

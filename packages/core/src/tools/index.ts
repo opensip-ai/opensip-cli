@@ -60,6 +60,14 @@ export type {
   ToolProvenance,
   ToolSource,
 } from './manifest.js';
+// ADR-0054 M4-E: the serializable, JSON-Schema-shaped config descriptor a tool
+// declares in its manifest (the coarse host pass for external tools).
+export type {
+  JsonSchemaPrimitiveType,
+  JsonSchemaNode,
+  JsonSchemaObject,
+  ToolConfigManifestDescriptor,
+} from './manifest-config.js';
 // Capability domain model (launch, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The runtime registry lives
 // in `plugins/capability-registry.ts`.

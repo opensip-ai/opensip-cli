@@ -86,6 +86,8 @@ describe('hostEnv reads (CLI infra)', () => {
   });
 
   it('CLI_INFRA_ENV_SPECS covers the infra variables', () => {
+    // ADR-0054 M4-E retired OPENSIP_CLI_EXTERNAL_WORKER (external tools now fork
+    // by default; no opt-in gate) — it is no longer in the surface.
     expect(CLI_INFRA_ENV_SPECS.map((s) => s.canonical)).toEqual([
       'OTEL_EXPORTER_OTLP_ENDPOINT',
       'OPENSIP_PROFILING',
@@ -97,10 +99,12 @@ describe('hostEnv reads (CLI infra)', () => {
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_SKIP_INSTALLED',
       'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
-      // ADR-0054 M4 vertical slice: opt-in out-of-process external dispatch.
-      'OPENSIP_CLI_EXTERNAL_WORKER',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
     ]);
+  });
+
+  it('does NOT declare the retired OPENSIP_CLI_EXTERNAL_WORKER gate (ADR-0054 M4-E)', () => {
+    expect(describeHostEnv().map((s) => s.canonical)).not.toContain('OPENSIP_CLI_EXTERNAL_WORKER');
   });
 
   it('CLI_ENV_SPECS = infra vars + the ten core CORRELATION_ENV_SPECS (spread, never re-declared)', () => {

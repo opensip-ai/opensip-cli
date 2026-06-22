@@ -169,6 +169,12 @@ const EXPORT_ALLOWLIST = {
   ToolCommandDescriptor: 'tool-plugin-contract',
   ToolCommandManifest: 'tool-plugin-contract',
   ToolConfigContribution: 'tool-plugin-contract',
+  // ADR-0054 M4-E: the serializable config descriptor + its JSON-Schema shape
+  // the host validates an external tool's namespace against (coarse, pre-fork).
+  ToolConfigManifestDescriptor: 'tool-plugin-contract',
+  JsonSchemaPrimitiveType: 'tool-plugin-contract',
+  JsonSchemaNode: 'tool-plugin-contract',
+  JsonSchemaObject: 'tool-plugin-contract',
   ToolLongId: 'tool-plugin-contract',
   ToolMetadata: 'tool-plugin-contract',
   ToolPluginExports: 'tool-plugin-contract',

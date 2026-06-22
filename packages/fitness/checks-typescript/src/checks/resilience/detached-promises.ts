@@ -255,6 +255,10 @@ const KNOWN_SYNC_RECEIVER_PATTERNS = [
   'timer',
   'counter',
   'gauge',
+  // The scope-owned DiagnosticsBus is a synchronous event sink (its `event` /
+  // `counter` / `emit` push onto an in-memory array and return void), exactly
+  // like a logger/emitter — `diagnostics.event(...)` is never a detached promise.
+  'diagnostics',
 ];
 
 /**

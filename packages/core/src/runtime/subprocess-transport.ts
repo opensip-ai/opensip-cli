@@ -31,13 +31,22 @@ import type {
   WorkerMessage,
 } from './progress-transport.js';
 
-/** Governed escape hatch (env-via-registry): force in-process execution. */
+/**
+ * Governed escape hatch (env-via-registry): force in-process execution.
+ *
+ * ADR-0054 M4-E trust tier: this fallback is BUNDLED-ONLY. It applies to
+ * first-party (trusted-computing-base) engine forks routed through
+ * {@link runOffThreadOrInProcess} (graph/fit/sim live engines). It NEVER applies
+ * to EXTERNAL tool command dispatch — an external tool always forks the worker
+ * (the dispatch supervisor has no in-process fallback by trust tier; a fork
+ * failure is a hard error there, not a degrade-to-in-host).
+ */
 const WORKER_ENV = new EnvRegistry([
   {
     canonical: 'OPENSIP_CLI_NO_WORKER',
     coerce: (raw) => raw === '1',
     default: false,
-    docs: 'Set to 1 to run a tool engine in the main process instead of a forked worker (debugging / constrained runtimes). The live view may stutter; output is unchanged.',
+    docs: 'Set to 1 to run a BUNDLED tool engine in the main process instead of a forked worker (debugging / constrained runtimes). The live view may stutter; output is unchanged. Bundled-only (ADR-0054 trust tier): external tools always fork — this flag never makes an external tool run in-host.',
   },
 ]);
 

@@ -32,6 +32,7 @@ import {
 
 import { type RunActionHooks } from '../bootstrap/run-plane.js';
 
+import { showInternalCommands } from './internal-command-visibility.js';
 import { splitActionArgs } from './mount-command-action.js';
 import { buildOption, formatArgUsage } from './mount-command-spec-wiring.js';
 import { emitCommandResult } from './mount-result-command.js';
@@ -118,6 +119,24 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
   const cmd = program.command(spec.name).description(spec.description);
   if (spec.aliases !== undefined && spec.aliases.length > 0) {
     cmd.aliases([...spec.aliases]);
+  }
+
+  // Tier-3 visibility, self-enforced AT MOUNT (tool-command-surface-taxonomy).
+  // A `visibility: 'internal'` command (every Tier-3 worker — fit/graph/sim run
+  // workers and the ADR-0054 M4-E `__tool-command-worker` dispatch worker) is
+  // hidden from `--help` here, in the ONE plane that mounts every tool AND host
+  // command, so hiding is order-independent: it does not matter whether the
+  // command is mounted before or after any registry-walk pass. (The former
+  // separate post-mount hide pass was order-dependent — it ran inside
+  // `mountAllToolCommands`, BEFORE the host mounted `__tool-command-worker`, so a
+  // host-mounted internal command leaked into `--help`.) The command stays fully
+  // invocable (Commander only filters `_hidden` from help); `OPENSIP_CLI_SHOW_INTERNAL=1`
+  // reveals it. `internalCommandNames` remains the descriptor-driven source the
+  // completion inventory reads, kept in lockstep with this predicate.
+  if (spec.visibility === 'internal' && !showInternalCommands()) {
+    // `_hidden` is Commander-internal (the property its help renderer filters
+    // on), not on the public `Command` type — set via a narrow structural cast.
+    (cmd as unknown as { _hidden: boolean })._hidden = true;
   }
 
   // ADR-0021 common flags. `cwd` is the only flag with a computed (per-

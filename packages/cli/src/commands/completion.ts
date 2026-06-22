@@ -60,6 +60,9 @@ export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
+  // ADR-0054 M4-E: the host-owned dispatch worker subcommand (forked by the
+  // supervisor; never a public surface).
+  '__tool-command-worker',
 ]);
 
 /**

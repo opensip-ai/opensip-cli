@@ -5,7 +5,7 @@
  *
  * Host commands (`init` / `configure` / `sessions` / `report` / `completion` /
  * `uninstall` / `tools`) are NOT tool plugins — they don't ride on a
- * `Tool.commandSpecs` and aren't discovered. But making them mount via the same
+ * `Tool.commandSpecs` and aren't discovered. Mounting them via the same
  * `mountCommandSpec` means the Phase 7 `command-surface-parity` guardrail sees
  * ONE uniform command surface: no second, more-privileged raw-Commander path for
  * "blessed" CLI-owned commands. The pack-management `plugin {add,list,remove,
@@ -14,28 +14,27 @@
  * no top-level `opensip plugin`.
  *
  * Each spec's handler closes over the per-invocation {@link CliCommandsContext}
- * (render / setExitCode / datastore thunk / pluginLayouts) — the same data the
- * former `register-*.ts` registrars threaded in. The handler signature's `TCtx`
- * is `CliCommandsContext`; the mount layer only reaches for `render` /
- * `setExitCode` (the `command-result` + thrown-`ToolError` arms) — the
- * `signal-envelope` / `live-view` arms are never exercised by a host command, so
- * `CliCommandsContext` is a valid (leaner) `CommandMountContext`.
+ * (render / setExitCode / datastore thunk / pluginLayouts). The mount layer only
+ * reaches for `render` / `setExitCode` (the `command-result` + thrown-`ToolError`
+ * arms) — the `signal-envelope` / `live-view` arms are never exercised by a host
+ * command, so `CliCommandsContext` is a valid (leaner) `CommandMountContext`.
  *
  * The action-less subcommand GROUPS (`sessions`, `tools`) + the domain-bound
- * per-tool `plugin` group leaves (and their {@link mountToolPluginGroups}) live
- * in `host-subcommand-groups.ts` (a leaf module that lets `completion.ts` source
- * its sub-subcommand names without a module cycle). This module assembles the
- * TOP-LEVEL specs and mounts the whole surface.
+ * per-tool `plugin` group leaves (and {@link mountToolPluginGroups}) live in
+ * `host-subcommand-groups.ts` (a leaf module that lets `completion.ts` source its
+ * sub-subcommand names without a cycle). This module assembles the TOP-LEVEL
+ * specs and mounts the whole surface.
  *
- * Specs are built per-invocation (inside the builders below, not at module
- * load) so the `--cwd` defaults that resolve to `process.cwd()` are evaluated
- * fresh each run — byte-identical to the former
- * `.option(spec, desc, process.cwd())` registrars.
+ * Specs are built per-invocation (in the builders below, not at module load) so
+ * the `--cwd` defaults that resolve to `process.cwd()` are evaluated fresh each
+ * run — byte-identical to the former `.option(spec, desc, process.cwd())`
+ * registrars.
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-cli/core';
 
+import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-entry.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
 import { executeAgentCatalog } from './agent-catalog.js';
@@ -200,18 +199,13 @@ function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return;
       }
-      // Derive the completion surface from the live specs: the tool commands
-      // (supplied by the composition root via `ctx.toolCommandSpecs`), the
-      // top-level host commands, and the action-less groups. Single source of
-      // truth — the emitted script tracks the real command surface.
-      //
-      // The host surface is read via {@link buildHostCompletionSurface}, NOT
-      // `buildTopLevelHostSpecs`: that assembly includes `buildCompletionSpec`,
-      // so calling it from this handler would form a `buildCompletionSpec →
-      // buildTopLevelHostSpecs → buildCompletionSpec` call cycle. The surface
-      // helper derives the same `SpecLike` views WITHOUT rebuilding the
-      // completion spec (it contributes a static, options-free descriptor for
-      // itself), keeping the dependency one-directional.
+      // Derive the completion surface from the live specs (single source of
+      // truth — the emitted script tracks the real command surface): the tool
+      // commands (via `ctx.toolCommandSpecs`), the top-level host commands, and
+      // the action-less groups. The host surface is read via
+      // {@link buildHostCompletionSurface}, NOT `buildTopLevelHostSpecs`, because
+      // that assembly includes `buildCompletionSpec` (a build → assembly → build
+      // cycle); the helper derives the same `SpecLike` views one-directionally.
       const host = buildHostCompletionSurface(ctx);
       // tool-command-surface-taxonomy Task 1.3/1.5: filter Tier-3 internal
       // commands from completion using the descriptor-driven set (the SAME source
@@ -399,6 +393,10 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
     buildAgentCatalogSpec(),
     buildCompletionSpec(ctx),
     buildUninstallSpec(),
+    // ADR-0054 M4-E internal worker subcommand the dispatch supervisor forks
+    // (`opensip __tool-command-worker <spec>`); visibility:'internal' (hidden,
+    // still invocable). See its spec's JSDoc in tool-command-worker-entry.ts.
+    toolCommandWorkerCommandSpec,
   ];
 }
 

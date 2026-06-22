@@ -74,6 +74,13 @@
  *    remain `opensip tools …` (unchanged). So `plugin` is absent from the root
  *    surface and present under `fit`/`sim`.
  *
+ * 8. ADR-0054 M4-E (config two-pass + worker-by-default): a NEW host-mounted
+ *    internal command `__tool-command-worker` appears in the full tree. The
+ *    dispatch supervisor forks it (`opensip __tool-command-worker <spec>`) to run
+ *    one external tool command out-of-process. It declares `visibility:'internal'`,
+ *    so it is mounted-but-hidden (ABSENT from `--help`/completion, PRESENT and
+ *    invocable in the tree) exactly like the five Tier-3 workers — asserted below.
+ *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -278,25 +285,34 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     const program = buildFullProgram();
     const topLevel = program.commands.map((c) => c.name());
 
-    // The five known Tier-3 internal/worker commands (tool-command-surface-taxonomy
-    // T-1). They are IPC/CI bootstrap entry points — still directly invocable, so
-    // they MUST remain mounted in the full tree (PRESENT below)...
+    // The known Tier-3 internal/worker commands (tool-command-surface-taxonomy
+    // T-1, + ADR-0054 M4-E). They are IPC/CI bootstrap entry points — still
+    // directly invocable, so they MUST remain mounted in the full tree (PRESENT
+    // below)...
+    //
+    // `__tool-command-worker` is the M4-E addition: a HOST-mounted internal
+    // command (the dispatch supervisor forks it). It is the case that proved the
+    // old hide mechanism was order-dependent — the former post-mount registry walk
+    // ran inside `mountAllToolCommands`, BEFORE `registerCliCommands` mounted this
+    // host command, so it leaked into `--help`. Hiding is now self-enforced AT
+    // MOUNT by `mountCommandSpec` (visibility:'internal' → `_hidden`), which is
+    // order-independent and covers tool workers AND host internal commands alike.
     const TIER_3_INTERNAL = [
       'fit-run-worker',
       'graph-run-worker',
       'graph-shard-worker',
       'graph-equivalence-check',
       'sim-run-worker',
+      '__tool-command-worker',
     ];
     for (const name of TIER_3_INTERNAL) {
       expect(topLevel, `internal command '${name}' must stay mounted (invocable)`).toContain(name);
     }
 
-    // ...but Phase 1's host hide pass (mountAllToolCommands → hideInternalCommands)
-    // sets Commander's `_hidden` on each so they are ABSENT from `--help`. This is
-    // the no-internal-worker-leakage assertion for the public surface: every Tier-3
-    // command is mounted yet hidden (absent from the PUBLIC surface), and NO
-    // non-internal command is hidden.
+    // ...but `mountCommandSpec` set Commander's `_hidden` on each at mount, so they
+    // are ABSENT from `--help`. This is the no-internal-worker-leakage assertion
+    // for the public surface: every Tier-3 command is mounted yet hidden (absent
+    // from the PUBLIC surface), and NO non-internal command is hidden.
     const publicNames = publicTopLevelCommandNames(program);
     for (const name of TIER_3_INTERNAL) {
       expect(
@@ -304,12 +320,12 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
         `internal command '${name}' must be ABSENT from the public surface`,
       ).not.toContain(name);
     }
-    // Exactly the five Tier-3 internals are hidden — nothing more, nothing less.
+    // Exactly the Tier-3 internals are hidden — nothing more, nothing less.
     const hiddenNames = program.commands
       .filter((c) => (c as unknown as { _hidden?: boolean })._hidden === true)
       .map((c) => c.name())
       .sort();
-    expect(hiddenNames, 'exactly the five Tier-3 internal commands are hidden from --help').toEqual(
+    expect(hiddenNames, 'exactly the Tier-3 internal commands are hidden from --help').toEqual(
       [...TIER_3_INTERNAL].sort(),
     );
   });
