@@ -196,6 +196,13 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/graph',
     publishReason: 'Graph tool engine; static call-graph kernel and CLI commands',
   },
+  {
+    unscoped: 'yagni',
+    name: '@opensip-cli/yagni',
+    dir: 'packages/yagni/engine',
+    filter: '@opensip-cli/yagni',
+    publishReason: 'YAGNI reduction audit tool engine',
+  },
   // Layer 3.5 — shared tree-sitter adapter scaffolding (before the 4 tree-sitter packs)
   {
     unscoped: 'graph-adapter-common',

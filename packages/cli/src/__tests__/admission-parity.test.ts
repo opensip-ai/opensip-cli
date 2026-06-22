@@ -122,6 +122,6 @@ describe('bundled policy parity — registerFirstPartyTools throws iff the repor
         .list()
         .map((t) => t.metadata.name ?? t.metadata.id)
         .sort(),
-    ).toEqual(['fit', 'graph', 'sim']);
+    ).toEqual(['fit', 'graph', 'sim', 'yagni']);
   });
 });
