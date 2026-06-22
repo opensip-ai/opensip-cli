@@ -252,7 +252,8 @@ Things that can go wrong, and what the CLI does:
 | Failure | When | What the CLI does |
 |---|---|---|
 | Invalid argv | Commander parse | Commander prints help; exit 1. |
-| Tool command mounting throws | `mountAllToolCommands()` | Logged at error level; the failing tool is skipped; CLI continues with remaining tools. |
+| Tool command mounting throws (bundled) | `mountAllToolCommands()` | `PluginIncompatibleError` → exit 5; startup aborts. |
+| Tool command mounting throws (external) | `mountAllToolCommands()` | Warn + `cli.tool.register_failed`; the failing tool is skipped; CLI continues with remaining tools. |
 | Action handler throws | Inside Tool execution | Caught at the program level; rendered as `ErrorResult`; exit code from `error.exitCode` or 2. |
 | Missing config | Tool action calls `loadProjectConfig()` | Tool throws `ConfigurationError`; CLI surfaces the error and the suggestion. Exit 2. |
 | Plugin failed to load | Inside the Tool's lazy plugin loader (e.g. `ensureChecksLoaded` in fitness) | Logged; the failing plugin is skipped; CLI continues. |
@@ -271,7 +272,7 @@ For `acme-api` running `opensip fit --gate-compare` from CI on 2026-05-17:
    - Registers six bundled language adapters (`typescript`, `rust`, `python`, `java`, `go`, `cpp`) into `langRegistry`.
    - Resolves each name in `BUNDLED_TOOL_PACKAGES` (`@opensip-cli/fitness`, `@opensip-cli/simulation`, `@opensip-cli/graph`) on disk, reads its manifest, admits it through `admitTool`, **dynamically imports** the tool runtime, and registers it into `toolRegistry` — the same path an installed tool takes; nothing is statically imported.
    - `discoverToolPackages()` walks `node_modules`. No third-party Tools installed. Returns empty.
-3. `mountAllToolCommands(toolRegistry, program, ctx)`: for each registered tool,
+3. `mountAllToolCommands(toolRegistry, program, ctx, provenance)`: for each registered tool,
    `mountCommandSpec` mounts every entry in the tool's declared `commandSpecs`,
    nesting `parent`-bearing specs under their tool primary. fitness's specs mount
    `fit` + the nested `fit list` / `fit recipes` / `fit export`; simulation's

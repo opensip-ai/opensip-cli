@@ -169,7 +169,7 @@ async function main(): Promise<void> {
   // through the named sequencer seam. The host owns `program` and passes it in
   // (launch — the tool context no longer carries a raw-Commander handle, §8); the
   // one command surface is each tool's declarative commandSpecs.
-  mountAllToolCommands(toolRegistry, program, ctx);
+  mountAllToolCommands(toolRegistry, program, ctx, provenance);
 
   registerCliCommands(program, commandCtx);
 

@@ -59,6 +59,10 @@ packages/
 See [CLAUDE.md](CLAUDE.md) for the full architecture overview, including
 the layer rules enforced by dependency-cruiser.
 
+- [Architecture map](docs/public/80-implementation/architecture-map.md) — generated
+  layer/seam reference (`pnpm docs:arch-map`)
+- [Toolchain support matrix](SUPPORT.md) — Node, pnpm, and quality-tool versions
+
 ## Writing a Fitness Check
 
 Checks are defined with `defineCheck()` from `@opensip-cli/fitness`

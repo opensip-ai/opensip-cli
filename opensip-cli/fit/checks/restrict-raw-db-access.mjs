@@ -73,6 +73,13 @@ const PERSISTENCE_BOUNDARY = [
 const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
 
 /**
+ * Import or call of `requireDrizzleDataStore` outside the persistence boundary.
+ * Complements the `.db.<method>(` call-shape rule — catches modules that peel
+ * the Drizzle handle via the narrow-or-throw accessor before querying.
+ */
+const REQUIRE_DRIZZLE = /\brequireDrizzleDataStore\s*\(/;
+
+/**
  * Drizzle query/builder methods. A `.db` access is only flagged when its
  * member is *immediately* one of these — i.e. the `.db` is being used as a
  * live query handle, not merely as a `.db` field on some unrelated object.
@@ -145,6 +152,21 @@ export function analyzeRawDbAccess(content, filePath) {
   const lines = content.split('\n');
   const rawDbAliases = new Set();
   for (const [i, line] of lines.entries()) {
+    if (REQUIRE_DRIZZLE.test(line)) {
+      violations.push({
+        message:
+          '`requireDrizzleDataStore` used outside the persistence boundary. ' +
+          'Narrowing to the raw Drizzle handle belongs in owner repositories ' +
+          '(ADR-0009, `tables-only-in-persistence`).',
+        severity: 'error',
+        line: i + 1,
+        suggestion:
+          'Route persistence through the owning repository in `src/persistence/` ' +
+          '(or `session-store` / `datastore`). Move the file into the boundary ' +
+          'or add `@fitness-ignore-file restrict-raw-db-access` with justification.',
+      });
+      continue;
+    }
     for (const alias of collectRawDbAliases(line)) {
       rawDbAliases.add(alias);
     }

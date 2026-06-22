@@ -1,5 +1,12 @@
 import { type CliProgram } from '@opensip-cli/contracts';
-import { logger, type Tool, type ToolCliContext, type ToolRegistry } from '@opensip-cli/core';
+import {
+  logger,
+  PluginIncompatibleError,
+  type Tool,
+  type ToolCliContext,
+  type ToolProvenance,
+  type ToolRegistry,
+} from '@opensip-cli/core';
 
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
@@ -7,6 +14,7 @@ import { buildMaybeDispatchExternal } from './bind-external-dispatch.js';
 import { bindToolCliContext } from './bind-tool-context.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { decorateToolPrimary } from './decorate-tool-primary.js';
+import { provenanceSourceFor } from './tool-provenance.js';
 
 /**
  * Walk the registry and mount each tool's commands onto `program`. This is
@@ -20,19 +28,23 @@ import { decorateToolPrimary } from './decorate-tool-primary.js';
  * mis-declaration: it contributes no commands, surfaced loudly via
  * `cli.tool.no_command_surface`.
  *
- * Failures are isolated per tool — one tool whose spec fails to mount must not
- * take the whole CLI down. The failure is logged + stderr-warned, then we
- * continue with the next tool.
+ * Mount failures are **bundled fail-closed, external best-effort** (R16). A
+ * bundled tool whose spec fails to mount throws `PluginIncompatibleError` so the
+ * composition root aborts startup (exit 5). External provenance (installed /
+ * project-local / user-global) keeps the warn-and-continue posture.
  *
  * @param registry The per-invocation tool registry to walk.
  * @param program The root Commander program (host-owned; the composition root
  *   passes it — it is no longer reachable through the tool context, §8).
  * @param ctx The per-invocation handler context (render/emit/scope — no program).
+ * @param provenance Admitted-tool provenance from bootstrap (required — no default).
+ * @throws {PluginIncompatibleError} When a bundled tool's command surface fails to mount.
  */
 export function mountAllToolCommands(
   registry: ToolRegistry,
   program: CliProgram,
   ctx: ToolCliContext,
+  provenance: readonly ToolProvenance[],
 ): void {
   for (const tool of registry.list()) {
     try {
@@ -41,6 +53,18 @@ export function mountAllToolCommands(
       const msg = error instanceof Error ? error.message : String(error);
       const human = tool.metadata.name ?? tool.metadata.id;
       process.stderr.write(`opensip: tool ${human} failed to mount: ${msg}\n`);
+      if (provenanceSourceFor(tool, provenance) === 'bundled') {
+        logger.warn({
+          evt: 'cli.tool.bundled_mount_failed',
+          module: BOOTSTRAP_MODULE,
+          toolId: tool.metadata.id,
+          toolName: human,
+          error: msg,
+        });
+        throw new PluginIncompatibleError(`bundled tool '${human}' failed to mount: ${msg}`, {
+          diagnostic: 'bundled command surface mount failed',
+        });
+      }
       logger.warn({
         evt: 'cli.tool.register_failed',
         module: BOOTSTRAP_MODULE,

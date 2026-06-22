@@ -111,7 +111,7 @@ async function buildLiveInventory(): Promise<{
   const registry = new ToolRegistry();
   await registerFirstPartyTools(registry);
   const toolCtx = makeStubToolContext();
-  mountAllToolCommands(registry, program, toolCtx);
+  mountAllToolCommands(registry, program, toolCtx, []);
   const hostCtx = makeStubHostContext();
   registerCliCommands(program, hostCtx);
 

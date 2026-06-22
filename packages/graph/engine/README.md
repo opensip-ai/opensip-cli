@@ -4,11 +4,13 @@
 
 # @opensip-cli/graph
 
-> Static call-graph + dead-end analysis (seven-stage pipeline)
+> Static call-graph + dead-end analysis (six-stage pipeline)
 
 This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.
 
 Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
+
+**Distribution model:** the published `opensip-cli` npm package is a full-stack bundle of first-party tools, check packs, and language adapters. Third-party tools install separately via the `opensipTools` manifest and host allowlist; a slim install without bundled tools is not a current goal.
 
 ## Install
 

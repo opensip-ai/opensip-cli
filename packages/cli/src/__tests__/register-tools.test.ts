@@ -239,7 +239,7 @@ describe('mountAllToolCommands', () => {
     registry.register(specTool('tool-b', 'b'));
     const program = new Command('opensip');
 
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     const names = program.commands.map((c) => c.name());
     expect(names).toContain('a');
@@ -264,7 +264,7 @@ describe('mountAllToolCommands', () => {
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
     try {
-      mountAllToolCommands(registry, program, makeStubContext());
+      mountAllToolCommands(registry, program, makeStubContext(), []);
     } finally {
       process.stderr.write = origWrite;
     }
@@ -273,7 +273,7 @@ describe('mountAllToolCommands', () => {
     expect(program.commands.map((c) => c.name())).not.toContain('tool-empty');
   });
 
-  it('isolates a tool whose spec fails to mount so the rest still mount', () => {
+  it('fail-closes a bundled tool whose spec fails to mount (subsequent tools do not mount)', () => {
     const registry = makeRegistry();
     // A malformed spec (a required boolean flag) throws inside mountCommandSpec.
     registry.register({
@@ -308,11 +308,62 @@ describe('mountAllToolCommands', () => {
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
     try {
-      expect(() => mountAllToolCommands(registry, program, makeStubContext())).not.toThrow();
+      expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
+        PluginIncompatibleError,
+      );
     } finally {
       process.stderr.write = origWrite;
     }
-    // The good tool mounted despite the bad tool throwing.
+    expect(program.commands.map((c) => c.name())).not.toContain('good');
+  });
+
+  it('isolates an external tool whose spec fails to mount so the rest still mount', () => {
+    const registry = makeRegistry();
+    registry.register({
+      metadata: {
+        id: 'tool-bad',
+        name: 'bad',
+        version: '0.0.0',
+        description: 'bad',
+      },
+      commands: [{ name: 'bad', description: 'bad' }],
+      commandSpecs: [
+        {
+          name: 'bad',
+          description: 'bad',
+          commonFlags: [],
+          scope: 'project',
+          output: 'command-result',
+          options: [
+            {
+              flag: '--flag',
+              description: 'boolean but required',
+              required: true,
+            },
+          ],
+          handler: () => Promise.resolve({ type: 'noop' }),
+        },
+      ] as never,
+    });
+    registry.register(specTool('tool-good', 'good'));
+    const program = new Command('opensip');
+
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = () => true;
+    try {
+      expect(() =>
+        mountAllToolCommands(registry, program, makeStubContext(), [
+          {
+            id: 'bad',
+            source: 'installed',
+            version: '0.0.0',
+            manifestHash: 'test',
+          },
+        ]),
+      ).not.toThrow();
+    } finally {
+      process.stderr.write = origWrite;
+    }
     expect(program.commands.map((c) => c.name())).toContain('good');
   });
 });

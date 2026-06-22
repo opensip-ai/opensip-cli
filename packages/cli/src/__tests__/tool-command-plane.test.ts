@@ -10,11 +10,12 @@
  *      `cli.tool.no_command_surface` event (no fallback);
  *   3. the lifecycle step ordinals are the documented canonical sequence and
  *      `mountAllToolCommands` drives step 8 over every registered tool;
- *   4. a mount failure is isolated per tool — the rest still mount;
+ *   4. bundled mount failures fail-closed; external failures warn-continue;
  *   5. `isValidTool` requires a non-empty `commandSpecs` (no register surface).
  */
 
 import {
+  PluginIncompatibleError,
   ToolRegistry as ToolRegistryClass,
   logger,
   type CommandSpec,
@@ -117,7 +118,7 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
     registry.register(specTool('spec-tool', 'speccmd'));
 
     const program = new Command('opensip');
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     expect(program.commands.map((c) => c.name())).toContain('speccmd');
   });
@@ -132,7 +133,7 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
 
     const program = new Command('opensip');
     const warnSpy = vi.spyOn(logger, 'warn');
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'cli.tool.no_command_surface', toolId: 'empty-tool' }),
@@ -147,7 +148,7 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
     registry.register(nestedTool('nested-tool'));
 
     const program = new Command('opensip');
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     // The primary verb is a top-level command; the child is NOT at root.
     const topLevel = program.commands.map((c) => c.name());
@@ -171,7 +172,7 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
 
     const program = new Command('opensip');
     const warnSpy = vi.spyOn(logger, 'warn');
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     // No matching parent → mounted flat at root, and the mis-declaration is loud.
     expect(program.commands.map((c) => c.name())).toContain('lonely');
@@ -182,7 +183,34 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
 });
 
 describe('mountAllToolCommands — per-tool failure isolation', () => {
-  it('a failing mount does not stop the other tools from mounting', () => {
+  it('a bundled failing mount aborts startup (PluginIncompatibleError)', () => {
+    const registry = new ToolRegistryClass();
+    const bad: Tool = {
+      metadata: { id: 'bad-tool', version: '0.0.0', description: 'bad' },
+      commands: [{ name: 'badcmd', description: 'bad' }],
+      commandSpecs: [
+        {
+          ...makeSpec('badcmd'),
+          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+        },
+      ],
+    };
+    registry.register(bad);
+    registry.register(specTool('ok-tool', 'okcmd'));
+
+    const program = new Command('opensip');
+    const restore = silenceStderr();
+    try {
+      expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
+        PluginIncompatibleError,
+      );
+    } finally {
+      restore();
+    }
+    expect(program.commands.map((c) => c.name())).not.toContain('okcmd');
+  });
+
+  it('an external failing mount does not stop the other tools from mounting', () => {
     const registry = new ToolRegistryClass();
     // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
     const bad: Tool = {
@@ -202,7 +230,17 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
     const warnSpy = vi.spyOn(logger, 'warn');
     const restore = silenceStderr();
     try {
-      expect(() => mountAllToolCommands(registry, program, makeStubContext())).not.toThrow();
+      expect(() =>
+        mountAllToolCommands(registry, program, makeStubContext(), [
+          {
+            id: 'bad-tool',
+            stableId: 'bad-tool',
+            source: 'installed',
+            version: '0.0.0',
+            manifestHash: 'test',
+          },
+        ]),
+      ).not.toThrow();
     } finally {
       restore();
     }
@@ -242,7 +280,7 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
     registry.register(specTool('second', 'secondcmd'));
 
     const program = new Command('opensip');
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     // Step 8 mounts every registered tool's command, in registration (== help/
     // listing) order — provenance no longer matters at this step.

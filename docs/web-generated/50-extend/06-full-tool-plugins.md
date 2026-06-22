@@ -288,28 +288,38 @@ program.
 ## External tool trust boundary (ADR-0054)
 
 Bundled first-party tools (`fitness`, `graph`, `simulation`) execute in the CLI host
-process. **Installed npm packages and project-local tools still do too** during the
-ADR-0054 transition: the host dynamically imports your package's runtime module
-before any `ToolCliContext` seam exists. That means your code shares the kernel
-process with `@opensip-cli/core` — a buggy or hostile tool can crash the entire CLI,
-call `process.exit`, or run top-level side effects at import time.
+process and are fail-closed on admission or mount failure (exit 5).
 
-What is enforced today:
+**External-provenance tools** (installed npm, project-local, user-global) use a
+different posture:
 
-- **Admission** — manifest compatibility, `apiVersion`, and manifest⇔runtime drift
-  checks before registration (`admit-tool-package.ts`).
-- **Mount isolation** — a broken `commandSpecs` declaration does not prevent other
-  tools from mounting (`register-tools-mount.ts`).
-- **Narrow import boundary** — `importToolRuntime` may only be called from the
-  admission/discovery modules, with an explicit bundled or `adr0054Transition`
-  policy (`host-tool-runtime-import-boundary` fitness check).
-- **`tools validate`** — can probe a not-yet-trusted package in a child process
+- **Host registration (M4-G)** — the host mounts command shells from the static
+  manifest via `synthesizeExternalTool` and does **not** import the untrusted
+  runtime module in the host process.
+- **Worker dispatch (M4-E)** — command handlers for external provenance fork a
+  `__tool-command-worker` child that loads and runs the real runtime in an
+  isolation boundary; results replay through the same `ToolCliContext` seams.
+- **Lifecycle gating (M4-F)** — external lifecycle/capability hooks run in the
+  worker, not the host.
+- **Enforcement** — `host-tool-runtime-import-boundary` fitness check forbids
+  host-side runtime imports outside the admission/dispatch modules.
+
+What is enforced at admission:
+
+- Manifest compatibility, `apiVersion`, and manifest⇔runtime drift checks
+  (`admit-tool-package.ts`).
+- Deny-by-default allowlists for project-local and installed tools
+  (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`).
+  The `*` wildcard admits all and emits `cli.trust.wildcard_allowlist`.
+- **Mount isolation** — a broken external `commandSpecs` declaration warns and
+  continues; bundled mount failures abort startup (exit 5).
+- **`tools validate`** — probes a not-yet-trusted package in a child process
   (`staticOnly` on the admission pipeline).
 
-What is **not** landed yet: worker-owned runtime dispatch for external-provenance
-tools (the ADR-0054 end state). Until that ships, treat third-party Tool plugins
-like any other npm dependency you execute locally — pin versions, review source,
-and use `opensip tools validate` before enabling a new tool in CI.
+What is **not** landed yet: npm package attestation (signatures, hash-lock at
+install). Public third-party ecosystem launch is blocked until that plan ships
+(Q7). Until then, pin versions, review source, and use `opensip tools validate`
+before enabling a new tool in CI.
 
 ## Tips that come up
 

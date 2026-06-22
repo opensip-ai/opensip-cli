@@ -10,8 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
-import { PluginIncompatibleError } from '@opensip-cli/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { logger, PluginIncompatibleError } from '@opensip-cli/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
 import {
@@ -39,6 +39,20 @@ function stageProjectLocalTool(id: string, apiVersion?: number): string {
 }
 
 describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
+  it('admits all on the wildcard and emits cli.trust.wildcard_allowlist once', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+    expect(isInstalledToolTrusted('anything', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    expect(isInstalledToolTrusted('again', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.trust.wildcard_allowlist',
+        envVar: INSTALLED_TOOL_ALLOWLIST_ENV,
+      }),
+    );
+    warnSpy.mockRestore();
+  });
+
   it('denies by default when the allowlist env is unset/empty', () => {
     expect(isInstalledToolTrusted('my-plugin', {})).toBe(false);
     expect(isInstalledToolTrusted('my-plugin', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '' })).toBe(false);
@@ -49,10 +63,6 @@ describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
     expect(isInstalledToolTrusted('my-plugin', env)).toBe(true);
     expect(isInstalledToolTrusted('other-tool', env)).toBe(true);
     expect(isInstalledToolTrusted('unknown', env)).toBe(false);
-  });
-
-  it('admits all on the wildcard', () => {
-    expect(isInstalledToolTrusted('anything', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
   });
 });
 

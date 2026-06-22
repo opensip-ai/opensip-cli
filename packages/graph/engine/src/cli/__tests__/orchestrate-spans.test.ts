@@ -82,7 +82,7 @@ describe('graph stage spans — standalone no-op invariant', () => {
     return runWithScope(scope, fn);
   }
 
-  it('GRAPH_STAGES is the canonical seven-stage set the spans are named after', () => {
+  it('GRAPH_STAGES is the canonical six-stage set the spans are named after', () => {
     expect(GRAPH_STAGES).toEqual([
       'discover',
       'parse',

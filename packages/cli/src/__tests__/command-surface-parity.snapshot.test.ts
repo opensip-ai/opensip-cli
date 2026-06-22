@@ -138,7 +138,7 @@ function buildFullProgram(): Command {
     // specs (the same path index.ts drives at step 8 of the tool lifecycle).
     const registry = new ToolRegistry();
     for (const tool of BUNDLED_TOOLS) registry.register(tool);
-    mountAllToolCommands(registry, program, makeStubToolContext());
+    mountAllToolCommands(registry, program, makeStubToolContext(), []);
 
     // Host-owned commands (init/report/sessions/configure/completion/uninstall/
     // tools), mounted via the same command plane — PLUS the domain-bound

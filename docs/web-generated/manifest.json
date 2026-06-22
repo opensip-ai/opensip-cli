@@ -633,6 +633,12 @@
         "contributors"
       ],
       "purpose": "How opensip.ai consumes docs/web-generated/ from this repo: backend proxy, frontend route, manifest contract."
+    },
+    {
+      "file": "docs/web-generated/80-implementation/architecture-map.md",
+      "path": "/docs/opensip-cli/80-implementation/architecture-map/",
+      "section": "80-implementation",
+      "title": "Architecture Map"
     }
   ],
   "nav": [
@@ -743,7 +749,8 @@
         "/docs/opensip-cli/80-implementation/04-coding-standards/",
         "/docs/opensip-cli/80-implementation/05-layer-policy/",
         "/docs/opensip-cli/80-implementation/06-doc-conventions/",
-        "/docs/opensip-cli/80-implementation/07-website-integration/"
+        "/docs/opensip-cli/80-implementation/07-website-integration/",
+        "/docs/opensip-cli/80-implementation/architecture-map/"
       ]
     }
   ],
@@ -885,7 +892,8 @@
         "/docs/opensip-cli/80-implementation/04-coding-standards/",
         "/docs/opensip-cli/80-implementation/05-layer-policy/",
         "/docs/opensip-cli/80-implementation/06-doc-conventions/",
-        "/docs/opensip-cli/80-implementation/07-website-integration/"
+        "/docs/opensip-cli/80-implementation/07-website-integration/",
+        "/docs/opensip-cli/80-implementation/architecture-map/"
       ]
     }
   ]

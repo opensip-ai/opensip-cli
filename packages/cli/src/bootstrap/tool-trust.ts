@@ -1,3 +1,5 @@
+import { logger } from '@opensip-cli/core';
+
 /**
  * tool-trust — executable-tool trust policies for project-local and installed
  * npm tools (release launch, Phase 3 Task 3.2; audit remediation).
@@ -34,6 +36,9 @@ export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS';
  */
 export const INSTALLED_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS';
 
+/** One-time process warning when a trust allowlist resolves to the `*` wildcard. */
+let wildcardAllowlistWarned = false;
+
 /**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
  * unset ⇒ empty set (deny-by-default). The wildcard `'*'` admits all
@@ -47,6 +52,16 @@ function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
   );
+}
+
+function warnWildcardAllowlist(envVar: string, allow: ReadonlySet<string>): void {
+  if (wildcardAllowlistWarned || !allow.has('*')) return;
+  wildcardAllowlistWarned = true;
+  logger.warn({
+    evt: 'cli.trust.wildcard_allowlist',
+    envVar,
+    detail: 'trust allowlist contains wildcard * — all matching tools are admitted',
+  });
 }
 
 /**
@@ -74,6 +89,7 @@ export function isProjectLocalToolTrusted(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const allow = parseAllowlist(env[PROJECT_TOOL_ALLOWLIST_ENV]);
+  warnWildcardAllowlist(PROJECT_TOOL_ALLOWLIST_ENV, allow);
   return allow.has('*') || allow.has(id);
 }
 
@@ -92,5 +108,6 @@ export function isProjectLocalToolTrusted(
  */
 export function isInstalledToolTrusted(id: string, env: NodeJS.ProcessEnv = process.env): boolean {
   const allow = parseAllowlist(env[INSTALLED_TOOL_ALLOWLIST_ENV]);
+  warnWildcardAllowlist(INSTALLED_TOOL_ALLOWLIST_ENV, allow);
   return allow.has('*') || allow.has(id);
 }

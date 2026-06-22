@@ -6,11 +6,16 @@
  *    LanguageRegistry.
  *  - registerFirstPartyTools registers fitness, simulation, graph in
  *    the documented order with no surprises.
- *  - mountAllToolCommands isolates failing tools (one bad register()
- *    call doesn't take the whole registry down).
+ *  - mountAllToolCommands fail-closes bundled mount failures (exit 5 path).
  */
 
-import { LanguageRegistry, ToolRegistry, type Tool, type ToolCliContext } from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  PluginIncompatibleError,
+  ToolRegistry,
+  type Tool,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -125,14 +130,14 @@ describe('mountAllToolCommands', () => {
     registry.register(specTool('fake-2', 'fake2'));
     const program = new Command('opensip');
 
-    mountAllToolCommands(registry, program, makeStubContext());
+    mountAllToolCommands(registry, program, makeStubContext(), []);
 
     const names = program.commands.map((c) => c.name());
     expect(names).toContain('fake1');
     expect(names).toContain('fake2');
   });
 
-  it('isolates failing tools — one spec that throws does not stop subsequent mounts', () => {
+  it('fail-closes bundled tools — one spec that throws aborts mount (exit 5 path)', () => {
     const registry = new ToolRegistry();
     // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
     const broken: Tool = {
@@ -155,9 +160,10 @@ describe('mountAllToolCommands', () => {
     const program = new Command('opensip');
 
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    mountAllToolCommands(registry, program, makeStubContext());
-
-    expect(program.commands.map((c) => c.name())).toContain('works');
+    expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
+      PluginIncompatibleError,
+    );
+    expect(program.commands.map((c) => c.name())).not.toContain('works');
     expect(stderr).toHaveBeenCalled();
     stderr.mockRestore();
   });

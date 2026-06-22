@@ -124,7 +124,7 @@ function buildProgram(tool: Tool): Command {
       hostGroups: [],
     }),
   );
-  mountAllToolCommands(tools, program, stubCtx());
+  mountAllToolCommands(tools, program, stubCtx(), []);
   return program;
 }
 

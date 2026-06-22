@@ -10,6 +10,8 @@ This is an **internal library** of the opensip-cli toolkit. It is published so t
 
 Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
 
+**Distribution model:** the published `opensip-cli` npm package is a full-stack bundle of first-party tools, check packs, and language adapters. Third-party tools install separately via the `opensipTools` manifest and host allowlist; a slim install without bundled tools is not a current goal.
+
 ## Install
 
 Most users install the CLI, which bundles the first-party tools:
