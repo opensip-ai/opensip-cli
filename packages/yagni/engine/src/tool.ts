@@ -11,6 +11,13 @@ import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 
 import type { Tool } from '@opensip-cli/core';
 
+/**
+ * Per-tool contract version for the yagni-specific surface (detectors, scoring,
+ * config schema, fingerprint strategy). Independent of the core
+ * TOOL_CONTRACT_VERSION (the generic Tool bus, ADR-0046). Bumped only on actual
+ * changes to this surface; value = major.minor of the CLI release shipping the
+ * change (see ADR-0047).
+ */
 export const YAGNI_CONTRACT_VERSION = '1.0.0';
 
 export const YAGNI_STABLE_ID = '3aba9195-2297-4f20-99d5-906945092dfc';

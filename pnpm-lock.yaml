@@ -1112,6 +1112,9 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1119,9 +1122,6 @@ importers:
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
-      typescript:
-        specifier: ~6.0.3
-        version: 6.0.3
       vitest:
         specifier: ^4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))

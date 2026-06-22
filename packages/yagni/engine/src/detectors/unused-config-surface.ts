@@ -11,7 +11,6 @@ import { relative } from 'node:path';
 
 import { isInPublicApiSurface } from '@opensip-cli/core';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- TypeScript AST analysis requires the compiler API at runtime (same pattern as checks-typescript)
 import * as ts from 'typescript';
 
 import { walkTypeScriptFiles } from '../lib/walk-typescript-files.js';
