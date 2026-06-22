@@ -23,6 +23,9 @@ should not get worse.
 - **See change impact before you merge** with static call graphs,
   blast-radius analysis, cycles, duplicated bodies, oversized functions, and
   architecture rules.
+- **Surface reduction opportunities** with the advisory `yagni` audit —
+  evidence-backed candidates to remove unused config and duplicate code
+  without automatic rewrites.
 - **Turn tech debt into a managed baseline** by saving today's findings and
   failing CI only when new regressions appear.
 - **Test operational behavior as code** with load, chaos, and adversarial
@@ -54,6 +57,7 @@ cd your-project
 opensip init
 opensip fit
 opensip graph
+opensip yagni
 opensip report
 ```
 
@@ -115,6 +119,19 @@ opensip sim --recipes
 opensip sim --recipe <name>
 ```
 
+### YAGNI reduction audit
+
+Run an advisory audit that ranks evidence-backed opportunities to reduce code
+while preserving behavior. Findings carry confidence, preservation arguments,
+and validation steps — not gate failures by default.
+
+```bash
+opensip yagni
+opensip yagni --json
+opensip yagni --min-confidence high
+opensip yagni --graph build
+```
+
 ### Reports
 
 Generate a self-contained HTML report that can be opened locally, shared as a
@@ -126,9 +143,9 @@ opensip report
 
 ### Extensible Tools
 
-OpenSIP ships with `fit`, `graph`, and `sim`, but the CLI is a pluggable tool
-platform. Add project-local checks, npm-packaged recipes, custom graph rules,
-or entire tools that mount as first-class `opensip` subcommands. Use
+OpenSIP ships with `fit`, `graph`, `sim`, and `yagni`, but the CLI is a
+pluggable tool platform. Add project-local checks, npm-packaged recipes, custom
+graph rules, or entire tools that mount as first-class `opensip` subcommands. Use
 `opensip fit plugin ...` / `opensip sim plugin ...` for fit/sim packs and
 `opensip tools ...` for whole Tool plugins.
 
@@ -139,7 +156,7 @@ init -> analyze -> baseline -> gate -> report
 ```
 
 1. `opensip init` detects your project and writes a local OpenSIP layout.
-2. `opensip fit`, `opensip graph`, and `opensip sim` run local analysis.
+2. `opensip fit`, `opensip graph`, `opensip sim`, and `opensip yagni` run local analysis.
 3. Gate commands compare against saved baselines so existing debt does not
    block every pull request.
 4. `opensip report` creates local HTML output for review and sharing.
@@ -170,6 +187,15 @@ opensip graph --json          # emit machine-readable output
 opensip graph --sarif graph.sarif
 opensip graph --gate-save
 opensip graph --gate-compare
+```
+
+### YAGNI
+
+```bash
+opensip yagni                   # advisory reduction audit (exit 0 by default)
+opensip yagni --json            # emit machine-readable output
+opensip yagni --graph build     # refresh graph evidence before graph-backed detectors
+opensip yagni packages/cli/src  # scope to a subtree
 ```
 
 ### Simulation
@@ -289,7 +315,7 @@ OpenSIP CLI is built to be extended.
 - Keep custom checks and scenarios private in your own repo.
 - Package reusable checks, recipes, scenarios, or graph adapters as npm
   plugins.
-- Build a full tool when `fit`, `graph`, or `sim` is not the right shape.
+- Build a full tool when `fit`, `graph`, `sim`, or `yagni` is not the right shape.
 - Manage whole Tool plugins with `opensip tools list`, `opensip tools validate`,
   and `opensip tools install`.
 - Share tools and packs with the OpenSIP community when they are useful beyond

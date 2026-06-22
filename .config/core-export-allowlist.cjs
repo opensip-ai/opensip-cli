@@ -39,6 +39,8 @@ const EXPORT_ALLOWLIST = {
   filterSignalsBySuppressions: 'shared-data-contracts',
   isErrorSeverity: 'shared-data-contracts',
   isErrorSignal: 'shared-data-contracts',
+  isInPublicApiSurface: 'shared-data-contracts',
+  _resetPublicApiGraphCache: 'shared-data-contracts',
   noopSignalSink: 'shared-data-contracts',
   policyPasses: 'shared-data-contracts',
   resolveFailOnDegraded: 'shared-data-contracts',

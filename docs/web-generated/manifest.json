@@ -371,6 +371,17 @@
       "purpose": "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
     },
     {
+      "file": "docs/web-generated/55-yagni/01-command-reference.md",
+      "path": "/docs/opensip-cli/55-yagni/01-command-reference/",
+      "section": "55-yagni",
+      "title": "YAGNI command reference",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "How to run the advisory YAGNI reduction audit and interpret its output."
+    },
+    {
       "file": "docs/web-generated/60-guides/00-initialize-your-first-repo.md",
       "path": "/docs/opensip-cli/60-guides/00-initialize-your-first-repo/",
       "section": "60-guides",
@@ -705,6 +716,13 @@
       ]
     },
     {
+      "section": "55-yagni",
+      "title": "55 — Yagni",
+      "pages": [
+        "/docs/opensip-cli/55-yagni/01-command-reference/"
+      ]
+    },
+    {
       "section": "60-guides",
       "title": "60 — Guides",
       "pages": [
@@ -829,6 +847,7 @@
         "/docs/opensip-cli/40-graph/02-rules-and-gating/",
         "/docs/opensip-cli/40-graph/04-suppressing-findings/",
         "/docs/opensip-cli/50-extend/07-command-taxonomy/",
+        "/docs/opensip-cli/55-yagni/01-command-reference/",
         "/docs/opensip-cli/60-guides/00-initialize-your-first-repo/",
         "/docs/opensip-cli/60-guides/03-wire-into-ci/",
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
@@ -872,6 +891,7 @@
         "/docs/opensip-cli/50-extend/04-check-pack-architecture/",
         "/docs/opensip-cli/50-extend/05-language-adapters/",
         "/docs/opensip-cli/50-extend/07-command-taxonomy/",
+        "/docs/opensip-cli/55-yagni/01-command-reference/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
         "/docs/opensip-cli/60-guides/07-create-your-first-tool/",
         "/docs/opensip-cli/70-reference/01-cli-commands/",

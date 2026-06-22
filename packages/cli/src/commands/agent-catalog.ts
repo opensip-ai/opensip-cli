@@ -112,6 +112,13 @@ export function buildAgentCatalog(): AgentCatalog {
       tier: 'tool' as const,
     },
     {
+      command: 'yagni',
+      description:
+        'Run YAGNI reduction audit detectors. Advisory findings; --json yields SignalEnvelope.',
+      examples: ['opensip yagni --json', 'opensip yagni --json --graph off'],
+      tier: 'tool' as const,
+    },
+    {
       command: 'sessions list',
       description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
       examples: [

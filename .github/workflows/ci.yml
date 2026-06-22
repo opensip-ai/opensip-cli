@@ -92,7 +92,7 @@ jobs:
 
       - name: Export fit baseline to SARIF
         if: always() && steps.fit.outcome != 'skipped'
-        run: node packages/cli/dist/index.js fit-baseline-export --out fit.sarif
+        run: node packages/cli/dist/index.js fit export --format baseline --out fit.sarif
 
       - name: Upload fit SARIF
         if: always() && hashFiles('fit.sarif') != ''
@@ -124,6 +124,12 @@ jobs:
         with:
           sarif_file: graph.sarif
           category: opensip-cli-graph
+
+      # Informational YAGNI dogfood — advisory only (failOnErrors/Warnings: 0).
+      # graphMode is pinned via opensip-cli.config.yml (build, not auto).
+      - name: YAGNI (informational dogfood)
+        continue-on-error: true
+        run: node packages/cli/dist/index.js yagni --graph build --json
 
       # REAL-REPO equivalence guardrail (ADR-0032): assert the SHARDED build is
       # byte-equivalent to the EXACT single-program build on THIS repo — a genuine

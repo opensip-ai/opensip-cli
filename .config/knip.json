@@ -55,6 +55,13 @@
     },
     "packages/simulation/engine": {
       "entry": ["src/tool.ts", "src/cli/sim.ts"]
+    },
+    "packages/yagni/engine": {
+      "entry": [
+        "src/tool.ts",
+        "src/cli/execute-yagni.ts",
+        "src/__tests__/fixtures/**/*.{ts,js,mjs}"
+      ]
     }
   }
 }

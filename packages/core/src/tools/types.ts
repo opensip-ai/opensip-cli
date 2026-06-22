@@ -236,6 +236,7 @@ export interface ToolExtensionPoints {
   readonly fitnessContractVersion?: string;
   readonly graphContractVersion?: string;
   readonly simulationContractVersion?: string;
+  readonly yagniContractVersion?: string;
 }
 
 /**

@@ -6,6 +6,7 @@ packages:
   - 'packages/simulation/*'
   - 'packages/languages/*'
   - 'packages/graph/*'
+  - 'packages/yagni/*'
 
 # --- Settings migrated from the package.json "pnpm" field ---
 # pnpm 11 no longer reads `pnpm.*` in package.json; this is the new home.

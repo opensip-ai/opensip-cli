@@ -82,6 +82,7 @@ Tool engines implement the `Tool` contract. They are peer domains: none imports 
 | `@opensip-cli/fitness` | `packages/fitness/engine/` | Fitness check engine, `defineCheck`, `defineRecipe`, gate. Returns a `SignalEnvelope`; SARIF/cloud egress is owned by the composition root (ADR-0011). The engine, recipe service, registries, gate/baseline primitives, and CLI handlers are package-internal (curated barrel, ADR-0013) — locked by `public-api.test.ts` | `defineCheck`, `defineRecipe`, `getCheckConfig`, `fitnessTool` (+ the AST/text authoring helpers: `isTestFile`, `stripStringsAndComments`, `extractSnippet`, …) |
 | `@opensip-cli/simulation` | `packages/simulation/engine/` | Simulation engine, two scenario kinds (load, chaos). Public barrel is scenario/recipe authoring API plus `simulationTool`; registry/lifecycle/recipe execution internals live on `@opensip-cli/simulation/internal` for tests only. | `defineLoadScenario`, `defineChaosScenario`, `defineSimulationRecipe`, `simulationTool`, `SCENARIO_KINDS`, `ASSERTIONS`, `httpTarget`, `fault` |
 | `@opensip-cli/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below); the CLI discovers them at startup and discovers them per command through the generic capability loader (`loadCapabilityDomain`). Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-cli/contracts`, not fitness or `@opensip-cli/output` | `graphTool`, `GraphLanguageAdapter` (type), `pickAdapter`, `defineGraphRecipe`, `defineRule`, `Catalog`/`Rule` (types) |
+| `@opensip-cli/yagni` | `packages/yagni/engine/` | Advisory YAGNI reduction audit. Detector framework over TypeScript sources with optional graph catalog evidence (`graph-evidence.ts` is the sole allowlisted `@opensip-cli/graph/internal` consumer). Returns a `SignalEnvelope` with `metadata.yagni` on each finding. Advisory defaults (`failOnErrors: 0`). | `yagniTool`, `YAGNI_STABLE_ID`, `YAGNI_CONTRACT_VERSION` |
 
 ## Layer 5 — fitness check packs and graph adapter packs
 
@@ -147,11 +148,11 @@ Imports every layer below. The published binary.
 
 Last verified at v0.1.10 against:
 
-- `packages/` directory listing — **33 publishable packages** total (all at `0.1.10`), plus one workspace-private test-support package:
+- `packages/` directory listing — **34 publishable packages** total (all at `0.1.10`), plus one workspace-private test-support package:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + tree-sitter + cli-ui): 4 — `datastore`, `contracts`, `tree-sitter`, `cli-ui`
   - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 — `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
-  - Layer 4 Tools: 3 — `fitness`, `simulation`, `graph`
+  - Layer 4 Tools: 4 — `fitness`, `simulation`, `graph`, `yagni`
   - Layer 5 (check packs + graph adapter packs/scaffolding): 13 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 6 (composition root): 1 — `cli`
 - The graph language adapters are publishable `@opensip-cli/graph-*` packages,

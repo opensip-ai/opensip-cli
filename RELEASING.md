@@ -6,7 +6,7 @@ workspace packages to npm with OIDC trusted publishing.
 
 The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 
-## The 33 packages
+## The 34 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -33,6 +33,7 @@ contract tests derive from or verify against that source.
 | Tools          | `@opensip-cli/fitness`              | `packages/fitness/engine`             |
 | Tools          | `@opensip-cli/simulation`           | `packages/simulation/engine`          |
 | Tools          | `@opensip-cli/graph`                | `packages/graph/engine`               |
+| Tools          | `@opensip-cli/yagni`                | `packages/yagni/engine`               |
 | Graph adapters | `@opensip-cli/graph-adapter-common` | `packages/graph/graph-adapter-common` |
 | Graph adapters | `@opensip-cli/graph-typescript`     | `packages/graph/graph-typescript`     |
 | Graph adapters | `@opensip-cli/graph-python`         | `packages/graph/graph-python`         |
@@ -61,8 +62,8 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 
 ### 1. Version fields (hand-set, lockstep)
 
-All 33 publishable packages **plus** the private root (`@opensip-cli/root`) and
-the private `@opensip-cli/test-support` carry one shared version — 35
+All 34 publishable packages **plus** the private root (`@opensip-cli/root`) and
+the private `@opensip-cli/test-support` carry one shared version — 36
 `package.json` files. The bump script matches `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
@@ -162,7 +163,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    ```bash
    for p in core datastore contracts session-store output config targeting cli-ui tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            dashboard fitness simulation graph graph-adapter-common graph-typescript \
+            dashboard fitness simulation graph yagni graph-adapter-common graph-typescript \
             graph-python graph-rust graph-go graph-java checks-universal checks-typescript \
             checks-python checks-go checks-java checks-cpp checks-rust; do
      printf '%-40s %s\n' "@opensip-cli/$p" "$(npm view "@opensip-cli/$p" version 2>/dev/null || echo MISSING)"

@@ -15,14 +15,21 @@ describe('buildAgentCatalog', () => {
     expect(c.version).toBe('1.0.0');
     expect(c.description).toMatch(/AI agents/i);
     // Every documented entry point carries at least one example.
-    expect(c.entryPoints.length).toBeGreaterThanOrEqual(5);
+    expect(c.entryPoints.length).toBeGreaterThanOrEqual(6);
     for (const e of c.entryPoints) {
       expect(e.command).toBeTruthy();
       expect(e.description).toBeTruthy();
       expect(e.examples.length).toBeGreaterThan(0);
     }
     expect(c.entryPoints.map((e) => e.command)).toEqual(
-      expect.arrayContaining(['fit', 'graph', 'sessions list', 'sessions show', 'agent-catalog']),
+      expect.arrayContaining([
+        'fit',
+        'graph',
+        'yagni',
+        'sessions list',
+        'sessions show',
+        'agent-catalog',
+      ]),
     );
   });
 

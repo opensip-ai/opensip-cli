@@ -5,9 +5,10 @@ This is the **START HERE** document for AI agents working on the OpenSIP CLI cod
 ## What is OpenSIP CLI?
 
 OpenSIP CLI is an **open-source codebase intelligence CLI** — a CLI that
-hosts pluggable tools for static analysis. Today it ships with three: `fit`
+hosts pluggable tools for static analysis. Today it ships with four: `fit`
 (fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
-(static call-graph analysis), and `sim` (simulation scenarios, experimental).
+(static call-graph analysis), `sim` (simulation scenarios, experimental), and
+`yagni` (advisory YAGNI reduction audit).
 Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Repository Structure
@@ -98,6 +99,11 @@ opensip-cli/
 │   │   ├── graph-go/            # @opensip-cli/graph-go — Go adapter
 │   │   └── graph-java/          # @opensip-cli/graph-java — Java adapter
 │   │
+│   ├── yagni/                   # yagni namespace
+│   │   └── engine/              # @opensip-cli/yagni — advisory reduction
+│   │                            #   audit; graph evidence via one allowlisted
+│   │                            #   internal import in graph-evidence.ts
+│   │
 │   └── languages/               # language adapters
 │       ├── lang-typescript/
 │       ├── lang-rust/
@@ -163,7 +169,7 @@ tool dispatcher:
    C/C++) into it.
 2. Constructs a fresh per-invocation `ToolRegistry` and registers the
    bundled tool packages (`@opensip-cli/fitness`, `@opensip-cli/simulation`,
-   `@opensip-cli/graph`) through the manifest → compatibility gate → dynamic
+   `@opensip-cli/graph`, `@opensip-cli/yagni`) through the manifest → compatibility gate → dynamic
    import path in `bootstrap/register-tools.ts`. Both registries are passed into
    `new RunScope({ tools, languages })` — there are no module-singleton
    registries (see the RunScope section below).
@@ -198,6 +204,7 @@ Subcommands available out of the box:
 - `opensip graph export --format catalog` — Write graph catalog JSON for downstream tooling
 - `opensip graph export --format sarif` — Run graph analysis and write SARIF findings
 - `opensip sim` — Run simulation scenarios [experimental]
+- `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--graph build`, `--min-confidence`)
 - `opensip init` — Generate `opensip-cli.config.yml`
 - `opensip sessions list|show|purge` — Manage stored sessions
 - `opensip <tool> plugin list|add|remove|sync` — Manage a pack-supporting
@@ -576,7 +583,7 @@ design exploration not yet ready for external readers, it stays in
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 33 packages
+Releases are tag-driven. See `RELEASING.md` — there are 34 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 When asked to prep a release, use the **release-prep** skill
@@ -595,8 +602,9 @@ npm's self-replacement and pnpm's lack of OIDC support.
 ## Project Status
 
 **v0.1.10 (initial production launch)** — OpenSIP CLI is a tool-plugin
-platform: `core` is a strict kernel, and `fitness`, `graph`, and
-`simulation` are peer tools implementing a shared Tool contract, with
+platform: `core` is a strict kernel, and `fitness`, `graph`,
+`simulation`, and `yagni` are peer tools implementing a shared Tool
+contract, with
 `cli` as a generic dispatcher. Adding a new tool requires zero CLI
 changes: tools declare `commandSpecs`, ship a manifest, and load through
 the same dynamic-import plugin path whether bundled, installed, or
@@ -621,6 +629,7 @@ fresh. The flags are mutually exclusive. See
 `docs/public/70-reference/01-cli-commands.md#init---scaffold-the-project-layout`
 for the full state table.
 
-Future tool ideas (not implemented): `audit`, `lint`, `bench`. Any of
-these would slot in by writing a Tool implementation and shipping a
-package.
+Future tool ideas (not implemented): `audit`, `lint`, `bench`. `yagni` is
+bundled as of the reduction-audit rollout; see ADR-0056 and
+`docs/public/55-yagni/`. Any new tool slots in by writing a Tool
+implementation and shipping a package.

@@ -70,6 +70,7 @@
     "@opensip-cli/output": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
     "@opensip-cli/simulation": "workspace:*",
+    "@opensip-cli/yagni": "workspace:*",
     "@opensip-cli/targeting": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-async-hooks": "^2.8.0",
