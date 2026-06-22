@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads source files one at a time; per-file memory bounded by source size (tree-sitter constraint)
 /**
  * `parseProject` driver that sources each file's parse from a
  * `LanguageAdapter` (ADR-0010) instead of an inline grammar-bound parser.
@@ -13,10 +12,10 @@
  * loads at module top level), so `parseProject` stays synchronous.
  */
 
-import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
 import { logger } from '@opensip-cli/core';
+import { readSourceFileGuarded } from '@opensip-cli/graph';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type { LanguageAdapter } from '@opensip-cli/core';
@@ -41,7 +40,7 @@ export function createParseProjectFromAdapter(
       let source: string;
       /* v8 ignore start */
       try {
-        source = readFileSync(path, 'utf8');
+        source = readSourceFileGuarded(path);
       } catch (error) {
         parseErrors.push({
           filePath: relative(input.projectDirAbs, path),

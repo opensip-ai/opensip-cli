@@ -114,6 +114,12 @@ export {
   GraphAdapterRegistry,
 } from './lang-adapter/registry.js';
 export { GraphAdapterSelector } from './lang-adapter/selector.js';
+// Size-guarded source-file reader for adapter parse steps (per-file 10 MB cap,
+// shared with the fitness engine's FileAccessor policy). Adapters use this
+// instead of a raw `readFileSync` so one pathological source file can't spike
+// graph memory; oversize throws and the adapter's per-file catch records a
+// ParseError + continues.
+export { readSourceFileGuarded, MAX_SOURCE_FILE_BYTES } from './lang-adapter/read-source.js';
 export {
   truncateForCallEdge,
   CALL_EDGE_TEXT_MAX,

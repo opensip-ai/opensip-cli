@@ -64,6 +64,10 @@ const EXPECTED_VALUE_EXPORTS = [
   'resolveSpecifierToPackage',
   'tool',
   'truncateForCallEdge',
+  // Per-file source size guard shared by adapter parse steps (10 MB cap, shared
+  // with the fitness engine's FileAccessor policy).
+  'MAX_SOURCE_FILE_BYTES',
+  'readSourceFileGuarded',
 ].sort();
 
 describe('@opensip-cli/graph public barrel', () => {

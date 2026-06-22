@@ -6,7 +6,7 @@
     "error-handling-quality": 52,
     "detached-promises": 50,
     "performance-anti-patterns": 37,
-    "unbounded-memory": 24,
+    "unbounded-memory": 23,
     "toctou-race-condition": 13
   },
   "cosmetic": {

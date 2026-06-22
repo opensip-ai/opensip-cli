@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads single source files for parsing; per-file memory bounded by source size
 /**
  * TypeScript fast (checker-free) parse implementation.
  *
@@ -22,9 +21,9 @@
  * `parseDiagnostics`, which we read per file.
  */
 
-import { readFileSync } from 'node:fs';
 import { extname, relative } from 'node:path';
 
+import { readSourceFileGuarded } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';
@@ -60,7 +59,7 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
   for (const fileName of input.files) {
     let text: string;
     try {
-      text = readFileSync(fileName, 'utf8');
+      text = readSourceFileGuarded(fileName);
     } catch (error) {
       /* v8 ignore next */
       parseErrors.push({

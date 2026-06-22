@@ -1,4 +1,4 @@
-// @fitness-ignore-file unbounded-memory -- reads single source files for parsing; per-file memory bounded by source size
+// @fitness-ignore-file unbounded-memory -- the only read here is `ts.sys.readFile` inside the ModuleResolutionHost (tsconfig + module-resolution lookups), bounded by TypeScript's own resolution behavior. Source-file parsing reads go through `readSourceFileGuarded` in `parse-fast.ts`.
 /**
  * @opensip-cli/graph — TypeScript language adapter.
  *
