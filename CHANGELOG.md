@@ -5,7 +5,20 @@ All notable changes to OpenSIP CLI are documented here.
 ## [0.1.10] - 2026-06-22
 
 A maintenance patch over 0.1.9 (all of 0.1.9's changes are included below). It
-adds a graph-dogfood cleanup and release-gate hardening.
+adds the bundled advisory YAGNI reduction audit, a graph-dogfood cleanup, and
+release-gate hardening.
+
+### Added
+
+- **`opensip yagni`** — bundled advisory YAGNI reduction audit
+  (`@opensip-cli/yagni`). MVP detectors: `unused-config-surface`,
+  `duplicate-body-candidate` (graph `bodyHash` evidence). Findings carry
+  `metadata.yagni` (confidence, preservation argument, validation steps).
+  Advisory defaults (`failOnErrors: 0`).
+- **`yagni-ignore-hygiene`** fitness check for `@yagni-ignore-*` directive
+  quality.
+- Public docs: `docs/public/55-yagni/`, ADR-0056, configuration and CLI
+  reference updates across README and `docs/public/`.
 
 ### Fixed
 

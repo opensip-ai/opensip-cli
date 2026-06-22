@@ -138,7 +138,7 @@ The session is written via [`SessionRepo.save()`](../../../packages/session-stor
 ```bash
 opensip sessions list                       # SELECT * FROM sessions ORDER BY timestamp DESC
 opensip sessions list --json --summary-only # lean listing for agents (omits heavy payloads)
-opensip sessions show <id>                  # replay a stored session (or `latest --tool <fit|graph|sim>`)
+opensip sessions show <id>                  # replay a stored session (or `latest --tool <fit|graph|sim|yagni>`)
 opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
 opensip sessions purge                      # DELETE FROM sessions (prompts for confirm)
 opensip sessions purge --older-than 7       # DELETE FROM sessions WHERE timestamp < cutoff

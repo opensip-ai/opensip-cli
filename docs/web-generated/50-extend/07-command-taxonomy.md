@@ -49,11 +49,12 @@ Each Tool exposes exactly one **primary** command. Its `CommandSpec.name` equals
 | `@opensip-cli/fitness` | UUID (`afd68bd3-…`) | `fit` | `fitness:` |
 | `@opensip-cli/simulation` | UUID | `sim` | `simulation:` |
 | `@opensip-cli/graph` | UUID | `graph` | `graph:` |
+| `@opensip-cli/yagni` | UUID | `yagni` | `yagni:` |
 
 The command verb and config namespace are **decoupled**. Existing
-`opensip-cli.config.yml` blocks keep using `fitness:` / `simulation:` / `graph:`.
-Config namespaces stay `fitness:` / `simulation:` / `graph:` permanently — command
-verbs (`fit`, `sim`, `graph`) do not drive config keys (see [Resolved decisions](#resolved-decisions)).
+`opensip-cli.config.yml` blocks keep using `fitness:` / `simulation:` / `graph:` / `yagni:`.
+Config namespaces stay `fitness:` / `simulation:` / `graph:` / `yagni:` permanently — command
+verbs (`fit`, `sim`, `graph`, `yagni`) do not drive config keys (see [Resolved decisions](#resolved-decisions)).
 
 ### Nested discoverability children
 
@@ -71,7 +72,10 @@ opensip graph lookup <symbol>
 opensip graph index
 opensip graph export --format sarif --out graph.sarif
 opensip sim recipes
+opensip yagni --json
 ```
+
+`yagni` ships a primary command only in the MVP (no nested `list`/`export` children yet).
 
 **Do not** introduce flat hyphenated top-level names (`fit-list`, `sarif-export`,
 `graph-baseline-export`, …). Those legacy forms were removed; parity tests assert

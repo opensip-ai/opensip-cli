@@ -21,6 +21,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 | Enforce project-specific quality, security, and architecture rules | `opensip fit` with 151 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
 | Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and ten built-in graph rules |
+| Review evidence-backed code-reduction opportunities (advisory) | `opensip yagni` with bundled detectors and optional graph evidence |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
 | Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
@@ -41,7 +42,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 |---|---|
 | Install, initialize, and run the first smoke test | [Quick start](./00-start/00-quick-start.md) |
 | Understand what OpenSIP CLI is for | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) |
-| See fit, sim, and graph side by side | [Show me each loop](./00-start/02-show-me-the-loops.md) |
+| See fit, sim, graph, and yagni side by side | [Show me each loop](./00-start/02-show-me-the-loops.md) |
 | Initialize a repo carefully | [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) |
 | Write a custom fitness check | [Write your first check](./60-guides/01-write-your-first-check.md) |
 | Use graph on a real project | [Use graph](./60-guides/06-use-graph.md) |
@@ -62,6 +63,8 @@ opensip fit --gate-compare
 opensip graph
 opensip graph --list-files
 opensip graph --workspace
+opensip yagni
+opensip yagni --json --graph build
 opensip sim --recipe <name>
 opensip report
 ```
@@ -131,54 +134,59 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 23. [Adding a language](./40-graph/03-adding-a-language.md)
 24. [Suppressing findings](./40-graph/04-suppressing-findings.md)
 
+### 55 - Yagni
+
+25. [Command reference](./55-yagni/01-command-reference.md)
+
 ### 50 - Extend
 
-25. [Plugin authoring](./50-extend/01-plugin-authoring.md)
-26. [Project-local plugins](./50-extend/02-project-local-plugins.md)
-27. [Publishable packs](./50-extend/03-publishable-packs.md)
-28. [Check pack architecture](./50-extend/04-check-pack-architecture.md)
-29. [Language adapters](./50-extend/05-language-adapters.md)
-30. [Full Tool plugins](./50-extend/06-full-tool-plugins.md)
+26. [Plugin authoring](./50-extend/01-plugin-authoring.md)
+27. [Project-local plugins](./50-extend/02-project-local-plugins.md)
+28. [Publishable packs](./50-extend/03-publishable-packs.md)
+29. [Check pack architecture](./50-extend/04-check-pack-architecture.md)
+30. [Language adapters](./50-extend/05-language-adapters.md)
+31. [Full Tool plugins](./50-extend/06-full-tool-plugins.md)
 
 ### 60 - Guides
 
-31. [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md)
-32. [Write your first check](./60-guides/01-write-your-first-check.md)
-33. [Ban an API pattern](./60-guides/02-ban-an-api-pattern.md)
-34. [Wire into CI](./60-guides/03-wire-into-ci.md)
-35. [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md)
-36. [Migrate from ESLint](./60-guides/05-migrate-from-eslint.md)
-37. [Use graph](./60-guides/06-use-graph.md)
-38. [Create your first Tool](./60-guides/07-create-your-first-tool.md)
+32. [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md)
+33. [Write your first check](./60-guides/01-write-your-first-check.md)
+34. [Ban an API pattern](./60-guides/02-ban-an-api-pattern.md)
+35. [Wire into CI](./60-guides/03-wire-into-ci.md)
+36. [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md)
+37. [Migrate from ESLint](./60-guides/05-migrate-from-eslint.md)
+38. [Use graph](./60-guides/06-use-graph.md)
+39. [Create your first Tool](./60-guides/07-create-your-first-tool.md)
 
 ### 70 - Reference
 
-39. [CLI commands](./70-reference/01-cli-commands.md)
-40. [Package catalog](./70-reference/02-package-catalog.md)
-41. [Configuration](./70-reference/03-configuration.md)
-42. [JSON output schema](./70-reference/04-json-output-schema.md)
-43. [Checks reference](./70-reference/05-checks-index.md)
-44. [Report](./70-reference/06-dashboard.md)
-45. [Supply-chain security](./70-reference/08-supply-chain-security.md)
-46. [Environment variables](./70-reference/10-environment-variables.md)
-47. [`tools` command](./70-reference/12-tools-command.md)
+40. [CLI commands](./70-reference/01-cli-commands.md)
+41. [Package catalog](./70-reference/02-package-catalog.md)
+42. [Configuration](./70-reference/03-configuration.md)
+43. [JSON output schema](./70-reference/04-json-output-schema.md)
+44. [Checks reference](./70-reference/05-checks-index.md)
+45. [Report](./70-reference/06-dashboard.md)
+46. [Supply-chain security](./70-reference/08-supply-chain-security.md)
+47. [Environment variables](./70-reference/10-environment-variables.md)
+48. [`tools` command](./70-reference/12-tools-command.md)
 
 ### 80 - Internals
 
-48. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-49. [Plugin loader](./80-implementation/02-plugin-loader.md)
-50. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-51. [Coding standards](./80-implementation/04-coding-standards.md)
-52. [Layer policy](./80-implementation/05-layer-policy.md)
-53. [Doc conventions](./80-implementation/06-doc-conventions.md)
-54. [Website integration](./80-implementation/07-website-integration.md)
+49. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+50. [Plugin loader](./80-implementation/02-plugin-loader.md)
+51. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+52. [Coding standards](./80-implementation/04-coding-standards.md)
+53. [Layer policy](./80-implementation/05-layer-policy.md)
+54. [Doc conventions](./80-implementation/06-doc-conventions.md)
+55. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 
 This v0.1.10 doc set was rechecked against the source on 2026-06-15:
 
 - 151 built-in fitness checks across seven packs.
-- 33 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- 34 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.
 - First-party Tool commands are mounted through `CommandSpec`; third-party Tool plugins use the same contract.

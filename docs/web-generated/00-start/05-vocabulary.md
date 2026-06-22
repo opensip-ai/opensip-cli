@@ -32,11 +32,11 @@ If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom
 
 ## Tool
 
-A **Tool** is a kernel-level plugin that contributes one or more CLI subcommands. `fit` is a Tool. `sim` is a Tool. `graph` is a Tool. Anything you write that mounts under the `opensip` binary is a Tool.
+A **Tool** is a kernel-level plugin that contributes one or more CLI subcommands. `fit` is a Tool. `sim` is a Tool. `graph` is a Tool. `yagni` is a Tool. Anything you write that mounts under the `opensip` binary is a Tool.
 
 The contract lives in [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/core/src/tools/types.ts). Each Tool exports `metadata` (id, version, description), a `commands[]` array (names + descriptions, used for `--help`), declarative `commandSpecs` (the typed command specs the host mounts), and an optional `initialize()` hook. The CLI is a generic dispatcher — it builds a per-invocation `ToolRegistry`, populates it during bootstrap, and mounts each registered Tool's `commandSpecs`.
 
-First-party Tools (`fit`, `sim`, `graph`) load by package name through the same plugin path as third-party Tools ([ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/docs/decisions/ADR-0027-ga-parity-cutover.md)) — the CLI holds no static `import` of a tool runtime. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
+First-party Tools (`fit`, `sim`, `graph`, `yagni`) load by package name through the same plugin path as third-party Tools ([ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/docs/decisions/ADR-0027-ga-parity-cutover.md)) — the CLI holds no static `import` of a tool runtime. Third-party Tools are discovered by walking `node_modules` for any package whose `package.json` declares `opensipTools.kind === 'tool'`. See [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
 
 ## Check
 
@@ -74,6 +74,10 @@ Scenarios are defined by tool packs analogous to check packs ([`packages/simulat
 A **rule** is the `graph`-side equivalent of a check — a single, named analysis over the static call graph. The graph tool is an architectural peer of fitness: rules are authored with `defineRule` ([`packages/graph/engine/src/rules/define-rule.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/graph/engine/src/rules/define-rule.ts)), the parallel to `defineCheck`. The difference is the input — a check sees `(content, filePath)`; a rule's `evaluate(dataset)` sees the engine **dataset**: the catalog, the indexes, and a derived **feature layer** (per-function size, fan-out, blast radius, test reachability; package-coupling and SCC membership). "The data is the data, the engine is the engine" — rules are declarative queries over that dataset, and the dashboard's graph view is a pure view over the same data.
 
 Ten rules ship today, in a fixed registration order ([`packages/graph/engine/src/rules/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/graph/engine/src/rules/registry.ts)): the five original reachability/duplication rules (`orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five structural rules (`large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`). Runtime loading of project-local rules is deferred — the bundled set is what runs today. Rule slugs are byte-stable (they key the baseline fingerprint), so a rule's `ruleId` survives refactors.
+
+## Detector
+
+A **detector** is the `yagni`-side unit of work — a single, named analysis that emits advisory reduction candidates. Detectors are registered in the yagni engine and selected per run (all enabled by default, or narrowed with `--detector`). Each finding carries `metadata.yagni` (confidence, preservation argument, evidence). Two detectors ship in the MVP: `unused-config-surface` and `duplicate-body-candidate`.
 
 ## Signal
 

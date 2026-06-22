@@ -19,13 +19,14 @@ related-docs:
 ---
 # Show me each loop
 
-opensip-cli ships three first-party tools. Each answers a different question shape:
+opensip-cli ships four first-party tools. Each answers a different question shape:
 
 | Tool | Question | Unit of work |
 |---|---|---|
 | `fit` | "Is the codebase clean?" | A **check** — runs once per file, returns violations. |
 | `sim` | "Does it behave correctly under stress?" | A **scenario** — drives traffic against your service and asserts on the result. |
 | `graph` | "What is reachable from where?" | A **rule** over the static call graph — authored with `defineRule` (parallel to `defineCheck`); ten ship in the box. |
+| `yagni` | "What could we remove safely?" | A **detector** — ranks advisory reduction candidates with `metadata.yagni` evidence; two ship in the MVP. |
 
 One concrete sample of each, below. After you've seen them, [quick start](/docs/opensip-cli/00-start/00-quick-start/) shows you how to run them.
 
@@ -166,17 +167,43 @@ Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catal
 
 ---
 
-## Same CLI, same gate model, three different questions
+## `yagni` — a detector run
 
-All three tools share the surface:
+`yagni` is advisory by default — it surfaces ranked reduction candidates for human review, not automatic deletions.
+
+```bash
+opensip yagni --json --graph build
+```
+
+Each finding carries `metadata.yagni`: detector slug, confidence (`low` | `medium` | `high`), a preservation argument, validation steps, and structured evidence. MVP detectors: `unused-config-surface` (AST/config evidence) and `duplicate-body-candidate` (graph `bodyHash` grouping). Deeper detail: [YAGNI command reference](/docs/opensip-cli/55-yagni/01-command-reference/).
+
+```text
+> opensip yagni
+  YAGNI reduction audit
+  Detectors: 2 ran   Candidates: 3 (high: 1, medium: 2)
+
+  net: ~42 LOC possible (estimate)
+
+> echo $?
+0
+```
+
+Exit code stays `0` unless you raise `yagni.failOnErrors` / `yagni.failOnWarnings` in config.
+
+---
+
+## Same CLI, same envelope, four different questions
+
+All four tools share the surface:
 
 ```bash
 opensip fit     # codebase cleanliness
 opensip sim     # runtime behavior under load
 opensip graph   # call-graph shape
+opensip yagni   # advisory reduction candidates
 ```
 
-Each exits `0` when the bar holds, non-zero when it doesn't. Each emits SARIF for CI annotations. Each has a baseline/compare gate so you can adopt incrementally. The CLI doesn't know what any of them do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes.
+`fit`, `graph`, and `sim` exit non-zero when the bar breaks (with baseline/compare gates for incremental adoption). `yagni` is advisory by default (exit `0`). Each can emit JSON (`SignalEnvelope`) for agents and CI. The CLI doesn't know what any of them do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes.
 
 ## What's next
 
@@ -185,4 +212,4 @@ Each exits `0` when the bar holds, non-zero when it doesn't. Each emits SARIF fo
 | Run the first smoke test right now | [Quick start](/docs/opensip-cli/00-start/00-quick-start/) |
 | Understand the design philosophy | [What is opensip-cli](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) |
 | Author a fit check or recipe | [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/) |
-| Go deep on one loop | [Fit](/docs/opensip-cli/20-fit/01-recipes-and-checks/) · [Sim](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/) · [Graph](/docs/opensip-cli/40-graph/01-stages-and-catalog/) |
+| Go deep on one loop | [Fit](/docs/opensip-cli/20-fit/01-recipes-and-checks/) · [Sim](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/) · [Graph](/docs/opensip-cli/40-graph/01-stages-and-catalog/) · [Yagni](/docs/opensip-cli/55-yagni/01-command-reference/) |

@@ -11,6 +11,7 @@ source-files:
   - packages/fitness/engine/src/config/fitness-config-schema.ts
   - packages/simulation/engine/src/cli/sim-config-schema.ts
   - packages/graph/engine/src/cli/graph-config-schema.ts
+  - packages/yagni/engine/src/cli/yagni-config-schema.ts
   - packages/config/src/document/global-config.ts
   - packages/cli/src/commands/init.ts
 related-docs:
@@ -27,7 +28,7 @@ opensip-cli reads two config files:
 | `<project>/opensip-cli.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
-Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
+Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
 
 ## Top-level shape
 
@@ -42,11 +43,12 @@ cli: {}                   # CliDefaults
 plugins: {}               # per-domain pin lists
 dashboard: {}             # dashboard.editor
 graph: {}                 # graph rule knobs (tool-contributed namespace)
+yagni: {}                 # YAGNI reduction audit knobs (tool-contributed namespace)
 ```
 
 Every section is optional; a missing section becomes `{}`.
 
-The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
@@ -268,6 +270,34 @@ graph:
   cycleSize2Severity: low
   severityOverrides:
     graph:orphan-subtree: warning
+```
+
+---
+
+## `yagni`
+
+YAGNI reduction audit settings. Validated against [`yagni-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/yagni/engine/src/cli/yagni-config-schema.ts). Defaults are advisory — findings do not fail the run unless you raise the gate keys.
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `failOnErrors` | number | `0` | Exit non-zero when high-severity finding count exceeds this threshold. |
+| `failOnWarnings` | number | `0` | Exit non-zero when medium-severity finding count exceeds this threshold. |
+| `defaultMinConfidence` | `'low' \| 'medium' \| 'high'` | `medium` | Default confidence floor when `--min-confidence` is not passed. |
+| `graphMode` | `'auto' \| 'reuse' \| 'build' \| 'off'` | `auto` | Default graph evidence mode for graph-backed detectors. Pin `build` or `off` in CI for determinism. |
+| `includeTests` | boolean | `false` | Include test and fixture files by default. |
+| `disabledDetectors` | string[] | `[]` | Detector slugs to skip for every run. |
+| `detectorSettings` | map | `{}` | Per-detector opaque settings bag (detector-specific). |
+
+Environment overrides (see [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)): `OPENSIP_YAGNI_GRAPH_MODE`, `OPENSIP_YAGNI_MIN_CONFIDENCE`, `OPENSIP_YAGNI_INCLUDE_TESTS`.
+
+```yaml
+yagni:
+  failOnErrors: 0
+  failOnWarnings: 0
+  defaultMinConfidence: medium
+  graphMode: build
+  includeTests: false
+  disabledDetectors: []
 ```
 
 ---
