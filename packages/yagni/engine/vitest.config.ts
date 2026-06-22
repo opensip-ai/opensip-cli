@@ -10,7 +10,12 @@ export default mergeConfig(
       passWithNoTests: true,
       coverage: {
         include: ['src/**'],
-        exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/**/__fixtures__/**', 'src/index.ts'],
+        exclude: [
+          'src/**/*.test.ts',
+          'src/**/__tests__/**',
+          'src/**/__fixtures__/**',
+          'src/index.ts',
+        ],
         thresholds: {
           statements: 85,
           branches: 80,

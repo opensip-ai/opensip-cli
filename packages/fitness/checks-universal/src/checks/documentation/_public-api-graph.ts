@@ -4,7 +4,4 @@
  * Keeps `_resetPublicApiGraphCache` on this path for existing tests.
  */
 
-export {
-  _resetPublicApiGraphCache,
-  isInPublicApiSurface,
-} from '@opensip-cli/core';
+export { _resetPublicApiGraphCache, isInPublicApiSurface } from '@opensip-cli/core';
