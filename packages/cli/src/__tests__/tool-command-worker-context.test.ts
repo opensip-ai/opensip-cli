@@ -59,6 +59,14 @@ describe('buildWorkerContext — FRR seams', () => {
     expect(acc.exitCode).toBe(0);
     expect(ctx.getExitCode?.()).toBe(0);
   });
+
+  it('emitError omits suggestion/code when undefined (conditional-spread else arms)', () => {
+    const { ctx, acc } = build();
+    // Neither suggestion nor code supplied ⇒ both conditional spreads take the
+    // `{}` arm, so the accumulated error carries only message + exitCode.
+    ctx.emitError({ message: 'bare', exitCode: 3 });
+    expect(acc.error).toEqual({ message: 'bare', exitCode: 3 });
+  });
 });
 
 describe('buildWorkerContext — RPC seams upcall the client', () => {
@@ -73,7 +81,10 @@ describe('buildWorkerContext — RPC seams upcall the client', () => {
     await ctx.exportBaselineSarif('t', '/a.sarif');
     await ctx.exportBaselineFingerprints('t', '/a.json');
     await ctx.writeSarif({ env: 1 }, '/b.sarif');
-    await ctx.deliverSignals({ env: 1 }, { cwd: '/x', reportTo: 'https://h', runFailed: true });
+    await ctx.deliverSignals(
+      { env: 1 },
+      { cwd: '/x', reportTo: 'https://h', apiKey: 'secret', runFailed: true },
+    );
     await ctx.maybeOpenReport({ openRequested: true, jsonOutput: false });
 
     const seams = calls.map((c) => c.seam);
@@ -92,7 +103,20 @@ describe('buildWorkerContext — RPC seams upcall the client', () => {
     ]);
     const deliver = calls.find((c) => c.seam === 'deliverSignals');
     expect(deliver).toMatchObject({
-      opts: { cwd: '/x', reportTo: 'https://h', runFailed: true },
+      opts: { cwd: '/x', reportTo: 'https://h', apiKey: 'secret', runFailed: true },
+    });
+  });
+
+  it('omits the optional deliverSignals opts when they are undefined (conditional-spread else arms)', async () => {
+    const { ctx, calls } = build();
+    // Only `cwd` is set ⇒ the reportTo / apiKey / runFailed conditional spreads
+    // all take their `{}` (absent) arm, so the marshaled opts carry cwd alone.
+    await ctx.deliverSignals({ env: 1 }, { cwd: '/only-cwd' });
+    const deliver = calls.find((c) => c.seam === 'deliverSignals');
+    expect(deliver).toEqual({
+      seam: 'deliverSignals',
+      envelope: { env: 1 },
+      opts: { cwd: '/only-cwd' },
     });
   });
 

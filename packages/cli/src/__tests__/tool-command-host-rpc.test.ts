@@ -164,6 +164,48 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(list.value).toContain('a');
   });
 
+  it('dispatches the remaining seams: exportBaselineSarif / exportBaselineFingerprints / toolState.delete', async () => {
+    const cap = makeDispatchHostCtx();
+    const sarif = await handleHostRpc(
+      { rpcId: 1, seam: 'exportBaselineSarif', tool: 't', path: '/base.sarif' },
+      cap.ctx,
+    );
+    expect(sarif.ok).toBe(true);
+
+    const fp = await handleHostRpc(
+      { rpcId: 2, seam: 'exportBaselineFingerprints', tool: 't', path: '/base.json' },
+      cap.ctx,
+    );
+    expect(fp.ok).toBe(true);
+
+    await handleHostRpc(
+      { rpcId: 3, seam: 'toolState.put', tool: 't', key: 'd', payload: 1 },
+      cap.ctx,
+    );
+    const del = await handleHostRpc(
+      { rpcId: 4, seam: 'toolState.delete', tool: 't', key: 'd' },
+      cap.ctx,
+    );
+    expect(del.ok).toBe(true);
+    expect(cap.toolStateStore.has('t:d')).toBe(false);
+    expect(cap.calls).toContain('toolState.delete:t:d');
+  });
+
+  it('marshals the FULL deliverSignals opts (reportTo / apiKey / runFailed present arms)', async () => {
+    const cap = makeDispatchHostCtx();
+    const reply = await handleHostRpc(
+      {
+        rpcId: 1,
+        seam: 'deliverSignals',
+        envelope: { e: 1 },
+        opts: { cwd: '/x', reportTo: 'https://h', apiKey: 'k', runFailed: true },
+      },
+      cap.ctx,
+    );
+    expect(reply.ok).toBe(true);
+    expect(cap.delivered[0]).toEqual({ e: 1 });
+  });
+
   it('catches a host-side fault and returns a structured { ok: false } reply', async () => {
     const cap = makeDispatchHostCtx();
     const reply = (await handleHostRpc(
@@ -172,6 +214,49 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
     expect(reply.error.message).toContain('faulted for key boom');
+  });
+
+  it('preserves a string `code` and the stack on a host-side Error fault reply', async () => {
+    // A thrown Error carrying a string `code` drives BOTH conditional spreads in
+    // the error reply: the `code` present arm (L192-195) and the `stack` present
+    // arm (L196). The maybeOpenReport seam stub is overridden to throw.
+    const coded = new Error('coded host fault') as Error & { code?: string };
+    coded.code = 'E_HOST_CODE';
+    const ctx = {
+      ...makeDispatchHostCtx().ctx,
+      maybeOpenReport: () => {
+        throw coded;
+      },
+    } as unknown as Parameters<typeof handleHostRpc>[1];
+
+    const reply = (await handleHostRpc(
+      { rpcId: 1, seam: 'maybeOpenReport', opts: { openRequested: true, jsonOutput: false } },
+      ctx,
+    )) as Extract<RpcReply, { ok: false }>;
+    expect(reply.ok).toBe(false);
+    expect(reply.error).toMatchObject({ message: 'coded host fault', code: 'E_HOST_CODE' });
+    expect(reply.error.stack).toContain('coded host fault');
+  });
+
+  it('stringifies a non-Error host fault (the String(error) ternary else)', async () => {
+    // A non-Error throw drives `error instanceof Error ? error.message : String(error)`
+    // down its else, AND leaves the `code`/`stack` spreads on their absent arm.
+    const ctx = {
+      ...makeDispatchHostCtx().ctx,
+      getExitCode: () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- intentional non-Error throw: drives handleHostRpc's `error instanceof Error ? … : String(error)` else.
+        throw 'plain string fault';
+      },
+    } as unknown as Parameters<typeof handleHostRpc>[1];
+
+    const reply = (await handleHostRpc({ rpcId: 1, seam: 'getExitCode' }, ctx)) as Extract<
+      RpcReply,
+      { ok: false }
+    >;
+    expect(reply.ok).toBe(false);
+    expect(reply.error.message).toBe('plain string fault');
+    expect(reply.error.code).toBeUndefined();
+    expect(reply.error.stack).toBeUndefined();
   });
 
   it('dispatches getExitCode + maybeOpenReport through the ctx', async () => {

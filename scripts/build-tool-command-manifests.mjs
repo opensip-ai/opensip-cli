@@ -34,7 +34,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -82,6 +82,15 @@ function deriveCommandShell(spec) {
 function deriveOptionDescriptor(option) {
   const serializable = { ...option };
   delete serializable.parse;
+  // Drop runtime-environment-derived defaults (e.g. the common `--cwd` flag's
+  // `default: process.cwd()`): an absolute filesystem path resolved at generation
+  // time is machine/worktree-specific and would make this manifest — and its
+  // `--check` drift gate — non-deterministic across machines/CI. The runtime
+  // resolves these lazily at parse time (`opts.cwd ?? process.cwd()`), so omitting
+  // the baked path is behaviour-preserving.
+  if (typeof serializable.default === 'string' && isAbsolute(serializable.default)) {
+    delete serializable.default;
+  }
   return serializable;
 }
 

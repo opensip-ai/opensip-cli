@@ -40,6 +40,7 @@ import { provenanceRecordFor } from './tool-provenance.js';
 
 /** Find the admitted manifest for `tool` (same stable-id-then-name match). */
 function manifestFor(tool: Tool): ToolPluginManifest | undefined {
+  /* v8 ignore next -- defensive: `manifestFor` is only reached from the external-dispatch arm, which has already resolved an EXTERNAL provenance record off `currentScope()?.toolProvenance` (so a scope exists for this synchronous hook body), and `RunScope` always initializes `toolManifests` to `[]` — so `currentScope()?.toolManifests` is never undefined here and the `?? []` arm cannot execute. */
   const recorded = currentScope()?.toolManifests ?? [];
   return (
     recorded.find((m) => m.stableId !== undefined && m.stableId === tool.metadata.id) ??

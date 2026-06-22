@@ -160,8 +160,10 @@ export function startProfiling(scope?: RunScope, command?: string): void {
     activeProfilingState = state;
 
     state.session.post('Profiler.enable', (_err?: Error | null, _res?: unknown) => {
+      /* v8 ignore next -- defensive: `state.session` is non-null when this callback runs (it was just assigned + connected above); the guard only fires if a concurrent `cleanup` nulled it between the async wire `post` and the REAL profiler's callback — unreachable with the synchronous fake-session used for coverage, and exercised only by the real async profiler proven out-of-process. */
       if (!state.session) return;
       state.session.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
+        /* v8 ignore next -- defensive: same concurrent-cleanup race as the enable guard above; `state.session` is non-null in the synchronous fake path, only nullable by the real async profiler's interleaving (proven out-of-process). */
         if (!state.session) return;
 
         const runId = scope?.runId ?? 'unknown';
