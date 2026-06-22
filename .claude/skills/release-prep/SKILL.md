@@ -19,6 +19,13 @@ publish **33 packages** in dependency order via OIDC trusted publishing when a
 **Authoritative reference:** `RELEASING.md` (recovery, partial publish, new
 package bootstrap). **Policy:** `docs/decisions/ADR-0012-versioning-and-release-policy.md`.
 
+> **Counts are illustrative, scripts are authoritative.** Any package/file/check
+> count in this skill (e.g. "33 packages") is a snapshot for orientation, not a
+> source of truth. The real values come from `scripts/release-package-order.mjs`
+> (publishable set), `scripts/verify-release.mjs` (the enforced checks), and
+> `RELEASING.md` (the prose contract). If a count here disagrees with those, the
+> scripts win — and the skill prose should be corrected.
+
 ## Scope boundaries
 
 | In scope | Out of scope |
@@ -43,6 +50,24 @@ unless the user explicitly requests it.
 ## Workflow
 
 Execute these phases in order. Fix failures before advancing.
+
+### Phase 0 — Repo state preflight
+
+Before bumping anything, confirm the working state is release-safe. **A release
+commits directly to `main`** — this is the one workflow where the usual "branch
+off main" rule is deliberately inverted, so the tree must be pristine and synced
+*first*, or you risk tagging a commit CI won't reproduce.
+
+```bash
+git rev-parse --abbrev-ref HEAD            # must be: main
+git status --porcelain                     # must be EMPTY — no unrelated/uncommitted changes
+git fetch origin
+git rev-list --left-right --count origin/main...HEAD   # must be: 0  0 (local == origin)
+```
+
+If the tree is dirty with unrelated work, stash or land it separately first — a
+release commit must contain only release surfaces. If you're not on `main` or
+local `main` has diverged from origin, stop and resolve before proceeding.
 
 ### Phase 1 — Mechanical version bump
 
@@ -80,7 +105,8 @@ Add a top entry to `CHANGELOG.md`:
 <release narrative — Changed / Fixed / Added as appropriate>
 ```
 
-Draft from `git log` since the previous release tag. Match the repo's existing
+Use today's date from the system (`date +%F`), never a guessed date. Draft from
+`git log` since the previous release tag. Match the repo's existing
 CHANGELOG voice (complete sentences, user-facing impact, not a raw commit dump).
 
 If crossing the **1.0 boundary**, also review peer-dependency **guidance prose**
@@ -109,25 +135,33 @@ This mirrors `.github/workflows/release.yml` before publish:
 | Drift checks | `pnpm verify-release --expected-version vX.Y.Z` |
 | Pack smoke | pack all 33 packages + `scripts/smoke-pack.mjs` |
 
-`verify-release` enforces 12 checks including: version lockstep, CHANGELOG
-header/date, `docs/web-generated/`, per-package READMEs, keywords, checks-index,
-and publishable set == `scripts/release-package-order.mjs`.
+`verify-release` enforces a battery of drift checks including: version lockstep,
+CHANGELOG header/date, `docs/web-generated/`, per-package READMEs, keywords,
+checks-index, and publishable set == `scripts/release-package-order.mjs`. (The
+exact set lives in `scripts/verify-release.mjs` — consult it for the current
+list rather than trusting a count here.)
 
 On failure: fix the root cause, re-run from the failed phase (or full preflight
 if unsure). Do not skip steps.
 
 ### Phase 4 — Commit (after preflight passes)
 
-Stage all release surfaces (version bumps, CHANGELOG, generated docs, lockfile):
+Stage the release surfaces (version bumps, CHANGELOG, generated docs, lockfile).
+**Review first, stage second** — do not `git add -A` before confirming the tree
+is release-only, or you risk sweeping unrelated changes into the release commit
+(Phase 0 should already guarantee this, but verify here too):
 
 ```bash
-git add -A
-git status   # review: should be version/docs/CHANGELOG/lockfile only
+git status              # review FIRST — every change must be a release surface
+git diff --stat         # show this to the user; if anything unrelated appears, STOP
+git add -A              # only after confirming the tree is release-only
 git commit -m "chore: release X.Y.Z"
 ```
 
-Show `git diff --stat` summary to the user before committing if they have not
-already reviewed.
+If any unrelated change is present, stash or handle it separately before staging —
+never fold it into the release commit. `bump-version.mjs` printed the exact
+surfaces it touched; the staged set should match that plus `CHANGELOG.md` and the
+regenerated docs.
 
 ### Phase 5 — Tag and push (explicit user request only)
 
@@ -163,6 +197,7 @@ End each run with a concise status table:
 
 | Phase | Status | Notes |
 | ----- | ------ | ----- |
+| Repo state | ✅/❌ | on main, clean, synced |
 | Bump | ✅/❌ | old → new version |
 | CHANGELOG | ✅/❌ | entry date |
 | Preflight | ✅/❌ | or which step failed |
@@ -311,6 +346,11 @@ package.
 ## Quick reference
 
 ```bash
+# Phase 0 — repo state (must be clean, on main, synced)
+git rev-parse --abbrev-ref HEAD            # main
+git status --porcelain                     # empty
+git fetch origin && git rev-list --left-right --count origin/main...HEAD   # 0  0
+
 # Full prep sequence (phases 1–3)
 node scripts/bump-version.mjs X.Y.Z
 pnpm install --lockfile-only
