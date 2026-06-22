@@ -4,6 +4,8 @@
 
 import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
+import { yagniFingerprintStrategy } from './baseline-strategy.js';
+import { collectYagniReportData } from './cli/report-data.js';
 import { yagniCommandSpec } from './cli/yagni-command-spec.js';
 import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 
@@ -24,5 +26,7 @@ export const yagniTool: Tool = defineTool({
   extensionPoints: {
     yagniContractVersion: YAGNI_CONTRACT_VERSION,
     config: yagniConfigDeclaration,
+    collectReportData: collectYagniReportData,
+    fingerprintStrategy: yagniFingerprintStrategy,
   },
 });
