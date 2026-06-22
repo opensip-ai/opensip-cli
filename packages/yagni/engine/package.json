@@ -56,7 +56,6 @@
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/lang-typescript": "workspace:*",
     "commander": "^15.0.0",
-    "glob": "^13.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

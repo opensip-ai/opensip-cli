@@ -2,6 +2,7 @@ import { isErrorSignal } from '@opensip-cli/core';
 
 import type { SkippedDetector } from '../detectors/types.js';
 import type { YagniGraphMode } from '../types/yagni-config.js';
+import type { YagniRunSummary } from '../types/yagni-metadata.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
 
@@ -36,6 +37,7 @@ export interface YagniSessionPayload {
     readonly graphMode?: YagniGraphMode;
     readonly graphBuilt?: boolean;
     readonly graphDetail?: string;
+    readonly yagni: YagniRunSummary;
   };
   readonly detectors: readonly YagniSessionDetector[];
 }
@@ -47,6 +49,7 @@ export function buildYagniSessionPayload(
     readonly graphMode: YagniGraphMode;
     readonly graphBuilt: boolean;
     readonly graphDetail?: string;
+    readonly yagniSummary: YagniRunSummary;
   },
 ): YagniSessionPayload {
   const bySource = new Map<string, Signal[]>();
@@ -89,6 +92,7 @@ export function buildYagniSessionPayload(
       graphMode: graph.graphMode,
       graphBuilt: graph.graphBuilt,
       ...(graph.graphDetail === undefined ? {} : { graphDetail: graph.graphDetail }),
+      yagni: graph.yagniSummary,
     },
     detectors,
   };

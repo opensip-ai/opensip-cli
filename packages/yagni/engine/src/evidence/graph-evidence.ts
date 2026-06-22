@@ -5,10 +5,10 @@
 
 import { CatalogRepo, executeGraph } from '@opensip-cli/graph/internal';
 
+import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
-import type { YagniGraphMode } from '../types/yagni-config.js';
 
 export interface GraphEvidenceResult {
   readonly catalog: GraphCatalog | null;
@@ -28,7 +28,12 @@ export async function resolveGraphEvidence(
 
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) {
-    return { catalog: null, mode, built: false, detail: 'datastore unavailable' };
+    return {
+      catalog: null,
+      mode,
+      built: false,
+      detail: 'datastore unavailable',
+    };
   }
 
   const repo = new CatalogRepo(datastore);
@@ -56,7 +61,12 @@ export async function resolveGraphEvidence(
   // auto: reuse when warm, otherwise build.
   const cached = repo.loadCatalogContract();
   if (cached !== null) {
-    return { catalog: cached, mode, built: false, detail: 'auto reused cached catalog' };
+    return {
+      catalog: cached,
+      mode,
+      built: false,
+      detail: 'auto reused cached catalog',
+    };
   }
   const built = await buildGraphCatalog(cwd, cli);
   return {
@@ -68,7 +78,7 @@ export async function resolveGraphEvidence(
 }
 
 async function buildGraphCatalog(cwd: string, cli: ToolCliContext): Promise<GraphCatalog | null> {
-  const outcome = await executeGraph({ cwd, json: true, noCache: false }, cli);
+  await executeGraph({ cwd, json: true, noCache: false }, cli);
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) return null;
   return new CatalogRepo(datastore).loadCatalogContract();

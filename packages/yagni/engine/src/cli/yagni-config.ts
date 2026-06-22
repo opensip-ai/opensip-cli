@@ -4,10 +4,11 @@
 
 import { currentScope, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 
+import { DEFAULT_YAGNI_CONFIG } from '../types/yagni-config.js';
+
 import { YagniConfigSchema } from './yagni-config-schema.js';
 
 import type { YagniConfig } from '../types/yagni-config.js';
-import { DEFAULT_YAGNI_CONFIG } from '../types/yagni-config.js';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -20,7 +21,9 @@ function mergeDefaults(parsed: YagniConfig): YagniConfig {
     defaultMinConfidence: parsed.defaultMinConfidence ?? DEFAULT_YAGNI_CONFIG.defaultMinConfidence,
     graphMode: parsed.graphMode ?? DEFAULT_YAGNI_CONFIG.graphMode,
     includeTests: parsed.includeTests ?? DEFAULT_YAGNI_CONFIG.includeTests,
-    ...(parsed.disabledDetectors === undefined ? {} : { disabledDetectors: parsed.disabledDetectors }),
+    ...(parsed.disabledDetectors === undefined
+      ? {}
+      : { disabledDetectors: parsed.disabledDetectors }),
     ...(parsed.detectorSettings === undefined ? {} : { detectorSettings: parsed.detectorSettings }),
   };
 }

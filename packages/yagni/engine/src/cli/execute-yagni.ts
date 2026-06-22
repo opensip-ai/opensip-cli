@@ -3,13 +3,20 @@ import { randomUUID } from 'node:crypto';
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
 import { isErrorSignal } from '@opensip-cli/core';
 
+import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 import { YAGNI_DETECTORS } from '../detectors/registry.js';
 import { resolveGraphEvidence } from '../evidence/graph-evidence.js';
-import { filterByMinConfidence } from '../scoring/confidence.js';
 import { buildYagniSessionPayload } from '../persistence/session-payload.js';
+import {
+  buildYagniRunSummary,
+  filterByMinConfidence,
+  filterByReductionCategories,
+  sortYagniSignals,
+} from '../scoring/confidence.js';
 
 import type { SkippedDetector, YagniDetector } from '../detectors/types.js';
 import type { YagniConfig, YagniGraphMode } from '../types/yagni-config.js';
+import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
 
@@ -17,6 +24,11 @@ export interface ExecuteYagniOptions {
   readonly cwd: string;
   readonly config?: YagniConfig;
   readonly graphMode?: YagniGraphMode;
+  readonly minConfidence?: YagniConfidence;
+  readonly detectors?: readonly string[];
+  readonly categories?: readonly string[];
+  readonly includeTests?: boolean;
+  readonly pathRoots?: readonly string[];
 }
 
 export interface ExecuteYagniResult {
@@ -35,17 +47,36 @@ function isDisabled(detector: YagniDetector, config: YagniConfig): boolean {
   return disabled.includes(detector.id) || disabled.includes(detector.slug);
 }
 
+function matchesDetectorFilter(detector: YagniDetector, filter: readonly string[]): boolean {
+  if (filter.length === 0) return true;
+  return filter.some(
+    (slug) =>
+      slug === detector.id ||
+      slug === detector.slug ||
+      slug === detector.slug.replace(/^yagni:/, ''),
+  );
+}
+
 function planDetectors(
   detectors: readonly YagniDetector[],
   config: YagniConfig,
   graphAvailable: boolean,
-): { readonly run: readonly YagniDetector[]; readonly skipped: readonly SkippedDetector[] } {
+  detectorFilter: readonly string[],
+): {
+  readonly run: readonly YagniDetector[];
+  readonly skipped: readonly SkippedDetector[];
+} {
   const run: YagniDetector[] = [];
   const skipped: SkippedDetector[] = [];
 
   for (const detector of detectors) {
+    if (!matchesDetectorFilter(detector, detectorFilter)) continue;
     if (isDisabled(detector, config)) {
-      skipped.push({ id: detector.id, slug: detector.slug, reason: 'disabled' });
+      skipped.push({
+        id: detector.id,
+        slug: detector.slug,
+        reason: 'disabled',
+      });
       continue;
     }
     if (detector.requiresGraph && !graphAvailable) {
@@ -72,8 +103,10 @@ export async function executeYagni(
   const graphMode = opts.graphMode ?? config.graphMode ?? 'auto';
   const graphEvidence = await resolveGraphEvidence(opts.cwd, graphMode, cli);
   const graphAvailable = graphEvidence.catalog !== null;
+  const includeTests = opts.includeTests ?? config.includeTests ?? false;
+  const minConfidence = opts.minConfidence ?? config.defaultMinConfidence ?? 'medium';
 
-  const { run, skipped } = planDetectors(detectors, config, graphAvailable);
+  const { run, skipped } = planDetectors(detectors, config, graphAvailable, opts.detectors ?? []);
   const allSignals = [];
   const units: UnitResult[] = [];
 
@@ -84,12 +117,10 @@ export async function executeYagni(
         cwd: opts.cwd,
         config,
         graphCatalog: graphEvidence.catalog,
-        includeTests: config.includeTests ?? false,
+        includeTests,
+        ...(opts.pathRoots === undefined ? {} : { pathRoots: opts.pathRoots }),
       });
-      const filtered = filterByMinConfidence(
-        result.signals,
-        config.defaultMinConfidence ?? 0.5,
-      );
+      const filtered = filterByMinConfidence(result.signals, minConfidence);
       allSignals.push(...filtered);
       const violationCount = filtered.length;
       units.push({
@@ -108,6 +139,9 @@ export async function executeYagni(
     }
   }
 
+  const categoryFiltered = filterByReductionCategories(allSignals, opts.categories ?? []);
+  const sortedSignals = sortYagniSignals(categoryFiltered);
+
   const runId = randomUUID();
   const createdAt = new Date().toISOString();
   const policy = {
@@ -119,15 +153,18 @@ export async function executeYagni(
     runId,
     createdAt,
     units,
-    signals: allSignals,
+    signals: sortedSignals,
     policy,
     runFaulted: units.some((u) => u.error !== undefined),
+    fingerprintStrategy: yagniFingerprintStrategy,
   });
 
+  const yagniSummary = buildYagniRunSummary(envelope.signals, graphEvidence.mode, skipped);
   const sessionPayload = buildYagniSessionPayload(envelope, skipped, {
     graphMode: graphEvidence.mode,
     graphBuilt: graphEvidence.built,
     graphDetail: graphEvidence.detail,
+    yagniSummary,
   });
 
   return {

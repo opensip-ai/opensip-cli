@@ -3,10 +3,14 @@
  * from a graph catalog bodyHash grouping as consolidation candidates.
  */
 
+import { relative } from 'node:path';
+
+import { severityForConfidence } from '../scoring/confidence.js';
+
 import { createYagniSignal } from './create-yagni-signal.js';
 
-import type { GraphFunctionOccurrence } from '@opensip-cli/contracts';
 import type { YagniDetector, YagniDetectorContext, YagniDetectorResult } from './types.js';
+import type { GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 const DETECTOR_ID = 'duplicate-body-candidate';
 const SLUG = 'yagni:duplicate-body-candidate';
@@ -28,10 +32,14 @@ function groupByBodyHash(
 }
 
 function primaryOccurrence(occs: readonly GraphFunctionOccurrence[]): GraphFunctionOccurrence {
-  return [...occs].sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName))[0]!;
+  return [...occs].sort((a, b) => a.qualifiedName.localeCompare(b.qualifiedName))[0];
 }
 
-async function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDetectorResult> {
+function relPath(cwd: string, filePath: string): string {
+  return relative(cwd, filePath).split('\\').join('/');
+}
+
+function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDetectorResult> {
   const started = Date.now();
   const settings = ctx.config.detectorSettings?.[DETECTOR_ID] ?? {};
   const minOccurrences =
@@ -40,7 +48,7 @@ async function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<Yag
     typeof settings.minBodyLines === 'number' ? settings.minBodyLines : DEFAULT_MIN_BODY_LINES;
 
   if (ctx.graphCatalog === null) {
-    return { signals: [], durationMs: Date.now() - started };
+    return Promise.resolve({ signals: [], durationMs: Date.now() - started });
   }
 
   const signals = [];
@@ -49,38 +57,68 @@ async function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<Yag
     const anchor = primaryOccurrence(occs);
     const bodyLines = anchor.endLine - anchor.line + 1;
     if (bodyLines < minBodyLines) continue;
-    const packages = [...new Set(occs.map((o) => o.package ?? o.filePath.split('/')[0] ?? 'unknown'))].sort();
+    const packages = [
+      ...new Set(occs.map((o) => o.package ?? o.filePath.split('/')[0] ?? 'unknown')),
+    ].sort();
+    const confidence = 'medium' as const;
+    const netEstimate = bodyLines * (occs.length - 1);
+    const anchorRel = relPath(ctx.cwd, anchor.filePath);
+    const peer = occs.find((o) => o.qualifiedName !== anchor.qualifiedName) ?? anchor;
+    const peerRel = relPath(ctx.cwd, peer.filePath);
     signals.push(
       createYagniSignal({
         source: SLUG,
         ruleId: SLUG,
-        severity: 'low',
+        severity: severityForConfidence(confidence),
         category: 'architecture',
-        message: `Duplicate body candidate (${String(occs.length)} occurrences, ${String(packages.length)} packages) — consider hoisting shared logic`,
+        message: `Duplicate body candidate (${String(occs.length)} occurrences) — consolidate shared logic (${confidence} confidence)`,
         suggestion: 'Extract the shared body into one module and import it from each copy site.',
-        code: { file: anchor.filePath, line: anchor.line, column: anchor.column },
+        code: {
+          file: anchor.filePath,
+          line: anchor.line,
+          column: anchor.column,
+        },
         yagni: {
           detector: DETECTOR_ID,
-          confidence: 0.75,
-          category: 'duplication',
-          evidenceKind: 'body-hash-group',
-          evidence: {
-            bodyHash,
-            occurrenceCount: occs.length,
-            packages,
-            anchor: {
-              qualifiedName: anchor.qualifiedName,
-              filePath: anchor.filePath,
-              line: anchor.line,
-            },
+          reductionCategory: 'dedupe',
+          confidence,
+          locDelta: {
+            remove: netEstimate,
+            add: Math.max(1, Math.floor(bodyLines / 2)),
+            netEstimate,
+            estimateKind: 'heuristic',
           },
-          recommendation: 'Consolidate duplicated implementation behind a single shared helper.',
+          preservationArgument:
+            'Occurrences share an identical bodyHash from the graph catalog; behavior should match after hoisting.',
+          suggestedAction: `Consolidate with ${peerRel} (${peer.qualifiedName}).`,
+          validationRequired: [
+            'Confirm neither occurrence is published public API.',
+            'Run tests covering each duplicate site after extraction.',
+          ],
+          riskTags: ['cross-package', 'behavior-preservation'],
+          evidence: [
+            {
+              id: `body-hash:${bodyHash}`,
+              kind: 'body-hash-group',
+              summary: `${String(occs.length)} functions share bodyHash ${bodyHash.slice(0, 8)}.`,
+              data: {
+                bodyHash,
+                occurrenceCount: occs.length,
+                packages,
+                anchor: {
+                  qualifiedName: anchor.qualifiedName,
+                  filePath: anchorRel,
+                  line: anchor.line,
+                },
+              },
+            },
+          ],
         },
       }),
     );
   }
 
-  return { signals, durationMs: Date.now() - started };
+  return Promise.resolve({ signals, durationMs: Date.now() - started });
 }
 
 export const duplicateBodyCandidateDetector: YagniDetector = {

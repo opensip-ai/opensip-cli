@@ -11,11 +11,12 @@ import type { YagniConfig } from '../types/yagni-config.js';
 import type { ToolConfigDeclaration } from '@opensip-cli/config';
 
 const graphMode = z.enum(['auto', 'reuse', 'build', 'off']);
+const confidenceLevel = z.enum(['low', 'medium', 'high']);
 
 export const YagniConfigSchema = z.object({
   failOnErrors: z.number().int().min(0).optional(),
   failOnWarnings: z.number().int().min(0).optional(),
-  defaultMinConfidence: z.number().min(0).max(1).optional(),
+  defaultMinConfidence: confidenceLevel.optional(),
   graphMode: graphMode.optional(),
   includeTests: z.boolean().optional(),
   disabledDetectors: z.array(z.string().min(1)).readonly().optional(),
@@ -32,13 +33,17 @@ export const yagniConfigDeclaration: ToolConfigDeclaration = {
   defaults: {
     failOnErrors: 0,
     failOnWarnings: 0,
-    defaultMinConfidence: 0.5,
+    defaultMinConfidence: 'medium',
     graphMode: 'auto',
     includeTests: false,
   },
   env: [
     { envVar: 'OPENSIP_YAGNI_GRAPH_MODE', key: 'graphMode' },
-    { envVar: 'OPENSIP_YAGNI_DEFAULT_MIN_CONFIDENCE', key: 'defaultMinConfidence', type: 'number' },
-    { envVar: 'OPENSIP_YAGNI_INCLUDE_TESTS', key: 'includeTests', type: 'boolean' },
+    { envVar: 'OPENSIP_YAGNI_MIN_CONFIDENCE', key: 'defaultMinConfidence' },
+    {
+      envVar: 'OPENSIP_YAGNI_INCLUDE_TESTS',
+      key: 'includeTests',
+      type: 'boolean',
+    },
   ],
 };

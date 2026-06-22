@@ -6,11 +6,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
-import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-candidate.js';
+import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';
 
@@ -21,16 +21,16 @@ const GOLDEN_PATH = join(HERE, '__fixtures__', 'yagni-golden.json');
 function stubCli(): ToolCliContext {
   return {
     scope: { datastore: () => undefined },
-    emitEnvelope: () => {},
-    emitJson: () => {},
-    emitError: () => {},
-    render: async () => {},
-    renderLive: async () => {},
-    registerLiveView: () => {},
-    setExitCode: () => {},
-    deliverSignals: async () => ({ delivered: false }),
-    writeSarif: async () => {},
-    maybeOpenReport: async () => {},
+    emitEnvelope: vi.fn(),
+    emitJson: vi.fn(),
+    emitError: vi.fn(),
+    render: vi.fn(() => Promise.resolve()),
+    renderLive: vi.fn(() => Promise.resolve()),
+    registerLiveView: vi.fn(),
+    setExitCode: vi.fn(),
+    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
+    writeSarif: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 
@@ -38,6 +38,8 @@ function stableJson(value: unknown): unknown {
   return JSON.parse(
     JSON.stringify(value, (key, v) => {
       if (key === 'durationMs' && typeof v === 'number') return 0;
+      if (key === 'fingerprint' && typeof v === 'string') return '<fingerprint>';
+      if (key === 'id' && typeof v === 'string' && v.startsWith('sig_')) return '<signalId>';
       if (typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)) return '<runId>';
       if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) return '<createdAt>';
       return v;
@@ -49,7 +51,7 @@ describe('yagni golden snapshots', () => {
   it('unused-config-surface fixture emits a stable finding shape', async () => {
     const result = await unusedConfigSurfaceDetector.run({
       cwd: FIXTURE_ROOT,
-      config: { defaultMinConfidence: 0 },
+      config: { defaultMinConfidence: 'low' },
       graphCatalog: null,
       includeTests: false,
     });
@@ -57,8 +59,14 @@ describe('yagni golden snapshots', () => {
     expect(result.signals[0]?.ruleId).toBe('yagni:unused-config-surface');
     expect(result.signals[0]?.metadata.yagni).toMatchObject({
       detector: 'unused-config-surface',
-      evidenceKind: 'unused-config-property',
-      evidence: expect.objectContaining({ property: 'orphanKnob' }),
+      reductionCategory: 'config',
+      confidence: 'high',
+      evidence: expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'unused-config-property',
+          data: expect.objectContaining({ property: 'orphanKnob' }),
+        }),
+      ]),
     });
   });
 
@@ -70,7 +78,7 @@ describe('yagni golden snapshots', () => {
           failOnErrors: 0,
           failOnWarnings: 0,
           graphMode: 'off',
-          defaultMinConfidence: 0,
+          defaultMinConfidence: 'low',
         },
         graphMode: 'off',
       },
@@ -101,10 +109,32 @@ describe('yagni golden snapshots', () => {
         line: s.line,
         metadata: s.metadata,
       })),
-      sessionSummary: outcome.session.payload.summary,
+      sessionSummary: {
+        ...outcome.session.payload.summary,
+        yagni: outcome.session.payload.summary.yagni,
+      },
     });
 
     const expected = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
     expect(actual).toEqual(expected);
+  });
+
+  it('executeYagni is deterministic for a fixed graph mode on the fixture', async () => {
+    const opts = {
+      cwd: FIXTURE_ROOT,
+      config: { graphMode: 'off' as const, defaultMinConfidence: 'low' as const },
+      graphMode: 'off' as const,
+    };
+    const firstRun = await executeYagni(opts, stubCli(), [
+      unusedConfigSurfaceDetector,
+      duplicateBodyCandidateDetector,
+    ]);
+    const secondRun = await executeYagni(opts, stubCli(), [
+      unusedConfigSurfaceDetector,
+      duplicateBodyCandidateDetector,
+    ]);
+    const first = stableJson(firstRun.envelope.signals);
+    const second = stableJson(secondRun.envelope.signals);
+    expect(first).toEqual(second);
   });
 });

@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SKIP_DIRS = new Set([
@@ -13,9 +13,14 @@ const SKIP_DIRS = new Set([
 
 const TS_EXT = /\.(ts|tsx|mts|cts)$/;
 
-export function walkTypeScriptFiles(root: string, includeTests: boolean): string[] {
+// eslint-disable-next-line sonarjs/cognitive-complexity -- iterative directory walk with test-path and skip-dir guards
+export function walkTypeScriptFiles(
+  root: string,
+  includeTests: boolean,
+  roots?: readonly string[],
+): string[] {
   const out: string[] = [];
-  const stack = [root];
+  const stack = roots !== undefined && roots.length > 0 ? [...roots] : [root];
   while (stack.length > 0) {
     const dir = stack.pop();
     if (dir === undefined) continue;
@@ -47,12 +52,4 @@ function isTestPath(filePath: string): boolean {
     /\.test\.(ts|tsx|mts|cts)$/.test(filePath) ||
     /\.spec\.(ts|tsx|mts|cts)$/.test(filePath)
   );
-}
-
-export function fileExists(path: string): boolean {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
 }

@@ -1112,9 +1112,6 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
-      glob:
-        specifier: ^13.0.0
-        version: 13.0.6
       zod:
         specifier: ^4.4.3
         version: 4.4.3

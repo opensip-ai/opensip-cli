@@ -1,13 +1,13 @@
+import type { YagniConfig } from '../types/yagni-config.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
-
-import type { YagniConfig } from '../types/yagni-config.js';
 
 export interface YagniDetectorContext {
   readonly cwd: string;
   readonly config: YagniConfig;
   readonly graphCatalog: GraphCatalog | null;
   readonly includeTests: boolean;
+  readonly pathRoots?: readonly string[];
 }
 
 export interface YagniDetectorResult {

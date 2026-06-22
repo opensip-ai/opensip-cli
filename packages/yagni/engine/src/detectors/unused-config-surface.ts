@@ -7,13 +7,17 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
 
 import { isInPublicApiSurface } from '@opensip-cli/core';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
+// eslint-disable-next-line import-x/no-extraneous-dependencies -- TypeScript AST analysis requires the compiler API at runtime (same pattern as checks-typescript)
 import * as ts from 'typescript';
 
-import { createYagniSignal } from './create-yagni-signal.js';
 import { walkTypeScriptFiles } from '../lib/walk-typescript-files.js';
+import { severityForConfidence } from '../scoring/confidence.js';
+
+import { createYagniSignal } from './create-yagni-signal.js';
 
 import type { YagniDetector, YagniDetectorContext, YagniDetectorResult } from './types.js';
 
@@ -125,6 +129,7 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
     }
     const sourceFile = getSharedSourceFile(filePath, content);
     if (!sourceFile) continue;
+    // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over per-file sourceFile; hoisting would thread extra params through every callsite
     const visit = (node: ts.Node): void => {
       if (ts.isPropertyAccessExpression(node)) {
         const propertyName = node.name.text;
@@ -141,9 +146,9 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
   return accessCounts;
 }
 
-async function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetectorResult> {
+function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetectorResult> {
   const started = Date.now();
-  const filePaths = walkTypeScriptFiles(ctx.cwd, ctx.includeTests);
+  const filePaths = walkTypeScriptFiles(ctx.cwd, ctx.includeTests, ctx.pathRoots);
   const configProperties = collectConfigProperties(filePaths);
   const accessCounts = countPropertyAccesses(filePaths);
 
@@ -151,34 +156,56 @@ async function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniD
   for (const prop of configProperties) {
     if (prop.isOptional) continue;
     if ((accessCounts.get(prop.name) ?? 0) > 0) continue;
+    const relPath = relative(ctx.cwd, prop.filePath).split('\\').join('/');
+    const confidence = 'high' as const;
+    const evidenceId = `unused-config:${relPath}:${String(prop.line)}:${prop.name}`;
     signals.push(
       createYagniSignal({
         source: SLUG,
         ruleId: SLUG,
-        severity: 'low',
+        severity: severityForConfidence(confidence),
         category: 'quality',
-        message: `Public config property '${prop.name}' in ${prop.interfaceName} is never accessed`,
-        suggestion: `Remove '${prop.name}' from ${prop.interfaceName} or implement code that reads it`,
+        message: `Unused public config key '${prop.name}' in ${prop.interfaceName} (${confidence} confidence)`,
+        suggestion: `Remove '${prop.name}' from ${prop.interfaceName} or wire it into runtime behavior`,
         code: { file: prop.filePath, line: prop.line, column: 0 },
         yagni: {
           detector: DETECTOR_ID,
-          confidence: 0.85,
-          category: 'config-surface',
-          evidenceKind: 'unused-config-property',
-          evidence: {
-            property: prop.name,
-            interfaceName: prop.interfaceName,
-            filePath: prop.filePath,
-            line: prop.line,
-            publicApiSurface: true,
+          reductionCategory: 'config',
+          confidence,
+          locDelta: {
+            remove: 1,
+            add: 0,
+            netEstimate: 1,
+            estimateKind: 'exact',
           },
-          recommendation: 'Delete the unused public config knob or wire it into runtime behavior.',
+          preservationArgument:
+            'The property is declared on a public config interface but has zero read sites in the project.',
+          suggestedAction: `Remove unused key \`${prop.name}\` from ${prop.interfaceName}.`,
+          validationRequired: [
+            'Confirm no dynamic property access reads this key.',
+            'Run the package test suite after removal.',
+          ],
+          riskTags: ['public-api-surface'],
+          evidence: [
+            {
+              id: evidenceId,
+              kind: 'unused-config-property',
+              summary: `Required property '${prop.name}' on ${prop.interfaceName} has no read sites.`,
+              data: {
+                property: prop.name,
+                interfaceName: prop.interfaceName,
+                filePath: relPath,
+                line: prop.line,
+                publicApiSurface: true,
+              },
+            },
+          ],
         },
       }),
     );
   }
 
-  return { signals, durationMs: Date.now() - started };
+  return Promise.resolve({ signals, durationMs: Date.now() - started });
 }
 
 export const unusedConfigSurfaceDetector: YagniDetector = {

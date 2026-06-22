@@ -21,24 +21,42 @@
   "signals": [
     {
       "ruleId": "yagni:unused-config-surface",
-      "message": "Public config property 'orphanKnob' in AppConfig is never accessed",
-      "severity": "low",
+      "message": "Unused public config key 'orphanKnob' in AppConfig (high confidence)",
+      "severity": "medium",
       "filePath": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-yagni/packages/yagni/engine/src/__tests__/fixtures/unused-config-surface/pkg/src/app-config.ts",
       "line": 3,
       "metadata": {
         "yagni": {
           "detector": "unused-config-surface",
-          "confidence": 0.85,
-          "category": "config-surface",
-          "evidenceKind": "unused-config-property",
-          "evidence": {
-            "property": "orphanKnob",
-            "interfaceName": "AppConfig",
-            "filePath": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-yagni/packages/yagni/engine/src/__tests__/fixtures/unused-config-surface/pkg/src/app-config.ts",
-            "line": 3,
-            "publicApiSurface": true
+          "reductionCategory": "config",
+          "confidence": "high",
+          "locDelta": {
+            "remove": 1,
+            "add": 0,
+            "netEstimate": 1,
+            "estimateKind": "exact"
           },
-          "recommendation": "Delete the unused public config knob or wire it into runtime behavior."
+          "preservationArgument": "The property is declared on a public config interface but has zero read sites in the project.",
+          "suggestedAction": "Remove unused key `orphanKnob` from AppConfig.",
+          "validationRequired": [
+            "Confirm no dynamic property access reads this key.",
+            "Run the package test suite after removal."
+          ],
+          "riskTags": ["public-api-surface"],
+          "evidence": [
+            {
+              "id": "unused-config:src/app-config.ts:3:orphanKnob",
+              "kind": "unused-config-property",
+              "summary": "Required property 'orphanKnob' on AppConfig has no read sites.",
+              "data": {
+                "property": "orphanKnob",
+                "interfaceName": "AppConfig",
+                "filePath": "src/app-config.ts",
+                "line": 3,
+                "publicApiSurface": true
+              }
+            }
+          ]
         }
       }
     }
@@ -59,6 +77,19 @@
     ],
     "graphMode": "off",
     "graphBuilt": false,
-    "graphDetail": "graph disabled"
+    "graphDetail": "graph disabled",
+    "yagni": {
+      "totalCandidates": 1,
+      "byConfidence": { "high": 1, "medium": 0, "low": 0 },
+      "estimatedTotalLocReduction": 1,
+      "graphMode": "off",
+      "skippedDetectors": [
+        {
+          "slug": "yagni:duplicate-body-candidate",
+          "reason": "graph-required",
+          "detail": "graph evidence unavailable"
+        }
+      ]
+    }
   }
 }

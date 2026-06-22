@@ -8,7 +8,3 @@ export const YAGNI_DETECTORS: readonly YagniDetector[] = [
   unusedConfigSurfaceDetector,
   duplicateBodyCandidateDetector,
 ];
-
-export function detectorById(id: string): YagniDetector | undefined {
-  return YAGNI_DETECTORS.find((d) => d.id === id || d.slug === id);
-}
