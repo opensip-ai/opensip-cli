@@ -1,4 +1,6 @@
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 
 import { resolveGraphEvidence } from '../evidence/graph-evidence.js';
 
@@ -27,10 +29,16 @@ const CATALOG: GraphCatalog = {
   functions: {},
 };
 
-function cliWithDatastore(): ToolCliContext {
+function cliWithDatastore(exit?: { prior?: number; current?: number }): ToolCliContext {
+  const state = { code: exit?.prior };
   return {
     scope: { datastore: () => ({}) },
-  } as unknown as ToolCliContext;
+    getExitCode: () => state.code,
+    setExitCode: (code: number) => {
+      state.code = code;
+    },
+    _exitState: state,
+  } as unknown as ToolCliContext & { _exitState: { code?: number } };
 }
 
 describe('resolveGraphEvidence', () => {
@@ -75,6 +83,36 @@ describe('resolveGraphEvidence', () => {
       built: false,
       detail: 'auto resolved graph catalog',
     });
+  });
+
+  it('clears exit codes set by executeGraph so yagni stays advisory', async () => {
+    graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
+    graphMocks.executeGraph.mockImplementation((_opts, cli) => {
+      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      return Promise.resolve();
+    });
+    const cli = cliWithDatastore();
+
+    await resolveGraphEvidence('/repo', 'build', cli);
+
+    expect((cli as ToolCliContext & { _exitState: { code?: number } })._exitState.code).toBe(
+      EXIT_CODES.SUCCESS,
+    );
+  });
+
+  it('restores a pre-existing exit code when graph mutates it', async () => {
+    graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
+    graphMocks.executeGraph.mockImplementation((_opts, cli) => {
+      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+      return Promise.resolve();
+    });
+    const cli = cliWithDatastore({ prior: EXIT_CODES.REPORT_FAILED });
+
+    await resolveGraphEvidence('/repo', 'auto', cli);
+
+    expect((cli as ToolCliContext & { _exitState: { code?: number } })._exitState.code).toBe(
+      EXIT_CODES.REPORT_FAILED,
+    );
   });
 
   it('reuses a persisted catalog without invoking graph in reuse mode', async () => {

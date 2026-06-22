@@ -5,6 +5,8 @@
 
 import { CatalogRepo, executeGraph } from '@opensip-cli/graph/internal';
 
+import { withPreservedExitCode } from '../lib/isolate-exit-code.js';
+
 import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
@@ -73,7 +75,9 @@ async function buildGraphCatalog(
   cli: ToolCliContext,
   opts: { readonly force: boolean },
 ): Promise<GraphCatalog | null> {
-  await executeGraph({ cwd, json: true, noCache: opts.force }, cli);
+  await withPreservedExitCode(cli, () =>
+    executeGraph({ cwd, json: true, noCache: opts.force }, cli),
+  );
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) return null;
   return new CatalogRepo(datastore).loadCatalogContract();

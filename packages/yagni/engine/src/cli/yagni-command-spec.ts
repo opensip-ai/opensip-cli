@@ -7,6 +7,7 @@
 
 import { defineCommand } from '@opensip-cli/core';
 
+import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
 import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js';
 
 import { executeYagni } from './execute-yagni.js';
@@ -55,6 +56,10 @@ async function runYagniCommand(rawOpts: unknown, cli: ToolCliContext): Promise<T
     cli,
   );
 
+  // Clear exit codes leaked by in-process `executeGraph` before the host wraps
+  // the envelope (emitEnvelope snapshots getExitCode at write time).
+  applyAdvisoryExitCode(cli, config);
+
   if (opts.json === true) {
     cli.emitEnvelope(outcome.envelope);
   } else {
@@ -80,6 +85,9 @@ async function runYagniCommand(rawOpts: unknown, cli: ToolCliContext): Promise<T
     openRequested: opts.open === true,
     jsonOutput: opts.json === true,
   });
+
+  // Re-affirm after delivery (--report-to may set exit 4; advisory policy wins otherwise).
+  applyAdvisoryExitCode(cli, config);
 
   return { session: outcome.session };
 }
