@@ -92,7 +92,7 @@ jobs:
 
       - name: Export fit baseline to SARIF
         if: always() && steps.fit.outcome != 'skipped'
-        run: node packages/cli/dist/index.js fit-baseline-export --out fit.sarif
+        run: node packages/cli/dist/index.js fit export --format baseline --out fit.sarif
 
       - name: Upload fit SARIF
         if: always() && hashFiles('fit.sarif') != ''
