@@ -1,7 +1,6 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
-
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';

@@ -1,7 +1,6 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-
 import { resolveGraphEvidence } from '../evidence/graph-evidence.js';
 
 import type { GraphCatalog } from '@opensip-cli/contracts';
