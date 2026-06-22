@@ -93,7 +93,14 @@ export async function runWorkerSpec(args: {
   const timeoutMs = args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS;
 
   try {
-    return await forkAndAwait(cliScript, specPath, args.cwd, args.spec, timeoutMs, args.ctx);
+    return await forkAndAwait({
+      cliScript,
+      specPath,
+      cwd: args.cwd,
+      spec: args.spec,
+      timeoutMs,
+      ctx: args.ctx,
+    });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -112,14 +119,23 @@ export async function runWorkerSpec(args: {
  * ADR-0054 Consequences) — it is deliberately NOT reset on each RPC, so a runaway
  * upcall loop is still SIGKILLed rather than extending the budget indefinitely.
  */
-function forkAndAwait(
-  cliScript: string,
-  specPath: string,
-  cwd: string,
-  spec: ToolCommandWorkerSpec,
-  timeoutMs: number,
-  ctx: DispatchHostCtx,
-): Promise<ToolCommandResult> {
+interface ForkAndAwaitInput {
+  readonly cliScript: string;
+  readonly specPath: string;
+  readonly cwd: string;
+  readonly spec: ToolCommandWorkerSpec;
+  readonly timeoutMs: number;
+  readonly ctx: DispatchHostCtx;
+}
+
+function forkAndAwait({
+  cliScript,
+  specPath,
+  cwd,
+  spec,
+  timeoutMs,
+  ctx,
+}: ForkAndAwaitInput): Promise<ToolCommandResult> {
   return new Promise<ToolCommandResult>((resolve, reject) => {
     const runId = currentScope()?.runId;
     // ADR-0054 M4-F: the child IS the isolation boundary. OPENSIP_CLI_IN_TOOL_WORKER
