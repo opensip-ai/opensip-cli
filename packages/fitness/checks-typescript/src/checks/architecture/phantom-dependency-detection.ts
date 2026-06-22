@@ -1,4 +1,4 @@
-// @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
+// @fitness-ignore-file toctou-race-condition -- synchronous read-through cache: `getCachedPackageJson` is not async and `readPackageJson` is sync, so get→read→set is one synchronous block with no await gap; no interleaving possible
 // @fitness-ignore-file fitness-check-standards -- Check requires direct fs access for package.json parsing outside of standard file scanning pipeline
 // @fitness-ignore-file unbounded-memory -- reads workspace package.json files; bounded by standard package metadata size
 // @fitness-ignore-file performance-anti-patterns -- sequential package.json reads keep peak memory bounded; small N per workspace

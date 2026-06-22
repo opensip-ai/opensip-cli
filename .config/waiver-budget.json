@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Frozen safety-waiver counts (no net-new). Cosmetic slugs are report-only.",
+  "description": "Reviewed safety-waiver residual (no net-new). Each suppression was triaged: stale ones removed, the rest carry a specific verifiable justification. Cosmetic slugs are report-only.",
   "safety": {
     "batch-operation-limits": 52,
     "error-handling-quality": 52,
     "detached-promises": 50,
     "performance-anti-patterns": 37,
     "unbounded-memory": 24,
-    "toctou-race-condition": 14
+    "toctou-race-condition": 13
   },
   "cosmetic": {
     "file-length-limit": 26,

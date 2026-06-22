@@ -1,5 +1,5 @@
 // @fitness-ignore-file file-length-limit -- Fitness check with TypeScript AST traversal and interface consistency analysis
-// @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
+// @fitness-ignore-file toctou-race-condition -- local Map `allInterfaces`; synchronous get-then-set merge of interface method sets, no await between read and write
 // @fitness-ignore-file interface-implementation-consistency -- Fitness check definition file; references interface patterns for detection, not actual implementations
 // @fitness-ignore-file performance-anti-patterns -- sequential file reading and bounded violation loops; not hot paths
 /**

@@ -1,5 +1,5 @@
 // @fitness-ignore-file throws-documentation -- Functions throw self-documenting typed errors
-// @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
+// @fitness-ignore-file toctou-race-condition -- local nested Map `functionsByName`; synchronous get-then-set that lazily creates a per-name group, no await between read and write
 // @fitness-ignore-file file-length-limit -- complex check with tightly coupled hash/normalization/scoring logic; splitting would risk losing the duplicate-detection contract
 /**
  * @fileoverview Duplicate Utility Functions check

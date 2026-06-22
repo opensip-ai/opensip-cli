@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- TOCTOU acceptable in this non-concurrent context
 // @fitness-ignore-file semgrep-justifications -- References nosemgrep patterns for directive parsing
 /**
  * @fileoverview Directive Audit — surfaces suppression directives for periodic review.
