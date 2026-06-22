@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.9
+release: v0.1.10
 title: "Show me each loop"
 audience: [getting-started]
 purpose: "One sample per tool — fit check, sim scenario, graph rule — so you can see the shape of the work before reading the architecture docs."

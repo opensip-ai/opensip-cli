@@ -2,6 +2,21 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.10] - 2026-06-22
+
+A maintenance patch over 0.1.9 (all of 0.1.9's changes are included below). It
+adds a graph-dogfood cleanup and release-gate hardening.
+
+### Fixed
+
+- Collapsed the worker fork-supervisor's `forkAndAwait` into an options object,
+  clearing the `graph:wide-function` self-analysis warning.
+- Hardened the release lane against latent CI breakage: the supply-chain check no
+  longer flags a token used solely for the OIDC-uncovered `npm dist-tag` promotion;
+  bundled tool-command manifests are deterministic (no machine-specific path baked
+  into a flag default); and CLI branch coverage is stable above its threshold
+  (a profiling test no longer drives the real inspector profiler in-process).
+
 ## [0.1.9] - 2026-06-22
 
 A platform-hardening release: external tools now run inside a process-isolation

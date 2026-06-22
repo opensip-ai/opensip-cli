@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.9
+release: v0.1.10
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-cli makes with the outside world, and what changing each one would cost."
@@ -298,7 +298,7 @@ If you write a tool, a check pack, or a CI integration:
 
 - **Lean on the six surfaces above.** Anything in this doc is safe to depend on. Read the linked source files for the precise shape.
 - **Don't import internal types.** If you find yourself wanting `import { CheckConfig } from '@opensip-cli/fitness'`, take a step back — that import will move under your feet. Use `defineCheck()` instead, or open an issue to expose what you need as a stable surface.
-- **Pin to the current 0.x line.** `peerDependencies: { "@opensip-cli/core": "^0.1.9" }` is the right shape today. While opensip-cli is pre-1.0, a caret range on a `0.x` version locks to the *minor* (`^0.1.0` resolves to `>=0.1.0 <0.2.0`), so each **minor** (`0.y`) bump may carry breaking changes — treat `0.1 → 0.2` as a deliberate migration, not a safe upgrade. Once opensip-cli reaches `1.0.0`, this becomes the usual "pin to majors; patch and minor are safe."
+- **Pin to the current 0.x line.** `peerDependencies: { "@opensip-cli/core": "^0.1.10" }` is the right shape today. While opensip-cli is pre-1.0, a caret range on a `0.x` version locks to the *minor* (`^0.1.0` resolves to `>=0.1.0 <0.2.0`), so each **minor** (`0.y`) bump may carry breaking changes — treat `0.1 → 0.2` as a deliberate migration, not a safe upgrade. Once opensip-cli reaches `1.0.0`, this becomes the usual "pin to majors; patch and minor are safe."
 - **Test against `--json`, not against the table renderer.** The table renderer is for humans; the JSON output is the contract. Your CI integration parses JSON.
 
 ---
