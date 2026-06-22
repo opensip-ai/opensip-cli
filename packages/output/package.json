@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/output",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "license": "Apache-2.0",
   "description": "Output layer for OpenSIP CLI — pure signal-envelope formatters (json/sarif/table) and effectful sinks (file/cloud)",
   "keywords": [

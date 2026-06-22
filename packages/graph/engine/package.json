@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/graph",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "license": "Apache-2.0",
   "description": "Static call-graph + dead-end analysis (seven-stage pipeline)",
   "keywords": [
@@ -297,8 +297,7 @@
           },
           {
             "flag": "--cwd <path>",
-            "description": "Target directory (out path resolves against this)",
-            "default": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-m4e"
+            "description": "Target directory (out path resolves against this)"
           },
           {
             "flag": "--out",
@@ -330,8 +329,7 @@
         "options": [
           {
             "flag": "--cwd <path>",
-            "description": "Target repo root to check (default: current directory)",
-            "default": "/Users/sb/Documents/Code/opensip-ai/opensip-cli-m4e"
+            "description": "Target repo root to check (default: current directory)"
           },
           {
             "flag": "--budget",

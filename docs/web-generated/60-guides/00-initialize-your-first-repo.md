@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.8
+release: v0.1.9
 title: "Initialize your first repo"
 audience: [getting-started, ci-integrators]
 purpose: "Task-led guide for running opensip init, understanding the scaffold, and getting to the first useful run."

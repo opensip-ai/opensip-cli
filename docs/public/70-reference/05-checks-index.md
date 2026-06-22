@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-18
+last_verified: 2026-06-22
 release: v0.1.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,7 +20,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **154 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **155 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
@@ -156,20 +156,21 @@ Language-agnostic; runs against every project.
 
 ---
 
-## TypeScript  *(54 checks)*
+## TypeScript  *(55 checks)*
 
 TypeScript/JavaScript projects; uses TS-AST analysis.
 
-### Architecture  *(13)*
+### Architecture  *(14)*
 
 | Slug | Description |
 |---|---|
 | [`architecture-no-run-done-result`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/no-run-done-result.ts) | Run commands render via the single RunPresentation variant; the contracts surface must not re-introduce a per-tool *DoneResult run type |
 | [`callback-invocation-safe`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/resilience/callback-invocation-safe.ts) | Class-field callbacks invoked from producer code paths (subscribers.forEach, for-of over listeners, etc.) must be wrapped in a safe<Name>(...) helper or try/catch. A throw from one subscriber must not crash the producer or skip subsequent subscribers. |
 | [`circular-import-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/circular-import-detection.ts) | Detects file-level circular import dependencies |
+| [`command-handler-host-owned-output`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/command-handler-host-owned-output.ts) | A tool command handler must let the host own rendering and exit — no direct stdout/console/process.exit inside a non-raw-stream defineCommand handler |
 | [`contracts-schema-consistency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/contracts-schema-consistency.ts) | Validates that contracts use Zod schemas consistently: types derived from schemas via z.infer |
 | [`drizzle-orm-migration-guardrails`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/drizzle-orm-migration-guardrails.ts) | Detects dangerous patterns in Drizzle ORM migrations (raw SQL, DROP, TRUNCATE, type changes) |
-| [`host-tool-runtime-import-boundary`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/host-tool-runtime-import-boundary.ts) | Host-process tool runtime imports must stay in the admission boundary and carry an explicit ADR-0054 transition policy |
+| [`host-tool-runtime-import-boundary`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/host-tool-runtime-import-boundary.ts) | External tool runtimes never import in the host: importToolRuntime stays in the admission/discovery boundary, host imports are bundled-only, and the external worker policy is confined to the worker plane (ADR-0054 M4-G capstone) |
 | [`missing-type-exports`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/missing-type-exports.ts) | Detects types imported via deep internal paths not declared in the package exports map or barrel |
 | [`module-coupling-fan-out`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/module-coupling-fan-out.ts) | Flags files with high outbound import fan-out (god-files) |
 | [`no-bootstrap-tool-import`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/no-bootstrap-tool-import.ts) | The CLI host must not statically import a tool runtime — bundled tools load via the dynamic plugin path (§1 install-source independence) |

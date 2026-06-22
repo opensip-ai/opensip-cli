@@ -2,6 +2,50 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.9] - 2026-06-22
+
+A platform-hardening release: external tools now run inside a process-isolation
+boundary, third-party tools reach parity with the bundled ones, and the graph and
+language layers become layout- and language-agnostic.
+
+### Changed
+
+- **External tools now run out-of-process behind a fault-isolation boundary
+  (ADR-0054).** Installed, project-local, and user-global tools execute in an
+  isolated worker process — their command handlers, config validation, and
+  lifecycle hooks no longer run in the CLI host, so a crash, `process.exit`, hang,
+  or native fault in an external tool can no longer take down the CLI. The host
+  loads external tools from their static manifest only and never imports their
+  runtime; privileged effects (rendering, output, datastore, egress, SARIF,
+  baselines) cross a structured IPC boundary back to the host. Bundled `fit`/`sim`/
+  `graph` keep in-process execution as the trusted computing base.
+- External tool config is validated in two passes: a coarse, manifest-declared
+  structural check in the host (no untrusted schema code runs host-side), then the
+  tool's own schema inside the worker.
+- Third-party tools gained session/persistence parity — their runs save, list, and
+  replay through the same machinery as the bundled tools (`sessions list --tool
+  <id>` accepts any registered tool id).
+- Graph cross-package resolution is now layout-agnostic: package attribution
+  derives from each file's nearest `package.json`, so coupling and cross-package
+  edges resolve correctly on any repository layout, not only `packages/<name>/`.
+- The cross-language query layer is unified — the Rust, Python, Go, and Java
+  tree-sitter adapters now implement the same `LanguageQueryAPI` as the TypeScript
+  adapter.
+- `graph index` gained `--build` (refresh the catalog before emitting the symbol
+  index), alongside tool-command taxonomy refinements.
+- Tool/host seam-discipline checks now ship in the fitness pack, so a tool author's
+  own `fit` run enforces the command-handler output contract.
+
+### Fixed
+
+- The staged-release promotion step now authenticates correctly (`npm dist-tag` is
+  not covered by OIDC trusted publishing), and the supply-chain policy check no
+  longer flags a token used solely for that promotion.
+- The lockfile now records the `@opensip-cli/tree-sitter` → `@opensip-cli/core`
+  dependency, so a clean `--frozen-lockfile` install (as CI runs) succeeds.
+- Resolved graph dogfood warnings and stabilized a flaky coverage measurement in
+  the CLI profiling-telemetry tests.
+
 ## [0.1.8] - 2026-06-21
 
 A release-hardening update focused on audit remediation, stronger type-aware
