@@ -87,7 +87,6 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
         });
         if (!ent.entitled) return { accepted: 0, authRejected: false, skippedReason: 'unentitled' };
 
-        // @fitness-ignore-next-line async-waterfall-detection -- the first-run notice must print BEFORE the emit; deliberately sequential, not parallelized
         await maybeShowFirstRunNotice(input.cacheDir);
         const result = await cloudSink.emit(batch);
         if (result.authRejected) {

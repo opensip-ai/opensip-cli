@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T23:20:31.833Z",
+  "generatedAt": "2026-06-23T23:22:03.483Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,7 +11,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 400,
+        "total": 394,
         "bySlug": {
           "throws-documentation": 10,
           "batch-operation-limits": 53,
@@ -23,7 +23,6 @@
           "silent-early-returns": 7,
           "one-outcome-shape": 1,
           "duplicate-utility-functions": 22,
-          "async-waterfall-detection": 6,
           "interface-implementation-consistency": 2,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 6,
@@ -93,11 +92,11 @@
           "cli": 23,
           "cli-ui": 1,
           "config": 2,
-          "core": 15,
+          "core": 13,
           "dashboard": 2,
-          "fitness/checks-typescript": 82,
+          "fitness/checks-typescript": 81,
           "fitness/checks-universal": 136,
-          "fitness/engine": 35,
+          "fitness/engine": 34,
           "graph/engine": 36,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
@@ -110,11 +109,11 @@
           "languages/lang-python": 4,
           "languages/lang-rust": 4,
           "languages/lang-typescript": 5,
-          "output": 4,
+          "output": 3,
           "simulation": 12,
           "targeting": 1,
           "test-support": 2,
-          "yagni": 2
+          "yagni": 1
         }
       },
       "graph": {
@@ -125,7 +124,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 180,
+        "total": 175,
         "bySlug": {
           "throws-documentation": 9,
           "batch-operation-limits": 41,
@@ -137,7 +136,6 @@
           "silent-early-returns": 5,
           "one-outcome-shape": 1,
           "duplicate-utility-functions": 18,
-          "async-waterfall-detection": 5,
           "interface-implementation-consistency": 1,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 6,
@@ -163,9 +161,9 @@
           "cli": 23,
           "cli-ui": 1,
           "config": 2,
-          "core": 15,
+          "core": 13,
           "dashboard": 2,
-          "fitness/engine": 35,
+          "fitness/engine": 34,
           "graph/engine": 36,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
@@ -178,10 +176,10 @@
           "languages/lang-python": 4,
           "languages/lang-rust": 4,
           "languages/lang-typescript": 5,
-          "output": 4,
+          "output": 3,
           "simulation": 12,
           "targeting": 1,
-          "yagni": 2
+          "yagni": 1
         }
       },
       "graph": {
@@ -202,7 +200,7 @@
     },
     "check-package": {
       "fitness": {
-        "total": 218,
+        "total": 217,
         "bySlug": {
           "batch-operation-limits": 12,
           "performance-anti-patterns": 23,
@@ -227,7 +225,6 @@
           "error-handling-quality": 2,
           "sonarjs-backend": 1,
           "stubbed-implementation-detection": 1,
-          "async-waterfall-detection": 1,
           "callback-invocation-safe": 1,
           "silent-early-returns": 2,
           "context-mutation": 1,
@@ -266,7 +263,7 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 82,
+          "fitness/checks-typescript": 81,
           "fitness/checks-universal": 136
         }
       },
@@ -399,19 +396,19 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 400,
-    "budgetGateFitnessSlugs": 75,
-    "productRuntimeFitness": 180,
-    "productRuntimeFitnessSlugs": 31,
+    "budgetGateFitness": 394,
+    "budgetGateFitnessSlugs": 74,
+    "productRuntimeFitness": 175,
+    "productRuntimeFitnessSlugs": 30,
     "productRuntimeGraph": 7,
     "productRuntimeGraphRuleIds": 2,
-    "productRuntimeCombined": 187,
-    "checkPackageFitness": 218,
+    "productRuntimeCombined": 182,
+    "checkPackageFitness": 217,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 135,
     "productRuntimeSafetyTotal": 93,
-    "unbudgetedProductRuntimeSlugs": 26
+    "unbudgetedProductRuntimeSlugs": 25
   }
 }

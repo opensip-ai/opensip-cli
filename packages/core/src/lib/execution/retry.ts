@@ -1,4 +1,3 @@
-// @fitness-ignore-file async-waterfall-detection -- the backoff-then-retry awaits are necessarily sequential (wait, THEN re-attempt); parallelizing them would defeat retry/backoff semantics
 // @fitness-ignore-file performance-anti-patterns -- same: sequential await is the entire point of a retry/backoff loop (same waiver as lib/retry.ts and the fitness retry this hoists)
 /**
  * runWithRetry — the generic retry-with-backoff primitive the execution substrate

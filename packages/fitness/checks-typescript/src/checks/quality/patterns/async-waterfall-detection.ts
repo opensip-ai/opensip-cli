@@ -43,8 +43,9 @@ export const asyncWaterfallDetection = defineCheck({
 - Awaits in different conditional branches (if/else, ternary, switch/case)
 - Dynamic \`await import()\` expressions (next statement almost always depends on the import)
 - Destructured binding dependencies (e.g., \`const { x } = await import(...); await x()\`)
-- Sleep/delay calls in polling loops (\`await sleep()\`, \`await delay()\`)
+- Sleep/delay/backoff/yield calls (\`await sleep()\`, \`await backoff()\`, \`await yieldToEventLoop()\`)
 - Mutex/lock acquire patterns (\`await this.acquire()\`, \`await lock()\`)
+- Documented sequential orchestration (setup-then-run, collect-then-count scans)
 - CLI entry point files (\`**/bin/**\`)
 
 **Why it matters:** Sequential independent awaits double latency unnecessarily; parallelizing them with \`Promise.all()\` can significantly improve performance.

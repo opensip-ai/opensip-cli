@@ -280,7 +280,6 @@ export const unusedConfigOptions = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    // @fitness-ignore-next-line async-waterfall-detection -- Both scan all files independently; parallelizing would double peak memory by loading file contents twice concurrently
     const configProperties = await collectConfigProperties(files);
     const accessCounts = await countPropertyAccesses(files);
     return findUnusedProperties(configProperties, accessCounts);

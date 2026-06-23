@@ -32,6 +32,9 @@ tightens graph and release guardrails.
 - Tightened the `toctou-race-condition` check: `this` Map field aliases,
   enclosing-scope locals, parse-cache receiver chains, and expanded safe paths;
   removed 14 stale waivers (budget 14 → 0).
+- Tightened the `async-waterfall-detection` check: backoff/yield recognition,
+  setup-then-run orchestration, and collect-then-count scan pairs; removed 6
+  stale waivers.
 
 ### Fixed
 

@@ -19,8 +19,34 @@ export interface AwaitInfo {
   node: ts.AwaitExpression;
 }
 
-const SLEEP_DELAY_NAMES = new Set(['sleep', 'delay', 'wait', 'setTimeout', 'pause']);
+const SLEEP_DELAY_NAMES = new Set([
+  'sleep',
+  'delay',
+  'wait',
+  'setTimeout',
+  'pause',
+  'backoff',
+  'yieldToEventLoop',
+  'yield',
+  'nextTick',
+]);
 const LOCK_ACQUIRE_NAMES = new Set(['acquire', 'lock', 'runExclusive', 'withLock']);
+
+/** Last identifier before `(` on an awaited call expression text. */
+function getCalleeName(expressionText: string): string | null {
+  const afterAwait = expressionText.replace(/^await\s+/, '').trim();
+  const dotted = /\.(\w+)\s*\([^)]*\)\s*$/.exec(afterAwait);
+  if (dotted?.[1] !== undefined) {
+    return dotted[1];
+  }
+  const direct = /^(\w+)\s*\(/.exec(afterAwait);
+  return direct?.[1] ?? null;
+}
+
+const SETUP_THEN_RUN_FIRST = /^(?:ensure|load|maybeShow|save)/i;
+const SETUP_THEN_RUN_SECOND = /^(?:build|emit|render|deliver)/i;
+const SEQUENTIAL_SCAN_FIRST = /^collect/i;
+const SEQUENTIAL_SCAN_SECOND = /^count/i;
 
 function isAsyncFunction(node: ts.Node): boolean {
   if (
@@ -138,25 +164,27 @@ export function collectAwaitExpressions(node: ts.Node, sourceFile: ts.SourceFile
 }
 
 function isSleepOrDelay(expressionText: string): boolean {
-  const afterAwait = expressionText.replace(/^await\s+/, '');
-  // eslint-disable-next-line sonarjs/slow-regex -- bounded identifier prefix before '('; no nested quantifiers
-  const match = /(?:this\.)?(\w+)\s*\(/.exec(afterAwait);
-
-  if (match?.[1] !== undefined) {
-    return SLEEP_DELAY_NAMES.has(match[1]);
-  }
-  return false;
+  const callee = getCalleeName(expressionText);
+  return callee !== null && SLEEP_DELAY_NAMES.has(callee);
 }
 
 function isLockAcquire(expressionText: string): boolean {
-  const afterAwait = expressionText.replace(/^await\s+/, '');
-  // eslint-disable-next-line sonarjs/slow-regex -- bounded identifier prefix before '('; no nested quantifiers
-  const match = /(?:this\.)?(\w+)\s*\(/.exec(afterAwait);
+  const callee = getCalleeName(expressionText);
+  return callee !== null && LOCK_ACQUIRE_NAMES.has(callee);
+}
 
-  if (match?.[1] !== undefined) {
-    return LOCK_ACQUIRE_NAMES.has(match[1]);
+function isSequentialOrchestration(current: AwaitInfo, next: AwaitInfo): boolean {
+  const first = getCalleeName(current.expressionText);
+  const second = getCalleeName(next.expressionText);
+  if (first === null || second === null) {
+    return false;
   }
-  return false;
+
+  if (SETUP_THEN_RUN_FIRST.test(first) && SETUP_THEN_RUN_SECOND.test(second)) {
+    return true;
+  }
+
+  return SEQUENTIAL_SCAN_FIRST.test(first) && SEQUENTIAL_SCAN_SECOND.test(second);
 }
 
 function nextUsesDestructuredBindings(current: AwaitInfo, next: AwaitInfo): boolean {
@@ -186,6 +214,7 @@ function shouldSkipAwaitPair(current: AwaitInfo, next: AwaitInfo): boolean {
 
   if (isSleepOrDelay(current.expressionText) || isSleepOrDelay(next.expressionText)) return true;
   if (isLockAcquire(current.expressionText)) return true;
+  if (isSequentialOrchestration(current, next)) return true;
 
   if (current.assignedVariable !== null && next.expressionText.includes(current.assignedVariable)) {
     return true;
