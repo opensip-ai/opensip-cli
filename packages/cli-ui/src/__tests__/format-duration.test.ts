@@ -9,6 +9,11 @@ describe('formatDuration', () => {
     expect(formatDuration(999)).toBe('999ms');
   });
 
+  it('rounds fractional sub-second durations (performance.now() deltas)', () => {
+    expect(formatDuration(639.6488329999999)).toBe('640ms');
+    expect(formatDuration(0.4)).toBe('0ms');
+  });
+
   it('uses seconds below the minute display boundary', () => {
     expect(formatDuration(1000)).toBe('1.0s');
     expect(formatDuration(12_340)).toBe('12.3s');

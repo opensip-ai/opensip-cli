@@ -11,7 +11,11 @@
  */
 // @fitness-ignore-file duplicate-utility-functions -- intentional: cli-ui is deliberately ink/react-only (see docstring above) and must not depend on @opensip-cli/core, so this small formatter is duplicated by design rather than shared across the layer boundary.
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
+  // Round to whole milliseconds: the host RunTimer reports fractional ms
+  // (performance.now()), and an unrounded sub-second value would print as
+  // e.g. "639.6488329999999ms". Every duration surface flows through here, so
+  // rounding once keeps them all consistent.
+  if (ms < 1000) return `${Math.round(ms)}ms`;
 
   const totalTenths = Math.round(ms / 100);
   if (totalTenths < 600) return `${(totalTenths / 10).toFixed(1)}s`;
