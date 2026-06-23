@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
+import { describe, expect, it } from 'vitest';
 
-import { isSyncTopLevelCallable } from '../detached-promises-sync-detection.js';
 import { analyzeFileForDetachedPromises } from '../detached-promises-detection.js';
+import { isSyncTopLevelCallable } from '../detached-promises-sync-detection.js';
 
 function sourceFileFor(content: string, path = 'src/example.ts'): ts.SourceFile {
   return ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  analyzeFileLength,
-  analyzeFileLengthForPath,
-} from '../checks/file-length-limit.js';
+import { analyzeFileLength, analyzeFileLengthForPath } from '../checks/file-length-limit.js';
 
 function buildLines(n: number): string {
   const out: string[] = [];
@@ -37,9 +34,7 @@ describe('analyzeFileLength', () => {
 
 describe('analyzeFileLengthForPath', () => {
   it('skips test files regardless of line count', () => {
-    expect(analyzeFileLengthForPath(buildLines(900), 'src/__tests__/big.test.ts')).toHaveLength(
-      0,
-    );
+    expect(analyzeFileLengthForPath(buildLines(900), 'src/__tests__/big.test.ts')).toHaveLength(0);
   });
 
   it('skips fixture paths', () => {

@@ -6,7 +6,6 @@ import { type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile, isInAsyncContext } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
-import { isSyncTopLevelCallable } from './detached-promises-sync-detection.js';
 import {
   buildEffectiveSyncSets,
   FILE_SKIP_PATTERNS,
@@ -15,6 +14,7 @@ import {
   KNOWN_SYNC_SUFFIXES,
   type EffectiveSyncSets,
 } from './detached-promises-sync-constants.js';
+import { isSyncTopLevelCallable } from './detached-promises-sync-detection.js';
 
 /**
  * Check if a method call expression is to a known synchronous receiver or method.

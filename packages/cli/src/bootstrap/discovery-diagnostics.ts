@@ -17,8 +17,7 @@ import { INSTALLED_TOOL_ALLOWLIST_ENV } from './tool-trust.js';
 
 import type { ToolRuntimeLoad } from './admit-tool-package.js';
 
-const INSTALLED_TOOL_SKIPPED_IMPACT =
-  'The package was skipped and its commands are not available.';
+const INSTALLED_TOOL_SKIPPED_IMPACT = 'The package was skipped and its commands are not available.';
 
 function record(
   collector: BootstrapDiagnosticsCollector | undefined,

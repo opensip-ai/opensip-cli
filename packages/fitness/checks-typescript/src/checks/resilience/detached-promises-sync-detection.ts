@@ -18,23 +18,25 @@ function initializerIsSyncCallable(init: ts.Expression | undefined): boolean {
   return false;
 }
 
+function isSyncNamedFunctionDeclaration(stmt: ts.Statement, name: string): boolean {
+  if (!ts.isFunctionDeclaration(stmt) || stmt.name?.text !== name) return false;
+  return isNonAsyncFunctionLike(stmt);
+}
+
+function isSyncNamedConstArrow(stmt: ts.Statement, name: string): boolean {
+  if (!ts.isVariableStatement(stmt)) return false;
+  for (const decl of stmt.declarationList.declarations) {
+    if (!ts.isIdentifier(decl.name) || decl.name.text !== name) continue;
+    if (initializerIsSyncCallable(decl.initializer)) return true;
+  }
+  return false;
+}
+
 /**
  * True when `name` refers to a top-level sync function or const arrow in `sourceFile`.
  */
 export function isSyncTopLevelCallable(sourceFile: ts.SourceFile, name: string): boolean {
-  for (const stmt of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(stmt) && stmt.name?.text === name) {
-      if (isNonAsyncFunctionLike(stmt)) return true;
-      continue;
-    }
-
-    if (!ts.isVariableStatement(stmt)) continue;
-
-    for (const decl of stmt.declarationList.declarations) {
-      if (!ts.isIdentifier(decl.name) || decl.name.text !== name) continue;
-      if (initializerIsSyncCallable(decl.initializer)) return true;
-    }
-  }
-
-  return false;
+  return sourceFile.statements.some(
+    (stmt) => isSyncNamedFunctionDeclaration(stmt, name) || isSyncNamedConstArrow(stmt, name),
+  );
 }

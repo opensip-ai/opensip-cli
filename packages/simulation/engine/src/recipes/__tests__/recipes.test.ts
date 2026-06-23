@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Sim-recipe contract + integration tests.
  *
