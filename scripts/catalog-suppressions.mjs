@@ -1,0 +1,455 @@
+#!/usr/bin/env node
+/**
+ * catalog-suppressions — regenerable suppression inventory (suppression triage Phase 0).
+ *
+ * Walks packages/** and classifies @fitness-ignore-* / @graph-ignore-* directives by
+ * layer (budget-gate, product-runtime, check-package, test-support, tests).
+ *
+ * Usage:
+ *   node scripts/catalog-suppressions.mjs              # write docs/internal outputs
+ *   node scripts/catalog-suppressions.mjs --check        # exit 1 if committed output is stale
+ *   node scripts/catalog-suppressions.mjs --stdout-json  # JSON to stdout (no write)
+ */
+
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const BUDGET_PATH = join(REPO_ROOT, '.config/waiver-budget.json');
+const CATALOG_JSON_PATH = join(REPO_ROOT, 'docs/internal/suppression-catalog.json');
+const TRIAGE_MD_PATH = join(REPO_ROOT, 'docs/internal/suppression-triage.md');
+
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'coverage', '.git']);
+
+const FITNESS_RE = /@fitness-ignore-(?:file|next-line)\s+([a-z][a-z0-9-]*)(?:\s|$|--)/g;
+const GRAPH_RE = /@graph-ignore-(?:file|next-line)\s+(\S+)/g;
+
+const SAFETY_SLUGS = new Set([
+  'error-handling-quality',
+  'unbounded-memory',
+  'detached-promises',
+  'toctou-race-condition',
+  'performance-anti-patterns',
+  'batch-operation-limits',
+]);
+
+const COSMETIC_SLUGS = new Set([
+  'file-length-limit',
+  'module-coupling-fan-out',
+  'project-readme-existence',
+]);
+
+const BUDGETED_SLUGS = new Set([...SAFETY_SLUGS, ...COSMETIC_SLUGS]);
+
+/** Primary triage disposition from suppression-triage-and-reduction spec. */
+const TRIAGE_DISPOSITION = {
+  'error-handling-quality': 'c',
+  'detached-promises': 'c',
+  'batch-operation-limits': 'b',
+  'unbounded-memory': 'b',
+  'performance-anti-patterns': 'b/c',
+  'toctou-race-condition': 'b',
+  'file-length-limit': 'c',
+  'module-coupling-fan-out': 'b',
+  'project-readme-existence': 'a/c',
+  'result-pattern-consistency': 'c',
+  'duplicate-utility-functions': 'b',
+  'throws-documentation': 'a/b',
+  'null-safety': 'b/c',
+  'silent-early-returns': 'a/c',
+  'async-waterfall-detection': 'c',
+  'context-mutation': 'b',
+  'no-non-null-assertions': 'a',
+  'public-api-jsdoc': 'a',
+  'graph:cycle': 'b',
+  'graph:always-throws-branch': 'b',
+};
+
+const log = (msg) => console.error(`[catalog-suppressions] ${msg}`);
+
+function isTestPath(rel, fileName) {
+  return (
+    rel.includes('/__tests__/') ||
+    rel.includes('/__fixtures__/') ||
+    fileName.endsWith('.test.ts') ||
+    fileName.endsWith('.test.tsx')
+  );
+}
+
+/**
+ * @returns {'budget-gate' | 'product-runtime' | 'check-package' | 'test-support' | 'tests' | 'skip'}
+ */
+function classifyLayer(rel, fileName) {
+  if (!rel.startsWith('packages/')) return 'skip';
+  if (!rel.includes('/src/')) return 'skip';
+  if (isTestPath(rel, fileName)) return 'tests';
+  if (rel.startsWith('packages/test-support/src/')) return 'test-support';
+  if (/^packages\/fitness\/checks-[^/]+\/src\//.test(rel)) return 'check-package';
+  if (/^packages\/graph\/graph-[^/]+\/src\//.test(rel)) return 'product-runtime';
+  return 'product-runtime';
+}
+
+function packageKey(rel) {
+  const parts = rel.split('/');
+  if (parts.length < 2) return rel;
+  if (parts[1] === 'fitness' || parts[1] === 'graph' || parts[1] === 'languages') {
+    return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : parts[1];
+  }
+  return parts[1];
+}
+
+function normalizeGraphId(raw) {
+  const trimmed = raw.replace(/['"`;,]+$/, '');
+  return trimmed.startsWith('graph:') ? trimmed : `graph:${trimmed}`;
+}
+
+function isCommentAnchoredLine(line) {
+  const t = line.trimStart();
+  return (
+    t.startsWith('//') ||
+    t.startsWith('#') ||
+    t.startsWith('<!--') ||
+    t.startsWith('/*')
+  );
+}
+
+function extractFitnessDirectives(content, { commentOnly }) {
+  const hits = [];
+  if (commentOnly) {
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!isCommentAnchoredLine(line)) continue;
+      for (const match of line.matchAll(FITNESS_RE)) {
+        hits.push({ slug: match[1], line: i + 1 });
+      }
+    }
+    return hits;
+  }
+  for (const match of content.matchAll(FITNESS_RE)) {
+    hits.push({ slug: match[1], line: null });
+  }
+  return hits;
+}
+
+function extractGraphDirectives(content, { commentOnly }) {
+  const hits = [];
+  if (commentOnly) {
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!isCommentAnchoredLine(line)) continue;
+      for (const match of line.matchAll(GRAPH_RE)) {
+        hits.push({ ruleId: normalizeGraphId(match[1]), line: i + 1 });
+      }
+    }
+    return hits;
+  }
+  for (const match of content.matchAll(GRAPH_RE)) {
+    hits.push({ ruleId: normalizeGraphId(match[1]), line: null });
+  }
+  return hits;
+}
+
+function emptyLayer() {
+  return {
+    fitness: { total: 0, bySlug: {}, byPackage: {} },
+    graph: { total: 0, byRuleId: {}, byPackage: {} },
+  };
+}
+
+function bump(bucket, key, pkg) {
+  bucket[key] = (bucket[key] ?? 0) + 1;
+}
+
+function walkPackages(catalog, { commentOnly, collectRecords = false }) {
+  const records = collectRecords ? [] : null;
+
+  function walk(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (SKIP_DIRS.has(entry.name)) continue;
+        walk(path);
+        continue;
+      }
+      if (!entry.name.endsWith('.ts') && !entry.name.endsWith('.tsx')) continue;
+
+      const rel = relative(REPO_ROOT, path);
+      const layer = classifyLayer(rel, entry.name);
+      if (layer === 'skip') continue;
+
+      const content = readFileSync(path, 'utf8');
+      const pkg = packageKey(rel);
+
+      for (const { slug, line } of extractFitnessDirectives(content, { commentOnly })) {
+        if (records) records.push({ kind: 'fitness', slug, layer, pkg, file: rel, line });
+        const layerBucket = catalog.layers[layer];
+        layerBucket.fitness.total += 1;
+        bump(layerBucket.fitness.bySlug, slug);
+        bump(layerBucket.fitness.byPackage, pkg);
+
+        if (layer !== 'tests') {
+          const gate = catalog.layers['budget-gate'];
+          gate.fitness.total += 1;
+          bump(gate.fitness.bySlug, slug);
+          bump(gate.fitness.byPackage, pkg);
+        }
+      }
+
+      for (const { ruleId, line } of extractGraphDirectives(content, { commentOnly })) {
+        if (records) records.push({ kind: 'graph', slug: ruleId, layer, pkg, file: rel, line });
+        const layerBucket = catalog.layers[layer];
+        layerBucket.graph.total += 1;
+        bump(layerBucket.graph.byRuleId, ruleId);
+        bump(layerBucket.graph.byPackage, pkg);
+      }
+    }
+  }
+
+  walk(join(REPO_ROOT, 'packages'));
+  return records;
+}
+
+function countSlugs(bySlug) {
+  return Object.keys(bySlug).length;
+}
+
+function sumSlugs(bySlug, slugs) {
+  return slugs.reduce((n, s) => n + (bySlug[s] ?? 0), 0);
+}
+
+function buildCatalog({ collectRecords = false } = {}) {
+  const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf8'));
+  const catalog = {
+    generatedAt: new Date().toISOString(),
+    repoRef: 'main',
+    layerRules: {
+      budgetGate:
+        'packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support',
+      productRuntime:
+        'budget-gate paths minus packages/fitness/checks-*; includes packages/graph/graph-* adapters',
+      checkPackage: 'packages/fitness/checks-*/src only',
+      testSupport: 'packages/test-support/src',
+      tests: '__tests__/, *.test.ts, __fixtures__/',
+    },
+    layers: {
+      'budget-gate': emptyLayer(),
+      'product-runtime': emptyLayer(),
+      'check-package': emptyLayer(),
+      'test-support': emptyLayer(),
+      tests: emptyLayer(),
+    },
+    budget: { safety: {}, cosmetic: {} },
+    summary: {},
+  };
+
+  const records = walkPackages(catalog, { commentOnly: false, collectRecords });
+  if (records) {
+    catalog.records = records;
+  }
+
+  const pr = catalog.layers['product-runtime'];
+  const gate = catalog.layers['budget-gate'];
+
+  for (const [slug, max] of Object.entries(budget.safety ?? {})) {
+    catalog.budget.safety[slug] = { budget: max, actual: gate.fitness.bySlug[slug] ?? 0 };
+  }
+  for (const [slug, max] of Object.entries(budget.cosmetic ?? {})) {
+    catalog.budget.cosmetic[slug] = { budget: max, actual: gate.fitness.bySlug[slug] ?? 0 };
+  }
+
+  catalog.summary = {
+    budgetGateFitness: gate.fitness.total,
+    budgetGateFitnessSlugs: countSlugs(gate.fitness.bySlug),
+    productRuntimeFitness: pr.fitness.total,
+    productRuntimeFitnessSlugs: countSlugs(pr.fitness.bySlug),
+    productRuntimeGraph: pr.graph.total,
+    productRuntimeGraphRuleIds: countSlugs(pr.graph.byRuleId),
+    productRuntimeCombined: pr.fitness.total + pr.graph.total,
+    checkPackageFitness: catalog.layers['check-package'].fitness.total,
+    testSupportFitness: catalog.layers['test-support'].fitness.total,
+    testsFitness: catalog.layers.tests.fitness.total,
+    testsGraph: catalog.layers.tests.graph.total,
+    budgetGateSafetyTotal: sumSlugs(gate.fitness.bySlug, [...SAFETY_SLUGS]),
+    productRuntimeSafetyTotal: sumSlugs(pr.fitness.bySlug, [...SAFETY_SLUGS]),
+    unbudgetedProductRuntimeSlugs: countSlugs(
+      Object.fromEntries(
+        Object.entries(pr.fitness.bySlug).filter(([s]) => !BUDGETED_SLUGS.has(s)),
+      ),
+    ),
+  };
+
+  return catalog;
+}
+
+function sortedEntries(obj) {
+  return Object.entries(obj).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function renderTriageMarkdown(catalog) {
+  const pr = catalog.layers['product-runtime'];
+  const gate = catalog.layers['budget-gate'];
+  const lines = [];
+
+  lines.push('# Suppression triage matrix');
+  lines.push('');
+  lines.push('<!-- Generated by scripts/catalog-suppressions.mjs — do not hand-edit. -->');
+  lines.push('');
+  lines.push(`**Generated:** ${catalog.generatedAt}`);
+  lines.push('');
+  lines.push('Contributor policy: [CONTRIBUTING.md § Suppressions](../CONTRIBUTING.md#suppressions)');
+  lines.push('');
+  lines.push('## Summary');
+  lines.push('');
+  lines.push('| Metric | Count |');
+  lines.push('|--------|------:|');
+  lines.push(`| Budget-gate \`@fitness-ignore\` | ${catalog.summary.budgetGateFitness} (${catalog.summary.budgetGateFitnessSlugs} slugs) |`);
+  lines.push(`| Product-runtime \`@fitness-ignore\` | ${catalog.summary.productRuntimeFitness} (${catalog.summary.productRuntimeFitnessSlugs} slugs) |`);
+  lines.push(`| Product-runtime \`@graph-ignore\` | ${catalog.summary.productRuntimeGraph} (${catalog.summary.productRuntimeGraphRuleIds} rule ids) |`);
+  lines.push(`| Product-runtime combined | ${catalog.summary.productRuntimeCombined} |`);
+  lines.push(`| Check-package | ${catalog.summary.checkPackageFitness} |`);
+  lines.push(`| Test-support | ${catalog.summary.testSupportFitness} |`);
+  lines.push(`| Tests / fixtures (fitness) | ${catalog.summary.testsFitness} |`);
+  lines.push(`| Tests / fixtures (graph) | ${catalog.summary.testsGraph} |`);
+  lines.push(`| Budget-gate safety total | ${catalog.summary.budgetGateSafetyTotal} |`);
+  lines.push(`| Product-runtime safety total | ${catalog.summary.productRuntimeSafetyTotal} |`);
+  lines.push(`| Unbudgeted product-runtime slugs | ${catalog.summary.unbudgetedProductRuntimeSlugs} |`);
+  lines.push('');
+  lines.push('Regenerate: `node scripts/catalog-suppressions.mjs`');
+  lines.push('');
+  lines.push('## Waiver budget (budget-gate scope)');
+  lines.push('');
+  lines.push('| Tier | Slug | Budget | Actual |');
+  lines.push('|------|------|-------:|-------:|');
+  const budgetRows = [
+    ...Object.entries(catalog.budget.safety).map(([slug, row]) => [slug, row]),
+    ...Object.entries(catalog.budget.cosmetic).map(([slug, row]) => [slug, row]),
+  ];
+  for (const [slug, row] of budgetRows) {
+    const tier = SAFETY_SLUGS.has(slug) ? 'Safety' : 'Cosmetic';
+    lines.push(`| ${tier} | \`${slug}\` | ${row.budget} | ${row.actual} |`);
+  }
+  lines.push('');
+  lines.push('## Product-runtime fitness slugs');
+  lines.push('');
+  lines.push('| Slug | Count | Budgeted | Disposition |');
+  lines.push('|------|------:|:--------:|:-----------:|');
+  for (const [slug, count] of sortedEntries(pr.fitness.bySlug)) {
+    const budgeted = BUDGETED_SLUGS.has(slug) ? 'yes' : 'no';
+    const disp = TRIAGE_DISPOSITION[slug] ?? 'TBD';
+    lines.push(`| \`${slug}\` | ${count} | ${budgeted} | ${disp} |`);
+  }
+  lines.push('');
+  lines.push('## Product-runtime graph rule ids');
+  lines.push('');
+  lines.push('| Rule id | Count | Disposition |');
+  lines.push('|---------|------:|:-----------:|');
+  for (const [ruleId, count] of sortedEntries(pr.graph.byRuleId)) {
+    const disp = TRIAGE_DISPOSITION[ruleId] ?? 'b';
+    lines.push(`| \`${ruleId}\` | ${count} | ${disp} |`);
+  }
+  lines.push('');
+  lines.push('## Package hotspots (product-runtime fitness)');
+  lines.push('');
+  lines.push('| Package | Count |');
+  lines.push('|---------|------:|');
+  for (const [pkg, count] of sortedEntries(pr.fitness.byPackage).slice(0, 12)) {
+    lines.push(`| \`${pkg}\` | ${count} |`);
+  }
+  lines.push('');
+  lines.push('## Disposition key');
+  lines.push('');
+  lines.push('| Code | Meaning |');
+  lines.push('|------|---------|');
+  lines.push('| **a** | Fix — code or docs should change |');
+  lines.push('| **b** | Accept — waiver is correct; document |');
+  lines.push('| **c** | Heuristic — improve check logic |');
+  lines.push('');
+  lines.push('Full program spec: `docs/plans/specs/suppression-triage-and-reduction.md` (local).');
+  lines.push('');
+
+  return `${lines.join('\n')}\n`;
+}
+
+function stableJson(value) {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function digest(content) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+function catalogFingerprint(catalog) {
+  const { generatedAt: _generatedAt, ...rest } = catalog;
+  return digest(stableJson(rest));
+}
+
+function markdownFingerprint(md) {
+  const normalized = md.replace(
+    /\*\*Generated:\*\* [^\n]+/,
+    '**Generated:** <regenerated-at-commit-time>',
+  );
+  return digest(normalized);
+}
+
+function writeOutputs(catalog) {
+  mkdirSync(dirname(CATALOG_JSON_PATH), { recursive: true });
+  const json = stableJson(catalog);
+  const md = renderTriageMarkdown(catalog);
+  writeFileSync(CATALOG_JSON_PATH, json);
+  writeFileSync(TRIAGE_MD_PATH, md);
+  log(`wrote ${relative(REPO_ROOT, CATALOG_JSON_PATH)}`);
+  log(`wrote ${relative(REPO_ROOT, TRIAGE_MD_PATH)}`);
+}
+
+function checkStale(catalog) {
+  const expectedJsonFp = catalogFingerprint(catalog);
+  const expectedMdFp = markdownFingerprint(renderTriageMarkdown(catalog));
+  let stale = false;
+
+  try {
+    const onDiskCatalog = JSON.parse(readFileSync(CATALOG_JSON_PATH, 'utf8'));
+    if (catalogFingerprint(onDiskCatalog) !== expectedJsonFp) {
+      log(`stale: ${relative(REPO_ROOT, CATALOG_JSON_PATH)}`);
+      stale = true;
+    }
+    if (markdownFingerprint(readFileSync(TRIAGE_MD_PATH, 'utf8')) !== expectedMdFp) {
+      log(`stale: ${relative(REPO_ROOT, TRIAGE_MD_PATH)}`);
+      stale = true;
+    }
+  } catch (err) {
+    log(`missing committed output: ${err instanceof Error ? err.message : String(err)}`);
+    stale = true;
+  }
+
+  if (stale) {
+    log('run: node scripts/catalog-suppressions.mjs');
+    process.exit(1);
+  }
+  log('suppression catalog outputs OK (fresh)');
+}
+
+function main() {
+  const args = new Set(process.argv.slice(2));
+  const catalog = buildCatalog({ collectRecords: args.has('--include-records') });
+
+  if (args.has('--stdout-json')) {
+    process.stdout.write(stableJson(catalog));
+    return;
+  }
+
+  if (args.has('--check')) {
+    checkStale(catalog);
+    return;
+  }
+
+  writeOutputs(catalog);
+  log(
+    `product-runtime: ${catalog.summary.productRuntimeFitness} fitness + ${catalog.summary.productRuntimeGraph} graph = ${catalog.summary.productRuntimeCombined}`,
+  );
+}
+
+main();

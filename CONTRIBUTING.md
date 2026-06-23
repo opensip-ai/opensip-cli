@@ -215,6 +215,30 @@ it('renders correctly', () => {
 });
 ```
 
+## Suppressions
+
+OpenSIP CLI dogfoods its own fitness checks. Inline `@fitness-ignore-*` and
+`@graph-ignore-*` directives are allowed when a check is right and the code is
+still right — but they are **ratcheted**: net-new budgeted suppressions fail
+`pnpm lint` via `pnpm gate:waiver-ratio`.
+
+**Before adding a suppression:**
+
+1. **Fix the code** when the rule applies and the change is reasonable.
+2. **Improve the check** when the pattern is valid but the heuristic misfires —
+   prefer this over a repo-only config exemption (helps all adopters).
+3. **Waive with justification** only when (1) and (2) are wrong. Every
+   `@fitness-ignore` must include `-- <reason>` (enforced by
+   `fitness-ignore-hygiene`).
+
+**Budgeted slugs** (safety + cosmetic) are capped in
+`.config/waiver-budget.json`. When you remove a waiver, lower the budget in the
+**same PR**. Unbudgeted slugs still require triage — see the matrix below.
+
+**Inventory:** `docs/internal/suppression-triage.md` (generated;
+`node scripts/catalog-suppressions.mjs`). Public syntax:
+[Ignore directives](docs/public/20-fit/03-ignore-directives.md).
+
 ## Before Submitting a PR
 
 ```bash

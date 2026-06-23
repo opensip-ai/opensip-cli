@@ -97,6 +97,7 @@ function main() {
   }
 
   log('safety waiver budget OK (no net-new)');
+  log('suppression triage matrix: docs/internal/suppression-triage.md');
 }
 
 main();

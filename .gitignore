@@ -66,6 +66,8 @@ docs/internal/*
 # docs/internal charter. Negate the bulk ignore for just this file.
 !docs/internal/subprocess-correlation-playbook.md
 !docs/internal/plugin-isolation-surface.md
+!docs/internal/suppression-catalog.json
+!docs/internal/suppression-triage.md
 !docs/internal/specs/
 !docs/internal/specs/**
 
