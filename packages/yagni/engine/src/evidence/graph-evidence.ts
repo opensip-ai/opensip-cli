@@ -59,8 +59,32 @@ export async function resolveGraphEvidence(
     };
   }
 
-  // auto: delegate to graph's cache invalidation path so stale persisted rows
-  // are rebuilt or incrementally refreshed instead of blindly reused.
+  // auto: best-effort enrichment. With a graph adapter in scope, delegate to
+  // graph's cache-invalidation path so stale persisted rows are rebuilt or
+  // incrementally refreshed. A plain `yagni` invocation, though, only loads
+  // yagni's own capabilities — no graph adapter is registered — so calling
+  // executeGraph would throw "no language adapter is registered" and graph's
+  // own error handler would log it to stderr, leaking a confusing warning.
+  // In that case degrade gracefully: reuse a previously-persisted catalog if
+  // the datastore has one (we can't rebuild without an adapter), else nothing.
+  // (Explicit `--graph build` still surfaces the actionable message.)
+  // The `graph` subscope is added to RunScope by the graph tool's module
+  // augmentation, which isn't visible in yagni's compilation (it's not part of
+  // `@opensip-cli/graph/internal`), so read the adapter count structurally.
+  const graphScope = cli.scope as { graph?: { adapters?: { size?: number } } };
+  if ((graphScope.graph?.adapters?.size ?? 0) === 0) {
+    const catalog = new CatalogRepo(datastore).loadCatalogContract();
+    return {
+      catalog,
+      mode,
+      built: false,
+      detail:
+        catalog === null
+          ? 'no graph adapter; no cached catalog'
+          : 'reused cached catalog (no adapter to rebuild)',
+    };
+  }
+
   const catalog = await buildGraphCatalog(cwd, cli, { force: false });
   return {
     catalog,

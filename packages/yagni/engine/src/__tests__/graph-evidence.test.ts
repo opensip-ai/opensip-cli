@@ -31,13 +31,21 @@ const CATALOG: GraphCatalog = {
 function cliWithDatastore(exit?: { prior?: number; current?: number }): ToolCliContext {
   const state = { code: exit?.prior };
   return {
-    scope: { datastore: () => ({}) },
+    // A graph adapter is registered → `auto` rebuilds via executeGraph.
+    scope: { datastore: () => ({}), graph: { adapters: { size: 1 } } },
     getExitCode: () => state.code,
     setExitCode: (code: number) => {
       state.code = code;
     },
     _exitState: state,
   } as unknown as ToolCliContext & { _exitState: { code?: number } };
+}
+
+/** Datastore present, but NO graph adapter registered (a plain `yagni` run). */
+function cliNoGraphAdapter(): ToolCliContext {
+  return {
+    scope: { datastore: () => ({}), graph: { adapters: { size: 0 } } },
+  } as unknown as ToolCliContext;
 }
 
 function cliWithoutDatastore(): ToolCliContext {
@@ -87,6 +95,36 @@ describe('resolveGraphEvidence', () => {
       mode: 'auto',
       built: false,
       detail: 'auto resolved graph catalog',
+    });
+  });
+
+  it('auto mode without a graph adapter reuses the cached catalog (no executeGraph, no warning)', async () => {
+    graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
+
+    const result = await resolveGraphEvidence('/repo', 'auto', cliNoGraphAdapter());
+
+    // executeGraph would log "no language adapter is registered" to stderr;
+    // the degraded path must NOT call it.
+    expect(graphMocks.executeGraph).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      catalog: CATALOG,
+      mode: 'auto',
+      built: false,
+      detail: 'reused cached catalog (no adapter to rebuild)',
+    });
+  });
+
+  it('auto mode returns null when there is no graph adapter and no cached catalog', async () => {
+    graphMocks.loadCatalogContract.mockReturnValue(null);
+
+    const result = await resolveGraphEvidence('/repo', 'auto', cliNoGraphAdapter());
+
+    expect(graphMocks.executeGraph).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      catalog: null,
+      mode: 'auto',
+      built: false,
+      detail: 'no graph adapter; no cached catalog',
     });
   });
 
