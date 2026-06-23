@@ -140,6 +140,82 @@ describe('runToolLiveView', () => {
     expect(workerTransport).toBeTypeOf('function');
   }, 10_000);
 
+  it('replays direct progress events emitted before the renderer subscribes', async () => {
+    const scope = makeScope();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    const stdoutCalls: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk, ...args) => {
+      stdoutCalls.push(String(chunk));
+      return originalWrite(chunk, ...args);
+    });
+
+    await runWithScope(scope, () =>
+      runToolLiveView({
+        tool: 'yagni',
+        meta: { title: 'Test', description: 'Running' },
+        surface: { shape: 'pool', label: 'Running detectors...' },
+        verbose: false,
+        quiet: true,
+        progressOnDone: true,
+        produce: async (progressEmit, helpers) => {
+          progressEmit({ type: 'stage-progress', stage: 'detectors', completed: 2, total: 4 });
+          helpers.setRunning(() => {
+            // In-process direct-emitter path.
+          });
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+          return {
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+          };
+        },
+      }),
+    );
+
+    expect(stdoutCalls.join('')).toContain('2/4 (50%)');
+    stdoutSpy.mockRestore();
+  }, 10_000);
+
+  it('replays transport progress when progressOnDone remounts the subscriber', async () => {
+    const scope = makeScope();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    const stdoutCalls: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk, ...args) => {
+      stdoutCalls.push(String(chunk));
+      return originalWrite(chunk, ...args);
+    });
+
+    await runWithScope(scope, () =>
+      runToolLiveView({
+        tool: 'graph',
+        meta: { title: 'Test', description: 'Running' },
+        surface: {
+          shape: 'phases',
+          stages: [{ id: 'parse', label: 'Parse project' }],
+        },
+        verbose: false,
+        quiet: true,
+        progressOnDone: true,
+        produce: async (_progressEmit, helpers) => {
+          helpers.setRunning((cb) => {
+            cb({ type: 'stage-done', stage: 'parse', durationMs: 1200, detail: '42 file(s)' });
+          });
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+          return {
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+          };
+        },
+      }),
+    );
+
+    expect(stdoutCalls.join('')).toContain('42 file(s) (1.2s)');
+    stdoutSpy.mockRestore();
+  }, 10_000);
+
   it('emits cli.liveview.run.start and complete observability events', async () => {
     const logger = createRunLogger({
       runId: 'RUN_liveview_test',

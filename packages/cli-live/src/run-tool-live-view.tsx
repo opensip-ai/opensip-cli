@@ -86,6 +86,10 @@ interface LiveRunnerProps {
   readonly onDone: (completion: ToolRunCompletion) => void;
 }
 
+function canPatchConsole(): boolean {
+  return typeof (console as Console & { Console?: unknown }).Console === 'function';
+}
+
 function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement {
   const { exit } = useApp();
   const [state, setState] = useState<LiveRunState>({ phase: 'loading' });
@@ -100,9 +104,21 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
     const logger = currentLogger();
     logger.info({ evt: 'cli.liveview.run.start', tool: spec.tool });
 
-    const progressListeners = new Set<ProgressCallback>();
+    const progressHistory: ProgressEvent[] = [];
+    let activeProgressListener: ProgressCallback | undefined;
+    const publishProgressEvent = (event: ProgressEvent): void => {
+      progressHistory.push(event);
+      activeProgressListener?.(event);
+    };
+    const subscribeProgress =
+      (subscribe: (cb: ProgressCallback) => void) =>
+      (cb: ProgressCallback): void => {
+        activeProgressListener = cb;
+        for (const event of progressHistory) cb(event);
+        subscribe(publishProgressEvent);
+      };
     const emit = (event: ProgressEvent): void => {
-      for (const listener of progressListeners) listener(event);
+      publishProgressEvent(event);
     };
 
     const helpers: LiveRunProduceHelpers = {
@@ -114,13 +130,11 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
       },
       setRunning: (subscribe) => {
         if (cancelled) return;
-        doneSubscribeRef.current = subscribe;
+        const bridgedSubscribe = subscribeProgress(subscribe);
+        doneSubscribeRef.current = bridgedSubscribe;
         setState({
           phase: 'running',
-          subscribe: (cb) => {
-            progressListeners.add(cb);
-            subscribe(cb);
-          },
+          subscribe: bridgedSubscribe,
         });
       },
     };
@@ -159,12 +173,7 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
         setState({
           phase: 'done',
           ...(spec.progressOnDone === true && doneSubscribe !== undefined
-            ? {
-                subscribe: (cb) => {
-                  progressListeners.add(cb);
-                  doneSubscribe(cb);
-                },
-              }
+            ? { subscribe: doneSubscribe }
             : {}),
           data: outcome.done,
         });
@@ -236,6 +245,7 @@ export async function runToolLiveView(
         />
       </ClockProvider>
     </ThemeProvider>,
+    { patchConsole: canPatchConsole() },
   );
 
   await app.waitUntilExit();

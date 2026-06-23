@@ -134,6 +134,6 @@ export async function renderYagniLive(
         };
       },
     },
-    { liveContext },
+    { liveContext, setExitCode: cli.setExitCode },
   );
 }

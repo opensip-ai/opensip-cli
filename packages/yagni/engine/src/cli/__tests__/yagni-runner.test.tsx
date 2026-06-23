@@ -79,14 +79,17 @@ function stubExecuteOutcome() {
 }
 
 let capturedSpec: LiveRunSpec | undefined;
+let capturedGlue: unknown;
 
 beforeEach(() => {
   capturedSpec = undefined;
+  capturedGlue = undefined;
   runToolLiveView.mockReset();
   executeYagniMock.mockReset();
   executeYagniMock.mockResolvedValue(stubExecuteOutcome());
-  runToolLiveView.mockImplementation((spec: LiveRunSpec) => {
+  runToolLiveView.mockImplementation((spec: LiveRunSpec, glue: unknown) => {
     capturedSpec = spec;
+    capturedGlue = glue;
     return Promise.resolve({});
   });
 });
@@ -96,6 +99,15 @@ describe('renderYagniLive produce mapping', () => {
     await renderYagniLive({ cwd: '/proj', graphMode: 'off' }, stubCli());
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
     expect(capturedSpec?.tool).toBe('yagni');
+  });
+
+  it('passes the host exit-code hook to runToolLiveView', async () => {
+    const setExitCode = vi.fn();
+    await renderYagniLive({ cwd: '/proj', graphMode: 'off' }, {
+      ...stubCli(),
+      setExitCode,
+    } as unknown as ToolCliContext);
+    expect(capturedGlue).toMatchObject({ setExitCode });
   });
 
   it('omits verbose table and lines on compact runs', async () => {

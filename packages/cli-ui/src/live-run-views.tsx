@@ -100,6 +100,7 @@ function liveRunDoneBody(
       passed={data.summary.passed}
       errors={data.summary.errors}
       warnings={data.summary.warnings}
+      {...(data.summary.durationMs === undefined ? {} : { durationMs: data.summary.durationMs })}
     />
   );
   const timedSummary =
@@ -116,14 +117,20 @@ function liveRunDoneBody(
           <Text dimColor>{data.banner}</Text>
         </Box>
       )}
-      {props.verbose && data.verboseLines !== undefined && data.verboseLines.length > 0 && (
-        <Box flexDirection="column" paddingTop={1}>
-          {renderToInk(viewVerboseLines(data.verboseLines))}
-        </Box>
-      )}
-      {props.verbose && data.verboseFindings !== undefined && data.verboseFindings.length > 0 && (
-        <Box>{renderToInk(viewFindingsGroups(data.verboseFindings))}</Box>
-      )}
+      {!props.quiet &&
+        props.verbose &&
+        data.verboseLines !== undefined &&
+        data.verboseLines.length > 0 && (
+          <Box flexDirection="column" paddingTop={1}>
+            {renderToInk(viewVerboseLines(data.verboseLines))}
+          </Box>
+        )}
+      {!props.quiet &&
+        props.verbose &&
+        data.verboseFindings !== undefined &&
+        data.verboseFindings.length > 0 && (
+          <Box>{renderToInk(viewFindingsGroups(data.verboseFindings))}</Box>
+        )}
       {tableNode !== null && (
         <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
           {renderToInk(tableNode)}
@@ -174,10 +181,10 @@ export function liveRunBody(props: LiveRunProps): React.ReactElement {
 
     case 'running': {
       return (
-        <>
+        <Box flexDirection="column">
           {header}
           <LiveProgress surface={props.surface} subscribe={props.state.subscribe} />
-        </>
+        </Box>
       );
     }
 
