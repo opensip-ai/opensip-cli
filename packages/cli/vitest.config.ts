@@ -38,6 +38,15 @@ export default mergeConfig(
           // Two-line dynamic-import wrapper around `ui/render.tsx`. Excluded
           // alongside its target.
           'src/bootstrap/render.ts',
+          // The shared Vitest aliases inline workspace dependencies so CLI
+          // integration tests can run against source. Coverage for those
+          // sibling packages belongs to their own package-level test lanes.
+          '../cli-live/src/**',
+          '../cli-ui/src/**',
+          'cli-live/src/**',
+          'cli-ui/src/**',
+          '**/packages/cli-live/src/**',
+          '**/packages/cli-ui/src/**',
         ],
         thresholds: {
           statements: 90,

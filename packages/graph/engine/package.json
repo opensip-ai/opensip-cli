@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/graph",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "Apache-2.0",
   "description": "Static call-graph + dead-end analysis (seven-stage pipeline)",
   "keywords": [

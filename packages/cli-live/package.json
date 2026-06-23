@@ -1,10 +1,12 @@
 {
   "name": "@opensip-cli/cli-live",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "Apache-2.0",
   "description": "Shared live-run runtime for OpenSIP CLI tools — state machine, produce() seam, and core glue over the cli-ui LiveRun shell.",
   "keywords": [
     "opensip-cli",
+    "static-analysis",
+    "code-quality",
     "cli",
     "terminal",
     "ink",

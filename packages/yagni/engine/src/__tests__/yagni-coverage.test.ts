@@ -483,6 +483,12 @@ describe('yagni detectors and scoring helpers', () => {
       'yagni:low',
       'plain',
     ]);
+    const detectorTieA = signal('alpha', 'medium', 10, 'exact', 'config');
+    const detectorTieB = signal('beta', 'medium', 10, 'exact', 'config');
+    expect(sortYagniSignals([detectorTieB, detectorTieA]).map((s) => s.ruleId)).toEqual([
+      'yagni:alpha',
+      'yagni:beta',
+    ]);
 
     const summary = buildYagniRunSummary([low, medium, high, plain], 'reuse', [
       { id: 'skipped', slug: 'yagni:skipped', reason: 'disabled' },

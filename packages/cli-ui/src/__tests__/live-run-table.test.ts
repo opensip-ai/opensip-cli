@@ -61,6 +61,36 @@ describe('liveRunTable', () => {
     expect(text).toContain('4 files');
   });
 
+  it('classifies ignore and duration thresholds while rendering fitness rows', () => {
+    const node = liveRunTable([
+      {
+        unit: 'moderate-ignore-rate',
+        status: 'ERROR',
+        errors: 0,
+        warnings: 0,
+        durationMs: 35_000,
+        validated: 100,
+        ignored: 6,
+        itemType: 'files',
+      },
+      {
+        unit: 'high-ignore-rate',
+        status: 'PASS',
+        errors: 0,
+        warnings: 0,
+        durationMs: 65_000,
+        validated: 100,
+        ignored: 11,
+        itemType: 'files',
+      },
+    ]);
+    const text = renderToText(node!);
+    expect(text).toContain('moderate-ignore-rate');
+    expect(text).toContain('high-ignore-rate');
+    expect(text).toContain('35.0s');
+    expect(text).toContain('1m 5.0s');
+  });
+
   it('sorts failing rows before passing rows', () => {
     const node = liveRunTable([
       {

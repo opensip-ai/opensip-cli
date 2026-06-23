@@ -2,6 +2,33 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.11] - 2026-06-23
+
+A polish and hardening patch over 0.1.10. It unifies live-run terminal
+rendering across tools, improves the YAGNI dashboard/reporting surface, and
+tightens graph and release guardrails.
+
+### Added
+
+- Dashboard report support for the YAGNI tab, with the detectors view aligned to
+  the graph catalog table.
+- A per-file source-size guard for graph adapter parse reads, preventing
+  unbounded-memory reads during graph analysis.
+
+### Changed
+
+- Consolidated live-run terminal rendering around `@opensip-cli/cli-live` and
+  `@opensip-cli/cli-ui`, including one terminal-table renderer, consistent run
+  banners, preserved shared progress, and rounded sub-second summary durations.
+
+### Fixed
+
+- Suppressed the misleading graph "no adapter" warning during YAGNI auto-mode
+  evidence collection.
+- Fixed dashboard session-detail rendering for YAGNI report data.
+- Hardened release/CI checks by verifying injected workspace copies include
+  their entry point and by using the nested `fit baseline export` path.
+
 ## [0.1.10] - 2026-06-22
 
 A maintenance patch over 0.1.9 (all of 0.1.9's changes are included below). It

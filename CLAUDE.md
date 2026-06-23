@@ -332,8 +332,19 @@ fn)`, every async descendant of `fn` sees the same scope. The
   Commander preAction hook uses `enterScope` so the action body
   invoked after the hook returns still resolves the same scope.
 - `getCheckConfig(slug)` reads from `currentScope()?.recipeCheckConfig`.
-  It does NOT read from `globalThis` and the `Symbol.for(globalThis)`
-  slot has been deleted.
+  It does NOT read run state from `globalThis` — the old
+  `Symbol.for(globalThis)` slot that held run state (`recipeCheckConfig`)
+  stays deleted. There IS one `Symbol.for('@opensip-cli/core/scopeStorage')`
+  slot on `globalThis`, but it holds only the `AsyncLocalStorage`
+  *container* (infrastructure), not run state: pinning the ALS instance
+  process-globally lets duplicate physical copies of `@opensip-cli/core`
+  (pnpm `injectWorkspacePackages` hard-links a nested core into the
+  virtual store) share one scope store instead of splitting it — which
+  otherwise leaves `currentScope()` undefined in check execution and
+  silently degrades content filters to raw. The scope *value* still flows
+  per-async-context through `runWithScope`/`enterScope`, so this does NOT
+  reintroduce module-level mutable run state. See `run-scope.ts` (ALS seam)
+  and the fitness-transitive probe in `single-core-guard.ts`.
 - Registration of tools, languages, scenarios, recipes, and checks is
   ALWAYS explicit. `defineX(...)` returns a value; the caller
   registers it via the plugin loader or by passing it into a
@@ -611,7 +622,7 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v0.1.10 (initial production launch)** — OpenSIP CLI is a tool-plugin
+**v0.1.11 (initial production launch)** — OpenSIP CLI is a tool-plugin
 platform: `core` is a strict kernel, and `fitness`, `graph`,
 `simulation`, and `yagni` are peer tools implementing a shared Tool
 contract, with

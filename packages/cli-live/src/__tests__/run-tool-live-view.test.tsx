@@ -13,15 +13,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runToolLiveView } from '../run-tool-live-view.js';
 
+import type { RunScopeOptions } from '@opensip-cli/core';
+
 const ACT_GLOBAL = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 ACT_GLOBAL.IS_REACT_ACT_ENVIRONMENT = true;
 
-function makeScope(logger?: ReturnType<typeof createRunLogger>): RunScope {
+function makeScope(opts: RunScopeOptions = {}): RunScope {
   return new RunScope({
+    ...opts,
     languages: new LanguageRegistry(),
+    logger: opts.logger,
     tools: new ToolRegistry(),
     runId: 'RUN_liveview_test',
-    ...(logger === undefined ? {} : { logger }),
   });
 }
 
@@ -53,29 +56,34 @@ describe('runToolLiveView', () => {
   });
   it('returns session and envelope from a successful produce()', async () => {
     const scope = makeScope();
+    const onEnvelope = vi.fn();
     const completion = await runWithScope(scope, () =>
-      runToolLiveView({
-        tool: 'yagni',
-        meta: { title: 'Test', description: 'Running' },
-        surface: { shape: 'pool', label: 'Working...' },
-        verbose: false,
-        quiet: true,
-        produce: () =>
-          Promise.resolve({
-            kind: 'done',
-            done: { summary: { passed: true, errors: 0, warnings: 0 } },
-            session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
-            envelope: {
-              signals: [],
-              units: [],
-              verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
-            },
-          }),
-      }),
+      runToolLiveView(
+        {
+          tool: 'yagni',
+          meta: { title: 'Test', description: 'Running' },
+          surface: { shape: 'pool', label: 'Working...' },
+          verbose: false,
+          quiet: true,
+          produce: () =>
+            Promise.resolve({
+              kind: 'done',
+              done: { summary: { passed: true, errors: 0, warnings: 0 } },
+              session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
+              envelope: {
+                signals: [],
+                units: [],
+                verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
+              },
+            }),
+        },
+        { onEnvelope },
+      ),
     );
 
     expect(completion.session?.tool).toBe('yagni');
     expect(completion.envelope?.signals).toEqual([]);
+    expect(onEnvelope).toHaveBeenCalledWith(completion.envelope);
   }, 10_000);
 
   it('invokes setExitCode on produce error outcomes', async () => {
@@ -104,6 +112,58 @@ describe('runToolLiveView', () => {
     expect(setExitCode).toHaveBeenCalledWith(2);
   }, 10_000);
 
+  it('renders suggested recovery text for produce error outcomes', async () => {
+    const scope = makeScope();
+    const setExitCode = vi.fn();
+
+    await runWithScope(scope, () =>
+      runToolLiveView(
+        {
+          tool: 'sim',
+          meta: { title: 'Test', description: 'Running' },
+          surface: { shape: 'pool', label: 'Working...' },
+          verbose: false,
+          quiet: true,
+          produce: () =>
+            Promise.resolve({
+              kind: 'error',
+              message: 'invalid recipe',
+              suggestion: 'Run opensip sim recipes',
+              exitCode: 2,
+            }),
+        },
+        { setExitCode },
+      ),
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(2);
+  }, 10_000);
+
+  it('allows progressOnDone without a running subscriber', async () => {
+    const scope = makeScope();
+
+    const completion = await runWithScope(scope, () =>
+      runToolLiveView({
+        tool: 'graph',
+        meta: { title: 'Test', description: 'Running' },
+        surface: {
+          shape: 'phases',
+          stages: [{ id: 'parse', label: 'Parse project' }],
+        },
+        verbose: false,
+        quiet: true,
+        progressOnDone: true,
+        produce: () =>
+          Promise.resolve({
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+          }),
+      }),
+    );
+
+    expect(completion).toEqual({});
+  }, 10_000);
+
   it('passes emit and setRunning helpers to produce()', async () => {
     const scope = makeScope();
     let helperSurface:
@@ -125,6 +185,8 @@ describe('runToolLiveView', () => {
         produce: (progressEmit, helpers) => {
           progressEmit({ type: 'stage-start', stage: 'checks', label: 'Checks' });
           helperSurface = helpers;
+          helpers.setHeaderMetadata([{ label: 'checks', value: '1/1' }]);
+          helpers.setShowRunHeader(false);
           helpers.setRunning(workerTransport);
           return Promise.resolve({
             kind: 'done',
@@ -138,6 +200,37 @@ describe('runToolLiveView', () => {
     expect(helperSurface?.setHeaderMetadata).toBeTypeOf('function');
     expect(helperSurface?.setShowRunHeader).toBeTypeOf('function');
     expect(workerTransport).toBeTypeOf('function');
+  }, 10_000);
+
+  it('reads UI and project defaults from the current run scope', async () => {
+    const scope = makeScope({
+      ui: { bannerSize: 'mini', version: '0.1.11', update: '0.1.12' },
+      projectContext: {
+        cwd: '/repo/subdir',
+        cwdExplicit: false,
+        projectRoot: '/repo',
+        configPath: '/repo/opensip-cli.config.yml',
+        walkedUp: 1,
+        scope: 'project',
+      },
+    });
+
+    const completion = await runWithScope(scope, () =>
+      runToolLiveView({
+        tool: 'fit',
+        meta: { title: 'Test', description: 'Running' },
+        surface: { shape: 'pool', label: 'Working...' },
+        verbose: false,
+        quiet: true,
+        produce: () =>
+          Promise.resolve({
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+          }),
+      }),
+    );
+
+    expect(completion).toEqual({});
   }, 10_000);
 
   it('replays direct progress events emitted before the renderer subscribes', async () => {
@@ -223,7 +316,7 @@ describe('runToolLiveView', () => {
       silent: false,
       level: 'info',
     });
-    const scope = makeScope(logger);
+    const scope = makeScope({ logger });
 
     await runWithScope(scope, () =>
       runToolLiveView({
@@ -252,7 +345,7 @@ describe('runToolLiveView', () => {
       silent: false,
       level: 'info',
     });
-    const scope = makeScope(logger);
+    const scope = makeScope({ logger });
     const setExitCode = vi.fn();
 
     await runWithScope(scope, () =>
@@ -288,7 +381,7 @@ describe('runToolLiveView', () => {
       silent: false,
       level: 'info',
     });
-    const scope = makeScope(logger);
+    const scope = makeScope({ logger });
     const setExitCode = vi.fn();
 
     await runWithScope(scope, () =>

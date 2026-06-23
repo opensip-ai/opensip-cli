@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.10
+release: v0.1.11
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
 purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."

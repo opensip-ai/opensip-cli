@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/root",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "license": "Apache-2.0",
   "description": "OpenSIP CLI — codebase intelligence from your terminal",

@@ -2,11 +2,11 @@
      Change the package's "description" (or the generator template) and run
      `pnpm docs:readmes`. CI enforces sync via `pnpm docs:readmes:check`. -->
 
-# @opensip-cli/checks-python
+# @opensip-cli/cli-live
 
-> Python fitness checks for opensip-cli
+> Shared live-run runtime for OpenSIP CLI tools — state machine, produce() seam, and core glue over the cli-ui LiveRun shell.
 
-This is a **fitness check pack**. Install it alongside the `opensip-cli` CLI and its checks are discovered automatically.
+This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
 Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
 
@@ -20,13 +20,13 @@ Most users install the CLI, which bundles the first-party tools:
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
-This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-cli/checks-python` directly.
+This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-cli/cli-live` directly.
 
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
 - 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.11/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.11/packages/fitness/checks-python
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.11/packages/cli-live
 
 ## License
 

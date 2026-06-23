@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-14
-release: v0.1.10
+release: v0.1.11
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
@@ -59,8 +59,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
     ]
   },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^0.1.10",
-    "@opensip-cli/core": "^0.1.10"
+    "@opensip-cli/contracts": "^0.1.11",
+    "@opensip-cli/core": "^0.1.11"
   }
 }
 ```
@@ -220,7 +220,7 @@ carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
 The runtime contract is unchanged — the directory's resolved main must export
 `tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
 Authored discovery, admission, dynamic import, and registration travel the exact
-same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.11/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
 > **Sidecar vs `tools install --project`.** `tools install --project` *installs an
 > npm package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
