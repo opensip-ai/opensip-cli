@@ -47,17 +47,18 @@ Once a Tool exists as a package, the customer-facing management surface is the [
   "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
-  "opensipTools": {
-    "kind": "tool",
-    "id": "audit-sec",
-    "apiVersion": 1,
-    "commands": [
-      { "name": "audit-sec", "description": "Run the security audit" },
-      { "name": "list", "description": "List audit rules" },
-      { "name": "recipes", "description": "List audit recipes" },
-      { "name": "export", "description": "Export audit artifacts (--format sarif)" }
-    ]
-  },
+	  "opensipTools": {
+	    "kind": "tool",
+	    "id": "audit-sec",
+	    "identity": { "name": "audit-sec" },
+	    "apiVersion": 1,
+	    "commands": [
+	      { "name": "audit-sec", "description": "Run the security audit" },
+	      { "name": "list", "parent": "audit-sec", "description": "List audit rules" },
+	      { "name": "recipes", "parent": "audit-sec", "description": "List audit recipes" },
+	      { "name": "export", "parent": "audit-sec", "description": "Export audit artifacts (--format sarif)" }
+	    ]
+	  },
   "peerDependencies": {
     "@opensip-cli/contracts": "^0.1.10",
     "@opensip-cli/core": "^0.1.10"
@@ -68,7 +69,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
 The `opensipTools` block is your tool's **static manifest** — read before your module is imported, so the host knows what it's admitting:
 
 - **`kind: "tool"`** — the marker that makes the CLI discover your package.
-- **`id`** — your tool's stable identity; must equal the runtime `tool.metadata.id`.
+- **`id`** — your canonical human key; must equal `identity.name` and runtime `tool.metadata.name`.
+- **`identity`** — the single source for the primary command, aliases, config namespace, and layout key.
 - **`apiVersion`** — the plugin-API epoch you target (currently `1`). A tool
   that declares no `apiVersion` is not admitted (it fail-closes when run
   explicitly, or is skipped with a diagnostic when discovered).
@@ -89,22 +91,25 @@ add `--json` yourself, and never write to stdout — the host renders your resul
 wraps `--json` in a `CommandOutcome`.
 
 ```ts
-import { defineCommand, defineTool, type ToolCliContext } from '@opensip-cli/core';
+import {
+  defineNestedCommand,
+  definePrimaryCommand,
+  defineTool,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { listAuditRecipes, listAuditRules, runAudit } from './audit.js';
 
 export const tool = defineTool({
+  identity: { name: 'audit-sec' },
   metadata: {
-    id: 'audit-sec', // must equal opensipTools.id in package.json
-    name: 'audit-sec', // primary verb — mounts as `opensip audit-sec`
+    id: '0c9d1b75-1d6c-4d42-a2f7-76907c3f0181',
     version: '1.0.0',
     description: 'Lightweight security audit',
   },
-  // The typed specs the host mounts (mountCommandSpec). `defineTool` derives
-  // `commands[]` from these — the manifest's `opensipTools.commands` name set
-  // must match (the host asserts at load).
+  // defineTool derives metadata.name, the primary command name, aliases,
+  // nested parents, and commands[] from identity + these specs.
   commandSpecs: [
-    defineCommand<{ cwd: string }, ToolCliContext>({
-      name: 'audit-sec',
+    definePrimaryCommand<{ cwd: string }, ToolCliContext>({
       description: 'Run the security audit',
       commonFlags: ['cwd', 'json'],
       scope: 'project',
@@ -115,27 +120,24 @@ export const tool = defineTool({
         return result;
       },
     }),
-    defineCommand<{ cwd: string }, ToolCliContext>({
+    defineNestedCommand<{ cwd: string }, ToolCliContext>({
       name: 'list',
-      parent: 'audit-sec', // nested: `opensip audit-sec list`
       description: 'List audit rules',
       commonFlags: ['cwd', 'json'],
       scope: 'project',
       output: 'command-result',
       handler: async (opts) => listAuditRules(opts.cwd),
     }),
-    defineCommand<{ cwd: string }, ToolCliContext>({
+    defineNestedCommand<{ cwd: string }, ToolCliContext>({
       name: 'recipes',
-      parent: 'audit-sec', // nested: `opensip audit-sec recipes`
       description: 'List audit recipes',
       commonFlags: ['cwd', 'json'],
       scope: 'project',
       output: 'command-result',
       handler: async (opts) => listAuditRecipes(opts.cwd),
     }),
-    defineCommand<{ cwd: string; out: string }, ToolCliContext>({
+    defineNestedCommand<{ cwd: string; out: string }, ToolCliContext>({
       name: 'export',
-      parent: 'audit-sec', // nested: `opensip audit-sec export --format sarif`
       description: 'Export audit artifacts',
       commonFlags: ['cwd', 'json'],
       options: [
@@ -162,7 +164,8 @@ export const tool = defineTool({
 
 `defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
 nested children). The manifest lists every command by **short name** — `list`,
-`recipes`, `export` — not as nested paths; mounting uses `parent` on the spec.
+`recipes`, `export` — not as nested paths; external-host mounting uses the
+serializable `parent` field in the manifest command shell.
 See [Command surface taxonomy](./07-command-taxonomy.md) for the full Tier-1/2/3
 grammar.
 
@@ -196,24 +199,26 @@ whole-subcommand analogue of the `opensip-cli/fit/checks/` and
   so it loads without an allowlist. Provenance is `user-global`.
 
 The sidecar **is** the manifest block (there is no `package.json` alongside it),
-carrying the same identity fields inline — `kind`, `id`, `name`, `version`,
-`apiVersion`, `commands` — plus the path to the tool's own resolved main entry:
+carrying the same identity fields inline — `kind`, `id`, `identity`, `name`,
+`version`, `apiVersion`, `commands` — plus the path to the tool's own resolved
+main entry:
 
 ```jsonc
 // <project>/opensip-cli/tools/audit-sec/opensip-tool.manifest.json
 {
-  "kind": "tool",
-  "id": "audit-sec",
-  "name": "Security audit",
+	  "kind": "tool",
+	  "id": "audit-sec",
+	  "identity": { "name": "audit-sec" },
+	  "name": "Security audit",
   "version": "1.0.0",
   "apiVersion": 1,
   "main": "dist/index.js",
-  "commands": [
-    { "name": "audit-sec", "description": "Run the security audit" },
-    { "name": "list", "description": "List audit rules" },
-    { "name": "recipes", "description": "List audit recipes" },
-    { "name": "export", "description": "Export audit artifacts (--format sarif)" }
-  ]
+	  "commands": [
+	    { "name": "audit-sec", "description": "Run the security audit" },
+	    { "name": "list", "parent": "audit-sec", "description": "List audit rules" },
+	    { "name": "recipes", "parent": "audit-sec", "description": "List audit recipes" },
+	    { "name": "export", "parent": "audit-sec", "description": "Export audit artifacts (--format sarif)" }
+	  ]
 }
 ```
 

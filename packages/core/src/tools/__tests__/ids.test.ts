@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { ValidationError } from '../../lib/errors.js';
 import {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,
@@ -14,6 +15,7 @@ import {
   isToolLongId,
   isToolShortId,
 } from '../ids.js';
+import { buildToolIdentityIndex } from '../identity-index.js';
 import { isRegisteredToolId, registeredToolShortIds } from '../registered-ids.js';
 import { ToolRegistry } from '../registry.js';
 
@@ -38,6 +40,20 @@ const toolWithReplay = (name: string, replayTool: string): Tool => ({
   extensionPoints: {
     sessionReplay: { tool: replayTool, replaySession: () => ({}) },
   },
+});
+
+const indexedTool = (
+  name: string,
+  identity: Tool['identity'] = { name },
+): Tool => ({
+  identity,
+  metadata: {
+    id: `00000000-0000-4000-8000-${name.padEnd(12, '0').slice(0, 12)}`,
+    name,
+    version: '0.0.0',
+    description: `${name} stub`,
+  },
+  commands: [{ name, description: `${name} command` }],
 });
 
 describe('tool-id registry', () => {
@@ -145,6 +161,32 @@ describe('tool-id registry', () => {
 
     it('is empty for an empty registry', () => {
       expect(registeredToolShortIds(new ToolRegistry()).size).toBe(0);
+    });
+  });
+
+  describe('buildToolIdentityIndex conflicts', () => {
+    it('allows one tool to use the same alias and layoutKey', () => {
+      const reg = new ToolRegistry();
+      reg.register(indexedTool('fitness', { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' }));
+      const index = buildToolIdentityIndex(reg);
+      expect(index.resolveInput('fit')?.canonicalName).toBe('fitness');
+      expect(index.canonicalForStoredTool('fit')).toBe('fitness');
+    });
+
+    it('throws when two tools share an alias', () => {
+      const reg = new ToolRegistry();
+      reg.register(indexedTool('alpha', { name: 'alpha', aliases: ['shared'] }));
+      reg.register(indexedTool('beta', { name: 'beta', aliases: ['shared'] }));
+      expect(() => buildToolIdentityIndex(reg)).toThrow(ValidationError);
+      expect(() => buildToolIdentityIndex(reg)).toThrow(/declared by both 'alpha' and 'beta'/);
+    });
+
+    it('throws when a layoutKey collides with another tool input', () => {
+      const reg = new ToolRegistry();
+      reg.register(indexedTool('alpha', { name: 'alpha', aliases: ['a'] }));
+      reg.register(indexedTool('beta', { name: 'beta', layoutKey: 'a' }));
+      expect(() => buildToolIdentityIndex(reg)).toThrow(ValidationError);
+      expect(() => buildToolIdentityIndex(reg)).toThrow(/Tool identity input 'a'/);
     });
   });
 

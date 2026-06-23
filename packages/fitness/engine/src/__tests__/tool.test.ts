@@ -22,11 +22,16 @@ const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')
 };
 
 describe('fitnessTool contract conformance', () => {
-  it("metadata.name is the command verb 'fit'; id is the stable UUID", () => {
-    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
-    // verb (`fit`). The config namespace literal stays `fitness` (decoupled).
-    expect(fitnessTool.metadata.name).toBe('fit');
+  it("metadata.name is the canonical identity 'fitness'; id is the stable UUID", () => {
+    expect(fitnessTool.identity).toEqual({
+      name: 'fitness',
+      aliases: ['fit'],
+      layoutKey: 'fit',
+    });
+    expect(fitnessTool.metadata.name).toBe('fitness');
     expect(fitnessTool.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
+    expect(fitnessTool.pluginLayout?.domain).toBe('fit');
+    expect(resolveToolHooks(fitnessTool).sessionReplay?.tool).toBe('fit');
   });
 
   it('metadata.version matches package.json', () => {
@@ -37,9 +42,9 @@ describe('fitnessTool contract conformance', () => {
     expect(fitnessTool.metadata.description.length).toBeGreaterThan(0);
   });
 
-  it('commands list includes fit + the nested list/recipes/export children', () => {
+  it('commands list includes fitness + the nested list/recipes/export children', () => {
     const names = (fitnessTool.commands ?? []).map((c) => c.name);
-    expect(names).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    expect(names).toEqual(expect.arrayContaining(['fitness', 'list', 'recipes', 'export']));
     // The legacy flat-root aliases are gone.
     expect(names).not.toContain('fit-list');
     expect(names).not.toContain('fit-recipes');
@@ -60,16 +65,22 @@ describe('fitnessTool contract conformance', () => {
     expect(Array.isArray(fitnessTool.commandSpecs)).toBe(true);
     const specNames = (fitnessTool.commandSpecs ?? []).map((s) => s.name);
     expect(specNames).toEqual([
-      'fit',
+      'fitness',
       // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) —
-      // name 'list' / 'recipes', parent 'fit'.
+      // name 'list' / 'recipes', parent 'fitness'.
       'list',
       'recipes',
-      // Canonical nested export — name 'export', parent 'fit'.
+      // Canonical nested export — name 'export', parent 'fitness'.
       'export',
       // [internal] headless run forked by the live view (ADR-0028).
       'fit-run-worker',
     ]);
+    expect(fitnessTool.commandSpecs?.[0]?.aliases).toEqual(['fit']);
+    for (const child of fitnessTool.commandSpecs?.filter((s) =>
+      ['list', 'recipes', 'export'].includes(s.name),
+    ) ?? []) {
+      expect(child.parent).toBe('fitness');
+    }
   });
 
   it('the nested list/recipes/export children declare no Commander aliases', () => {

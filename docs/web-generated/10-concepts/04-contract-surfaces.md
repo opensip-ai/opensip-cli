@@ -238,11 +238,17 @@ opensip-cli discovers third-party packages two different ways depending on what 
 {
   "name": "@yourorg/your-tool",
   "main": "dist/index.js",
-  "opensipTools": { "kind": "tool" }
+  "opensipTools": {
+    "kind": "tool",
+    "id": "your-tool",
+    "identity": { "name": "your-tool" },
+    "apiVersion": 1,
+    "commands": [{ "name": "your-tool", "description": "Run your tool" }]
+  }
 }
 ```
 
-The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. The package's main entry must export a `tool: Tool` symbol.
+The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. Tool packages also carry the static identity manifest shown above, and the package's main entry must export a `tool: Tool` symbol with the same identity.
 
 ### Check packs — `opensipTools.kind` marker
 

@@ -28,9 +28,17 @@ distinct from:
   IDs never collide across repos.
 - **Append-only:** never rewrite a shipped decision. To change one, write a new
   ADR, set the old one's `status: superseded` + `superseded_by: ADR-NNNN`, and the
+  new one's `supersedes: [ADR-NNNN]`.
+- **Status** lives in each file's YAML block: `active` | `superseded` | `deferred`.
+- Start from [`TEMPLATE.md`](./TEMPLATE.md). The parent's SaaS-specific
+  `Audit-history impact` block is intentionally omitted here.
+- This index is **hand-maintained** for now; add your ADR below when you create
+  it. (A generator can follow, like `scripts/build-web-docs.mjs`.)
 
 ## Index (most recent first)
 
+- [ADR-0059](ADR-0059-tool-identity-single-source.md) — Tool Identity Single Source (each Tool declares one required `identity`; host-derived names, config namespaces, layout keys, and manifest identity replace legacy inference).
+- [ADR-0058](ADR-0058-shared-live-run-shell.md) — Shared live-run shell and `@opensip-cli/cli-live` (all first-party live views render through the shared cli-live state machine and cli-ui shell).
 - [ADR-0057](ADR-0057-yagni-reduction-audit.md) — YAGNI as a bundled Tool with graph evidence seam (the `yagni` reduction-audit tool ships as a first-party bundled tool consuming a read-only graph evidence seam).
 - [ADR-0056](ADR-0056-architecture-audit-remediation.md) — Architecture audit remediation scope (preserve the layered plugin-host DAG; remediate the 2026-06 first-look audit via policy / ratchet / discoverability / documentation fixes only — no de-layering).
 - [ADR-0055](ADR-0055-core-kernel-sub-boundaries.md) — Core Kernel Sub-Boundaries (core remains one publishable package, but its internal ownership areas are documented with extraction triggers).
@@ -51,12 +59,6 @@ distinct from:
 - ADR-0047 — Per-Tool Contract Versioning
 - ADR-0046 — Tool Contract Versioning Policy
 - (earlier ADRs follow the numbered files in this directory)
-  new one's `supersedes: [ADR-NNNN]`.
-- **Status** lives in each file's YAML block: `active` | `superseded` | `deferred`.
-- Start from [`TEMPLATE.md`](./TEMPLATE.md). The parent's SaaS-specific
-  `Audit-history impact` block is intentionally omitted here.
-- This index is **hand-maintained** for now; add your ADR below when you create
-  it. (A generator can follow, like `scripts/build-web-docs.mjs`.)
 
 ## Index
 

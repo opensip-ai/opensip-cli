@@ -26,6 +26,8 @@ function commandAliasesEqual(
  */
 export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: Tool): void {
   const runtimeHuman = tool.metadata.name;
+  const manifestIdentity = validateToolIdentity(manifest.identity);
+  const runtimeIdentity = validateToolIdentity(tool.identity);
 
   if (manifest.id !== runtimeHuman) {
     throw new ValidationError(
@@ -39,41 +41,42 @@ export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: To
     );
   }
 
-  if (manifest.identity !== undefined) {
-    const normalized = validateToolIdentity(manifest.identity);
-    if (normalized.name !== tool.identity.name) {
-      throw new ValidationError(
-        `tool manifest identity.name '${normalized.name}' does not match runtime identity.name '${tool.identity.name}'`,
-      );
-    }
-    if (manifest.id !== normalized.name) {
-      throw new ValidationError(
-        `tool manifest id '${manifest.id}' must equal identity.name '${normalized.name}'`,
-      );
-    }
-    if (!commandAliasesEqual(manifest.identity.aliases, normalized.aliases)) {
-      throw new ValidationError('tool manifest identity.aliases do not match runtime identity.aliases');
-    }
-    const layoutKey = normalized.layoutKey;
-    if (manifest.pluginLayout !== undefined && manifest.pluginLayout.domain !== layoutKey) {
-      throw new ValidationError(
-        `tool manifest pluginLayout.domain '${manifest.pluginLayout.domain}' must equal layoutKey '${layoutKey}'`,
-      );
-    }
-    if (manifest.config !== undefined && manifest.config.namespace !== normalized.name) {
-      throw new ValidationError(
-        `tool manifest config.namespace '${manifest.config.namespace}' must equal identity.name '${normalized.name}'`,
-      );
-    }
+  if (manifestIdentity.name !== runtimeIdentity.name) {
+    throw new ValidationError(
+      `tool manifest identity.name '${manifestIdentity.name}' does not match runtime identity.name '${runtimeIdentity.name}'`,
+    );
+  }
+  if (manifest.id !== manifestIdentity.name) {
+    throw new ValidationError(
+      `tool manifest id '${manifest.id}' must equal identity.name '${manifestIdentity.name}'`,
+    );
+  }
+  if (!commandAliasesEqual(manifestIdentity.aliases, runtimeIdentity.aliases)) {
+    throw new ValidationError('tool manifest identity.aliases do not match runtime identity.aliases');
+  }
+  const layoutKey = manifestIdentity.layoutKey;
+  if (manifest.pluginLayout !== undefined && manifest.pluginLayout.domain !== layoutKey) {
+    throw new ValidationError(
+      `tool manifest pluginLayout.domain '${manifest.pluginLayout.domain}' must equal layoutKey '${layoutKey}'`,
+    );
+  }
+  if (tool.pluginLayout !== undefined && tool.pluginLayout.domain !== runtimeIdentity.layoutKey) {
+    throw new ValidationError(
+      `runtime pluginLayout.domain '${tool.pluginLayout.domain}' must equal layoutKey '${runtimeIdentity.layoutKey}'`,
+    );
+  }
+  if (manifest.config !== undefined && manifest.config.namespace !== manifestIdentity.name) {
+    throw new ValidationError(
+      `tool manifest config.namespace '${manifest.config.namespace}' must equal identity.name '${manifestIdentity.name}'`,
+    );
   }
 
   const hooks = resolveToolHooks(tool);
   const primarySpec = tool.commandSpecs?.find(
     (spec) => spec.parent === undefined && spec.name === tool.metadata.name,
   );
-  if (primarySpec !== undefined && manifest.identity !== undefined) {
-    const normalized = validateToolIdentity(manifest.identity);
-    if (!commandAliasesEqual(primarySpec.aliases, [...normalized.aliases])) {
+  if (primarySpec !== undefined) {
+    if (!commandAliasesEqual(primarySpec.aliases, [...manifestIdentity.aliases])) {
       throw new ValidationError(
         'tool manifest primary command aliases do not match runtime primary spec aliases',
       );
@@ -104,7 +107,7 @@ export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: To
   }
 
   if (hooks.sessionReplay !== undefined && tool.pluginLayout !== undefined) {
-    const layoutKey = validateToolIdentity(tool.identity).layoutKey;
+    const layoutKey = runtimeIdentity.layoutKey;
     if (hooks.sessionReplay.tool !== layoutKey) {
       throw new ValidationError(
         `runtime sessionReplay.tool '${hooks.sessionReplay.tool}' must equal layoutKey '${layoutKey}'`,

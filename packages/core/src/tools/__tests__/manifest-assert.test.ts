@@ -17,8 +17,8 @@ function makeTool(
   stableId = '00000000-0000-4000-8000-000000000000',
 ): Tool {
   return {
-    identity: { name: 'test-tool' },
-      metadata: { id: stableId, name: humanName, version: '0.0.0', description: 'test tool' },
+    identity: { name: humanName },
+    metadata: { id: stableId, name: humanName, version: '0.0.0', description: 'test tool' },
     commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
   };
 }
@@ -31,6 +31,7 @@ function makeManifest(
   return {
     kind: 'tool',
     id: humanId,
+    identity: { name: humanId },
     ...(stableId ? { stableId } : {}),
     name: '@scope/test',
     version: '0.0.0',

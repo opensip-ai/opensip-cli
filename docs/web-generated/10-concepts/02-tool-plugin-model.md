@@ -244,21 +244,18 @@ The minimum viable tool, end-to-end:
 
 ```ts
 // packages/audit-sec/src/index.ts
-import { defineCommand, type Tool, type ToolCliContext } from '@opensip-cli/core';
+import { definePrimaryCommand, defineTool, type ToolCliContext } from '@opensip-cli/core';
 import { runAudit } from './audit.js';
 
-export const auditSecTool: Tool = {
+export const tool = defineTool({
+  identity: { name: 'audit-sec' },
   metadata: {
-    id: 'audit-sec',
+    id: '0c9d1b75-1d6c-4d42-a2f7-76907c3f0181',
     version: '1.0.0',
     description: 'Lightweight security audit',
   },
-  commands: [
-    { name: 'audit-sec', description: 'Run the audit' },
-  ],
   commandSpecs: [
-    defineCommand<{ cwd: string }, ToolCliContext>({
-      name: 'audit-sec',
+    definePrimaryCommand<{ cwd: string }, ToolCliContext>({
       description: 'Run the audit',
       commonFlags: ['cwd', 'json'],   // shared flags arrive for free; never declare --json yourself
       scope: 'project',
@@ -270,9 +267,7 @@ export const auditSecTool: Tool = {
       },
     }),
   ],
-};
-
-export const tool = auditSecTool; // discovery export
+});
 ```
 
 ```json
@@ -285,6 +280,7 @@ export const tool = auditSecTool; // discovery export
   "opensipTools": {
     "kind": "tool",
     "id": "audit-sec",
+    "identity": { "name": "audit-sec" },
     "apiVersion": 1,
     "commands": [{ "name": "audit-sec", "description": "Run the audit" }]
   },
@@ -295,7 +291,7 @@ export const tool = auditSecTool; // discovery export
 }
 ```
 
-That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip tools install @yourorg/audit-sec`), and `opensip audit-sec` works. For discoverability verbs (`list`, `recipes`, `export`) mount as nested children via `parent: 'audit-sec'` — see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/). For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/).
+That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip tools install @yourorg/audit-sec`), and `opensip audit-sec` works. For discoverability verbs (`list`, `recipes`, `export`) use `defineNestedCommand`; `defineTool` mounts them under `identity.name` — see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/). For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/).
 
 What you *don't* need:
 

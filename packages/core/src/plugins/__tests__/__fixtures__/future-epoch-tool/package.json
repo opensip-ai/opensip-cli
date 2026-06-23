@@ -4,6 +4,7 @@
   "opensipTools": {
     "kind": "tool",
     "id": "future",
+    "identity": { "name": "future" },
     "apiVersion": 999,
     "commands": [{ "name": "future", "description": "A tool from a later plugin-API epoch" }]
   }

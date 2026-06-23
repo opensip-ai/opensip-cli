@@ -11,6 +11,7 @@
 // the manifest's `id`, so a mismatched display name would break provenance
 // matching).
 export const tool = {
+  identity: { name: 'audit-demo-tool', aliases: ['audit-demo'] },
   metadata: {
     id: 'audit-demo-tool',
     name: 'audit-demo-tool',
@@ -18,14 +19,19 @@ export const tool = {
     description: 'Fixture tool plugin used by the e2e install-path test',
   },
   commands: [
-    { name: 'audit-demo', description: 'Demo audit command contributed by a tool plugin' },
+    {
+      name: 'audit-demo-tool',
+      aliases: ['audit-demo'],
+      description: 'Demo audit command contributed by a tool plugin',
+    },
   ],
   // 3.0.0: the one command surface is the declarative commandSpec the host mounts
   // (register() was removed). `raw-stream` output = the handler owns its output
   // surface, emitted via the `cli.emitRaw` seam so it crosses the worker boundary.
   commandSpecs: [
     {
-      name: 'audit-demo',
+      name: 'audit-demo-tool',
+      aliases: ['audit-demo'],
       description: 'Demo audit command contributed by a tool plugin',
       commonFlags: [],
       scope: 'project',

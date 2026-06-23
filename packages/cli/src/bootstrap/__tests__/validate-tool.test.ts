@@ -15,7 +15,8 @@ const minimalSpec = defineCommand({
 describe('toolValidationFailure', () => {
   it('rejects deprecated top-level hooks with an actionable message', () => {
     const value = {
-      metadata: { id: 'demo', version: '0.0.0', description: 'demo' },
+      identity: { name: 'demo' },
+      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
       commandSpecs: [minimalSpec],
       initialize: () => Promise.resolve(),
     };
@@ -26,12 +27,32 @@ describe('toolValidationFailure', () => {
 
   it('accepts hooks under extensionPoints', () => {
     const value = {
-      metadata: { id: 'demo', version: '0.0.0', description: 'demo' },
+      identity: { name: 'demo' },
+      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
       commandSpecs: [minimalSpec],
       extensionPoints: {
         initialize: () => Promise.resolve(),
       },
     };
     expect(isValidTool(value)).toBe(true);
+  });
+
+  it('rejects tools without identity', () => {
+    const value = {
+      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
+      commandSpecs: [minimalSpec],
+    };
+    expect(isValidTool(value)).toBe(false);
+    expect(toolValidationFailure(value)).toContain('Tool identity is required');
+  });
+
+  it('rejects metadata.name drift from identity.name', () => {
+    const value = {
+      identity: { name: 'demo' },
+      metadata: { id: 'demo', name: 'other', version: '0.0.0', description: 'demo' },
+      commandSpecs: [minimalSpec],
+    };
+    expect(isValidTool(value)).toBe(false);
+    expect(toolValidationFailure(value)).toContain("must equal tool.identity.name 'demo'");
   });
 });

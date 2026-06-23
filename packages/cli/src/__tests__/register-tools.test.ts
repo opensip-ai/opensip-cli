@@ -107,7 +107,7 @@ describe('registerFirstPartyTools', () => {
       expect(record.manifestHash.length).toBeGreaterThan(0);
       expect(record.packageName).toMatch(/^@opensip-cli\//);
     }
-    // Task 2.4: the manifest `id` (human key) now equals the short verb.
+    // Manifest ids follow identity.name, the canonical human key.
     expect(provenance.map((p) => p.id)).toEqual(
       expect.arrayContaining(['fitness', 'simulation', 'graph']),
     );
@@ -188,6 +188,7 @@ describe('registerFirstPartyTools', () => {
         opensipTools: {
           kind: 'tool',
           id: 'broken-bundled',
+          identity: { name: 'broken-bundled' },
           apiVersion: 1,
           commands: [
             {
@@ -218,7 +219,8 @@ describe('registerFirstPartyTools', () => {
 /** A minimal tool that mounts one command via the declarative commandSpecs path. */
 function specTool(id: string, commandName: string): Tool {
   return {
-    metadata: { id, name: id, version: '0.0.0', description: id },
+    identity: { name: commandName },
+    metadata: { id, name: commandName, version: '0.0.0', description: id },
     commands: [{ name: commandName, description: `${commandName} cmd` }],
     commandSpecs: [
       {
@@ -251,6 +253,7 @@ describe('mountAllToolCommands', () => {
     const registry = makeRegistry();
     // A tool with neither commandSpecs nor any mount surface — a mis-declaration.
     registry.register({
+      identity: { name: 'empty' },
       metadata: {
         id: 'tool-empty',
         name: 'empty',
@@ -278,6 +281,7 @@ describe('mountAllToolCommands', () => {
     const registry = makeRegistry();
     // A malformed spec (a required boolean flag) throws inside mountCommandSpec.
     registry.register({
+      identity: { name: 'bad' },
       metadata: {
         id: 'tool-bad',
         name: 'bad',
@@ -321,6 +325,7 @@ describe('mountAllToolCommands', () => {
   it('isolates an external tool whose spec fails to mount so the rest still mount', () => {
     const registry = makeRegistry();
     registry.register({
+      identity: { name: 'bad' },
       metadata: {
         id: 'tool-bad',
         name: 'bad',
@@ -425,10 +430,29 @@ interface Fixture {
   readonly dir: string;
 }
 
+function withDefaultToolIdentity(packageJson: object): object {
+  const json = packageJson as { opensipTools?: Record<string, unknown> };
+  const manifest = json.opensipTools;
+  if (
+    manifest?.kind === 'tool' &&
+    typeof manifest.id === 'string' &&
+    manifest.identity === undefined
+  ) {
+    return {
+      ...packageJson,
+      opensipTools: {
+        ...manifest,
+        identity: { name: manifest.id },
+      },
+    };
+  }
+  return packageJson;
+}
+
 function stageFixture(shortName: string, files: { packageJson: object; indexJs: string }): Fixture {
   const dir = join(FIXTURE_SCOPE, shortName);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'package.json'), JSON.stringify(files.packageJson), 'utf8');
+  writeFileSync(join(dir, 'package.json'), JSON.stringify(withDefaultToolIdentity(files.packageJson)), 'utf8');
   writeFileSync(join(dir, 'index.js'), files.indexJs, 'utf8');
   return { name: `@opensip-cli-fixture/${shortName}`, dir };
 }
@@ -480,7 +504,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0', description: 'fixture' }, commandSpecs: [{ name: 'fixture-valid', description: 'x', commonFlags: ['json'], scope: 'project', output: 'command-result', handler: () => Promise.resolve({ type: 'text-lines', title: 't', lines: [] }) }] };",
+          "export const tool = { identity: { name: 'fixture-valid' }, metadata: { id: '00000000-0000-4000-8000-0000000000b2', name: 'fixture-valid', version: '0.0.0', description: 'fixture' }, commandSpecs: [{ name: 'fixture-valid', description: 'x', commonFlags: ['json'], scope: 'project', output: 'command-result', handler: () => Promise.resolve({ type: 'text-lines', title: 't', lines: [] }) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -538,7 +562,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000d5', name: 'fixture-trust-allowed', version: '0.0.0', description: 'fixture' }, commandSpecs: [{ name: 'fixture-trust-allowed', description: 'x', commonFlags: ['json'], scope: 'project', output: 'command-result', handler: () => Promise.resolve({ type: 'text-lines', title: 't', lines: [] }) }] };",
+          "export const tool = { identity: { name: 'fixture-trust-allowed' }, metadata: { id: '00000000-0000-4000-8000-0000000000d5', name: 'fixture-trust-allowed', version: '0.0.0', description: 'fixture' }, commandSpecs: [{ name: 'fixture-trust-allowed', description: 'x', commonFlags: ['json'], scope: 'project', output: 'command-result', handler: () => Promise.resolve({ type: 'text-lines', title: 't', lines: [] }) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -578,7 +602,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           },
         },
         indexJs:
-          "export const tool = { metadata: { id: '00000000-0000-4000-8000-0000000000c3', name: 'fixture-drift', version: '0.0.0' }, commands: [{ name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'c', description: 'c', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
+          "export const tool = { identity: { name: 'fixture-drift' }, metadata: { id: '00000000-0000-4000-8000-0000000000c3', name: 'fixture-drift', version: '0.0.0', description: 'fixture' }, commands: [{ name: 'fixture-drift', description: 'x' }, { name: 'something-else', description: 'x' }], commandSpecs: [{ name: 'fixture-drift', description: 'x', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }, { name: 'something-else', parent: 'fixture-drift', description: 'x', commonFlags: [], scope: 'project', output: 'command-result', handler: () => Promise.resolve({}) }] };",
       }),
     );
     const registry = new ToolRegistryClass();
@@ -686,6 +710,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
         opensipTools: {
           kind: 'tool',
           id: 'fixture-no-entry',
+          identity: { name: 'fixture-no-entry' },
           apiVersion: 1,
           commands: [{ name: 'fixture-no-entry', description: 'x' }],
         },

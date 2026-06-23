@@ -5,7 +5,15 @@
  * A Tool plugin is any npm package (scoped or unscoped, first- or third-
  * party) whose `package.json` declares:
  *
- *   { "opensipTools": { "kind": "tool" } }
+ *   {
+ *     "opensipTools": {
+ *       "kind": "tool",
+ *       "id": "audit-sec",
+ *       "identity": { "name": "audit-sec" },
+ *       "apiVersion": 1,
+ *       "commands": [{ "name": "audit-sec", "description": "Run the audit" }]
+ *     }
+ *   }
  *
  * The walker itself lives in `marker-discovery.ts` — this file preserves
  * the public surface (`discoverToolPackages`, `DiscoveredToolPackage`)

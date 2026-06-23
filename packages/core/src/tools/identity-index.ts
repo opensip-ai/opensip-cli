@@ -3,6 +3,7 @@
  */
 
 import { resolveToolHooks } from './resolve-tool-hooks.js';
+import { ValidationError } from '../lib/errors.js';
 import { validateToolIdentity } from './identity.js';
 
 import type { ToolIdentity } from './identity.js';
@@ -18,6 +19,31 @@ export interface ToolIdentityIndex {
   readonly bindings: readonly ToolIdentityBinding[];
   resolveInput(input: string): ToolIdentityBinding | undefined;
   canonicalForStoredTool(tool: string): string;
+}
+
+function assertIdentityInputAvailable(
+  inputToBinding: Map<string, ToolIdentityBinding>,
+  input: string,
+  binding: ToolIdentityBinding,
+): void {
+  const incumbent = inputToBinding.get(input);
+  if (incumbent === undefined || incumbent.canonicalName === binding.canonicalName) {
+    return;
+  }
+  throw new ValidationError(
+    `Tool identity input '${input}' is declared by both '${incumbent.canonicalName}' and '${binding.canonicalName}'.`,
+    { code: 'TOOL.IDENTITY.CONFLICT' },
+  );
+}
+
+function addIdentityInput(
+  inputToBinding: Map<string, ToolIdentityBinding>,
+  input: string | undefined,
+  binding: ToolIdentityBinding,
+): void {
+  if (input === undefined) return;
+  assertIdentityInputAvailable(inputToBinding, input, binding);
+  inputToBinding.set(input, binding);
 }
 
 function bindingFromTool(identity: ToolIdentity, layoutKey: string): ToolIdentityBinding {
@@ -36,7 +62,11 @@ export function buildToolIdentityIndex(registry: ToolRegistry): ToolIdentityInde
 
   for (const tool of registry.list()) {
     const identity = tool.identity;
-    if (identity === undefined) continue;
+    if (identity === undefined) {
+      throw new ValidationError(`Registered tool '${tool.metadata.name}' is missing identity.`, {
+        code: 'TOOL.IDENTITY.REQUIRED',
+      });
+    }
 
     const hooks = resolveToolHooks(tool);
     const layoutKey =
@@ -44,17 +74,13 @@ export function buildToolIdentityIndex(registry: ToolRegistry): ToolIdentityInde
     const binding = bindingFromTool(identity, layoutKey);
 
     bindings.push(binding);
-    inputToBinding.set(binding.canonicalName, binding);
+    addIdentityInput(inputToBinding, binding.canonicalName, binding);
     for (const alias of binding.aliases) {
-      inputToBinding.set(alias, binding);
+      addIdentityInput(inputToBinding, alias, binding);
     }
-    inputToBinding.set(binding.layoutKey, binding);
-    if (hooks.sessionReplay?.tool) {
-      inputToBinding.set(hooks.sessionReplay.tool, binding);
-    }
-    if (tool.pluginLayout?.domain) {
-      inputToBinding.set(tool.pluginLayout.domain, binding);
-    }
+    addIdentityInput(inputToBinding, binding.layoutKey, binding);
+    addIdentityInput(inputToBinding, hooks.sessionReplay?.tool, binding);
+    addIdentityInput(inputToBinding, tool.pluginLayout?.domain, binding);
   }
 
   return {

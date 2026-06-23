@@ -44,14 +44,15 @@ import { join } from 'node:path';
 
 import { logger } from '../lib/logger.js';
 import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
+import { validateToolIdentity, type ToolIdentity } from '../tools/identity.js';
 import { PLUGIN_API_VERSION } from '../tools/manifest.js';
-import type { ToolIdentity } from '../tools/identity.js';
 
 import { isRecord, isStringArray } from './json-guards.js';
 import { normalizeDiscovery } from './manifest-discovery.js';
 
 import type { PluginLayout } from './types.js';
 import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
+import type { ToolConfigManifestDescriptor } from '../tools/manifest-config.js';
 import type {
   RawToolPluginManifest,
   ToolCommandManifest,
@@ -281,21 +282,18 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value !== '';
 }
 
-function normalizeStringArray(raw: unknown): readonly string[] | undefined {
-  if (raw === undefined) return undefined;
-  if (!Array.isArray(raw) || !raw.every(isNonEmptyString)) return undefined;
-  return raw;
-}
-
 function normalizeIdentity(raw: unknown): ToolIdentity | undefined {
-  if (!isIdentityObject(raw) || !isNonEmptyString(raw.name)) return undefined;
-  const aliases = normalizeStringArray(raw.aliases);
-  const layoutKey = raw.layoutKey;
-  return {
-    name: raw.name,
-    ...(aliases === undefined ? {} : { aliases }),
-    ...(isNonEmptyString(layoutKey) ? { layoutKey } : {}),
-  };
+  if (!isIdentityObject(raw)) return undefined;
+  try {
+    const normalized = validateToolIdentity(raw as unknown as ToolIdentity);
+    return {
+      name: normalized.name,
+      ...(normalized.aliases.length === 0 ? {} : { aliases: normalized.aliases }),
+      ...(normalized.layoutKey === normalized.name ? {} : { layoutKey: normalized.layoutKey }),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /** Narrow to an optional non-empty string: absent, or a non-empty string. */
@@ -330,6 +328,11 @@ function validateManifest(
   const commands = normalizeCommands(block.commands);
   if (commands === undefined) return undefined;
 
+  const identity = normalizeIdentity(block.identity);
+  if (identity === undefined) return undefined;
+  const normalizedIdentity = validateToolIdentity(identity);
+  if (block.id !== normalizedIdentity.name) return undefined;
+
   const apiVersion = block.apiVersion;
   if (apiVersion !== undefined && typeof apiVersion !== 'number') return undefined;
 
@@ -354,19 +357,27 @@ function validateManifest(
   // manifest is invalid (mirroring the strict `commands`/`capabilities` parse).
   const pluginLayout = normalizePluginLayout(block.pluginLayout);
   if (pluginLayout === 'invalid') return undefined;
+  if (pluginLayout !== undefined && pluginLayout.domain !== normalizedIdentity.layoutKey) {
+    return undefined;
+  }
 
-  const identity = normalizeIdentity(block.identity);
+  const config = normalizeConfig(block.config);
+  if (config === 'invalid') return undefined;
+  if (config !== undefined && config.namespace !== normalizedIdentity.name) {
+    return undefined;
+  }
 
   return {
     kind: 'tool',
     id: block.id,
-    ...opt('identity', identity),
+    identity,
     ...opt('stableId', stableId),
     name,
     version,
     ...opt('apiVersion', apiVersion),
     commands,
     ...opt('capabilities', capabilities),
+    ...opt('config', config),
     ...opt('pluginLayout', pluginLayout),
     // Reserved for future community/catalog (see ToolPluginManifestBase): copied
     // through as `unknown` (additive) so they survive load → admit without loss.
@@ -541,13 +552,25 @@ function normalizePluginLayout(value: unknown): PluginLayout | undefined | 'inva
   return { domain, userSubdirs };
 }
 
+function normalizeConfig(value: unknown): ToolConfigManifestDescriptor | undefined | 'invalid' {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return 'invalid';
+  const { namespace, schema } = value;
+  if (!isNonEmptyString(namespace)) return 'invalid';
+  if (!isRecord(schema)) return 'invalid';
+  return { namespace, schema };
+}
+
 function hashManifest(manifest: RawToolPluginManifest): string {
   const canonical = JSON.stringify({
     kind: manifest.kind,
     id: manifest.id,
+    identity: manifest.identity,
     name: manifest.name,
     version: manifest.version,
     apiVersion: manifest.apiVersion ?? null,
+    config: manifest.config ?? null,
+    pluginLayout: manifest.pluginLayout ?? null,
     commands: manifest.commands.map((c) => ({
       name: c.name,
       description: c.description,

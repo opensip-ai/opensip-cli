@@ -4,6 +4,9 @@
   "opensipTools": {
     "kind": "tool",
     "id": "missing-api-version",
-    "commands": [{ "name": "missing-api-version", "description": "A tool manifest that omits apiVersion" }]
+    "identity": { "name": "missing-api-version" },
+    "commands": [
+      { "name": "missing-api-version", "description": "A tool manifest that omits apiVersion" }
+    ]
   }
 }

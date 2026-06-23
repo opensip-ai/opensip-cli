@@ -61,6 +61,7 @@ const deepConfigSchema = {
 const initSentinel = { initialized: false, initPid: undefined };
 
 export const tool = {
+  identity: { name: 'external-dispatch-tool', aliases: ['ext-run'] },
   metadata: {
     id: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567',
     name: 'external-dispatch-tool',
@@ -132,13 +133,15 @@ export const tool = {
   },
   commands: [
     {
-      name: 'ext-run',
+      name: 'external-dispatch-tool',
+      aliases: ['ext-run'],
       description: 'fixture external command exercising the ADR-0054 dispatch boundary',
     },
   ],
   commandSpecs: [
     {
-      name: 'ext-run',
+      name: 'external-dispatch-tool',
+      aliases: ['ext-run'],
       description: 'fixture external command exercising the ADR-0054 dispatch boundary',
       commonFlags: [],
       scope: 'project',

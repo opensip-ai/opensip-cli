@@ -8,13 +8,11 @@ import {
   assertCommandSpec,
   defineTool,
   SystemError,
-  validateToolIdentity,
   type CommandSpec,
   type ManifestOptionDescriptor,
   type OptionSpec,
   type ToolCliContext,
   type ToolCommandManifest,
-  type ToolIdentity,
   type ToolPluginManifest,
 } from '@opensip-cli/core';
 
@@ -54,27 +52,18 @@ function manifestCommandToSpec(cmd: ToolCommandManifest): CommandSpec<unknown, T
   return spec;
 }
 
-function resolveManifestIdentity(manifest: ToolPluginManifest): ToolIdentity {
-  if (manifest.identity !== undefined) {
-    return manifest.identity;
-  }
-  const primary = manifest.commands.find((cmd) => cmd.parent === undefined);
-  const name = primary?.name ?? manifest.id;
-  return {
-    name,
-    ...(primary?.aliases === undefined ? {} : { aliases: primary.aliases }),
-    ...(manifest.pluginLayout === undefined ? {} : { layoutKey: manifest.pluginLayout.domain }),
-  };
-}
-
 export function synthesizeExternalTool(
   manifest: ToolPluginManifest,
 ): ReturnType<typeof defineTool> {
-  const identity = resolveManifestIdentity(manifest);
-  const normalized = validateToolIdentity(identity);
+  if (manifest.identity === undefined) {
+    throw new SystemError(
+      `external tool manifest '${manifest.id}' is missing required identity`,
+      { code: 'SYSTEM.EXTERNAL_TOOL.IDENTITY_MISSING' },
+    );
+  }
 
   return defineTool({
-    identity,
+    identity: manifest.identity,
     metadata: {
       id: manifest.stableId ?? manifest.id,
       version: manifest.version,
