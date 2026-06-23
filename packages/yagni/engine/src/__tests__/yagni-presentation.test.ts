@@ -40,6 +40,6 @@ describe('yagni presentation', () => {
     expect(text).toContain('High confidence');
     expect(text).toContain('unused-config-surface');
     expect(text).toContain('net: ~1 LOC possible');
-    expect(text).toContain('Run with --verbose for evidence');
+    expect(text).not.toContain('Run with --verbose for evidence');
   });
 });

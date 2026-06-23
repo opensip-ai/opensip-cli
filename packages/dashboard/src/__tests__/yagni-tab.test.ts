@@ -94,7 +94,9 @@ describe('renderYagniTab', () => {
     const headers = [...catalog.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(headers).toEqual(['Detector', 'Description', 'Evidence', 'Source']);
     // Detectors are sorted by slug; the first cell of each row is the slug.
-    const slugs = [...catalog.querySelectorAll('tbody tr td:first-child')].map((c) => c.textContent);
+    const slugs = [...catalog.querySelectorAll('tbody tr td:first-child')].map(
+      (c) => c.textContent,
+    );
     expect(slugs).toEqual(['unreferenced-symbol', 'unused-export']);
     // First row is the graph-backed detector → Evidence 'graph'; both rows are 'built-in'.
     const evidence = [...catalog.querySelectorAll('tbody tr td:nth-child(3) .badge')].map(

@@ -46,9 +46,13 @@ opensip-cli/
 │   │                            #   targeting/global-config I/O
 │   ├── cli-ui/                  # @opensip-cli/cli-ui — shared Ink/React
 │   │                            #   primitives (Banner, Spinner, RunHeader,
-│   │                            #   theme). Extracted from cli/ so tools that
-│   │                            #   ship a live view depend on the UI kit
-│   │                            #   without pulling in the dispatcher.
+│   │                            #   LiveRun shell, theme). Extracted from cli/
+│   │                            #   so tools that ship a live view depend on the
+│   │                            #   UI kit without pulling in the dispatcher.
+│   ├── cli-live/                # @opensip-cli/cli-live — shared live-run
+│   │                            #   runtime: runToolLiveView state machine +
+│   │                            #   produce() seam; all four tools render through
+│   │                            #   it (ADR-0058).
 │   ├── output/                  # @opensip-cli/output — machine output layer
 │   │                            #   (ADR-0011): pure format/ formatters (json,
 │   │                            #   sarif, table) + effectful sink/ delivery

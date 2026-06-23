@@ -115,6 +115,13 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/cli-ui',
     publishReason: 'Shared Ink/React primitives without pulling the CLI dispatcher',
   },
+  {
+    unscoped: 'cli-live',
+    name: '@opensip-cli/cli-live',
+    dir: 'packages/cli-live',
+    filter: '@opensip-cli/cli-live',
+    publishReason: 'Shared live-run runtime (state machine + produce seam) for tool Ink views',
+  },
   // Layer 3 — tree-sitter parse substrate (ADR-0010)
   {
     unscoped: 'tree-sitter',

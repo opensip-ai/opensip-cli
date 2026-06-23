@@ -26,7 +26,6 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { admitTool, loadToolManifest } from '@opensip-cli/core';
-import { fitnessTool } from '@opensip-cli/fitness';
 import { Command } from 'commander';
 import { describe, it, expect } from 'vitest';
 
@@ -90,11 +89,11 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
   });
 
   it('the externally-loaded fit has a command surface identical to the bundled fit', async () => {
-    const mod = (await import(pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href)) as {
-      tool?: Tool;
-    };
+    const distUrl = pathToFileURL(join(FIT_DIR, 'dist', 'index.js')).href;
+    const mod = (await import(distUrl)) as { tool?: Tool };
+    const bundledMod = (await import(distUrl)) as { tool?: Tool };
     const external = specsByName(mod.tool!);
-    const bundled = specsByName(fitnessTool);
+    const bundled = specsByName(bundledMod.tool!);
 
     // Same set of command names (fit, list, recipes, export, fit-run-worker).
     expect([...external.keys()].sort()).toEqual([...bundled.keys()].sort());

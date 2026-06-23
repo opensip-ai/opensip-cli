@@ -30,6 +30,7 @@ export interface ExecuteYagniOptions {
   readonly categories?: readonly string[];
   readonly includeTests?: boolean;
   readonly pathRoots?: readonly string[];
+  readonly onProgress?: (completed: number, total: number) => void;
 }
 
 /** Envelope plus session payload returned to the host command runner. */
@@ -112,6 +113,8 @@ export async function executeYagni(
   const { run, skipped } = planDetectors(detectors, config, graphAvailable, opts.detectors ?? []);
   const allSignals = [];
   const units: UnitResult[] = [];
+  const total = run.length;
+  opts.onProgress?.(0, total);
 
   for (const detector of run) {
     const started = Date.now();
@@ -140,6 +143,7 @@ export async function executeYagni(
         error: error instanceof Error ? error.message : String(error),
       });
     }
+    opts.onProgress?.(units.length, total);
   }
 
   const categoryFiltered = filterByReductionCategories(allSignals, opts.categories ?? []);

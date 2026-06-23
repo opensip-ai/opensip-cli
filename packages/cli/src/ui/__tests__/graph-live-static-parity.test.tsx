@@ -4,7 +4,7 @@
  * Graph's STATIC render path routes through the host's `envelopeToTableView`
  * (`result-to-view.ts`) when a verbose/detail view asks for the table. To keep
  * the LIVE verbose final frame in parity, graph's live runner renders its OWN
- * per-unit table node (`graphDoneTableNode`,
+ * per-unit table (`liveRunTable` + `envelopeToLiveRunTableRows`,
  * `@opensip-cli/graph/internal`) — it cannot import the host's `envelopeTableNode`
  * (cli) nor `@opensip-cli/output` (forbidden to tool engines). This test pins the
  * two against each other: for the same graph envelope, the live table node and the
@@ -15,13 +15,13 @@
  * frame renders the summary via the shared `<RunSummary>` (already reconciled with
  * the static `viewRunSummary` producer). So we compare the TABLE rows only —
  * extracting the lines above the summary — which is exactly the surface
- * `graphDoneTableNode` owns.
+ * `liveRunTable` owns.
  */
 
-import { renderToText, renderToInk, ThemeProvider } from '@opensip-cli/cli-ui';
+import { liveRunTable, renderToText, renderToInk, ThemeProvider } from '@opensip-cli/cli-ui';
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
 import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
-import { graphDoneTableNode } from '@opensip-cli/graph/internal';
+import { envelopeToLiveRunTableRows } from '@opensip-cli/graph/internal';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -118,7 +118,7 @@ function staticTableLines(envelope: SignalEnvelope): string[] {
 }
 
 function liveTableLines(envelope: SignalEnvelope): string[] {
-  const node = graphDoneTableNode(envelope);
+  const node = liveRunTable(envelopeToLiveRunTableRows(envelope));
   expect(node).not.toBeNull();
   const text = deAnsi(renderToText(node!));
   return text.split('\n').filter((l) => l.trim().length > 0);
@@ -132,7 +132,7 @@ describe('graph live/static verbose table parity', () => {
 
   it('the live table node TTY frame matches its pipe text (no renderer drift)', () => {
     const envelope = graphEnvelope();
-    const node = graphDoneTableNode(envelope);
+    const node = liveRunTable(envelopeToLiveRunTableRows(envelope));
     expect(node).not.toBeNull();
     const { lastFrame } = render(<ThemeProvider>{renderToInk(node!)}</ThemeProvider>);
     const ttyLines = deAnsi(lastFrame() ?? '')
@@ -153,6 +153,6 @@ describe('graph live/static verbose table parity', () => {
       policy: HOST_VERDICT_POLICY_FALLBACK,
       runFaulted: false,
     });
-    expect(graphDoneTableNode(empty)).toBeNull();
+    expect(liveRunTable(envelopeToLiveRunTableRows(empty))).toBeNull();
   });
 });

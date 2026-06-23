@@ -32,6 +32,7 @@ export * from './command-handler-host-owned-output.js';
 export * from './contracts-schema-consistency.js';
 export * from './drizzle-orm-migration-guardrails.js';
 export * from './host-tool-runtime-import-boundary.js';
+export * from './live-view-through-cli-live.js';
 export * from './missing-type-exports.js';
 export * from './module-coupling-fan-out.js';
 export * from './no-bootstrap-tool-import.js';

@@ -17,7 +17,6 @@
  * Pure: no IO, no clock. `getDisplayName` is a registry lookup (display only).
  */
 
-import { formatValidatedColumn } from '@opensip-cli/cli-ui';
 import { buildFindingGroups, groupSignalsBySource } from '@opensip-cli/contracts';
 import { formatDuration, isErrorSignal } from '@opensip-cli/core';
 
@@ -69,11 +68,6 @@ export function envelopeToFitRows(envelope: SignalEnvelope): FitTableRow[] {
       durationMs: unit.durationMs,
     };
   });
-}
-
-/** Render a row's "Validated" cell (e.g. `"450 files"`, `"—"`). */
-export function fitValidatedCell(row: FitTableRow): string {
-  return formatValidatedColumn(row.validated, row.itemType);
 }
 
 /**

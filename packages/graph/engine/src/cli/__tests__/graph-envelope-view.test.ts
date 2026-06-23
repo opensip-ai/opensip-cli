@@ -1,9 +1,9 @@
-import { renderToText } from '@opensip-cli/cli-ui';
+import { liveRunTable, renderToText } from '@opensip-cli/cli-ui';
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
 import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { graphDoneTableNode } from '../graph-envelope-view.js';
+import { envelopeToLiveRunTableRows } from '../graph-envelope-view.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
@@ -82,9 +82,9 @@ function envelope(): SignalEnvelope {
   });
 }
 
-describe('graphDoneTableNode', () => {
+describe('envelopeToLiveRunTableRows + liveRunTable', () => {
   it('renders the graph unit table derived from the signal envelope', () => {
-    const node = graphDoneTableNode(envelope());
+    const node = liveRunTable(envelopeToLiveRunTableRows(envelope()));
 
     expect(node).not.toBeNull();
     expect(renderToText(node!)).toMatchInlineSnapshot(`
@@ -107,6 +107,6 @@ describe('graphDoneTableNode', () => {
       runFaulted: false,
     });
 
-    expect(graphDoneTableNode(empty)).toBeNull();
+    expect(liveRunTable(envelopeToLiveRunTableRows(empty))).toBeNull();
   });
 });

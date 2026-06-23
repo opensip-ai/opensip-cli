@@ -43,11 +43,9 @@ export type {
 export { executeGraph, buildUnifiedReportLines } from './cli/graph.js';
 export type { UnifiedReportInput } from './cli/graph.js';
 
-// The graph live verbose/detail per-unit table node. Internal — exported only
-// so the host-side live/static parity proof
-// (`packages/cli/src/ui/__tests__/graph-live-static-parity.test.tsx`) can assert
-// it renders byte-identically to the static `envelopeToTableView` table.
-export { graphDoneTableNode } from './cli/graph-envelope-view.js';
+// Graph envelope → live-run table rows. Internal — exported for the host-side
+// live/static parity proof (`graph-live-static-parity.test.tsx`).
+export { envelopeToLiveRunTableRows } from './cli/graph-envelope-view.js';
 
 // `CatalogRepo` — the engine's SQLite/Drizzle catalog persistence repo. Used
 // internally by graph (orchestrator cache, `tool.ts` report contribution,

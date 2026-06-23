@@ -6,7 +6,7 @@ workspace packages to npm with OIDC trusted publishing.
 
 The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 
-## The 34 packages
+## The 35 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -22,6 +22,7 @@ contract tests derive from or verify against that source.
 | Config         | `@opensip-cli/config`               | `packages/config`                     |
 | Targeting      | `@opensip-cli/targeting`            | `packages/targeting`                  |
 | Shared CLI     | `@opensip-cli/cli-ui`               | `packages/cli-ui`                     |
+| Shared CLI     | `@opensip-cli/cli-live`             | `packages/cli-live`                   |
 | Languages      | `@opensip-cli/tree-sitter`          | `packages/tree-sitter`                |
 | Languages      | `@opensip-cli/lang-typescript`      | `packages/languages/lang-typescript`  |
 | Languages      | `@opensip-cli/lang-rust`            | `packages/languages/lang-rust`        |
@@ -161,7 +162,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    Or inspect manually:
 
    ```bash
-   for p in core datastore contracts session-store output config targeting cli-ui tree-sitter \
+   for p in core datastore contracts session-store output config targeting cli-ui cli-live tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard fitness simulation graph yagni graph-adapter-common graph-typescript \
             graph-python graph-rust graph-go graph-java checks-universal checks-typescript \

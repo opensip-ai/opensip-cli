@@ -1,4 +1,9 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * Shared vitest defaults for every `@opensip-cli/*` package.
@@ -26,6 +31,71 @@ import { defineConfig } from 'vitest/config';
  * re-run), wedging unrelated PRs. The job-level timeout still catches true hangs.
  */
 export const vitestBase = defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: /^@opensip-cli\/core/,
+        replacement: join(repoRoot, 'packages/core/src'),
+      },
+      {
+        find: /^@opensip-cli\/fitness/,
+        replacement: join(repoRoot, 'packages/fitness/engine/src'),
+      },
+      {
+        find: /^@opensip-cli\/graph(?!-)/,
+        replacement: join(repoRoot, 'packages/graph/engine/src'),
+      },
+      {
+        find: /^@opensip-cli\/contracts/,
+        replacement: join(repoRoot, 'packages/contracts/src'),
+      },
+      {
+        find: /^@opensip-cli\/cli-live/,
+        replacement: join(repoRoot, 'packages/cli-live/src'),
+      },
+      {
+        find: /^@opensip-cli\/cli-ui/,
+        replacement: join(repoRoot, 'packages/cli-ui/src'),
+      },
+      {
+        find: /^@opensip-cli\/test-support/,
+        replacement: join(repoRoot, 'packages/test-support/src'),
+      },
+      {
+        find: /^@opensip-cli\/datastore/,
+        replacement: join(repoRoot, 'packages/datastore/src'),
+      },
+      {
+        find: /^@opensip-cli\/session-store/,
+        replacement: join(repoRoot, 'packages/session-store/src'),
+      },
+      {
+        find: /^@opensip-cli\/config/,
+        replacement: join(repoRoot, 'packages/config/src'),
+      },
+      {
+        find: /^@opensip-cli\/targeting/,
+        replacement: join(repoRoot, 'packages/targeting/src'),
+      },
+      {
+        find: /^@opensip-cli\/output/,
+        replacement: join(repoRoot, 'packages/output/src'),
+      },
+      {
+        find: /^@opensip-cli\/simulation/,
+        replacement: join(repoRoot, 'packages/simulation/engine/src'),
+      },
+      {
+        find: /^@opensip-cli\/yagni/,
+        replacement: join(repoRoot, 'packages/yagni/engine/src'),
+      },
+    ],
+  },
+  server: {
+    deps: {
+      inline: [/^@opensip-cli\//],
+    },
+  },
   test: {
     testTimeout: 120_000,
     hookTimeout: 30_000,

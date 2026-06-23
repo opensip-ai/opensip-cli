@@ -21,7 +21,6 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { admitTool, loadToolManifest } from '@opensip-cli/core';
-import { graphTool } from '@opensip-cli/graph';
 import { Command } from 'commander';
 import { describe, it, expect } from 'vitest';
 
@@ -110,11 +109,11 @@ describe('graph externalization acceptance test (§1 / §8 — invariant 1, grap
   });
 
   it('the externally-loaded graph has a command surface identical to the bundled graph', async () => {
-    const mod = (await import(pathToFileURL(join(GRAPH_DIR, 'dist', 'index.js')).href)) as {
-      tool?: Tool;
-    };
+    const distUrl = pathToFileURL(join(GRAPH_DIR, 'dist', 'index.js')).href;
+    const mod = (await import(distUrl)) as { tool?: Tool };
+    const bundledMod = (await import(distUrl)) as { tool?: Tool };
     const external = specsByName(mod.tool!);
-    const bundled = specsByName(graphTool);
+    const bundled = specsByName(bundledMod.tool!);
 
     // Same set of command names — public commands and internal workers alike.
     expect([...external.keys()].sort()).toEqual([...bundled.keys()].sort());

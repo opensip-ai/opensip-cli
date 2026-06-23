@@ -1,5 +1,4 @@
 import type { ProgressCallback, ProgressEvent } from '@opensip-cli/cli-ui';
-import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 export interface CheckCountLabelInput {
   readonly running: number;
@@ -9,10 +8,6 @@ export interface CheckCountLabelInput {
 
 export function progressTotal(event: ProgressEvent): number | null {
   return event.type === 'stage-progress' ? event.total : null;
-}
-
-export function firstUnitCount(envelope: SignalEnvelope): number {
-  return envelope.verdict.summary.total;
 }
 
 export function checkCountLabel({ running, available, verbose }: CheckCountLabelInput): string {

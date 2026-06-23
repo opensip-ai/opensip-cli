@@ -2,25 +2,23 @@
  * yagniTool — YAGNI reduction audit as a Tool plugin.
  */
 
-import { defineTool, readPackageVersion } from '@opensip-cli/core';
+import { defineTool, readPackageVersion, type ToolCliContext, type Tool } from '@opensip-cli/core';
 
 import { yagniFingerprintStrategy } from './baseline-strategy.js';
 import { collectYagniReportData } from './cli/report-data.js';
-import { yagniCommandSpec } from './cli/yagni-command-spec.js';
+import { buildYagniCommandSpec } from './cli/yagni-command-spec.js';
 import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
+import { renderYagniLive, YAGNI_LIVE_VIEW_KEY, type YagniLiveArgs } from './cli/yagni-runner.js';
 
-import type { Tool } from '@opensip-cli/core';
-
-/**
- * Per-tool contract version for the yagni-specific surface (detectors, scoring,
- * config schema, fingerprint strategy). Independent of the core
- * TOOL_CONTRACT_VERSION (the generic Tool bus, ADR-0046). Bumped only on actual
- * changes to this surface; value = major.minor of the CLI release shipping the
- * change (see ADR-0047).
- */
 export const YAGNI_CONTRACT_VERSION = '1.0.0';
 
 export const YAGNI_STABLE_ID = '3aba9195-2297-4f20-99d5-906945092dfc';
+
+function setUpYagniLiveView(cli: ToolCliContext): void {
+  cli.registerLiveView(YAGNI_LIVE_VIEW_KEY, async (args, liveContext) =>
+    renderYagniLive(args as YagniLiveArgs, cli, liveContext),
+  );
+}
 
 export const yagniTool: Tool = defineTool({
   metadata: {
@@ -29,7 +27,7 @@ export const yagniTool: Tool = defineTool({
     version: readPackageVersion(import.meta.url),
     description: 'YAGNI reduction audit — find speculative surface to remove',
   },
-  commandSpecs: [yagniCommandSpec],
+  commandSpecs: [buildYagniCommandSpec(setUpYagniLiveView)],
   extensionPoints: {
     yagniContractVersion: YAGNI_CONTRACT_VERSION,
     config: yagniConfigDeclaration,

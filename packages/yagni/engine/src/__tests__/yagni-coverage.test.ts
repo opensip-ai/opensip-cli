@@ -8,7 +8,7 @@ import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { collectYagniReportData } from '../cli/report-data.js';
-import { yagniCommandSpec } from '../cli/yagni-command-spec.js';
+import { buildYagniCommandSpec } from '../cli/yagni-command-spec.js';
 import { YagniConfigSchema, yagniConfigDeclaration } from '../cli/yagni-config-schema.js';
 import { loadYagniConfig } from '../cli/yagni-config.js';
 import {
@@ -32,6 +32,10 @@ import { YAGNI_CONTRACT_VERSION, YAGNI_STABLE_ID, yagniTool } from '../tool.js';
 
 import type { GraphCatalog, GraphFunctionOccurrence, SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
+
+const yagniCommandSpec = buildYagniCommandSpec(() => {
+  // coverage tests use the static handler path
+});
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = join(HERE, 'fixtures', 'unused-config-surface', 'pkg');
@@ -235,7 +239,7 @@ describe('yagni config, tool metadata, and command handler', () => {
       id: YAGNI_STABLE_ID,
       name: 'yagni',
     });
-    expect(yagniTool.commandSpecs).toContain(yagniCommandSpec);
+    expect(yagniTool.commandSpecs?.[0]?.name).toBe(yagniCommandSpec.name);
     expect(yagniTool.extensionPoints?.collectReportData).toBe(collectYagniReportData);
   });
 

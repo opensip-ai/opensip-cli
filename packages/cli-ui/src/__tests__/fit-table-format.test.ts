@@ -1,6 +1,6 @@
 /**
  * Shared fit results-table helpers — used by both the cli static view-model
- * (fit-done-view) and the fitness live Ink view (fit-runner-views), so their
+ * (fit-done-view) and the shared live-run table (live-run-table), so their
  * behavior is pinned once here.
  */
 

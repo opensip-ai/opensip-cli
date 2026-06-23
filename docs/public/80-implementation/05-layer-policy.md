@@ -67,7 +67,7 @@ Production code can't import test files, and source code can't import undeclared
 
 ## Layer enforcement rules
 
-The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). Several runtime packages carry their own narrow allowlist rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit. They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
+The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). Several runtime packages carry their own narrow allowlist rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058 — shared live-run state machine; tools must not import `ink` directly), and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit. They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
 
 ### `core-imports-nothing-workspace`
 

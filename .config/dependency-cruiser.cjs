@@ -10,6 +10,7 @@
  *   2. @opensip-cli/contracts      — shared contract types (SignalEnvelope, CommandResult, exit codes)
  *   2. @opensip-cli/tree-sitter    — grammar-agnostic parser substrate
  *   2. @opensip-cli/cli-ui         — shared Ink/React presentational primitives
+ *   3. @opensip-cli/cli-live        — shared live-run runtime (state machine + produce seam)
  *   3. @opensip-cli/session-store  — session persistence over datastore/contracts
  *   3. @opensip-cli/output         — signal-envelope formatters + sinks
  *   3. @opensip-cli/config         — capability-configuration composer + schema registry (depends on core)
@@ -590,6 +591,39 @@ module.exports = {
       // source (a leaf importing its own files is fine; importing any
       // other package is the violation).
       to: { path: '^packages/', pathNot: '^packages/cli-ui/' },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — cli-live depends on core + contracts + cli-ui only
+    // (ADR-0058 shared live-run shell).
+    // -------------------------------------------------------------------
+    {
+      name: 'cli-live-imports-core-cli-ui-only',
+      severity: 'error',
+      comment:
+        'cli-live owns the shared live-run state machine and produce() seam. ' +
+        'It may import core (LiveViewContext, ToolRunCompletion), contracts ' +
+        '(SignalEnvelope), and cli-ui (LiveRun shell) plus ink/react — never ' +
+        'a tool engine, the CLI, datastore, output, or lang/check packs.',
+      from: { path: '^packages/cli-live/src/' },
+      to: {
+        path: [
+          '^packages/cli/',
+          '^packages/datastore/',
+          '^packages/session-store/',
+          '^packages/output/',
+          '^packages/config/',
+          '^packages/targeting/',
+          '^packages/dashboard/',
+          '^packages/fitness/',
+          '^packages/simulation/',
+          '^packages/graph/',
+          '^packages/yagni/',
+          '^packages/languages/lang-',
+          '^packages/fitness/checks-',
+          '^packages/tree-sitter/',
+        ],
+      },
     },
 
     // -------------------------------------------------------------------

@@ -45,7 +45,7 @@ importers:
         version: link:packages/fitness/checks-universal
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:packages/fitness/engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-go':
         specifier: workspace:*
         version: link:packages/graph/graph-go
@@ -114,25 +114,25 @@ importers:
     dependencies:
       '@opensip-cli/checks-cpp':
         specifier: workspace:*
-        version: link:../fitness/checks-cpp
+        version: file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/checks-go':
         specifier: workspace:*
-        version: link:../fitness/checks-go
+        version: file:packages/fitness/checks-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/checks-java':
         specifier: workspace:*
-        version: link:../fitness/checks-java
+        version: file:packages/fitness/checks-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/checks-python':
         specifier: workspace:*
-        version: link:../fitness/checks-python
+        version: file:packages/fitness/checks-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/checks-rust':
         specifier: workspace:*
-        version: link:../fitness/checks-rust
+        version: file:packages/fitness/checks-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/checks-typescript':
         specifier: workspace:*
-        version: link:../fitness/checks-typescript
+        version: file:packages/fitness/checks-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/checks-universal':
         specifier: workspace:*
-        version: link:../fitness/checks-universal
+        version: file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../cli-ui
@@ -159,19 +159,19 @@ importers:
         version: link:../graph/engine
       '@opensip-cli/graph-go':
         specifier: workspace:*
-        version: link:../graph/graph-go
+        version: file:packages/graph/graph-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-java':
         specifier: workspace:*
-        version: link:../graph/graph-java
+        version: file:packages/graph/graph-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-python':
         specifier: workspace:*
-        version: link:../graph/graph-python
+        version: file:packages/graph/graph-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-rust':
         specifier: workspace:*
-        version: link:../graph/graph-rust
+        version: file:packages/graph/graph-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-typescript':
         specifier: workspace:*
-        version: link:../graph/graph-typescript
+        version: file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/lang-cpp':
         specifier: workspace:*
         version: link:../languages/lang-cpp
@@ -253,7 +253,7 @@ importers:
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: link:../test-support
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -275,6 +275,37 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/cli-live:
+    dependencies:
+      '@opensip-cli/cli-ui':
+        specifier: workspace:*
+        version: link:../cli-ui
+      '@opensip-cli/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      ink:
+        specifier: ^7.0.5
+        version: 7.0.5(@types/react@19.2.17)(react@19.2.7)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/cli-ui:
     dependencies:
@@ -433,7 +464,7 @@ importers:
         version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
@@ -449,7 +480,7 @@ importers:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
@@ -468,7 +499,7 @@ importers:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
@@ -487,7 +518,7 @@ importers:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/lang-python':
         specifier: workspace:*
         version: link:../../languages/lang-python
@@ -509,7 +540,7 @@ importers:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
@@ -531,7 +562,7 @@ importers:
         version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript
@@ -556,7 +587,7 @@ importers:
         version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
@@ -570,6 +601,9 @@ importers:
 
   packages/fitness/engine:
     dependencies:
+      '@opensip-cli/cli-live':
+        specifier: workspace:*
+        version: link:../../cli-live
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../../cli-ui
@@ -603,9 +637,6 @@ importers:
       glob:
         specifier: ^13.0.0
         version: 13.0.6
-      ink:
-        specifier: ^7.0.5
-        version: 7.0.5(@types/react@19.2.17)(react@19.2.7)
       minimatch:
         specifier: ^10.2.5
         version: 10.2.5
@@ -634,6 +665,9 @@ importers:
 
   packages/graph/engine:
     dependencies:
+      '@opensip-cli/cli-live':
+        specifier: workspace:*
+        version: link:../../cli-live
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../../cli-ui
@@ -664,9 +698,6 @@ importers:
       glob:
         specifier: ^13.0.0
         version: 13.0.6
-      ink:
-        specifier: ^7.0.5
-        version: 7.0.5(@types/react@19.2.17)(react@19.2.7)
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -697,7 +728,7 @@ importers:
         version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -719,7 +750,7 @@ importers:
         version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -744,7 +775,7 @@ importers:
         version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -769,7 +800,7 @@ importers:
         version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -794,7 +825,7 @@ importers:
         version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -819,7 +850,7 @@ importers:
         version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: link:../engine
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript
@@ -985,6 +1016,9 @@ importers:
 
   packages/simulation/engine:
     dependencies:
+      '@opensip-cli/cli-live':
+        specifier: workspace:*
+        version: link:../../cli-live
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../../cli-ui
@@ -1006,9 +1040,6 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
-      ink:
-        specifier: ^7.0.5
-        version: 7.0.5(@types/react@19.2.17)(react@19.2.7)
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -1022,9 +1053,6 @@ importers:
       '@types/react':
         specifier: ^19.2.17
         version: 19.2.17
-      ink-testing-library:
-        specifier: ^4.0.0
-        version: 4.0.0(@types/react@19.2.17)
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -1064,7 +1092,7 @@ importers:
         version: link:../core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: link:../fitness/engine
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -1091,6 +1119,12 @@ importers:
 
   packages/yagni/engine:
     dependencies:
+      '@opensip-cli/cli-live':
+        specifier: workspace:*
+        version: link:../../cli-live
+      '@opensip-cli/cli-ui':
+        specifier: workspace:*
+        version: link:../../cli-ui
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../../config
@@ -1112,6 +1146,9 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -1122,6 +1159,9 @@ importers:
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
       vitest:
         specifier: ^4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
@@ -1782,6 +1822,102 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@opensip-cli/checks-cpp@file:packages/fitness/checks-cpp':
+    resolution: {directory: packages/fitness/checks-cpp, type: directory}
+
+  '@opensip-cli/checks-go@file:packages/fitness/checks-go':
+    resolution: {directory: packages/fitness/checks-go, type: directory}
+
+  '@opensip-cli/checks-java@file:packages/fitness/checks-java':
+    resolution: {directory: packages/fitness/checks-java, type: directory}
+
+  '@opensip-cli/checks-python@file:packages/fitness/checks-python':
+    resolution: {directory: packages/fitness/checks-python, type: directory}
+
+  '@opensip-cli/checks-rust@file:packages/fitness/checks-rust':
+    resolution: {directory: packages/fitness/checks-rust, type: directory}
+
+  '@opensip-cli/checks-typescript@file:packages/fitness/checks-typescript':
+    resolution: {directory: packages/fitness/checks-typescript, type: directory}
+
+  '@opensip-cli/checks-universal@file:packages/fitness/checks-universal':
+    resolution: {directory: packages/fitness/checks-universal, type: directory}
+
+  '@opensip-cli/cli-live@file:packages/cli-live':
+    resolution: {directory: packages/cli-live, type: directory}
+
+  '@opensip-cli/cli-ui@file:packages/cli-ui':
+    resolution: {directory: packages/cli-ui, type: directory}
+
+  '@opensip-cli/config@file:packages/config':
+    resolution: {directory: packages/config, type: directory}
+
+  '@opensip-cli/contracts@file:packages/contracts':
+    resolution: {directory: packages/contracts, type: directory}
+    peerDependencies:
+      commander: ^14.0.0 || ^15.0.0
+    peerDependenciesMeta:
+      commander:
+        optional: true
+
+  '@opensip-cli/core@file:packages/core':
+    resolution: {directory: packages/core, type: directory}
+
+  '@opensip-cli/datastore@file:packages/datastore':
+    resolution: {directory: packages/datastore, type: directory}
+
+  '@opensip-cli/fitness@file:packages/fitness/engine':
+    resolution: {directory: packages/fitness/engine, type: directory}
+
+  '@opensip-cli/graph-adapter-common@file:packages/graph/graph-adapter-common':
+    resolution: {directory: packages/graph/graph-adapter-common, type: directory}
+
+  '@opensip-cli/graph-go@file:packages/graph/graph-go':
+    resolution: {directory: packages/graph/graph-go, type: directory}
+
+  '@opensip-cli/graph-java@file:packages/graph/graph-java':
+    resolution: {directory: packages/graph/graph-java, type: directory}
+
+  '@opensip-cli/graph-python@file:packages/graph/graph-python':
+    resolution: {directory: packages/graph/graph-python, type: directory}
+
+  '@opensip-cli/graph-rust@file:packages/graph/graph-rust':
+    resolution: {directory: packages/graph/graph-rust, type: directory}
+
+  '@opensip-cli/graph-typescript@file:packages/graph/graph-typescript':
+    resolution: {directory: packages/graph/graph-typescript, type: directory}
+
+  '@opensip-cli/graph@file:packages/graph/engine':
+    resolution: {directory: packages/graph/engine, type: directory}
+
+  '@opensip-cli/lang-go@file:packages/languages/lang-go':
+    resolution: {directory: packages/languages/lang-go, type: directory}
+
+  '@opensip-cli/lang-java@file:packages/languages/lang-java':
+    resolution: {directory: packages/languages/lang-java, type: directory}
+
+  '@opensip-cli/lang-python@file:packages/languages/lang-python':
+    resolution: {directory: packages/languages/lang-python, type: directory}
+
+  '@opensip-cli/lang-rust@file:packages/languages/lang-rust':
+    resolution: {directory: packages/languages/lang-rust, type: directory}
+
+  '@opensip-cli/lang-typescript@file:packages/languages/lang-typescript':
+    resolution: {directory: packages/languages/lang-typescript, type: directory}
+
+  '@opensip-cli/session-store@file:packages/session-store':
+    resolution: {directory: packages/session-store, type: directory}
+
+  '@opensip-cli/targeting@file:packages/targeting':
+    resolution: {directory: packages/targeting, type: directory}
+
+  '@opensip-cli/test-support@file:packages/test-support':
+    resolution: {directory: packages/test-support, type: directory}
+    engines: {node: '>=24'}
+
+  '@opensip-cli/tree-sitter@file:packages/tree-sitter':
+    resolution: {directory: packages/tree-sitter, type: directory}
 
   '@opentelemetry/api-logs@0.219.0':
     resolution: {integrity: sha512-FFx7YnaYJlIjqWW/AG/yAZ0L/NEY724PipXXXQLdtZPbLwBGbUMTGL1i/esI56TWfTUXxhLfpgrnWJCG8aUJyg==}
@@ -4593,6 +4729,806 @@ snapshots:
       '@emnapi/runtime': 1.10.0
       '@tybys/wasm-util': 0.10.2
     optional: true
+
+  '@opensip-cli/checks-cpp@file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/checks-go@file:packages/fitness/checks-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/checks-java@file:packages/fitness/checks-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/checks-python@file:packages/fitness/checks-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-python': file:packages/languages/lang-python
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/checks-rust@file:packages/fitness/checks-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/checks-typescript@file:packages/fitness/checks-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-typescript': file:packages/languages/lang-typescript
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/checks-universal@file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/cli-live@file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)':
+    dependencies:
+      '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
+      '@opensip-cli/core': file:packages/core
+      ink: 7.0.5(@types/react@19.2.17)(react@19.2.7)
+      react: 19.2.7
+    transitivePeerDependencies:
+      - '@types/react'
+      - bufferutil
+      - commander
+      - react-devtools-core
+      - utf-8-validate
+
+  '@opensip-cli/cli-ui@file:packages/cli-ui(@types/react@19.2.17)':
+    dependencies:
+      ink: 7.0.5(@types/react@19.2.17)(react@19.2.7)
+      react: 19.2.7
+    transitivePeerDependencies:
+      - '@types/react'
+      - bufferutil
+      - react-devtools-core
+      - utf-8-validate
+
+  '@opensip-cli/config@file:packages/config':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      yaml: 2.9.0
+      zod: 4.4.3
+
+  '@opensip-cli/contracts@file:packages/contracts(commander@15.0.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+    optionalDependencies:
+      commander: 15.0.0
+
+  '@opensip-cli/core@file:packages/core':
+    dependencies:
+      '@opentelemetry/api': 1.9.1
+      js-yaml: 4.2.0
+      ulid: 3.0.2
+
+  '@opensip-cli/datastore@file:packages/datastore(@types/better-sqlite3@7.6.13)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opentelemetry/api': 1.9.1
+      better-sqlite3: 12.10.0
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - sql.js
+      - sqlite3
+
+  '@opensip-cli/fitness@file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/cli-live': file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
+      '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
+      '@opensip-cli/config': file:packages/config
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
+      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)
+      '@opensip-cli/targeting': file:packages/targeting
+      '@opentelemetry/api': 1.9.1
+      commander: 15.0.0
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+      glob: 13.0.6
+      minimatch: 10.2.5
+      react: 19.2.7
+      typescript: 6.0.3
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph-adapter-common@file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+      glob: 13.0.6
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph-go@file:packages/graph/graph-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-go': file:packages/languages/lang-go
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph-java@file:packages/graph/graph-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-java': file:packages/languages/lang-java
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph-python@file:packages/graph/graph-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-python': file:packages/languages/lang-python
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph-rust@file:packages/graph/graph-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-rust': file:packages/languages/lang-rust
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph-typescript@file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/lang-typescript': file:packages/languages/lang-typescript
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/graph@file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/cli-live': file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
+      '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
+      '@opensip-cli/config': file:packages/config
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
+      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)
+      '@opentelemetry/api': 1.9.1
+      commander: 15.0.0
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+      glob: 13.0.6
+      react: 19.2.7
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/lang-go@file:packages/languages/lang-go':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+
+  '@opensip-cli/lang-java@file:packages/languages/lang-java':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+
+  '@opensip-cli/lang-python@file:packages/languages/lang-python':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+
+  '@opensip-cli/lang-rust@file:packages/languages/lang-rust':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/tree-sitter': file:packages/tree-sitter
+
+  '@opensip-cli/lang-typescript@file:packages/languages/lang-typescript':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      typescript: 6.0.3
+
+  '@opensip-cli/session-store@file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)':
+    dependencies:
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
+      '@opentelemetry/api': 1.9.1
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bun-types
+      - commander
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - sql.js
+      - sqlite3
+
+  '@opensip-cli/targeting@file:packages/targeting':
+    dependencies:
+      '@opensip-cli/config': file:packages/config
+      '@opensip-cli/core': file:packages/core
+      glob: 13.0.6
+      minimatch: 10.2.5
+
+  '@opensip-cli/test-support@file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
+
+  '@opensip-cli/tree-sitter@file:packages/tree-sitter':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      web-tree-sitter: 0.26.9
 
   '@opentelemetry/api-logs@0.219.0':
     dependencies:

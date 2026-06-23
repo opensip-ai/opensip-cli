@@ -88,10 +88,6 @@ export function buildYagniPresentationLines(
     lines.push('', `net: ~${String(summary.estimatedTotalLocReduction)} LOC possible`);
   }
 
-  if (!verbose) {
-    lines.push('', 'Run with --verbose for evidence and validation requirements.');
-  }
-
   if (verbose && skippedDetectors.length > 0) {
     lines.push('', 'Skipped detectors:');
     for (const skip of skippedDetectors) {
@@ -118,12 +114,11 @@ export function buildYagniRunPresentation(input: {
     input.skippedDetectors,
     input.verbose,
   );
-  const verboseDetail: VerboseDetail = { kind: 'lines', lines };
   return {
     type: 'run-presentation',
     tool: 'yagni',
     envelope: input.envelope,
-    verboseDetail,
+    ...(input.verbose ? { verboseDetail: { kind: 'lines', lines } satisfies VerboseDetail } : {}),
     ...(input.durationMs === undefined ? {} : { durationMs: input.durationMs }),
   };
 }

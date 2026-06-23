@@ -79,6 +79,7 @@ const OVERRIDES = {
   '@opensip-cli/tree-sitter': ['tree-sitter', 'ast', 'parser'],
   '@opensip-cli/dashboard': ['html-report', 'visualization', 'reporting'],
   '@opensip-cli/cli-ui': ['cli', 'terminal', 'ink', 'react'],
+  '@opensip-cli/cli-live': ['cli', 'terminal', 'ink', 'react'],
   '@opensip-cli/graph-adapter-common': ['call-graph', 'tree-sitter'],
 };
 

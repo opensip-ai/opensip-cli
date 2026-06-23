@@ -47,6 +47,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-cli/cli-live": "workspace:*",
+    "@opensip-cli/cli-ui": "workspace:*",
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
@@ -54,11 +56,13 @@
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/lang-typescript": "workspace:*",
     "commander": "^15.0.0",
+    "react": "^19.2.7",
     "typescript": "~6.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
     "vitest": "^4.1.8"
   }
 }

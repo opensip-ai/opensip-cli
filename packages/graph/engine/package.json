@@ -380,6 +380,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-cli/cli-live": "workspace:*",
     "@opensip-cli/cli-ui": "workspace:*",
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
@@ -390,7 +391,6 @@
     "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",
     "glob": "^13.0.0",
-    "ink": "^7.0.5",
     "react": "^19.2.7",
     "zod": "^4.4.3"
   },

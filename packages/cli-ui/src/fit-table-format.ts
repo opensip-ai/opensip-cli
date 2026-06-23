@@ -2,7 +2,7 @@
  * Shared, renderer-agnostic helpers for the fitness results table.
  *
  * Used by BOTH the cli static view-model builder (`fit-done-view.ts`) and the
- * fitness live Ink view (`fit-runner-views.tsx`), which previously each kept a
+ * shared live-run table (`live-run-table.tsx`), which previously each kept a
  * byte-identical copy (flagged by graph:duplicated-function-body). Pure
  * functions with structural parameter types so cli-ui stays free of any
  * @opensip-cli dependency — contracts' `TableRow` structurally satisfies

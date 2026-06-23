@@ -32,7 +32,7 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'executeGraph',
   // envelope-first-presentation RP-2: the graph live done-frame table node,
   // exported only for the host-side live/static parity proof.
-  'graphDoneTableNode',
+  'envelopeToLiveRunTableRows',
   'noSideEffectPathRule',
   'orphanSubtreeRule',
   'runGraph',

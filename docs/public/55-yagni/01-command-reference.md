@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-21
+last_verified: 2026-06-22
 release: v0.1.10
 title: "YAGNI command reference"
 audience: [contributors, ci-integrators]
@@ -8,6 +8,7 @@ purpose: "How to run the advisory YAGNI reduction audit and interpret its output
 source-files:
   - packages/yagni/engine/src/tool.ts
   - packages/yagni/engine/src/cli/yagni-command-spec.ts
+  - packages/yagni/engine/src/cli/yagni-runner.tsx
   - packages/yagni/engine/src/cli/execute-yagni.ts
   - packages/yagni/engine/src/types/yagni-metadata.ts
 related-docs:
@@ -83,7 +84,9 @@ Each signal carries `metadata.yagni`:
 
 ## Human output
 
-Default view shows **high + medium** confidence candidates grouped by confidence, with a `net: ~N LOC possible` footer. Low-confidence findings appear only with `--verbose` or in JSON.
+On a TTY (and without `[paths...]` or `--json`), `opensip yagni` uses the shared live-run shell (`@opensip-cli/cli-live` + `@opensip-cli/cli-ui`): banner, `YAGNI Audit` header, progress stages, then the compact summary line and shared footer hints — the same chrome as `fit`, `graph`, and `sim`.
+
+The non-TTY / piped path renders a static presentation. Default view shows **high + medium** confidence candidates grouped by confidence, with a `net: ~N LOC possible` footer. Low-confidence findings and the per-detector detail block appear only with `--verbose` or in JSON (matching fit/graph compact-vs-verbose gating).
 
 ## Suppressions
 
