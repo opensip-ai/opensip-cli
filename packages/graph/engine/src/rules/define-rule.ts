@@ -86,7 +86,6 @@ export function defineRule(config: DefineRuleConfig): Rule {
     config.slug.length === 0 ||
     !config.slug.startsWith('graph:')
   ) {
-    // @fitness-ignore-next-line result-pattern-consistency -- authoring-time programmer error: invalid rule metadata
     throw new ValidationError(
       `defineRule: 'slug' must be a non-empty string starting with 'graph:' (got ${JSON.stringify(config.slug)})`,
       {
@@ -95,7 +94,6 @@ export function defineRule(config: DefineRuleConfig): Rule {
     );
   }
   if (config.defaultSeverity !== 'error' && config.defaultSeverity !== 'warning') {
-    // @fitness-ignore-next-line result-pattern-consistency -- authoring-time programmer error: invalid rule metadata
     throw new ValidationError(
       `defineRule: 'defaultSeverity' must be 'error' or 'warning' (got ${JSON.stringify(config.defaultSeverity)})`,
       {
@@ -104,7 +102,6 @@ export function defineRule(config: DefineRuleConfig): Rule {
     );
   }
   if (typeof config.evaluate !== 'function') {
-    // @fitness-ignore-next-line result-pattern-consistency -- authoring-time programmer error: invalid rule metadata
     throw new ValidationError(
       `defineRule: 'evaluate' must be a function for rule '${config.slug}'`,
       {

@@ -108,7 +108,6 @@ class FileAccessorImpl implements FileAccessor {
     this.signal?.throwIfAborted();
 
     if (!this.pathSet.has(filePath)) {
-      // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to public Result boundary
       throw new ValidationError(
         `File path not in matched set: ${filePath}. ` +
           `Only paths from the 'paths' property can be read.`,
@@ -129,7 +128,6 @@ class FileAccessorImpl implements FileAccessor {
     if (content === undefined) {
       const fileStats = await fs.stat(filePath);
       if (fileStats.size > 10_000_000) {
-        // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary guard, not domain logic
         throw new ValidationError(
           `File too large (${fileStats.size} bytes, max 10MB): ${filePath}`,
           { code: 'VALIDATION.FITNESS.FILE_TOO_LARGE' },
@@ -176,7 +174,6 @@ class FileAccessorImpl implements FileAccessor {
 }
 
 /** Create a FileAccessor for lazy-loading files with LRU caching. */
-// @fitness-ignore-next-line result-pattern-consistency -- factory function, cannot fail in domain-meaningful ways
 export function createFileAccessor(
   filePaths: readonly string[],
   options: FileAccessorOptions = {},

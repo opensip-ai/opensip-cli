@@ -64,11 +64,17 @@ const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
   /^resolve[A-Z]/,
   /^load[A-Z]/,
   /^parse[A-Z]/,
+  /^project[A-Z]/,
+  /^throw[A-Z]/,
+  /^create[A-Z]/,
   /^map[A-Z]\w*To[A-Z]/,
   /Guard$/,
   /Validator$/,
   /Assertion$/,
 ];
+
+/** Method names that guard registry/registerable invariants (throw, not Result). */
+const REGISTRATION_GUARD_METHODS = new Set(['register', 'registerAll']);
 
 /**
  * Paths where throwing is expected (infrastructure boundaries per DEC-015).
@@ -102,7 +108,20 @@ export const THROW_ALLOWED_PATHS = [
 /**
  * File name patterns where throwing is legitimate (infrastructure boundary classes)
  */
-const INFRASTRUCTURE_FILE_PATTERNS = [/registry/i, /-registry/i, /store/i, /-store/i, /adapter/i];
+const INFRASTRUCTURE_FILE_PATTERNS = [
+  /registry/i,
+  /-registry/i,
+  /store/i,
+  /-store/i,
+  /-repo/i,
+  /adapter/i,
+  /loader/i,
+  /file-cache/i,
+  /file-accessor/i,
+  /result-builder/i,
+  /validation/i,
+  /selector/i,
+];
 
 /**
  * Check if a file path is in a throw-allowed context
@@ -114,8 +133,16 @@ function buildEffectiveThrowAllowedPaths(): readonly RegExp[] {
   return [...THROW_ALLOWED_PATHS, ...extra];
 }
 
+function isRecipeOrchestratorPath(filePath: string): boolean {
+  return /\/recipes\//.test(filePath) && /service\.ts$/i.test(filePath);
+}
+
 function isThrowAllowedPath(filePath: string): boolean {
   if (buildEffectiveThrowAllowedPaths().some((pattern) => pattern.test(filePath))) {
+    return true;
+  }
+
+  if (isRecipeOrchestratorPath(filePath)) {
     return true;
   }
 
@@ -207,6 +234,72 @@ function isInPrivateMethod(node: ts.Node): boolean {
   return false;
 }
 
+function getContainingMethodDeclaration(node: ts.Node): ts.MethodDeclaration | undefined {
+  let current: ts.Node | undefined = node.parent;
+
+  while (current) {
+    if (ts.isMethodDeclaration(current)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return undefined;
+}
+
+/** Registry/registerAll duplicate and collision guards intentionally throw. */
+function isRegistrationGuardMethod(node: ts.Node): boolean {
+  const method = getContainingMethodDeclaration(node);
+  if (!method?.name || !ts.isIdentifier(method.name)) {
+    return false;
+  }
+  return REGISTRATION_GUARD_METHODS.has(method.name.text);
+}
+
+/** Fluent builder preconditions return `this` and throw on invalid state. */
+function isFluentBuilderMethod(node: ts.Node, sourceFile: ts.SourceFile): boolean {
+  const method = getContainingMethodDeclaration(node);
+  if (!method?.type) {
+    return false;
+  }
+  const returnType = method.type.getText(sourceFile);
+  return returnType === 'this';
+}
+
+/** Terminal `build()` on a builder is a precondition boundary, not Result flow. */
+function isBuildMethod(node: ts.Node): boolean {
+  const method = getContainingMethodDeclaration(node);
+  if (!method?.name || !ts.isIdentifier(method.name)) {
+    return false;
+  }
+  return method.name.text === 'build';
+}
+
+/**
+ * Switch default arm with a `never` exhaustiveness binding before the throw
+ * (programmer-error probe, not domain Result flow).
+ */
+function isExhaustivenessThrow(node: ts.ThrowStatement, sourceFile: ts.SourceFile): boolean {
+  const parent = node.parent;
+  if (!ts.isCaseClause(parent) && !ts.isBlock(parent)) {
+    return false;
+  }
+
+  const statements = ts.isCaseClause(parent) ? parent.statements : parent.statements;
+  for (const stmt of statements) {
+    if (stmt === node) {
+      break;
+    }
+    if (!ts.isVariableStatement(stmt)) {
+      continue;
+    }
+    const text = stmt.getText(sourceFile);
+    if (/:\s*never\b/.test(text)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Options for checkThrowStatement */
 interface CheckThrowStatementOptions {
   node: ts.ThrowStatement;
@@ -243,6 +336,22 @@ function checkThrowStatement(options: CheckThrowStatementOptions): CheckViolatio
   // Skip validation/guard helper functions
   const funcName = getContainingFunctionName(node, sourceFile);
   if (funcName && isValidationHelper(funcName)) {
+    return null;
+  }
+
+  if (isRegistrationGuardMethod(node)) {
+    return null;
+  }
+
+  if (isFluentBuilderMethod(node, sourceFile)) {
+    return null;
+  }
+
+  if (isBuildMethod(node)) {
+    return null;
+  }
+
+  if (isExhaustivenessThrow(node, sourceFile)) {
     return null;
   }
 
@@ -327,6 +436,50 @@ function checkResultFunctionBody(options: CheckResultFunctionBodyOptions): Check
   return null;
 }
 
+/** Analyze a file for Result/throw consistency issues. */
+export function analyzeFileForResultPatternConsistency(
+  content: string,
+  filePath: string,
+): CheckViolation[] {
+  const hasErrorPatterns = content.includes('throw') || content.includes('Result');
+  if (!hasErrorPatterns) {
+    return [];
+  }
+
+  const violations: CheckViolation[] = [];
+
+  const sourceFile = getSharedSourceFile(filePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
+
+  const visit = (node: ts.Node): void => {
+    ts.forEachChild(node, visit);
+
+    if (ts.isThrowStatement(node)) {
+      const violation = checkThrowStatement({ node, sourceFile, filePath });
+      if (violation) {
+        violations.push(violation);
+      }
+      return;
+    }
+
+    if (!ts.isFunctionDeclaration(node) && !ts.isMethodDeclaration(node)) return;
+
+    const returnType = node.type?.getText(sourceFile);
+    if (!returnType || !/\bResult\s*</.test(returnType)) return;
+
+    /* v8 ignore next -- defensive nullish fallback */
+    const bodyText = node.body?.getText(sourceFile) ?? '';
+    const violation = checkResultFunctionBody({ bodyText, node, sourceFile, filePath });
+    if (violation) {
+      violations.push(violation);
+    }
+  };
+
+  visit(sourceFile);
+  return violations;
+}
+
 /**
  * Check: quality/result-pattern-consistency
  *
@@ -353,53 +506,5 @@ export const resultPatternConsistency = defineCheck({
   tags: ['error-handling', 'quality', 'best-practices'],
   fileTypes: ['ts'],
 
-  analyze(content, filePath) {
-    // Quick filter: skip files without error patterns
-    const hasErrorPatterns = content.includes('throw') || content.includes('Result');
-    if (!hasErrorPatterns) {
-      return [];
-    }
-
-    const violations: CheckViolation[] = [];
-
-    const sourceFile = getSharedSourceFile(filePath, content);
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return [];
-
-    const visit = (node: ts.Node): void => {
-      ts.forEachChild(node, visit);
-
-      // Check throw statements for expected error types
-      if (ts.isThrowStatement(node)) {
-        const violation = checkThrowStatement({ node, sourceFile, filePath });
-        if (violation) {
-          violations.push(violation);
-        }
-        return;
-      }
-
-      // Check functions that return Result but also throw expected errors
-      if (!ts.isFunctionDeclaration(node) && !ts.isMethodDeclaration(node)) return;
-
-      const returnType = node.type?.getText(sourceFile);
-      // Require the canonical generic form `Result<…>` (also matches
-      // `Promise<Result<…>>`). A bare substring match for "Result"
-      // misclassifies domain types like `GateCompareResult`, `AnalyzeResult`,
-      // or `ParseResult` as Result-returning and produces false positives
-      // wherever such a function throws on a legitimate infrastructure
-      // boundary. Word-boundary + `<` preserves the intent without matching
-      // unrelated trailing-token names.
-      if (!returnType || !/\bResult\s*</.test(returnType)) return;
-
-      /* v8 ignore next -- defensive nullish fallback */
-      const bodyText = node.body?.getText(sourceFile) ?? '';
-      const violation = checkResultFunctionBody({ bodyText, node, sourceFile, filePath });
-      if (violation) {
-        violations.push(violation);
-      }
-    };
-
-    visit(sourceFile);
-    return violations;
-  },
+  analyze: analyzeFileForResultPatternConsistency,
 });

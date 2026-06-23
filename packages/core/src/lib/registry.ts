@@ -126,7 +126,6 @@ export class Registry<T extends Registerable> {
       this.nameCollisionMode === 'throw' &&
       !internal
     ) {
-      // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
       throw new ValidationError(
         `${this.module} registry: name collision — '${item.name}' is already registered with id '${nameIncumbent.id}', cannot register id '${item.id}' with the same name`,
         { code: this.validationCode ?? 'VALIDATION.REGISTRY.NAME_COLLISION' },
@@ -157,7 +156,6 @@ export class Registry<T extends Registerable> {
           return;
         }
         case 'throw': {
-          // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
           throw new ValidationError(
             `${this.module}: '${item.name}' (${item.id}) already registered`,
             { code: this.validationCode ?? 'VALIDATION.REGISTRY.DUPLICATE' },
@@ -182,7 +180,6 @@ export class Registry<T extends Registerable> {
           if (existing && existing.id === item.id && existing.name === item.name) {
             return;
           }
-          // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
           throw new ValidationError(
             `${this.module}: '${item.name}' (${item.id}) already registered (allow-internal: only the first write is permitted without { internal: true })`,
             { code: this.validationCode ?? 'VALIDATION.REGISTRY.DUPLICATE' },

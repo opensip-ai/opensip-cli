@@ -103,7 +103,6 @@ export class FitnessRecipeService {
    * @throws {SystemError} If a session is already in progress.
    * @throws {NotFoundError} If the recipe name is not found in the registry.
    */
-  // @fitness-ignore-next-line result-pattern-consistency -- return type is FitnessRecipeResult (not Result<T,E>); throw is appropriate for precondition failures
   async start(recipeOrName: FitnessRecipe | string): Promise<FitnessRecipeResult> {
     if (this.activeSession) {
       throw new SystemError('Recipe execution already in progress', {
@@ -115,7 +114,6 @@ export class FitnessRecipeService {
 
     if (!recipe) {
       const identifier = typeof recipeOrName === 'string' ? recipeOrName : recipeOrName.name;
-      // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to CLI boundary
       throw new NotFoundError(`Recipe not found: ${identifier}`, {
         code: 'RESOURCE.NOT_FOUND.RECIPE',
         metadata: { entity: 'recipe', identifier },

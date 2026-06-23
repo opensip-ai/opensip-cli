@@ -108,7 +108,6 @@ export class RecipeRegistry<T extends RecipeBase> {
       // JSDoc claim of mutual exclusion at runtime so a defensive
       // caller that sets both doesn't silently get the overwrite
       // path with no diagnostic.
-      // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
       throw new ValidationError(
         `RecipeRegistry.register: 'allowOverwrite' and 'throwOnDuplicate' are mutually exclusive`,
         { code: options.validationCode ?? this.validationCode },
@@ -136,7 +135,6 @@ export class RecipeRegistry<T extends RecipeBase> {
         this.inner.has(recipe.id) ||
         (this.inner.has(recipe.name) && this.inner.getByName(recipe.name)?.id !== recipe.id);
       if (dup) {
-        // @fitness-ignore-next-line result-pattern-consistency -- registration guard, throw is appropriate
         throw new ValidationError(`Recipe '${recipe.name}' (${recipe.id}) already registered`, {
           code: options.validationCode ?? this.validationCode,
         });

@@ -72,7 +72,6 @@ export class SessionRepo {
       const startedMs = new Date(session.startedAt).getTime();
       const completedMs = new Date(session.completedAt).getTime();
       if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
-        // @fitness-ignore-next-line result-pattern-consistency -- persistence boundary (DEC-015): invalid run timing is a write-time data-integrity guard the caller cannot recover from, so throw (not Result) is correct
         throw new ValidationError(
           `Invalid session timing for session ${session.id} (tool=${session.tool}): startedAt=${JSON.stringify(session.startedAt)} completedAt=${JSON.stringify(session.completedAt)}`,
           { code: 'VALIDATION.SESSION.INVALID_TIMESTAMP' },

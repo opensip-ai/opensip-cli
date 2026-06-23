@@ -108,7 +108,6 @@ function buildFromParsed(
       const targetNames = typeof targetRef === 'string' ? [targetRef] : targetRef;
       for (const name of targetNames) {
         if (!registry.has(name)) {
-          // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
           throw new ValidationError(
             `${sourceLabel}: checkOverrides['${checkSlug}'] references unknown target '${name}'. ` +
               `Available targets: ${registry
@@ -178,7 +177,6 @@ function projectTargetsConfig(
   const result = TargetsFileSchema.safeParse(parsed);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
-    // @fitness-ignore-next-line result-pattern-consistency -- infrastructure boundary, throw is appropriate
     throw new ValidationError(`${sourceLabel} validation failed:\n${issues}`, {
       code: 'ERRORS.TARGETS.VALIDATION_FAILED',
     });

@@ -114,7 +114,6 @@ const UNKNOWN_SELECTOR_CODE = 'SYSTEM.CORE.UNKNOWN_SELECTOR';
 
 function requireMatcher(match: Matcher | undefined, arm: string): Matcher {
   if (match === undefined) {
-    // @fitness-ignore-next-line result-pattern-consistency -- programmer error: a pattern/all-exclude arm reached the resolver without an injected matcher
     throw new SystemError(
       `resolveSelector: '${arm}' selector needs a 'match' matcher but none was supplied`,
       {
@@ -231,7 +230,6 @@ export function resolveSelector<T extends Registerable, S extends { readonly typ
     /* v8 ignore start -- exhaustive guard: a tool-only arm with no matching predicate lands here */
     default: {
       const _exhaustive: never = arm;
-      // @fitness-ignore-next-line result-pattern-consistency -- programmer error: unknown selector arm with no predicate
       throw new SystemError(
         `resolveSelector: unknown selector type: ${JSON.stringify(_exhaustive)}`,
         {

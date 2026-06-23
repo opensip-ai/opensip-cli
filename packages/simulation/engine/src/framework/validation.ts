@@ -153,7 +153,6 @@ export function throwValidationErrors(
 ): void {
   if (errors.length === 0) return;
   const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n');
-  // @fitness-ignore-next-line result-pattern-consistency -- definition-time validation, throw is appropriate
   throw new CoreValidationError(`Invalid ${kind} scenario configuration:\n${messages}`, {
     code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
     metadata: { errors: [...errors], kind },

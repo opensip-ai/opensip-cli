@@ -130,7 +130,6 @@ export class FileCache {
 
     const stats = await fs.stat(absolutePath);
     if (stats.isDirectory()) {
-      // @fitness-ignore-next-line result-pattern-consistency -- internal method, exceptions propagate to public Result boundary
       throw new ValidationError(`Cannot read directory as file: ${absolutePath}`, {
         code: 'VALIDATION.FITNESS.DIRECTORY_AS_FILE',
       });

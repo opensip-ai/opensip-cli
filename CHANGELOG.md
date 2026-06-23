@@ -23,6 +23,9 @@ tightens graph and release guardrails.
 - Tightened the `detached-promises` check: same-file sync helper detection,
   expanded sync-call allowlists, and removal of 33 stale line-level waivers
   (budget 52 → 19).
+- Tightened the `result-pattern-consistency` check: registration guards,
+  fluent-builder preconditions, exhaustiveness probes, and expanded
+  infrastructure-path detection; removed 27 stale waivers.
 
 ### Fixed
 

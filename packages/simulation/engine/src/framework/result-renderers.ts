@@ -75,7 +75,6 @@ export function renderScenarioResultView(result: ScenarioExecutorResult): Scenar
       // turns this assignment into a compile-time error, forcing every dispatch
       // site (including this one) to add the missing branch.
       const _exhaustive: never = result;
-      // @fitness-ignore-next-line result-pattern-consistency -- exhaustiveness probe; runtime should never hit this
       throw new Error(
         `Unreachable: ScenarioExecutorResult kind exhaustiveness violation (${String(_exhaustive)})`,
       );

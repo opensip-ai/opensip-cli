@@ -67,7 +67,6 @@ export function resolveRecipeToRules(
     recipe = recipes.loadRecipe(BUILTIN_DEFAULT_RECIPE);
   }
   if (!recipe) {
-    // @fitness-ignore-next-line result-pattern-consistency -- user config error surfaced as a thrown ConfigurationError, mapped to an exit code by handleGraphError
     throw new ConfigurationError(
       `Unknown graph recipe '${name}'. Run 'opensip graph-recipes' to list available recipes.`,
       { code: UNKNOWN_RECIPE_CODE },

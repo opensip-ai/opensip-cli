@@ -118,7 +118,6 @@ export class ScenarioResultBuilder {
   /** Evaluate all assertions against the current metrics. */
   evaluateAssertions(assertions: readonly ScenarioAssertion[]): this {
     if (!this._metrics) {
-      // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
       throw new ValidationError(
         'Metrics must be set before evaluating assertions. Call withMetrics() first.',
         { code: 'VALIDATION.RESULT_BUILDER.METRICS_REQUIRED' },
@@ -158,10 +157,8 @@ export class ScenarioResultBuilder {
   // ===========================================================================
 
   /** Build the final load-shaped payload. Throws if metrics are not set. */
-  // @fitness-ignore-next-line result-pattern-consistency -- return type is LoadResultPayload (not canonical Result); throw is a builder precondition
   build(): LoadResultPayload {
     if (!this._metrics) {
-      // @fitness-ignore-next-line result-pattern-consistency -- builder precondition, throw is appropriate
       throw new ValidationError('Metrics are required. Call withMetrics() before build().', {
         code: 'VALIDATION.RESULT_BUILDER.METRICS_REQUIRED',
       });
