@@ -65,6 +65,26 @@ describe('foreignCorePath', () => {
     expect(foreign).toContain(testDir);
     expect(foreign).not.toBe(selfCore());
   });
+
+  it('returns the foreign core path when fitness transitively resolves a different core', () => {
+    const fitnessDir = join(testDir, 'node_modules', '@opensip-cli', 'fitness');
+    mkdirSync(fitnessDir, { recursive: true });
+    writeFileSync(
+      join(fitnessDir, 'package.json'),
+      JSON.stringify({
+        name: '@opensip-cli/fitness',
+        version: '0.0.0-foreign',
+        main: 'index.js',
+        dependencies: { '@opensip-cli/core': 'workspace:*' },
+      }),
+    );
+    writeFileSync(join(fitnessDir, 'index.js'), 'module.exports = {};');
+    plantForeignCore(fitnessDir);
+    const foreign = foreignCorePath(testDir);
+    expect(foreign).toBeDefined();
+    expect(foreign).toContain('@opensip-cli');
+    expect(foreign).not.toBe(selfCore());
+  });
 });
 
 describe('filterSameCorePackages', () => {

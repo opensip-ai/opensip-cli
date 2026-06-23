@@ -281,11 +281,11 @@ export interface RunScope extends ToolScope {}
 // `fn`. Library functions read `currentScope()` instead of any
 // module global.
 //
-// Both copies of a package import the same `AsyncLocalStorage`
-// instance from this module — so the slot identity is bound to core,
-// not to whichever package is reading from it. This solves the
-// two-copies-of-fitness hazard documented at the prior
-// `Symbol.for(globalThis)` site.
+// The ALS instance is pinned on `globalThis` so duplicate physical copies
+// of `@opensip-cli/core` (pnpm `injectWorkspacePackages` hard-links fitness
+// into the virtual store with its own nested core copy) still share one
+// scope slot. A module-level `new AsyncLocalStorage()` would split the
+// store across those copies and silently degrade content filters.
 //
 // Concurrency contract — two ways to bind a scope, with strict roles:
 //
@@ -310,7 +310,16 @@ export interface RunScope extends ToolScope {}
 // (wired below via `setRunIdProvider`), so concurrent runs produce
 // non-colliding, per-run-filterable logs.
 
-const scopeStorage = new AsyncLocalStorage<RunScope>();
+const SCOPE_STORAGE_KEY = Symbol.for('@opensip-cli/core/scopeStorage');
+
+/** Process-global ALS singleton — survives duplicate @opensip-cli/core copies. */
+function scopeStorage(): AsyncLocalStorage<RunScope> {
+  const slot = globalThis as {
+    [SCOPE_STORAGE_KEY]?: AsyncLocalStorage<RunScope>;
+  };
+  slot[SCOPE_STORAGE_KEY] ??= new AsyncLocalStorage<RunScope>();
+  return slot[SCOPE_STORAGE_KEY];
+}
 
 /**
  * Run `fn` with `scope` bound as the current scope for everything in its
@@ -320,12 +329,12 @@ const scopeStorage = new AsyncLocalStorage<RunScope>();
  * overlapping runs each see their own scope and never collide.
  */
 export function runWithScope<T>(scope: RunScope, fn: () => Promise<T>): Promise<T> {
-  return scopeStorage.run(scope, fn);
+  return scopeStorage().run(scope, fn);
 }
 
 /** Synchronous variant of `runWithScope`. */
 export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
-  return scopeStorage.run(scope, fn);
+  return scopeStorage().run(scope, fn);
 }
 
 /**
@@ -351,7 +360,7 @@ export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
  * `AsyncLocalStorage.run` and nest cleanly without touching the shared slot.
  */
 export function enterScope(scope: RunScope): void {
-  const current = scopeStorage.getStore();
+  const current = scopeStorage().getStore();
   if (current !== undefined && current !== scope) {
     throw new SystemError(
       'enterScope called while a different scope is already current. ' +
@@ -359,7 +368,7 @@ export function enterScope(scope: RunScope): void {
       { code: 'SYSTEM.SCOPE.REENTRANT' },
     );
   }
-  scopeStorage.enterWith(scope);
+  scopeStorage().enterWith(scope);
 }
 
 /**
@@ -382,12 +391,12 @@ export function exitScope(): void {
   // read sites; the cast is the one place we exercise the runtime's documented
   // "store may be undefined" contract to reset the slot.
   // eslint-disable-next-line unicorn/no-useless-undefined -- the `undefined` is load-bearing: it is the slot-clear value for AsyncLocalStorage.enterWith, not a removable default.
-  (scopeStorage as AsyncLocalStorage<RunScope | undefined>).enterWith(undefined);
+  (scopeStorage() as AsyncLocalStorage<RunScope | undefined>).enterWith(undefined);
 }
 
 /** Read the current scope. Returns undefined when called outside a runWithScope. */
 export function currentScope(): RunScope | undefined {
-  return scopeStorage.getStore();
+  return scopeStorage().getStore();
 }
 
 /**

@@ -37,19 +37,53 @@ export function selfCore(): string | undefined {
   return selfCorePath;
 }
 
-/** The pack's resolved `@opensip-cli/core` if it differs from {@link selfCore}; else undefined. */
-export function foreignCorePath(packageDir: string): string | undefined {
-  if (selfCorePath === undefined) return undefined;
+/** Resolve `@opensip-cli/core` from a createRequire anchor (undefined when absent). */
+function resolveCoreFromAnchor(anchor: string): string | undefined {
   try {
-    // The anchor file need not exist — createRequire only uses its directory as
-    // the resolution base, walking up node_modules from the pack.
-    const anchor = pathToFileURL(join(packageDir, 'noop.js')).href;
-    const packCore = createRequire(anchor).resolve('@opensip-cli/core');
-    return packCore === selfCorePath ? undefined : packCore;
+    return createRequire(anchor).resolve('@opensip-cli/core');
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- resolution probe: a pack with no core dep throws here, and "no foreign core → allow" is the contract.
+    // @fitness-ignore-next-line error-handling-quality -- resolution probe: no core dep is "no foreign core → allow".
     return undefined;
   }
+}
+
+/** Resolve `@opensip-cli/fitness` from a createRequire anchor (undefined when absent). */
+function resolveFitnessFromAnchor(anchor: string): string | undefined {
+  try {
+    return createRequire(anchor).resolve('@opensip-cli/fitness');
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- resolution probe: no fitness dep is fine for non-fit packs.
+    return undefined;
+  }
+}
+
+/**
+ * The pack's resolved `@opensip-cli/core` if it differs from {@link selfCore}; else
+ * undefined. Probes both the pack's direct core dep and the core that
+ * `@opensip-cli/fitness` resolves when the pack depends on fitness — fit-packs
+ * execute `check.run()` through fitness's `define-check`, which reads
+ * `currentScope()` from fitness's core copy, not the pack's direct one.
+ */
+export function foreignCorePath(packageDir: string): string | undefined {
+  if (selfCorePath === undefined) return undefined;
+  // The anchor file need not exist — createRequire only uses its directory as
+  // the resolution base, walking up node_modules from the pack.
+  const anchor = pathToFileURL(join(packageDir, 'noop.js')).href;
+
+  const directCore = resolveCoreFromAnchor(anchor);
+  if (directCore !== undefined && directCore !== selfCorePath) {
+    return directCore;
+  }
+
+  const fitnessEntry = resolveFitnessFromAnchor(anchor);
+  if (fitnessEntry !== undefined) {
+    const transitiveCore = resolveCoreFromAnchor(fitnessEntry);
+    if (transitiveCore !== undefined && transitiveCore !== selfCorePath) {
+      return transitiveCore;
+    }
+  }
+
+  return undefined;
 }
 
 /**

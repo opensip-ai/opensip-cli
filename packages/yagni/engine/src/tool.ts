@@ -10,6 +10,9 @@ import { buildYagniCommandSpec } from './cli/yagni-command-spec.js';
 import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 import { renderYagniLive, YAGNI_LIVE_VIEW_KEY, type YagniLiveArgs } from './cli/yagni-runner.js';
 
+/**
+ * Per-tool contract version (ADR-0047).
+ */
 export const YAGNI_CONTRACT_VERSION = '1.0.0';
 
 export const YAGNI_STABLE_ID = '3aba9195-2297-4f20-99d5-906945092dfc';
