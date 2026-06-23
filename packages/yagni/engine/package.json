@@ -33,14 +33,18 @@
     "id": "yagni",
     "identity": {
       "name": "yagni",
-      "aliases": ["yag"]
+      "aliases": [
+        "yag"
+      ]
     },
     "stableId": "3aba9195-2297-4f20-99d5-906945092dfc",
     "apiVersion": 1,
     "commands": [
       {
         "name": "yagni",
-        "aliases": ["yag"],
+        "aliases": [
+          "yag"
+        ],
         "description": "Run YAGNI reduction audit detectors"
       }
     ]

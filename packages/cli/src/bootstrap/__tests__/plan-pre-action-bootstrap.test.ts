@@ -70,6 +70,7 @@ function runtimeWith(tools: Tool[]): PreActionRuntime {
     tools: registry,
     manifests: [] as ToolPluginManifest[],
     provenance: [] as ToolProvenance[],
+    bootstrapDiagnostics: [],
   };
 }
 

@@ -13,10 +13,7 @@ import type { Tool } from './types.js';
 
 type NormalizedToolIdentity = ReturnType<typeof validateToolIdentity>;
 
-function commandAliasesEqual(
-  a: readonly string[] | undefined,
-  b: readonly string[],
-): boolean {
+function commandAliasesEqual(a: readonly string[] | undefined, b: readonly string[]): boolean {
   const left = a ?? [];
   if (left.length !== b.length) return false;
   return left.every((value, index) => value === b[index]);
@@ -53,7 +50,9 @@ function assertManifestIdentity(
     );
   }
   if (!commandAliasesEqual(manifestIdentity.aliases, runtimeIdentity.aliases)) {
-    throw new ValidationError('tool manifest identity.aliases do not match runtime identity.aliases');
+    throw new ValidationError(
+      'tool manifest identity.aliases do not match runtime identity.aliases',
+    );
   }
 }
 

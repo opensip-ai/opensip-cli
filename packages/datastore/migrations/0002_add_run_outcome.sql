@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `run_outcome` text;

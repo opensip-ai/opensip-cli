@@ -11,6 +11,7 @@
  * (`index.ts`), so consumers still import these from `@opensip-cli/contracts`.
  */
 
+import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { RunPresentation } from './run-presentation.js';
 import type { StoredSession } from './session-types.js';
 import type { SignalEnvelope } from './signal-envelope.js';
@@ -38,6 +39,7 @@ export type CommandResult =
   | UninstallDoneResult
   | TextLinesResult
   | ToolsListResult
+  | ToolsDoctorResult
   | ToolsCreateResult
   | ToolsValidateResult
   | ToolsInstallResult
@@ -155,6 +157,13 @@ export interface ToolsCreateResult {
 export interface ToolsListResult {
   type: 'tools-list';
   tools: readonly ToolsListRow[];
+  totalCount: number;
+}
+
+/** Outcome of `opensip tools doctor` (ADR-0060). */
+export interface ToolsDoctorResult {
+  type: 'tools-doctor';
+  diagnostics: readonly CliDiagnostic[];
   totalCount: number;
 }
 
@@ -383,8 +392,18 @@ export type PluginResult =
        */
       toolProvenance: readonly ToolProvenance[];
     }
-  | { type: 'plugin-add'; packageName: string; success: boolean; error?: string }
-  | { type: 'plugin-remove'; packageName: string; success: boolean; error?: string }
+  | {
+      type: 'plugin-add';
+      packageName: string;
+      success: boolean;
+      error?: string;
+    }
+  | {
+      type: 'plugin-remove';
+      packageName: string;
+      success: boolean;
+      error?: string;
+    }
   | {
       type: 'plugin-sync';
       synced: readonly SyncEntry[];
@@ -428,4 +447,8 @@ export interface ErrorResult {
   message: string;
   suggestion?: string;
   exitCode: number;
+  /** Machine-readable error code (e.g. CLI_DIAGNOSTIC_CODES value). */
+  code?: string;
+  /** Structured diagnostic substrate when the error is host-classified (ADR-0060). */
+  diagnostic?: CliDiagnostic;
 }

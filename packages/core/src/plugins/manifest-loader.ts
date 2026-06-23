@@ -199,7 +199,12 @@ export function admitTool(args: {
       manifestHash,
       decision: 'admit',
     });
-    return { decision: 'admit', provenance, verdict, manifest: admittedManifest };
+    return {
+      decision: 'admit',
+      provenance,
+      verdict,
+      manifest: admittedManifest,
+    };
   }
 
   // incompatible
@@ -315,9 +320,12 @@ function validateOptionalCapabilities(
   return normalizeCapabilities(raw) ?? 'invalid';
 }
 
-function normalizeManifestIdentity(
-  block: Record<string, unknown>,
-): { readonly identity: ToolIdentity; readonly normalized: ReturnType<typeof validateToolIdentity> } | undefined {
+function normalizeManifestIdentity(block: Record<string, unknown>):
+  | {
+      readonly identity: ToolIdentity;
+      readonly normalized: ReturnType<typeof validateToolIdentity>;
+    }
+  | undefined {
   const identity = normalizeIdentity(block.identity);
   if (identity === undefined) return undefined;
   const normalized = validateToolIdentity(identity);

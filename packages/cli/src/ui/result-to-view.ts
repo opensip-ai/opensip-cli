@@ -49,6 +49,7 @@ import { viewPlugin } from './views/plugin-view.js';
 import {
   viewToolsCreate,
   viewToolsDataPurge,
+  viewToolsDoctor,
   viewToolsInstall,
   viewToolsList,
   viewToolsUninstall,
@@ -308,6 +309,9 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'tools-list': {
       return viewToolsList(result);
+    }
+    case 'tools-doctor': {
+      return viewToolsDoctor(result);
     }
     case 'tools-create': {
       return viewToolsCreate(result);

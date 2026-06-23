@@ -24,6 +24,10 @@ import { buildPerRunScope } from './build-per-run-scope.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
 import { PRE_ACTION_PHASES } from './pre-action-bootstrap-phases.js';
+import {
+  isDedicatedBootstrapDiagnosticCommand,
+  renderRelevantBootstrapDiagnostics,
+} from './render-bootstrap-diagnostics.js';
 
 import type { PreActionBootstrapPlan } from './plan-pre-action-bootstrap.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';
@@ -100,7 +104,7 @@ export async function executePostBailoutBootstrap(
   const d = { ...defaultDeps, ...deps };
   const record = deps.recordPhase ?? noopPhaseRecord;
   const { plan, runtime, version, noCloud, apiKey } = input;
-  const { languages, tools, manifests, provenance } = runtime;
+  const { languages, tools, manifests, provenance, bootstrapDiagnostics } = runtime;
 
   record(PRE_ACTION_PHASES.projectSideEffects);
 
@@ -133,6 +137,7 @@ export async function executePostBailoutBootstrap(
     registries: { languages, tools },
     manifests,
     provenance,
+    bootstrapDiagnostics,
     apiKey,
     noCloud,
     logger: runLogger,
@@ -141,6 +146,14 @@ export async function executePostBailoutBootstrap(
 
   record(PRE_ACTION_PHASES.enterScope);
   d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
+
+  if (
+    !isDedicatedBootstrapDiagnosticCommand(plan.commandPath) &&
+    plan.jsonOutput !== true &&
+    plan.opts.help !== true
+  ) {
+    renderRelevantBootstrapDiagnostics(scope.bootstrapDiagnostics, toolName);
+  }
 
   if (!d.isScopeEntered()) {
     throw new SystemError('Scope was not entered before command dispatch', {

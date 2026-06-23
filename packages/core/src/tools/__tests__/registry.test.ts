@@ -7,7 +7,7 @@ import type { Tool } from '../types.js';
 
 const stub = (id: string, version = '0.0.0'): Tool => ({
   identity: { name: 'test-tool' },
-      metadata: {
+  metadata: {
     id: '00000000-0000-4000-8000-000000000000',
     name: id,
     version,

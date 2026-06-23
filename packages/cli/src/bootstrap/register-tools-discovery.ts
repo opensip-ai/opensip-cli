@@ -15,6 +15,7 @@ import {
   resolveProjectPaths,
   resolveUserPaths,
   loadToolManifest,
+  type BootstrapDiagnosticsCollector,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
@@ -26,12 +27,21 @@ import {
   workerRuntimeImportPolicyFor,
   type ToolRuntimeLoad,
 } from './admit-tool-package.js';
+import { BUNDLED_TOOL_PACKAGES } from './bundled-manifest.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
+import {
+  recordInstalledCatchFailure,
+  recordInstalledLoadFailure,
+  recordInstalledManifestInvalid,
+  recordInstalledTrustDenied,
+} from './discovery-diagnostics.js';
 import { synthesizeExternalTool } from './synthesize-external-tool.js';
 import { isHostRuntimeImportForbidden } from './tool-provenance.js';
 import { isInstalledToolTrusted } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
+
+const BUNDLED_PACKAGE_NAMES = new Set<string>(BUNDLED_TOOL_PACKAGES);
 
 /**
  * Run the admission gate over a discovered INSTALLED tool package before its
@@ -41,12 +51,22 @@ import type { ToolAdmission } from './tool-admission-types.js';
 function admitInstalledTool(
   pkg: { readonly name: string; readonly packageDir: string },
   builtInIds: ReadonlySet<string>,
+  collector?: BootstrapDiagnosticsCollector,
 ): ToolAdmission | undefined {
+  // ADR-0060 Phase 1: stale injected copies of bundled first-party tools are
+  // distribution noise — skip before strict installed validation runs.
+  if (BUNDLED_PACKAGE_NAMES.has(pkg.name)) {
+    logger.debug({
+      evt: 'cli.tool.bundled_installed_copy_skipped',
+      module: BOOTSTRAP_MODULE,
+      packageName: pkg.name,
+      packageDir: pkg.packageDir,
+    });
+    return undefined;
+  }
   const manifest = loadToolManifest('installed', pkg.packageDir);
   if (manifest === undefined) {
-    process.stderr.write(
-      `opensip: tool package ${pkg.name} has no conformant package.json#opensipTools manifest — skipping\n`,
-    );
+    recordInstalledManifestInvalid(pkg.name, collector);
     logger.warn({
       evt: 'cli.tool.manifest_invalid',
       module: BOOTSTRAP_MODULE,
@@ -72,17 +92,14 @@ function admitInstalledTool(
  * INSTALLED tool whose runtime failed to load. Each failure reason maps to its
  * own diagnostic while preserving the installed leg's skip-not-crash posture.
  */
-/** Stderr + structured log when an installed tool is skipped by the trust gate. */
+/** Record + structured log when an installed tool is skipped by the trust gate. */
 export function emitInstalledTrustDenied(
   toolId: string,
   packageName: string,
   packageDir: string,
+  collector?: BootstrapDiagnosticsCollector,
 ): void {
-  process.stderr.write(
-    `opensip: installed tool ${packageName} (${toolId}) is not trusted to load (deny-by-default). ` +
-      `Allowlist it via OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='${toolId}' to admit it ` +
-      `(or OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='*' for all). See opensip.ai/docs/opensip-cli/70-reference/10-environment-variables/\n`,
-  );
+  recordInstalledTrustDenied(toolId, packageName, packageDir, collector);
   logger.warn({
     evt: 'cli.tool.installed_trust_denied',
     module: BOOTSTRAP_MODULE,
@@ -95,18 +112,14 @@ export function emitInstalledTrustDenied(
 export function emitInstalledLoadFailure(
   name: string,
   load: Extract<ToolRuntimeLoad, { ok: false }>,
+  collector?: BootstrapDiagnosticsCollector,
 ): void {
+  recordInstalledLoadFailure(name, load, collector);
   if (load.reason === 'no-entry') {
-    process.stderr.write(
-      `opensip: tool package ${name} has no resolvable entry point — skipping\n`,
-    );
     logger.warn({ evt: 'cli.tool.no_entry', module: BOOTSTRAP_MODULE, name });
     return;
   }
   if (load.reason === 'invalid-shape') {
-    process.stderr.write(
-      `opensip: tool package ${name} does not export a valid \`tool\` — skipping\n`,
-    );
     logger.warn({
       evt: 'cli.tool.invalid_shape',
       module: BOOTSTRAP_MODULE,
@@ -114,7 +127,6 @@ export function emitInstalledLoadFailure(
     });
     return;
   }
-  process.stderr.write(`opensip: failed to load tool ${name}: ${load.detail ?? 'import failed'}\n`);
   logger.warn({
     evt: 'cli.tool.load_failed',
     module: BOOTSTRAP_MODULE,
@@ -133,6 +145,8 @@ export interface DiscoveryOptions {
   readonly sources: readonly ToolDiscoverySource[];
   /** Injectable env for installed-tool trust (bootstrap-time; defaults to `process.env`). */
   readonly env?: NodeJS.ProcessEnv;
+  /** Optional bootstrap diagnostics sink (defaults to the process-wide buffer). */
+  readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
 }
 
 /**
@@ -204,13 +218,19 @@ async function registerDiscoveredInstalledPackage(
     readonly registeredStableIds: ReadonlySet<string>;
     readonly provenance: ToolProvenance[];
     readonly manifests: ToolPluginManifest[];
+    readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
   },
 ): Promise<void> {
-  const admission = admitInstalledTool(pkg, args.builtInIds);
+  const admission = admitInstalledTool(pkg, args.builtInIds, args.bootstrapDiagnostics);
   if (admission === undefined) return;
 
   if (!isInstalledToolTrusted(admission.manifest.id, args.env)) {
-    emitInstalledTrustDenied(admission.manifest.id, pkg.name, pkg.packageDir);
+    emitInstalledTrustDenied(
+      admission.manifest.id,
+      pkg.name,
+      pkg.packageDir,
+      args.bootstrapDiagnostics,
+    );
     return;
   }
 
@@ -224,13 +244,15 @@ async function registerDiscoveredInstalledPackage(
   if (isHostRuntimeImportForbidden(args.env)) {
     // Synchronous void registration (no import in the host); `void` marks the
     // floating call as deliberately non-promise (the synthesize path never awaits).
-    void registerSyntheticExternalTool(args, admission, { sourcePackage: pkg.name });
+    void registerSyntheticExternalTool(args, admission, {
+      sourcePackage: pkg.name,
+    });
     return;
   }
 
   const load = await importToolRuntime(pkg.packageDir, workerRuntimeImportPolicyFor('installed'));
   if (!load.ok) {
-    emitInstalledLoadFailure(pkg.name, load);
+    emitInstalledLoadFailure(pkg.name, load, args.bootstrapDiagnostics);
     return;
   }
   if (args.builtInIds.has(load.tool.metadata.name ?? load.tool.metadata.id)) return;
@@ -291,6 +313,7 @@ export async function discoverAndRegisterToolPackages(
   const registeredStableIds = new Set(registry.list().map((t) => t.metadata.id));
 
   const env = opts.env ?? process.env;
+  const bootstrapDiagnostics = opts.bootstrapDiagnostics;
 
   for (const pkg of discovered) {
     try {
@@ -301,10 +324,11 @@ export async function discoverAndRegisterToolPackages(
         registeredStableIds,
         provenance,
         manifests,
+        bootstrapDiagnostics,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`opensip: failed to load tool ${pkg.name}: ${msg}\n`);
+      recordInstalledCatchFailure(pkg.name, msg, bootstrapDiagnostics);
       logger.warn({
         evt: 'cli.tool.load_failed',
         module: BOOTSTRAP_MODULE,

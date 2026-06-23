@@ -7,7 +7,9 @@
   "opensipTools": {
     "kind": "tool",
     "id": "manifest-id",
-    "identity": { "name": "manifest-id" },
+    "identity": {
+      "name": "manifest-id"
+    },
     "apiVersion": 1,
     "commands": [
       {

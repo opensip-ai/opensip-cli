@@ -1,4 +1,5 @@
 import { passRate } from '@opensip-cli/contracts';
+import { deriveRunOutcome } from '@opensip-cli/core';
 
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
@@ -64,12 +65,14 @@ export function contributionFromSignals(
   evaluatedSlugs: readonly string[] = evaluatedRuleSlugs(),
 ): ToolSessionContribution {
   const payload = buildGraphSessionPayload(signals, evaluatedSlugs);
+  const passed = payload.summary.errors === 0;
   return {
     tool: 'graph',
     cwd: opts.cwd,
     ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
     score: passRate(payload.summary),
-    passed: payload.summary.errors === 0,
+    passed,
+    runOutcome: deriveRunOutcome({ passed }),
     payload,
   };
 }

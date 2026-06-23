@@ -18,6 +18,7 @@ import {
 
 import { toolsCreate } from './create.js';
 import { toolsDataPurge } from './data-purge.js';
+import { toolsDoctor } from './doctor.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
 import { toolsUninstall } from './uninstall.js';
@@ -46,14 +47,36 @@ function effectiveCwd(opts: ScopeFilterOpts): string {
   return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd();
 }
 
+function buildToolsDoctorSpec(): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'doctor',
+    description: 'Show every buffered bootstrap diagnostic for this run',
+    commonFlags: ['json'],
+    scope: 'none',
+    output: COMMAND_RESULT_OUTPUT,
+    handler: () => {
+      const scope = currentScope();
+      return Promise.resolve(toolsDoctor(scope?.bootstrapDiagnostics.list() ?? []));
+    },
+  });
+}
+
 function buildToolsListSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'list',
     description: 'List the effective tool set (bundled, global, and project-local)',
     commonFlags: ['json'],
     options: [
-      { flag: '--global', description: 'Only user-global installed tools', default: false },
-      { flag: '--project', description: 'Only project-local installed tools', default: false },
+      {
+        flag: '--global',
+        description: 'Only user-global installed tools',
+        default: false,
+      },
+      {
+        flag: '--project',
+        description: 'Only project-local installed tools',
+        default: false,
+      },
     ],
     // Listing must work outside a project too (global tools are still
     // visible); the project host dir simply scans empty there.
@@ -83,7 +106,12 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
     description:
       'Validate a tool package against the Tool contract (runs the package module — see docs)',
     commonFlags: ['json'],
-    args: [{ name: 'spec', description: 'npm spec, tarball, or local directory path' }],
+    args: [
+      {
+        name: 'spec',
+        description: 'npm spec, tarball, or local directory path',
+      },
+    ],
     options: [
       {
         flag: '--install-deps',
@@ -94,7 +122,10 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
     scope: 'none',
     output: COMMAND_RESULT_OUTPUT,
     handler: async (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & { _args: string[]; installDeps?: boolean };
+      const opts = rawOpts as ScopeFilterOpts & {
+        _args: string[];
+        installDeps?: boolean;
+      };
       const spec = opts._args[0] ?? '';
       const { result } = await runToolValidation({
         spec,
@@ -112,9 +143,18 @@ function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
     name: 'install',
     description: 'Validate, then install a tool package (global by default; see tools validate)',
     commonFlags: ['json'],
-    args: [{ name: 'spec', description: 'npm spec, tarball, or local directory path' }],
+    args: [
+      {
+        name: 'spec',
+        description: 'npm spec, tarball, or local directory path',
+      },
+    ],
     options: [
-      { flag: '--global', description: 'Install user-global (the default)', default: false },
+      {
+        flag: '--global',
+        description: 'Install user-global (the default)',
+        default: false,
+      },
       {
         flag: '--project',
         description: 'Install into this project’s runtime tool host instead',
@@ -152,8 +192,16 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
     commonFlags: ['json'],
     args: [{ name: 'name-or-id', description: 'Tool id or npm package name' }],
     options: [
-      { flag: '--global', description: 'Target the user-global install', default: false },
-      { flag: '--project', description: 'Target the project-local install', default: false },
+      {
+        flag: '--global',
+        description: 'Target the user-global install',
+        default: false,
+      },
+      {
+        flag: '--project',
+        description: 'Target the project-local install',
+        default: false,
+      },
       {
         flag: '--purge-data',
         description: 'Also purge the tool’s project SQLite rows (project scope only)',
@@ -164,7 +212,10 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
     output: COMMAND_RESULT_OUTPUT,
     // eslint-disable-next-line @typescript-eslint/require-await -- async keeps the CommandSpec handler signature; the bodies are synchronous SQLite + fs
     handler: async (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & { _args: string[]; purgeData?: boolean };
+      const opts = rawOpts as ScopeFilterOpts & {
+        _args: string[];
+        purgeData?: boolean;
+      };
       // --purge-data is project-local only: runtime data lives per project
       // (the spec's explicit rejection for --global).
       if (opts.purgeData === true && opts.global === true) {
@@ -211,7 +262,12 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
     name: 'create',
     description: 'Scaffold a minimal project-local Tool under opensip-cli/tools/<id>/',
     commonFlags: ['json'],
-    args: [{ name: 'tool-id', description: 'Kebab-case tool id (also the subcommand name)' }],
+    args: [
+      {
+        name: 'tool-id',
+        description: 'Kebab-case tool id (also the subcommand name)',
+      },
+    ],
     options: [
       {
         flag: '--force',
@@ -222,7 +278,10 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
     scope: 'project',
     output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & { _args: string[]; force?: boolean };
+      const opts = rawOpts as ScopeFilterOpts & {
+        _args: string[];
+        force?: boolean;
+      };
       const toolId = opts._args[0] ?? '';
       const result = toolsCreate({
         toolId,
@@ -265,6 +324,7 @@ function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
 export function buildToolsGroupLeaves(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildToolsListSpec(),
+    buildToolsDoctorSpec(),
     buildToolsCreateSpec(ctx),
     buildToolsValidateSpec(ctx),
     buildToolsInstallSpec(ctx),

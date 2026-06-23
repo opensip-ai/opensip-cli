@@ -22,9 +22,11 @@ import { basename, join } from 'node:path';
 
 import { resolveApiKey, resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
+  BootstrapDiagnosticsCollector,
   createCapabilityRegistry,
   currentTraceparent,
   isContributionWithDisposer,
+  type CliDiagnostic,
   type LanguageRegistry,
   type Logger,
   PluginIncompatibleError,
@@ -128,6 +130,10 @@ export interface BuildPerRunScopeInput {
    * commands read it via `currentScope()` rather than a module global.
    */
   readonly provenance: readonly ToolProvenance[];
+  /**
+   * Startup bootstrap diagnostics gathered before this scope was built (ADR-0060).
+   */
+  readonly bootstrapDiagnostics?: readonly CliDiagnostic[];
   readonly apiKey?: string;
   readonly noCloud?: boolean;
   readonly logger: Logger;
@@ -159,6 +165,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     registries,
     manifests,
     provenance,
+    bootstrapDiagnostics,
     apiKey,
     noCloud,
     logger,
@@ -166,6 +173,10 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   } = input;
 
   const { languages, tools } = registries;
+  const scopeBootstrapDiagnostics = new BootstrapDiagnosticsCollector();
+  for (const diagnostic of bootstrapDiagnostics ?? []) {
+    scopeBootstrapDiagnostics.record(diagnostic);
+  }
 
   // Resolve the effective cloud config ONCE — both the signal sink (ADR-0008)
   // and the correlation cloud-active gate (B2) read it; do not resolve twice.
@@ -205,6 +216,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     provenance,
     configPath: project.scope === 'project' ? project.configPath : undefined,
     env: process.env,
+    bootstrapDiagnostics: scopeBootstrapDiagnostics,
   });
 
   // ADR-0037: build the host file-targeting accessor from the SAME single
@@ -243,6 +255,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // uninstall`) read them via `currentScope()` — the single source of truth.
     toolManifests: manifests,
     toolProvenance: provenance,
+    bootstrapDiagnostics: scopeBootstrapDiagnostics.list(),
     // B2: the cloud-aware correlation bag, read downstream via
     // `currentScope()?.correlation` and forwarded into spawned/forked children.
     correlation,

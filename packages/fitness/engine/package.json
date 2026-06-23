@@ -43,7 +43,9 @@
     "id": "fitness",
     "identity": {
       "name": "fitness",
-      "aliases": ["fit"],
+      "aliases": [
+        "fit"
+      ],
       "layoutKey": "fit"
     },
     "stableId": "afd68bd3-ff3c-4935-a5b6-76d8fc7a5224",

@@ -21,6 +21,7 @@
 
 import {
   createRunLifecycle,
+  deriveRunOutcome,
   generatePrefixedId,
   logger as defaultLogger,
   type Logger,
@@ -156,6 +157,10 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       const persistStart = performance.now();
       try {
         const repo = new SessionRepo(datastore);
+        const runOutcome = deriveRunOutcome({
+          passed: contribution.passed,
+          explicit: contribution.runOutcome,
+        });
         repo.save({
           id,
           tool: contribution.tool,
@@ -165,13 +170,16 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           recipe: contribution.recipe,
           score: contribution.score,
           passed: contribution.passed,
+          runOutcome,
           durationMs: snapshot.durationMs,
           payload: contribution.payload,
         });
         sessionId = id;
         // persistMs: host-side write cost, recorded on the sibling metrics row
         // (separate clock from canonical durationMs).
-        repo.upsertHostMetrics(id, { persistMs: Math.max(0, performance.now() - persistStart) });
+        repo.upsertHostMetrics(id, {
+          persistMs: Math.max(0, performance.now() - persistStart),
+        });
         log.info?.({
           evt: 'cli.run-session.recorded',
           module: MODULE_TAG,

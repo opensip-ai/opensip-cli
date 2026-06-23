@@ -12,6 +12,7 @@ import type { HostAudit, HostEntitlements, HostGovernance } from './host-planes.
 import type { LiveViewContext, LiveViewRenderer } from './live-view.js';
 import type { GateCompareResult, SignalDeliveryResult } from './tool-results.js';
 import type { ToolRunCompletion, ToolRunSessions } from './tool-sessions.js';
+import type { CliDiagnostic } from '../lib/cli-diagnostic.js';
 import type { Logger } from '../lib/logger.js';
 import type { ToolScope } from '../lib/scope-types.js';
 
@@ -210,6 +211,8 @@ export interface ToolCliContext {
      * without parsing `message`.
      */
     readonly code?: string;
+    /** Structured bootstrap/setup diagnostic (ADR-0060 command-error substrate). */
+    readonly diagnostic?: CliDiagnostic;
   }) => void;
   /**
    * Emit a **raw, unwrapped** value as machine-output for a command that

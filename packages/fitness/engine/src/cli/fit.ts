@@ -29,6 +29,11 @@ import { FitnessRecipeService } from '../recipes/service.js';
 
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
+import {
+  fitCommandErrorResult,
+  fitLoadCommandError,
+  fitLoadIsDegraded,
+} from './fit/load-outcome.js';
 import { runRecipeOrAdHoc, selectRecipe } from './fit/recipe-selector.js';
 import { resolvedFitnessConfig } from './fit/resolved-fitness-config.js';
 import {
@@ -114,11 +119,22 @@ export async function executeFit(
   // field (not on the presentation — it is not a display field the table view
   // renders): the non-Ink paths surface it via `emitWarningsToStderr` and the
   // live runner renders it in its summary block.
-  | { result: RunPresentation; envelope: SignalEnvelope; warnings?: readonly string[] }
+  | {
+      result: RunPresentation;
+      envelope: SignalEnvelope;
+      warnings?: readonly string[];
+      runOutcome?: 'degraded';
+    }
   | { result: ErrorResult; envelope?: undefined; warnings?: undefined }
 > {
   logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
+
+  const loadCommandError = fitLoadCommandError();
+  if (loadCommandError !== undefined) {
+    return { result: fitCommandErrorResult(loadCommandError) };
+  }
+
   const checkRegistry = currentCheckRegistry();
   logger.info({
     evt: 'cli.checks.loaded',
@@ -211,5 +227,6 @@ export async function executeFit(
     // warnings ride as a sibling field (not on the presentation): the non-Ink
     // paths surface them via emitWarningsToStderr, the live runner in its summary.
     ...(warnings.length > 0 ? { warnings } : {}),
+    ...(fitLoadIsDegraded() ? { runOutcome: 'degraded' as const } : {}),
   };
 }

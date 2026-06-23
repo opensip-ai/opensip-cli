@@ -39,6 +39,7 @@ import {
   type ToolConfigDeclaration,
 } from '@opensip-cli/config';
 import {
+  type BootstrapDiagnosticsCollector,
   type CapabilityRegistry,
   ConfigurationError,
   logger,
@@ -197,8 +198,12 @@ export function composeAndValidateToolConfig(args: {
   readonly provenance?: readonly ToolProvenance[];
   readonly configPath: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
-}): { readonly config: ResolvedToolConfig | undefined; readonly document: unknown } {
-  const { tools, configPath, env, manifests = [], provenance = [] } = args;
+  readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
+}): {
+  readonly config: ResolvedToolConfig | undefined;
+  readonly document: unknown;
+} {
+  const { tools, configPath, env, manifests = [], provenance = [], bootstrapDiagnostics } = args;
   // ADR-0054 M4-E: provenance-aware fold — bundled tools' Zod is composed
   // host-side (trusted), external tools validate from their serializable
   // manifest descriptor (coarse, NO Zod import); the deep Zod pass runs in the
@@ -219,7 +224,9 @@ export function composeAndValidateToolConfig(args: {
   // validates STRICT through the one composed schema (ADR-0023, the launch seam).
   // Gate keys are added only to tool namespaces; host blocks stay strict.
   const declarations: readonly ToolConfigDeclaration[] = [
-    ...hostConfigDeclarations({ pluginConfigKeys: collectPluginConfigKeys(manifests) }),
+    ...hostConfigDeclarations({
+      pluginConfigKeys: collectPluginConfigKeys(manifests),
+    }),
     ...toolDeclarations,
   ];
 
@@ -244,7 +251,12 @@ export function composeAndValidateToolConfig(args: {
   //     Tool.config yet its block exists: a tool-authoring bug, hard-reject;
   //   - otherwise → warn loudly (structured event + stderr for CI), with a
   //     did-you-mean when the key is edit-distance-close to a claimed one.
-  reportUnclaimedNamespaces({ declarations, document: validated, tools });
+  reportUnclaimedNamespaces({
+    declarations,
+    document: validated,
+    tools,
+    bootstrapDiagnostics,
+  });
 
   // The validated document is returned alongside the resolved config so the
   // host can build the targeting substrate (`buildTargets`) from the SAME
@@ -272,6 +284,7 @@ function reportUnclaimedNamespaces(args: {
   readonly declarations: readonly ToolConfigDeclaration[];
   readonly document: unknown;
   readonly tools: ToolRegistry;
+  readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
 }): void {
   const report = analyzeNamespaceClaims(args.declarations, args.document);
   if (report.unclaimed.length === 0) return;
@@ -295,10 +308,15 @@ function reportUnclaimedNamespaces(args: {
       namespace: u.namespace,
       suggestion: u.suggestion,
     });
-    process.stderr.write(
-      `opensip: config namespace '${u.namespace}:' is not claimed by any loaded tool${didYouMean} ` +
-        `(expected if that tool isn't installed in this project)\n`,
-    );
+    args.bootstrapDiagnostics?.record({
+      severity: 'warning',
+      code: 'OPENSIP_CONFIG_UNCLAIMED_NAMESPACE',
+      category: 'configuration',
+      message:
+        `Config namespace '${u.namespace}:' is not claimed by any loaded tool${didYouMean} ` +
+        `(expected if that tool isn't installed in this project).`,
+      impact: 'The namespace block is ignored for this run.',
+    });
   }
 }
 

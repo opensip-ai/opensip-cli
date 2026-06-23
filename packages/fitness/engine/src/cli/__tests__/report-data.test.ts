@@ -24,19 +24,59 @@ import {
   resolveToolHooks,
   runWithScope,
 } from '@opensip-cli/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../fit/check-loader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof CheckLoaderModule>();
+  const { currentCheckRegistry, currentFitnessLoadState } =
+    await import('../../framework/scope-registry.js');
+  const { defineCheck } = await import('../../framework/define-check.js');
+  return {
+    ...actual,
+    ensureChecksLoaded: vi.fn((projectDir = '') => {
+      const key = projectDir;
+      const load = currentFitnessLoadState();
+      if (load.loadedFor === key) return;
+      const registry = currentCheckRegistry();
+      if (registry.listEnabled().length === 0) {
+        registry.register(
+          defineCheck({
+            id: '00000000-0000-4000-8000-000000000098',
+            slug: 'catalog-stub',
+            description: 'catalog stub',
+            tags: ['test'],
+            analyze: () => [],
+          }),
+          '@opensip-cli/test',
+        );
+      }
+      load.loadedFor = key;
+      load.pluginLoadErrors = [];
+      load.checkPackErrors = [];
+      load.loadWarnings = [];
+      load.degradedDiagnostics = [];
+      load.commandError = undefined;
+      load.loadDegraded = undefined;
+      load.outcomeFinalized = true;
+    }),
+  };
+});
 
 /** Fresh scope with empty registries — local equivalent of the retired
  *  `@opensip-cli/core/test-utils` helper. The fitness engine's own tests
  *  cannot use `@opensip-cli/test-support` (it depends on this package —
  *  the dev edge would make the package graph cyclic; ADR-0040). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 const withScope = runWithScope;
 
 import { fitnessTool } from '../../tool.js';
 import { collectFitnessReportData } from '../report-data.js';
 
+import type * as CheckLoaderModule from '../fit/check-loader.js';
 import type { CheckCatalogEntry, RecipeCatalogEntry } from '../report-data.js';
 
 /** The fitness engine package root (carries the manifest), 4 dirs up from this test. */

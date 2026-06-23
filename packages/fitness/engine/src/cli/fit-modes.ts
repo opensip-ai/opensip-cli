@@ -22,11 +22,15 @@ import {
 } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
+  deriveRunOutcome,
+  formatCliDiagnosticHuman,
   resolveFailOnDegraded,
   SystemError,
+  type CliDiagnostic,
   type ToolCliContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
+  type ToolRunOutcome,
 } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
@@ -55,13 +59,16 @@ type FitRunCompletion = Pick<ToolRunCompletion, 'session'>;
 function fitSessionContribution(
   args: FitOptions,
   envelope: SignalEnvelope,
+  runOutcome?: ToolRunOutcome,
 ): ToolSessionContribution {
+  const passed = envelope.verdict.passed;
   return {
     tool: 'fit',
     cwd: args.cwd,
     recipe: envelope.recipe,
     score: envelope.verdict.score,
-    passed: envelope.verdict.passed,
+    passed,
+    runOutcome: deriveRunOutcome({ passed, explicit: runOutcome }),
     payload: buildFitnessSessionPayload(envelope),
   };
 }
@@ -70,10 +77,49 @@ function fitSessionContribution(
  * Build fit's run completion from the run envelope (host-owned-run-timing
  * Phase 3): the generic-session contribution the host run plane persists.
  */
-function fitRunCompletion(args: FitOptions, envelope: SignalEnvelope): FitRunCompletion {
+function fitRunCompletion(
+  args: FitOptions,
+  envelope: SignalEnvelope,
+  runOutcome?: ToolRunOutcome,
+): FitRunCompletion {
   return {
-    session: fitSessionContribution(args, envelope),
+    session: fitSessionContribution(args, envelope, runOutcome),
   };
+}
+
+/** Emit a fail-closed command error — no findings envelope, no session persistence. */
+function emitFitCommandError(
+  cli: ToolCliContext,
+  result: {
+    message: string;
+    exitCode: number;
+    suggestion?: string;
+    code?: string;
+    diagnostic?: CliDiagnostic;
+  },
+  jsonRequested: boolean,
+): void {
+  cli.setExitCode(result.exitCode);
+  if (jsonRequested) {
+    cli.emitError({
+      message: result.message,
+      exitCode: result.exitCode,
+      ...(result.suggestion === undefined ? {} : { suggestion: result.suggestion }),
+      ...(result.code === undefined ? {} : { code: result.code }),
+      ...(result.diagnostic === undefined ? {} : { diagnostic: result.diagnostic }),
+    });
+    return;
+  }
+  if (result.diagnostic !== undefined) {
+    process.stderr.write(`${formatCliDiagnosticHuman(result.diagnostic)}\n`);
+    return;
+  }
+  void cli.render({
+    type: 'error',
+    message: result.message,
+    ...(result.suggestion === undefined ? {} : { suggestion: result.suggestion }),
+    exitCode: result.exitCode,
+  });
 }
 
 // persistFitRun removed (Phase 3). The three mode bodies (json/live-fallback/gate)
@@ -145,7 +191,10 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
     await emitShowError(args, cli, 'datastore-unavailable', 'session replay requires a datastore');
     return;
   }
-  const resolved = resolveSession(datastore, { ref: args.show ?? 'latest', tool: 'fit' });
+  const resolved = resolveSession(datastore, {
+    ref: args.show ?? 'latest',
+    tool: 'fit',
+  });
   if (!resolved.ok) {
     await emitShowError(args, cli, resolved.reason, resolved.detail);
     return;
@@ -182,9 +231,8 @@ export async function runJsonMode(
 ): Promise<FitRunCompletion | undefined> {
   const fitResult = await executeFit(args);
   if (fitResult.envelope === undefined) {
-    // 2.12.0 (§5.5): a failed `--json` run emits a structured `status:'error'`
-    // CommandOutcome (the host wraps + sets the exit code), not a bare `{ error }`.
-    cli.emitError({ message: fitResult.result.message, exitCode: fitResult.result.exitCode });
+    // ADR-0060: command-error — structured diagnostic, no findings envelope or session.
+    emitFitCommandError(cli, fitResult.result, true);
     return undefined;
   }
   // ADR-0011: emit the signal envelope through the shared `formatSignalJson`
@@ -202,7 +250,7 @@ export async function runJsonMode(
   // Host-owned persistence (host-owned-run-timing Phases 3 + 5): RETURN the
   // session + dashboard contribution; the host persists both after the handler
   // resolves.
-  return fitRunCompletion(args, fitResult.envelope);
+  return fitRunCompletion(args, fitResult.envelope, fitResult.runOutcome);
 }
 
 /**
@@ -241,7 +289,7 @@ export async function runLiveMode(
       // Effectful egress + host-owned findings exit at the composition root
       // (ADR-0035), composing with non-TTY runs (CI), not just the TTY live view.
       await deliverFitSignals(cli, fitResult.envelope, args);
-      completion = fitRunCompletion(args, fitResult.envelope);
+      completion = fitRunCompletion(args, fitResult.envelope, fitResult.runOutcome);
     }
   }
   await cli.maybeOpenReport({
@@ -277,15 +325,14 @@ export async function runGateMode(
       mode: args.gateSave === true ? 'save' : 'compare',
       reason: fitResult.result.message,
     });
-    cli.setExitCode(fitResult.result.exitCode);
-    process.stderr.write(`Error: ${fitResult.result.message}\n`);
+    emitFitCommandError(cli, fitResult.result, args.json === true);
     return undefined;
   }
   // ADR-0036: the envelope arrives fingerprint-stamped — `buildFitEnvelope`
   // passes fit's message-hash strategy to `buildSignalEnvelope`, which stamps
   // at construction. The host seams only read `signal.fingerprint`.
   const envelope: SignalEnvelope = fitResult.envelope;
-  const completion = fitRunCompletion(args, envelope);
+  const completion = fitRunCompletion(args, envelope, fitResult.runOutcome);
   // Surface non-fatal warnings before the gate output so the user sees them
   // alongside the run summary. Safe here because gate mode is non-Ink. Warnings
   // ride on the result bundle now (sibling field), not the RunPresentation.
@@ -316,7 +363,10 @@ export async function runGateMode(
       return completion;
     }
     const result = await cli.compareBaseline('fitness', envelope);
-    await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
+    await cli.render({
+      type: 'gate-done',
+      lines: renderGateCompareOutput(result).split('\n'),
+    });
     // gate-compare's verdict is the baseline-diff `degraded` predicate, NOT the
     // findings policy — pass it as the host runFailed override (ADR-0035), gated by
     // the reserved `failOnDegraded` key (ADR-0036, default true → ratchet-as-report
@@ -362,7 +412,11 @@ async function emitShowError(
 ): Promise<void> {
   if (args.json) {
     // emitError sets the exit code itself (process exit == reported outcome).
-    cli.emitError({ message: detail, exitCode: EXIT_CODES.CONFIGURATION_ERROR, code: reason });
+    cli.emitError({
+      message: detail,
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      code: reason,
+    });
     return;
   }
   cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);

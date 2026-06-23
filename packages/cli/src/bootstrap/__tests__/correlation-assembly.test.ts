@@ -77,7 +77,12 @@ function captureDeps(onBuild: (input: BuildPerRunScopeInput) => void): PostBailo
   };
 }
 
-const logger: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const logger: Logger = {
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
 
 const cliDefaults = { cloud: {}, ui: {} } as ReturnType<typeof loadCliDefaults>;
 
@@ -103,7 +108,10 @@ function baseInput(
     parentCommand: 'graph',
     toolName: 'graph',
     cliDefaults,
-    registries: { languages: new LanguageRegistry(), tools: new ToolRegistry() },
+    registries: {
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+    },
     manifests: [],
     provenance: [],
     logger,
@@ -119,6 +127,7 @@ function emptyRuntime(): PreActionRuntime {
     tools: new ToolRegistry(),
     manifests: [],
     provenance: [],
+    bootstrapDiagnostics: [],
   };
 }
 
@@ -136,7 +145,9 @@ describe('buildPerRunScope correlation assembly (B2)', () => {
 
   it('attaches repo and stamps tool/parentCommand when cloud egress is ACTIVE', () => {
     vi.spyOn(configModule, 'resolveApiKey').mockReturnValue('a-key');
-    vi.spyOn(configModule, 'resolveEffectiveCloudConfig').mockReturnValue({ sync: true });
+    vi.spyOn(configModule, 'resolveEffectiveCloudConfig').mockReturnValue({
+      sync: true,
+    });
 
     const root = mkdtempSync(join(tmpdir(), 'corr-active-'));
     try {
@@ -170,12 +181,17 @@ describe('buildPerRunScope correlation assembly (B2)', () => {
 
   it('omits repo when --no-cloud is set even though a key resolves', () => {
     vi.spyOn(configModule, 'resolveApiKey').mockReturnValue('a-key');
-    vi.spyOn(configModule, 'resolveEffectiveCloudConfig').mockReturnValue({ sync: true });
+    vi.spyOn(configModule, 'resolveEffectiveCloudConfig').mockReturnValue({
+      sync: true,
+    });
 
     const root = mkdtempSync(join(tmpdir(), 'corr-nocloud-'));
     try {
       const scope = buildPerRunScope(
-        baseInput(projectAt(root, 'project'), { noCloud: true, apiKey: 'a-key' }),
+        baseInput(projectAt(root, 'project'), {
+          noCloud: true,
+          apiKey: 'a-key',
+        }),
       );
       expect(scope.correlation).not.toHaveProperty('repo');
     } finally {

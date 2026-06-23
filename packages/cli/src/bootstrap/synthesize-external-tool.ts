@@ -56,10 +56,9 @@ export function synthesizeExternalTool(
   manifest: ToolPluginManifest,
 ): ReturnType<typeof defineTool> {
   if (manifest.identity === undefined) {
-    throw new SystemError(
-      `external tool manifest '${manifest.id}' is missing required identity`,
-      { code: 'SYSTEM.EXTERNAL_TOOL.IDENTITY_MISSING' },
-    );
+    throw new SystemError(`external tool manifest '${manifest.id}' is missing required identity`, {
+      code: 'SYSTEM.EXTERNAL_TOOL.IDENTITY_MISSING',
+    });
   }
 
   return defineTool({

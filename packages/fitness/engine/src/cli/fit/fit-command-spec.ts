@@ -84,9 +84,7 @@ async function runFit(
  * by the tool (tool.ts) so the `cli.registerLiveView(renderFitLive)` wiring
  * stays next to the renderer import; this module stays renderer-free.
  */
-export function buildFitCommandSpec(
-  setUpLiveView: (cli: ToolCliContext) => void,
-) {
+export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {
   return definePrimaryCommand<unknown, ToolCliContext>({
     description: 'Run fitness checks',
     // ADR-0021 cross-tool flags from the single registry: --cwd, --json,

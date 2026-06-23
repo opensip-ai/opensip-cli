@@ -127,7 +127,7 @@ describe('renderFitLive produce mapping', () => {
   it('routes through runToolLiveView with the fit tool key', async () => {
     await renderFitLive(fitArgs({ cwd: '/proj' }));
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
-    expect(capturedSpec?.tool).toBe('fit');
+    expect(capturedSpec?.tool).toBe('fitness');
   });
 
   it('omits the per-check table unless --verbose', async () => {
@@ -136,8 +136,16 @@ describe('renderFitLive produce mapping', () => {
     expect(outcome.kind).toBe('done');
     if (outcome.kind !== 'done') return;
     expect(outcome.done.table).toBeUndefined();
-    expect(outcome.done.summary).toMatchObject({ passed: true, errors: 0, warnings: 0 });
-    expect(outcome.session).toMatchObject({ tool: 'fit', cwd: '/proj', passed: true });
+    expect(outcome.done.summary).toMatchObject({
+      passed: true,
+      errors: 0,
+      warnings: 0,
+    });
+    expect(outcome.session).toMatchObject({
+      tool: 'fit',
+      cwd: '/proj',
+      passed: true,
+    });
   });
 
   it('includes the validated-column table when --verbose', async () => {

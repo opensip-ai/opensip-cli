@@ -23,7 +23,12 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolveCapabilityPreferences } from '@opensip-cli/config';
-import { currentScope, loadCapabilityDomain, logger } from '@opensip-cli/core';
+import {
+  capabilityDiscoveryToCliDiagnostic,
+  currentScope,
+  loadCapabilityDomain,
+  logger,
+} from '@opensip-cli/core';
 
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
@@ -72,6 +77,11 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   // Reset per-run warning buffer. Its lifetime mirrors loadedFor —
   // a fresh load (new projectDir or first call) starts with no warnings.
   load.loadWarnings = [];
+  load.checkPackErrors = [];
+  load.degradedDiagnostics = [];
+  load.commandError = undefined;
+  load.loadDegraded = undefined;
+  load.outcomeFinalized = undefined;
 
   // 1. Load fit plugins — discovers .mjs files in
   //    <projectDir>/opensip-cli/fit/{checks,recipes}/ and any
@@ -85,12 +95,13 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   const pluginResult = await loadAllPlugins('fit', projectDir);
   load.pluginLoadErrors = pluginResult.errors;
   if (pluginResult.errors.length > 0) {
-    // Plugin load errors go to loadWarnings (rendered via the result) and
-    // logger.warn (structured logs). Direct stderr writes are forbidden
-    // during live-view runs — they desync Ink's frame tracking.
+    // Structured classification happens in finalizeFitLoadOutcome; log only here.
     for (const err of pluginResult.errors) {
-      load.loadWarnings.push(`plugin failed to load — ${err}`);
-      logger.warn({ evt: 'cli.plugin.warning', module: 'cli:fit', message: err });
+      logger.warn({
+        evt: 'cli.plugin.warning',
+        module: 'cli:fit',
+        message: err,
+      });
     }
   }
 
@@ -103,28 +114,13 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    on the scope capability registry, so the CLI pre-action hook and this
   //    call don't double-load. Discovery errors (incl. the single-core guard's
   //    foreign-core skips) surface as load warnings.
-  for (const err of await loadFitCheckPackages(projectDir ?? cliInstallDir())) {
-    load.loadWarnings.push(err);
-  }
-
-  // 3. No-checks-loaded guard. Silent zero-checks would let a misconfig or
-  //    missing dep produce a green run that scanned nothing — the failure mode
-  //    the CLI exists to prevent. Checks the TOTAL registry count (the load may
-  //    have been memoized by the pre-action hook, so a per-call delta is wrong).
-  if (currentCheckRegistry().listEnabled().length === 0) {
-    load.loadWarnings.push(
-      'no check packages were loaded. ' +
-        'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
-        'or declare plugins.checkPackages in opensip-cli.config.yml.',
-    );
-    logger.warn({
-      evt: 'cli.check_packages.empty',
-      module: 'cli:fit',
-      msg: 'no check packages loaded',
-    });
-  }
+  load.checkPackErrors = [...(await loadFitCheckPackages(projectDir ?? cliInstallDir()))];
 
   load.loadedFor = key;
+
+  // Classify required vs optional failures and stamp command-error / degraded state.
+  const { finalizeFitLoadOutcome } = await import('./load-outcome.js');
+  finalizeFitLoadOutcome(projectDir ?? '');
 }
 
 /**
@@ -144,15 +140,33 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
     descriptor === undefined
       ? {}
       : resolveCapabilityPreferences(descriptor, scope?.configDocument?.plugins ?? {});
-  return registry.isDomainLoaded('fit-pack', projectDir)
+  const errors = registry.isDomainLoaded('fit-pack', projectDir)
     ? registry.domainLoadErrors('fit-pack')
-    : loadCapabilityDomain({
+    : await loadCapabilityDomain({
         registry,
         domainId: 'fit-pack',
         projectDir,
         cliDir: cliInstallDir(),
         preferences,
+        onDiagnostic: (diagnostic) => {
+          currentScope()?.bootstrapDiagnostics.record(
+            capabilityDiscoveryToCliDiagnostic(diagnostic, 'fit-pack', {
+              toolId: 'fitness',
+              capabilityDomain: 'fit-pack',
+            }),
+          );
+        },
       });
+  for (const message of errors) {
+    currentScope()?.bootstrapDiagnostics.record(
+      capabilityDiscoveryToCliDiagnostic(
+        { evt: 'capability.fit-pack.load_error', message },
+        'fit-pack',
+        { toolId: 'fitness', capabilityDomain: 'fit-pack' },
+      ),
+    );
+  }
+  return errors;
 }
 
 /**

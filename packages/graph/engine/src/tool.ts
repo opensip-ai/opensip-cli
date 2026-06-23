@@ -52,11 +52,7 @@ import { createRulesRegistry } from './rules/registry.js';
 import './scope-augmentation.js';
 
 import type { GraphLanguageAdapter } from './lang-adapter/types.js';
-import type {
-  CapabilityRegistrar,
-  Tool,
-  ToolScope,
-} from '@opensip-cli/core';
+import type { CapabilityRegistrar, Tool, ToolScope } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 // =============================================================================

@@ -25,6 +25,8 @@ export const sessions = sqliteTable(
     recipe: text('recipe'),
     score: integer('score').notNull(),
     passed: integer('passed', { mode: 'boolean' }).notNull(),
+    /** Persisted run health (ADR-0060): passed | failed | degraded | error. Nullable for legacy rows. */
+    run_outcome: text('run_outcome'),
     durationMs: integer('duration_ms').notNull(),
   },
   (table) => [index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`)],

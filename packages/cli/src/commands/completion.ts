@@ -79,7 +79,7 @@ export interface CompletionInventory {
   /**
    * Sub-subcommand names for the action-less groups (`sessions`, `tools`), the
    * `<tool> <verb>` grammar (`fit export`…), and the per-tool `plugin` groups
- * (`fit plugin`, keyed under `${parentVerb} plugin`).
+   * (`fit plugin`, keyed under `${parentVerb} plugin`).
    */
   readonly groupSubcommands: Readonly<Record<string, readonly string[]>>;
 }

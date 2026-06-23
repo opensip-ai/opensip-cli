@@ -68,7 +68,9 @@ describe('fitness scope-registry — factories', () => {
     const load = createFitnessLoadState();
     expect(load.loadedFor).toBeNull();
     expect(load.pluginLoadErrors).toEqual([]);
+    expect(load.checkPackErrors).toEqual([]);
     expect(load.loadWarnings).toEqual([]);
+    expect(load.degradedDiagnostics).toEqual([]);
   });
 });
 

@@ -1,4 +1,5 @@
 import type {
+  CliDiagnostic,
   LanguageRegistry,
   ToolPluginManifest,
   ToolProvenance,
@@ -11,4 +12,5 @@ export interface PreActionRuntime {
   readonly tools: ToolRegistry;
   readonly manifests: readonly ToolPluginManifest[];
   readonly provenance: readonly ToolProvenance[];
+  readonly bootstrapDiagnostics: readonly CliDiagnostic[];
 }

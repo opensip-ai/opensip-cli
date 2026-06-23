@@ -54,6 +54,7 @@ function runtime(): PreActionRuntime {
     tools: new ToolRegistry(),
     manifests: [],
     provenance: [],
+    bootstrapDiagnostics: [],
   };
 }
 
@@ -102,7 +103,11 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
 
     const buildPerRunScope = vi.fn();
     const enterScope = vi.fn();
-    const createRunLogger = vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+    const createRunLogger = vi.fn(() => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    }));
     const maybeInitializeOwningTool = vi.fn();
     const loadOwningToolCapabilities = vi.fn();
 

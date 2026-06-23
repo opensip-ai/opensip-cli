@@ -22,7 +22,9 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveCapabilityPreferences, type CapabilityPreferences } from '@opensip-cli/config';
 import {
+  capabilityDiscoveryToCliDiagnostic,
   currentCapabilityRegistry,
+  currentScope,
   loadCapabilityDomain,
   type CapabilityDiscoveryDescriptor,
   type Tool,
@@ -87,7 +89,21 @@ export async function loadOwningToolCapabilities(
       domain.discovery,
       resolveCapabilityPreferences(domain.discovery, pluginsConfig),
     );
-    await loadCapabilityDomain({ registry, domainId: domain.id, projectDir, cliDir, preferences });
+    await loadCapabilityDomain({
+      registry,
+      domainId: domain.id,
+      projectDir,
+      cliDir,
+      preferences,
+      onDiagnostic: (diagnostic) => {
+        currentScope()?.bootstrapDiagnostics.record(
+          capabilityDiscoveryToCliDiagnostic(diagnostic, domain.id, {
+            toolId: owningTool.metadata.id,
+            capabilityDomain: domain.id,
+          }),
+        );
+      },
+    });
     driven++;
   }
   return driven;

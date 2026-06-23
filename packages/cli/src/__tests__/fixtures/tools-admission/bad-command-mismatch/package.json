@@ -7,7 +7,9 @@
   "opensipTools": {
     "kind": "tool",
     "id": "command-mismatch-tool",
-    "identity": { "name": "command-mismatch-tool" },
+    "identity": {
+      "name": "command-mismatch-tool"
+    },
     "apiVersion": 1,
     "commands": [
       {
