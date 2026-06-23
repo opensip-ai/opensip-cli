@@ -44,9 +44,49 @@ import {
 } from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
 import { executeFit } from '@opensip-cli/fitness/internal';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as CheckLoaderModule from '@opensip-cli/fitness/cli/fit/check-loader.js';
 import type { FitOptions } from '@opensip-cli/contracts';
+
+// Seed a stub check so executeFit reaches the recipe path (ADR-0060 fail-closed
+// when the registry is empty). Check packs are intentionally not loaded — only
+// scope isolation is under test.
+vi.mock('@opensip-cli/fitness/cli/fit/check-loader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof CheckLoaderModule>();
+  const { currentCheckRegistry, currentFitnessLoadState } =
+    await import('@opensip-cli/fitness/framework/scope-registry.js');
+  const { defineCheck } = await import('@opensip-cli/fitness/framework/define-check.js');
+  return {
+    ...actual,
+    ensureChecksLoaded: vi.fn((projectDir = '') => {
+      const key = projectDir;
+      const load = currentFitnessLoadState();
+      if (load.loadedFor === key) return;
+      const registry = currentCheckRegistry();
+      if (registry.listEnabled().length === 0) {
+        registry.register(
+          defineCheck({
+            id: '00000000-0000-4000-8000-000000000097',
+            slug: 'saas-smoke-stub',
+            description: 'stub',
+            tags: ['test'],
+            analyze: () => [],
+          }),
+          '@opensip-cli/test',
+        );
+      }
+      load.loadedFor = key;
+      load.pluginLoadErrors = [];
+      load.checkPackErrors = [];
+      load.loadWarnings = [];
+      load.degradedDiagnostics = [];
+      load.commandError = undefined;
+      load.loadDegraded = undefined;
+      load.outcomeFinalized = true;
+    }),
+  };
+});
 
 let projectA: string;
 let projectB: string;

@@ -29,6 +29,7 @@ function stageProjectLocalTool(id: string, apiVersion?: number): string {
   const manifest: Record<string, unknown> = {
     kind: 'tool',
     id,
+    identity: { name: id },
     name: `${id} tool`,
     version: '1.0.0',
     commands: [{ name: id, description: `the ${id} command` }],

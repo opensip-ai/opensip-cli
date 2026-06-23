@@ -53,17 +53,6 @@ function admitInstalledTool(
   builtInIds: ReadonlySet<string>,
   collector?: BootstrapDiagnosticsCollector,
 ): ToolAdmission | undefined {
-  // ADR-0060 Phase 1: stale injected copies of bundled first-party tools are
-  // distribution noise — skip before strict installed validation runs.
-  if (BUNDLED_PACKAGE_NAMES.has(pkg.name)) {
-    logger.debug({
-      evt: 'cli.tool.bundled_installed_copy_skipped',
-      module: BOOTSTRAP_MODULE,
-      packageName: pkg.name,
-      packageDir: pkg.packageDir,
-    });
-    return undefined;
-  }
   const manifest = loadToolManifest('installed', pkg.packageDir);
   if (manifest === undefined) {
     recordInstalledManifestInvalid(pkg.name, collector);
@@ -71,6 +60,19 @@ function admitInstalledTool(
       evt: 'cli.tool.manifest_invalid',
       module: BOOTSTRAP_MODULE,
       name: pkg.name,
+    });
+    return undefined;
+  }
+  // ADR-0060 Phase 1: stale injected copies of bundled first-party tools are
+  // distribution noise when the bundled path already admitted the same id.
+  // When OPENSIP_CLI_SKIP_BUNDLED dropped bundled admission, the installed
+  // package is the intentional takeover path — do not skip it here.
+  if (BUNDLED_PACKAGE_NAMES.has(pkg.name) && builtInIds.has(manifest.id)) {
+    logger.debug({
+      evt: 'cli.tool.bundled_installed_copy_skipped',
+      module: BOOTSTRAP_MODULE,
+      packageName: pkg.name,
+      packageDir: pkg.packageDir,
     });
     return undefined;
   }

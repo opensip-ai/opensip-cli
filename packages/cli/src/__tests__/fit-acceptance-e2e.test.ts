@@ -35,7 +35,7 @@ const cli = distRunner();
  *  discovers + loads it as an external plugin (the §1 "as if external" lever). */
 const AS_INSTALLED = {
   OPENSIP_CLI_SKIP_BUNDLED: 'fitness',
-  OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'fit',
+  OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'fitness',
 };
 
 let testDir: string;

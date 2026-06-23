@@ -317,7 +317,7 @@ describe('CLI e2e', () => {
         expect(sessions.length).toBeGreaterThanOrEqual(1);
 
         const s = sessions[0];
-        expect(s.tool).toBe('fit');
+        expect(s.tool).toBe('fitness');
         // Host-stamped lifecycle timing (the tool never supplies these).
         expect(typeof s.startedAt).toBe('string');
         expect(typeof s.completedAt).toBe('string');

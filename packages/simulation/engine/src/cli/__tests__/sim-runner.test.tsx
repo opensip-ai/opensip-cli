@@ -75,7 +75,7 @@ describe('renderSimLive', () => {
   it('routes through runToolLiveView with the sim tool key', async () => {
     await renderSimLive({ cwd: '/proj', recipe: 'example', json: false, debug: false });
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
-    expect(capturedSpec?.tool).toBe('sim');
+    expect(capturedSpec?.tool).toBe('simulation');
   });
 
   it('maps executeSim results into a done LiveRunOutcome with session', async () => {

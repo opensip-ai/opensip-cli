@@ -19,6 +19,7 @@ import {
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
+import { resetBootstrapDiagnosticsBuffer } from '../bootstrap/bootstrap-diagnostics-buffer.js';
 import { registerLanguageAdapters } from '../bootstrap/register-language-adapters.js';
 import { mountAllToolCommands, registerFirstPartyTools } from '../bootstrap/register-tools.js';
 
@@ -161,12 +162,11 @@ describe('mountAllToolCommands', () => {
     registry.register(specTool('works', 'works'));
     const program = new Command('opensip');
 
-    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const diagnostics = resetBootstrapDiagnosticsBuffer();
     expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
       PluginIncompatibleError,
     );
     expect(program.commands.map((c) => c.name())).not.toContain('works');
-    expect(stderr).toHaveBeenCalled();
-    stderr.mockRestore();
+    expect(diagnostics.list().some((d) => d.message.includes('failed to mount'))).toBe(true);
   });
 });

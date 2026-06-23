@@ -1820,6 +1820,26 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
         {
           "aliases": [],
+          "args": [],
+          "name": "doctor",
+          "options": [
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Output structured JSON",
+              "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+          ],
+          "subcommands": [],
+          "synopsis": "Show every buffered bootstrap diagnostic for this run",
+          "usage": "[options]",
+        },
+        {
+          "aliases": [],
           "args": [
             {
               "name": "spec",

@@ -109,7 +109,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     process.stdout.isTTY = originalIsTTY;
   });
 
-  it('registers a live view under the `sim` key and delivers the rendered envelope', async () => {
+  it('registers a live view under the `simulation` key and delivers the rendered envelope', async () => {
     process.stdout.isTTY = true;
     const cap = makeCtx();
 
@@ -117,7 +117,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     // to install it, then exercise the registered callback directly.
     await simHandler()({ cwd: '/proj' }, cap.ctx);
 
-    const callback = cap.liveViews.get('sim');
+    const callback = cap.liveViews.get('simulation');
     expect(callback).toBeDefined();
 
     // Invoke the live-view callback the dispatcher would call.
@@ -152,7 +152,7 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     const cap = makeCtx();
     await simHandler()({ cwd: '/proj' }, cap.ctx);
 
-    await cap.liveViews.get('sim')?.({ cwd: '/proj' });
+    await cap.liveViews.get('simulation')?.({ cwd: '/proj' });
 
     expect(cap.delivered).toHaveLength(0);
   });
@@ -174,7 +174,7 @@ describe('simulationTool action — interactive TTY branch', () => {
     // Interactive path: the static executeSim render is bypassed in favour of
     // the live view, then the report auto-open hook fires.
     expect(cap.renderLiveCalls).toHaveLength(1);
-    expect(cap.renderLiveCalls[0]?.[0]).toBe('sim');
+    expect(cap.renderLiveCalls[0]?.[0]).toBe('simulation');
     expect(cap.dashboardCalls).toHaveLength(1);
     expect(cap.dashboardCalls[0]).toMatchObject({ openRequested: true, jsonOutput: false });
   });

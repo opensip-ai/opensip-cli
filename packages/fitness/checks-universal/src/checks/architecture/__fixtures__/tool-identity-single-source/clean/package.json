@@ -1,0 +1,21 @@
+{
+  "name": "@example/conformant-tool",
+  "version": "1.0.0",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "conformant",
+    "identity": {
+      "name": "conformant",
+      "aliases": ["conformant-alias"],
+      "layoutKey": "conformant"
+    },
+    "commands": [
+      {
+        "name": "conformant",
+        "aliases": ["conformant-alias"],
+        "description": "A fully conformant tool command"
+      }
+    ],
+    "pluginLayout": { "domain": "conformant", "userSubdirs": ["checks"] }
+  }
+}

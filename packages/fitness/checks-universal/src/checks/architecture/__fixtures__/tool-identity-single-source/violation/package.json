@@ -1,0 +1,14 @@
+{
+  "name": "@example/drift-tool",
+  "version": "1.0.0",
+  "opensipTools": {
+    "kind": "tool",
+    "id": "wrong-id",
+    "identity": {
+      "name": "conformant",
+      "layoutKey": "conformant"
+    },
+    "commands": [{ "name": "other", "description": "Primary command does not match identity.name" }],
+    "pluginLayout": { "domain": "mismatch", "userSubdirs": [] }
+  }
+}

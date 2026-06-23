@@ -68,6 +68,7 @@ function stageAuthoredTool(
     JSON.stringify({
       kind: 'tool',
       id: name,
+      identity: { name },
       name: `${name} tool`,
       version: '1.0.0',
       apiVersion: 1,

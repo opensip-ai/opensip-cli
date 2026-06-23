@@ -31,8 +31,9 @@ function writeToolPackage(hostDir: string, pkgName: string, toolId: string, body
       opensipTools: {
         kind: 'tool',
         id: toolId,
+        identity: { name: toolId },
         apiVersion: 1,
-        commands: [{ name: `${toolId}-cmd`, description: 'fixture' }],
+        commands: [{ name: toolId, description: 'fixture' }],
       },
     }),
   );

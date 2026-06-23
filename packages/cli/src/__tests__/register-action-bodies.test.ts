@@ -676,6 +676,7 @@ describe('buildHostCommandInventory', () => {
     expect(inventory.groupSubcommands.plugin).toBeUndefined();
     expect(inventory.groupSubcommands.tools).toEqual([
       'list',
+      'doctor',
       'create',
       'validate',
       'install',
