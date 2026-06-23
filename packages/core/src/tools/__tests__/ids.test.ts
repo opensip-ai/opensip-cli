@@ -21,6 +21,7 @@ import type { Tool } from '../types.js';
 
 /** A minimal Tool whose session short id == its command verb (the fit/sim/graph shape). */
 const tool = (name: string): Tool => ({
+  identity: { name },
   metadata: {
     id: '00000000-0000-4000-8000-000000000000',
     name,
@@ -33,6 +34,7 @@ const tool = (name: string): Tool => ({
 /** A Tool that persists/replays under an explicit `sessionReplay.tool` short id. */
 const toolWithReplay = (name: string, replayTool: string): Tool => ({
   ...tool(name),
+  identity: { name, layoutKey: replayTool },
   extensionPoints: {
     sessionReplay: { tool: replayTool, replaySession: () => ({}) },
   },

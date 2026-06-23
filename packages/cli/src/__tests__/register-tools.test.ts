@@ -68,10 +68,9 @@ function makeStubContext(): ToolCliContext {
 }
 
 describe('BUNDLED_TOOLS', () => {
-  it('contains fit, sim, and graph (by human name = command verb)', () => {
-    // Task 2.4: metadata.name == the short command verb (fit/sim/graph).
+  it('contains fitness, simulation, and graph (by canonical metadata.name)', () => {
     const names = BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id);
-    expect(names).toEqual(expect.arrayContaining(['fit', 'sim', 'graph']));
+    expect(names).toEqual(expect.arrayContaining(['fitness', 'simulation', 'graph']));
   });
 });
 
@@ -99,7 +98,7 @@ describe('registerFirstPartyTools', () => {
     await registerFirstPartyTools(registry, provenance);
 
     expect(registry.list().map((t) => t.metadata.name ?? t.metadata.id)).toEqual(
-      expect.arrayContaining(['fit', 'sim', 'graph']),
+      expect.arrayContaining(['fitness', 'simulation', 'graph']),
     );
     expect(provenance).toHaveLength(BUNDLED_TOOLS.length);
     for (const record of provenance) {
@@ -109,7 +108,9 @@ describe('registerFirstPartyTools', () => {
       expect(record.packageName).toMatch(/^@opensip-cli\//);
     }
     // Task 2.4: the manifest `id` (human key) now equals the short verb.
-    expect(provenance.map((p) => p.id)).toEqual(expect.arrayContaining(['fit', 'sim', 'graph']));
+    expect(provenance.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['fitness', 'simulation', 'graph']),
+    );
   });
 
   it('a bundled fail-closed throws a PluginIncompatibleError (→ exit 5)', () => {
@@ -717,9 +718,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           main: './index.js',
           opensipTools: {
             kind: 'tool',
-            id: 'fit',
+            id: 'fitness',
+            identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
             apiVersion: 1,
-            commands: [{ name: 'fit', description: 'x' }],
+            commands: [{ name: 'fitness', aliases: ['fit'], description: 'x' }],
           },
         },
         indexJs: "throw new Error('a built-in-colliding tool must never be imported');",

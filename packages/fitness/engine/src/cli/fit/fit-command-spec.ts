@@ -14,7 +14,9 @@
  * the handler stays authoritative — byte-identical to the former action body.
  */
 
-import { defineCommand } from '@opensip-cli/core';
+import { definePrimaryCommand } from '@opensip-cli/core';
+
+import { FITNESS_LIVE_VIEW_KEY } from '../../identity.js';
 
 import {
   runGateMode,
@@ -28,11 +30,8 @@ import {
 import type { FitOptions } from '@opensip-cli/contracts';
 import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 
-// Live-view key fitness contributes to the CLI's renderer registry. Owned by
-// this package — the CLI dispatcher does NOT key off this literal; each tool
-// decides its own live-view name. The renderer is registered lazily inside the
-// live branch of the handler via `setUpFitLiveView` (the tool wires that up).
-export const FIT_LIVE_VIEW_KEY = 'fit';
+/** @deprecated Use {@link FITNESS_LIVE_VIEW_KEY} from `identity.ts`. */
+export const FIT_LIVE_VIEW_KEY = FITNESS_LIVE_VIEW_KEY;
 
 /**
  * The `fit` command handler — the former `registerFitCommand()` action body,
@@ -81,7 +80,7 @@ async function runFit(
   // mount-time `register()` hook, so we set the renderer up on the host context
   // before the `cli.renderLive` lookup inside runLiveMode.
   setUpLiveView(cli);
-  return await runLiveMode(opts, cli, FIT_LIVE_VIEW_KEY, opts.open === true);
+  return await runLiveMode(opts, cli, FITNESS_LIVE_VIEW_KEY, opts.open === true);
 }
 
 /**
@@ -91,9 +90,8 @@ async function runFit(
  */
 export function buildFitCommandSpec(
   setUpLiveView: (cli: ToolCliContext) => void,
-): CommandSpec<unknown, ToolCliContext> {
-  return defineCommand<unknown, ToolCliContext>({
-    name: 'fit',
+) {
+  return definePrimaryCommand<unknown, ToolCliContext>({
     description: 'Run fitness checks',
     // ADR-0021 cross-tool flags from the single registry: --cwd, --json,
     // --quiet, --verbose, --debug, --report-to, --api-key, --open. `cwd` is

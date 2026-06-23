@@ -16,7 +16,7 @@
  * never had a legacy flat `sim-recipes`, so there is nothing to alias.
  */
 
-import { defineCommand } from '@opensip-cli/core';
+import { defineNestedCommand } from '@opensip-cli/core';
 
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 
@@ -60,12 +60,11 @@ export async function listSimRecipes(projectDir?: string): Promise<ListRecipesRe
  * seam (`--json` → JSON, else the shared `viewListRecipes` renderer) — the same
  * path `graph recipes` / `fit recipes` use.
  */
-export const simRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const simRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'recipes',
-  parent: 'sim',
   description: 'List available simulation recipes',
   commonFlags: ['cwd', 'json'],
   scope: 'project',

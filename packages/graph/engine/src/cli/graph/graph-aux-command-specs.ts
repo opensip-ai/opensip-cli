@@ -28,7 +28,7 @@
  */
 
 import { commonFlags, EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
+import { ConfigurationError, defineCommand, defineNestedCommand, logger } from '@opensip-cli/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { listGraphRules } from '../graph-list.js';
@@ -421,12 +421,11 @@ function requireExportFlags(
  * required subset per format at runtime (`requireExportFlags` →
  * ConfigurationError → exit 2).
  */
-export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'export',
-  parent: 'graph',
   description:
     'Export graph analysis artifacts: --format sarif (SARIF v2.1.0 findings), catalog (CatalogExport JSON), or baseline (gate fingerprint JSON)',
   commonFlags: ['cwd', 'json'],
@@ -506,12 +505,11 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
  * `command-result`: the host dispatches the returned result through the shared
  * seam (`--json` → JSON, else render).
  */
-export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'recipes',
-  parent: 'graph',
   description: 'List available graph recipes',
   commonFlags: ['json'],
   scope: 'project',
@@ -520,12 +518,11 @@ export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext
 });
 
 /** `graph lookup <name>` — look up function occurrences by simple name. */
-export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'lookup',
-  parent: 'graph',
   description: 'Look up function occurrences by simple name from the persisted catalog',
   commonFlags: ['json'],
   args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
@@ -543,12 +540,11 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
  * file→names). Default (query): read the persisted catalog only. `--build`:
  * run the graph pipeline first, then emit from the refreshed catalog (Q7).
  */
-export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'index',
-  parent: 'graph',
   description:
     'Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first',
   commonFlags: [],
@@ -592,12 +588,11 @@ export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> 
  * `viewListChecks` renderer with the graph-supplied title) — the same path
  * `graph recipes` / `fit list` use.
  */
-export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'list',
-  parent: 'graph',
   description: 'List available graph rules',
   commonFlags: ['cwd', 'json'],
   scope: 'project',

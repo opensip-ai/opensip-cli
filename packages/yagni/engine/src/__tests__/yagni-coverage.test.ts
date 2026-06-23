@@ -239,7 +239,8 @@ describe('yagni config, tool metadata, and command handler', () => {
       id: YAGNI_STABLE_ID,
       name: 'yagni',
     });
-    expect(yagniTool.commandSpecs?.[0]?.name).toBe(yagniCommandSpec.name);
+    expect(yagniTool.commandSpecs?.[0]?.name).toBe('yagni');
+    expect(yagniTool.commandSpecs?.[0]?.aliases).toEqual(['yag']);
     expect(yagniTool.extensionPoints?.collectReportData).toBe(collectYagniReportData);
   });
 

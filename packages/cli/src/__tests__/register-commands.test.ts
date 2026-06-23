@@ -9,6 +9,7 @@
  * binary.
  */
 
+import { ToolRegistry } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, it, expect } from 'vitest';
 
@@ -107,19 +108,37 @@ describe('plugin wiring', () => {
     const { ctx } = makeCtx();
     // Two pack-supporting layouts (fit/sim) + two stub tool primaries to host
     // their `plugin` groups, mirroring the real mount order (tools first).
+    const tools = new ToolRegistry();
+    for (const t of [
+      {
+        identity: { name: 'fitness', layoutKey: 'fit' },
+        metadata: { id: 'f', name: 'fitness', version: '0', description: '' },
+        commandSpecs: [],
+        pluginLayout: { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+      },
+      {
+        identity: { name: 'simulation', layoutKey: 'sim' },
+        metadata: { id: 's', name: 'simulation', version: '0', description: '' },
+        commandSpecs: [],
+        pluginLayout: { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+      },
+    ]) {
+      tools.register(t as never);
+    }
     const ctxWithLayouts: CliCommandsContext = {
       ...ctx,
       pluginLayouts: [
         { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
         { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
       ],
+      tools,
     };
     const program = new Command('opensip');
-    program.command('fit').description('Run fitness checks');
-    program.command('sim').description('Run simulation scenarios');
+    program.command('fitness').description('Run fitness checks');
+    program.command('simulation').description('Run simulation scenarios');
     mountHostCommands(program, ctxWithLayouts);
 
-    for (const toolVerb of ['fit', 'sim']) {
+    for (const toolVerb of ['fitness', 'simulation']) {
       const primary = findSubcommand(program, toolVerb);
       expect(primary, `${toolVerb} primary should exist`).toBeDefined();
       const pluginGroup = primary!.commands.find((c) => c.name() === 'plugin');

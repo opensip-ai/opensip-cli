@@ -18,6 +18,7 @@ import {
 
 import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 
+import { SIMULATION_LAYOUT_KEY } from '../identity.js';
 import { executeSim } from './sim.js';
 
 import type { ProgressEvent, ProgressSurface } from '@opensip-cli/cli-ui';
@@ -56,7 +57,7 @@ export async function renderSimLive(
 ): Promise<ToolRunCompletion> {
   return runToolLiveView(
     {
-      tool: 'sim',
+      tool: 'simulation',
       meta: { title: SIM_TOOL_TITLE, description: SIM_TOOL_DESCRIPTION },
       surface: SIM_RUNNING_SURFACE,
       loadingSurface: SIM_LOADING_SURFACE,
@@ -120,7 +121,7 @@ export async function renderSimLive(
           },
           envelope: done.envelope,
           session: {
-            tool: 'sim',
+            tool: SIMULATION_LAYOUT_KEY,
             cwd: args.cwd,
             recipe: done.envelope.recipe,
             score: done.envelope.verdict.score,

@@ -25,7 +25,9 @@
  */
 
 import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-cli/contracts';
-import { defineCommand } from '@opensip-cli/core';
+import { definePrimaryCommand } from '@opensip-cli/core';
+
+import { GRAPH_LIVE_VIEW_KEY as GRAPH_LIVE_KEY } from '../../identity.js';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
@@ -50,7 +52,7 @@ import type { DataStore } from '@opensip-cli/datastore';
  * The renderer is registered lazily inside the interactive branch of the handler
  * via {@link setUpGraphLiveView} (the tool wires that callback in).
  */
-export const GRAPH_LIVE_VIEW_KEY = 'graph';
+export const GRAPH_LIVE_VIEW_KEY = GRAPH_LIVE_KEY;
 
 /** Parsed `graph` options — the ADR-0021 common flags plus graph's own flags. */
 interface GraphCommandOptions {
@@ -489,11 +491,7 @@ function parseConcurrency(v: string): number {
  * The host mounts this spec, applies the ADR-0021 common flags + graph's options
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
  */
-export const graphCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
-  unknown,
-  ToolCliContext
->({
-  name: 'graph',
+export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
   // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,

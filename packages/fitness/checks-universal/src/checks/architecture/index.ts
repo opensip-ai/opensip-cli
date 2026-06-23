@@ -11,5 +11,6 @@ export * from './node-version-consistency.js';
 export * from './project-readme-existence.js';
 export * from './stale-build-artifacts.js';
 export * from './tool-has-manifest.js';
+export * from './tool-identity-single-source.js';
 export * from './vitest-config-extends-base.js';
 export * from './vitest-config-required-with-tests.js';

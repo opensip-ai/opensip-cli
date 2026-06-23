@@ -39,9 +39,8 @@ function recordSpecFlags(tool: Tool): string[] {
 // The locked flag surface per tool (union across all of each tool's
 // subcommands). Adding/removing a flag is a deliberate edit here.
 const EXPECTED: Record<string, string[]> = {
-  // Keyed by tool.metadata.name, which Task 2.4 aligned to the short command
-  // verb (`fit`/`sim`/`graph`).
-  fit: [
+  // Keyed by tool.metadata.name (= identity.name — canonical CLI verb).
+  fitness: [
     // The flag set is the union across all of fit's subcommands. The canonical
     // `fit export --format baseline` command contributes `--format` (choices:
     // baseline) and `--out` (the SARIF baseline path). The legacy flat-root
@@ -121,7 +120,7 @@ const EXPECTED: Record<string, string[]> = {
   ],
   // ADR-0011 (Phase 4): sim gained --report-to / --api-key cloud egress.
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
-  sim: [
+  simulation: [
     '--api-key',
     '--cwd',
     '--debug',

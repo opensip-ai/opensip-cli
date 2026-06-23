@@ -95,11 +95,10 @@ describe('registerFirstPartyTools', () => {
     expect(names).toEqual(BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id));
   });
 
-  it('produces a deterministic ordering matching BUNDLED_TOOLS (human names = verbs)', () => {
-    // Task 2.4: metadata.name == the short command verb (fit/sim/graph).
+  it('produces a deterministic ordering matching BUNDLED_TOOLS (canonical names)', () => {
     expect(BUNDLED_TOOLS.map((t) => t.metadata.name ?? t.metadata.id)).toEqual([
-      'fit',
-      'sim',
+      'fitness',
+      'simulation',
       'graph',
       'yagni',
     ]);
@@ -109,6 +108,7 @@ describe('registerFirstPartyTools', () => {
 /** A tool that mounts one command via the declarative commandSpecs path. */
 function specTool(id: string, commandName: string): Tool {
   return {
+    identity: { name: id },
     metadata: { id, name: id, version: '0.0.0', description: id },
     commands: [{ name: commandName, description: `${commandName} cmd` }],
     commandSpecs: [
@@ -142,6 +142,7 @@ describe('mountAllToolCommands', () => {
     const registry = new ToolRegistry();
     // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
     const broken: Tool = {
+      identity: { name: 'broken' },
       metadata: { id: 'broken', name: 'Broken', version: '0.0.0', description: '' },
       commands: [{ name: 'broken', description: 'broken' }],
       commandSpecs: [

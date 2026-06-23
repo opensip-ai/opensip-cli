@@ -51,10 +51,10 @@ describe('sim externalization proof slice (§8)', () => {
   it("admits sim's static manifest through the compatibility gate", () => {
     const manifest = loadToolManifest('installed', SIM_DIR);
     expect(manifest, 'sim package.json#opensipTools must load as a manifest').toBeDefined();
-    // Task 2.4: the manifest `id` (human key) equals metadata.name = `sim`.
-    expect(manifest?.id).toBe('sim');
+    expect(manifest?.id).toBe('simulation');
+    expect(manifest?.identity?.name).toBe('simulation');
     expect(manifest?.apiVersion).toBeGreaterThanOrEqual(1);
-    expect(manifest?.commands?.some((c) => c.name === 'sim')).toBe(true);
+    expect(manifest?.commands?.some((c) => c.name === 'simulation')).toBe(true);
 
     const admission = admitTool({
       manifest: manifest!,
@@ -70,7 +70,7 @@ describe('sim externalization proof slice (§8)', () => {
       tool?: Tool;
     };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
-    expect(mod.tool?.metadata.name).toBe('sim');
+    expect(mod.tool?.metadata.name).toBe('simulation');
     expect(mod.tool?.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(mod.tool?.commandSpecs?.length).toBeGreaterThan(0);
   });
@@ -83,7 +83,7 @@ describe('sim externalization proof slice (§8)', () => {
     const bundled = simSpec(simulationTool);
 
     // Identical command contract: name, common flags, declared options, output mode.
-    expect(external.name).toBe('sim');
+    expect(external.name).toBe('simulation');
     expect(external.name).toBe(bundled.name);
     expect(external.commonFlags).toEqual(bundled.commonFlags);
     expect(external.options).toEqual(bundled.options);
@@ -92,8 +92,8 @@ describe('sim externalization proof slice (§8)', () => {
     // The host mount produces a real Commander command named `sim` with its flags.
     const program = new Command();
     mountCommandSpec(program, external as CommandSpec<unknown, CommandMountContext>, STUB_CTX);
-    const cmd = program.commands.find((c) => c.name() === 'sim');
-    expect(cmd, 'mountCommandSpec must mount a `sim` command').toBeDefined();
+    const cmd = program.commands.find((c) => c.name() === 'simulation');
+    expect(cmd, 'mountCommandSpec must mount a `simulation` command').toBeDefined();
     const flagNames = cmd!.options.map((o) => o.long);
     expect(flagNames).toContain('--json'); // a common flag arrives via the host
     expect(flagNames).toContain('--recipe'); // sim's declared option

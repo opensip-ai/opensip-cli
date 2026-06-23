@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { fitnessTool } from '@opensip-cli/fitness';
 import { ToolRegistry, createSignal, currentScope } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
@@ -59,9 +60,10 @@ function makeSession(
 function makeReplayRegistry(): SessionReplayRegistry {
   const registry = new ToolRegistry();
   registry.register({
+    identity: { name: 'fitness', layoutKey: 'fit' },
     metadata: {
       id: '00000000-0000-4000-8000-000000000000',
-      name: 'fit-replay-test',
+      name: 'fitness',
       version: '0.0.0',
       description: 'test',
     },
@@ -176,10 +178,13 @@ describe('executeSessionShow', () => {
       // Phase 2/6 hygiene: the handler body (via execute) must see a real entered scope.
       expect(currentScope()).toBeTruthy();
       expect(currentScope()?.datastore()).toBe(ds);
+      const tools = new ToolRegistry();
+      tools.register(fitnessTool);
       return executeSessionShow({
         replayRegistry: makeReplayRegistry(),
         ref: 'latest',
         tool: 'fit',
+        registry: tools,
         json: true,
         render: s.render,
         emitJson: s.emitJson,
@@ -191,7 +196,7 @@ describe('executeSessionShow', () => {
 
     expect(s.emitted).toHaveLength(1);
     expect(s.emitted[0]).toMatchObject({
-      session: { id: 'FIT_2', tool: 'fit' },
+      session: { id: 'FIT_2', tool: 'fitness' },
       fidelity: 'projection',
       envelope: { runId: 'FIT_2', tool: 'fit' },
     });
@@ -230,9 +235,12 @@ describe('executeSessionShow', () => {
     const scope = makeTestScope({ datastore: () => ds });
     await withScope(scope, () => {
       expect(currentScope()).toBeTruthy();
+      const tools = new ToolRegistry();
+      tools.register(fitnessTool);
       return executeSessionShow({
         replayRegistry: makeReplayRegistry(),
         ref: 'FIT_1',
+        registry: tools,
         render: s.render,
         emitJson: s.emitJson,
         emitRaw: s.emitRaw,
@@ -246,7 +254,7 @@ describe('executeSessionShow', () => {
     // tool's live fit-done view), so fit/graph/sim replays look the same.
     expect(s.rendered[0]).toMatchObject({
       type: 'session-replay',
-      session: { id: 'FIT_1', tool: 'fit' },
+      session: { id: 'FIT_1', tool: 'fitness' },
       envelope: { tool: 'fit' },
       fidelity: 'projection',
     });

@@ -12,6 +12,7 @@ async function bagInit(): Promise<void> {
 describe('resolveToolHooks', () => {
   it('reads hooks from extensionPoints only', () => {
     const tool = {
+      identity: { name: 'test-tool' },
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
       extensionPoints: { initialize: bagInit, config: { namespace: 'x', schema: {} } },
@@ -24,6 +25,7 @@ describe('resolveToolHooks', () => {
 
   it('returns empty hook slots when the tool has no extensionPoints bag', () => {
     const tool = {
+      identity: { name: 'test-tool' },
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
     } as Tool;
@@ -47,6 +49,7 @@ describe('applyToolContributeScope', () => {
   it('leaves the scope untouched when no contribution is supplied', () => {
     const scope = new RunScope();
     const tool = {
+      identity: { name: 'test-tool' },
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
       extensionPoints: {},
@@ -60,6 +63,7 @@ describe('applyToolContributeScope', () => {
   it('installs a plain scope contribution', () => {
     const scope = new RunScope();
     const tool = {
+      identity: { name: 'test-tool' },
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
       extensionPoints: { contributeScope: () => ({ x: { ready: true } }) },
@@ -74,6 +78,7 @@ describe('applyToolContributeScope', () => {
     const scope = new RunScope();
     let disposeCount = 0;
     const tool = {
+      identity: { name: 'test-tool' },
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
       extensionPoints: {

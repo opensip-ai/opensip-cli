@@ -21,6 +21,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'project-readme-existence': ['📝', 'Project README Existence'],
   'stale-build-artifacts': ['🏚️', 'Stale Build Artifacts'],
   'tool-has-manifest': ['🪪', 'Tool Has Manifest'],
+  'tool-identity-single-source': ['🆔', 'Tool Identity Single Source'],
   'vitest-config-extends-base': ['🧪', 'Vitest Config Extends Base'],
   'vitest-config-required-with-tests': ['🧪', 'Vitest Config Required With Tests'],
 });

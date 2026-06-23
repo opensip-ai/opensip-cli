@@ -47,18 +47,14 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
     // `metadata.name`, now the short command verb (`fit`/`sim`; graph already
     // matched). The config namespace literal (`fitness`/`simulation`) is decoupled
     // and unchanged.
-    id: 'fit',
+    id: 'fitness',
     dir: join(REPO_ROOT, 'packages', 'fitness', 'engine'),
-    // The canonical nested `<tool> <verb>` grammar: `fit` + the grouped `list` /
-    // `recipes` / `export` (parent: 'fit') children. The legacy flat-root
-    // `fit-list` / `fit-recipes` / `fit-baseline-export` aliases were removed.
-    commands: ['fit', 'list', 'recipes', 'export', 'fit-run-worker'],
+    commands: ['fitness', 'list', 'recipes', 'export', 'fit-run-worker'],
   },
   {
-    id: 'sim',
+    id: 'simulation',
     dir: join(REPO_ROOT, 'packages', 'simulation', 'engine'),
-    // Task 3.3 adds the grouped `recipes` (parent: 'sim') discoverability child.
-    commands: ['sim', 'recipes', 'sim-run-worker'],
+    commands: ['simulation', 'recipes', 'sim-run-worker'],
   },
   {
     id: 'graph',

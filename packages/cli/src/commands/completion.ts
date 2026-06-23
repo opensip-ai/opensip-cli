@@ -114,6 +114,7 @@ export interface GroupLike {
  */
 export interface ToolPluginGroupLike {
   readonly toolVerb: string;
+  readonly parentAliases?: readonly string[];
   readonly leaves: readonly { readonly name: string }[];
 }
 
@@ -201,6 +202,7 @@ export function assembleCompletionInventory(input: {
   // `<tool> <verb>` grammar). Merged into `groupSubcommands` below so the
   // emitted script offers `<parent> <leaf>` exactly like a host group.
   const toolGroupLeaves: Record<string, string[]> = {};
+  const parentAliases: Record<string, readonly string[]> = {};
 
   for (const spec of [...input.toolSpecs, ...input.hostSpecs]) {
     if (internalCommands.has(spec.name)) continue;
@@ -216,7 +218,11 @@ export function assembleCompletionInventory(input: {
       }
       continue;
     }
-    for (const name of [spec.name, ...(spec.aliases ?? [])]) {
+    const primaryAliases = spec.aliases ?? [];
+    if (primaryAliases.length > 0) {
+      parentAliases[spec.name] = primaryAliases;
+    }
+    for (const name of [spec.name, ...primaryAliases]) {
       subcommands.push(name);
       commandFlags[name] = flags;
     }
@@ -232,14 +238,26 @@ export function assembleCompletionInventory(input: {
   // its nested leaves here lets the script also complete `graph export` etc.
   for (const [parent, leaves] of Object.entries(toolGroupLeaves)) {
     groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), ...leaves];
+    for (const alias of parentAliases[parent] ?? []) {
+      groupSubcommands[alias] = [...(groupSubcommands[alias] ?? []), ...leaves];
+      for (const leaf of leaves) {
+        const parentFlags = commandFlags[`${parent} ${leaf}`];
+        if (parentFlags !== undefined) {
+          commandFlags[`${alias} ${leaf}`] = parentFlags;
+        }
+      }
+    }
   }
   // Fold the per-tool `plugin` groups in: `plugin` becomes a completable leaf
   // under the tool verb (`opensip fit <TAB>` ⇒ `… plugin`), and the bound
   // leaf names register under the doubly-nested `${toolVerb} plugin` key for
   // deeper completion. There is NO top-level `plugin` group anymore.
   for (const group of input.toolPluginGroups ?? []) {
-    groupSubcommands[group.toolVerb] = [...(groupSubcommands[group.toolVerb] ?? []), 'plugin'];
-    groupSubcommands[`${group.toolVerb} plugin`] = group.leaves.map((l) => l.name);
+    const pluginParents = [group.toolVerb, ...(group.parentAliases ?? [])];
+    for (const parent of pluginParents) {
+      groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), 'plugin'];
+      groupSubcommands[`${parent} plugin`] = group.leaves.map((l) => l.name);
+    }
   }
 
   // `help` is a Commander built-in the script also surfaces.

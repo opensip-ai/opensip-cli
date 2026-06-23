@@ -15,24 +15,29 @@
  * is the host's stronger guarantee.
  */
 
+import { buildToolIdentityIndex } from './identity-index.js';
 import { resolveToolHooks } from './resolve-tool-hooks.js';
 
 import type { ToolShortId } from './ids.js';
 import type { ToolRegistry } from './registry.js';
 
 /**
- * The set of session short ids the registered tools answer to: each tool's
- * `sessionReplay.tool` (when present) plus its `metadata.name`. Both forms
- * are admitted because a tool may filter/replay under its command verb
- * (`metadata.name`) while persisting under an explicit `sessionReplay.tool`
- * — for the bundled three these coincide.
+ * The set of tool ids accepted by session filters: canonical name, aliases,
+ * layoutKey, and sessionReplay.tool for each registered tool.
  */
 export function registeredToolShortIds(registry: ToolRegistry): ReadonlySet<string> {
   const ids = new Set<string>();
+  const index = buildToolIdentityIndex(registry);
+  for (const binding of index.bindings) {
+    ids.add(binding.canonicalName);
+    for (const alias of binding.aliases) ids.add(alias);
+    ids.add(binding.layoutKey);
+  }
   for (const tool of registry.list()) {
     const replayTool = resolveToolHooks(tool).sessionReplay?.tool;
     if (replayTool) ids.add(replayTool);
     if (tool.metadata.name) ids.add(tool.metadata.name);
+    if (tool.pluginLayout?.domain) ids.add(tool.pluginLayout.domain);
   }
   return ids;
 }

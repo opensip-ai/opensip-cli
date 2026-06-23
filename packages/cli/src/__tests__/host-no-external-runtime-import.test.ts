@@ -70,11 +70,12 @@ function stageSentinelFixture(): void {
       opensipTools: {
         kind: 'tool',
         id: FIXTURE_ID,
+        identity: { name: FIXTURE_ID },
         stableId: STABLE_ID,
         apiVersion: 1,
         commands: [
           {
-            name: 'm4g-sentinel',
+            name: FIXTURE_ID,
             description: 'sentinel external command',
             commonFlags: [],
             scope: 'project',
@@ -96,11 +97,12 @@ function stageSentinelFixture(): void {
       'const here = dirname(fileURLToPath(import.meta.url));',
       "writeFileSync(join(here, 'imported.sentinel'), 'imported', 'utf8');",
       'export const tool = {',
+      `  identity: { name: '${FIXTURE_ID}' },`,
       `  metadata: { id: '${STABLE_ID}', name: '${FIXTURE_ID}', version: '0.0.0', description: 'fixture' },`,
       '  extensionPoints: { initialize: () => undefined },',
-      "  commands: [{ name: 'm4g-sentinel', description: 'sentinel external command' }],",
+      `  commands: [{ name: '${FIXTURE_ID}', description: 'sentinel external command' }],`,
       '  commandSpecs: [{',
-      "    name: 'm4g-sentinel', description: 'sentinel external command', commonFlags: [],",
+      `    name: '${FIXTURE_ID}', description: 'sentinel external command', commonFlags: [],`,
       "    scope: 'project', output: 'command-result',",
       "    handler: () => Promise.resolve({ type: 'text-lines', title: 'real', lines: [] }),",
       '  }],',
@@ -142,7 +144,7 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
     const tool = registry.get(FIXTURE_ID);
     expect(tool).toBeDefined();
     expect(tool?.metadata.id).toBe(STABLE_ID);
-    expect(tool?.commandSpecs.map((s) => s.name)).toEqual(['m4g-sentinel']);
+    expect(tool?.commandSpecs.map((s) => s.name)).toEqual([FIXTURE_ID]);
     // Synthetic: NO real runtime hooks (the host runs none for external tools).
     expect(tool?.extensionPoints).toBeUndefined();
     // The handler is the fail-loud dispatch stub (the host never calls it; the

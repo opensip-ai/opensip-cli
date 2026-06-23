@@ -39,6 +39,7 @@
  */
 
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
+import type { ToolIdentity } from './identity.js';
 import type { ToolCliContext } from './cli-context.js';
 import type { CommandSpec } from './command-spec.js';
 import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
@@ -288,6 +289,8 @@ export interface ToolExtensionPoints {
  */
 export interface Tool {
   // ── Core Identity ──────────────────────────────────────────────────────
+  /** Author-facing identity declaration; host derives names from this. */
+  readonly identity: ToolIdentity;
   readonly metadata: ToolMetadata;
 
   /**

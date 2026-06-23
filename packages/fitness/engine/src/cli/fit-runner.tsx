@@ -16,6 +16,7 @@ import {
   type ToolRunCompletion,
 } from '@opensip-cli/core';
 
+import { FITNESS_IDENTITY, FITNESS_LAYOUT_KEY } from '../identity.js';
 import { buildFitVerboseDetail, envelopeToFitRows, type FitTableRow } from './fit/envelope-view.js';
 import { buildFitnessSessionPayload } from './fit/result-builders.js';
 import { checkCountLabel, withCheckCountFromProgress } from './fit-runner-progress.js';
@@ -75,7 +76,7 @@ export async function renderFitLive(
 
   return runToolLiveView(
     {
-      tool: 'fit',
+      tool: 'fitness',
       meta: { title: FIT_TOOL_TITLE, description: FIT_TOOL_DESCRIPTION },
       surface: FIT_RUNNING_SURFACE,
       loadingSurface: FIT_LOADING_SURFACE,
@@ -159,7 +160,7 @@ export async function renderFitLive(
           },
           envelope,
           session: {
-            tool: 'fit',
+            tool: FITNESS_LAYOUT_KEY,
             cwd: args.cwd,
             recipe: envelope.recipe,
             score: envelope.verdict.score,

@@ -1,43 +1,47 @@
 /**
  * history command — show run history.
- *
- * Backed by SessionRepo over the project-local SQLite DataStore.
- * The CLI bootstrap opens the DataStore in `preAction`; this command
- * receives the constructed repo from its caller.
  */
 
+import { buildToolIdentityIndex } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
 import type { HistoryResult, HistorySession, StoredSession } from '@opensip-cli/contracts';
-import type { ToolShortId } from '@opensip-cli/core';
+import type { ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ShowHistoryOptions {
   readonly tool?: ToolShortId;
   readonly limit?: number;
-  /** Agent ergonomics: drop the heavy per-session payload (keep showCommand + lightweight summary). */
   readonly summaryOnly?: boolean;
+  /** When set, session list displays canonical tool names. */
+  readonly registry?: ToolRegistry;
 }
 
 export function showHistory(datastore: DataStore, opts: ShowHistoryOptions = {}): HistoryResult {
   const repo = new SessionRepo(datastore);
-  const sessions = repo.list(opts).map((s) => toHistorySession(s, opts.summaryOnly));
+  const identityIndex =
+    opts.registry === undefined ? undefined : buildToolIdentityIndex(opts.registry);
+  const sessions = repo
+    .list(opts)
+    .map((s) => toHistorySession(s, opts.summaryOnly, identityIndex));
   return {
     type: 'history',
     sessions,
   };
 }
 
-function toHistorySession(session: StoredSession, summaryOnly = false): HistorySession {
+function toHistorySession(
+  session: StoredSession,
+  summaryOnly = false,
+  identityIndex?: ReturnType<typeof buildToolIdentityIndex>,
+): HistorySession {
   const summary = sessionSummary(session.payload);
-  // In summary-only mode, drop the (potentially large) tool-owned payload for
-  // agent "menu" use cases — the lightweight summary (if present) + showCommand
-  // remain. `payload` is `readonly?`, so we omit it by spreading `rest` (without
-  // payload) and adding `payload` back only when NOT summary-only — no mutation /
-  // delete (which would need an `any` cast to bypass readonly).
-  const { payload, ...rest } = session;
+  const { payload, tool, ...rest } = session;
+  const displayTool =
+    identityIndex === undefined ? tool : identityIndex.canonicalForStoredTool(tool);
   return {
     ...rest,
+    tool: displayTool,
     ...(summaryOnly ? {} : { payload }),
     ...(summary === undefined ? {} : { summary }),
     showCommand: `opensip sessions show ${session.id} --json`,

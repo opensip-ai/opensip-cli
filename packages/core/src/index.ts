@@ -222,6 +222,8 @@ export type {
 export {
   assertCommandSpec,
   defineCommand,
+  defineNestedCommand,
+  definePrimaryCommand,
   validateCommandSpec,
   COMMON_FLAG_KEYS,
   RAW_STREAM_REASONS,
@@ -258,6 +260,20 @@ export { checkCompatibility } from './tools/index.js';
 export type { CompatibilityVerdict } from './tools/index.js';
 // Load-time manifest⇔Tool drift guard.
 export { assertManifestMatchesTool } from './tools/index.js';
+// Tool identity — single source of truth (ADR tool-identity-single-source).
+export {
+  buildToolIdentityIndex,
+  resolveToolFilterToLayoutKey,
+  validateToolIdentity,
+} from './tools/index.js';
+export type {
+  ToolIdentity,
+  ToolIdentityBinding,
+  ToolIdentityIndex,
+  NestedCommandSpecDraft,
+  PrimaryCommandSpecDraft,
+  ToolCommandSpecInput,
+} from './tools/index.js';
 export {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,

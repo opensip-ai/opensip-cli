@@ -34,6 +34,7 @@ function makeTool(opts: {
     ...(opts.capabilityRegistrars ? { capabilityRegistrars: opts.capabilityRegistrars } : {}),
   };
   return {
+    identity: { name: opts.id },
     metadata: { id: opts.id, name: opts.id, version: '0.0.0', description: opts.id },
     commandSpecs: [],
     ...(Object.keys(extensionPoints).length > 0 ? { extensionPoints } : {}),
@@ -163,47 +164,28 @@ describe('composeAndValidateToolConfig', () => {
     expect(result.config?.fitness).toEqual({ failOnErrors: 3 });
   });
 
-  // tool-command-surface-taxonomy Task 2.4 / Q1: the config namespace literal is
-  // DECOUPLED from `metadata.name`. After the rename, fitness's `metadata.name`
-  // is `fit` (the command verb) while its config namespace stays `fitness`. Two
-  // consequences this pair of tests pins:
-  describe('config namespace is decoupled from the renamed metadata.name (Task 2.4)', () => {
-    // A fitness-shaped tool whose human key (`metadata.name`/registry id) is the
-    // renamed short verb `fit`, but whose config namespace stays `fitness`.
-    const renamedFitnessTool = makeTool({
-      id: 'fit',
-      config: {
-        namespace: 'fitness',
-        schema: z.object({ failOnErrors: z.number().int().optional() }),
-        defaults: { failOnErrors: 1 },
-      },
-    });
-
-    it('the long `fitness:` block still validates against the renamed tool (namespace literal unchanged)', () => {
+  // Tool identity single source: config namespace aligns with identity.name (`fitness`).
+  // The layout key `fit` is not a config namespace alias.
+  describe('config namespace aligns with identity.name', () => {
+    it('the `fitness:` block validates against the fitness tool', () => {
       const configPath = writeConfig('fitness:\n  failOnErrors: 3\n');
       const result = composeAndValidateToolConfig({
-        tools: registryWith([renamedFitnessTool]),
+        tools: registryWith([fitnessTool]),
         configPath,
         env: {},
       });
       expect(result.config?.fitness).toEqual({ failOnErrors: 3 });
     });
 
-    it('REJECTS a `fit:` block with CONFIGURATION_ERROR (loaded-tool unclaimed namespace)', () => {
-      // `fit` is now a loaded tool's human key (`metadata.name`), but the tool
-      // claims the `fitness` namespace — no tool claims `fit`. The
-      // unclaimed-namespace policy hard-fails a block whose key equals a loaded
-      // tool's name that contributes no matching config. This is the explicit
-      // guard that the short config key is NOT a back-compat alias (Q6 decided:
-      // keep `fitness:`; no `fit:` alias).
+    it('does not map a `fit:` block onto the fitness tool (layout key is not a config namespace)', () => {
       const configPath = writeConfig('fit:\n  failOnErrors: 3\n');
-      expect(() =>
-        composeAndValidateToolConfig({
-          tools: registryWith([renamedFitnessTool]),
-          configPath,
-          env: {},
-        }),
-      ).toThrow(ConfigurationError);
+      const result = composeAndValidateToolConfig({
+        tools: registryWith([fitnessTool]),
+        configPath,
+        env: {},
+      });
+      expect(result.config?.fitness).toEqual({ failOnErrors: 1 });
+      expect((result.config as { fit?: unknown }).fit).toBeUndefined();
     });
   });
 

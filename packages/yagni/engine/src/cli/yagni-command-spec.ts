@@ -2,7 +2,9 @@
  * yagni-command-spec — declarative primary `yagni` command.
  */
 
-import { defineCommand } from '@opensip-cli/core';
+import { definePrimaryCommand } from '@opensip-cli/core';
+
+import { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
 
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
 import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js';
@@ -10,7 +12,7 @@ import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js'
 import { executeYagni } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
 import { buildYagniRunPresentation } from './yagni-presentation.js';
-import { YAGNI_LIVE_VIEW_KEY, type YagniLiveArgs } from './yagni-runner.js';
+import type { YagniLiveArgs } from './yagni-runner.js';
 
 import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
@@ -156,9 +158,8 @@ async function runYagniCommand(
 
 export function buildYagniCommandSpec(
   setUpLiveView: (cli: ToolCliContext) => void,
-): CommandSpec<unknown, ToolCliContext> {
-  return defineCommand<unknown, ToolCliContext>({
-    name: 'yagni',
+) {
+  return definePrimaryCommand<unknown, ToolCliContext>({
     description: 'Run YAGNI reduction audit detectors (advisory; exit 0 by default)',
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     options: [

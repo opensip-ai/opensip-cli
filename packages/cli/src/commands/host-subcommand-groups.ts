@@ -32,10 +32,12 @@ import {
   currentScope,
   defineCommand,
   registeredToolShortIds,
+  resolveToolFilterToLayoutKey,
   type CommandScopeRequirement,
   type CommandSpec,
   type PluginLayout,
   type ProjectContext,
+  type ToolRegistry,
   type ToolShortId,
 } from '@opensip-cli/core';
 
@@ -94,7 +96,8 @@ function validateToolFilter(
   // `isRegisteredToolId` guard reads); used directly here so the unknown-id
   // branch keeps `tool` typed as the original string for the message below.
   const known = registeredToolShortIds(registry);
-  if (known.has(tool)) return undefined;
+  const resolved = resolveToolFilterToLayoutKey(registry, tool) ?? tool;
+  if (known.has(tool) || known.has(resolved)) return undefined;
   const knownList = [...known].sort();
   return {
     code: 'unknown-tool',
@@ -141,10 +144,16 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
           exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         };
       }
+      const registry = currentScope()?.tools;
+      const layoutFilter =
+        registry === undefined || opts.tool === undefined
+          ? opts.tool
+          : (resolveToolFilterToLayoutKey(registry, opts.tool) as ToolShortId | undefined);
       return showHistory(ctx.datastore() as DataStore, {
-        tool: opts.tool,
+        tool: layoutFilter,
         limit: opts.limit,
         summaryOnly: !!opts.summaryOnly,
+        ...(registry === undefined ? {} : { registry }),
       });
     },
   });
@@ -209,10 +218,15 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         return;
       }
       const filters = normalizeFilterOption(opts.filter);
+      const registry = currentScope()?.tools;
+      const layoutTool =
+        registry === undefined || opts.tool === undefined
+          ? opts.tool
+          : (resolveToolFilterToLayoutKey(registry, opts.tool) as ToolShortId | undefined);
       await executeSessionShow({
         replayRegistry: ctx.sessionReplayRegistry,
         ref,
-        tool: opts.tool,
+        tool: layoutTool,
         json: opts.json,
         filters,
         raw: opts.raw,
@@ -221,6 +235,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         emitRaw: ctx.emitRaw,
         emitError: ctx.emitError,
         setExitCode: ctx.setExitCode,
+        ...(registry === undefined ? {} : { registry }),
       });
     },
   });
@@ -431,9 +446,13 @@ export function buildToolPluginLeaves(
 /** One pack-supporting tool's `plugin` group: the tool's primary verb + the
  *  action-less `plugin` parent + the four domain-bound leaves. */
 export interface ToolPluginGroup {
-  /** The tool primary verb the `plugin` group mounts under (`fit`/`sim`). */
+  /** Canonical primary verb (`fitness`/`simulation`). */
+  readonly parentVerb: string;
+  /** CLI aliases for the primary verb (`fit`/`sim`). */
+  readonly parentAliases: readonly string[];
+  /** @deprecated Use {@link parentVerb} — kept for completion inventory compat. */
   readonly toolVerb: string;
-  /** The plugin domain (== `toolVerb` for the pack-supporting tools). */
+  /** Plugin layout domain / config pin key (`fit`/`sim`). */
   readonly domain: string;
   readonly description: string;
   readonly leaves: readonly HostSpec[];
@@ -445,13 +464,25 @@ export interface ToolPluginGroup {
  * no `pluginLayout` (e.g. `graph`) contributes none, so it gets no `plugin`
  * group. The single source the mount path + scope index + completion all read.
  */
-export function buildToolPluginGroups(ctx: CliCommandsContext): readonly ToolPluginGroup[] {
-  return ctx.pluginLayouts.map((layout) => ({
-    toolVerb: layout.domain,
-    domain: layout.domain,
-    description: `Manage ${layout.domain} extension packs (add, list, remove, sync)`,
-    leaves: buildToolPluginLeaves(ctx, layout.domain),
-  }));
+export function buildToolPluginGroups(
+  ctx: CliCommandsContext,
+  registry?: ToolRegistry,
+): readonly ToolPluginGroup[] {
+  return ctx.pluginLayouts.map((layout) => {
+    const tool = registry
+      ?.list()
+      .find((candidate) => candidate.pluginLayout?.domain === layout.domain);
+    const parentVerb = tool?.metadata.name ?? layout.domain;
+    const parentAliases = tool?.identity.aliases ?? [];
+    return {
+      parentVerb,
+      parentAliases,
+      toolVerb: parentVerb,
+      domain: layout.domain,
+      description: `Manage ${layout.domain} extension packs (add, list, remove, sync)`,
+      leaves: buildToolPluginLeaves(ctx, layout.domain),
+    };
+  });
 }
 
 /**
@@ -462,9 +493,13 @@ export function buildToolPluginGroups(ctx: CliCommandsContext): readonly ToolPlu
  * composition root mounts tools before the host commands; a domain whose primary
  * is absent (isolated host-only tests) is skipped (nowhere to hang it).
  */
-export function mountToolPluginGroups(program: CliProgram, ctx: CliCommandsContext): void {
-  for (const group of buildToolPluginGroups(ctx)) {
-    const primary = program.commands.find((c) => c.name() === group.toolVerb);
+export function mountToolPluginGroups(
+  program: CliProgram,
+  ctx: CliCommandsContext,
+  registry?: ToolRegistry,
+): void {
+  for (const group of buildToolPluginGroups(ctx, registry)) {
+    const primary = program.commands.find((c) => c.name() === group.parentVerb);
     if (primary === undefined) continue; // no tool primary mounted (host-only tests)
     const parent = primary.command('plugin').description(group.description);
     for (const leaf of group.leaves) {

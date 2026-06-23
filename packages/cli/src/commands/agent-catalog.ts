@@ -100,9 +100,13 @@ export function buildAgentCatalog(): AgentCatalog {
   // also asserts this).
   const entryPoints = [
     {
-      command: 'fit',
-      description: 'Run fitness checks. Use --json for machine output (SignalEnvelope).',
-      examples: ['opensip fit --recipe default --json', 'opensip fit --check some-check --json'],
+      command: 'fitness',
+      description:
+        'Run fitness checks. Use --json for machine output (SignalEnvelope). Alias: fit.',
+      examples: [
+        'opensip fitness --recipe default --json',
+        'opensip fit --check some-check --json',
+      ],
       tier: 'tool' as const,
     },
     {
@@ -123,7 +127,7 @@ export function buildAgentCatalog(): AgentCatalog {
       description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
       examples: [
         'opensip sessions list --json --summary-only',
-        'opensip sessions list --json --tool fit --limit 5',
+        'opensip sessions list --json --tool fitness --limit 5',
       ],
       tier: 'platform' as const,
     },
@@ -133,7 +137,7 @@ export function buildAgentCatalog(): AgentCatalog {
         'Retrieve a prior run as SessionReplayResult (includes projected SignalEnvelope). ' +
         'Supports latest + --tool and rich filtering.',
       examples: [
-        'opensip sessions show latest --tool fit --json',
+        'opensip sessions show latest --tool fitness --json',
         'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
         'opensip sessions show GRAPH_01... --json --raw',
         'opensip sessions show previous --tool graph --json',

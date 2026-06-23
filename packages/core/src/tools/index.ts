@@ -42,6 +42,19 @@ export { COMMON_FLAG_KEYS, RAW_STREAM_REASONS } from './command-spec.js';
 // The runtime admission guard for the command contract lives beside the types
 // in ./command-spec-validate.ts (kept separate so each file stays one concern).
 export { assertCommandSpec, defineCommand, validateCommandSpec } from './command-spec-validate.js';
+export { defineNestedCommand, definePrimaryCommand } from './command-spec-draft.js';
+export type {
+  NestedCommandSpecDraft,
+  PrimaryCommandSpecDraft,
+  ToolCommandSpecInput,
+} from './command-spec-draft.js';
+export { validateToolIdentity } from './identity.js';
+export type { ToolIdentity } from './identity.js';
+export {
+  buildToolIdentityIndex,
+  resolveToolFilterToLayoutKey,
+} from './identity-index.js';
+export type { ToolIdentityBinding, ToolIdentityIndex } from './identity-index.js';
 export type {
   CommandSpec,
   OptionSpec,

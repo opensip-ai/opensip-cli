@@ -41,20 +41,20 @@ pack-supporting tool primary — there is no top-level `opensip plugin`.
 
 ### Primary command
 
-Each Tool exposes exactly one **primary** command. Its `CommandSpec.name` equals
-`metadata.name` (the short verb users type):
+Each Tool exposes exactly one **primary** command. Authors declare a single
+`ToolIdentity`; `defineTool` derives `CommandSpec.name`, `metadata.name`, and the
+config namespace from `identity.name`. Short forms are **CLI aliases** only.
 
-| Tool package | `metadata.id` (registry key) | `metadata.name` (command verb) | Config namespace |
-|--------------|------------------------------|--------------------------------|------------------|
-| `@opensip-cli/fitness` | UUID (`afd68bd3-…`) | `fit` | `fitness:` |
-| `@opensip-cli/simulation` | UUID | `sim` | `simulation:` |
-| `@opensip-cli/graph` | UUID | `graph` | `graph:` |
-| `@opensip-cli/yagni` | UUID | `yagni` | `yagni:` |
+| Tool package | `metadata.id` (UUID) | `identity.name` (canonical verb) | CLI aliases | Config namespace | `layoutKey` (paths / `session.tool`) |
+|--------------|----------------------|----------------------------------|-------------|------------------|----------------------------------------|
+| `@opensip-cli/fitness` | `afd68bd3-…` | `fitness` | `fit` | `fitness:` | `fit` |
+| `@opensip-cli/simulation` | `715d32c2-…` | `simulation` | `sim` | `simulation:` | `sim` |
+| `@opensip-cli/graph` | UUID | `graph` | — | `graph:` | `graph` |
+| `@opensip-cli/yagni` | UUID | `yagni` | `yag` | `yagni:` | `yagni` |
 
-The command verb and config namespace are **decoupled**. Existing
-`opensip-cli.config.yml` blocks keep using `fitness:` / `simulation:` / `graph:` / `yagni:`.
-Config namespaces stay `fitness:` / `simulation:` / `graph:` / `yagni:` permanently — command
-verbs (`fit`, `sim`, `graph`, `yagni`) do not drive config keys (see [Resolved decisions](#resolved-decisions)).
+`opensip fitness` and `opensip fit` invoke the same handler. Config blocks use the
+canonical namespace (`fitness:`, not `fit:`). Plugin pins and on-disk layout remain
+`plugins.fit:` and `opensip-cli/fit/` via `layoutKey`.
 
 ### Nested discoverability children
 
@@ -204,9 +204,10 @@ derived `commands`, and `commandSpecs` — must agree.
 
 ## Resolved decisions
 
-**Q6 — Config namespace (decided: keep as-is).** Config keys remain `fitness:`,
-`simulation:`, and `graph:`. Command verbs (`fit`, `sim`, `graph`) are decoupled
-from config namespaces and will not be aliased (`fit:`, `sim:`) or migrated.
+**Q6 — Config namespace (updated: aligns with `identity.name`).** Config keys are
+the canonical tool name (`fitness:`, `simulation:`, `graph:`, `yagni:`). CLI aliases
+(`fit`, `sim`, `yag`) do not introduce config aliases (`fit:` is not valid). Layout
+paths and plugin pins still use `layoutKey` (`plugins.fit:`, `opensip-cli/fit/`).
 
 **Q7 — `graph index` semantics (decided: single command + `--build`).** Default
 behavior queries the persisted catalog and writes `symbolindex.json` (same as
@@ -216,8 +217,8 @@ graph pipeline first, refresh the catalog, then emit the artifact. A nested
 
 ## Authoring checklist
 
-- [ ] `metadata.name` equals the primary `CommandSpec.name`
-- [ ] Discoverability verbs (`list`, `recipes`, `export`, …) use `parent: '<tool>'`
+- [ ] `defineTool` declares `identity`; `metadata.name` and the primary `CommandSpec.name` equal `identity.name`
+- [ ] Discoverability verbs use `defineNestedCommand` (or `parent: identity.name`)
 - [ ] Export uses `name: 'export'` + required `--format` (no `*-export` top-level names)
 - [ ] Workers declare `visibility: 'internal'`
 - [ ] `opensipTools.commands` lists every spec name (flat), matching derived descriptors

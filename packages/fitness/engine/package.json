@@ -40,13 +40,21 @@
   },
   "opensipTools": {
     "kind": "tool",
-    "id": "fit",
+    "id": "fitness",
+    "identity": {
+      "name": "fitness",
+      "aliases": ["fit"],
+      "layoutKey": "fit"
+    },
     "stableId": "afd68bd3-ff3c-4935-a5b6-76d8fc7a5224",
     "apiVersion": 1,
     "commands": [
       {
-        "name": "fit",
+        "name": "fitness",
         "description": "Run fitness checks",
+        "aliases": [
+          "fit"
+        ],
         "commonFlags": [
           "cwd",
           "json",
@@ -118,7 +126,7 @@
       {
         "name": "list",
         "description": "List available fitness checks",
-        "parent": "fit",
+        "parent": "fitness",
         "commonFlags": [
           "cwd",
           "json"
@@ -129,7 +137,7 @@
       {
         "name": "recipes",
         "description": "List available fitness recipes",
-        "parent": "fit",
+        "parent": "fitness",
         "commonFlags": [
           "cwd",
           "json"
@@ -140,7 +148,7 @@
       {
         "name": "export",
         "description": "Export fit artifacts: --format baseline (the SARIF-shaped gate baseline)",
-        "parent": "fit",
+        "parent": "fitness",
         "commonFlags": [
           "cwd",
           "json"

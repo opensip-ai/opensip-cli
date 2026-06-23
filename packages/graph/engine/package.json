@@ -41,12 +41,16 @@
   "opensipTools": {
     "kind": "tool",
     "id": "graph",
+    "identity": {
+      "name": "graph"
+    },
     "stableId": "3873f1c2-02a9-4719-930a-bca74b62b706",
     "apiVersion": 1,
     "commands": [
       {
         "name": "graph",
         "description": "Run static call-graph analysis (rules, entry points, catalog summary in one report)",
+        "aliases": [],
         "commonFlags": [
           "cwd",
           "json",

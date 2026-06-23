@@ -28,6 +28,7 @@ import { createToolScope, defineTool, logger, readPackageVersion } from '@opensi
 // (register-graph-adapters.ts). The historical engine-side bootstrap is
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
+import { GRAPH_IDENTITY } from './identity.js';
 import {
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
@@ -73,7 +74,7 @@ import type { DataStore } from '@opensip-cli/datastore';
  * export` / `graph recipes` / `graph lookup` / `graph index` / `graph list` —
  * the legacy flat-root aliases were removed.
  */
-const graphCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
+const graphCommandSpecs = [
   graphCommandSpec,
   graphShardWorkerCommandSpec,
   graphRunWorkerCommandSpec,
@@ -164,9 +165,9 @@ export const GRAPH_CONTRACT_VERSION = '1.0.0';
 export const GRAPH_STABLE_ID = '3873f1c2-02a9-4719-930a-bca74b62b706';
 
 export const graphTool: Tool = defineTool({
+  identity: GRAPH_IDENTITY,
   metadata: {
-    id: GRAPH_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
-    name: 'graph', // human key (previously the value in `id`)
+    id: GRAPH_STABLE_ID,
     version: readPackageVersion(import.meta.url),
     description: 'Static call-graph + dead-end analysis',
   },
@@ -176,10 +177,13 @@ export const graphTool: Tool = defineTool({
     contributeScope: graphScope.contributeScope,
     collectReportData,
     sessionReplay: {
-      tool: 'graph',
       replaySession: graphReplayFromSession,
     },
-    config: graphConfigDeclaration,
+    config: {
+      schema: graphConfigDeclaration.schema,
+      defaults: graphConfigDeclaration.defaults,
+      env: graphConfigDeclaration.env,
+    },
     capabilityRegistrars: { 'graph-adapter': registerGraphAdapter },
     fingerprintStrategy: graphFingerprintStrategy,
   },

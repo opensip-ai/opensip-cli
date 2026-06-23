@@ -13,12 +13,13 @@ function manifest(over: Partial<ToolPluginManifest> = {}): ToolPluginManifest {
   return {
     kind: 'tool',
     id: 'ext-tool',
+    identity: { name: 'ext-tool', layoutKey: 'ext' },
     name: 'ext-tool',
     version: '1.2.3',
     apiVersion: 1,
     commands: [
       {
-        name: 'ext',
+        name: 'ext-tool',
         description: 'run ext',
         commonFlags: ['cwd', 'json'],
         options: [{ flag: '--mode', value: '<m>', description: 'mode' }],
@@ -38,7 +39,7 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
     expect(tool.metadata.id).toBe('00000000-0000-4000-8000-00000000ext1');
     expect(tool.metadata.name).toBe('ext-tool');
     expect(tool.metadata.version).toBe('1.2.3');
-    expect(tool.commandSpecs.map((s) => s.name)).toEqual(['ext']);
+    expect(tool.commandSpecs.map((s) => s.name)).toEqual(['ext-tool']);
     const spec = tool.commandSpecs[0];
     expect(spec?.commonFlags).toEqual(['cwd', 'json']);
     expect(spec?.options).toEqual([{ flag: '--mode', value: '<m>', description: 'mode' }]);
@@ -80,7 +81,11 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
 
   it('applies CommandSpec defaults for shell fields the manifest omits', () => {
     const tool = synthesizeExternalTool(
-      manifest({ commands: [{ name: 'bare', description: 'bare' }] }),
+      manifest({
+        identity: { name: 'bare' },
+        id: 'bare',
+        commands: [{ name: 'bare', description: 'bare' }],
+      }),
     );
     const spec = tool.commandSpecs[0];
     expect(spec?.commonFlags).toEqual([]);

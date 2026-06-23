@@ -23,7 +23,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
+import { ConfigurationError, defineCommand, defineNestedCommand, logger } from '@opensip-cli/core';
 
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';
@@ -41,12 +41,11 @@ import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 // =============================================================================
 
 /** `fit list` — list available fitness checks. */
-export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'list',
-  parent: 'fit',
   description: 'List available fitness checks',
   commonFlags: ['cwd', 'json'],
   scope: 'project',
@@ -58,12 +57,11 @@ export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = d
 });
 
 /** `fit recipes` — list available fitness recipes. */
-export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'recipes',
-  parent: 'fit',
   description: 'List available fitness recipes',
   commonFlags: ['cwd', 'json'],
   scope: 'project',
@@ -136,12 +134,11 @@ async function runFitBaselineExport(
  * capability), so it shares the root with `graph export` without colliding (both
  * declare `name: 'export'`).
  */
-export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'export',
-  parent: 'fit',
   description: 'Export fit artifacts: --format baseline (the SARIF-shaped gate baseline)',
   commonFlags: ['cwd', 'json'],
   options: [

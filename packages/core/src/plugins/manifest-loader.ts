@@ -45,6 +45,7 @@ import { join } from 'node:path';
 import { logger } from '../lib/logger.js';
 import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
 import { PLUGIN_API_VERSION } from '../tools/manifest.js';
+import type { ToolIdentity } from '../tools/identity.js';
 
 import { isRecord, isStringArray } from './json-guards.js';
 import { normalizeDiscovery } from './manifest-discovery.js';
@@ -271,9 +272,30 @@ function readSidecar(dir: string): RawManifest | undefined {
  * fields (bundled/installed) or inline (sidecar). Returns `undefined` (with
  * a `reason` is reported by the caller) on any identity violation.
  */
+function isIdentityObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /** Narrow an unknown value to a non-empty string (the manifest identity-field guard). */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value !== '';
+}
+
+function normalizeStringArray(raw: unknown): readonly string[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || !raw.every(isNonEmptyString)) return undefined;
+  return raw;
+}
+
+function normalizeIdentity(raw: unknown): ToolIdentity | undefined {
+  if (!isIdentityObject(raw) || !isNonEmptyString(raw.name)) return undefined;
+  const aliases = normalizeStringArray(raw.aliases);
+  const layoutKey = raw.layoutKey;
+  return {
+    name: raw.name,
+    ...(aliases === undefined ? {} : { aliases }),
+    ...(isNonEmptyString(layoutKey) ? { layoutKey } : {}),
+  };
 }
 
 /** Narrow to an optional non-empty string: absent, or a non-empty string. */
@@ -333,9 +355,12 @@ function validateManifest(
   const pluginLayout = normalizePluginLayout(block.pluginLayout);
   if (pluginLayout === 'invalid') return undefined;
 
+  const identity = normalizeIdentity(block.identity);
+
   return {
     kind: 'tool',
     id: block.id,
+    ...opt('identity', identity),
     ...opt('stableId', stableId),
     name,
     version,

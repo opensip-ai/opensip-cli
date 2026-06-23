@@ -49,6 +49,8 @@ export interface CommandRegistrationInput {
    * Task 1.3), so completion and help stay in lockstep.
    */
   readonly toolInternalCommands: ReadonlySet<string>;
+  /** Live tool registry — used for identity-aware plugin groups and session display. */
+  readonly tools: ToolRegistry;
 }
 
 /**
@@ -145,5 +147,6 @@ export function buildCommandRegistrationInput(
     sessionReplayRegistry,
     toolCommandSpecs,
     toolInternalCommands,
+    tools: registry,
   };
 }
