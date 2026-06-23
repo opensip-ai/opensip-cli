@@ -67,7 +67,6 @@ export class UnsupportedSeamError extends Error {
  *   seam must surface as a structured failure, never a silent no-op.
  */
 function unsupported(seam: string): (...args: unknown[]) => never {
-  // @fitness-ignore-next-line throws-documentation -- the throw is documented on the enclosing `unsupported` factory's @throws above; this is the one-line closure it returns.
   return () => {
     throw new UnsupportedSeamError(seam);
   };

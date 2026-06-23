@@ -52,7 +52,6 @@ export class FileCache {
     // Find all matching files for content caching
     const allFiles = new Set<string>();
     for (const pattern of patterns) {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential glob calls: each pattern must resolve before deduplication
       const files = await glob(pattern, {
         cwd,
         absolute: true,
@@ -69,7 +68,6 @@ export class FileCache {
 
     for (let i = 0; i < files.length; i += PREWARM_BATCH_SIZE) {
       const batch = files.slice(i, i + PREWARM_BATCH_SIZE);
-      // @fitness-ignore-next-line performance-anti-patterns -- intentional batching: limits concurrent file reads to control memory pressure
       const results = await Promise.allSettled(
         batch.map(async (filePath) => {
           const stats = await fs.stat(filePath);

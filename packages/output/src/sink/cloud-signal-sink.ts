@@ -76,7 +76,6 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
               apiKey: opts.apiKey,
               chunks,
               idempotencyKeyFor: (i) => `${batch.runId}:${i}`,
-              // @fitness-ignore-next-line null-safety -- `i` is the in-range index of the chunks array being posted; chunks[i] is always defined
               timeoutFor: (_chunk, i) => Math.min(120_000, 30_000 + chunks[i].signals.length * 50),
               policy: POLICY,
               evtPrefix: 'cli.signal-sync',

@@ -1,4 +1,4 @@
-// @fitness-ignore-file performance-anti-patterns -- discoverPolyglotUnits iterates the small fixed adapters list (5 languages); each adapter's discoverWorkspaceUnits performs I/O whose results depend on the per-adapter cwd state, so sequential await is intentional to keep error context attributable per adapter.
+
 /**
  * `graph --workspace` parallel runner.
  *

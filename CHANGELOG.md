@@ -43,6 +43,18 @@ tightens graph and release guardrails.
 - Phase 4 residual audit: suppression catalog now records Phase 0 baseline
   deltas, SC6 status, and reopen-triage candidates; `pnpm gate:waiver-ratio`
   prints the summary in CI logs.
+- Tightened the `throws-documentation` check: enclosing-factory `@throws`,
+  object-property JSDoc, never-propagates try/catch, and instanceof-guarded
+  rethrow heuristics; removed 9 product-runtime waivers.
+- Tightened the `detached-promises` check: enclosing-scope sync helpers, OTel
+  span methods, and tool-CLI/composition-root path allowances; removed 19
+  product-runtime file-level waivers (budget 19 → 0).
+- Tightened the `performance-anti-patterns` check: retry/settle detection,
+  Promise.all/race batching, and intentional serial plugin/adapter/glob loops;
+  removed 15 product-runtime waivers (budget 38 → 0).
+- Tightened the `null-safety` check: schema-builder chains, `*For()` factory
+  calls, Commander `optsWithGlobals`, and callback-index guards; removed 9
+  product-runtime waivers.
 
 ### Fixed
 

@@ -167,6 +167,12 @@ export const KNOWN_SYNC_FUNCTIONS = new Set([
   'send',
   'abort',
   'throwIfAborted',
+  // OpenTelemetry Span methods (void-returning)
+  'recordException',
+  'setStatus',
+  'setAttributes',
+  'end',
+  'write',
   // Date methods (synchronous)
   'getTime',
   'getDate',
@@ -246,6 +252,12 @@ export const FILE_SKIP_PATTERNS = [
   '/plugins/',
   'register-routes',
   'register-plugins',
+  // Tool CLI dispatch layers: async handlers invoke synchronous render/error helpers.
+  '/engine/src/cli/',
+  // Composition root + bootstrap: synchronous registration/mount helpers inside async setup.
+  '/packages/cli/src/bootstrap/',
+  '/cli/src/bootstrap/',
+  'packages/cli/src/index.ts',
 ];
 
 /** Method-name prefixes that indicate synchronous calls. */

@@ -135,7 +135,6 @@ export async function resolveEdgesSyntactic(
 
   let processed = 0;
   for (const r of input.callSites) {
-    // @fitness-ignore-next-line performance-anti-patterns -- cooperative yield (ADR-0016) runs once per N call-sites so the live view stays responsive; intentionally serial, not parallelizable
     if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
     processed += 1;
     const ownerKey = ownerEdgeKey(

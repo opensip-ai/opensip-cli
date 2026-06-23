@@ -1,6 +1,4 @@
-// @fitness-ignore-file detached-promises -- CLI dispatch: render helpers are synchronous; heuristic flags inside async handlers.
 // @fitness-ignore-file no-non-null-assertions -- narrowing helpers prove the discriminant before access; the assertions encode that proof for the type checker.
-// @fitness-ignore-file throws-documentation -- internal CLI mode helper rethrows for the top-level handleGraphError; not a documented contract surface.
 /**
  * @fileoverview Mode dispatch for `opensip graph`.
  *

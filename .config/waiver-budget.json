@@ -4,8 +4,8 @@
   "safety": {
     "batch-operation-limits": 53,
     "error-handling-quality": 2,
-    "detached-promises": 19,
-    "performance-anti-patterns": 38,
+    "detached-promises": 0,
+    "performance-anti-patterns": 0,
     "unbounded-memory": 23,
     "toctou-race-condition": 0
   },

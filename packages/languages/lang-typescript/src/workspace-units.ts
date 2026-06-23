@@ -1,4 +1,3 @@
-// @fitness-ignore-file detached-promises -- `walk` is a synchronous filesystem walk function (declared with `function`, returns void); heuristic flags it because it's invoked inside an async-returning enclosing function.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 

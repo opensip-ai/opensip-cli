@@ -1,5 +1,5 @@
 // @fitness-ignore-file zod-schema-strictness -- flexible schema for external data
-// @fitness-ignore-file null-safety -- Zod schema builder chains (z.string().regex(), z.object().passthrough().superRefine().pipe()) always return valid schema objects
+
 /**
  * @fileoverview Unified check configuration schema
  *

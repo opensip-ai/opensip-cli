@@ -42,13 +42,12 @@ function findThrowStatements(node: ts.Node): ts.ThrowStatement[] {
   return throws;
 }
 
-function hasThrowsJSDoc(node: ts.Node, sourceFile: ts.SourceFile): boolean {
-  const fullText = sourceFile.getFullText();
-  const nodeStart = node.getFullStart();
-  const comments = ts.getLeadingCommentRanges(fullText, nodeStart);
-
+function commentRangesIncludeThrows(
+  fullText: string,
+  pos: number,
+): boolean {
+  const comments = ts.getLeadingCommentRanges(fullText, pos);
   if (!comments) return false;
-
   for (const comment of comments) {
     const commentText = fullText.slice(comment.pos, comment.end);
     if (commentText.includes('@throws')) {
@@ -56,6 +55,113 @@ function hasThrowsJSDoc(node: ts.Node, sourceFile: ts.SourceFile): boolean {
     }
   }
   return false;
+}
+
+function hasThrowsJSDoc(node: ts.Node, sourceFile: ts.SourceFile): boolean {
+  return commentRangesIncludeThrows(sourceFile.getFullText(), node.getFullStart());
+}
+
+function hasPropertyAssignmentThrowsJSDoc(
+  arrow: ts.ArrowFunction,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const parent = arrow.parent;
+  if (!ts.isPropertyAssignment(parent)) return false;
+  return commentRangesIncludeThrows(sourceFile.getFullText(), parent.name.getFullStart());
+}
+
+function isReturnedClosure(node: ts.ArrowFunction): boolean {
+  const parent = node.parent;
+  if (ts.isReturnStatement(parent)) return true;
+  if (ts.isPropertyAssignment(parent)) {
+    let current: ts.Node | undefined = parent.parent;
+    while (current) {
+      if (ts.isReturnStatement(current)) return true;
+      if (isFunctionLikeNode(current)) return false;
+      current = current.parent;
+    }
+  }
+  return false;
+}
+
+function isFactoryBodyConstArrow(node: ts.ArrowFunction): boolean {
+  const parent = node.parent;
+  if (!ts.isVariableDeclaration(parent) || parent.initializer !== node) return false;
+  const stmt = parent.parent.parent;
+  if (!ts.isVariableStatement(stmt)) return false;
+  let current: ts.Node | undefined = stmt.parent;
+  while (current) {
+    if (isFunctionLikeNode(current)) return true;
+    if (ts.isSourceFile(current)) return false;
+    current = current.parent;
+  }
+  return false;
+}
+
+function hasEnclosingFactoryThrowsJSDoc(
+  node: ts.ArrowFunction,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (!isReturnedClosure(node) && !isFactoryBodyConstArrow(node)) return false;
+  let current: ts.Node | undefined = node.parent;
+  while (current) {
+    if (
+      ts.isFunctionDeclaration(current) ||
+      ts.isFunctionExpression(current) ||
+      ts.isMethodDeclaration(current)
+    ) {
+      if (hasThrowsJSDoc(current, sourceFile)) return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function getFunctionBody(node: FunctionLikeNode): ts.ConciseBody | undefined {
+  if (ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node)) {
+    return node.body ?? undefined;
+  }
+  return node.body;
+}
+
+function isInsideTopLevelTry(throwStmt: ts.ThrowStatement, fnNode: FunctionLikeNode): boolean {
+  const body = getFunctionBody(fnNode);
+  if (!body || !ts.isBlock(body)) return false;
+  let current: ts.Node | undefined = throwStmt.parent;
+  while (current && current !== fnNode) {
+    if (isFunctionLikeNode(current) && current !== fnNode) return false;
+    if (ts.isTryStatement(current) && body.statements.includes(current)) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function topLevelTryCatchRethrows(fnNode: FunctionLikeNode): boolean {
+  const body = getFunctionBody(fnNode);
+  if (!body || !ts.isBlock(body)) return false;
+  for (const stmt of body.statements) {
+    if (!ts.isTryStatement(stmt)) continue;
+    const visit = (n: ts.Node): boolean => {
+      if (ts.isThrowStatement(n)) return true;
+      if (isFunctionLikeNode(n)) return false;
+      let found = false;
+      ts.forEachChild(n, (child) => {
+        if (visit(child)) found = true;
+      });
+      return found;
+    };
+    if (stmt.catchClause && visit(stmt.catchClause)) return true;
+  }
+  return false;
+}
+
+function neverPropagatesThrows(node: FunctionLikeNode): boolean {
+  const throwStatements = findThrowStatements(node);
+  if (throwStatements.length === 0) return false;
+  if (!throwStatements.every((stmt) => isInsideTopLevelTry(stmt, node))) return false;
+  return !topLevelTryCatchRethrows(node);
 }
 
 const ANONYMOUS_FUNCTION_NAME = '<anonymous>';
@@ -222,6 +328,38 @@ function isRethrow(
   return !text.includes('new ') && ERROR_VAR_NAME_PATTERN.test(text);
 }
 
+function matchesInstanceofGuard(
+  cond: ts.Expression,
+  thrown: ts.Expression,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (!ts.isIdentifier(thrown)) return false;
+  if (!ts.isBinaryExpression(cond) || cond.operatorToken.kind !== ts.SyntaxKind.InstanceOfKeyword) {
+    return false;
+  }
+  return cond.left.getText(sourceFile) === thrown.text;
+}
+
+function isInstanceofGuardedRethrow(
+  throwStmt: ts.ThrowStatement,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const parent = throwStmt.parent;
+  const thrown = throwStmt.expression;
+
+  if (ts.isIfStatement(parent)) {
+    return matchesInstanceofGuard(parent.expression, thrown, sourceFile);
+  }
+
+  if (!ts.isBlock(parent)) return false;
+  const siblings = parent.statements;
+  const idx = siblings.indexOf(throwStmt);
+  if (idx <= 0) return false;
+  const prev = siblings[idx - 1];
+  if (!ts.isIfStatement(prev)) return false;
+  return matchesInstanceofGuard(prev.expression, thrown, sourceFile);
+}
+
 function analyzeFunctionNode(
   node: FunctionLikeNode,
   ctx: FileAnalysisContext,
@@ -242,12 +380,31 @@ function analyzeFunctionNode(
     return null;
   }
 
+  if (ts.isArrowFunction(node)) {
+    if (hasPropertyAssignmentThrowsJSDoc(node, ctx.sourceFile)) {
+      return null;
+    }
+    if (hasEnclosingFactoryThrowsJSDoc(node, ctx.sourceFile)) {
+      return null;
+    }
+  }
+
+  if (neverPropagatesThrows(node)) {
+    return null;
+  }
+
   if (allThrowsSelfDocumenting(throwStatements, ctx.sourceFile, ctx.selfDocumentingSuffixes)) {
     return null;
   }
 
   const caughtNames = collectCaughtErrorNames(node);
-  if (throwStatements.every((stmt) => isRethrow(stmt, ctx.sourceFile, caughtNames))) {
+  if (
+    throwStatements.every(
+      (stmt) =>
+        isRethrow(stmt, ctx.sourceFile, caughtNames) ||
+        isInstanceofGuardedRethrow(stmt, ctx.sourceFile),
+    )
+  ) {
     return null;
   }
 

@@ -32,6 +32,24 @@ function isSyncNamedConstArrow(stmt: ts.Statement, name: string): boolean {
   return false;
 }
 
+function blockDeclaresSyncCallable(block: ts.Block, name: string): boolean {
+  return block.statements.some(
+    (stmt) => isSyncNamedFunctionDeclaration(stmt, name) || isSyncNamedConstArrow(stmt, name),
+  );
+}
+
+function isDirectFunctionBodyBlock(block: ts.Block): boolean {
+  const parent = block.parent;
+  return (
+    parent !== undefined &&
+    (ts.isFunctionDeclaration(parent) ||
+      ts.isFunctionExpression(parent) ||
+      ts.isArrowFunction(parent) ||
+      ts.isMethodDeclaration(parent) ||
+      ts.isConstructorDeclaration(parent))
+  );
+}
+
 /**
  * True when `name` refers to a top-level sync function or const arrow in `sourceFile`.
  */
@@ -39,4 +57,26 @@ export function isSyncTopLevelCallable(sourceFile: ts.SourceFile, name: string):
   return sourceFile.statements.some(
     (stmt) => isSyncNamedFunctionDeclaration(stmt, name) || isSyncNamedConstArrow(stmt, name),
   );
+}
+
+/**
+ * True when `name` refers to a sync helper declared in an enclosing scope of `callSite`
+ * (nested `function` declarations or local `const` arrows), or at module top level.
+ */
+export function isSyncCallableInScope(
+  callSite: ts.Node,
+  sourceFile: ts.SourceFile,
+  name: string,
+): boolean {
+  if (isSyncTopLevelCallable(sourceFile, name)) return true;
+
+  let current: ts.Node | undefined = callSite;
+  while (current) {
+    if (ts.isSourceFile(current)) break;
+    if (ts.isBlock(current) && isDirectFunctionBodyBlock(current)) {
+      if (blockDeclaresSyncCallable(current, name)) return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }

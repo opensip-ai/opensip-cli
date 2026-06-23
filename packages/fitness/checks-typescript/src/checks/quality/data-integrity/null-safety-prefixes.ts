@@ -228,6 +228,7 @@ export const SAFE_FLUENT_METHODS = new Set([
   'create',
   'of',
   'merge',
+  'optsWithGlobals',
   'mergeWith',
   'toBe',
   'toEqual',

@@ -127,7 +127,6 @@ function externalContribution(
 ): CliSessionReplayContribution {
   return {
     tool: contribution.tool,
-    // @fitness-ignore-next-line throws-documentation -- the throws are documented on the enclosing externalContribution factory's JSDoc above (fail-loud when the external tool cannot be isolated, or on a replay-worker fork failure).
     replaySession: async (stored): Promise<ToolSessionReplay<CommandResult>> => {
       const record = provenanceRecordFor(tool, provenance);
       if (record === undefined || dispatchExternalReplay === undefined) {

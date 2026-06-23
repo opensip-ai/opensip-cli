@@ -1,4 +1,4 @@
-// @fitness-ignore-file null-safety -- Zod schema builder chains (.optional()/.strict()) always return a valid schema object; there is no nullable access on the builder.
+
 /**
  * graph-config-schema — the graph tool's namespaced Zod config schema
  * (launch, ADR-0023, Phase 4 Task 4.1).

@@ -1,4 +1,3 @@
-// @fitness-ignore-file null-safety -- Zod schema builder chains (.strict()/.optional()/.catchall()) always return valid schema objects; there is no nullable access
 /**
  * composer — merges the registered namespaced schemas into one strict
  * whole-document schema, and validates a raw config document against it.

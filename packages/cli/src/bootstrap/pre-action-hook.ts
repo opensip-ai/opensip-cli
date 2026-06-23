@@ -1,4 +1,4 @@
-// @fitness-ignore-file detached-promises -- the preAction hook is a composition root: its body awaits maybeInitializeOwningTool inside executePostBailoutBootstrap. Matches the same suppression on index.ts and bootstrap/index.ts.
+
 /**
  * pre-action-hook — Commander `preAction` adapter (ADR-0052).
  *
@@ -61,7 +61,6 @@ export function installPreActionHook(
       plan,
       runtime,
       version,
-      // @fitness-ignore-next-line null-safety -- Commander optsWithGlobals always returns OptionValues; `.cloud` is absent-or-boolean.
       noCloud: actionCommand.optsWithGlobals().cloud === false,
       apiKey: opts.apiKey as string | undefined,
     });

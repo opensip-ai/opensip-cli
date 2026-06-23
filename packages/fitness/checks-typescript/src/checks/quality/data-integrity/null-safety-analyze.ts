@@ -19,11 +19,12 @@ import {
 import {
   getChainDepth,
   isFluentChain,
+  isCallbackIndexGuarded,
   isGuardedByEnclosingCondition,
   isSafeBuilderPattern,
   isSafeFluentMethod,
+  isSchemaBuilderChain,
   isThisAccess,
-  isZodBuilderChain,
 } from './null-safety-heuristics.js';
 
 /**
@@ -65,8 +66,8 @@ export function analyzeNullSafety(content: string, filePath: string): CheckViola
       // Skip method chains longer than 2 — fluent APIs are designed to return non-null
       if (getChainDepth(node) > 2) return;
 
-      // Skip Zod builder pattern chains (z.string().min(1).optional())
-      if (isZodBuilderChain(node, sourceFile)) return;
+      // Skip Zod / schema builder chains (z.string().min(1), FooSchema.strict().safeParse)
+      if (isSchemaBuilderChain(node, sourceFile)) return;
 
       // Skip known safe builder patterns
       if (
@@ -92,6 +93,8 @@ export function analyzeNullSafety(content: string, filePath: string): CheckViola
       // Skip if guarded by an enclosing if / ternary / && condition on a
       // previous line (the line-local scan above only sees this line).
       if (isGuardedByEnclosingCondition(node, sourceFile)) return;
+
+      if (isCallbackIndexGuarded(node, sourceFile)) return;
 
       // Skip common safe cases
       if (['length', 'toString', 'valueOf'].includes(propName)) return;

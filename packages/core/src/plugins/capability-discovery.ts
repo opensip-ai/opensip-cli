@@ -119,7 +119,6 @@ export async function discoverCapabilityContributions(
   const out: RawCapabilityContribution[] = [];
   for (let i = 0; i < packages.length; i += LOAD_CONCURRENCY) {
     const batch = packages.slice(i, i + LOAD_CONCURRENCY);
-    // @fitness-ignore-next-line performance-anti-patterns -- bounded fan-out: each batch runs in parallel via Promise.all; running batches serially caps in-flight imports (the bounded-concurrency pattern), not a per-item serial loop.
     const loaded = await Promise.all(batch.map((pkg) => loadPackageContributions(pkg, options)));
     for (const contributions of loaded) out.push(...contributions);
   }

@@ -1,4 +1,4 @@
-// @fitness-ignore-file performance-anti-patterns -- sequential await across discovered plugin modules preserves load order for deterministic conflict detection; bounded by installed plugin count
+
 /**
  * @fileoverview Generic plugin loader.
  *

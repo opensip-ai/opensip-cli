@@ -153,7 +153,6 @@ async function buildShardedCatalog(input: {
  * missing/invalid budget) is caught locally and converted to
  * `EXIT_CODES.RUNTIME_ERROR` — so this function does not throw to its caller.
  */
-// @fitness-ignore-next-line throws-documentation -- All throws in the body are caught by this function's own try/catch and converted to an exit code; the function never propagates an error to its caller, so a caller-facing @throws tag would be inaccurate.
 export async function executeEquivalenceCheck(
   opts: EquivalenceCheckOptions,
   cli: ToolCliContext,

@@ -1,4 +1,4 @@
-// @fitness-ignore-file performance-anti-patterns -- sequential await across discovered tool packages preserves load order for plugin-conflict detection; bounded by installed plugin count
+
 /**
  * register-tools-discovery — installed + authored tool admission and discovery.
  *

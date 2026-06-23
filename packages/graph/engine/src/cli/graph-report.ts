@@ -1,4 +1,3 @@
-// @fitness-ignore-file performance-anti-patterns -- spread in CLI report aggregation iterates bounded result sets (rule counts, entry-point lists).
 /**
  * @fileoverview Unified human-readable graph report.
  *

@@ -1,4 +1,3 @@
-// @fitness-ignore-file null-safety -- repoFor() returns a freshly constructed ToolStateRepo (never null); the heuristic misreads the fluent .put/.list calls
 /**
  * state-seams — the host implementation behind the `ToolCliContext.toolState`
  * grouped seam (ADR-0042): durable keyed JSON persistence over the host-owned

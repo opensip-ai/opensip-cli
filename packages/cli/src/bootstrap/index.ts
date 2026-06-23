@@ -1,4 +1,4 @@
-// @fitness-ignore-file detached-promises -- bootstrap calls the synchronous registerLanguageAdapters and awaits the async tool registration helpers (registerFirstPartyTools, discoverAndRegisterToolPackages) that the heuristic flags
+
 /**
  * bootstrap — performs the one-time (per-process) STARTUP phase registrations
  * (language adapters + tool admission via the uniform dynamic path) and

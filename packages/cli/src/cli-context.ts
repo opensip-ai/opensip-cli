@@ -218,7 +218,6 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
  * @throws {Error} always — that is the point.
  */
 function deniedHookSeam(seam: string): () => never {
-  // @fitness-ignore-next-line throws-documentation -- the throw is documented on the enclosing factory's @throws above; this is the one-line closure it returns.
   return () => {
     throw new Error(
       `host dispatch ctx: seam '${seam}' is not available to a data-gathering hook worker`,

@@ -1,4 +1,4 @@
-// @fitness-ignore-file detached-promises -- handleGraphError is synchronous (void); the heuristic flags it as a discarded promise inside the async handler. Mirrors the same pragma on graph.ts for the identical CLI-error-boundary pattern.
+
 /**
  * `opensip graph --list-files` — discovery-only mode.
  *

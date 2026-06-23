@@ -101,6 +101,58 @@ interface CheckLineForPerformancePatternsOptions {
  */
 const RETRY_LOOP_BODY = /await\s{1,5}(delay|sleep|wait|setTimeout|backoff|pause)\s{0,5}\(/;
 
+const RETRY_SETTLE_BODY = /await\s+new\s+Promise[\s\S]{0,400}?setTimeout/;
+
+/** Parallel batching / back-pressure / cooperative-yield awaits inside loops. */
+const PARALLEL_OR_GATE_AWAIT =
+  /await\s+Promise\.(all|allSettled|race)\s*\(|await\s+(yieldToEventLoop|yieldEventLoop)\s*\(/;
+
+/**
+ * Bounded, intentional serial loops (plugin admission, adapter discovery,
+ * glob deduplication) — not data-volume waterfalls.
+ */
+const INTENTIONAL_SERIAL_LOOP_CONTEXT = [
+  /for\s*\(\s*const\s+\w+\s+of\s+packages\b/,
+  /for\s*\(\s*const\s+\w+\s+of\s+discovered\b/,
+  /for\s*\(\s*const\s+adapter\s+of\s+adapters\b/,
+  /for\s*\(\s*const\s+pattern\s+of\s+patterns\b/,
+  /for\s*\(\s*let\s+\w+\s*=\s*0\s*;\s*\w+\s*<\s*packages\.length\b/,
+];
+
+function isIntentionalSequentialAwait(
+  line: string,
+  context: string,
+  retryContext: string,
+): boolean {
+  if (RETRY_LOOP_BODY.test(retryContext) || RETRY_SETTLE_BODY.test(retryContext)) {
+    return true;
+  }
+  if (PARALLEL_OR_GATE_AWAIT.test(line)) return true;
+  return INTENTIONAL_SERIAL_LOOP_CONTEXT.some((re) => re.test(context));
+}
+
+/** Exported for FP regression tests. */
+export function analyzeFileForPerformancePatterns(
+  content: string,
+  filePath: string,
+): CheckViolation[] {
+  if (isTestFile(filePath)) return [];
+  if (isCheckAuthoringSource(filePath)) return [];
+  if (filePath.includes('/diagnostics')) return [];
+  if (!content.includes('await') && !content.includes('for') && !content.includes('while')) {
+    return [];
+  }
+  if (content.includes('@sequential-ok')) return [];
+
+  const violations: CheckViolation[] = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const violation = checkLineForPerformancePatterns({ lines, index: i });
+    if (violation) violations.push(violation);
+  }
+  return violations;
+}
+
 /* v8 ignore start -- multi-pattern AST-style detector with many type-specific branches; covered indirectly */
 function checkLineForPerformancePatterns(
   options: CheckLineForPerformancePatternsOptions,
@@ -130,7 +182,7 @@ function checkLineForPerformancePatterns(
       // real bug).
       if (
         patternConfig.type === ANTI_PATTERN_TYPES.SEQUENTIAL_AWAIT &&
-        RETRY_LOOP_BODY.test(retryContext)
+        isIntentionalSequentialAwait(line, context, retryContext)
       ) {
         continue;
       }
@@ -261,34 +313,6 @@ export const performanceAntiPatterns = defineCheck({
   timeout: 180_000, // 3 minutes - parses AST for all production files
 
   analyze(content, filePath) {
-    // Skip test files — performance anti-patterns in tests are low-risk
-    if (isTestFile(filePath)) return [];
-
-    // Check-pack source contains literal pattern examples and bounded analyzeAll loops.
-    if (isCheckAuthoringSource(filePath)) return [];
-
-    // Skip diagnostic/debug endpoints — sequential processing is acceptable for diagnostics
-    if (filePath.includes('/diagnostics')) return [];
-
-    // @lazy-ok -- 'await' appears as a string literal, not an actual await expression
-    // Quick filter: skip files without performance-related patterns
-    if (!content.includes('await') && !content.includes('for') && !content.includes('while')) {
-      return [];
-    }
-
-    // Skip files with explicit sequential-ok marker (intentional sequential processing)
-    if (content.includes('@sequential-ok')) return [];
-
-    const violations: CheckViolation[] = [];
-    const lines = content.split('\n');
-
-    for (let i = 0; i < lines.length; i++) {
-      const violation = checkLineForPerformancePatterns({ lines, index: i });
-      if (violation) {
-        violations.push(violation);
-      }
-    }
-
-    return violations;
+    return analyzeFileForPerformancePatterns(content, filePath);
   },
 });

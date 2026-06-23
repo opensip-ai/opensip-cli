@@ -107,7 +107,6 @@ export function createPressureMonitor(opts: PressureMonitorOptions = {}): Pressu
     );
   };
 
-  // @fitness-ignore-next-line throws-documentation -- closure throws MemoryPressureError when heap usage crosses the limit ratio (lastError cache or fresh evaluate()); JSDoc cannot attach to a const-arrow
   const check = (): void => {
     const tripped = lastError;
     if (tripped instanceof MemoryPressureError) throw tripped;

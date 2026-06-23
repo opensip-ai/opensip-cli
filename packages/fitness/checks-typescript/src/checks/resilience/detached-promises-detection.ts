@@ -14,7 +14,7 @@ import {
   KNOWN_SYNC_SUFFIXES,
   type EffectiveSyncSets,
 } from './detached-promises-sync-constants.js';
-import { isSyncTopLevelCallable } from './detached-promises-sync-detection.js';
+import { isSyncCallableInScope } from './detached-promises-sync-detection.js';
 
 /**
  * Check if a method call expression is to a known synchronous receiver or method.
@@ -93,7 +93,7 @@ function isKnownSyncCall(
       sets.syncFunctions.has(name) ||
       FIRE_AND_FORGET_PATTERNS.has(name) ||
       matchesSyncNamePattern(name, sets) ||
-      isSyncTopLevelCallable(sourceFile, name)
+      isSyncCallableInScope(node, sourceFile, name)
     ) {
       return true;
     }

@@ -54,6 +54,7 @@ export const SELF_DOCUMENTING_ERRORS = new Set([
   'ResourceNotFoundError',
   'DuplicateResourceError',
   'DataIntegrityError',
+  'ToolError',
 ]);
 
 export const SELF_DOCUMENTING_SUFFIXES = [

@@ -1,4 +1,4 @@
-// @fitness-ignore-file detached-promises -- phase recorder, diagnostics, OTel meter, logger, and enterScope calls are synchronous; the async tool lifecycle calls are awaited below.
+
 /**
  * execute-post-bailout-bootstrap — post-bailout phases 5–9 (ADR-0052).
  *

@@ -1,4 +1,3 @@
-// @fitness-ignore-file performance-anti-patterns -- sequential scenario execution preserves ordering and isolates per-scenario state; parallel execution belongs to load-window driver, not the recipe runner
 /**
  * @fileoverview SimulationRecipeService — resolves a recipe to scenarios
  * and runs them.

@@ -16,8 +16,8 @@ import { describe, expect, it } from 'vitest';
 
 import { analyzeNullSafety } from '../null-safety.js';
 
-function analyze(src: string): readonly { line: number }[] {
-  return analyzeNullSafety(src, 'src/svc/sample.ts');
+function analyze(src: string, path = 'src/svc/sample.ts'): readonly { line: number }[] {
+  return analyzeNullSafety(src, path);
 }
 
 describe('null-safety — FP regression suite', () => {
@@ -43,6 +43,47 @@ describe('null-safety — FP regression suite', () => {
       }
     `;
     expect(analyze(src)).toHaveLength(0);
+  });
+
+  it('does NOT flag schema builder chains on *Schema identifiers', () => {
+    const src = `
+      const GraphConfigSchema = z.object({});
+      export function load(documentGraph: unknown) {
+        return GraphConfigSchema.strict().safeParse(documentGraph);
+      }
+    `;
+    expect(analyze(src, 'packages/graph/engine/src/cli/graph-config.ts')).toHaveLength(0);
+  });
+
+  it('does NOT flag repoFor() factory chains', () => {
+    const src = `
+      function repoFor() { return { put() {}, list() { return []; } }; }
+      export function build() {
+        return {
+          put: () => { repoFor().put('fit', 'k', {}); },
+          list: () => repoFor().list('fit'),
+        };
+      }
+    `;
+    expect(analyze(src, 'packages/cli/src/bootstrap/state-seams.ts')).toHaveLength(0);
+  });
+
+  it('does NOT flag Commander optsWithGlobals().cloud access', () => {
+    const src = `
+      export function hook(actionCommand: { optsWithGlobals(): { cloud?: boolean } }) {
+        return actionCommand.optsWithGlobals().cloud === false;
+      }
+    `;
+    expect(analyze(src, 'packages/cli/src/bootstrap/pre-action-hook.ts')).toHaveLength(0);
+  });
+
+  it('does NOT flag callback-index access chunks[i].signals', () => {
+    const src = `
+      export function timeoutFor(chunks: { signals: unknown[] }[]) {
+        return (_chunk: unknown, i: number) => chunks[i].signals.length;
+      }
+    `;
+    expect(analyze(src, 'packages/output/src/sink/cloud-signal-sink.ts')).toHaveLength(0);
   });
 
   it('STILL flags an unguarded property access on an element-access result', () => {

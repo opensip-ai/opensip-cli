@@ -1,4 +1,3 @@
-// @fitness-ignore-file detached-promises -- OTel Span methods (recordException/setStatus/end) return void (sync); the heuristic flags them inside withSpanAsync's async callback. The only promise here (fn(span)) is awaited.
 /**
  * Tracing primitive for opensip-cli — the kernel sibling of `logger`.
  *

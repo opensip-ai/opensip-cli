@@ -102,7 +102,6 @@ export function buildBaselineSeams(deps: {
     },
 
     /** @throws {ConfigurationError} (→ exit 2) when no baseline exists for `tool`. */
-    // @fitness-ignore-next-line throws-documentation -- contract is in the @throws above + on the ToolCliContext.exportBaselineSarif seam; the check cannot read an object-property arrow's leading JSDoc.
     exportBaselineSarif: async (tool, path) => {
       const repo = repoFor();
       if (!repo.exists(tool)) throw missingBaseline(tool);
@@ -162,7 +161,6 @@ export function buildBaselineSeams(deps: {
     },
 
     /** @throws {ConfigurationError} (→ exit 2) when no baseline exists for `tool`. */
-    // @fitness-ignore-next-line throws-documentation -- contract is in the @throws above + on the ToolCliContext.exportBaselineFingerprints seam; the check cannot read an object-property arrow's leading JSDoc.
     exportBaselineFingerprints: async (tool, path) => {
       const repo = repoFor();
       if (!repo.exists(tool)) throw missingBaseline(tool);

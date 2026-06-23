@@ -28,7 +28,14 @@ export function isSafeBuilderPattern(
   const text = expression.getText(sourceFile);
   if (safeBuilders.some((prefix) => text.startsWith(prefix))) return true;
   if (ts.isIdentifier(expression.expression)) {
-    return isSafeFluentMethod(expression.expression.text);
+    const name = expression.expression.text;
+    if (isSafeFluentMethod(name)) return true;
+    // Local `repoFor()`-style factories return a fresh non-null handle.
+    if (name.endsWith('For')) return true;
+    return false;
+  }
+  if (ts.isPropertyAccessExpression(expression.expression)) {
+    return isSafeFluentMethod(expression.expression.name.text);
   }
   return false;
 }
@@ -114,6 +121,102 @@ export function getChainDepth(node: ts.PropertyAccessExpression): number {
     }
   }
   return depth;
+}
+
+const SCHEMA_BUILDER_METHODS = new Set([
+  'strict',
+  'optional',
+  'safeParse',
+  'parse',
+  'pipe',
+  'superRefine',
+  'catchall',
+  'passthrough',
+  'refine',
+  'default',
+  'transform',
+]);
+
+function calleeRootEndsWithSchema(expr: ts.Expression, sourceFile: ts.SourceFile): boolean {
+  let current: ts.Expression = expr;
+  while (current) {
+    if (ts.isIdentifier(current)) {
+      return current.text.endsWith('Schema') || current.text === 'z';
+    }
+    if (ts.isPropertyAccessExpression(current)) {
+      if (current.expression.getText(sourceFile) === 'z') return true;
+      current = current.expression;
+      continue;
+    }
+    if (ts.isCallExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+/**
+ * Zod and project schema-builder chains (including `FooSchema.strict().safeParse`).
+ */
+export function isSchemaBuilderChain(
+  node: ts.PropertyAccessExpression,
+  sourceFile: ts.SourceFile,
+): boolean {
+  if (isZodBuilderChain(node, sourceFile)) return true;
+
+  let current: ts.Expression = node.expression;
+  while (current) {
+    if (ts.isCallExpression(current)) {
+      const callee = current.expression;
+      if (ts.isPropertyAccessExpression(callee) && SCHEMA_BUILDER_METHODS.has(callee.name.text)) {
+        if (calleeRootEndsWithSchema(callee.expression, sourceFile)) return true;
+      }
+      if (ts.isIdentifier(callee)) {
+        if (callee.text.endsWith('Schema') || callee.text.endsWith('Namespace')) return true;
+      }
+      current = callee;
+      if (ts.isPropertyAccessExpression(current)) current = current.expression;
+      continue;
+    }
+    if (ts.isIdentifier(current)) {
+      return current.text.endsWith('Schema');
+    }
+    break;
+  }
+  return false;
+}
+
+function isFunctionParameter(name: string, fn: ts.SignatureDeclaration): boolean {
+  return fn.parameters.some((p) => ts.isIdentifier(p.name) && p.name.text === name);
+}
+
+/**
+ * True when accessing `arr[i].prop` where `i` is a parameter of the enclosing
+ * callback (e.g. chunked POST `timeoutFor: (_chunk, i) => chunks[i].signals`).
+ */
+export function isCallbackIndexGuarded(
+  node: ts.PropertyAccessExpression,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const receiver = node.expression;
+  if (!ts.isElementAccessExpression(receiver)) return false;
+  const index = receiver.argumentExpression;
+  if (!index || !ts.isIdentifier(index)) return false;
+  const indexName = index.text;
+
+  let current: ts.Node | undefined = node.parent;
+  while (current) {
+    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+      if (isFunctionParameter(indexName, current)) return true;
+    }
+    if (ts.isFunctionDeclaration(current)) {
+      if (isFunctionParameter(indexName, current)) return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }
 
 /**

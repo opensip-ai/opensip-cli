@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-// @fitness-ignore-file detached-promises -- composition root invokes synchronous bootstrap helpers (mountAllToolCommands, registerCliCommands, printWelcome) that the heuristic mistakes for promise-returning calls
 /**
  * OpenSIP CLI — composition root (sequencer, not a god file).
  *
