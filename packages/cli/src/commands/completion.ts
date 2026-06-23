@@ -79,7 +79,7 @@ export interface CompletionInventory {
   /**
    * Sub-subcommand names for the action-less groups (`sessions`, `tools`), the
    * `<tool> <verb>` grammar (`fit export`…), and the per-tool `plugin` groups
-   * (`fit plugin`, keyed under `${toolVerb} plugin`).
+ * (`fit plugin`, keyed under `${parentVerb} plugin`).
    */
   readonly groupSubcommands: Readonly<Record<string, readonly string[]>>;
 }
@@ -107,13 +107,13 @@ export interface GroupLike {
 }
 
 /**
- * One pack-supporting tool's `plugin` group, keyed by the tool verb it mounts
+ * One pack-supporting tool's `plugin` group, keyed by the primary verb it mounts
  * under (`fit`/`sim`). The `plugin` parent is offered as a leaf under that verb
  * (`opensip fit <TAB>` ⇒ `… plugin`), and the `add|list|remove|sync` leaves are
- * registered under the `${toolVerb} plugin` path for deeper completion.
+ * registered under the `${parentVerb} plugin` path for deeper completion.
  */
 export interface ToolPluginGroupLike {
-  readonly toolVerb: string;
+  readonly parentVerb: string;
   readonly parentAliases?: readonly string[];
   readonly leaves: readonly { readonly name: string }[];
 }
@@ -168,6 +168,91 @@ export function specLongFlags(spec: SpecLike): readonly string[] {
   return [...new Set([...common, ...opts, '--help'])];
 }
 
+interface InventoryAccumulator {
+  readonly commandFlags: Record<string, readonly string[]>;
+  readonly subcommands: string[];
+  readonly toolGroupLeaves: Record<string, string[]>;
+  readonly parentAliases: Record<string, readonly string[]>;
+}
+
+function addFlatSpec(spec: SpecLike, flags: readonly string[], acc: InventoryAccumulator): void {
+  const primaryAliases = spec.aliases ?? [];
+  if (primaryAliases.length > 0) {
+    acc.parentAliases[spec.name] = primaryAliases;
+  }
+  for (const name of [spec.name, ...primaryAliases]) {
+    acc.subcommands.push(name);
+    acc.commandFlags[name] = flags;
+  }
+}
+
+function addNestedSpec(spec: SpecLike, flags: readonly string[], acc: InventoryAccumulator): void {
+  if (spec.parent === undefined) return;
+  const leaves = (acc.toolGroupLeaves[spec.parent] ??= []);
+  for (const name of [spec.name, ...(spec.aliases ?? [])]) {
+    leaves.push(name);
+    acc.commandFlags[`${spec.parent} ${name}`] = flags;
+  }
+}
+
+function addSpecToInventory(
+  spec: SpecLike,
+  internalCommands: ReadonlySet<string>,
+  acc: InventoryAccumulator,
+): void {
+  if (internalCommands.has(spec.name)) return;
+  const flags = specLongFlags(spec);
+  if (spec.parent !== undefined) {
+    addNestedSpec(spec, flags, acc);
+    return;
+  }
+  addFlatSpec(spec, flags, acc);
+}
+
+function addGroupedCommands(
+  groups: readonly GroupLike[],
+  subcommands: string[],
+  groupSubcommands: Record<string, readonly string[]>,
+): void {
+  for (const group of groups) {
+    subcommands.push(group.name);
+    groupSubcommands[group.name] = group.leaves.map((l) => l.name);
+  }
+}
+
+function foldToolLeaves(
+  toolGroupLeaves: Record<string, string[]>,
+  parentAliases: Record<string, readonly string[]>,
+  commandFlags: Record<string, readonly string[]>,
+  groupSubcommands: Record<string, readonly string[]>,
+): void {
+  for (const [parent, leaves] of Object.entries(toolGroupLeaves)) {
+    groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), ...leaves];
+    for (const alias of parentAliases[parent] ?? []) {
+      groupSubcommands[alias] = [...(groupSubcommands[alias] ?? []), ...leaves];
+      for (const leaf of leaves) {
+        const parentFlags = commandFlags[`${parent} ${leaf}`];
+        if (parentFlags !== undefined) {
+          commandFlags[`${alias} ${leaf}`] = parentFlags;
+        }
+      }
+    }
+  }
+}
+
+function foldToolPluginGroups(
+  toolPluginGroups: readonly ToolPluginGroupLike[] | undefined,
+  groupSubcommands: Record<string, readonly string[]>,
+): void {
+  for (const group of toolPluginGroups ?? []) {
+    const pluginParents = [group.parentVerb, ...(group.parentAliases ?? [])];
+    for (const parent of pluginParents) {
+      groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), 'plugin'];
+      groupSubcommands[`${parent} plugin`] = group.leaves.map((l) => l.name);
+    }
+  }
+}
+
 /**
  * Assemble the completion inventory from the live specs. Pure: callers pass
  * the tool command specs (from the populated `ToolRegistry`), the top-level
@@ -189,83 +274,45 @@ export function assembleCompletionInventory(input: {
   /**
    * The DOMAIN-BOUND per-tool `plugin` groups (mounted under each pack-supporting
    * tool primary). Folded into the group map so completion offers `plugin` under
-   * the tool verb and `add|list|remove|sync` under `${toolVerb} plugin`. Optional
+   * the tool verb and `add|list|remove|sync` under `${parentVerb} plugin`. Optional
    * so callers without tools omit it.
    */
   readonly toolPluginGroups?: readonly ToolPluginGroupLike[];
   readonly internalCommands?: ReadonlySet<string>;
 }): CompletionInventory {
   const internalCommands = input.internalCommands ?? INTERNAL_COMMANDS;
-  const commandFlags: Record<string, readonly string[]> = {};
-  const subcommands: string[] = [];
-  // `parent` → leaf names, accumulated from `parent`-nested tool specs (the
-  // `<tool> <verb>` grammar). Merged into `groupSubcommands` below so the
-  // emitted script offers `<parent> <leaf>` exactly like a host group.
-  const toolGroupLeaves: Record<string, string[]> = {};
-  const parentAliases: Record<string, readonly string[]> = {};
+  const acc: InventoryAccumulator = {
+    commandFlags: {},
+    subcommands: [],
+    // `parent` → leaf names, accumulated from `parent`-nested tool specs (the
+    // `<tool> <verb>` grammar). Merged into `groupSubcommands` below so the
+    // emitted script offers `<parent> <leaf>` exactly like a host group.
+    toolGroupLeaves: {},
+    parentAliases: {},
+  };
 
   for (const spec of [...input.toolSpecs, ...input.hostSpecs]) {
-    if (internalCommands.has(spec.name)) continue;
-    const flags = specLongFlags(spec);
-    // A `parent`-nested tool spec is a sub-subcommand, NOT a top-level command:
-    // offer it as a leaf under its parent and key its flags under the qualified
-    // `${parent} ${name}` path (mirroring the host group leaves).
-    if (spec.parent !== undefined) {
-      const leaves = (toolGroupLeaves[spec.parent] ??= []);
-      for (const name of [spec.name, ...(spec.aliases ?? [])]) {
-        leaves.push(name);
-        commandFlags[`${spec.parent} ${name}`] = flags;
-      }
-      continue;
-    }
-    const primaryAliases = spec.aliases ?? [];
-    if (primaryAliases.length > 0) {
-      parentAliases[spec.name] = primaryAliases;
-    }
-    for (const name of [spec.name, ...primaryAliases]) {
-      subcommands.push(name);
-      commandFlags[name] = flags;
-    }
+    addSpecToInventory(spec, internalCommands, acc);
   }
 
   const groupSubcommands: Record<string, readonly string[]> = {};
-  for (const group of input.groups) {
-    subcommands.push(group.name);
-    groupSubcommands[group.name] = group.leaves.map((l) => l.name);
-  }
+  addGroupedCommands(input.groups, acc.subcommands, groupSubcommands);
   // Fold tool-command sub-subcommands into the group map. A primary verb
   // (e.g. `graph`) is already a top-level subcommand with its own flags; adding
   // its nested leaves here lets the script also complete `graph export` etc.
-  for (const [parent, leaves] of Object.entries(toolGroupLeaves)) {
-    groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), ...leaves];
-    for (const alias of parentAliases[parent] ?? []) {
-      groupSubcommands[alias] = [...(groupSubcommands[alias] ?? []), ...leaves];
-      for (const leaf of leaves) {
-        const parentFlags = commandFlags[`${parent} ${leaf}`];
-        if (parentFlags !== undefined) {
-          commandFlags[`${alias} ${leaf}`] = parentFlags;
-        }
-      }
-    }
-  }
+  foldToolLeaves(acc.toolGroupLeaves, acc.parentAliases, acc.commandFlags, groupSubcommands);
   // Fold the per-tool `plugin` groups in: `plugin` becomes a completable leaf
   // under the tool verb (`opensip fit <TAB>` ⇒ `… plugin`), and the bound
-  // leaf names register under the doubly-nested `${toolVerb} plugin` key for
+  // leaf names register under the doubly-nested `${parentVerb} plugin` key for
   // deeper completion. There is NO top-level `plugin` group anymore.
-  for (const group of input.toolPluginGroups ?? []) {
-    const pluginParents = [group.toolVerb, ...(group.parentAliases ?? [])];
-    for (const parent of pluginParents) {
-      groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), 'plugin'];
-      groupSubcommands[`${parent} plugin`] = group.leaves.map((l) => l.name);
-    }
-  }
+  foldToolPluginGroups(input.toolPluginGroups, groupSubcommands);
 
   // `help` is a Commander built-in the script also surfaces.
-  subcommands.push('help');
+  acc.subcommands.push('help');
 
   return {
-    subcommands: [...new Set(subcommands)].sort(),
-    commandFlags,
+    subcommands: [...new Set(acc.subcommands)].sort(),
+    commandFlags: acc.commandFlags,
     groupSubcommands,
   };
 }

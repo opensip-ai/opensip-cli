@@ -16,7 +16,8 @@ import {
   type ToolRunCompletion,
 } from '@opensip-cli/core';
 
-import { FITNESS_IDENTITY, FITNESS_LAYOUT_KEY } from '../identity.js';
+import { FITNESS_LAYOUT_KEY } from '../identity.js';
+
 import { buildFitVerboseDetail, envelopeToFitRows, type FitTableRow } from './fit/envelope-view.js';
 import { buildFitnessSessionPayload } from './fit/result-builders.js';
 import { checkCountLabel, withCheckCountFromProgress } from './fit-runner-progress.js';

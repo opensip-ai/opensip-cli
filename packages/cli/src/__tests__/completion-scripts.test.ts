@@ -142,14 +142,14 @@ describe('buildCompletionScript — action-less groups (plugin / sessions)', () 
 });
 
 describe('assembleCompletionInventory — per-tool plugin groups', () => {
-  it('folds `plugin` under the tool verb and the bound leaves under `${toolVerb} plugin`', () => {
+  it('folds `plugin` under the tool verb and the bound leaves under `${parentVerb} plugin`', () => {
     const inv = assembleCompletionInventory({
       toolSpecs: [spec('fit', ['cwd', 'json'], ['--recipe'])],
       hostSpecs: [],
       groups: [],
       toolPluginGroups: [
         {
-          toolVerb: 'fit',
+          parentVerb: 'fit',
           leaves: [{ name: 'list' }, { name: 'add' }, { name: 'remove' }, { name: 'sync' }],
         },
       ],

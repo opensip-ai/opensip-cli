@@ -39,9 +39,9 @@
  */
 
 import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
-import type { ToolIdentity } from './identity.js';
 import type { ToolCliContext } from './cli-context.js';
 import type { CommandSpec } from './command-spec.js';
+import type { ToolIdentity } from './identity.js';
 import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 import type { ToolSessionReplayContribution } from './tool-sessions.js';
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';

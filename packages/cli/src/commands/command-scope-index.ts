@@ -34,7 +34,7 @@ export interface CommandScopeIndexInput {
   /**
    * The DOMAIN-BOUND per-tool `plugin` groups (mounted under each pack-supporting
    * tool primary, e.g. `opensip fit plugin list`). Each leaf keys under
-   * `${toolVerb} plugin ${leaf}` so `commandPath` resolves the doubly-nested path.
+   * `${parentVerb} plugin ${leaf}` so `commandPath` resolves the doubly-nested path.
    * Optional so callers without tools (isolated tests) can omit it.
    */
   readonly toolPluginGroups?: readonly ToolPluginGroup[];
@@ -63,10 +63,10 @@ export function buildCommandScopeIndex(input: CommandScopeIndexInput): CommandSc
     group.leaves.forEach((leaf) => addSpec(index, group.name, leaf));
   });
   // Per-tool `plugin` group leaves key under the doubly-nested
-  // `${toolVerb} plugin ${leaf}` path (e.g. `fit plugin list`), matching what
+  // `${parentVerb} plugin ${leaf}` path (e.g. `fit plugin list`), matching what
   // `commandPath` resolves for the mounted `opensip fit plugin list`.
   (input.toolPluginGroups ?? []).forEach((group) => {
-    group.leaves.forEach((leaf) => addSpec(index, `${group.toolVerb} plugin`, leaf));
+    group.leaves.forEach((leaf) => addSpec(index, `${group.parentVerb} plugin`, leaf));
   });
 
   return index;

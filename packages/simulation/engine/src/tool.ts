@@ -18,8 +18,6 @@ import {
   defineTool,
   readPackageVersion,
 } from '@opensip-cli/core';
-
-import { SIMULATION_IDENTITY, SIMULATION_LIVE_VIEW_KEY } from './identity.js';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { collectSimulationReportData } from './cli/report-data.js';
@@ -33,6 +31,7 @@ import {
   createSimulationLoadState,
   currentScenarioRegistry,
 } from './framework/registry.js';
+import { SIMULATION_IDENTITY, SIMULATION_LIVE_VIEW_KEY } from './identity.js';
 import { simReplayFromSession } from './persistence/session-replay.js';
 import { SIM_PLUGIN_LAYOUT } from './plugins/loader.js';
 import {
@@ -48,15 +47,11 @@ import type { RunnableScenario } from './framework/runnable-scenario.js';
 import type { SimulationRecipe } from './recipes/types.js';
 import type {
   CapabilityRegistrar,
-  CommandSpec,
   Tool,
   ToolCliContext,
   ToolRunCompletion,
 } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
-
-/** @deprecated Use {@link SIMULATION_LIVE_VIEW_KEY} from `identity.ts`. */
-const SIM_LIVE_VIEW_KEY = SIMULATION_LIVE_VIEW_KEY;
 
 /** Parsed `sim` options — the ADR-0021 common flags plus sim's `--recipe`. */
 type SimOptions = ToolOptions & {
@@ -80,7 +75,7 @@ type SimOptions = ToolOptions & {
  * equivalent to the old mount-time registration.
  */
 function setUpSimLiveView(cli: ToolCliContext): void {
-  cli.registerLiveView(SIM_LIVE_VIEW_KEY, async (args, liveContext) => {
+  cli.registerLiveView(SIMULATION_LIVE_VIEW_KEY, async (args, liveContext) => {
     const simArgs = args as ToolOptions;
     // The renderer returns a ToolRunCompletion; the HOST persists its `session`
     // after this resolves (host-owned-run-timing Phase 2).
@@ -116,7 +111,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
   // renderSimLive (host completeLiveRender) after the Ink app exits.
   if (opts.json !== true && process.stdout.isTTY === true) {
     setUpSimLiveView(cli);
-    await cli.renderLive(SIM_LIVE_VIEW_KEY, opts);
+    await cli.renderLive(SIMULATION_LIVE_VIEW_KEY, opts);
     await cli.maybeOpenReport({
       openRequested: Boolean(opts.open),
       jsonOutput: false,

@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { fitnessTool } from '@opensip-cli/fitness';
 import { ToolRegistry, createSignal, currentScope } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
+import { fitnessTool } from '@opensip-cli/fitness';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

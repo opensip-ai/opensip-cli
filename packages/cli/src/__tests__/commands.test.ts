@@ -10,13 +10,13 @@
  * additions / removals at PR time.
  */
 
+import { ToolRegistry, type PluginLayout } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerCliCommands } from '../commands/index.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
-import { ToolRegistry, type PluginLayout } from '@opensip-cli/core';
 
 function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
   setExitCode: ReturnType<typeof vi.fn>;
@@ -32,7 +32,7 @@ function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
       metadata: { id: 'f', name: 'fitness', version: '0', description: '' },
       commandSpecs: [],
       pluginLayout: { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
-    } as never);
+    });
   }
   if (pluginLayouts.some((l) => l.domain === 'sim')) {
     tools.register({
@@ -40,7 +40,7 @@ function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
       metadata: { id: 's', name: 'simulation', version: '0', description: '' },
       commandSpecs: [],
       pluginLayout: { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
-    } as never);
+    });
   }
   return {
     setExitCode: vi.fn(),

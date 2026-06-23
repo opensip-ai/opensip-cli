@@ -374,7 +374,7 @@ function buildHostCompletionSurface(ctx: CliCommandsContext): {
     specs: [...buildNonCompletionHostSpecs(ctx), COMPLETION_SELF_SPEC],
     groups: buildHostSubcommandGroups(ctx),
     toolPluginGroups: buildToolPluginGroups(ctx, ctx.tools).map((g) => ({
-      toolVerb: g.toolVerb,
+      parentVerb: g.parentVerb,
       parentAliases: g.parentAliases,
       leaves: g.leaves.map((l) => ({ name: l.name })),
     })),

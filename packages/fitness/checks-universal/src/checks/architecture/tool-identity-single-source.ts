@@ -51,58 +51,78 @@ function checkIdentity(block: OpensipToolsBlock, push: PushViolation): void {
   }
 }
 
+function findPrimaryCommand(commands: readonly unknown[]): ManifestCommand | undefined {
+  for (const entry of commands) {
+    if (!isJsonObject(entry)) continue;
+    const cmd = entry as ManifestCommand;
+    if (cmd.parent === undefined) return cmd;
+  }
+  return undefined;
+}
+
+function checkPrimaryCommandName(
+  primary: ManifestCommand,
+  identityName: string,
+  push: PushViolation,
+): void {
+  if (primary.name === identityName) return;
+  push(
+    'commands',
+    `primary command name must be identity.name (${JSON.stringify(identityName)}), got ${JSON.stringify(primary.name)}`,
+  );
+}
+
+function checkPrimaryCommandAliases(
+  primary: ManifestCommand,
+  identity: ManifestIdentity,
+  push: PushViolation,
+): void {
+  const expectedAliases = Array.isArray(identity.aliases) ? identity.aliases : [];
+  const declaredAliases = Array.isArray(primary.aliases) ? primary.aliases : [];
+  if (JSON.stringify(declaredAliases) === JSON.stringify(expectedAliases)) return;
+  push('commands', 'primary command aliases must equal identity.aliases exactly');
+}
+
+function layoutKeyForIdentity(identity: ManifestIdentity, identityName: string): string {
+  return typeof identity.layoutKey === 'string' && identity.layoutKey !== ''
+    ? identity.layoutKey
+    : identityName;
+}
+
+function checkPluginLayoutDomain(
+  block: OpensipToolsBlock,
+  layoutKey: string,
+  push: PushViolation,
+): void {
+  const pluginDomain = block.pluginLayout?.domain;
+  if (pluginDomain === undefined || pluginDomain === layoutKey) return;
+  push(
+    'pluginLayout.domain',
+    `must equal identity.layoutKey ?? identity.name (${JSON.stringify(layoutKey)})`,
+  );
+}
+
 function checkManifestCommands(
   block: OpensipToolsBlock,
   push: PushViolation,
 ): void {
-  const identityName = isJsonObject(block.identity) ? block.identity.name : undefined;
+  const identity = block.identity;
+  if (!isJsonObject(identity)) return;
+  const identityName = identity.name;
   if (typeof identityName !== 'string') return;
 
   const commands = block.commands;
   if (!Array.isArray(commands)) return;
 
-  let primary: ManifestCommand | undefined;
-  for (const entry of commands) {
-    if (!isJsonObject(entry)) continue;
-    const cmd = entry as ManifestCommand;
-    if (cmd.parent === undefined) {
-      primary = cmd;
-      break;
-    }
-  }
+  const primary = findPrimaryCommand(commands);
 
   if (primary === undefined) {
     push('commands', 'must declare exactly one flat primary command matching identity.name');
     return;
   }
-  if (primary.name !== identityName) {
-    push(
-      'commands',
-      `primary command name must be identity.name (${JSON.stringify(identityName)}), got ${JSON.stringify(primary.name)}`,
-    );
-  }
-
-  const identity = block.identity as ManifestIdentity;
-  const expectedAliases = Array.isArray(identity.aliases) ? identity.aliases : [];
-  const declaredAliases = Array.isArray(primary.aliases) ? primary.aliases : [];
-  if (JSON.stringify(declaredAliases) !== JSON.stringify(expectedAliases)) {
-    push(
-      'commands',
-      'primary command aliases must equal identity.aliases exactly',
-    );
-  }
-
-  const layoutKey =
-    typeof identity.layoutKey === 'string' && identity.layoutKey !== ''
-      ? identity.layoutKey
-      : identityName;
-  const pluginDomain = block.pluginLayout?.domain;
-  if (pluginDomain !== undefined && pluginDomain !== layoutKey) {
-    push(
-      'pluginLayout.domain',
-      `must equal identity.layoutKey ?? identity.name (${JSON.stringify(layoutKey)})`,
-    );
-  }
+  checkPrimaryCommandName(primary, identityName, push);
+  checkPrimaryCommandAliases(primary, identity, push);
+  checkPluginLayoutDomain(block, layoutKeyForIdentity(identity, identityName), push);
 }
 
 function checkManifestBlock(block: OpensipToolsBlock, filePath: string): CheckViolation[] {

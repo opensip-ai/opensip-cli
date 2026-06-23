@@ -5,19 +5,18 @@
 import { definePrimaryCommand } from '@opensip-cli/core';
 
 import { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
-
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
 import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js';
 
 import { executeYagni } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
 import { buildYagniRunPresentation } from './yagni-presentation.js';
-import type { YagniLiveArgs } from './yagni-runner.js';
 
+import type { YagniLiveArgs } from './yagni-runner.js';
 import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
-import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
+import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 
 interface YagniCommandOptions {
   cwd: string;

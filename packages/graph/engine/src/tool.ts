@@ -28,7 +28,6 @@ import { createToolScope, defineTool, logger, readPackageVersion } from '@opensi
 // (register-graph-adapters.ts). The historical engine-side bootstrap is
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
-import { GRAPH_IDENTITY } from './identity.js';
 import {
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
@@ -42,6 +41,7 @@ import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
+import { GRAPH_IDENTITY } from './identity.js';
 import { createAdapterRegistry, currentAdapterRegistry } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
 import { graphReplayFromSession } from './persistence/session-replay.js';
@@ -54,9 +54,7 @@ import './scope-augmentation.js';
 import type { GraphLanguageAdapter } from './lang-adapter/types.js';
 import type {
   CapabilityRegistrar,
-  CommandSpec,
   Tool,
-  ToolCliContext,
   ToolScope,
 } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';

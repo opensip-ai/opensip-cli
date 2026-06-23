@@ -26,10 +26,9 @@
 
 import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-cli/contracts';
 import { definePrimaryCommand } from '@opensip-cli/core';
-
-import { GRAPH_LIVE_VIEW_KEY as GRAPH_LIVE_KEY } from '../../identity.js';
 import { resolveSession } from '@opensip-cli/session-store';
 
+import { GRAPH_LIVE_VIEW_KEY as GRAPH_LIVE_KEY } from '../../identity.js';
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
 import { resolveRecipeToRules } from '../../recipes/resolve.js';
 import { renderGraphLive } from '../graph-runner.js';
@@ -40,7 +39,7 @@ import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js'
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
 import type { Shard } from '../orchestrate/shard-model.js';
-import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
+import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /**

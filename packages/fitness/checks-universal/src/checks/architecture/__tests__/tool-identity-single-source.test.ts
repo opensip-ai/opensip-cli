@@ -10,10 +10,10 @@ import type { FileAccessor } from '@opensip-cli/fitness';
 function accessor(files: Record<string, string>): FileAccessor {
   return {
     paths: Object.keys(files),
-    read: async (path: string) => files[path] ?? '',
-    readMany: async (paths: readonly string[]) =>
-      new Map(paths.map((path) => [path, files[path] ?? ''])),
-    readAll: async () => new Map(Object.entries(files)),
+    read: (path: string) => Promise.resolve(files[path] ?? ''),
+    readMany: (paths: readonly string[]) =>
+      Promise.resolve(new Map(paths.map((path) => [path, files[path] ?? '']))),
+    readAll: () => Promise.resolve(new Map(Object.entries(files))),
   };
 }
 

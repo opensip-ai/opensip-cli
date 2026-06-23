@@ -24,7 +24,6 @@
  */
 
 import type { ToolCapabilityDeclaration } from './capability.js';
-import type { ToolIdentity } from './identity.js';
 import type {
   ArgSpec,
   CommandOutputMode,
@@ -33,6 +32,7 @@ import type {
   OptionSpec,
   RawStreamReason,
 } from './command-spec.js';
+import type { ToolIdentity } from './identity.js';
 import type { ToolConfigManifestDescriptor } from './manifest-config.js';
 import type { PluginLayout } from '../plugins/types.js'; // leaf import — manifest must not pull the plugins barrel
 

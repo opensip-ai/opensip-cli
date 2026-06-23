@@ -121,7 +121,7 @@ async function buildLiveInventory(): Promise<{
     hostSpecs: buildTopLevelHostSpecs(hostCtx),
     groups: buildHostSubcommandGroups(hostCtx),
     toolPluginGroups: buildToolPluginGroups(hostCtx, registry).map((g) => ({
-      toolVerb: g.toolVerb,
+      parentVerb: g.parentVerb,
       parentAliases: g.parentAliases,
       leaves: g.leaves.map((l) => ({ name: l.name })),
     })),

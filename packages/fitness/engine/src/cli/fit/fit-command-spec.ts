@@ -17,7 +17,6 @@
 import { definePrimaryCommand } from '@opensip-cli/core';
 
 import { FITNESS_LIVE_VIEW_KEY } from '../../identity.js';
-
 import {
   runGateMode,
   runJsonMode,
@@ -28,10 +27,7 @@ import {
 } from '../fit-modes.js';
 
 import type { FitOptions } from '@opensip-cli/contracts';
-import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
-
-/** @deprecated Use {@link FITNESS_LIVE_VIEW_KEY} from `identity.ts`. */
-export const FIT_LIVE_VIEW_KEY = FITNESS_LIVE_VIEW_KEY;
+import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 
 /**
  * The `fit` command handler — the former `registerFitCommand()` action body,
@@ -149,3 +145,5 @@ export function buildFitCommandSpec(
     handler: (opts, cli) => runFit(opts, cli, setUpLiveView),
   });
 }
+
+export { FITNESS_LIVE_VIEW_KEY as FIT_LIVE_VIEW_KEY } from '../../identity.js';

@@ -9,8 +9,8 @@
 import { ConfigurationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
-import { fitExportCommandSpec, FIT_EXPORT_FORMATS } from '../fit-aux-command-specs.js';
 import { fitnessTool } from '../../../tool.js';
+import { fitExportCommandSpec, FIT_EXPORT_FORMATS } from '../fit-aux-command-specs.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';
 

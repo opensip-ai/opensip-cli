@@ -23,7 +23,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, defineNestedCommand, logger } from '@opensip-cli/core';
+import { ConfigurationError, defineNestedCommand, logger } from '@opensip-cli/core';
 
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';

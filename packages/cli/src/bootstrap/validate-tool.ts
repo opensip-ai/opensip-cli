@@ -63,6 +63,49 @@ function identityValidationFailure(identity: unknown): string | undefined {
   }
 }
 
+function diagnosticString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value) ?? String(value);
+}
+
+function aliasesMatchIdentity(commandAliases: unknown, identity: NormalizedIdentity): boolean {
+  const aliases = Array.isArray(commandAliases) ? commandAliases : [];
+  return (
+    aliases.length === identity.aliases.length &&
+    aliases.every((value, index) => value === identity.aliases[index])
+  );
+}
+
+function commandSpecEntryValidation(
+  spec: unknown,
+  identity: NormalizedIdentity,
+): { readonly failure?: string; readonly primary: boolean } {
+  if (!validateCommandSpec(spec)) {
+    return { failure: 'tool.commandSpecs contains an invalid CommandSpec', primary: false };
+  }
+
+  const command = spec as { name?: unknown; parent?: unknown; aliases?: unknown };
+  if (command.parent !== undefined && command.parent !== identity.name) {
+    return {
+      failure: `tool.commandSpecs parent '${diagnosticString(command.parent)}' must equal identity.name '${identity.name}'`,
+      primary: false,
+    };
+  }
+
+  if (command.parent !== undefined || command.name !== identity.name) {
+    return { primary: false };
+  }
+
+  if (!aliasesMatchIdentity(command.aliases, identity)) {
+    return {
+      failure: 'tool.commandSpecs primary command aliases must match tool.identity.aliases',
+      primary: true,
+    };
+  }
+
+  return { primary: true };
+}
+
 function commandSpecsValidationFailure(
   commandSpecs: unknown,
   identity: NormalizedIdentity,
@@ -72,23 +115,9 @@ function commandSpecsValidationFailure(
   }
   let primaryCount = 0;
   for (const spec of commandSpecs) {
-    if (!validateCommandSpec(spec)) {
-      return 'tool.commandSpecs contains an invalid CommandSpec';
-    }
-    const command = spec as { name?: unknown; parent?: unknown; aliases?: unknown };
-    if (command.parent !== undefined && command.parent !== identity.name) {
-      return `tool.commandSpecs parent '${String(command.parent)}' must equal identity.name '${identity.name}'`;
-    }
-    if (command.parent === undefined && command.name === identity.name) {
-      primaryCount += 1;
-      const aliases = Array.isArray(command.aliases) ? command.aliases : [];
-      if (
-        aliases.length !== identity.aliases.length ||
-        aliases.some((value, index) => value !== identity.aliases[index])
-      ) {
-        return 'tool.commandSpecs primary command aliases must match tool.identity.aliases';
-      }
-    }
+    const result = commandSpecEntryValidation(spec, identity);
+    if (result.failure !== undefined) return result.failure;
+    if (result.primary) primaryCount += 1;
   }
   if (primaryCount !== 1) {
     return `tool.commandSpecs must contain exactly one primary command named '${identity.name}'`;

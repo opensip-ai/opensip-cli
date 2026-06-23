@@ -195,20 +195,20 @@ describe('<tool> plugin spec — action bodies (domain-bound)', () => {
 
     expect(
       buildToolPluginGroups(ctx).map((group) => ({
-        toolVerb: group.toolVerb,
+        parentVerb: group.parentVerb,
         domain: group.domain,
         description: group.description,
         leaves: group.leaves.map((leaf) => leaf.name),
       })),
     ).toEqual([
       {
-        toolVerb: 'fit',
+        parentVerb: 'fit',
         domain: 'fit',
         description: 'Manage fit extension packs (add, list, remove, sync)',
         leaves: ['list', 'add', 'remove', 'sync'],
       },
       {
-        toolVerb: 'sim',
+        parentVerb: 'sim',
         domain: 'sim',
         description: 'Manage sim extension packs (add, list, remove, sync)',
         leaves: ['list', 'add', 'remove', 'sync'],

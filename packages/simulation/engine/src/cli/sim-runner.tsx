@@ -16,9 +16,9 @@ import {
   type ToolRunCompletion,
 } from '@opensip-cli/core';
 
+import { SIMULATION_LAYOUT_KEY } from '../identity.js';
 import { buildSimulationSessionPayload } from '../persistence/session-payload.js';
 
-import { SIMULATION_LAYOUT_KEY } from '../identity.js';
 import { executeSim } from './sim.js';
 
 import type { ProgressEvent, ProgressSurface } from '@opensip-cli/cli-ui';

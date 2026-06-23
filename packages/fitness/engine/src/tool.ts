@@ -50,8 +50,6 @@
 
 import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
-import { FITNESS_IDENTITY, FITNESS_LIVE_VIEW_KEY } from './identity.js';
-
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import {
   fitExportCommandSpec,
@@ -71,6 +69,7 @@ import {
   currentCheckRegistry,
   currentRecipeRegistry,
 } from './framework/scope-registry.js';
+import { FITNESS_IDENTITY, FITNESS_LIVE_VIEW_KEY } from './identity.js';
 import { fitReplayFromSession } from './persistence/session-replay.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
 import { fitScaffoldConfigBlock } from './scaffold/config-block.js';
@@ -84,7 +83,6 @@ import type { FitnessRecipe } from './recipes/types.js';
 import type { FitOptions } from '@opensip-cli/contracts';
 import type {
   CapabilityRegistrar,
-  CommandSpec,
   ContributeScopeResult,
   Tool,
   ToolCliContext,

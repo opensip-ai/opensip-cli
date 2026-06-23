@@ -123,7 +123,7 @@ describe('plugin wiring', () => {
         pluginLayout: { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
       },
     ]) {
-      tools.register(t as never);
+      tools.register(t);
     }
     const ctxWithLayouts: CliCommandsContext = {
       ...ctx,

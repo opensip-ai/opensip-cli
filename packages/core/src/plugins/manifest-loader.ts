@@ -315,6 +315,33 @@ function validateOptionalCapabilities(
   return normalizeCapabilities(raw) ?? 'invalid';
 }
 
+function normalizeManifestIdentity(
+  block: Record<string, unknown>,
+): { readonly identity: ToolIdentity; readonly normalized: ReturnType<typeof validateToolIdentity> } | undefined {
+  const identity = normalizeIdentity(block.identity);
+  if (identity === undefined) return undefined;
+  const normalized = validateToolIdentity(identity);
+  return block.id === normalized.name ? { identity, normalized } : undefined;
+}
+
+function layoutMatchesIdentity(
+  pluginLayout: PluginLayout | undefined,
+  identity: ReturnType<typeof validateToolIdentity>,
+): boolean {
+  return pluginLayout === undefined || pluginLayout.domain === identity.layoutKey;
+}
+
+type ConfigParseResult =
+  | { readonly ok: true; readonly config?: ToolConfigManifestDescriptor }
+  | { readonly ok: false };
+
+function configMatchesIdentity(
+  config: ToolConfigManifestDescriptor | undefined,
+  identity: ReturnType<typeof validateToolIdentity>,
+): boolean {
+  return config === undefined || config.namespace === identity.name;
+}
+
 function validateManifest(
   block: Record<string, unknown>,
   name: unknown,
@@ -328,10 +355,9 @@ function validateManifest(
   const commands = normalizeCommands(block.commands);
   if (commands === undefined) return undefined;
 
-  const identity = normalizeIdentity(block.identity);
-  if (identity === undefined) return undefined;
-  const normalizedIdentity = validateToolIdentity(identity);
-  if (block.id !== normalizedIdentity.name) return undefined;
+  const identityResult = normalizeManifestIdentity(block);
+  if (identityResult === undefined) return undefined;
+  const { identity, normalized: normalizedIdentity } = identityResult;
 
   const apiVersion = block.apiVersion;
   if (apiVersion !== undefined && typeof apiVersion !== 'number') return undefined;
@@ -357,15 +383,12 @@ function validateManifest(
   // manifest is invalid (mirroring the strict `commands`/`capabilities` parse).
   const pluginLayout = normalizePluginLayout(block.pluginLayout);
   if (pluginLayout === 'invalid') return undefined;
-  if (pluginLayout !== undefined && pluginLayout.domain !== normalizedIdentity.layoutKey) {
-    return undefined;
-  }
+  if (!layoutMatchesIdentity(pluginLayout, normalizedIdentity)) return undefined;
 
-  const config = normalizeConfig(block.config);
-  if (config === 'invalid') return undefined;
-  if (config !== undefined && config.namespace !== normalizedIdentity.name) {
-    return undefined;
-  }
+  const configResult = normalizeConfig(block.config);
+  if (!configResult.ok) return undefined;
+  const { config } = configResult;
+  if (!configMatchesIdentity(config, normalizedIdentity)) return undefined;
 
   return {
     kind: 'tool',
@@ -552,13 +575,13 @@ function normalizePluginLayout(value: unknown): PluginLayout | undefined | 'inva
   return { domain, userSubdirs };
 }
 
-function normalizeConfig(value: unknown): ToolConfigManifestDescriptor | undefined | 'invalid' {
-  if (value === undefined) return undefined;
-  if (!isRecord(value)) return 'invalid';
+function normalizeConfig(value: unknown): ConfigParseResult {
+  if (value === undefined) return { ok: true };
+  if (!isRecord(value)) return { ok: false };
   const { namespace, schema } = value;
-  if (!isNonEmptyString(namespace)) return 'invalid';
-  if (!isRecord(schema)) return 'invalid';
-  return { namespace, schema };
+  if (!isNonEmptyString(namespace)) return { ok: false };
+  if (!isRecord(schema)) return { ok: false };
+  return { ok: true, config: { namespace, schema } };
 }
 
 function hashManifest(manifest: RawToolPluginManifest): string {

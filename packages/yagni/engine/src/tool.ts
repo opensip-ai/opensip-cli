@@ -4,13 +4,12 @@
 
 import { defineTool, readPackageVersion, type ToolCliContext, type Tool } from '@opensip-cli/core';
 
-import { YAGNI_IDENTITY, YAGNI_LIVE_VIEW_KEY } from './identity.js';
-
 import { yagniFingerprintStrategy } from './baseline-strategy.js';
 import { collectYagniReportData } from './cli/report-data.js';
 import { buildYagniCommandSpec } from './cli/yagni-command-spec.js';
 import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 import { renderYagniLive, type YagniLiveArgs } from './cli/yagni-runner.js';
+import { YAGNI_IDENTITY, YAGNI_LIVE_VIEW_KEY } from './identity.js';
 
 /**
  * Per-tool contract version (ADR-0047).

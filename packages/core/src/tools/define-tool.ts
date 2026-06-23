@@ -5,20 +5,23 @@
  */
 
 import { ValidationError } from '../lib/errors.js';
-import { assertCommandSpec } from './command-spec-validate.js';
+
 import {
   isNestedCommandDraft,
   isPrimaryCommandDraft,
   NESTED_COMMAND_DRAFT,
   PRIMARY_COMMAND_DRAFT,
+  type NestedCommandSpecDraft,
+  type PrimaryCommandSpecDraft,
   type ToolCommandSpecInput,
 } from './command-spec-draft.js';
+import { assertCommandSpec } from './command-spec-validate.js';
 import { deriveCommandsFromSpecs } from './derive-commands-from-specs.js';
 import { validateToolIdentity } from './identity.js';
 
+import type { ToolConfigContribution } from './capability.js';
 import type { CommandSpec } from './command-spec.js';
 import type { ToolIdentity } from './identity.js';
-import type { ToolConfigContribution } from './capability.js';
 import type { ToolSessionReplayContribution } from './tool-sessions.js';
 import type { ToolCliContext, Tool, ToolExtensionPoints, ToolMetadata } from './types.js';
 import type { PluginLayout } from '../plugins/types.js';
@@ -54,9 +57,8 @@ function normalizeCommandSpecs(
 
   for (const spec of specs) {
     if (isPrimaryCommandDraft(spec)) {
-      const { [PRIMARY_COMMAND_DRAFT]: _draft, ...rest } = spec;
       const primary: CommandSpec<unknown, ToolCliContext> = {
-        ...(rest as Omit<CommandSpec<unknown, ToolCliContext>, 'name' | 'aliases' | 'parent'>),
+        ...stripPrimaryDraftMarker(spec),
         name: identity.name,
         aliases: [...identity.aliases],
       };
@@ -67,9 +69,8 @@ function normalizeCommandSpecs(
     }
 
     if (isNestedCommandDraft(spec)) {
-      const { [NESTED_COMMAND_DRAFT]: _draft, ...rest } = spec;
       const nested: CommandSpec<unknown, ToolCliContext> = {
-        ...(rest as Omit<CommandSpec<unknown, ToolCliContext>, 'parent'>),
+        ...stripNestedDraftMarker(spec),
         parent: identity.name,
       };
       assertCommandSpec(nested);
@@ -77,7 +78,7 @@ function normalizeCommandSpecs(
       continue;
     }
 
-    const named = spec as CommandSpec<unknown, ToolCliContext>;
+    const named = spec;
     if (named.parent !== undefined && named.parent !== identity.name) {
       throw new ValidationError(
         `Command '${named.name}' declares parent '${named.parent}' but tool identity name is '${identity.name}'.`,
@@ -107,16 +108,23 @@ function normalizeCommandSpecs(
   return normalized;
 }
 
-/**
- * Build a host-ready {@link Tool} from the reduced author input.
- */
-export function defineTool(input: DefineToolInput): Tool {
-  if (input.identity === undefined) {
-    throw new ValidationError('Tool identity is required.', { code: 'TOOL.IDENTITY.REQUIRED' });
-  }
+function stripPrimaryDraftMarker(
+  spec: PrimaryCommandSpecDraft<unknown, ToolCliContext>,
+): Omit<CommandSpec<unknown, ToolCliContext>, 'name' | 'aliases' | 'parent'> {
+  const rest = { ...spec };
+  delete (rest as Partial<Record<typeof PRIMARY_COMMAND_DRAFT, true>>)[PRIMARY_COMMAND_DRAFT];
+  return rest;
+}
 
-  const identity = validateToolIdentity(input.identity);
+function stripNestedDraftMarker(
+  spec: NestedCommandSpecDraft<unknown, ToolCliContext>,
+): Omit<CommandSpec<unknown, ToolCliContext>, 'parent'> {
+  const rest = { ...spec };
+  delete (rest as Partial<Record<typeof NESTED_COMMAND_DRAFT, true>>)[NESTED_COMMAND_DRAFT];
+  return rest;
+}
 
+function assertNoDerivedExtensionInputs(input: DefineToolInput): void {
   if (input.extensionPoints?.config !== undefined && 'namespace' in input.extensionPoints.config) {
     throw new ValidationError(
       'config.namespace must not be hand-written when using identity — it is derived from identity.name.',
@@ -138,6 +146,18 @@ export function defineTool(input: DefineToolInput): Tool {
       { code: 'TOOL.IDENTITY.LAYOUT_DOMAIN_FORBIDDEN' },
     );
   }
+}
+
+/**
+ * Build a host-ready {@link Tool} from the reduced author input.
+ */
+export function defineTool(input: DefineToolInput): Tool {
+  if (input.identity === undefined) {
+    throw new ValidationError('Tool identity is required.', { code: 'TOOL.IDENTITY.REQUIRED' });
+  }
+
+  const identity = validateToolIdentity(input.identity);
+  assertNoDerivedExtensionInputs(input);
 
   const commandSpecs = normalizeCommandSpecs(input.commandSpecs, identity);
   const commands = deriveCommandsFromSpecs(commandSpecs);

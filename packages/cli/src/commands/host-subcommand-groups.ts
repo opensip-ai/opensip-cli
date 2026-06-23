@@ -148,7 +148,7 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
       const layoutFilter =
         registry === undefined || opts.tool === undefined
           ? opts.tool
-          : (resolveToolFilterToLayoutKey(registry, opts.tool) as ToolShortId | undefined);
+          : (resolveToolFilterToLayoutKey(registry, opts.tool));
       return showHistory(ctx.datastore() as DataStore, {
         tool: layoutFilter,
         limit: opts.limit,
@@ -222,7 +222,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
       const layoutTool =
         registry === undefined || opts.tool === undefined
           ? opts.tool
-          : (resolveToolFilterToLayoutKey(registry, opts.tool) as ToolShortId | undefined);
+          : (resolveToolFilterToLayoutKey(registry, opts.tool));
       await executeSessionShow({
         replayRegistry: ctx.sessionReplayRegistry,
         ref,

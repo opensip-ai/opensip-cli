@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ValidationError } from '../../lib/errors.js';
+import { buildToolIdentityIndex } from '../identity-index.js';
 import {
   TOOL_LONG_IDS,
   TOOL_LONG_TO_SHORT,
@@ -15,7 +16,6 @@ import {
   isToolLongId,
   isToolShortId,
 } from '../ids.js';
-import { buildToolIdentityIndex } from '../identity-index.js';
 import { isRegisteredToolId, registeredToolShortIds } from '../registered-ids.js';
 import { ToolRegistry } from '../registry.js';
 
@@ -44,17 +44,20 @@ const toolWithReplay = (name: string, replayTool: string): Tool => ({
 
 const indexedTool = (
   name: string,
-  identity: Tool['identity'] = { name },
-): Tool => ({
-  identity,
-  metadata: {
-    id: `00000000-0000-4000-8000-${name.padEnd(12, '0').slice(0, 12)}`,
-    name,
-    version: '0.0.0',
-    description: `${name} stub`,
-  },
-  commands: [{ name, description: `${name} command` }],
-});
+  identity?: Tool['identity'],
+): Tool => {
+  const resolvedIdentity = identity ?? { name };
+  return {
+    identity: resolvedIdentity,
+    metadata: {
+      id: `00000000-0000-4000-8000-${name.padEnd(12, '0').slice(0, 12)}`,
+      name,
+      version: '0.0.0',
+      description: `${name} stub`,
+    },
+    commands: [{ name, description: `${name} command` }],
+  };
+};
 
 describe('tool-id registry', () => {
   it('exposes both id lists', () => {

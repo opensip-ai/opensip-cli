@@ -49,7 +49,7 @@ describe('defineTool', () => {
       extensionPoints: {
         initialize: noopHandler,
         sessionReplay: { replaySession: () => ({}) },
-        config: { schema: {} as unknown },
+        config: { schema: {} },
       },
     });
 

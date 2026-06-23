@@ -2,9 +2,10 @@
  * Tool identity index — resolve canonical name | alias | layoutKey.
  */
 
-import { resolveToolHooks } from './resolve-tool-hooks.js';
 import { ValidationError } from '../lib/errors.js';
+
 import { validateToolIdentity } from './identity.js';
+import { resolveToolHooks } from './resolve-tool-hooks.js';
 
 import type { ToolIdentity } from './identity.js';
 import type { ToolRegistry } from './registry.js';
