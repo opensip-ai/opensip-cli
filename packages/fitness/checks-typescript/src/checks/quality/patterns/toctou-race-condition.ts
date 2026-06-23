@@ -22,10 +22,7 @@ import {
   buildEffectiveSafePaths,
   hasAtomicPatterns,
   isSafeToctouPath,
-  type TocTouConfig,
 } from './toctou-race-condition-constants.js';
-
-export type { TocTouConfig };
 
 function getFunctionNameFromNode(node: FunctionLikeNode, sourceFile: ts.SourceFile): string {
   if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
@@ -148,3 +145,5 @@ export const toctouRaceCondition = defineCheck({
     return analyzeFileForToctou(filePath, content);
   },
 });
+
+export { type TocTouConfig } from './toctou-race-condition-constants.js';

@@ -8,8 +8,8 @@ import { logger, ConfigurationError } from '@opensip-cli/core';
 
 import { resolveChecks, validateCheckReferences } from './check-resolution.js';
 
-import type { Check, CheckRegistry } from '../framework/registry.js';
 import type { FitnessRecipe } from './types.js';
+import type { Check, CheckRegistry } from '../framework/registry.js';
 
 const MODULE_FITNESS_RECIPES = 'fitness:recipes';
 
@@ -68,9 +68,7 @@ export function resolveAndFilterChecks(
     if (!check) continue;
     const bareSlug = slug.includes(':') ? slug.split(':').pop()! : slug;
     const isDisabled =
-      (check.config.disabled ?? false) ||
-      configDisabled.has(slug) ||
-      configDisabled.has(bareSlug);
+      (check.config.disabled ?? false) || configDisabled.has(slug) || configDisabled.has(bareSlug);
     const isForceIncluded = includeDisabledSet.has(slug) || includeDisabledSet.has(bareSlug);
     if (!isDisabled || isForceIncluded) {
       checks.push(check);

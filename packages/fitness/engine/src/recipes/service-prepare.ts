@@ -8,9 +8,9 @@ import { initParseCache } from '@opensip-cli/core';
 
 import { computePrewarmPatterns } from './service-prewarm.js';
 
+import type { FitnessRecipeServiceCallbacks } from './service-types.js';
 import type { FileCache } from '../framework/file-cache.js';
 import type { Check, CheckRegistry } from '../framework/registry.js';
-import type { FitnessRecipeServiceCallbacks } from './service-types.js';
 
 /** Options for {@link prepareRecipeExecution}. */
 export interface PrepareExecutionOptions {

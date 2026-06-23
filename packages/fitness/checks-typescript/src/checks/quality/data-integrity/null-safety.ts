@@ -13,6 +13,7 @@ import {
 } from '@opensip-cli/fitness';
 
 import { getSharedTypeCheckedProgram } from '../../../shared/type-program.js';
+
 import { analyzeFileConvention, analyzeFileTyped } from './null-safety-analyze.js';
 import { type NullSafetyConfig } from './null-safety-config.js';
 

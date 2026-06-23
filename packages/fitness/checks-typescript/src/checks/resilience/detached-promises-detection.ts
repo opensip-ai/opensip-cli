@@ -208,7 +208,10 @@ function isDefinedAsSyncInSameFile(expr: ts.CallExpression): boolean {
 }
 
 /** Analyze a file for detached promise issues. */
-export function analyzeFileForDetachedPromises(content: string, filePath: string): CheckViolation[] {
+export function analyzeFileForDetachedPromises(
+  content: string,
+  filePath: string,
+): CheckViolation[] {
   const violations: CheckViolation[] = [];
 
   if (FILE_SKIP_PATTERNS.some((pattern) => filePath.includes(pattern))) {

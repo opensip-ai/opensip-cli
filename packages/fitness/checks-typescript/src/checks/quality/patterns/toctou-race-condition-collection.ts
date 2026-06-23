@@ -114,7 +114,9 @@ export function collectClassInMemoryFieldNames(node: FunctionLikeNode): Set<stri
 }
 
 /** Index file-local interface/type declarations to Map/Set field names. */
-export function collectInterfaceCollectionFields(sourceFile: ts.SourceFile): Map<string, Set<string>> {
+export function collectInterfaceCollectionFields(
+  sourceFile: ts.SourceFile,
+): Map<string, Set<string>> {
   const byType = new Map<string, Set<string>>();
   const fieldsFrom = (members: ts.NodeArray<ts.TypeElement>): Set<string> => {
     const fields = new Set<string>();

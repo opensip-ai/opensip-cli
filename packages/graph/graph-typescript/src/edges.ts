@@ -20,7 +20,6 @@ import {
   ownerEdgeKey,
   pushCreationEdge as pushSharedCreationEdge,
 } from '@opensip-cli/graph';
-import ts from 'typescript';
 
 import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
 import {
@@ -30,16 +29,12 @@ import {
   resolveSyntactic,
   type ImportIndex,
 } from './edge-resolvers/syntactic.js';
-import {
-  computeVerdict,
-  pushCallEdge,
-  rebuildCatalog,
-  tsPosition,
-} from './edges-dispatch.js';
+import { computeVerdict, pushCallEdge, rebuildCatalog, tsPosition } from './edges-dispatch.js';
 
 import type { ResolverContext } from './edge-resolvers/types.js';
 import type { CallSiteRecord } from './walk.js';
 import type { CallEdge, Catalog, ResolutionStats } from '@opensip-cli/graph';
+import type ts from 'typescript';
 
 export { isReturnValueDiscarded } from './edges-dispatch.js';
 

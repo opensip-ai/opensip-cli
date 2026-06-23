@@ -5,6 +5,11 @@
 import * as ts from 'typescript';
 
 import {
+  isFunctionLikeNode,
+  isInMemoryCacheReceiverText,
+  type FunctionLikeNode,
+} from './toctou-race-condition-collection.js';
+import {
   DRIZZLE_ATOMIC_WRITE_METHODS,
   KIND_READ_LOCAL,
   KIND_READ_SHARED,
@@ -13,11 +18,6 @@ import {
   READ_METHODS,
   UPDATE_METHODS,
 } from './toctou-race-condition-constants.js';
-import {
-  isFunctionLikeNode,
-  isInMemoryCacheReceiverText,
-  type FunctionLikeNode,
-} from './toctou-race-condition-collection.js';
 
 /** Classification of a `<receiver>.<method>(...)` call site. */
 export type CallKind =
@@ -33,11 +33,7 @@ function isAtomicSqlExecute(call: ts.CallExpression): boolean {
   if (call.expression.name.text !== 'execute') return false;
   const arg = call.arguments[0];
   if (!arg) return false;
-  if (
-    ts.isTaggedTemplateExpression(arg) &&
-    ts.isIdentifier(arg.tag) &&
-    arg.tag.text === 'sql'
-  )
+  if (ts.isTaggedTemplateExpression(arg) && ts.isIdentifier(arg.tag) && arg.tag.text === 'sql')
     return true;
   return false;
 }

@@ -19,14 +19,7 @@ const RELAXED_VALIDATION_PATHS = [
   /\/scripts\//,
 ];
 
-const COMPLEX_TYPE_PATTERNS = [
-  'Record<',
-  'Map<',
-  '=> ',
-  ': (',
-  'Promise<',
-  'Observable<',
-];
+const COMPLEX_TYPE_PATTERNS = ['Record<', 'Map<', '=> ', ': (', 'Promise<', 'Observable<'];
 
 export function isTopLevelArrayType(typeNode: ts.TypeNode): boolean {
   if (ts.isArrayTypeNode(typeNode)) {
@@ -62,7 +55,11 @@ export function isComplexNestedType(typeText: string): boolean {
   return COMPLEX_TYPE_PATTERNS.some((pattern) => typeText.includes(pattern));
 }
 
-export function isLengthAccess(node: ts.Node, paramName: string, sourceFile: ts.SourceFile): boolean {
+export function isLengthAccess(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
   if (!ts.isPropertyAccessExpression(node)) return false;
   const objName = node.expression.getText(sourceFile);
   const propName = node.name.getText(sourceFile);
@@ -147,7 +144,11 @@ export function isIterationOverParam(
   return false;
 }
 
-export function isOutSinkUsage(node: ts.Node, paramName: string, sourceFile: ts.SourceFile): boolean {
+export function isOutSinkUsage(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
   if (!ts.isCallExpression(node)) return false;
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
   const objText = node.expression.expression.getText(sourceFile);
@@ -156,12 +157,20 @@ export function isOutSinkUsage(node: ts.Node, paramName: string, sourceFile: ts.
   return methodName === 'push' || methodName === 'unshift' || methodName === 'splice';
 }
 
-export function isIndexedAccess(node: ts.Node, paramName: string, sourceFile: ts.SourceFile): boolean {
+export function isIndexedAccess(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
   if (!ts.isElementAccessExpression(node)) return false;
   return node.expression.getText(sourceFile) === paramName;
 }
 
-export function isSpreadOfParam(node: ts.Node, paramName: string, sourceFile: ts.SourceFile): boolean {
+export function isSpreadOfParam(
+  node: ts.Node,
+  paramName: string,
+  sourceFile: ts.SourceFile,
+): boolean {
   if (ts.isSpreadElement(node) || ts.isSpreadAssignment(node)) {
     return node.expression.getText(sourceFile) === paramName;
   }

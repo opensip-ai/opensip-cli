@@ -10,12 +10,7 @@ import { defineCheck, isTestFile } from '@opensip-cli/fitness';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 
 import { analyzeFile } from './throws-documentation-analyze.js';
-import {
-  buildEffectiveSuffixes,
-  type ThrowsDocConfig,
-} from './throws-documentation-constants.js';
-
-export type { ThrowsDocConfig };
+import { buildEffectiveSuffixes } from './throws-documentation-constants.js';
 
 /**
  * Check: quality/throws-documentation
@@ -59,3 +54,5 @@ export const throwsDocumentation = defineCheck({
     });
   },
 });
+
+export { type ThrowsDocConfig } from './throws-documentation-constants.js';

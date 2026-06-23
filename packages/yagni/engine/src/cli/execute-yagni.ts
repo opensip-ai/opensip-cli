@@ -6,6 +6,7 @@ import { isErrorSignal } from '@opensip-cli/core';
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 import { YAGNI_DETECTORS } from '../detectors/registry.js';
 import { resolveGraphEvidence } from '../evidence/graph-evidence.js';
+import { YAGNI_LAYOUT_KEY } from '../identity.js';
 import { buildYagniSessionPayload } from '../persistence/session-payload.js';
 import {
   buildYagniRunSummary,
@@ -177,7 +178,7 @@ export async function executeYagni(
   return {
     envelope,
     session: {
-      tool: 'yagni',
+      tool: YAGNI_LAYOUT_KEY,
       cwd: opts.cwd,
       score: envelope.verdict.score,
       passed: true,

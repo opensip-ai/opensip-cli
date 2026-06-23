@@ -1,9 +1,10 @@
 // @fitness-ignore-file null-safety -- null checks are intentional guards
 import { getSharedSourceFile, isAsync } from '@opensip-cli/lang-typescript';
-import type { CheckViolation } from '@opensip-cli/fitness';
 import * as ts from 'typescript';
 
 import { getBranchKey } from './async-waterfall-branch-keys.js';
+
+import type { CheckViolation } from '@opensip-cli/fitness';
 
 export const MAX_LINE_GAP = 1;
 
@@ -138,6 +139,7 @@ export function collectAwaitExpressions(node: ts.Node, sourceFile: ts.SourceFile
 
 function isSleepOrDelay(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '');
+  // eslint-disable-next-line sonarjs/slow-regex -- bounded identifier prefix before '('; no nested quantifiers
   const match = /(?:this\.)?(\w+)\s*\(/.exec(afterAwait);
 
   if (match?.[1] !== undefined) {
@@ -148,6 +150,7 @@ function isSleepOrDelay(expressionText: string): boolean {
 
 function isLockAcquire(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '');
+  // eslint-disable-next-line sonarjs/slow-regex -- bounded identifier prefix before '('; no nested quantifiers
   const match = /(?:this\.)?(\w+)\s*\(/.exec(afterAwait);
 
   if (match?.[1] !== undefined) {
@@ -165,6 +168,7 @@ function nextUsesDestructuredBindings(current: AwaitInfo, next: AwaitInfo): bool
 
 function isAwaitingFunctionCall(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '');
+  // eslint-disable-next-line sonarjs/slow-regex -- trailing call parens on a single await expression; bounded slice
   return /\([^)]*\)\s*$/.test(afterAwait);
 }
 

@@ -4,7 +4,6 @@
 
 import { logger } from '@opensip-cli/core';
 import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
-import { stripStringsAndCommentsPreservingPositions } from '@opensip-cli/fitness';
 
 interface UnboundedBatchPattern {
   pattern: string;

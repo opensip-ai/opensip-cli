@@ -120,7 +120,10 @@ export function getChainDepth(node: ts.PropertyAccessExpression): number {
  * Check if a property access chain is on a Zod method call
  * Handles chained calls like z.string().min(1).optional()
  */
-export function isZodBuilderChain(node: ts.PropertyAccessExpression, sourceFile: ts.SourceFile): boolean {
+export function isZodBuilderChain(
+  node: ts.PropertyAccessExpression,
+  sourceFile: ts.SourceFile,
+): boolean {
   // Walk the full expression chain to find if it originates from z.xxx()
   // Handles arbitrary depth: z.string().regex().optional().superRefine().pipe()
   let current: ts.Expression = node.expression;

@@ -17,9 +17,6 @@
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 import { analyzeFileForDetachedPromises } from './detached-promises-detection.js';
-import { type DetachedPromisesConfig } from './detached-promises-sync-constants.js';
-
-export type { DetachedPromisesConfig };
 
 /**
  * Check: resilience/detached-promises
@@ -58,3 +55,5 @@ export const detachedPromises = defineCheck({
     return analyzeFileForDetachedPromises(content, filePath);
   },
 });
+
+export { type DetachedPromisesConfig } from './detached-promises-sync-constants.js';

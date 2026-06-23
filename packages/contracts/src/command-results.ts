@@ -10,8 +10,6 @@
  * (`index.ts`), so consumers still import these from `@opensip-cli/contracts`.
  */
 
-import type { RunPresentation } from './run-presentation.js';
-
 export type {
   UninstallDoneResult,
   ClearDoneResult,
@@ -62,6 +60,19 @@ import type {
   GraphStatusResult,
   TextLinesResult,
 } from './command-results-variants/done-results.js';
+import type { InitResult, SimNoticeResult } from './command-results-variants/init-results.js';
+import type {
+  ListChecksResult,
+  ListRecipesResult,
+  HistoryResult,
+  ReportResult,
+} from './command-results-variants/list-history-results.js';
+import type { PluginResult } from './command-results-variants/plugin-results.js';
+import type {
+  SessionReplayResult,
+  HelpResult,
+  ErrorResult,
+} from './command-results-variants/session-results.js';
 import type {
   ToolsListResult,
   ToolsDoctorResult,
@@ -71,19 +82,7 @@ import type {
   ToolsDataPurgeResult,
   ToolsUninstallResult,
 } from './command-results-variants/tools-results.js';
-import type {
-  ListChecksResult,
-  ListRecipesResult,
-  HistoryResult,
-  ReportResult,
-} from './command-results-variants/list-history-results.js';
-import type { InitResult, SimNoticeResult } from './command-results-variants/init-results.js';
-import type { PluginResult } from './command-results-variants/plugin-results.js';
-import type {
-  SessionReplayResult,
-  HelpResult,
-  ErrorResult,
-} from './command-results-variants/session-results.js';
+import type { RunPresentation } from './run-presentation.js';
 
 /** Union type for all command results — App.tsx dispatches on result.type */
 export type CommandResult =

@@ -2,10 +2,13 @@
  * Per-tool `plugin` subcommand group leaf specs and mount helpers.
  */
 
-import { currentScope, type PluginLayout, type ToolRegistry } from '@opensip-cli/core';
+import {
+  currentScope,
+  type PluginLayout,
+  type ToolRegistry,
+  type ProjectContext,
+} from '@opensip-cli/core';
 
-import { mountCommandSpec } from './mount-command-spec.js';
-import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 import {
   COMMAND_RESULT,
   defineCommand,
@@ -13,10 +16,11 @@ import {
   PROJECT_SCOPE,
   type HostSpec,
 } from './host-subcommand-shared.js';
+import { mountCommandSpec } from './mount-command-spec.js';
+import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { CliProgram } from '@opensip-cli/contracts';
-import type { ProjectContext } from '@opensip-cli/core';
 
 function pluginCwdOption() {
   return {

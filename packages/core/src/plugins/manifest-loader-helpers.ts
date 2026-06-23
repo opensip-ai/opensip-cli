@@ -4,16 +4,14 @@ import { join } from 'node:path';
 
 import { logger } from '../lib/logger.js';
 import { validateToolIdentity, type ToolIdentity } from '../tools/identity.js';
+
 import { isRecord, isStringArray } from './json-guards.js';
 import { normalizeDiscovery } from './manifest-discovery.js';
+
 import type { PluginLayout } from './types.js';
 import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
 import type { ToolConfigManifestDescriptor } from '../tools/manifest-config.js';
-import type {
-  RawToolPluginManifest,
-  ToolCommandManifest,
-  ToolSource,
-} from '../tools/manifest.js';
+import type { RawToolPluginManifest, ToolCommandManifest, ToolSource } from '../tools/manifest.js';
 
 /**
  * Filename of the project-local manifest sidecar. A project-local tool is
@@ -151,7 +149,7 @@ export function validateManifest(
   if (capabilities === 'invalid') return undefined;
 
   const pluginLayout = normalizePluginLayout(block.pluginLayout);
-  if (pluginLayout === 'invalid') return undefined;
+  if (block.pluginLayout !== undefined && pluginLayout === undefined) return undefined;
   if (!layoutMatchesIdentity(pluginLayout, normalizedIdentity)) return undefined;
 
   const configResult = normalizeConfig(block.config);
@@ -241,12 +239,12 @@ const COMMAND_SHELL_VALIDATORS: Readonly<Record<string, (v: unknown) => boolean>
 
 function normalizeCommandShell(
   entry: Record<string, unknown>,
-): Partial<ToolCommandManifest> | 'invalid' {
+): Partial<ToolCommandManifest> | undefined {
   const shell: Record<string, unknown> = {};
   for (const [field, isValid] of Object.entries(COMMAND_SHELL_VALIDATORS)) {
     const value = entry[field];
     if (value === undefined) continue;
-    if (!isValid(value)) return 'invalid';
+    if (!isValid(value)) return undefined;
     shell[field] = value;
   }
   return shell;
@@ -262,7 +260,7 @@ function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | und
     const { aliases } = entry;
     if (aliases !== undefined && !isStringArray(aliases)) return undefined;
     const shell = normalizeCommandShell(entry);
-    if (shell === 'invalid') return undefined;
+    if (shell === undefined) return undefined;
     out.push({
       name: entry.name,
       description: entry.description,
@@ -273,12 +271,12 @@ function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | und
   return out;
 }
 
-function normalizePluginLayout(value: unknown): PluginLayout | undefined | 'invalid' {
+function normalizePluginLayout(value: unknown): PluginLayout | undefined {
   if (value === undefined) return undefined;
-  if (!isRecord(value)) return 'invalid';
+  if (!isRecord(value)) return undefined;
   const { domain, userSubdirs } = value;
-  if (typeof domain !== 'string' || domain === '') return 'invalid';
-  if (!isStringArray(userSubdirs)) return 'invalid';
+  if (typeof domain !== 'string' || domain === '') return undefined;
+  if (!isStringArray(userSubdirs)) return undefined;
   return { domain, userSubdirs };
 }
 

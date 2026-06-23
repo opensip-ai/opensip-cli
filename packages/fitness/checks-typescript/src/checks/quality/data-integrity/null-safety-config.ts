@@ -44,13 +44,7 @@ export interface NullSafetyConfig extends Record<string, unknown> {
 }
 
 /** Patterns that indicate the access is already protected */
-export const SAFE_PATTERNS = [
-  /\?\./,
-  /!!/,
-  /\?\?/,
-  /if\s*\(/,
-  /&&/,
-];
+export const SAFE_PATTERNS = [/\?\./, /!!/, /\?\?/, /if\s*\(/, /&&/];
 
 /**
  * Common method name prefixes that indicate safe (non-null) return values.

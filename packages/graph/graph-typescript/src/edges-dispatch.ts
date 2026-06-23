@@ -1,5 +1,3 @@
-import { relative } from 'node:path';
-
 import {
   appendEdge,
   ownerEdgeKey,

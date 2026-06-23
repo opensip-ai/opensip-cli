@@ -6,9 +6,9 @@
 
 import { passRate } from '@opensip-cli/contracts';
 
-import type { DirectiveEntry } from '../framework/directive-inventory.js';
 import type { FitnessRecipeSession } from './service-types.js';
 import type { FitnessRecipe, FitnessRecipeResult, RecipeRunSummary } from './types.js';
+import type { DirectiveEntry } from '../framework/directive-inventory.js';
 
 /** Default success threshold percentage when none is configured. */
 export const DEFAULT_SUCCESS_THRESHOLD_PERCENT = 85;

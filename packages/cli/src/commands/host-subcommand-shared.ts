@@ -3,7 +3,6 @@
  */
 
 import {
-  defineCommand,
   type CommandScopeRequirement,
   type CommandSpec,
   type ProjectContext,
@@ -28,4 +27,5 @@ export function effectiveCwd(opts: { cwd?: string; projectContext?: ProjectConte
 }
 
 /** Re-export defineCommand for sibling modules building HostSpecs. */
-export { defineCommand };
+
+export { defineCommand } from '@opensip-cli/core';

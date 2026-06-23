@@ -45,13 +45,10 @@ import {
   diagnose,
   hashManifest,
   LOADER_MODULE,
-  PROJECT_LOCAL_MANIFEST_FILE,
   readPackageManifest,
   readSidecar,
   validateManifest,
 } from './manifest-loader-helpers.js';
-
-export { PROJECT_LOCAL_MANIFEST_FILE };
 
 import type {
   RawToolPluginManifest,
@@ -217,3 +214,5 @@ export function admitTool(args: {
   });
   return { decision: 'skip', provenance, verdict, diagnostic };
 }
+
+export { PROJECT_LOCAL_MANIFEST_FILE } from './manifest-loader-helpers.js';
