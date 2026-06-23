@@ -3,7 +3,6 @@
 exports[`formatSignalTableRows > derives one row per unit (snapshot) 1`] = `
 [
   {
-    "duration": "12ms",
     "durationMs": 12,
     "error": undefined,
     "errors": 1,
@@ -15,7 +14,6 @@ exports[`formatSignalTableRows > derives one row per unit (snapshot) 1`] = `
     "warnings": 0,
   },
   {
-    "duration": "7ms",
     "durationMs": 7,
     "error": undefined,
     "errors": 0,

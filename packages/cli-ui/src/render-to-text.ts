@@ -32,24 +32,34 @@ function hintsToText(items: readonly HintItem[]): string {
 }
 
 /**
- * Column-aligned table rendering: every cell is padded to its column width
- * (shared `tableColumnWidths`, so the pipe form lines up exactly as the TTY
- * form). Trailing whitespace is trimmed to keep the ANSI-free output clean.
+ * Column-aligned table rendering in the canonical pipe style: cells joined by
+ * ` | `, and (when the header shows) a `-|-` rule beneath it whose pipes align
+ * with the column gaps. Every cell is padded to its column width (shared
+ * `tableColumnWidths` + per-column `minWidths`, so the pipe form lines up
+ * exactly as the TTY form). Trailing whitespace is trimmed to keep the
+ * ANSI-free output clean.
  */
 function tableToText(
   columns: readonly string[],
   rows: readonly (readonly Span[])[],
   align: readonly ('left' | 'right')[] | undefined,
+  minWidths: readonly number[] | undefined,
   showHeader: boolean,
 ): string {
-  const widths = tableColumnWidths(columns, rows);
+  const widths = tableColumnWidths(columns, rows, minWidths);
   const alignOf = (i: number): 'left' | 'right' => align?.[i] ?? 'left';
   const renderRow = (cells: readonly { text: string }[]): string =>
     widths
       .map((w, i) => padTableCell(cells[i]?.text ?? '', w, alignOf(i)))
-      .join('  ')
+      .join(' | ')
       .trimEnd();
-  const lines = showHeader ? [renderRow(columns.map((c) => ({ text: c })))] : [];
+  const lines: string[] = [];
+  if (showHeader) {
+    lines.push(
+      renderRow(columns.map((c) => ({ text: c }))),
+      widths.map((w) => '-'.repeat(w)).join('-|-'),
+    );
+  }
   for (const cells of rows) lines.push(renderRow(cells));
   return lines.join('\n');
 }
@@ -80,7 +90,13 @@ export function renderToText(node: ViewNode): string {
       return node.pairs.map((p) => `${p.label}: ${p.value}`).join('\n');
     }
     case 'table': {
-      return tableToText(node.columns, node.rows, node.align, node.showHeader !== false);
+      return tableToText(
+        node.columns,
+        node.rows,
+        node.align,
+        node.minWidths,
+        node.showHeader !== false,
+      );
     }
     case 'hints': {
       return hintsToText(node.items);

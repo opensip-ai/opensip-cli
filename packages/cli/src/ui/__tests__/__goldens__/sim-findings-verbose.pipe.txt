@@ -4,8 +4,8 @@
           error  invariant broke
 
 
-Unit                                     | Status  | Errors | Warnings | Duration  
+Unit                                     | Status  | Errors | Warnings | Duration
 -----------------------------------------|---------|--------|----------|-----------
-b                                        | FAIL    | 1      | 0        | 20ms      
-a                                        | PASS    | 0      | 0        | 10ms      
+b                                        | FAIL    | 1      | 0        | 20ms
+a                                        | PASS    | 0      | 0        | 10ms
 FAIL  (1 Errors, 0 Warnings) | Duration 30ms

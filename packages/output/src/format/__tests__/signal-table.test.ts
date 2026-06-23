@@ -23,9 +23,9 @@ describe('formatSignalTableRows', () => {
     expect(large).toMatchObject({ status: 'PASS', errors: 0, warnings: 1 });
   });
 
-  it('formats durations and preserves raw ms', () => {
+  it('preserves raw ms (the renderer formats the duration)', () => {
     const rows = formatSignalTableRows(FIXTURE_ENVELOPE);
-    expect(rows[0]).toMatchObject({ duration: '12ms', durationMs: 12 });
+    expect(rows[0]).toMatchObject({ durationMs: 12 });
   });
 
   it('marks an errored unit as ERROR and surfaces its message', () => {

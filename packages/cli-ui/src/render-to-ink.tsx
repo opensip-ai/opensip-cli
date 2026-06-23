@@ -107,26 +107,26 @@ function NodeView({ node }: { readonly node: ViewNode }): React.ReactElement | n
       );
     }
     case 'table': {
-      const widths = tableColumnWidths(node.columns, node.rows);
+      // Canonical pipe style: cells joined by ` | ` (dim pipe), and — when the
+      // header shows — a `-|-` rule beneath it. Column widths honour the
+      // optional per-column `minWidths` floor so fixed-width results columns
+      // keep their size. This is the single terminal-table renderer (ADR-0058).
+      const widths = tableColumnWidths(node.columns, node.rows, node.minWidths);
       const alignOf = (i: number): 'left' | 'right' => node.align?.[i] ?? 'left';
       const showHeader = node.showHeader !== false;
       return (
         <Box flexDirection="column">
           {showHeader && (
             <Text dimColor>
-              {widths
-                .map(
-                  (w, i) =>
-                    (i > 0 ? '  ' : '') + padTableCell(node.columns[i] ?? '', w, alignOf(i)),
-                )
-                .join('')}
+              {widths.map((w, i) => padTableCell(node.columns[i] ?? '', w, alignOf(i))).join(' | ')}
             </Text>
           )}
+          {showHeader && <Text dimColor>{widths.map((w) => '-'.repeat(w)).join('-|-')}</Text>}
           {node.rows.map((cells, r) => (
             <Text key={r}>
               {widths.map((w, ci) => (
                 <Text key={ci}>
-                  {ci > 0 ? '  ' : ''}
+                  {ci > 0 ? <Text dimColor> | </Text> : ''}
                   <SpanText
                     span={{
                       ...(cells[ci] ?? { text: '' }),

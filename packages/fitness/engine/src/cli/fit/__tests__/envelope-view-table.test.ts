@@ -21,7 +21,6 @@ function fitRowsToLiveRunTable(rows: ReturnType<typeof envelopeToFitRows>): Live
     status: row.status,
     errors: row.errors,
     warnings: row.warnings,
-    duration: row.duration,
     durationMs: row.durationMs,
     validated: row.validated,
     ignored: row.ignored,
@@ -71,10 +70,10 @@ describe('envelopeToFitRows + liveRunTable', () => {
     );
     expect(node).not.toBeNull();
     expect(renderToText(node!)).toMatchInlineSnapshot(`
-      "Unit                                     | Status  | Errors | Warnings | Validated    | Ignores | Duration  
+      "Unit                                     | Status  | Errors | Warnings | Validated    | Ignores | Duration
       -----------------------------------------|---------|--------|----------|--------------|---------|-----------
-      Dead Code                                | FAIL    | 0      | 0        | 4 files      | 1       | 50ms      
-      Clean Check                              | PASS    | 0      | 0        | 2 files      | 0       | 10ms      "
+      Dead Code                                | FAIL    | 0      | 0        | 4 files      | 1       | 50ms
+      Clean Check                              | PASS    | 0      | 0        | 2 files      | 0       | 10ms"
     `);
   });
 });

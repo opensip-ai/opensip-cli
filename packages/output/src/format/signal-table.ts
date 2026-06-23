@@ -21,7 +21,7 @@
  * (ADR-0011, Phase 6, decision B) rather than a fitness-specific rich view.
  */
 import { groupSignalsBySource } from '@opensip-cli/contracts';
-import { formatDuration, isErrorSignal } from '@opensip-cli/core';
+import { isErrorSignal } from '@opensip-cli/core';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
 
@@ -35,9 +35,7 @@ export interface SignalTableRow {
   readonly errors: number;
   /** Count of this unit's `medium`/`low` signals. */
   readonly warnings: number;
-  /** Pretty duration (`"450ms"` / `"1.5s"` / `"24m 31.6s"`). */
-  readonly duration: string;
-  /** Raw duration in milliseconds (for sorting / re-formatting). */
+  /** Raw duration in milliseconds — the shared table renderer formats it. */
   readonly durationMs: number;
   /** The unit's error message, when it errored (status `ERROR`). */
   readonly error?: string;
@@ -88,7 +86,6 @@ export function formatSignalTableRows(envelope: SignalEnvelope): SignalTableRow[
       status: rowStatus(unit),
       errors,
       warnings,
-      duration: formatDuration(unit.durationMs),
       durationMs: unit.durationMs,
       error: unit.error,
       validated: unit.filesValidated,

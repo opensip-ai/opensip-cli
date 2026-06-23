@@ -20,25 +20,18 @@
 import {
   line,
   group,
+  liveRunTable,
   viewRunSummary,
   viewFooterHints,
   viewVerboseLines,
   viewFindingsGroups,
   DEFAULT_RUN_FOOTER_HINTS,
-  formatValidatedColumn,
-  parseValidatedCount,
   shouldRenderRunFooterHints,
   shouldRenderRunUnitTable,
-  sortFitRowPriority,
-  type Span,
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
-import {
-  formatSignalTableRows,
-  formatSignalTableSummary,
-  type SignalTableRow,
-} from '@opensip-cli/output';
+import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
 import { viewInit } from './views/init-view.js';
 import {
@@ -160,103 +153,12 @@ function assertNever(result: never): never {
 // scenario). Replaced the three per-tool, pre-computed `rows`/`reportLines`
 // shapes (the fit/sim/graph per-tool render branches, retired in Phase 7).
 
-const ENV_COL = {
-  status: 7,
-  errors: 6,
-  warnings: 8,
-  validated: 12,
-  ignored: 7,
-  duration: 10,
-} as const;
-
-function envStatusTone(status: SignalTableRow['status']): Tone {
-  if (status === 'FAIL') return 'error';
-  if (status === 'ERROR') return 'warning';
-  return 'success';
-}
-
-function envDurationTone(ms: number): Tone {
-  if (ms >= 60_000) return 'error';
-  if (ms >= 30_000) return 'warning';
-  return 'success';
-}
-
-/** Ignored-ratio tone: red >10%, yellow >5%, else muted (parity with the live view). */
-function envIgnoredTone(ignored: number, validatedCell: string): Tone {
-  const total = parseValidatedCount(validatedCell);
-  if (total === 0 || ignored === 0) return 'muted';
-  const pct = (ignored / total) * 100;
-  if (pct > 10) return 'error';
-  if (pct > 5) return 'warning';
-  return 'muted';
-}
-
-const ENV_SEP: Span = { text: ' | ' };
-
-/**
- * Fixed-width per-unit table from the envelope's signal-table rows, or null
- * when empty. Fresh non-verbose runs intentionally do not call this helper; the
- * table is a detailed surface (`--verbose`, replay, and direct table tests).
- * Renders fitness's `Validated`/`Ignores` columns when ANY row carries
- * `validated` (a per-unit fact on {@link UnitResult}); graph/sim rows omit them,
- * so those tools' tables stay the lean 5-column form.
- */
-function envelopeTableNode(rows: readonly SignalTableRow[]): ViewNode | null {
-  if (rows.length === 0) return null;
-  const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
-  const unitW = Math.max(40, ...sorted.map((r) => r.unit.length));
-  const showValidated = sorted.some((r) => r.validated !== undefined);
-
-  const headerCells = [
-    'Unit'.padEnd(unitW),
-    'Status'.padEnd(ENV_COL.status),
-    'Errors'.padEnd(ENV_COL.errors),
-    'Warnings'.padEnd(ENV_COL.warnings),
-    ...(showValidated
-      ? ['Validated'.padEnd(ENV_COL.validated), 'Ignores'.padEnd(ENV_COL.ignored)]
-      : []),
-    'Duration'.padEnd(ENV_COL.duration),
-  ];
-  const sepCells = [
-    '-'.repeat(unitW),
-    '-'.repeat(ENV_COL.status),
-    '-'.repeat(ENV_COL.errors),
-    '-'.repeat(ENV_COL.warnings),
-    ...(showValidated ? ['-'.repeat(ENV_COL.validated), '-'.repeat(ENV_COL.ignored)] : []),
-    '-'.repeat(ENV_COL.duration),
-  ];
-  const header = line([{ text: headerCells.join(' | ') }]);
-  const separator = line([{ text: sepCells.join('-|-') }]);
-
-  const rowNodes = sorted.map((r) => {
-    const validatedCell = formatValidatedColumn(r.validated, r.itemType);
-    const spans: Span[] = [
-      { text: r.unit.padEnd(unitW) },
-      ENV_SEP,
-      { text: r.status.padEnd(ENV_COL.status), tone: envStatusTone(r.status) },
-      ENV_SEP,
-      { text: String(r.errors).padEnd(ENV_COL.errors), tone: r.errors > 0 ? 'error' : 'success' },
-      ENV_SEP,
-      {
-        text: String(r.warnings).padEnd(ENV_COL.warnings),
-        tone: r.warnings > 0 ? 'warning' : 'muted',
-      },
-    ];
-    if (showValidated) {
-      spans.push(ENV_SEP, { text: validatedCell.padEnd(ENV_COL.validated) }, ENV_SEP, {
-        text: String(r.ignored ?? 0).padEnd(ENV_COL.ignored),
-        tone: envIgnoredTone(r.ignored ?? 0, validatedCell),
-      });
-    }
-    spans.push(ENV_SEP, {
-      text: r.duration.padEnd(ENV_COL.duration),
-      tone: envDurationTone(r.durationMs),
-    });
-    return line(spans);
-  });
-
-  return group([header, separator, ...rowNodes]);
-}
+// The per-unit table itself is rendered by cli-ui's shared `liveRunTable`
+// (ADR-0058) — the SAME producer the live (TTY) views use — so the static
+// non-TTY table and the live table cannot diverge. `SignalTableRow` is
+// structurally a `LiveRunTableRow` (it carries `durationMs`, which the renderer
+// formats), so the rows pass straight through. The tone/width/column policy
+// lives once, in `liveRunTable`.
 
 /**
  * Render a tool's verbose detail body (ADR-0021) as a `ViewNode`, switching on
@@ -310,7 +212,7 @@ export function envelopeToTableView(
     children.push(renderVerboseDetail(verboseDetail), SPACER);
   }
   if (showTable) {
-    const table = envelopeTableNode(rows);
+    const table = liveRunTable(rows);
     if (table !== null) children.push(table);
   }
   children.push(

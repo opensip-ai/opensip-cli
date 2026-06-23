@@ -49,7 +49,6 @@ vi.mock('../fit/envelope-view.js', () => ({
       validated: 4,
       itemType: 'files',
       ignored: 0,
-      duration: '50ms',
       durationMs: 50,
     },
   ]),

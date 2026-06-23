@@ -18,7 +18,7 @@
  */
 
 import { buildFindingGroups, groupSignalsBySource } from '@opensip-cli/contracts';
-import { formatDuration, isErrorSignal } from '@opensip-cli/core';
+import { isErrorSignal } from '@opensip-cli/core';
 
 import { getDisplayName } from './display-registry.js';
 
@@ -36,7 +36,7 @@ export interface FitTableRow {
   readonly itemType?: string;
   /** Findings suppressed by an inline ignore directive. */
   readonly ignored: number;
-  readonly duration: string;
+  /** Raw duration in milliseconds — the shared table renderer formats it. */
   readonly durationMs: number;
 }
 
@@ -64,7 +64,6 @@ export function envelopeToFitRows(envelope: SignalEnvelope): FitTableRow[] {
       validated: unit.filesValidated,
       itemType: unit.itemType,
       ignored: unit.ignoredCount ?? 0,
-      duration: formatDuration(unit.durationMs),
       durationMs: unit.durationMs,
     };
   });

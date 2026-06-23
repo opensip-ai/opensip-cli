@@ -48,7 +48,6 @@ function fitRowsToLiveRunTable(rows: readonly FitTableRow[]): LiveRunTableRow[] 
     status: row.status,
     errors: row.errors,
     warnings: row.warnings,
-    duration: row.duration,
     durationMs: row.durationMs,
     validated: row.validated,
     ignored: row.ignored,

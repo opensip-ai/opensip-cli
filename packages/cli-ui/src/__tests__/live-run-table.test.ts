@@ -15,7 +15,6 @@ describe('liveRunTable', () => {
         status: 'PASS',
         errors: 0,
         warnings: 1,
-        duration: '1.2s',
         durationMs: 1200,
       },
     ]);
@@ -33,7 +32,6 @@ describe('liveRunTable', () => {
         status: 'FAIL',
         errors: 1,
         warnings: 0,
-        duration: '0ms',
         durationMs: 0,
       },
     ]);
@@ -51,7 +49,6 @@ describe('liveRunTable', () => {
         status: 'FAIL',
         errors: 1,
         warnings: 0,
-        duration: '50ms',
         durationMs: 50,
         validated: 4,
         ignored: 0,
@@ -71,7 +68,6 @@ describe('liveRunTable', () => {
         status: 'PASS',
         errors: 0,
         warnings: 0,
-        duration: '1s',
         durationMs: 1000,
       },
       {
@@ -79,7 +75,6 @@ describe('liveRunTable', () => {
         status: 'FAIL',
         errors: 2,
         warnings: 0,
-        duration: '2s',
         durationMs: 2000,
       },
     ]);

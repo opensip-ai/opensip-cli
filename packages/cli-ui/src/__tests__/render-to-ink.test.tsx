@@ -53,8 +53,8 @@ describe('renderToInk — visible text', () => {
     const lines = out.split('\n').filter((l) => l.includes('check') || l.includes('PASS'));
     const header = lines.find((l) => l.includes('status'))!;
     const row = lines.find((l) => l.includes('PASS'))!;
-    expect(header).toContain('check  status');
-    // 'PASS' starts at the same column as 'status' (the cell padded to width 5).
+    expect(header).toContain('check | status');
+    // 'PASS' starts at the same column as 'status' (cells joined by ` | `).
     expect(row.indexOf('PASS')).toBe(header.indexOf('status'));
   });
 

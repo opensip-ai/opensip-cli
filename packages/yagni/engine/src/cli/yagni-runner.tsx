@@ -5,7 +5,6 @@
 import { runToolLiveView } from '@opensip-cli/cli-live';
 import { groupSignalsBySource } from '@opensip-cli/contracts';
 import {
-  formatDuration,
   isErrorSignal,
   currentScope,
   type LiveViewContext,
@@ -60,7 +59,6 @@ function envelopeToLiveRunTableRows(envelope: SignalEnvelope): LiveRunTableRow[]
       status: rowStatus(unit),
       errors,
       warnings,
-      duration: formatDuration(unit.durationMs),
       durationMs: unit.durationMs,
     };
   });

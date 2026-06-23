@@ -60,17 +60,26 @@ export type ViewNode =
     }
   /**
    * A column-aligned table. Each row is a list of cell spans — one span per
-   * column (cell N styles column N). Both interpreters pad every cell to its
-   * column's width (the max of the header and all cells in that column), so the
-   * columns line up in a TTY and a pipe alike. `align` is per-column
+   * column (cell N styles column N). Both interpreters render it identically in
+   * the canonical pipe style: cells joined by ` | `, and (when the header
+   * shows) a `-|-` rule beneath it. Every cell is padded to its column's width
+   * — the max of the header, all cells, and the optional per-column `minWidths`
+   * — so the grid lines up in a TTY and a pipe alike. `align` is per-column
    * (`'right'` pads on the left — for numeric/duration columns); default left.
+   *
+   * This is the ONE terminal table renderer (ADR-0058): every tool's results
+   * table and every host list (sessions/tools/history) flows through here, so
+   * tables cannot diverge in style. Producers supply data (cells + column
+   * specs); the interpreters own all separators, padding, and the header rule.
    */
   | {
       readonly kind: 'table';
       readonly columns: readonly string[];
       readonly rows: readonly (readonly Span[])[];
       readonly align?: readonly ('left' | 'right')[];
-      /** When false, suppress the header row (a bare aligned grid). Default true. */
+      /** Per-column minimum width (floor); actual width still grows to fit content. */
+      readonly minWidths?: readonly number[];
+      /** When false, suppress the header row + rule (a bare aligned grid). Default true. */
       readonly showHeader?: boolean;
     }
   /** A next-step hint strip, ` | `-joined, with bolded flag substrings. */
@@ -112,10 +121,16 @@ export function group(children: readonly ViewNode[], indent?: number): ViewNode 
 export function tableColumnWidths(
   columns: readonly string[],
   rows: readonly (readonly Span[])[],
+  minWidths?: readonly number[],
 ): number[] {
   const colCount = Math.max(columns.length, ...rows.map((r) => r.length), 0);
   return Array.from({ length: colCount }, (_, i) =>
-    Math.max(columns[i]?.length ?? 0, ...rows.map((r) => r[i]?.text.length ?? 0), 0),
+    Math.max(
+      columns[i]?.length ?? 0,
+      minWidths?.[i] ?? 0,
+      ...rows.map((r) => r[i]?.text.length ?? 0),
+      0,
+    ),
   );
 }
 
@@ -124,10 +139,12 @@ export function padTableCell(value: string, width: number, align: 'left' | 'righ
   return align === 'right' ? value.padStart(width) : value.padEnd(width);
 }
 
-/** Per-column spec for {@link viewTable}: a header label and optional alignment. */
+/** Per-column spec for {@link viewTable}: a header label, alignment, min width. */
 export interface TableColumnSpec {
   readonly header: string;
   readonly align?: 'left' | 'right';
+  /** Minimum column width (floor); the column still widens to fit content. */
+  readonly minWidth?: number;
 }
 
 /**
@@ -144,11 +161,13 @@ export function viewTable(
   opts?: { readonly showHeader?: boolean },
 ): ViewNode {
   const specs = columns.map((c) => (typeof c === 'string' ? { header: c } : c));
+  const minWidths = specs.map((s) => s.minWidth ?? 0);
   return {
     kind: 'table',
     columns: specs.map((s) => s.header),
     rows,
     align: specs.map((s) => s.align ?? 'left'),
+    ...(minWidths.some((w) => w > 0) ? { minWidths } : {}),
     ...(opts?.showHeader === undefined ? {} : { showHeader: opts.showHeader }),
   };
 }

@@ -88,11 +88,11 @@ describe('envelopeToLiveRunTableRows + liveRunTable', () => {
 
     expect(node).not.toBeNull();
     expect(renderToText(node!)).toMatchInlineSnapshot(`
-      "Unit                                     | Status  | Errors | Warnings | Duration  
+      "Unit                                     | Status  | Errors | Warnings | Duration
       -----------------------------------------|---------|--------|----------|-----------
-      graph.unit.error                         | ERROR   | 0      | 0        | 1m 1.0s   
-      graph.slow.warning                       | FAIL    | 1      | 1        | 31.0s     
-      graph.clean.pass                         | PASS    | 0      | 1        | 0ms       "
+      graph.unit.error                         | ERROR   | 0      | 0        | 1m 1.0s
+      graph.slow.warning                       | FAIL    | 1      | 1        | 31.0s
+      graph.clean.pass                         | PASS    | 0      | 1        | 0ms"
     `);
   });
 

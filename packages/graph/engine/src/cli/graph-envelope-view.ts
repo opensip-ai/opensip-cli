@@ -7,7 +7,7 @@
  */
 
 import { groupSignalsBySource } from '@opensip-cli/contracts';
-import { formatDuration, isErrorSignal } from '@opensip-cli/core';
+import { isErrorSignal } from '@opensip-cli/core';
 
 import type { LiveRunTableRow } from '@opensip-cli/cli-ui';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
@@ -33,7 +33,6 @@ export function envelopeToLiveRunTableRows(envelope: SignalEnvelope): LiveRunTab
       status: rowStatus(unit),
       errors,
       warnings,
-      duration: formatDuration(unit.durationMs),
       durationMs: unit.durationMs,
     };
   });
