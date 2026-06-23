@@ -26,6 +26,44 @@ describe('liveRunTable', () => {
     expect(text).toContain('1.2s');
   });
 
+  it('renders the lean five-column graph table when no validated counts are present', () => {
+    const node = liveRunTable([
+      {
+        unit: 'graph.architecture.cycle',
+        status: 'FAIL',
+        errors: 1,
+        warnings: 0,
+        duration: '0ms',
+        durationMs: 0,
+      },
+    ]);
+    const text = renderToText(node!);
+    expect(text).toContain('Unit');
+    expect(text).toContain('Duration');
+    expect(text).not.toContain('Validated');
+    expect(text).not.toContain('Ignores');
+  });
+
+  it('renders validated and ignores columns for fitness-shaped rows', () => {
+    const node = liveRunTable([
+      {
+        unit: 'dead-code',
+        status: 'FAIL',
+        errors: 1,
+        warnings: 0,
+        duration: '50ms',
+        durationMs: 50,
+        validated: 4,
+        ignored: 0,
+        itemType: 'files',
+      },
+    ]);
+    const text = renderToText(node!);
+    expect(text).toContain('Validated');
+    expect(text).toContain('Ignores');
+    expect(text).toContain('4 files');
+  });
+
   it('sorts failing rows before passing rows', () => {
     const node = liveRunTable([
       {

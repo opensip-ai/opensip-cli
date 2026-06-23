@@ -2,22 +2,55 @@
  * @fileoverview Integration tests for the shared live-run state machine.
  */
 
-import { LanguageRegistry, RunScope, ToolRegistry, runWithScope } from '@opensip-cli/core';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  createRunLogger,
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+  runWithScope,
+} from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runToolLiveView } from '../run-tool-live-view.js';
 
 const ACT_GLOBAL = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 ACT_GLOBAL.IS_REACT_ACT_ENVIRONMENT = true;
 
-function makeScope(): RunScope {
+function makeScope(logger?: ReturnType<typeof createRunLogger>): RunScope {
   return new RunScope({
     languages: new LanguageRegistry(),
     tools: new ToolRegistry(),
+    runId: 'RUN_liveview_test',
+    ...(logger === undefined ? {} : { logger }),
   });
 }
 
+function stderrEvents(calls: readonly string[]): Record<string, unknown>[] {
+  return calls
+    .map((line) => {
+      try {
+        return JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        return undefined;
+      }
+    })
+    .filter((row): row is Record<string, unknown> => row !== undefined);
+}
+
 describe('runToolLiveView', () => {
+  const stderrCalls: string[] = [];
+
+  beforeEach(() => {
+    stderrCalls.length = 0;
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
+      stderrCalls.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   it('returns session and envelope from a successful produce()', async () => {
     const scope = makeScope();
     const completion = await runWithScope(scope, () =>
@@ -105,5 +138,128 @@ describe('runToolLiveView', () => {
     expect(helperSurface?.setHeaderMetadata).toBeTypeOf('function');
     expect(helperSurface?.setShowRunHeader).toBeTypeOf('function');
     expect(workerTransport).toBeTypeOf('function');
+  }, 10_000);
+
+  it('emits cli.liveview.run.start and complete observability events', async () => {
+    const logger = createRunLogger({
+      runId: 'RUN_liveview_test',
+      debugMode: true,
+      silent: false,
+      level: 'info',
+    });
+    const scope = makeScope(logger);
+
+    await runWithScope(scope, () =>
+      runToolLiveView({
+        tool: 'graph',
+        meta: { title: 'Test', description: 'Running' },
+        surface: { shape: 'pool', label: 'Working...' },
+        verbose: false,
+        quiet: true,
+        produce: () =>
+          Promise.resolve({
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+          }),
+      }),
+    );
+
+    const events = stderrEvents(stderrCalls).map((row) => row.evt);
+    expect(events).toContain('cli.liveview.run.start');
+    expect(events).toContain('cli.liveview.run.complete');
+  }, 10_000);
+
+  it('scrubs secrets in error outcomes and logs cli.liveview.run.error', async () => {
+    const logger = createRunLogger({
+      runId: 'RUN_liveview_test',
+      debugMode: true,
+      silent: false,
+      level: 'info',
+    });
+    const scope = makeScope(logger);
+    const setExitCode = vi.fn();
+
+    await runWithScope(scope, () =>
+      runToolLiveView(
+        {
+          tool: 'yagni',
+          meta: { title: 'Test', description: 'Running' },
+          surface: { shape: 'pool', label: 'Working...' },
+          verbose: false,
+          quiet: true,
+          produce: () =>
+            Promise.resolve({
+              kind: 'error',
+              message: `failed api_key=${'x'.repeat(600)}`,
+              exitCode: 2,
+            }),
+        },
+        { setExitCode },
+      ),
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    const errorEvt = stderrEvents(stderrCalls).find((row) => row.evt === 'cli.liveview.run.error');
+    expect(errorEvt?.tool).toBe('yagni');
+    expect(String(errorEvt?.message)).toContain('[redacted]');
+    expect(String(errorEvt?.message).length).toBeLessThanOrEqual(501);
+  }, 10_000);
+
+  it('handles producer rejection without an unhandled rejection', async () => {
+    const logger = createRunLogger({
+      runId: 'RUN_liveview_test',
+      debugMode: true,
+      silent: false,
+      level: 'info',
+    });
+    const scope = makeScope(logger);
+    const setExitCode = vi.fn();
+
+    await runWithScope(scope, () =>
+      runToolLiveView(
+        {
+          tool: 'fit',
+          meta: { title: 'Test', description: 'Running' },
+          surface: { shape: 'pool', label: 'Working...' },
+          verbose: false,
+          quiet: true,
+          produce: () => Promise.reject(new Error('api_key=leaked')),
+        },
+        { setExitCode },
+      ),
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    const errorEvt = stderrEvents(stderrCalls).find((row) => row.evt === 'cli.liveview.run.error');
+    expect(errorEvt?.tool).toBe('fit');
+    expect(String(errorEvt?.message)).toContain('[redacted]');
+  }, 10_000);
+
+  it('writes a trailing newline after the Ink app exits', async () => {
+    const scope = makeScope();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    const writes: unknown[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk, ...args) => {
+      writes.push(chunk);
+      return originalWrite(chunk, ...args);
+    });
+
+    await runWithScope(scope, () =>
+      runToolLiveView({
+        tool: 'sim',
+        meta: { title: 'Test', description: 'Running' },
+        surface: { shape: 'pool', label: 'Working...' },
+        verbose: false,
+        quiet: true,
+        produce: () =>
+          Promise.resolve({
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+          }),
+      }),
+    );
+
+    expect(writes.includes('\n')).toBe(true);
+    stdoutSpy.mockRestore();
   }, 10_000);
 });

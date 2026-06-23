@@ -646,6 +646,12 @@
       "purpose": "How opensip.ai consumes docs/web-generated/ from this repo: backend proxy, frontend route, manifest contract."
     },
     {
+      "file": "docs/web-generated/80-implementation/08-tool-live-view.md",
+      "path": "/docs/opensip-cli/80-implementation/08-tool-live-view/",
+      "section": "80-implementation",
+      "title": "Tool Live View"
+    },
+    {
       "file": "docs/web-generated/80-implementation/architecture-map.md",
       "path": "/docs/opensip-cli/80-implementation/architecture-map/",
       "section": "80-implementation",
@@ -768,6 +774,7 @@
         "/docs/opensip-cli/80-implementation/05-layer-policy/",
         "/docs/opensip-cli/80-implementation/06-doc-conventions/",
         "/docs/opensip-cli/80-implementation/07-website-integration/",
+        "/docs/opensip-cli/80-implementation/08-tool-live-view/",
         "/docs/opensip-cli/80-implementation/architecture-map/"
       ]
     }
@@ -913,6 +920,7 @@
         "/docs/opensip-cli/80-implementation/05-layer-policy/",
         "/docs/opensip-cli/80-implementation/06-doc-conventions/",
         "/docs/opensip-cli/80-implementation/07-website-integration/",
+        "/docs/opensip-cli/80-implementation/08-tool-live-view/",
         "/docs/opensip-cli/80-implementation/architecture-map/"
       ]
     }

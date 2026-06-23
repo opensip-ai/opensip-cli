@@ -405,18 +405,24 @@ This is the mechanical realization of "only use documented seams".
 ```
 core (kernel)
   ↑
-contracts (Tool↔runner contract facade)
+contracts / cli-ui / datastore / tree-sitter (layer 2)
   ↑
-lang-* / fitness / simulation (peer layer)
+cli-live / output / config / targeting / lang-* / dashboard (layer 3)
   ↑
-checks-* (depend on fitness)
+fitness / graph / simulation / yagni (layer 4 — tool engines)
   ↑
-cli (entry point — depends on every tool)
+checks-* / graph-* (layer 5)
+  ↑
+cli (layer 6 — composition root; depends on every tool)
 ```
 
 - core must NOT import from contracts, cli, fitness, simulation, lang-_, or checks-_.
 - contracts must NOT import from cli, fitness, simulation, lang-_, or checks-_.
-- fitness / simulation must NOT import from cli (would create a cycle).
+- `cli-ui` is presentational only (layer 2): Banner, Spinner, `<LiveRun>`,
+  `liveRunTable`, theme — no `core` or `contracts`.
+- `cli-live` (layer 3) owns `runToolLiveView`; all four bundled tools render
+  through it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
+- fitness / graph / simulation / yagni must NOT import from cli (would create a cycle).
 - check packs must NOT import from cli or contracts.
 - lang-\* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`

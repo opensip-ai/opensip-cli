@@ -6,7 +6,7 @@ export default mergeConfig(
   vitestBase,
   defineConfig({
     test: {
-      include: ['src/**/*.test.ts'],
+      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
       passWithNoTests: true,
       coverage: {
         include: ['src/**'],
