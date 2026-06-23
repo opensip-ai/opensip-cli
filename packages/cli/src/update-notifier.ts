@@ -147,7 +147,6 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
     if (fresh && isNewerVersion(fresh.latest, fresh.current)) {
       writeKnownLatest(fresh.latest, opts.stateFile);
     }
-    // @fitness-ignore-next-line error-handling-quality -- the update fetch is best-effort cosmetic: any failure (corrupt cache, network helper error) must degrade silently, never break the user's command. The sticky store below still drives display from whatever was last known.
   } catch {
     // Intentionally swallow — see the directive above. Display falls through
     // to readKnownLatest, so a failed fetch just shows the last known state.

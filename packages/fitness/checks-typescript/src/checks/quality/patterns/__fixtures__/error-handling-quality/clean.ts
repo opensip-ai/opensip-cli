@@ -1,6 +1,6 @@
 import { logger } from './logger.js'
 
-export function tryParse(raw: string): unknown {
+export function loadConfigJson(raw: string): unknown {
   try {
     return JSON.parse(raw)
   } catch (err) {

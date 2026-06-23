@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- best-effort cloud egress (ADR-0008): repo-identity detection and signal emission degrade silently (no git, network error). A cloud failure never blocks, slows, or fails the user's run.
 /**
  * deliver-envelope — the composition root's signal-delivery step (ADR-0011,
  * Phase 3).

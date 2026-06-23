@@ -145,7 +145,6 @@ function readCargoPackageName(projectDirAbs: string): string | null {
   try {
     content = readFileSync(join(projectDirAbs, 'Cargo.toml'), 'utf8');
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- missing/unreadable Cargo.toml is the expected "no package name" signal for projects that aren't a Cargo crate; caller treats null as "skip package-name resolution".
     return null;
   }
   let inPackage = false;

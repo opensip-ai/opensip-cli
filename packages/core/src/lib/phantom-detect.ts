@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- isPhantomDir/safeIsDirectory are filesystem probes where exception → false is the function's contract; the caller treats absence/permission errors identically to "not a phantom dir".
 /**
  * @fileoverview Detect orphaned `opensip-cli/` subtrees between cwd
  * and the discovered project root. These are fossils from pre-discovery

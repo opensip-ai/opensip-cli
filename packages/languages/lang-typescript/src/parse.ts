@@ -17,7 +17,6 @@ export function parseSource(content: string, filePath: string): ts.SourceFile | 
       ts.ScriptKind.TSX,
     );
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- defensive parse-or-null helper; ts.createSourceFile is permissive (recovers from syntax errors) and effectively does not throw on real input, so caller's null-check is belt-and-suspenders.
     return null;
   }
 }

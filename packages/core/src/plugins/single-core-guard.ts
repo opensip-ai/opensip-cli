@@ -36,7 +36,6 @@ const selfCorePath: string | undefined = (() => {
     return createRequire(import.meta.url).resolve('@opensip-cli/core');
   } catch {
     /* v8 ignore next 2 -- core resolves from itself; defensive only */
-    // @fitness-ignore-next-line error-handling-quality -- an unresolvable self-core disables the guard (fail-open), not an error.
     return;
   }
 })();
@@ -51,7 +50,6 @@ function resolveCoreFromAnchor(anchor: string): string | undefined {
   try {
     return createRequire(anchor).resolve('@opensip-cli/core');
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- resolution probe: no core dep is "no foreign core → allow".
     return undefined;
   }
 }
@@ -61,7 +59,6 @@ function resolveFitnessFromAnchor(anchor: string): string | undefined {
   try {
     return createRequire(anchor).resolve('@opensip-cli/fitness');
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- resolution probe: no fitness dep is fine for non-fit packs.
     return undefined;
   }
 }
@@ -78,7 +75,6 @@ function coreVersionFromManifest(manifestPath: string): string | undefined {
     if (record.name !== '@opensip-cli/core' || typeof record.version !== 'string') return undefined;
     return record.version;
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- malformed manifest → version unknown → treated as foreign by the caller.
     return undefined;
   }
 }

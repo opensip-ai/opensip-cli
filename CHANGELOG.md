@@ -26,6 +26,9 @@ tightens graph and release guardrails.
 - Tightened the `result-pattern-consistency` check: registration guards,
   fluent-builder preconditions, exhaustiveness probes, and expanded
   infrastructure-path detection; removed 27 stale waivers.
+- Tightened the `error-handling-quality` check: disambiguate `Result.match`
+  from `String.match`, probe-function contracts, and composition-root path
+  allowances; removed 52 stale waivers (budget 54 → 2).
 
 ### Fixed
 

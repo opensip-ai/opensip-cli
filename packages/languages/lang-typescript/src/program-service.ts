@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- the ParseConfigHost.readFile shim returns undefined when TS asks about a vanished referenced file (TS treats undefined as "skip"); intentional per the ts.ParseConfigHost contract, not a silent error swallow.
 // @fitness-ignore-file unbounded-memory -- readFileSync reads tsconfig.json files only, bounded by the standard TS configuration shape (mirrors graph-typescript/src/discover.ts).
 /**
  * @fileoverview Shared TypeScript type-checked Program service.

@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- best-effort repo-identity detection (ADR-0008): a missing git binary, a non-repo cwd, or a spawn failure must degrade silently to an undefined field; it never blocks, slows, or fails the user's run.
 /**
  * resolveRepoIdentity — best-effort git repo identity (HEAD sha + origin
  * remote) for cloud signal egress (ADR-0008).

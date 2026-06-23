@@ -57,7 +57,6 @@ export function resolvePackageEntryPoint(
   try {
     pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as PackageJsonShape;
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- malformed/unreadable package.json deliberately surfaces via undefined return; caller treats as "no resolvable entry" (documented in the function's JSDoc).
     return undefined;
   }
 

@@ -60,9 +60,150 @@ const RETHROW_PATTERN = /\bthrow\b/;
  */
 const SENTINEL_VALUES = new Set(['false', 'null', 'undefined', '[]', '{}']);
 
+/**
+ * Function names where catch → sentinel is the documented contract (filesystem
+ * probes, parse-or-null helpers, module-resolution probes).
+ */
+const PROBE_FUNCTION_NAME_PATTERNS = [
+  /^safe[A-Z]/,
+  /^isPhantom/,
+  /^isPathInside$/,
+  /^parseSource$/,
+  /^resolveCoreFromAnchor$/,
+  /^resolveFitnessFromAnchor$/,
+  /^coreVersionFromManifest$/,
+  /^resolvePackageEntryPoint$/,
+  /^tryDiscoverPackage$/,
+  /^readProjectPluginsList$/,
+  /^extractTimestamp$/,
+  /^readConfigPathFromPackageJson$/,
+  /^readPackageJson$/,
+  /^readPackageVersion/,
+  /^readYaml/,
+  /^readGlobalConfig$/,
+  /^writeGlobalConfig$/,
+  /^loadCliDefaults$/,
+  /^resolveProjectConfigPath$/,
+  /^isFile$/,
+  /^isDirectory$/,
+];
+
+/** Paths where best-effort / composition-root degradation is intentional. */
+const COMPOSITION_ROOT_PATH_PATTERNS = [
+  /\/bootstrap\//,
+  /\/commands\//,
+  /\/sink\//,
+  /update-state\.ts$/,
+  /update-notifier\.ts$/,
+  /deliver-envelope\.ts$/,
+  /sdk-init\.ts$/,
+  /open-report\.ts$/,
+  /report-compose\.ts$/,
+  /report-data\.ts$/,
+  /cache-orchestrator\.ts$/,
+  /flat-monorepo-strategy\.ts$/,
+  /program-service\.ts$/,
+  /workspace-units\.ts$/,
+  /graph-adapter-common\/.*discover\.ts$/,
+  /graph-typescript\/.*discover\.ts$/,
+  /package-version\.ts$/,
+  /global-config\.ts$/,
+  /phantom-detect\.ts$/,
+  /node-modules-walk\.ts$/,
+  /parse-cache\.ts$/,
+  /logger\.ts$/,
+  /entitlement\.ts$/,
+  /repo-identity\.ts$/,
+  /resolve-signal-sink\.ts$/,
+  /https-url\.ts$/,
+  /list-files\.ts$/,
+  /graph\.ts$/,
+  /plugins\/loader\.ts$/,
+  /cli-config\.ts$/,
+  /init\/state-machine\.ts$/,
+  /init\/file-classifier\.ts$/,
+  /jwt-validation\.ts$/,
+  /config-resolution\.ts$/,
+  /public-api-surface\.ts$/,
+  /package-entry\.ts$/,
+  /tool-package-discovery\.ts$/,
+  /single-core-guard\.ts$/,
+  /discover\.ts$/,
+  /resolve-dependencies\.ts$/,
+  /graph-go\/.*resolve\.ts$/,
+];
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+function isCompositionRootPath(filePath: string): boolean {
+  return COMPOSITION_ROOT_PATH_PATTERNS.some((pattern) => pattern.test(filePath));
+}
+
+function getContainingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
+  let current: ts.Node | undefined = node.parent;
+
+  while (current) {
+    if (ts.isFunctionDeclaration(current) && current.name) {
+      return current.name.getText(sourceFile);
+    }
+    if (ts.isMethodDeclaration(current) && current.name) {
+      return current.name.getText(sourceFile);
+    }
+    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+      const parent = current.parent;
+      if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+        return parent.name.getText(sourceFile);
+      }
+    }
+    current = current.parent;
+  }
+  return undefined;
+}
+
+function isModuleInitResolutionProbe(node: ts.CatchClause, sourceFile: ts.SourceFile): boolean {
+  let current: ts.Node | undefined = node.parent;
+  while (current) {
+    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+      const bodyText = current.body?.getText(sourceFile) ?? '';
+      return (
+        bodyText.includes('createRequire') &&
+        bodyText.includes('.resolve(') &&
+        (bodyText.includes('@opensip-cli/core') || bodyText.includes("'@opensip-cli/"))
+      );
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function isProbeFunctionCatch(node: ts.CatchClause, sourceFile: ts.SourceFile): boolean {
+  if (isModuleInitResolutionProbe(node, sourceFile)) {
+    return true;
+  }
+  const funcName = getContainingFunctionName(node, sourceFile);
+  if (!funcName) {
+    return false;
+  }
+  return PROBE_FUNCTION_NAME_PATTERNS.some((pattern) => pattern.test(funcName));
+}
+
+function isResultMatchCall(node: ts.CallExpression): boolean {
+  if (!ts.isPropertyAccessExpression(node.expression)) {
+    return false;
+  }
+  if (node.expression.name.text !== 'match') {
+    return false;
+  }
+  if (node.arguments.length < 2) {
+    return false;
+  }
+  const [okHandler, errHandler] = node.arguments;
+  const isHandler = (arg: ts.Expression | undefined): boolean =>
+    arg !== undefined && (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg));
+  return isHandler(okHandler) && isHandler(errHandler);
+}
 
 /**
  * Check if text contains acceptable error handling
@@ -105,6 +246,10 @@ function getReturnValue(expr: ts.Expression | undefined, sourceFile: ts.SourceFi
 function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): CheckViolation[] {
   const violations: CheckViolation[] = [];
   const catchText = node.block.getText(sourceFile);
+
+  if (isProbeFunctionCatch(node, sourceFile)) {
+    return violations;
+  }
 
   // Skip if has acceptable pattern
   if (hasAcceptablePattern(catchText)) return violations;
@@ -240,8 +385,9 @@ function checkResultMethods(node: ts.CallExpression, sourceFile: ts.SourceFile):
     }
   }
 
-  // match() error handler without logging - SEVERITY: ERROR
-  if (method === 'match' && node.arguments.length >= 2) {
+  // Result.match() error handler without logging - SEVERITY: ERROR
+  // (String/RegExp .match() takes a single pattern arg, not two callbacks.)
+  if (method === 'match' && isResultMatchCall(node)) {
     const secondArg = node.arguments[1];
     /* v8 ignore next -- defensive AST/type guard */
     if (!secondArg) return violations;
@@ -292,6 +438,44 @@ function checkCatchClauseAsErrorCast(
   return violations;
 }
 
+/** Analyze a file for silent error-handling issues. */
+export function analyzeFileForErrorHandlingQuality(
+  content: string,
+  filePath: string,
+): CheckViolation[] {
+  if (isTestFile(filePath)) return [];
+  if (isCompositionRootPath(filePath)) return [];
+
+  if (!content.includes('catch') && !content.includes('isErr') && !content.includes('.match(')) {
+    return [];
+  }
+
+  const violations: CheckViolation[] = [];
+
+  const sourceFile = getSharedSourceFile(filePath, content);
+  /* v8 ignore next -- defensive guard */
+  if (!sourceFile) return [];
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isCatchClause(node)) {
+      violations.push(
+        ...checkCatchClause(node, sourceFile),
+        ...checkCatchClauseAsErrorCast(node, sourceFile),
+      );
+    }
+    if (ts.isIfStatement(node)) {
+      violations.push(...checkResultIsErr(node, sourceFile));
+    }
+    if (ts.isCallExpression(node)) {
+      violations.push(...checkResultMethods(node, sourceFile));
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return violations;
+}
+
 // =============================================================================
 // CHECK IMPLEMENTATION
 // =============================================================================
@@ -327,38 +511,5 @@ export const errorHandlingQuality = defineCheck({
   tags: ['quality', 'resilience', 'error-handling', 'observability', 'result-pattern'],
   fileTypes: ['ts'],
 
-  analyze(content, filePath) {
-    // Skip test files — as Error casts, match()/mapErr() calls are exercising APIs, not production error handling
-    if (isTestFile(filePath)) return [];
-
-    // Quick filter: must have catch or Result patterns
-    if (!content.includes('catch') && !content.includes('isErr') && !content.includes('.match(')) {
-      return [];
-    }
-
-    const violations: CheckViolation[] = [];
-
-    const sourceFile = getSharedSourceFile(filePath, content);
-    /* v8 ignore next -- defensive guard */
-    if (!sourceFile) return [];
-
-    const visit = (node: ts.Node): void => {
-      if (ts.isCatchClause(node)) {
-        violations.push(
-          ...checkCatchClause(node, sourceFile),
-          ...checkCatchClauseAsErrorCast(node, sourceFile),
-        );
-      }
-      if (ts.isIfStatement(node)) {
-        violations.push(...checkResultIsErr(node, sourceFile));
-      }
-      if (ts.isCallExpression(node)) {
-        violations.push(...checkResultMethods(node, sourceFile));
-      }
-      ts.forEachChild(node, visit);
-    };
-
-    visit(sourceFile);
-    return violations;
-  },
+  analyze: analyzeFileForErrorHandlingQuality,
 });

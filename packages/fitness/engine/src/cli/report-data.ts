@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- report-data collection is a best-effort UX action: signalers-config load failures degrade gracefully to ungoverned mode (surfaced separately by the fitness run). The CLI composition root owns file-writing and browser launch; this module only contributes fitness's catalog inputs.
 /**
  * report-data contribution — fitness's inputs to the cross-tool HTML
  * report.

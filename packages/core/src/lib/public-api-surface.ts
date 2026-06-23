@@ -129,7 +129,6 @@ function readPackageJson(pkgJsonPath: string): Record<string, unknown> | null {
   try {
     pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- malformed/unreadable package.json deliberately surfaces via null return; caller treats absence as "no public-API surface info available" and falls back to broad scanning.
     return null;
   }
   if (typeof pkg !== 'object' || pkg === null) return null;
@@ -323,7 +322,6 @@ function fileExists(p: string): boolean {
   try {
     return statSync(p).isFile();
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- filesystem probe; exception → false is the function's contract (missing path or permission denied means "not a file", same as truly absent).
     return false;
   }
 }

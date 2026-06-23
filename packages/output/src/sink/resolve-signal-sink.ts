@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- best-effort sink selection + first-run notice (ADR-0008): a failed marker read/write just re-shows the notice, and the entitlement/egress paths degrade silently. Cloud sync never blocks the user's run.
 /**
  * resolveSignalSink — choose the SignalSink for a run (ADR-0008).
  *

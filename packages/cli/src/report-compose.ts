@@ -160,7 +160,6 @@ async function collectExternalReportData(
       error: error instanceof Error ? error.message : String(error),
       msg: 'External tool report-data worker failed; its contribution is omitted (the report still renders).',
     });
-    // @fitness-ignore-next-line error-handling-quality -- the failure IS logged via log.warn just above; an external report-data worker fault is best-effort by contract (parity with a tool that omits collectReportData): the report still renders for every other tool. NEVER an in-host fallback (that would run untrusted code).
     return undefined;
   }
 }

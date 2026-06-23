@@ -108,7 +108,6 @@ export function warnIfInsecureOtlpEndpoint(endpoint: string): void {
   try {
     url = new URL(endpoint);
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- a malformed endpoint is the exporter's failure to surface; nothing actionable to warn here.
     return;
   }
   // Only plaintext http is the leak we warn on. https is secure; any other scheme

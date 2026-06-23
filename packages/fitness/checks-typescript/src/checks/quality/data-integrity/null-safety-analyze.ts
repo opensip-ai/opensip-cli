@@ -199,7 +199,6 @@ export async function analyzeFileConvention(
     const content = await files.read(filePath);
     return analyzeNullSafety(content, filePath);
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- an unreadable target file is an expected skip (the engine's own analyze mode does the same — see define-check.ts executeAnalyzeMode); a pure check has no actionable error to surface here.
     return []; // unreadable file — skip, matching per-file analyze resilience
   }
 }
