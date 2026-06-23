@@ -5,12 +5,12 @@
     "batch-operation-limits": 53,
     "error-handling-quality": 54,
     "detached-promises": 52,
-    "performance-anti-patterns": 37,
+    "performance-anti-patterns": 38,
     "unbounded-memory": 23,
     "toctou-race-condition": 14
   },
   "cosmetic": {
-    "file-length-limit": 26,
+    "file-length-limit": 0,
     "module-coupling-fan-out": 6,
     "project-readme-existence": 12
   }

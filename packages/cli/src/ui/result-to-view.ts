@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- the one result→view dispatch switch grows a case per CommandResult variant; the view BODIES already live in ui/views/* (init, misc, plugin, tools) and cli-ui, so what remains is the irreducible switch + shared envelope-table helpers. Splitting the switch would fragment the single dispatch surface (cf. command-results.ts's identical waiver for the union itself).
 /**
  * resultToView — the single `CommandResult → ViewNode` mapping.
  *

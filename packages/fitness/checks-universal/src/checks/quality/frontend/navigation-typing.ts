@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 /**
  * @fileoverview Navigation Typing Check
  *
