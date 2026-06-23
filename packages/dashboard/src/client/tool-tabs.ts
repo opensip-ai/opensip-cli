@@ -163,15 +163,23 @@ interface YagniDetectorEntry {
   requiresGraph?: boolean;
 }
 
-// Render the bundled YAGNI detectors as rows (slug + graph badge + description).
-// Only invoked when the catalog is non-empty (renderToolTab shows a graceful
-// empty state otherwise).
+// Reused badge style for a neutral "source"-style pill (matches graph's catalog
+// Source column). The graph-evidence pill uses the yagni accent instead.
+const NEUTRAL_BADGE = 'background:var(--bg-hover);color:var(--text-muted)';
+const GRAPH_EVIDENCE_BADGE = 'background:rgba(111,159,176,0.15);color:var(--accent-yagni)';
+
+// Render the bundled YAGNI detectors as a data-table card — same shape as the
+// graph rule catalog (Code Graph › Catalog): a column header row + a per-row
+// Source badge, with an Evidence column (graph vs static) where graph shows
+// Default Severity. Only invoked when the catalog is non-empty (the YAGNI tab
+// shows a graceful empty state otherwise).
 function renderYagniDetectorsCatalog(
   container: HTMLElement,
   catalogData: readonly unknown[],
 ): void {
   // A short summary line above the table — detector count + how many need the
-  // call graph. yagniSummary is null when yagni contributed no data.
+  // call graph (mirrors fit's "N total checks …" count). yagniSummary is null
+  // when yagni contributed no data.
   if (yagniSummary) {
     const parts: string[] = [];
     if (typeof yagniSummary.detectorCount === 'number')
@@ -185,25 +193,38 @@ function renderYagniDetectorsCatalog(
   }
 
   const detectors = catalogData as readonly YagniDetectorEntry[];
-  const table = el('table', { class: 'session-table' });
+  const table = el('table', { class: 'data-table' });
+  const thead = el('thead');
+  const headerRow = el('tr');
+  ['Detector', 'Description', 'Evidence', 'Source'].forEach((h) => {
+    headerRow.append(el('th', { text: h }));
+  });
+  thead.append(headerRow);
+  table.append(thead);
+
   const tbody = el('tbody');
   [...detectors]
     .sort((a, b) => a.slug.localeCompare(b.slug))
     .forEach((d) => {
       const row = el('tr');
-      const nameCell = el('td');
-      nameCell.append(el('strong', { text: d.slug }));
-      if (d.requiresGraph)
-        nameCell.append(el('span', { class: 'badge', text: 'graph', style: 'margin-left:8px' }));
-      if (d.description)
-        nameCell.append(
-          el('div', { class: 'muted', style: 'font-size:12px', text: d.description }),
-        );
-      row.append(nameCell);
+      row.append(el('td', { text: d.slug, style: 'font-weight:500' }));
+      row.append(el('td', { text: d.description ?? '', style: 'color:var(--text-muted)' }));
+      const evidenceCell = el('td');
+      evidenceCell.append(
+        el('span', {
+          class: 'badge',
+          style: d.requiresGraph ? GRAPH_EVIDENCE_BADGE : NEUTRAL_BADGE,
+          text: d.requiresGraph ? 'graph' : 'static',
+        }),
+      );
+      row.append(evidenceCell);
+      const sourceCell = el('td');
+      sourceCell.append(el('span', { class: 'badge', style: NEUTRAL_BADGE, text: 'built-in' }));
+      row.append(sourceCell);
       tbody.append(row);
     });
   table.append(tbody);
-  container.append(table);
+  container.append(el('div', { class: 'card' }, [table]));
 }
 
 // Yagni has no recipe namespace, so it uses a two-subtab shape (Sessions |

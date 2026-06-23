@@ -71,7 +71,7 @@ describe('renderYagniTab', () => {
     ]);
   });
 
-  it('renders one row per detector with a graph badge for graph-backed detectors', () => {
+  it('renders a data-table card with one row per detector, mirroring the graph catalog', () => {
     const panel = loadEnv().render(
       [
         { id: '1', slug: 'unused-export', description: 'Export with no importers' },
@@ -88,12 +88,23 @@ describe('renderYagniTab', () => {
     // Summary line reflects the counts.
     expect(catalog.querySelector('.muted')?.textContent).toContain('2 detectors');
     expect(catalog.querySelector('.muted')?.textContent).toContain('1 graph-backed');
-    // Detectors are sorted by slug; both slugs render.
-    const slugs = [...catalog.querySelectorAll('tbody tr strong')].map((s) => s.textContent);
+    // Same structural shape as the graph rule catalog: a data-table inside a card.
+    expect(catalog.querySelector('.card table.data-table')).not.toBeNull();
+    // Column headers match the graph catalog's shape (Severity → Evidence).
+    const headers = [...catalog.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(headers).toEqual(['Detector', 'Description', 'Evidence', 'Source']);
+    // Detectors are sorted by slug; the first cell of each row is the slug.
+    const slugs = [...catalog.querySelectorAll('tbody tr td:first-child')].map((c) => c.textContent);
     expect(slugs).toEqual(['unreferenced-symbol', 'unused-export']);
-    // Only the graph-backed detector carries the 'graph' badge.
-    const badges = [...catalog.querySelectorAll('tbody tr .badge')].map((b) => b.textContent);
-    expect(badges).toEqual(['graph']);
+    // First row is the graph-backed detector → Evidence 'graph'; both rows are 'built-in'.
+    const evidence = [...catalog.querySelectorAll('tbody tr td:nth-child(3) .badge')].map(
+      (b) => b.textContent,
+    );
+    expect(evidence).toEqual(['graph', 'static']);
+    const sources = [...catalog.querySelectorAll('tbody tr td:nth-child(4) .badge')].map(
+      (b) => b.textContent,
+    );
+    expect(sources).toEqual(['built-in', 'built-in']);
   });
 
   it('shows a graceful empty state when no detectors are available', () => {
