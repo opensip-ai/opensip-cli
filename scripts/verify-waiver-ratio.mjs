@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BUDGET_PATH = join(REPO_ROOT, '.config/waiver-budget.json');
+const CATALOG_JSON_PATH = join(REPO_ROOT, 'docs/internal/suppression-catalog.json');
 
 const SAFETY_SLUGS = new Set([
   'error-handling-quality',
@@ -98,6 +99,27 @@ function main() {
 
   log('safety waiver budget OK (no net-new)');
   log('suppression triage matrix: docs/internal/suppression-triage.md');
+
+  try {
+    const catalog = JSON.parse(readFileSync(CATALOG_JSON_PATH, 'utf8'));
+    const audit = catalog.phase4Audit;
+    if (audit) {
+      const d = audit.delta;
+      log(
+        `phase-4 catalog delta: product-runtime combined ${d.productRuntimeCombined} (now ${catalog.summary.productRuntimeCombined})`,
+      );
+      if (audit.reopenCandidates?.length > 0) {
+        log(
+          `phase-4 reopen triage: ${audit.reopenCandidates.length} slug(s) >5 without pure (b) disposition`,
+        );
+      }
+      if (audit.successCriteria?.sc6Met === true) {
+        log(`phase-4 SC6 met: product-runtime safety ${audit.successCriteria.sc6ProductRuntimeSafetyActual} ≤ 143`);
+      }
+    }
+  } catch {
+    log('phase-4 catalog summary: run node scripts/catalog-suppressions.mjs to refresh');
+  }
 }
 
 main();

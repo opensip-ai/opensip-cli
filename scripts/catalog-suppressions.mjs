@@ -43,6 +43,20 @@ const COSMETIC_SLUGS = new Set([
 
 const BUDGETED_SLUGS = new Set([...SAFETY_SLUGS, ...COSMETIC_SLUGS]);
 
+/**
+ * Phase 0 baseline (suppression-triage-and-reduction spec, pre-program counts).
+ * Used for Phase 4 residual-audit delta reporting.
+ */
+const PHASE0_BASELINE = {
+  productRuntimeFitness: 305,
+  productRuntimeGraph: 7,
+  productRuntimeCombined: 312,
+  budgetGateFitness: 542,
+  checkPackageFitness: 234,
+  productRuntimeSafetyTotal: 183,
+  budgetGateSafetyTotal: 234,
+};
+
 /** Primary triage disposition from suppression-triage-and-reduction spec. */
 const TRIAGE_DISPOSITION = {
   'error-handling-quality': 'c',
@@ -65,7 +79,28 @@ const TRIAGE_DISPOSITION = {
   'public-api-jsdoc': 'a',
   'graph:cycle': 'b',
   'graph:always-throws-branch': 'b',
+  'concurrency-safety': 'b',
+  'env-secret-exposure': 'b',
+  'env-via-registry': 'b',
+  'error-handling-suite': 'b',
+  'module-coupling-metrics': 'b',
+  'no-direct-stdout-in-tool-engine': 'b',
+  'no-markdown-references': 'b',
+  'only-documented-toolcli-seams': 'b',
+  'unsafe-secret-comparison': 'b',
+  'array-validation': 'b',
+  'clean-code-naming-quality': 'b',
+  'eslint-backend': 'b',
+  'interface-implementation-consistency': 'b',
+  'no-raw-fetch': 'b',
+  'no-unbounded-concurrency': 'b',
+  'one-outcome-shape': 'b',
+  'semgrep-scan': 'b',
+  'stream-buffer-size-limits': 'b',
+  'zod-schema-strictness': 'b',
 };
+
+const PHASE4_REOPEN_THRESHOLD = 5;
 
 const log = (msg) => console.error(`[catalog-suppressions] ${msg}`);
 
@@ -273,11 +308,74 @@ function buildCatalog({ collectRecords = false } = {}) {
     ),
   };
 
+  catalog.phase4Audit = buildPhase4Audit(catalog);
+
   return catalog;
 }
 
 function sortedEntries(obj) {
   return Object.entries(obj).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function dispositionForSlug(slug) {
+  return TRIAGE_DISPOSITION[slug] ?? 'TBD';
+}
+
+function isPureAcceptedDisposition(disp) {
+  return disp === 'b';
+}
+
+function buildPhase4Audit(catalog) {
+  const pr = catalog.layers['product-runtime'];
+  const reopenCandidates = [];
+  const acceptedHighCount = [];
+
+  const auditSlug = (slug, count, kind) => {
+    if (count <= PHASE4_REOPEN_THRESHOLD) return;
+    const disposition = dispositionForSlug(slug);
+    const row = { slug, count, disposition, kind };
+    if (isPureAcceptedDisposition(disposition)) {
+      acceptedHighCount.push(row);
+    } else {
+      reopenCandidates.push(row);
+    }
+  };
+
+  for (const [slug, count] of Object.entries(pr.fitness.bySlug)) {
+    auditSlug(slug, count, 'fitness');
+  }
+  for (const [ruleId, count] of Object.entries(pr.graph.byRuleId)) {
+    auditSlug(ruleId, count, 'graph');
+  }
+
+  reopenCandidates.sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug));
+
+  const delta = {
+    productRuntimeFitness:
+      catalog.summary.productRuntimeFitness - PHASE0_BASELINE.productRuntimeFitness,
+    productRuntimeGraph: catalog.summary.productRuntimeGraph - PHASE0_BASELINE.productRuntimeGraph,
+    productRuntimeCombined:
+      catalog.summary.productRuntimeCombined - PHASE0_BASELINE.productRuntimeCombined,
+    budgetGateFitness: catalog.summary.budgetGateFitness - PHASE0_BASELINE.budgetGateFitness,
+    checkPackageFitness:
+      catalog.summary.checkPackageFitness - PHASE0_BASELINE.checkPackageFitness,
+    productRuntimeSafetyTotal:
+      catalog.summary.productRuntimeSafetyTotal - PHASE0_BASELINE.productRuntimeSafetyTotal,
+    budgetGateSafetyTotal:
+      catalog.summary.budgetGateSafetyTotal - PHASE0_BASELINE.budgetGateSafetyTotal,
+  };
+
+  return {
+    baseline: PHASE0_BASELINE,
+    delta,
+    reopenCandidates,
+    acceptedHighCount,
+    successCriteria: {
+      sc6ProductRuntimeSafetyTarget: 143,
+      sc6ProductRuntimeSafetyActual: catalog.summary.productRuntimeSafetyTotal,
+      sc6Met: catalog.summary.productRuntimeSafetyTotal <= 143,
+    },
+  };
 }
 
 function renderTriageMarkdown(catalog) {
@@ -332,7 +430,7 @@ function renderTriageMarkdown(catalog) {
   );
   for (const [slug, count] of sortedEntries(pr.fitness.bySlug)) {
     const budgeted = BUDGETED_SLUGS.has(slug) ? 'yes' : 'no';
-    const disp = TRIAGE_DISPOSITION[slug] ?? 'TBD';
+    const disp = dispositionForSlug(slug);
     lines.push(`| \`${slug}\` | ${count} | ${budgeted} | ${disp} |`);
   }
   lines.push(
@@ -356,6 +454,59 @@ function renderTriageMarkdown(catalog) {
   for (const [pkg, count] of sortedEntries(pr.fitness.byPackage).slice(0, 12)) {
     lines.push(`| \`${pkg}\` | ${count} |`);
   }
+
+  const audit = catalog.phase4Audit;
+  const fmtDelta = (n) => (n > 0 ? `+${n}` : String(n));
+  lines.push(
+    '',
+    '## Phase 0 → current delta',
+    '',
+    '| Metric | Phase 0 | Current | Δ |',
+    '|--------|--------:|--------:|--:|',
+    `| Product-runtime \`@fitness-ignore\` | ${audit.baseline.productRuntimeFitness} | ${catalog.summary.productRuntimeFitness} | ${fmtDelta(audit.delta.productRuntimeFitness)} |`,
+    `| Product-runtime \`@graph-ignore\` | ${audit.baseline.productRuntimeGraph} | ${catalog.summary.productRuntimeGraph} | ${fmtDelta(audit.delta.productRuntimeGraph)} |`,
+    `| Product-runtime combined | ${audit.baseline.productRuntimeCombined} | ${catalog.summary.productRuntimeCombined} | ${fmtDelta(audit.delta.productRuntimeCombined)} |`,
+    `| Budget-gate \`@fitness-ignore\` | ${audit.baseline.budgetGateFitness} | ${catalog.summary.budgetGateFitness} | ${fmtDelta(audit.delta.budgetGateFitness)} |`,
+    `| Check-package | ${audit.baseline.checkPackageFitness} | ${catalog.summary.checkPackageFitness} | ${fmtDelta(audit.delta.checkPackageFitness)} |`,
+    `| Product-runtime safety total | ${audit.baseline.productRuntimeSafetyTotal} | ${catalog.summary.productRuntimeSafetyTotal} | ${fmtDelta(audit.delta.productRuntimeSafetyTotal)} |`,
+    `| Budget-gate safety total | ${audit.baseline.budgetGateSafetyTotal} | ${catalog.summary.budgetGateSafetyTotal} | ${fmtDelta(audit.delta.budgetGateSafetyTotal)} |`,
+    '',
+    `SC6 (product-runtime safety ≤ 143): **${audit.successCriteria.sc6Met ? 'met' : 'NOT met'}** (actual ${audit.successCriteria.sc6ProductRuntimeSafetyActual})`,
+    '',
+    '## Phase 4 residual audit',
+    '',
+    `Slugs with **>${PHASE4_REOPEN_THRESHOLD}** product-runtime suppressions and disposition other than pure **(b)** are reopened for triage:`,
+    '',
+  );
+  if (audit.reopenCandidates.length === 0) {
+    lines.push('_None — all high-count buckets are accepted (b) or at/under threshold._', '');
+  } else {
+    lines.push(
+      '| Slug | Count | Disposition | Kind | Next action |',
+      '|------|------:|:-----------:|:----:|-------------|',
+    );
+    for (const row of audit.reopenCandidates) {
+      const action =
+        row.disposition === 'c' || row.disposition === 'b/c'
+          ? 'Further heuristic tightening (future release)'
+          : row.disposition === 'a/b'
+            ? 'Spot-fix @throws / docs where cheap; keep remainder waived'
+            : 'Assign disposition in TRIAGE_DISPOSITION';
+      lines.push(
+        `| \`${row.slug}\` | ${row.count} | ${row.disposition} | ${row.kind} | ${action} |`,
+      );
+    }
+    lines.push('');
+  }
+  if (audit.acceptedHighCount.length > 0) {
+    lines.push(
+      '**Accepted high-count buckets (disposition b, no reopen):**',
+      '',
+      audit.acceptedHighCount.map((r) => `- \`${r.slug}\` (${r.count})`).join('\n'),
+      '',
+    );
+  }
+
   lines.push(
     '',
     '## Disposition key',
@@ -449,6 +600,19 @@ function main() {
   log(
     `product-runtime: ${catalog.summary.productRuntimeFitness} fitness + ${catalog.summary.productRuntimeGraph} graph = ${catalog.summary.productRuntimeCombined}`,
   );
+  log(
+    `phase-4 delta: product-runtime combined ${catalog.phase4Audit.delta.productRuntimeCombined} (baseline ${catalog.phase4Audit.baseline.productRuntimeCombined})`,
+  );
+  if (catalog.phase4Audit.reopenCandidates.length > 0) {
+    log(
+      `phase-4 reopen: ${catalog.phase4Audit.reopenCandidates.length} slug(s) >${PHASE4_REOPEN_THRESHOLD} without pure (b) — see docs/internal/suppression-triage.md`,
+    );
+    for (const row of catalog.phase4Audit.reopenCandidates) {
+      log(`  ${row.slug}: ${row.count} (${row.disposition})`);
+    }
+  } else {
+    log('phase-4 reopen: none (all high-count buckets accepted or under threshold)');
+  }
 }
 
 main();

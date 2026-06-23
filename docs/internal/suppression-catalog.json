@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T23:26:46.564Z",
+  "generatedAt": "2026-06-23T23:29:03.687Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -400,5 +400,76 @@
     "budgetGateSafetyTotal": 100,
     "productRuntimeSafetyTotal": 93,
     "unbudgetedProductRuntimeSlugs": 25
+  },
+  "phase4Audit": {
+    "baseline": {
+      "productRuntimeFitness": 305,
+      "productRuntimeGraph": 7,
+      "productRuntimeCombined": 312,
+      "budgetGateFitness": 542,
+      "checkPackageFitness": 234,
+      "productRuntimeSafetyTotal": 183,
+      "budgetGateSafetyTotal": 234
+    },
+    "delta": {
+      "productRuntimeFitness": -148,
+      "productRuntimeGraph": 0,
+      "productRuntimeCombined": -148,
+      "budgetGateFitness": -201,
+      "checkPackageFitness": -52,
+      "productRuntimeSafetyTotal": -90,
+      "budgetGateSafetyTotal": -134
+    },
+    "reopenCandidates": [
+      {
+        "slug": "detached-promises",
+        "count": 18,
+        "disposition": "c",
+        "kind": "fitness"
+      },
+      {
+        "slug": "performance-anti-patterns",
+        "count": 15,
+        "disposition": "b/c",
+        "kind": "fitness"
+      },
+      {
+        "slug": "null-safety",
+        "count": 9,
+        "disposition": "b/c",
+        "kind": "fitness"
+      },
+      {
+        "slug": "throws-documentation",
+        "count": 9,
+        "disposition": "a/b",
+        "kind": "fitness"
+      }
+    ],
+    "acceptedHighCount": [
+      {
+        "slug": "batch-operation-limits",
+        "count": 41,
+        "disposition": "b",
+        "kind": "fitness"
+      },
+      {
+        "slug": "unbounded-memory",
+        "count": 19,
+        "disposition": "b",
+        "kind": "fitness"
+      },
+      {
+        "slug": "graph:cycle",
+        "count": 6,
+        "disposition": "b",
+        "kind": "graph"
+      }
+    ],
+    "successCriteria": {
+      "sc6ProductRuntimeSafetyTarget": 143,
+      "sc6ProductRuntimeSafetyActual": 93,
+      "sc6Met": true
+    }
   }
 }

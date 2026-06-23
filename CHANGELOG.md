@@ -40,6 +40,9 @@ tightens graph and release guardrails.
   check-pack paths for `performance-anti-patterns`, `batch-operation-limits`,
   and `unbounded-memory`; `module-coupling-fan-out` auto-exempts scope-augmentation
   barrels and documents a permanent floor of 4.
+- Phase 4 residual audit: suppression catalog now records Phase 0 baseline
+  deltas, SC6 status, and reopen-triage candidates; `pnpm gate:waiver-ratio`
+  prints the summary in CI logs.
 
 ### Fixed
 
