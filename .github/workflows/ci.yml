@@ -39,8 +39,13 @@ jobs:
       - name: Clean dist
         run: pnpm -r run clean
 
+      # Two-pass build that re-syncs pnpm's injected workspace copies between
+      # passes. injectWorkspacePackages leaves the injected copies dist-less on
+      # a cold checkout/store, which breaks the build of packages that import a
+      # built first-party dep at typecheck time (test-support, checks-*). See
+      # scripts/build-ci.mjs and scripts/verify-pnpm-injection.mjs.
       - name: Build
-        run: pnpm build
+        run: node scripts/build-ci.mjs
 
       - name: Typecheck
         run: pnpm typecheck

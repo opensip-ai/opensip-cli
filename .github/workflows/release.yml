@@ -68,7 +68,11 @@ jobs:
       # list-checks,list-recipes}.js after they moved into the tool
       # packages. Cleaning here is cheap and guarantees a fresh dist.
       - run: pnpm -r run clean
-      - run: pnpm build
+      # Two-pass build re-syncing pnpm's injected workspace copies between
+      # passes (dist-less on a cold checkout/store otherwise — breaks
+      # test-support / checks-* which import built first-party deps). See
+      # scripts/build-ci.mjs.
+      - run: node scripts/build-ci.mjs
       - run: pnpm typecheck
 
       # ADR-0017 — the release gate must be at least as strict as the PR gate.
