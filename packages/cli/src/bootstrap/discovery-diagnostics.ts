@@ -17,6 +17,9 @@ import { INSTALLED_TOOL_ALLOWLIST_ENV } from './tool-trust.js';
 
 import type { ToolRuntimeLoad } from './admit-tool-package.js';
 
+const INSTALLED_TOOL_SKIPPED_IMPACT =
+  'The package was skipped and its commands are not available.';
+
 function record(
   collector: BootstrapDiagnosticsCollector | undefined,
   diagnostic: CliDiagnostic,
@@ -35,7 +38,7 @@ export function recordInstalledManifestInvalid(
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_MANIFEST_INVALID,
     category: 'discovery',
     message: `Tool package ${packageName} has no conformant package.json#opensipTools manifest.`,
-    impact: 'The package was skipped and its commands are not available.',
+    impact: INSTALLED_TOOL_SKIPPED_IMPACT,
     provenance: { packageName, discoverySource: 'installed' },
   });
 }
@@ -55,7 +58,7 @@ export function recordInstalledTrustDenied(
       `Installed tool ${packageName} (${toolId}) is not trusted to load (deny-by-default). ` +
       `Allowlist it via ${INSTALLED_TOOL_ALLOWLIST_ENV}='${toolId}' to admit it ` +
       `(or ${INSTALLED_TOOL_ALLOWLIST_ENV}='*' for all).`,
-    impact: 'The package was skipped and its commands are not available.',
+    impact: INSTALLED_TOOL_SKIPPED_IMPACT,
     action:
       'See opensip.ai/docs/opensip-cli/70-reference/10-environment-variables/ for trust configuration.',
     provenance: { toolId, packageName, discoverySource: 'installed' },
@@ -79,7 +82,7 @@ export function recordInstalledLoadFailure(
       code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
       category: 'discovery',
       message: `Tool package ${name} has no resolvable entry point.`,
-      impact: 'The package was skipped and its commands are not available.',
+      impact: INSTALLED_TOOL_SKIPPED_IMPACT,
       provenance,
     });
   }
@@ -89,7 +92,7 @@ export function recordInstalledLoadFailure(
       code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
       category: 'discovery',
       message: `Tool package ${name} does not export a valid \`tool\`.`,
-      impact: 'The package was skipped and its commands are not available.',
+      impact: INSTALLED_TOOL_SKIPPED_IMPACT,
       provenance,
     });
   }
@@ -100,7 +103,7 @@ export function recordInstalledLoadFailure(
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
     category: 'discovery',
     message: `Failed to load tool ${name}: ${scrubModuleNotFoundMessage(rawDetail)}.`,
-    impact: 'The package was skipped and its commands are not available.',
+    impact: INSTALLED_TOOL_SKIPPED_IMPACT,
     provenance,
     detail: classified.detail,
   });
@@ -122,7 +125,7 @@ export function recordInstalledCatchFailure(
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
     category: 'discovery',
     message: `Failed to load tool ${packageName}: ${scrubModuleNotFoundMessage(message)}.`,
-    impact: 'The package was skipped and its commands are not available.',
+    impact: INSTALLED_TOOL_SKIPPED_IMPACT,
     provenance,
     detail: classified.detail,
   });
