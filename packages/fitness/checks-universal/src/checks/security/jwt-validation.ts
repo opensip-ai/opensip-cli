@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- reviewed: tightly coupled JWT validation logic with pattern detection, AST analysis, and violation reporting requires single-file cohesion
 // @fitness-ignore-file error-handling-quality -- reviewed: false positive; String.prototype.match() at line 141 is regex matching, not Result.match() error handling
 /**
  * @fileoverview Validate JWT handling follows security best practices

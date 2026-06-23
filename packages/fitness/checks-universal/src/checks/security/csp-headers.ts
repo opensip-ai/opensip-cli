@@ -1,6 +1,5 @@
 // @fitness-ignore-file no-eval -- String literals referencing eval()/Function() in CSP check descriptions and suggestions, not actual usage
 // @fitness-ignore-file fitness-ignore-validation -- Fitness-ignore directives reference internal check IDs that may not be statically resolvable
-// @fitness-ignore-file file-length-limit -- Complex module with tightly coupled logic; refactoring would risk breaking changes
 // @fitness-ignore-file csp-headers -- Fitness check definition, not production CSP configuration
 /**
  * @fileoverview Validate Content Security Policy headers configuration
