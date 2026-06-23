@@ -7,7 +7,7 @@
     "detached-promises": 19,
     "performance-anti-patterns": 38,
     "unbounded-memory": 23,
-    "toctou-race-condition": 14
+    "toctou-race-condition": 0
   },
   "cosmetic": {
     "file-length-limit": 0,

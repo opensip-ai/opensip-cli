@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- wirePagination reads pageHandlers.get then pageHandlers.set on a module-level WeakMap of per-container handler slots; both operations are synchronous DOM-setup code (browser event handlers are serialized on the single JS thread), no async gap, safe in single-threaded JS.
 /**
  * Pagination helpers — `paginateTable`, `paginateGroupedRows`, the page-button
  * renderer, and the delegated click wiring.

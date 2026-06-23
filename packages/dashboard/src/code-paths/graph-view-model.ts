@@ -263,7 +263,6 @@ function deriveNodesAndEdges(
   edgeByKey: ReadonlyMap<string, MutableEdge>,
 ): { nodes: MutableNode[]; edges: MutableEdge[] } {
   const nodeById = new Map<string, MutableNode>();
-  // @fitness-ignore-next-line toctou-race-condition -- synchronous single-pass projector; `nodeById` is a local Map with no async/concurrent access, so there is no time-of-check/time-of-use window between the get and the set.
   const ensure = (id: string): MutableNode => {
     let n = nodeById.get(id);
     if (!n) {

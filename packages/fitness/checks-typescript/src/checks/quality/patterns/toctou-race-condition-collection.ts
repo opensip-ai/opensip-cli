@@ -55,7 +55,91 @@ export function isInMemoryCacheReceiverText(text: string): boolean {
   const normalized = text.replace(/^[#_]/, '');
   if (normalized === 'cache') return true;
   if (normalized.endsWith('Cache')) return true;
+  if (normalized.endsWith('.filteredContent')) return true;
+  if (normalized.includes('parseCache')) return true;
+  if (normalized === 'byId' || normalized === 'byName') return true;
+  if (normalized.endsWith('.byId') || normalized.endsWith('.byName')) return true;
+  if (normalized.endsWith('Handlers')) return true;
   return false;
+}
+
+/** Full dotted receiver chain for a property-access call target. */
+export function getReceiverChainText(expr: ts.Expression): string | null {
+  if (ts.isIdentifier(expr)) return expr.text;
+  if (expr.kind === ts.SyntaxKind.ThisKeyword) return 'this';
+  if (ts.isPropertyAccessExpression(expr)) {
+    const base = getReceiverChainText(expr.expression);
+    if (base) return `${base}.${expr.name.text}`;
+  }
+  return null;
+}
+
+/** `const { byId } = this` aliases for class-owned Map/Set fields. */
+export function collectThisCollectionFieldAliases(
+  node: FunctionLikeNode,
+  classCacheFields: ReadonlySet<string>,
+): Set<string> {
+  const aliases = new Set<string>();
+  if (classCacheFields.size === 0) return aliases;
+
+  const visit = (n: ts.Node): void => {
+    if (n !== node && isFunctionLikeNode(n)) return;
+    if (!ts.isVariableDeclaration(n) || !n.initializer) {
+      ts.forEachChild(n, visit);
+      return;
+    }
+
+    if (
+      ts.isObjectBindingPattern(n.name) &&
+      n.initializer.kind === ts.SyntaxKind.ThisKeyword
+    ) {
+      for (const element of n.name.elements) {
+        if (!ts.isBindingElement(element) || !ts.isIdentifier(element.name)) continue;
+        const propName =
+          element.propertyName && ts.isIdentifier(element.propertyName)
+            ? element.propertyName.text
+            : element.name.text;
+        if (classCacheFields.has(propName)) {
+          aliases.add(element.name.text);
+        }
+      }
+    }
+
+    if (
+      ts.isIdentifier(n.name) &&
+      ts.isPropertyAccessExpression(n.initializer) &&
+      n.initializer.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      classCacheFields.has(n.initializer.name.text)
+    ) {
+      aliases.add(n.name.text);
+    }
+
+    ts.forEachChild(n, visit);
+  };
+
+  if (node.body) visit(node.body);
+  return aliases;
+}
+
+/** Map/Set names declared in enclosing functions (closure-visible locals). */
+export function collectEnclosingLocalCollectionNames(node: FunctionLikeNode): Set<string> {
+  const names = new Set<string>();
+  let current: ts.Node | undefined = node.parent;
+
+  while (current) {
+    if (isFunctionLikeNode(current)) {
+      for (const name of collectLocalCollectionNames(current)) {
+        names.add(name);
+      }
+      const classFields = collectClassInMemoryFieldNames(current);
+      for (const alias of collectThisCollectionFieldAliases(current, classFields)) {
+        names.add(alias);
+      }
+    }
+    current = current.parent;
+  }
+
+  return names;
 }
 
 /** Collect local Map/Set variable names within a function. */

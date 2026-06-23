@@ -53,6 +53,53 @@ describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
     expect(analyze(src)).toHaveLength(0);
   });
 
+  it('does NOT flag registry register() with destructured Map aliases', () => {
+    const src = `
+      class Registry {
+        private readonly byId = new Map<string, string>();
+        private readonly byName = new Map<string, string>();
+        register(item: { id: string; name: string }): void {
+          const { byId, byName } = this;
+          const incumbent = byName.get(item.name);
+          if (incumbent) return;
+          byId.set(item.id, item.name);
+          byName.set(item.name, item.name);
+        }
+      }
+    `;
+    expect(analyzeFileForToctou('packages/core/src/lib/registry.ts', src)).toHaveLength(0);
+  });
+
+  it('does NOT flag nested closures over a local Map', () => {
+    const src = `
+      function derive(): void {
+        const nodeById = new Map<string, { id: string }>();
+        const ensure = (id: string) => {
+          let n = nodeById.get(id);
+          if (!n) {
+            n = { id };
+            nodeById.set(id, n);
+          }
+          return n;
+        };
+        ensure('a');
+      }
+    `;
+    expect(analyzeFileForToctou('packages/dashboard/src/code-paths/graph-view-model.ts', src)).toHaveLength(0);
+  });
+
+  it('does NOT flag parse-cache filteredContent chains', () => {
+    const src = `
+      function filterContent(scope: { parseCache: { filteredContent: Map<string, string> } }, content: string): string {
+        const cached = scope.parseCache.filteredContent.get(content);
+        if (cached) return cached;
+        scope.parseCache.filteredContent.set(content, content);
+        return content;
+      }
+    `;
+    expect(analyzeFileForToctou('packages/languages/lang-typescript/src/filter.ts', src)).toHaveLength(0);
+  });
+
   it('STILL flags genuine read-then-update on a shared persistent receiver', () => {
     const src = `
       async function updateUser(userRepo: UserRepository, id: string): Promise<void> {

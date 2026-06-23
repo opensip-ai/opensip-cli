@@ -12,9 +12,11 @@ import * as ts from 'typescript';
 import { classifyFunctionCalls } from './toctou-race-condition-classify.js';
 import {
   collectClassInMemoryFieldNames,
+  collectEnclosingLocalCollectionNames,
   collectInterfaceCollectionFields,
   collectLocalCollectionNames,
   collectLocalObjectCollectionFieldKeys,
+  collectThisCollectionFieldAliases,
   isFunctionLikeNode,
   type FunctionLikeNode,
 } from './toctou-race-condition-collection.js';
@@ -51,7 +53,13 @@ function checkFunctionForToctou(options: CheckFunctionForToctouOptions): CheckVi
   if (hasAtomicPatterns(funcText)) return null;
 
   const localCollections = collectLocalCollectionNames(node);
+  for (const name of collectEnclosingLocalCollectionNames(node)) {
+    localCollections.add(name);
+  }
   const classCacheFields = collectClassInMemoryFieldNames(node);
+  for (const alias of collectThisCollectionFieldAliases(node, classCacheFields)) {
+    localCollections.add(alias);
+  }
   const localObjectCollectionKeys = collectLocalObjectCollectionFieldKeys(
     node,
     interfaceCollectionFields,

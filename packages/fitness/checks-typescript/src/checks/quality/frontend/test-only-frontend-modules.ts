@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- local Map `importMap` in `buildImportMap`; get→push→set runs synchronously in the inner loop (the only await is the file read in the outer loop, before the get), so there is no async gap on a shared key
 // @fitness-ignore-file duplicate-implementation-detection -- intentionally co-located for check isolation
 /**
  * @fileoverview Test-Only Frontend Modules Check

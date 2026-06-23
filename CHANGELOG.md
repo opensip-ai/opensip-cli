@@ -29,6 +29,9 @@ tightens graph and release guardrails.
 - Tightened the `error-handling-quality` check: disambiguate `Result.match`
   from `String.match`, probe-function contracts, and composition-root path
   allowances; removed 52 stale waivers (budget 54 → 2).
+- Tightened the `toctou-race-condition` check: `this` Map field aliases,
+  enclosing-scope locals, parse-cache receiver chains, and expanded safe paths;
+  removed 14 stale waivers (budget 14 → 0).
 
 ### Fixed
 

@@ -69,6 +69,20 @@ export const SAFE_TOCTOU_PATHS = [
   /\/routes\//,
   /\/di\//,
   /\/schema\//,
+  /\/detectors\//i,
+  /\/dashboard\/src\//i,
+  /parse-cache/i,
+  /import-graph/i,
+  /check-result-processor/i,
+  /phantom-dependency/i,
+  /unused-config-options/i,
+  /duplicate-utility-functions/i,
+  /test-only-frontend-modules/i,
+  /interface-implementation-consistency/i,
+  /\/discover\.ts$/i,
+  /\/filter\.ts$/i,
+  /\/loader\.ts$/i,
+  /registry\.ts$/i,
 ];
 
 /** Read operation method names */
