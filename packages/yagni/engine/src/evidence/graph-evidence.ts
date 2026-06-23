@@ -52,6 +52,7 @@ export async function resolveGraphEvidence(
   }
 
   if (mode === 'build') {
+    // @fitness-ignore-next-line async-waterfall-detection -- ordered, not parallelizable: buildGraphCatalog consumes the adapters ensureGraphAdaptersLoaded registers; Promise.all would build with zero adapters.
     await ensureGraphAdaptersLoaded(cwd);
     const built = await buildGraphCatalog(cwd, cli, { force: true });
     return {
