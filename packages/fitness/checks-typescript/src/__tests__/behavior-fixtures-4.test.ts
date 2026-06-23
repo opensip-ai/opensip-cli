@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
  * @fileoverview Final behavior fixture suite targeting the biggest remaining misses:
  * duplicate-utility-functions, result-pattern-consistency,

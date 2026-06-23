@@ -1,5 +1,4 @@
 // @fitness-ignore-file performance-anti-patterns -- spread in CLI report aggregation iterates bounded result sets (rule counts, entry-point lists).
-// @fitness-ignore-file public-api-jsdoc -- helper barrel for the graph CLI report; the report payload types are documented via their consumers (graph.ts) and the engine's public types module.
 /**
  * @fileoverview Unified human-readable graph report.
  *

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T22:59:45.927Z",
+  "generatedAt": "2026-06-23T23:02:54.148Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,7 +11,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 542,
+        "total": 526,
         "bySlug": {
           "throws-documentation": 10,
           "batch-operation-limits": 53,
@@ -39,7 +39,6 @@
           "unused-config-options": 13,
           "no-generic-error": 4,
           "numeric-validation": 11,
-          "project-readme-existence": 12,
           "fitness-check-architecture": 4,
           "no-hardcoded-timeouts": 7,
           "unsafe-secret-comparison": 7,
@@ -81,11 +80,10 @@
           "no-stub-tests": 1,
           "no-direct-stdout-in-tool-engine": 2,
           "only-documented-toolcli-seams": 2,
-          "no-non-null-assertions": 3,
+          "no-non-null-assertions": 2,
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
           "module-coupling-metrics": 2,
-          "public-api-jsdoc": 3,
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
@@ -100,10 +98,10 @@
           "core": 40,
           "dashboard": 4,
           "datastore": 1,
-          "fitness/checks-typescript": 90,
-          "fitness/checks-universal": 144,
-          "fitness/engine": 55,
-          "graph/engine": 58,
+          "fitness/checks-typescript": 87,
+          "fitness/checks-universal": 139,
+          "fitness/engine": 50,
+          "graph/engine": 56,
           "graph/graph-adapter-common": 3,
           "graph/graph-go": 4,
           "graph/graph-java": 1,
@@ -117,7 +115,7 @@
           "languages/lang-typescript": 9,
           "output": 8,
           "session-store": 1,
-          "simulation": 20,
+          "simulation": 19,
           "targeting": 1,
           "test-support": 3,
           "yagni": 5
@@ -131,7 +129,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 305,
+        "total": 297,
         "bySlug": {
           "throws-documentation": 9,
           "batch-operation-limits": 41,
@@ -152,15 +150,13 @@
           "module-coupling-fan-out": 6,
           "no-direct-stdout-in-tool-engine": 2,
           "only-documented-toolcli-seams": 2,
-          "no-non-null-assertions": 3,
+          "no-non-null-assertions": 2,
           "semgrep-scan": 1,
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
-          "project-readme-existence": 4,
           "module-coupling-metrics": 2,
           "concurrency-safety": 3,
           "no-unbounded-concurrency": 1,
-          "public-api-jsdoc": 3,
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "no-markdown-references": 2,
@@ -177,8 +173,8 @@
           "core": 40,
           "dashboard": 4,
           "datastore": 1,
-          "fitness/engine": 55,
-          "graph/engine": 58,
+          "fitness/engine": 50,
+          "graph/engine": 56,
           "graph/graph-adapter-common": 3,
           "graph/graph-go": 4,
           "graph/graph-java": 1,
@@ -192,7 +188,7 @@
           "languages/lang-typescript": 9,
           "output": 8,
           "session-store": 1,
-          "simulation": 20,
+          "simulation": 19,
           "targeting": 1,
           "yagni": 5
         }
@@ -215,7 +211,7 @@
     },
     "check-package": {
       "fitness": {
-        "total": 234,
+        "total": 226,
         "bySlug": {
           "batch-operation-limits": 12,
           "performance-anti-patterns": 23,
@@ -234,7 +230,6 @@
           "error-handling-quality": 4,
           "no-generic-error": 4,
           "numeric-validation": 11,
-          "project-readme-existence": 8,
           "fitness-check-architecture": 4,
           "no-hardcoded-timeouts": 7,
           "unsafe-secret-comparison": 5,
@@ -281,8 +276,8 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 90,
-          "fitness/checks-universal": 144
+          "fitness/checks-typescript": 87,
+          "fitness/checks-universal": 139
         }
       },
       "graph": {
@@ -311,13 +306,12 @@
     },
     "tests": {
       "fitness": {
-        "total": 93,
+        "total": 61,
         "bySlug": {
           "test-file-naming": 3,
           "no-generic-error": 1,
           "my-check": 2,
           "no-stub-tests": 2,
-          "file-length-limit": 38,
           "no-console-log": 9,
           "no-todo-comments": 4,
           "some-check": 3,
@@ -339,6 +333,7 @@
           "md-check": 2,
           "yaml-check": 1,
           "shared-fixture-check": 2,
+          "file-length-limit": 6,
           "other-check": 1,
           "second-id": 1,
           "my-rule": 1,
@@ -351,13 +346,9 @@
           "cli": 3,
           "core": 2,
           "dashboard": 1,
-          "fitness/checks-typescript": 9,
-          "fitness/checks-universal": 39,
-          "fitness/engine": 30,
-          "graph/engine": 4,
-          "graph/graph-rust": 1,
-          "graph/graph-typescript": 3,
-          "simulation": 1
+          "fitness/checks-universal": 26,
+          "fitness/engine": 27,
+          "graph/engine": 2
         }
       },
       "graph": {
@@ -413,25 +404,25 @@
         "actual": 6
       },
       "project-readme-existence": {
-        "budget": 12,
-        "actual": 12
+        "budget": 0,
+        "actual": 0
       }
     }
   },
   "summary": {
-    "budgetGateFitness": 542,
-    "budgetGateFitnessSlugs": 79,
-    "productRuntimeFitness": 305,
-    "productRuntimeFitnessSlugs": 36,
+    "budgetGateFitness": 526,
+    "budgetGateFitnessSlugs": 77,
+    "productRuntimeFitness": 297,
+    "productRuntimeFitnessSlugs": 34,
     "productRuntimeGraph": 7,
     "productRuntimeGraphRuleIds": 2,
-    "productRuntimeCombined": 312,
-    "checkPackageFitness": 234,
+    "productRuntimeCombined": 304,
+    "checkPackageFitness": 226,
     "testSupportFitness": 3,
-    "testsFitness": 93,
+    "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 234,
     "productRuntimeSafetyTotal": 183,
-    "unbudgetedProductRuntimeSlugs": 28
+    "unbudgetedProductRuntimeSlugs": 27
   }
 }

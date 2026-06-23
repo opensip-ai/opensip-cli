@@ -1,6 +1,5 @@
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 // @fitness-ignore-file clean-code-naming-quality -- short names used in severity mapping utilities
-// @fitness-ignore-file project-readme-existence -- internal module, not a package root
 /**
  * @fileoverview Shared severity classification helpers
  *

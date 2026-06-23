@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
  * @fileoverview Behavior fixture suite for remaining TypeScript check branches.
  * with focused tests across openapi-type-source, api-contract-validation,

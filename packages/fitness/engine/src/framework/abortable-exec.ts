@@ -99,7 +99,6 @@ export function execAbortable(
         return;
       }
       const [bin, ...args] = command;
-      // @fitness-ignore-next-line no-non-null-assertions -- command length validated above
       child = spawn(bin ?? '', args, {
         cwd,
         env,

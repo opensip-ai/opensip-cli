@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while covered domains are split into focused tests.
 /**
  * Tests for the catalog JSON renderer.
  *

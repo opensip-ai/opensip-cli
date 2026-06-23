@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while covered domains are split into focused tests.
 /**
  * @fileoverview Branch coverage tests for parallel/sequential execution
  * engines and the check-result-processor.

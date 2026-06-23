@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
  * @fileoverview Third batch of fixture-based tests targeting the
  * remaining check analyzers.

@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
  * @fileoverview Branch-behavior fixture suite: targets high-impact uncovered branches
  * across many checks via rich, realistic source fixtures.

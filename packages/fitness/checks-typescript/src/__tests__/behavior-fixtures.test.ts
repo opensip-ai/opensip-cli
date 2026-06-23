@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
  * @fileoverview Targeted fixture-based behavior tests for TypeScript checks.
  *

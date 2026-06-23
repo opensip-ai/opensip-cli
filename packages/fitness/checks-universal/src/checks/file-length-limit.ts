@@ -5,8 +5,11 @@
  * language. Counts only non-empty lines so massive whitespace-padded
  * files don't slip through and trivial generated boilerplate isn't
  * over-counted (configurable later if needed).
+ *
+ * Test and fixture paths are excluded — long behavior-fixture suites are
+ * intentional; modularity rules apply to production source.
  */
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 const SOFT_LIMIT = 400;
 const HARD_LIMIT = 800;
@@ -38,11 +41,21 @@ export function analyzeFileLength(content: string): CheckViolation[] {
   return violations;
 }
 
+/**
+ * Per-file entry point: skips test/fixture paths before line counting.
+ */
+export function analyzeFileLengthForPath(content: string, filePath: string): CheckViolation[] {
+  if (isTestFile(filePath) || filePath.includes('/__fixtures__/')) {
+    return [];
+  }
+  return analyzeFileLength(content);
+}
+
 export const fileLengthLimit = defineCheck({
   id: 'fc8b5ec9-d020-4e76-b16f-f5f73ce9d21e',
   slug: 'file-length-limit',
   description: `Files longer than ${HARD_LIMIT} lines hint at insufficient module decomposition`,
   scope: { languages: [], concerns: [] },
   tags: ['quality', 'modularity'],
-  analyze: (content) => analyzeFileLength(content),
+  analyze: (content, filePath) => analyzeFileLengthForPath(content, filePath),
 });

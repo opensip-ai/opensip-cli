@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while covered domains are split into focused tests.
 
 /**
  * @fileoverview Sim-recipe contract + integration tests.

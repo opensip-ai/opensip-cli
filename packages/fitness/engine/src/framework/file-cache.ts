@@ -1,4 +1,3 @@
-// @fitness-ignore-file public-api-jsdoc -- internal framework module; public API documented at package level
 /**
  * @fileoverview In-memory file cache for fitness checks
  *

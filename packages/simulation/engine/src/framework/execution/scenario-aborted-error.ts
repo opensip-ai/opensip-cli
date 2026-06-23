@@ -1,4 +1,3 @@
-// @fitness-ignore-file project-readme-existence -- internal module, not a package root
 /**
  * @fileoverview ScenarioAbortedError - extracted to break circular dependency
  * between action-handlers.ts and execution-engine.ts.

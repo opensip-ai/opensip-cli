@@ -1,4 +1,3 @@
-// @fitness-ignore-file project-readme-existence -- internal module, not a package root
 // @fitness-ignore-file fitness-check-coverage -- check implementation with framework-managed coverage
 /**
  * @fileoverview Detects process.exit() usage that bypasses finally blocks

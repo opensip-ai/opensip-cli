@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyzeFileLength } from '../checks/file-length-limit.js';
+import {
+  analyzeFileLength,
+  analyzeFileLengthForPath,
+} from '../checks/file-length-limit.js';
 
 function buildLines(n: number): string {
   const out: string[] = [];
@@ -29,5 +32,23 @@ describe('analyzeFileLength', () => {
     // 200 real lines, 200 blank — should fall under soft limit
     const padded = buildLines(200) + '\n' + '\n'.repeat(200);
     expect(analyzeFileLength(padded)).toHaveLength(0);
+  });
+});
+
+describe('analyzeFileLengthForPath', () => {
+  it('skips test files regardless of line count', () => {
+    expect(analyzeFileLengthForPath(buildLines(900), 'src/__tests__/big.test.ts')).toHaveLength(
+      0,
+    );
+  });
+
+  it('skips fixture paths', () => {
+    expect(
+      analyzeFileLengthForPath(buildLines(900), 'src/checks/__fixtures__/huge/violation.ts'),
+    ).toHaveLength(0);
+  });
+
+  it('still flags oversized production files', () => {
+    expect(analyzeFileLengthForPath(buildLines(900), 'src/checks/my-check.ts')).toHaveLength(1);
   });
 });

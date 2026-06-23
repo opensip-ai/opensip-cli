@@ -1,4 +1,3 @@
-// @fitness-ignore-file project-readme-existence -- internal module, not a package root
 /**
  * @fileoverview Shared constants for the fitness framework
  */

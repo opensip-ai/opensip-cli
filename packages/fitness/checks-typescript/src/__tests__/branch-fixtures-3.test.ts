@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- behavior fixture suite; related scenarios stay together while checks are split into focused tests.
 /**
  * @fileoverview Third branch-behavior fixture suite: uses recipe config injection
  * to drive otherwise-unreachable defensive guard branches, plus targeted

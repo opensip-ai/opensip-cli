@@ -1,4 +1,3 @@
-// @fitness-ignore-file project-readme-existence -- internal module, not a package root
 /**
  * @fileoverview Validates logger event names follow the 3+ dot-separated segment convention
  */

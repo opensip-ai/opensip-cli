@@ -12,6 +12,6 @@
   "cosmetic": {
     "file-length-limit": 0,
     "module-coupling-fan-out": 6,
-    "project-readme-existence": 12
+    "project-readme-existence": 0
   }
 }
