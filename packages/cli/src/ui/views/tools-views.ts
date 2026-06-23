@@ -98,7 +98,11 @@ function validationView(result: ToolsValidateResult, title = 'Tool validation'):
     ]),
     line([
       { text: 'Verdict: ', dim: true },
-      { text: result.verdict.toUpperCase(), tone: verdictTone(result.verdict), bold: true },
+      {
+        text: result.verdict.toUpperCase(),
+        tone: verdictTone(result.verdict),
+        bold: true,
+      },
       ...(result.toolId === undefined
         ? []
         : [
@@ -140,7 +144,14 @@ export function viewToolsCreate(result: ToolsCreateResult): ViewNode {
 export function viewToolsDoctor(result: ToolsDoctorResult): ViewNode {
   if (result.diagnostics.length === 0) {
     return group(
-      [line([{ text: 'No bootstrap diagnostics were recorded for this run.', dim: true }])],
+      [
+        line([
+          {
+            text: 'No bootstrap diagnostics were recorded for this run.',
+            dim: true,
+          },
+        ]),
+      ],
       2,
     );
   }
@@ -182,9 +193,15 @@ export function viewToolsValidate(result: ToolsValidateResult): ViewNode {
 export function viewToolsInstall(result: ToolsInstallResult): ViewNode {
   const children: ViewNode[] = [
     line([
-      { text: result.success ? '✓' : '✗', tone: result.success ? 'success' : 'error' },
+      {
+        text: result.success ? '✓' : '✗',
+        tone: result.success ? 'success' : 'error',
+      },
       { text: result.success ? ' Installed ' : ' Failed to install ' },
-      { text: result.toolId ?? result.spec, tone: result.success ? 'brand' : 'default' },
+      {
+        text: result.toolId ?? result.spec,
+        tone: result.success ? 'brand' : 'default',
+      },
       { text: ` (${result.scope})`, dim: true },
       ...(result.version === undefined ? [] : [{ text: ` ${result.version}`, dim: true }]),
     ]),
@@ -224,7 +241,12 @@ export function viewToolsUninstall(result: ToolsUninstallResult): ViewNode {
         { text: removed?.id ?? result.target, tone: 'brand' },
         ...(removed === undefined
           ? []
-          : [{ text: ` (${removed.packageName}, ${removed.scope})`, dim: true }]),
+          : [
+              {
+                text: ` (${removed.packageName}, ${removed.scope})`,
+                dim: true,
+              },
+            ]),
       ]),
     ],
     2,
@@ -242,7 +264,10 @@ export function viewToolsDataPurge(result: ToolsDataPurgeResult): ViewNode {
       line([
         { text: `  ${result.sessions} session(s), `, dim: true },
         { text: `${result.baselineEntries} baseline entr(ies), `, dim: true },
-        { text: `${result.baselineMeta ? 1 : 0} baseline marker(s), `, dim: true },
+        {
+          text: `${result.baselineMeta ? 1 : 0} baseline marker(s), `,
+          dim: true,
+        },
         { text: `${result.stateRows} state row(s)`, dim: true },
       ]),
     ],

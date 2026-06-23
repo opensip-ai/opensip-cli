@@ -27,14 +27,14 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../fit/check-loader.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../fit/check-loader.js')>();
+  const actual = await importOriginal<typeof CheckLoaderModule>();
   const { currentCheckRegistry, currentFitnessLoadState } =
     await import('../../framework/scope-registry.js');
   const { defineCheck } = await import('../../framework/define-check.js');
   return {
     ...actual,
-    ensureChecksLoaded: vi.fn(async (projectDir?: string) => {
-      const key = projectDir ?? '';
+    ensureChecksLoaded: vi.fn((projectDir = '') => {
+      const key = projectDir;
       const load = currentFitnessLoadState();
       if (load.loadedFor === key) return;
       const registry = currentCheckRegistry();
@@ -67,12 +67,16 @@ vi.mock('../fit/check-loader.js', async (importOriginal) => {
  *  cannot use `@opensip-cli/test-support` (it depends on this package —
  *  the dev edge would make the package graph cyclic; ADR-0040). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 const withScope = runWithScope;
 
 import { fitnessTool } from '../../tool.js';
 import { collectFitnessReportData } from '../report-data.js';
 
+import type * as CheckLoaderModule from '../fit/check-loader.js';
 import type { CheckCatalogEntry, RecipeCatalogEntry } from '../report-data.js';
 
 /** The fitness engine package root (carries the manifest), 4 dirs up from this test. */

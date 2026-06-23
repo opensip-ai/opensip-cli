@@ -199,7 +199,10 @@ export function composeAndValidateToolConfig(args: {
   readonly configPath: string | undefined;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
-}): { readonly config: ResolvedToolConfig | undefined; readonly document: unknown } {
+}): {
+  readonly config: ResolvedToolConfig | undefined;
+  readonly document: unknown;
+} {
   const { tools, configPath, env, manifests = [], provenance = [], bootstrapDiagnostics } = args;
   // ADR-0054 M4-E: provenance-aware fold — bundled tools' Zod is composed
   // host-side (trusted), external tools validate from their serializable
@@ -221,7 +224,9 @@ export function composeAndValidateToolConfig(args: {
   // validates STRICT through the one composed schema (ADR-0023, the launch seam).
   // Gate keys are added only to tool namespaces; host blocks stay strict.
   const declarations: readonly ToolConfigDeclaration[] = [
-    ...hostConfigDeclarations({ pluginConfigKeys: collectPluginConfigKeys(manifests) }),
+    ...hostConfigDeclarations({
+      pluginConfigKeys: collectPluginConfigKeys(manifests),
+    }),
     ...toolDeclarations,
   ];
 
@@ -246,7 +251,12 @@ export function composeAndValidateToolConfig(args: {
   //     Tool.config yet its block exists: a tool-authoring bug, hard-reject;
   //   - otherwise → warn loudly (structured event + stderr for CI), with a
   //     did-you-mean when the key is edit-distance-close to a claimed one.
-  reportUnclaimedNamespaces({ declarations, document: validated, tools, bootstrapDiagnostics });
+  reportUnclaimedNamespaces({
+    declarations,
+    document: validated,
+    tools,
+    bootstrapDiagnostics,
+  });
 
   // The validated document is returned alongside the resolved config so the
   // host can build the targeting substrate (`buildTargets`) from the SAME

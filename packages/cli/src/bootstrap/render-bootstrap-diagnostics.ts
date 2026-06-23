@@ -3,11 +3,13 @@
  * bootstrap diagnostics (ADR-0060, Phase 5).
  */
 
-import type { BootstrapDiagnosticsCollector } from '@opensip-cli/core';
-
 import { renderDiagnosticsHuman } from '../ui/render-diagnostic.js';
 
-const STDERR_HOST = { writeStderr: (text: string) => process.stderr.write(text) };
+import type { BootstrapDiagnosticsCollector } from '@opensip-cli/core';
+
+const STDERR_HOST = {
+  writeStderr: (text: string) => process.stderr.write(text),
+};
 
 /** True when the selected command owns its own bootstrap diagnostic surface. */
 export function isDedicatedBootstrapDiagnosticCommand(commandPath: string): boolean {

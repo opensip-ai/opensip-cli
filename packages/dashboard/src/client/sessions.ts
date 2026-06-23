@@ -28,7 +28,13 @@ export function scoreColorStyle(score: number): string {
 }
 
 /** Empty per-session summary used when a tool persists no summary payload. */
-const EMPTY_SUMMARY = { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } as const;
+const EMPTY_SUMMARY = {
+  total: 0,
+  passed: 0,
+  failed: 0,
+  errors: 0,
+  warnings: 0,
+} as const;
 
 type SessionStatus = 'fail' | 'warn' | 'pass' | 'error' | 'degraded';
 
@@ -73,7 +79,10 @@ export function statusBadge(status: SessionStatus): HTMLElement {
     error: 'badge-fail',
     degraded: 'badge-warn',
   };
-  return el('span', { class: 'badge ' + classes[status], text: labels[status] });
+  return el('span', {
+    class: 'badge ' + classes[status],
+    text: labels[status],
+  });
 }
 
 /** Score cell style — error/degraded runs must not show green 100%. */
@@ -140,8 +149,18 @@ export function renderSessionTable(
         renderSessionDetail(detailContainer, s, idx, tool);
       },
     });
-    row.append(el('td', { class: 'cell-nowrap', text: new Date(s.startedAt).toLocaleString() }));
-    row.append(el('td', { text: s.recipe ?? 'default', style: 'color:var(--text-muted)' }));
+    row.append(
+      el('td', {
+        class: 'cell-nowrap',
+        text: new Date(s.startedAt).toLocaleString(),
+      }),
+    );
+    row.append(
+      el('td', {
+        text: s.recipe ?? 'default',
+        style: 'color:var(--text-muted)',
+      }),
+    );
     const scoreCell = el('td', { style: 'font-weight:600;' + sc });
     scoreCell.textContent = s.score + '%';
     row.append(scoreCell);

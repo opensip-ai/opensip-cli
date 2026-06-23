@@ -25,7 +25,9 @@ describe('renderDiagnosticHuman', () => {
   it('renders the canonical severity/code/message header plus impact and action', () => {
     const text = renderDiagnosticHuman(SAMPLE);
 
-    expect(text).toContain('opensip: error [OPENSIP_FIT_EMPTY_CHECK_REGISTRY]: Fitness check registry is empty.');
+    expect(text).toContain(
+      'opensip: error [OPENSIP_FIT_EMPTY_CHECK_REGISTRY]: Fitness check registry is empty.',
+    );
     expect(text).toContain('impact: No checks were loaded');
     expect(text).toContain('action: Verify check packs');
     expect(text).toContain('log: run_abc123');

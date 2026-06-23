@@ -5,14 +5,17 @@
 
 import {
   CLI_DIAGNOSTIC_CODES,
+  classifyModuleError,
+  scrubModuleNotFoundMessage,
   type BootstrapDiagnosticsCollector,
   type CliDiagnostic,
   type CliDiagnosticProvenance,
 } from '@opensip-cli/core';
 
-import type { ToolRuntimeLoad } from './admit-tool-package.js';
 import { getBootstrapDiagnosticsBuffer } from './bootstrap-diagnostics-buffer.js';
 import { INSTALLED_TOOL_ALLOWLIST_ENV } from './tool-trust.js';
+
+import type { ToolRuntimeLoad } from './admit-tool-package.js';
 
 function record(
   collector: BootstrapDiagnosticsCollector | undefined,
@@ -66,7 +69,10 @@ export function recordInstalledLoadFailure(
   load: Extract<ToolRuntimeLoad, { ok: false }>,
   collector?: BootstrapDiagnosticsCollector,
 ): CliDiagnostic {
-  const provenance: CliDiagnosticProvenance = { packageName: name, discoverySource: 'installed' };
+  const provenance: CliDiagnosticProvenance = {
+    packageName: name,
+    discoverySource: 'installed',
+  };
   if (load.reason === 'no-entry') {
     return record(collector, {
       severity: 'warning',
@@ -87,14 +93,16 @@ export function recordInstalledLoadFailure(
       provenance,
     });
   }
+  const rawDetail = load.detail ?? 'import failed';
+  const classified = classifyModuleError(new Error(rawDetail), provenance);
   return record(collector, {
     severity: 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
     category: 'discovery',
-    message: `Failed to load tool ${name}: ${load.detail ?? 'import failed'}.`,
+    message: `Failed to load tool ${name}: ${scrubModuleNotFoundMessage(rawDetail)}.`,
     impact: 'The package was skipped and its commands are not available.',
     provenance,
-    detail: load.detail,
+    detail: classified.detail,
   });
 }
 
@@ -104,12 +112,18 @@ export function recordInstalledCatchFailure(
   message: string,
   collector?: BootstrapDiagnosticsCollector,
 ): CliDiagnostic {
+  const provenance: CliDiagnosticProvenance = {
+    packageName,
+    discoverySource: 'installed',
+  };
+  const classified = classifyModuleError(new Error(message), provenance);
   return record(collector, {
     severity: 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
     category: 'discovery',
-    message: `Failed to load tool ${packageName}: ${message}.`,
+    message: `Failed to load tool ${packageName}: ${scrubModuleNotFoundMessage(message)}.`,
     impact: 'The package was skipped and its commands are not available.',
-    provenance: { packageName, discoverySource: 'installed' },
+    provenance,
+    detail: classified.detail,
   });
 }

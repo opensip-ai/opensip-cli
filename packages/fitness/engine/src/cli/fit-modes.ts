@@ -23,6 +23,7 @@ import {
 import {
   ConfigurationError,
   deriveRunOutcome,
+  formatCliDiagnosticHuman,
   resolveFailOnDegraded,
   SystemError,
   type CliDiagnostic,
@@ -89,14 +90,35 @@ function fitRunCompletion(
 /** Emit a fail-closed command error — no findings envelope, no session persistence. */
 function emitFitCommandError(
   cli: ToolCliContext,
-  result: { message: string; exitCode: number; suggestion?: string; code?: string; diagnostic?: CliDiagnostic },
+  result: {
+    message: string;
+    exitCode: number;
+    suggestion?: string;
+    code?: string;
+    diagnostic?: CliDiagnostic;
+  },
+  jsonRequested: boolean,
 ): void {
-  cli.emitError({
+  cli.setExitCode(result.exitCode);
+  if (jsonRequested) {
+    cli.emitError({
+      message: result.message,
+      exitCode: result.exitCode,
+      ...(result.suggestion === undefined ? {} : { suggestion: result.suggestion }),
+      ...(result.code === undefined ? {} : { code: result.code }),
+      ...(result.diagnostic === undefined ? {} : { diagnostic: result.diagnostic }),
+    });
+    return;
+  }
+  if (result.diagnostic !== undefined) {
+    process.stderr.write(`${formatCliDiagnosticHuman(result.diagnostic)}\n`);
+    return;
+  }
+  void cli.render({
+    type: 'error',
     message: result.message,
-    exitCode: result.exitCode,
     ...(result.suggestion === undefined ? {} : { suggestion: result.suggestion }),
-    ...(result.code === undefined ? {} : { code: result.code }),
-    ...(result.diagnostic === undefined ? {} : { diagnostic: result.diagnostic }),
+    exitCode: result.exitCode,
   });
 }
 
@@ -169,7 +191,10 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
     await emitShowError(args, cli, 'datastore-unavailable', 'session replay requires a datastore');
     return;
   }
-  const resolved = resolveSession(datastore, { ref: args.show ?? 'latest', tool: 'fit' });
+  const resolved = resolveSession(datastore, {
+    ref: args.show ?? 'latest',
+    tool: 'fit',
+  });
   if (!resolved.ok) {
     await emitShowError(args, cli, resolved.reason, resolved.detail);
     return;
@@ -207,7 +232,7 @@ export async function runJsonMode(
   const fitResult = await executeFit(args);
   if (fitResult.envelope === undefined) {
     // ADR-0060: command-error — structured diagnostic, no findings envelope or session.
-    emitFitCommandError(cli, fitResult.result);
+    emitFitCommandError(cli, fitResult.result, true);
     return undefined;
   }
   // ADR-0011: emit the signal envelope through the shared `formatSignalJson`
@@ -300,10 +325,7 @@ export async function runGateMode(
       mode: args.gateSave === true ? 'save' : 'compare',
       reason: fitResult.result.message,
     });
-    emitFitCommandError(cli, fitResult.result);
-    if (!args.json) {
-      process.stderr.write(`Error: ${fitResult.result.message}\n`);
-    }
+    emitFitCommandError(cli, fitResult.result, args.json === true);
     return undefined;
   }
   // ADR-0036: the envelope arrives fingerprint-stamped — `buildFitEnvelope`
@@ -341,7 +363,10 @@ export async function runGateMode(
       return completion;
     }
     const result = await cli.compareBaseline('fitness', envelope);
-    await cli.render({ type: 'gate-done', lines: renderGateCompareOutput(result).split('\n') });
+    await cli.render({
+      type: 'gate-done',
+      lines: renderGateCompareOutput(result).split('\n'),
+    });
     // gate-compare's verdict is the baseline-diff `degraded` predicate, NOT the
     // findings policy — pass it as the host runFailed override (ADR-0035), gated by
     // the reserved `failOnDegraded` key (ADR-0036, default true → ratchet-as-report
@@ -387,7 +412,11 @@ async function emitShowError(
 ): Promise<void> {
   if (args.json) {
     // emitError sets the exit code itself (process exit == reported outcome).
-    cli.emitError({ message: detail, exitCode: EXIT_CODES.CONFIGURATION_ERROR, code: reason });
+    cli.emitError({
+      message: detail,
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      code: reason,
+    });
     return;
   }
   cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);

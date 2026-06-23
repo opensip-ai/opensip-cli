@@ -409,7 +409,9 @@ describe('discoverAndRegisterToolPackages', () => {
 const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
 /** Installed npm tools are deny-by-default; tests that expect load opt in via `*`. */
-const ALLOW_ALL_INSTALLED: NodeJS.ProcessEnv = { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' };
+const ALLOW_ALL_INSTALLED: NodeJS.ProcessEnv = {
+  [INSTALLED_TOOL_ALLOWLIST_ENV]: '*',
+};
 const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
 const WALK_UP_SOURCES = {
   sources: WALK_UP_SOURCE_LIST,
@@ -455,7 +457,11 @@ function withDefaultToolIdentity(packageJson: object): object {
 function stageFixture(shortName: string, files: { packageJson: object; indexJs: string }): Fixture {
   const dir = join(FIXTURE_SCOPE, shortName);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'package.json'), JSON.stringify(withDefaultToolIdentity(files.packageJson)), 'utf8');
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify(withDefaultToolIdentity(files.packageJson)),
+    'utf8',
+  );
   writeFileSync(join(dir, 'index.js'), files.indexJs, 'utf8');
   return { name: `@opensip-cli-fixture/${shortName}`, dir };
 }
@@ -468,7 +474,10 @@ function silenceStderr(): () => void {
   };
 }
 
-function captureStderr(): { readonly read: () => string; readonly restore: () => void } {
+function captureStderr(): {
+  readonly read: () => string;
+  readonly restore: () => void;
+} {
   const orig = process.stderr.write.bind(process.stderr);
   let output = '';
   process.stderr.write = (chunk: unknown) => {
@@ -539,7 +548,11 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     try {
       await discoverAndRegisterToolPackages(
         registry,
-        { sources: WALK_UP_SOURCE_LIST, env: ALLOW_ALL_INSTALLED, bootstrapDiagnostics: collector },
+        {
+          sources: WALK_UP_SOURCE_LIST,
+          env: ALLOW_ALL_INSTALLED,
+          bootstrapDiagnostics: collector,
+        },
         BUILTIN_IDS,
       );
     } finally {
@@ -548,6 +561,51 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.get('fitness')).toBeUndefined();
     expect(stderr.read()).toBe('');
     expect(collector.list()).toHaveLength(0);
+  });
+
+  it('records manifest-invalid unrelated tool as typed diagnostic without user-facing stderr (ADR-0060)', async () => {
+    staged.push(
+      stageFixture('manifest-invalid', {
+        packageJson: {
+          name: '@opensip-cli-fixture/manifest-invalid',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            apiVersion: 1,
+            commands: [{ name: 'manifest-invalid', description: 'x' }],
+          },
+        },
+        indexJs: 'export const tool = {};',
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const collector = new BootstrapDiagnosticsCollector();
+    const stderr = captureStderr();
+    try {
+      await discoverAndRegisterToolPackages(
+        registry,
+        {
+          sources: WALK_UP_SOURCE_LIST,
+          env: ALLOW_ALL_INSTALLED,
+          bootstrapDiagnostics: collector,
+        },
+        BUILTIN_IDS,
+      );
+    } finally {
+      stderr.restore();
+    }
+    expect(registry.get('manifest-invalid')).toBeUndefined();
+    expect(stderr.read()).toBe('');
+    expect(collector.list()).toEqual([
+      expect.objectContaining({
+        code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_MANIFEST_INVALID,
+        provenance: expect.objectContaining({
+          packageName: '@opensip-cli-fixture/manifest-invalid',
+        }),
+      }),
+    ]);
   });
 
   it('records trust denial as a typed diagnostic without user-facing stderr (ADR-0060 Phase 3)', async () => {
@@ -574,7 +632,11 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     try {
       await discoverAndRegisterToolPackages(
         registry,
-        { sources: WALK_UP_SOURCE_LIST, env: {}, bootstrapDiagnostics: collector },
+        {
+          sources: WALK_UP_SOURCE_LIST,
+          env: {},
+          bootstrapDiagnostics: collector,
+        },
         BUILTIN_IDS,
       );
     } finally {

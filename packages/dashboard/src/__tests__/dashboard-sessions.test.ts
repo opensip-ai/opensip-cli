@@ -423,12 +423,14 @@ describe('renderSessionTable / renderDetail', () => {
         score: 100,
         passed: false,
         runOutcome: 'error',
-        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+        payload: {
+          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+        },
       }),
     ]);
     const badge = panel.querySelector('.badge')?.textContent;
     expect(badge).toBe('ERROR');
-    const scoreCell = panel.querySelector('tbody tr td:nth-child(3)') as HTMLElement | null;
+    const scoreCell = panel.querySelector('tbody tr td:nth-child(3)');
     expect(scoreCell?.style.color).toContain('var(--error)');
   });
 
@@ -438,7 +440,9 @@ describe('renderSessionTable / renderDetail', () => {
         score: 85,
         passed: true,
         runOutcome: 'degraded',
-        payload: { summary: { total: 2, passed: 2, failed: 0, errors: 0, warnings: 0 } },
+        payload: {
+          summary: { total: 2, passed: 2, failed: 0, errors: 0, warnings: 0 },
+        },
       }),
     ]);
     expect(panel.querySelector('.badge')?.textContent).toBe('DEGRADED');

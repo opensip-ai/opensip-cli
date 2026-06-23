@@ -41,7 +41,9 @@
     "id": "simulation",
     "identity": {
       "name": "simulation",
-      "aliases": ["sim"],
+      "aliases": [
+        "sim"
+      ],
       "layoutKey": "sim"
     },
     "stableId": "715d32c2-692c-4ed4-985b-a35deaf186aa",

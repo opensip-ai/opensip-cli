@@ -30,13 +30,13 @@ import { DiagnosticsBus } from './diagnostics-bus.js';
 import { SystemError } from './errors.js';
 import { logger as defaultLogger } from './logger.js';
 
+import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 import type { RunCorrelation } from './run-correlation.js';
 import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
-import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
 
 // RecipeUnitConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution

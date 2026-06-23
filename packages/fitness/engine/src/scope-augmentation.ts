@@ -28,11 +28,10 @@
  * no `scope.fitness`, and reads return `undefined`.
  */
 
-import type { CliDiagnostic } from '@opensip-cli/core';
-
 import type { FileCache } from './framework/file-cache.js';
 import type { CheckRegistry } from './framework/registry.js';
 import type { FitnessRecipeRegistry } from './recipes/registry.js';
+import type { CliDiagnostic } from '@opensip-cli/core';
 
 /**
  * Per-RunScope `ensureChecksLoaded` lifecycle state — moved off the

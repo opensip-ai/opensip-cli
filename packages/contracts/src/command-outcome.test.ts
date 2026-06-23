@@ -10,9 +10,9 @@
 import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
+import { CLI_DIAGNOSTIC_CODES } from './cli-diagnostic.js';
 import { buildSignalEnvelope } from './signal-envelope.js';
 
-import { CLI_DIAGNOSTIC_CODES } from './cli-diagnostic.js';
 import type { CommandOutcome } from './command-outcome.js';
 import type { CliDiagnostic, RunDiagnostics } from '@opensip-cli/core';
 

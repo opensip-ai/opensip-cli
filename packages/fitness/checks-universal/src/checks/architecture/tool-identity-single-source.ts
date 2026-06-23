@@ -47,7 +47,10 @@ function checkIdentity(block: OpensipToolsBlock, push: PushViolation): void {
     push('identity.name', 'must be a non-empty string (canonical CLI + config namespace)');
   }
   if (block.id !== identity.name) {
-    push('id', `must equal identity.name (got id=${JSON.stringify(block.id)}, identity.name=${JSON.stringify(identity.name)})`);
+    push(
+      'id',
+      `must equal identity.name (got id=${JSON.stringify(block.id)}, identity.name=${JSON.stringify(identity.name)})`,
+    );
   }
 }
 
@@ -102,10 +105,7 @@ function checkPluginLayoutDomain(
   );
 }
 
-function checkManifestCommands(
-  block: OpensipToolsBlock,
-  push: PushViolation,
-): void {
+function checkManifestCommands(block: OpensipToolsBlock, push: PushViolation): void {
   const identity = block.identity;
   if (!isJsonObject(identity)) return;
   const identityName = identity.name;

@@ -21,13 +21,13 @@ import { startProfiling } from '../telemetry/profiling.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { buildPerRunScope } from './build-per-run-scope.js';
+import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
+import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
+import { PRE_ACTION_PHASES } from './pre-action-bootstrap-phases.js';
 import {
   isDedicatedBootstrapDiagnosticCommand,
   renderRelevantBootstrapDiagnostics,
 } from './render-bootstrap-diagnostics.js';
-import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
-import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
-import { PRE_ACTION_PHASES } from './pre-action-bootstrap-phases.js';
 
 import type { PreActionBootstrapPlan } from './plan-pre-action-bootstrap.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';

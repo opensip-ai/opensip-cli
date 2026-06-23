@@ -58,20 +58,18 @@ export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = d
 });
 
 /** `fit recipes` — list available fitness recipes. */
-export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
-  unknown,
-  ToolCliContext
->({
-  name: 'recipes',
-  description: 'List available fitness recipes',
-  commonFlags: ['cwd', 'json'],
-  scope: 'project',
-  output: 'command-result',
-  handler: async (rawOpts) => {
-    const opts = rawOpts as ToolOptions;
-    return listRecipes(opts.cwd);
-  },
-});
+export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
+  defineNestedCommand<unknown, ToolCliContext>({
+    name: 'recipes',
+    description: 'List available fitness recipes',
+    commonFlags: ['cwd', 'json'],
+    scope: 'project',
+    output: 'command-result',
+    handler: async (rawOpts) => {
+      const opts = rawOpts as ToolOptions;
+      return listRecipes(opts.cwd);
+    },
+  });
 
 /**
  * The canonical fit export formats. Single value today (`baseline`) but declared

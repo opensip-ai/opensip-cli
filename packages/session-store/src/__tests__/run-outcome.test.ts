@@ -42,7 +42,11 @@ describe('SessionRepo runOutcome (ADR-0060)', () => {
     repo.save(session({ passed: true, score: 100, runOutcome: undefined }));
     expect(repo.get('ses-outcome-1')?.runOutcome).toBeUndefined();
 
-    repo.save({ ...session({ id: 'ses-outcome-2' }), passed: false, score: 40 });
+    repo.save({
+      ...session({ id: 'ses-outcome-2' }),
+      passed: false,
+      score: 40,
+    });
     expect(repo.get('ses-outcome-2')?.runOutcome).toBeUndefined();
   });
 });

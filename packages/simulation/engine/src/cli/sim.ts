@@ -80,7 +80,6 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
   const pluginResult = await loadAllSimPlugins(projectDir);
   load.pluginLoadErrors = pluginResult.errors;
   for (const err of pluginResult.errors) {
-    process.stderr.write(`opensip: plugin failed to load — ${err}\n`);
     logger.warn({ evt: 'cli.plugin.warning', module: 'cli:sim', message: err });
   }
 
@@ -122,7 +121,12 @@ async function loadSimScenarioPackages(projectDir: string): Promise<void> {
     descriptor === undefined
       ? {}
       : resolveCapabilityPreferences(descriptor, scope?.configDocument?.plugins ?? {});
-  await loadCapabilityDomain({ registry, domainId: 'sim-pack', projectDir, preferences });
+  await loadCapabilityDomain({
+    registry,
+    domainId: 'sim-pack',
+    projectDir,
+    preferences,
+  });
 }
 
 /**
@@ -232,7 +236,10 @@ export async function executeSim(
     };
   }
 
-  const service = new SimulationRecipeService({ cwd: args.cwd, onProgress: opts.onProgress });
+  const service = new SimulationRecipeService({
+    cwd: args.cwd,
+    onProgress: opts.onProgress,
+  });
   const recipeResult = await service.runRecipe(recipe);
 
   const scenarios = recipeResult.scenarios;

@@ -7,7 +7,9 @@
   "opensipTools": {
     "kind": "tool",
     "id": "no-apiversion-tool",
-    "identity": { "name": "no-apiversion-tool" },
+    "identity": {
+      "name": "no-apiversion-tool"
+    },
     "commands": [
       {
         "name": "no-apiversion-tool",

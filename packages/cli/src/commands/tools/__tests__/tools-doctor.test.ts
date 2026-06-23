@@ -36,6 +36,10 @@ describe('toolsDoctor', () => {
 
   it('returns an empty doctor result when no diagnostics were recorded', () => {
     const result = toolsDoctor([]);
-    expect(result).toEqual({ type: 'tools-doctor', diagnostics: [], totalCount: 0 });
+    expect(result).toEqual({
+      type: 'tools-doctor',
+      diagnostics: [],
+      totalCount: 0,
+    });
   });
 });

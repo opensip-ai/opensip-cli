@@ -97,7 +97,11 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   if (pluginResult.errors.length > 0) {
     // Structured classification happens in finalizeFitLoadOutcome; log only here.
     for (const err of pluginResult.errors) {
-      logger.warn({ evt: 'cli.plugin.warning', module: 'cli:fit', message: err });
+      logger.warn({
+        evt: 'cli.plugin.warning',
+        module: 'cli:fit',
+        message: err,
+      });
     }
   }
 

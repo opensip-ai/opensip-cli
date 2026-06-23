@@ -49,14 +49,22 @@ describe('scrubModuleNotFoundMessage', () => {
 
 describe('classifyModuleError', () => {
   it('classifies ERR_MODULE_NOT_FOUND with scrubbed message and no absolute path leak', () => {
-    const error = Object.assign(new Error(ABS_CORE_IDENTITY), { code: 'ERR_MODULE_NOT_FOUND' });
-    const diag = classifyModuleError(error, { packageName: '@opensip-cli/core', toolId: 'fit' });
+    const error = Object.assign(new Error(ABS_CORE_IDENTITY), {
+      code: 'ERR_MODULE_NOT_FOUND',
+    });
+    const diag = classifyModuleError(error, {
+      packageName: '@opensip-cli/core',
+      toolId: 'fit',
+    });
 
     expect(diag.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_INTEGRITY_INJECTED_COPY_STALE);
     expect(diag.category).toBe('integrity');
     expect(diag.message).not.toContain('/Users/');
     expect(diag.provenance).toEqual(
-      expect.objectContaining({ packageName: '@opensip-cli/core', toolId: 'fit' }),
+      expect.objectContaining({
+        packageName: '@opensip-cli/core',
+        toolId: 'fit',
+      }),
     );
   });
 
@@ -97,8 +105,12 @@ describe('classifyIntegrityFailure', () => {
 
 describe('detectIntegrityFailure', () => {
   it('detects stale injected-copy patterns from a module-not-found throw', () => {
-    const error = Object.assign(new Error(ABS_CORE_IDENTITY), { code: 'ERR_MODULE_NOT_FOUND' });
-    const detected = detectIntegrityFailure(error, { packageName: '@opensip-cli/core' });
+    const error = Object.assign(new Error(ABS_CORE_IDENTITY), {
+      code: 'ERR_MODULE_NOT_FOUND',
+    });
+    const detected = detectIntegrityFailure(error, {
+      packageName: '@opensip-cli/core',
+    });
 
     expect(detected?.kind).toBe('injected-copy-stale');
     expect(detected?.packageName).toBe('@opensip-cli/core');

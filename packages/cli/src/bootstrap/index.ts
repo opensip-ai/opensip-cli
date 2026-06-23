@@ -173,7 +173,10 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   const globalAuthoredDir = resolveUserPaths().authoredToolsDir;
   let projectAuthoredDir: string | undefined;
   try {
-    const project = resolveProjectContext({ cwd: opts.cwd, cwdExplicit: false });
+    const project = resolveProjectContext({
+      cwd: opts.cwd,
+      cwdExplicit: false,
+    });
     if (project.scope === 'project') {
       projectAuthoredDir = resolveProjectPaths(project.projectRoot).authoredToolsDir;
     }
@@ -192,7 +195,11 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // discovered here. The pre-action hook drives the generic capability loader
   // per command for the invoked tool's declared domains (§5.3/§4.5) — no
   // host-coupled, eager, per-tool discovery at bootstrap.
-  return { provenance, manifests, bootstrapDiagnostics: takeBootstrapDiagnostics() };
+  return {
+    provenance,
+    manifests,
+    bootstrapDiagnostics: takeBootstrapDiagnostics(),
+  };
 }
 
 /** What {@link bootstrapCli} hands back to the composition root. */

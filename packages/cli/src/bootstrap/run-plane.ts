@@ -177,7 +177,9 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         sessionId = id;
         // persistMs: host-side write cost, recorded on the sibling metrics row
         // (separate clock from canonical durationMs).
-        repo.upsertHostMetrics(id, { persistMs: Math.max(0, performance.now() - persistStart) });
+        repo.upsertHostMetrics(id, {
+          persistMs: Math.max(0, performance.now() - persistStart),
+        });
         log.info?.({
           evt: 'cli.run-session.recorded',
           module: MODULE_TAG,

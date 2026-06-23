@@ -72,3 +72,27 @@ export const CLI_DIAGNOSTIC_CODES = {
 } as const;
 
 export type CliDiagnosticCode = (typeof CLI_DIAGNOSTIC_CODES)[keyof typeof CLI_DIAGNOSTIC_CODES];
+
+const SEVERITY_LABEL: Record<CliDiagnosticSeverity, string> = {
+  error: 'error',
+  warning: 'warning',
+};
+
+/** Canonical human stderr block for one diagnostic (ADR-0060 host renderer). */
+export function formatCliDiagnosticHuman(diag: CliDiagnostic): string {
+  const lines: string[] = [
+    `opensip: ${SEVERITY_LABEL[diag.severity]} [${diag.code}]: ${diag.message}`,
+    `  impact: ${diag.impact}`,
+  ];
+  if (diag.action !== undefined) lines.push(`  action: ${diag.action}`);
+  if (diag.logRef !== undefined) lines.push(`  log: ${diag.logRef}`);
+  return lines.join('\n');
+}
+
+/** Stamp `logRef` from the current run id when absent. */
+export function withLogRef(diagnostic: CliDiagnostic, runId?: string): CliDiagnostic {
+  if (runId === undefined || runId.length === 0 || diagnostic.logRef !== undefined) {
+    return diagnostic;
+  }
+  return { ...diagnostic, logRef: runId };
+}

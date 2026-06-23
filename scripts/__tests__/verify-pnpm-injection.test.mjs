@@ -32,7 +32,9 @@ test('verifyConfigFromText rejects missing injectWorkspacePackages', () => {
 test('entryFor resolves conditional and main fallbacks', () => {
   assert.equal(
     entryFor({
-      exports: { '.': { import: './dist/index.js', types: './dist/index.d.ts' } },
+      exports: {
+        '.': { import: './dist/index.js', types: './dist/index.d.ts' },
+      },
     }),
     './dist/index.js',
   );
@@ -82,7 +84,7 @@ test('opensipToolsEqual compares manifest blocks regardless of key order', () =>
     true,
   );
   assert.equal(opensipToolsEqual({ kind: 'tool' }, { kind: 'fit-pack' }), false);
-  assert.equal(opensipToolsEqual({ kind: 'tool' }, undefined), false);
+  assert.equal(opensipToolsEqual({ kind: 'tool' }), false);
 });
 
 test('verifyPackageFreshness detects entry, export, dist, and opensipTools drift', () => {
@@ -176,15 +178,9 @@ test('collectSourcePackages and collectInjectedPackages index by package name', 
   );
 
   mkdirSync(packagesDir, { recursive: true });
-  writeFileSync(
-    join(packagesDir, 'package.json'),
-    JSON.stringify({ name: '@opensip-cli/demo' }),
-  );
+  writeFileSync(join(packagesDir, 'package.json'), JSON.stringify({ name: '@opensip-cli/demo' }));
   mkdirSync(injectedDir, { recursive: true });
-  writeFileSync(
-    join(injectedDir, 'package.json'),
-    JSON.stringify({ name: '@opensip-cli/demo' }),
-  );
+  writeFileSync(join(injectedDir, 'package.json'), JSON.stringify({ name: '@opensip-cli/demo' }));
 
   const source = collectSourcePackages(join(root, 'packages'));
   const injected = collectInjectedPackages(join(root, 'node_modules', '.pnpm'));
@@ -197,7 +193,13 @@ test('formatContentFailures includes remedy steps', () => {
     new Map([
       [
         '@opensip-cli/core',
-        [{ kind: 'export', subpath: './tools/identity', file: './dist/tools/identity.js' }],
+        [
+          {
+            kind: 'export',
+            subpath: './tools/identity',
+            file: './dist/tools/identity.js',
+          },
+        ],
       ],
     ]),
   );

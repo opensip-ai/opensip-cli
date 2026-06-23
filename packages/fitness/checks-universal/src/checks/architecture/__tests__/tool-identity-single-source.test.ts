@@ -31,7 +31,9 @@ describe('tool-identity-single-source', () => {
         pluginLayout: { domain: 'fit', userSubdirs: ['checks'] },
       },
     };
-    expect(analyzeToolIdentitySingleSource(pkg, 'packages/fitness/engine/package.json')).toEqual([]);
+    expect(analyzeToolIdentitySingleSource(pkg, 'packages/fitness/engine/package.json')).toEqual(
+      [],
+    );
   });
 
   it('flags missing identity', () => {

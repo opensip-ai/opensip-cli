@@ -7,12 +7,19 @@
   "opensipTools": {
     "kind": "tool",
     "id": "audit-demo-tool",
-    "identity": { "name": "audit-demo-tool", "aliases": ["audit-demo"] },
+    "identity": {
+      "name": "audit-demo-tool",
+      "aliases": [
+        "audit-demo"
+      ]
+    },
     "apiVersion": 1,
     "commands": [
       {
         "name": "audit-demo-tool",
-        "aliases": ["audit-demo"],
+        "aliases": [
+          "audit-demo"
+        ],
         "description": "Demo audit command contributed by a tool plugin",
         "commonFlags": [],
         "scope": "project",

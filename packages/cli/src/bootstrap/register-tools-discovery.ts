@@ -244,7 +244,9 @@ async function registerDiscoveredInstalledPackage(
   if (isHostRuntimeImportForbidden(args.env)) {
     // Synchronous void registration (no import in the host); `void` marks the
     // floating call as deliberately non-promise (the synthesize path never awaits).
-    void registerSyntheticExternalTool(args, admission, { sourcePackage: pkg.name });
+    void registerSyntheticExternalTool(args, admission, {
+      sourcePackage: pkg.name,
+    });
     return;
   }
 

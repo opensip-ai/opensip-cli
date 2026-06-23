@@ -7,7 +7,11 @@
  * diagnostics that point at rebuild/reinstall rather than config edits.
  */
 
-import { CLI_DIAGNOSTIC_CODES, type CliDiagnostic, type CliDiagnosticProvenance } from './cli-diagnostic.js';
+import {
+  CLI_DIAGNOSTIC_CODES,
+  type CliDiagnostic,
+  type CliDiagnosticProvenance,
+} from './cli-diagnostic.js';
 
 /** Input for an integrity failure the host already diagnosed structurally. */
 export interface IntegrityFailureInput {
@@ -19,8 +23,7 @@ export interface IntegrityFailureInput {
 
 const MODULE_NOT_FOUND_RE = /Cannot find module (['"])([^'"]+)\1/g;
 
-const INJECTED_COPY_HINT =
-  /node_modules\/\.pnpm\/@opensip-cli\+|node_modules\/@opensip-cli\//;
+const INJECTED_COPY_HINT = /node_modules\/\.pnpm\/@opensip-cli\+|node_modules\/@opensip-cli\//;
 
 /**
  * Replace an absolute filesystem path in a module-resolution message with a
@@ -106,7 +109,7 @@ export function classifyModuleError(
         ? 'Rebuild the workspace and refresh injected copies: `pnpm build` then `rm -f node_modules/.pnpm-workspace-state-v1.json && pnpm install`.'
         : 'Verify the package is installed and its build output exists.',
       provenance,
-      detail: rawMessage !== scrubbed ? rawMessage : undefined,
+      detail: rawMessage === scrubbed ? undefined : rawMessage,
     };
   }
 
@@ -117,7 +120,7 @@ export function classifyModuleError(
     message: scrubbed,
     impact: 'A bootstrap loader failed, so the selected command may be incomplete.',
     provenance,
-    detail: rawMessage !== scrubbed ? rawMessage : undefined,
+    detail: rawMessage === scrubbed ? undefined : rawMessage,
   };
 }
 
@@ -136,7 +139,7 @@ export function classifyIntegrityFailure(input: IntegrityFailureInput): CliDiagn
   const { kind, packageName, expectedEntry, provenance } = input;
 
   if (kind === 'injected-copy-stale') {
-    const entryHint = expectedEntry !== undefined ? ` (missing ${expectedEntry})` : '';
+    const entryHint = expectedEntry === undefined ? '' : ` (missing ${expectedEntry})`;
     return {
       severity: 'error',
       code: CLI_DIAGNOSTIC_CODES.OPENSIP_INTEGRITY_INJECTED_COPY_STALE,
@@ -151,7 +154,7 @@ export function classifyIntegrityFailure(input: IntegrityFailureInput): CliDiagn
   }
 
   if (kind === 'missing-dist-entry') {
-    const entryHint = expectedEntry !== undefined ? ` (${expectedEntry})` : '';
+    const entryHint = expectedEntry === undefined ? '' : ` (${expectedEntry})`;
     return {
       severity: 'error',
       code: CLI_DIAGNOSTIC_CODES.OPENSIP_INTEGRITY_MISSING_DIST_ENTRY,

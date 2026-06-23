@@ -31,19 +31,20 @@ import { buildFitnessSessionPayload } from '../cli/fit/result-builders.js';
 import { executeFit } from '../cli/fit.js';
 import { fitnessTool } from '../tool.js';
 
+import type * as CheckLoaderModule from '../cli/fit/check-loader.js';
 import type { FitOptions } from '@opensip-cli/contracts';
 
 // Unit tests run without built @opensip-cli/checks-* dist artifacts — seed a stub
 // check so executeFit reaches the recipe path (ADR-0060 fail-closed otherwise).
 vi.mock('../cli/fit/check-loader.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../cli/fit/check-loader.js')>();
+  const actual = await importOriginal<typeof CheckLoaderModule>();
   const { currentCheckRegistry, currentFitnessLoadState } =
     await import('../framework/scope-registry.js');
   const { defineCheck } = await import('../framework/define-check.js');
   return {
     ...actual,
-    ensureChecksLoaded: vi.fn(async (projectDir?: string) => {
-      const key = projectDir ?? '';
+    ensureChecksLoaded: vi.fn((projectDir = '') => {
+      const key = projectDir;
       const load = currentFitnessLoadState();
       if (load.loadedFor === key) return;
       const registry = currentCheckRegistry();

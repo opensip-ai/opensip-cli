@@ -42,8 +42,6 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const WORKSPACE = join(REPO_ROOT, 'pnpm-workspace.yaml');
-const PACKAGES_DIR = join(REPO_ROOT, 'packages');
-const PNPM_DIR = join(REPO_ROOT, 'node_modules', '.pnpm');
 
 const SKIP_PACKAGE_DIRS = new Set(['node_modules', 'dist', '.git', '.claude', 'coverage']);
 
@@ -58,10 +56,16 @@ const log = (msg) => console.error(`[verify-pnpm-injection] ${msg}`);
 export function verifyConfigFromText(text) {
   const match = text.match(/^injectWorkspacePackages:\s*(\S+)/m);
   if (!match) {
-    return { ok: false, reason: 'MISSING injectWorkspacePackages in pnpm-workspace.yaml' };
+    return {
+      ok: false,
+      reason: 'MISSING injectWorkspacePackages in pnpm-workspace.yaml',
+    };
   }
   if (match[1] !== 'true') {
-    return { ok: false, reason: `injectWorkspacePackages must be true (found: ${match[1]})` };
+    return {
+      ok: false,
+      reason: `injectWorkspacePackages must be true (found: ${match[1]})`,
+    };
   }
   return { ok: true };
 }
@@ -164,7 +168,7 @@ export function compareDistFileSets(sourceFiles, injectedFiles) {
 
 /** Deep-sort object keys for stable JSON comparison. */
 export function sortKeysDeep(value) {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (Array.isArray(value)) return value.map((item) => sortKeysDeep(item));
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.keys(value)
@@ -179,9 +183,7 @@ export function sortKeysDeep(value) {
 export function opensipToolsEqual(sourceTools, injectedTools) {
   if (sourceTools === undefined && injectedTools === undefined) return true;
   if (sourceTools === undefined || injectedTools === undefined) return false;
-  return (
-    JSON.stringify(sortKeysDeep(sourceTools)) === JSON.stringify(sortKeysDeep(injectedTools))
-  );
+  return JSON.stringify(sortKeysDeep(sourceTools)) === JSON.stringify(sortKeysDeep(injectedTools));
 }
 
 /** Recursively collect every package.json path under packages/. */
@@ -287,7 +289,10 @@ export function verifyPackageFreshness(source, injected) {
       }
     }
 
-    if (source.pkg.opensipTools !== undefined && !opensipToolsEqual(source.pkg.opensipTools, injected.pkg.opensipTools)) {
+    if (
+      source.pkg.opensipTools !== undefined &&
+      !opensipToolsEqual(source.pkg.opensipTools, injected.pkg.opensipTools)
+    ) {
       issues.push({ kind: 'opensipTools' });
     }
   }
@@ -337,48 +342,58 @@ export function verifyInjectedContent(options = {}) {
   return { checked, issuesByPkg };
 }
 
-/** @param {Map<string, Array<Record<string, unknown>>>} issuesByPkg */
-export function formatContentFailures(issuesByPkg) {
+/** @param {Array<Record<string, unknown>>} issues */
+function issueLines(issues) {
   const lines = [];
-  lines.push('CONTENT: injected workspace copies are stale vs source:');
-  for (const [pkg, issues] of [...issuesByPkg.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    lines.push(`  - ${pkg}:`);
-    for (const issue of issues) {
-      switch (issue.kind) {
-        case 'pnpm-missing':
-          lines.push('      node_modules/.pnpm not found — run `pnpm install` first');
-          break;
-        case 'entry':
-          lines.push(`      missing entry → ${issue.entry}`);
-          break;
-        case 'export':
-          lines.push(`      missing export ${issue.subpath} → ${issue.file}`);
-          break;
-        case 'dist-missing':
-          lines.push(
-            `      dist/ missing ${issue.files.length} file(s): ${issue.files.map((f) => `dist/${f}`).join(', ')}`,
-          );
-          break;
-        case 'dist-extra':
-          lines.push(
-            `      dist/ has ${issue.files.length} stale file(s): ${issue.files.map((f) => `dist/${f}`).join(', ')}`,
-          );
-          break;
-        case 'opensipTools':
-          lines.push('      package.json#opensipTools differs from source');
-          break;
-        default:
-          break;
+  for (const issue of issues) {
+    switch (issue.kind) {
+      case 'pnpm-missing': {
+        lines.push('      node_modules/.pnpm not found — run `pnpm install` first');
+        break;
+      }
+      case 'entry': {
+        lines.push(`      missing entry → ${issue.entry}`);
+        break;
+      }
+      case 'export': {
+        lines.push(`      missing export ${issue.subpath} → ${issue.file}`);
+        break;
+      }
+      case 'dist-missing': {
+        const paths = issue.files.map((f) => `dist/${f}`).join(', ');
+        lines.push(`      dist/ missing ${issue.files.length} file(s): ${paths}`);
+        break;
+      }
+      case 'dist-extra': {
+        const paths = issue.files.map((f) => `dist/${f}`).join(', ');
+        lines.push(`      dist/ has ${issue.files.length} stale file(s): ${paths}`);
+        break;
+      }
+      case 'opensipTools': {
+        lines.push('      package.json#opensipTools differs from source');
+        break;
+      }
+      default: {
+        break;
       }
     }
   }
-  lines.push('Injected copies were snapshotted before the package was built (or the');
-  lines.push('pnpm store cache is cold). `pnpm build` alone does NOT re-sync them.');
-  lines.push('Remedy:');
-  for (const step of REMEDY_LINES) {
-    lines.push(`  ${step}`);
-  }
   return lines;
+}
+
+/** @param {Map<string, Array<Record<string, unknown>>>} issuesByPkg */
+export function formatContentFailures(issuesByPkg) {
+  const header = ['CONTENT: injected workspace copies are stale vs source:'];
+  const pkgLines = [...issuesByPkg.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([pkg, issues]) => [`  - ${pkg}:`, ...issueLines(issues)]);
+  const footer = [
+    'Injected copies were snapshotted before the package was built (or the',
+    'pnpm store cache is cold). `pnpm build` alone does NOT re-sync them.',
+    'Remedy:',
+    ...REMEDY_LINES.map((step) => `  ${step}`),
+  ];
+  return [...header, ...pkgLines, ...footer];
 }
 
 function main() {
@@ -403,8 +418,7 @@ function main() {
   log(`OK — injectWorkspacePackages: true; ${checked} injected packages match source`);
 }
 
-const invokedDirectly =
-  process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (invokedDirectly) {
   main();
 }

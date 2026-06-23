@@ -9,8 +9,8 @@
  */
 
 import type { ToolShortId } from './ids.js';
-import type { RunTimer } from '../lib/run-timer.js';
 import type { ToolRunOutcome } from './run-outcome.js';
+import type { RunTimer } from '../lib/run-timer.js';
 
 /**
  * Canonical generic stored-session leaf shape accepted by tool replay hooks.

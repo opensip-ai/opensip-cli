@@ -392,8 +392,18 @@ export type PluginResult =
        */
       toolProvenance: readonly ToolProvenance[];
     }
-  | { type: 'plugin-add'; packageName: string; success: boolean; error?: string }
-  | { type: 'plugin-remove'; packageName: string; success: boolean; error?: string }
+  | {
+      type: 'plugin-add';
+      packageName: string;
+      success: boolean;
+      error?: string;
+    }
+  | {
+      type: 'plugin-remove';
+      packageName: string;
+      success: boolean;
+      error?: string;
+    }
   | {
       type: 'plugin-sync';
       synced: readonly SyncEntry[];
@@ -440,5 +450,5 @@ export interface ErrorResult {
   /** Machine-readable error code (e.g. CLI_DIAGNOSTIC_CODES value). */
   code?: string;
   /** Structured diagnostic substrate when the error is host-classified (ADR-0060). */
-  diagnostic?: import('./cli-diagnostic.js').CliDiagnostic;
+  diagnostic?: CliDiagnostic;
 }

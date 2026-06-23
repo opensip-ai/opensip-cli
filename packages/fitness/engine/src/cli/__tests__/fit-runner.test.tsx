@@ -136,8 +136,16 @@ describe('renderFitLive produce mapping', () => {
     expect(outcome.kind).toBe('done');
     if (outcome.kind !== 'done') return;
     expect(outcome.done.table).toBeUndefined();
-    expect(outcome.done.summary).toMatchObject({ passed: true, errors: 0, warnings: 0 });
-    expect(outcome.session).toMatchObject({ tool: 'fit', cwd: '/proj', passed: true });
+    expect(outcome.done.summary).toMatchObject({
+      passed: true,
+      errors: 0,
+      warnings: 0,
+    });
+    expect(outcome.session).toMatchObject({
+      tool: 'fit',
+      cwd: '/proj',
+      passed: true,
+    });
   });
 
   it('includes the validated-column table when --verbose', async () => {

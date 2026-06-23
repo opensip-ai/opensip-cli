@@ -4,6 +4,8 @@
  * diagnostics; detailed raw errors stay in structured logs (`logRef`).
  */
 
+import { formatCliDiagnosticHuman } from '@opensip-cli/core';
+
 import type { CliDiagnostic } from '@opensip-cli/contracts';
 
 /** Host seam for stderr delivery — keeps the renderer testable without Ink. */
@@ -11,22 +13,11 @@ export interface DiagnosticRenderHost {
   readonly writeStderr: (text: string) => void;
 }
 
-const SEVERITY_LABEL: Record<CliDiagnostic['severity'], string> = {
-  error: 'error',
-  warning: 'warning',
-};
-
 /**
  * Materialize one diagnostic as the canonical human line + indented detail block.
  */
 export function renderDiagnosticHuman(diag: CliDiagnostic): string {
-  const lines: string[] = [
-    `opensip: ${SEVERITY_LABEL[diag.severity]} [${diag.code}]: ${diag.message}`,
-    `  impact: ${diag.impact}`,
-  ];
-  if (diag.action !== undefined) lines.push(`  action: ${diag.action}`);
-  if (diag.logRef !== undefined) lines.push(`  log: ${diag.logRef}`);
-  return lines.join('\n');
+  return formatCliDiagnosticHuman(diag);
 }
 
 /**

@@ -23,17 +23,30 @@ import {
   currentCheckRegistry,
   currentFitnessLoadState,
 } from '../../framework/scope-registry.js';
-import { finalizeFitLoadOutcome } from '../fit/load-outcome.js';
 import { fitnessTool } from '../../tool.js';
+import { finalizeFitLoadOutcome } from '../fit/load-outcome.js';
 import { executeFit } from '../fit.js';
 
+import type * as LoaderModule from '../../plugins/loader.js';
 import type { FitOptions } from '@opensip-cli/contracts';
+import type * as CoreModule from '@opensip-cli/core';
+
+const DEFAULT_FIT_CONFIG: Record<string, unknown> = {
+  targets: {
+    source: {
+      description: 'minimal',
+      languages: ['typescript'],
+      concerns: ['backend'],
+      include: ['src/**/*.ts'],
+    },
+  },
+};
 
 const loadAllPluginsMock = vi.hoisted(() => vi.fn());
 const loadCapabilityDomainMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../plugins/loader.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../plugins/loader.js')>();
+  const actual = await importOriginal<typeof LoaderModule>();
   return {
     ...actual,
     loadAllPlugins: loadAllPluginsMock,
@@ -41,7 +54,7 @@ vi.mock('../../plugins/loader.js', async (importOriginal) => {
 });
 
 vi.mock('@opensip-cli/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@opensip-cli/core')>();
+  const actual = await importOriginal<typeof CoreModule>();
   return {
     ...actual,
     loadCapabilityDomain: loadCapabilityDomainMock,
@@ -68,18 +81,12 @@ function fitArgs(cwd: string): FitOptions {
 
 function withFitScope<T>(
   fn: () => Promise<T>,
-  configDocument: Record<string, unknown> = {
-    targets: {
-      source: {
-        description: 'minimal',
-        languages: ['typescript'],
-        concerns: ['backend'],
-        include: ['src/**/*.ts'],
-      },
-    },
-  },
+  configDocument: Record<string, unknown> = DEFAULT_FIT_CONFIG,
 ): Promise<T> {
-  const scope = new RunScope({ languages: new LanguageRegistry() });
+  const scope = new RunScope({
+    languages: new LanguageRegistry(),
+    runId: 'run_test',
+  });
   applyToolContributeScope(scope, fitnessTool);
   Object.assign(scope, { configDocument });
   return runWithScope(scope, fn);
@@ -125,6 +132,32 @@ describe('executeFit fail-closed (ADR-0060)', () => {
       expect(result.result.diagnostic?.code).toBe(
         CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_EMPTY_CHECK_REGISTRY,
       );
+      expect(result.result.diagnostic?.logRef).toBeDefined();
+    });
+  });
+
+  it('scrubs absolute module paths from required plugin command-error detail', async () => {
+    const pluginPath = join(projectDir, 'opensip-cli', 'fit', 'checks');
+    mkdirSync(pluginPath, { recursive: true });
+    writeFileSync(join(pluginPath, 'broken.mjs'), 'export default {};\n');
+
+    const absolute =
+      '/Users/sb/proj/node_modules/.pnpm/@opensip-cli+core@file+packages+core/node_modules/@opensip-cli/core/dist/missing.js';
+    loadAllPluginsMock.mockResolvedValue({
+      plugins: [],
+      totals: {},
+      errors: [`broken.mjs: Cannot find module '${absolute}'`],
+    });
+
+    await withFitScope(async () => {
+      const result = await executeFit(fitArgs(projectDir));
+      expect(result.result.type).toBe('error');
+      if (result.result.type !== 'error') return;
+      expect(result.result.diagnostic?.message).not.toContain('/Users/sb/proj/node_modules');
+      const detail = result.result.diagnostic?.detail;
+      if (detail !== undefined) {
+        expect(detail).not.toContain('/Users/sb/proj/node_modules');
+      }
     });
   });
 
@@ -150,7 +183,7 @@ describe('executeFit fail-closed (ADR-0060)', () => {
 
   it('classifies required checkPackages load failure as command-error', async () => {
     await withFitScope(
-      async () => {
+      () => {
         const load = currentFitnessLoadState();
         Object.assign(load, createFitnessLoadState());
         load.loadedFor = projectDir;
@@ -169,7 +202,10 @@ describe('executeFit fail-closed (ADR-0060)', () => {
           'test',
         );
         finalizeFitLoadOutcome(projectDir);
-        expect(load.commandError?.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED);
+        expect(load.commandError?.code).toBe(
+          CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
+        );
+        return Promise.resolve();
       },
       {
         plugins: { checkPackages: ['@acme/required-pack'] },
@@ -186,7 +222,7 @@ describe('executeFit fail-closed (ADR-0060)', () => {
   });
 
   it('marks optional plugin failure as degraded when built-in checks are registered', async () => {
-    await withFitScope(async () => {
+    await withFitScope(() => {
       const load = currentFitnessLoadState();
       Object.assign(load, createFitnessLoadState());
       load.loadedFor = projectDir;
@@ -211,6 +247,7 @@ describe('executeFit fail-closed (ADR-0060)', () => {
       expect(load.commandError).toBeUndefined();
       expect(load.loadDegraded).toBe(true);
       expect(load.degradedDiagnostics.length).toBeGreaterThan(0);
+      return Promise.resolve();
     });
   });
 });

@@ -3,7 +3,11 @@
  * {@link CliDiagnostic}s (ADR-0060, Phase 3).
  */
 
-import { CLI_DIAGNOSTIC_CODES, type CliDiagnostic, type CliDiagnosticProvenance } from './cli-diagnostic.js';
+import {
+  CLI_DIAGNOSTIC_CODES,
+  type CliDiagnostic,
+  type CliDiagnosticProvenance,
+} from './cli-diagnostic.js';
 
 import type { CapabilityDiscoveryDiagnostic } from '../plugins/capability-discovery.js';
 

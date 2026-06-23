@@ -505,79 +505,73 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
  * `command-result`: the host dispatches the returned result through the shared
  * seam (`--json` → JSON, else render).
  */
-export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
-  unknown,
-  ToolCliContext
->({
-  name: 'recipes',
-  description: 'List available graph recipes',
-  commonFlags: ['json'],
-  scope: 'project',
-  output: 'command-result',
-  handler: async () => listGraphRecipes(),
-});
+export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
+  defineNestedCommand<unknown, ToolCliContext>({
+    name: 'recipes',
+    description: 'List available graph recipes',
+    commonFlags: ['json'],
+    scope: 'project',
+    output: 'command-result',
+    handler: async () => listGraphRecipes(),
+  });
 
 /** `graph lookup <name>` — look up function occurrences by simple name. */
-export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
-  unknown,
-  ToolCliContext
->({
-  name: 'lookup',
-  description: 'Look up function occurrences by simple name from the persisted catalog',
-  commonFlags: ['json'],
-  args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
-  scope: 'project',
-  output: RAW_STREAM,
-  rawStreamReason: 'lookup',
-  handler: async (rawOpts, cli): Promise<void> => {
-    const opts = rawOpts as { json?: boolean } & Record<string, unknown>;
-    await executeLookup({ name: firstArg(opts), json: opts.json }, cli);
-  },
-});
+export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
+  defineNestedCommand<unknown, ToolCliContext>({
+    name: 'lookup',
+    description: 'Look up function occurrences by simple name from the persisted catalog',
+    commonFlags: ['json'],
+    args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
+    scope: 'project',
+    output: RAW_STREAM,
+    rawStreamReason: 'lookup',
+    handler: async (rawOpts, cli): Promise<void> => {
+      const opts = rawOpts as { json?: boolean } & Record<string, unknown>;
+      await executeLookup({ name: firstArg(opts), json: opts.json }, cli);
+    },
+  });
 
 /**
  * `graph index` — emit a `symbolindex.json` artifact (name→file:line and
  * file→names). Default (query): read the persisted catalog only. `--build`:
  * run the graph pipeline first, then emit from the refreshed catalog (Q7).
  */
-export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
-  unknown,
-  ToolCliContext
->({
-  name: 'index',
-  description:
-    'Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first',
-  commonFlags: [],
-  options: [
-    {
-      flag: '--build',
-      description: 'Run the graph pipeline to refresh the catalog before emitting the index',
-      default: false,
+export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
+  defineNestedCommand<unknown, ToolCliContext>({
+    name: 'index',
+    description:
+      'Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first',
+    commonFlags: [],
+    options: [
+      {
+        flag: '--build',
+        description: 'Run the graph pipeline to refresh the catalog before emitting the index',
+        default: false,
+      },
+      // --cwd keeps its command-specific description (the out path resolves
+      // against it), so it is declared as a tool option rather than the common
+      // flag. The literal default is `process.cwd()`, evaluated once at module
+      // load (CLI startup) — equivalent to the former register-time evaluation.
+      {
+        flag: OPT_CWD,
+        description: 'Target directory (out path resolves against this)',
+        default: process.cwd(),
+      },
+      {
+        flag: '--out',
+        value: '<path>',
+        description: 'Output file path',
+        default: 'symbolindex.json',
+      },
+    ],
+    scope: 'project',
+    output: RAW_STREAM,
+    rawStreamReason: REASON_FILE_EXPORT,
+    handler: async (rawOpts, cli): Promise<void> => {
+      const opts = rawOpts as { cwd: string; out: string; build?: boolean };
+      await executeSymbolIndex({ cwd: opts.cwd, out: opts.out, build: opts.build }, cli);
     },
-    // --cwd keeps its command-specific description (the out path resolves
-    // against it), so it is declared as a tool option rather than the common
-    // flag. The literal default is `process.cwd()`, evaluated once at module
-    // load (CLI startup) — equivalent to the former register-time evaluation.
-    {
-      flag: OPT_CWD,
-      description: 'Target directory (out path resolves against this)',
-      default: process.cwd(),
-    },
-    {
-      flag: '--out',
-      value: '<path>',
-      description: 'Output file path',
-      default: 'symbolindex.json',
-    },
-  ],
-  scope: 'project',
-  output: RAW_STREAM,
-  rawStreamReason: REASON_FILE_EXPORT,
-  handler: async (rawOpts, cli): Promise<void> => {
-    const opts = rawOpts as { cwd: string; out: string; build?: boolean };
-    await executeSymbolIndex({ cwd: opts.cwd, out: opts.out, build: opts.build }, cli);
-  },
-});
+  });
 
 /**
  * `graph list` — list available graph rules (the natural analog of `fit list`,

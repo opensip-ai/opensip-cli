@@ -42,10 +42,7 @@ const toolWithReplay = (name: string, replayTool: string): Tool => ({
   },
 });
 
-const indexedTool = (
-  name: string,
-  identity?: Tool['identity'],
-): Tool => {
+const indexedTool = (name: string, identity?: Tool['identity']): Tool => {
   const resolvedIdentity = identity ?? { name };
   return {
     identity: resolvedIdentity,

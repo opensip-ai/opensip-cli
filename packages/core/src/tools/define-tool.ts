@@ -39,10 +39,7 @@ export interface DefineToolInput {
   readonly contractVersion?: string;
 }
 
-function aliasesEqual(
-  a: readonly string[] | undefined,
-  b: readonly string[],
-): boolean {
+function aliasesEqual(a: readonly string[] | undefined, b: readonly string[]): boolean {
   const left = a ?? [];
   if (left.length !== b.length) return false;
   return left.every((value, index) => value === b[index]);

@@ -100,7 +100,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  Object.defineProperty(process.stdout, 'isTTY', { value: savedTTY, configurable: true });
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: savedTTY,
+    configurable: true,
+  });
   vi.restoreAllMocks();
 });
 
@@ -162,7 +165,9 @@ describe('runLiveMode', () => {
     expect(render).toHaveBeenCalledWith(result);
     expect(render).toHaveBeenCalledTimes(1);
     expect(render.mock.calls[0]?.[0]).toMatchObject({ type: 'error' });
-    expect(render.mock.calls[0]?.[0]).not.toMatchObject({ type: 'run-presentation' });
+    expect(render.mock.calls[0]?.[0]).not.toMatchObject({
+      type: 'run-presentation',
+    });
     expect(deliverSignals).not.toHaveBeenCalled();
   });
 });
@@ -215,7 +220,10 @@ describe('runJsonMode', () => {
     await runJsonMode(args, cli);
     // 2.12.0 (§5.5): a failed --json run emits a structured error through the
     // `emitError` seam (host wraps it + sets the exit code), not a bare envelope.
-    expect(emitError).toHaveBeenCalledWith({ message: 'no config', exitCode: 2 });
+    expect(emitError).toHaveBeenCalledWith({
+      message: 'no config',
+      exitCode: 2,
+    });
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(emitEnvelope).not.toHaveBeenCalled();
     expect(deliverSignals).not.toHaveBeenCalled();

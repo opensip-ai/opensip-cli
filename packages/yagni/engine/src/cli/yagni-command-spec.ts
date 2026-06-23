@@ -155,9 +155,7 @@ async function runYagniCommand(
   return { session: outcome.session };
 }
 
-export function buildYagniCommandSpec(
-  setUpLiveView: (cli: ToolCliContext) => void,
-) {
+export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {
   return definePrimaryCommand<unknown, ToolCliContext>({
     description: 'Run YAGNI reduction audit detectors (advisory; exit 0 by default)',
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],

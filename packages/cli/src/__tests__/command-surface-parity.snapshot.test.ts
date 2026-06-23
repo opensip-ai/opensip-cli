@@ -360,16 +360,28 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     // The canonical nested export forms (Phase 2) are mounted children under
     // their tool primary — `graph export` and `fit export`.
     expect(nestedChild(program, 'graph', 'export'), '`graph export` must be mounted').toBeDefined();
-    expect(nestedChild(program, 'fitness', 'export'), '`fitness export` must be mounted').toBeDefined();
+    expect(
+      nestedChild(program, 'fitness', 'export'),
+      '`fitness export` must be mounted',
+    ).toBeDefined();
 
     // The new discoverability commands (Phase 3) — `simulation recipes` and `graph list`.
-    expect(nestedChild(program, 'simulation', 'recipes'), '`simulation recipes` must be mounted').toBeDefined();
+    expect(
+      nestedChild(program, 'simulation', 'recipes'),
+      '`simulation recipes` must be mounted',
+    ).toBeDefined();
     expect(nestedChild(program, 'graph', 'list'), '`graph list` must be mounted').toBeDefined();
 
     // The per-tool `plugin` groups mount UNDER the pack-supporting tool primaries
     // (fit + sim; graph has no pluginLayout, so no `plugin` group).
-    expect(nestedChild(program, 'fitness', 'plugin'), '`fitness plugin` must be mounted').toBeDefined();
-    expect(nestedChild(program, 'simulation', 'plugin'), '`simulation plugin` must be mounted').toBeDefined();
+    expect(
+      nestedChild(program, 'fitness', 'plugin'),
+      '`fitness plugin` must be mounted',
+    ).toBeDefined();
+    expect(
+      nestedChild(program, 'simulation', 'plugin'),
+      '`simulation plugin` must be mounted',
+    ).toBeDefined();
     expect(
       nestedChild(program, 'graph', 'plugin'),
       '`graph plugin` must NOT exist (graph supports no packs)',

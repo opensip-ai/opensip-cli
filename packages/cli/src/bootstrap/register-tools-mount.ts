@@ -1,5 +1,6 @@
 import { type CliProgram } from '@opensip-cli/contracts';
 import {
+  CLI_DIAGNOSTIC_CODES,
   logger,
   PluginIncompatibleError,
   type Tool,
@@ -12,6 +13,7 @@ import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import { buildMaybeDispatchExternal } from './bind-external-dispatch.js';
 import { bindToolCliContext } from './bind-tool-context.js';
+import { getBootstrapDiagnosticsBuffer } from './bootstrap-diagnostics-buffer.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { decorateToolPrimary } from './decorate-tool-primary.js';
 import { provenanceSourceFor } from './tool-provenance.js';
@@ -52,7 +54,19 @@ export function mountAllToolCommands(
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const human = tool.metadata.name ?? tool.metadata.id;
-      process.stderr.write(`opensip: tool ${human} failed to mount: ${msg}\n`);
+      getBootstrapDiagnosticsBuffer().record({
+        severity: 'warning',
+        code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_LOAD_FAILED,
+        category: 'discovery',
+        message: `Tool ${human} failed to mount: ${msg}`,
+        impact: 'The tool commands are not available on the CLI surface.',
+        provenance: {
+          toolId: tool.metadata.id,
+          packageName: human,
+          discoverySource: 'mount',
+        },
+        detail: msg,
+      });
       if (provenanceSourceFor(tool, provenance) === 'bundled') {
         logger.warn({
           evt: 'cli.tool.bundled_mount_failed',

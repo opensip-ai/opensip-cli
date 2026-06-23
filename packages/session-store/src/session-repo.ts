@@ -6,6 +6,7 @@ import {
   isToolShortId,
   logger,
   type ToolRunOutcome,
+  type ToolShortId,
 } from '@opensip-cli/core';
 import {
   requireDrizzleDataStore,
@@ -17,7 +18,6 @@ import { count, desc, eq, inArray, lt } from 'drizzle-orm';
 import { sessionHostMetrics, sessions, sessionToolPayload } from './schema/sessions.js';
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
-import type { ToolShortId } from '@opensip-cli/core';
 
 const MODULE_NAME = 'session-store:session-repo';
 
@@ -283,7 +283,10 @@ export class SessionRepo {
       .where(inArray(sessionToolPayload.sessionId, ids))
       .all();
     for (const r of rows) {
-      byId.set(r.sessionId, { payload: r.payload, payload_version: r.payload_version });
+      byId.set(r.sessionId, {
+        payload: r.payload,
+        payload_version: r.payload_version,
+      });
     }
     return byId;
   }
@@ -432,7 +435,10 @@ export class SessionRepo {
           egressMs: metrics.egressMs ?? null,
           totalCommandMs: metrics.totalCommandMs ?? null,
         })
-        .onConflictDoUpdate({ target: sessionHostMetrics.sessionId, set: patch })
+        .onConflictDoUpdate({
+          target: sessionHostMetrics.sessionId,
+          set: patch,
+        })
         .run();
     } catch (error) {
       logger.warn({

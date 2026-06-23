@@ -50,10 +50,7 @@ export type {
 } from './command-spec-draft.js';
 export { validateToolIdentity } from './identity.js';
 export type { ToolIdentity } from './identity.js';
-export {
-  buildToolIdentityIndex,
-  resolveToolFilterToLayoutKey,
-} from './identity-index.js';
+export { buildToolIdentityIndex, resolveToolFilterToLayoutKey } from './identity-index.js';
 export type { ToolIdentityBinding, ToolIdentityIndex } from './identity-index.js';
 export type {
   CommandSpec,

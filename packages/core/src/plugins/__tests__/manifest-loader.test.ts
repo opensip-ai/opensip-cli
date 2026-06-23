@@ -72,7 +72,12 @@ describe('loadToolManifest', () => {
     writePackageManifest(testDir, {
       name: 'installed-tool',
       version: '0.1.0',
-      opensipTools: { kind: 'tool', id: 'installed', identity: { name: 'installed' }, commands: [] },
+      opensipTools: {
+        kind: 'tool',
+        id: 'installed',
+        identity: { name: 'installed' },
+        commands: [],
+      },
     });
     const manifest = loadToolManifest('installed', testDir);
     expect(manifest?.id).toBe('installed');

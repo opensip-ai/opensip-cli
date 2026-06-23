@@ -64,7 +64,12 @@ export function kindFromResult(value: unknown): string {
  * and the gate verdict is read from `.envelope.verdict`, not the outer status.
  */
 export function outcomeFromEnvelope(envelope: SignalEnvelope, exitCode: number): CommandOutcome {
-  return withDiagnostics({ kind: kindFromEnvelope(envelope), status: 'ok', exitCode, envelope });
+  return withDiagnostics({
+    kind: kindFromEnvelope(envelope),
+    status: 'ok',
+    exitCode,
+    envelope,
+  });
 }
 
 /**
@@ -78,7 +83,12 @@ export function outcomeFromResult(value: unknown, exitCode: number): CommandOutc
     const err = value as ErrorResult;
     return withDiagnostics(errorOutcomeFromDetail(err, err.exitCode, value));
   }
-  return withDiagnostics({ kind: kindFromResult(value), status: 'ok', exitCode, data: value });
+  return withDiagnostics({
+    kind: kindFromResult(value),
+    status: 'ok',
+    exitCode,
+    data: value,
+  });
 }
 
 /**

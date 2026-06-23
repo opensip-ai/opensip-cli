@@ -21,9 +21,7 @@ export function showHistory(datastore: DataStore, opts: ShowHistoryOptions = {})
   const repo = new SessionRepo(datastore);
   const identityIndex =
     opts.registry === undefined ? undefined : buildToolIdentityIndex(opts.registry);
-  const sessions = repo
-    .list(opts)
-    .map((s) => toHistorySession(s, opts.summaryOnly, identityIndex));
+  const sessions = repo.list(opts).map((s) => toHistorySession(s, opts.summaryOnly, identityIndex));
   return {
     type: 'history',
     sessions,

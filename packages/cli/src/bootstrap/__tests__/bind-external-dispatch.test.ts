@@ -32,7 +32,10 @@ const TOOL_ID = '11111111-1111-1111-1111-111111111111';
 const TOOL_NAME = 'demo';
 
 function makeTool(): Tool {
-  return { identity: { name: TOOL_NAME }, metadata: { id: TOOL_ID, name: TOOL_NAME } } as unknown as Tool;
+  return {
+    identity: { name: TOOL_NAME },
+    metadata: { id: TOOL_ID, name: TOOL_NAME },
+  } as unknown as Tool;
 }
 
 function makeCtx(): ToolCliContext {

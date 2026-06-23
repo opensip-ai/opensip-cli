@@ -85,7 +85,11 @@ describe('isValidTool', () => {
   it('rejects when identity is missing or invalid', () => {
     expect(isValidTool({ metadata: { id: 'x', name: 'x' }, commands: [] })).toBe(false);
     expect(
-      isValidTool({ identity: { name: 'Not Valid' }, metadata: { id: 'x', name: 'x' }, commands: [] }),
+      isValidTool({
+        identity: { name: 'Not Valid' },
+        metadata: { id: 'x', name: 'x' },
+        commands: [],
+      }),
     ).toBe(false);
   });
 

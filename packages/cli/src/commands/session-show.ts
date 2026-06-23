@@ -52,9 +52,11 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
     );
   }
   const registry = opts.registry ?? currentScope()?.tools;
-  const identityIndex =
-    registry === undefined ? undefined : buildToolIdentityIndex(registry);
-  const resolved = resolveSession(datastore as DataStore, { ref: opts.ref, tool: opts.tool });
+  const identityIndex = registry === undefined ? undefined : buildToolIdentityIndex(registry);
+  const resolved = resolveSession(datastore as DataStore, {
+    ref: opts.ref,
+    tool: opts.tool,
+  });
   if (!resolved.ok) {
     await emitSessionShowError(opts, resolved.reason, resolved.detail);
     return;
@@ -286,7 +288,11 @@ async function emitSessionShowError(
 ): Promise<void> {
   if (opts.json === true) {
     // emitError sets the exit code itself (process exit == reported outcome).
-    opts.emitError({ message: detail, exitCode: EXIT_CODES.CONFIGURATION_ERROR, code: reason });
+    opts.emitError({
+      message: detail,
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      code: reason,
+    });
     return;
   }
   opts.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);

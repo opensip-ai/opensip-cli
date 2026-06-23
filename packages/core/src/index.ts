@@ -454,7 +454,11 @@ export type {
 // Lib — CLI diagnostics (ADR-0060, Phase 2). Typed bootstrap/setup substrate
 // buffered by the scope-owned collector and classified before host rendering.
 // Types DEFINED here; re-exported by @opensip-cli/contracts for CommandOutcome.
-export { CLI_DIAGNOSTIC_CODES } from './lib/cli-diagnostic.js';
+export {
+  CLI_DIAGNOSTIC_CODES,
+  formatCliDiagnosticHuman,
+  withLogRef,
+} from './lib/cli-diagnostic.js';
 export type {
   CliDiagnostic,
   CliDiagnosticCategory,
