@@ -194,7 +194,6 @@ function readGoModulePath(projectDirAbs: string): string | null {
   try {
     content = readFileSync(join(projectDirAbs, 'go.mod'), 'utf8');
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- missing/unreadable go.mod is the expected "no module path" signal for projects that aren't a Go module; caller treats null as "skip module-path resolution".
     return null;
   }
   for (const rawLine of content.split('\n')) {

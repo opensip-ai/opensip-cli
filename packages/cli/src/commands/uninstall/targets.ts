@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- file/dir walks for uninstall planning: missing/unreadable entries (TOCTOU vanish between readdir+stat, permission-denied subdirs) are the expected non-terminal signal to skip; failure-IS-the-signal is the contract in each catch.
 /**
  * @fileoverview Uninstall target collection + display formatting.
  *

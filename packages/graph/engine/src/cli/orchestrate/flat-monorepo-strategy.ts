@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- all catches here are filesystem probes for a discovery walk: readdir on a missing/unreadable dir → skip (treated identically to "empty dir"), JSON.parse on a malformed root package.json → null (caller continues with no workspaces info), statSync probe → "not a directory". Failure IS the function contract in each case.
 /**
  * Flat-monorepo discovery strategy — Phase 12 of opensip's substrate
  * consolidation (opensip DEC-498).

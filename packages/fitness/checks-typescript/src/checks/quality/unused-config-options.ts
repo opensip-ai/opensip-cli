@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- local accumulator Map `accessCounts` in `countPropertyAccesses`; the get+set is a single synchronous increment expression (the `.set` argument contains the `.get`), no await between read and write — no shared/concurrent state
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Unused Configuration Options Check
@@ -281,7 +280,6 @@ export const unusedConfigOptions = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
-    // @fitness-ignore-next-line async-waterfall-detection -- Both scan all files independently; parallelizing would double peak memory by loading file contents twice concurrently
     const configProperties = await collectConfigProperties(files);
     const accessCounts = await countPropertyAccesses(files);
     return findUnusedProperties(configProperties, accessCounts);

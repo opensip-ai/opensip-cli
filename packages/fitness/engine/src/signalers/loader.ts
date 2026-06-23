@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- cache check + populate is synchronous (sync file I/O + Map.set); no async gap, safe in single-threaded Node.js
 // @fitness-ignore-file batch-operation-limits -- iterates bounded collection (signaler entries listed in opensip-cli.config.yml)
 /**
  * @fileoverview Load and cache opensip-cli.config.yml

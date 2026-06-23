@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- the two realpathSync probes (root normalization + per-unit discovery) intentionally fall through: the first uses the resolved path when realpath fails (e.g. a path inside a symlinked dir), the second skips a workspace unit the adapter can't discover (mirrors resolveShards in graph.ts). Both are documented at the call site.
 // @fitness-ignore-file detached-promises -- handleGraphError is synchronous (void); the heuristic flags it as a discarded promise inside the async handler. Mirrors the same pragma on graph.ts for the identical CLI-error-boundary pattern.
 /**
  * `opensip graph --list-files` — discovery-only mode.

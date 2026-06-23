@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- every function here is best-effort cosmetic state for the "update available" notice: any failure (missing dir, malformed JSON, EACCES) must degrade silently to "nothing known" and never break the user's command. Absence and corruption are deliberately equivalent to "no update known".
 // @fitness-ignore-file unbounded-memory -- reads ~/.opensip-cli/update-state.json, a tiny tool-generated cache holding a single version string.
 /**
  * update-state — sticky persistence for the "update available" notice.

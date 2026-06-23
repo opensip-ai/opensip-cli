@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T23:15:41.723Z",
+  "generatedAt": "2026-06-23T23:22:03.483Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,11 +11,10 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 466,
+        "total": 394,
         "bySlug": {
           "throws-documentation": 10,
           "batch-operation-limits": 53,
-          "error-handling-quality": 54,
           "env-secret-exposure": 3,
           "detached-promises": 19,
           "null-safety": 16,
@@ -24,8 +23,6 @@
           "silent-early-returns": 7,
           "one-outcome-shape": 1,
           "duplicate-utility-functions": 22,
-          "toctou-race-condition": 14,
-          "async-waterfall-detection": 6,
           "interface-implementation-consistency": 2,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 6,
@@ -43,6 +40,7 @@
           "unsafe-secret-comparison": 7,
           "canonical-result-usage": 3,
           "logging-standards": 3,
+          "error-handling-quality": 2,
           "sonarjs-backend": 1,
           "stubbed-implementation-detection": 1,
           "callback-invocation-safe": 1,
@@ -91,31 +89,31 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 36,
+          "cli": 23,
           "cli-ui": 1,
-          "config": 6,
-          "core": 32,
-          "dashboard": 4,
-          "fitness/checks-typescript": 87,
-          "fitness/checks-universal": 138,
-          "fitness/engine": 40,
-          "graph/engine": 40,
-          "graph/graph-adapter-common": 3,
-          "graph/graph-go": 4,
+          "config": 2,
+          "core": 13,
+          "dashboard": 2,
+          "fitness/checks-typescript": 81,
+          "fitness/checks-universal": 136,
+          "fitness/engine": 34,
+          "graph/engine": 36,
+          "graph/graph-adapter-common": 2,
+          "graph/graph-go": 3,
           "graph/graph-java": 1,
           "graph/graph-python": 2,
-          "graph/graph-rust": 3,
-          "graph/graph-typescript": 17,
+          "graph/graph-rust": 2,
+          "graph/graph-typescript": 16,
           "languages/lang-go": 4,
           "languages/lang-java": 4,
           "languages/lang-python": 4,
           "languages/lang-rust": 4,
-          "languages/lang-typescript": 9,
-          "output": 8,
-          "simulation": 13,
+          "languages/lang-typescript": 5,
+          "output": 3,
+          "simulation": 12,
           "targeting": 1,
           "test-support": 2,
-          "yagni": 3
+          "yagni": 1
         }
       },
       "graph": {
@@ -126,11 +124,10 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 239,
+        "total": 175,
         "bySlug": {
           "throws-documentation": 9,
           "batch-operation-limits": 41,
-          "error-handling-quality": 50,
           "env-secret-exposure": 2,
           "detached-promises": 18,
           "null-safety": 9,
@@ -139,8 +136,6 @@
           "silent-early-returns": 5,
           "one-outcome-shape": 1,
           "duplicate-utility-functions": 18,
-          "toctou-race-condition": 9,
-          "async-waterfall-detection": 5,
           "interface-implementation-consistency": 1,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 6,
@@ -163,28 +158,28 @@
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 36,
+          "cli": 23,
           "cli-ui": 1,
-          "config": 6,
-          "core": 32,
-          "dashboard": 4,
-          "fitness/engine": 40,
-          "graph/engine": 40,
-          "graph/graph-adapter-common": 3,
-          "graph/graph-go": 4,
+          "config": 2,
+          "core": 13,
+          "dashboard": 2,
+          "fitness/engine": 34,
+          "graph/engine": 36,
+          "graph/graph-adapter-common": 2,
+          "graph/graph-go": 3,
           "graph/graph-java": 1,
           "graph/graph-python": 2,
-          "graph/graph-rust": 3,
-          "graph/graph-typescript": 17,
+          "graph/graph-rust": 2,
+          "graph/graph-typescript": 16,
           "languages/lang-go": 4,
           "languages/lang-java": 4,
           "languages/lang-python": 4,
           "languages/lang-rust": 4,
-          "languages/lang-typescript": 9,
-          "output": 8,
-          "simulation": 13,
+          "languages/lang-typescript": 5,
+          "output": 3,
+          "simulation": 12,
           "targeting": 1,
-          "yagni": 3
+          "yagni": 1
         }
       },
       "graph": {
@@ -205,13 +200,12 @@
     },
     "check-package": {
       "fitness": {
-        "total": 225,
+        "total": 217,
         "bySlug": {
           "batch-operation-limits": 12,
           "performance-anti-patterns": 23,
           "shipped-checks-must-be-generic": 5,
           "fitness-check-standards": 17,
-          "toctou-race-condition": 5,
           "unbounded-memory": 4,
           "null-safety": 7,
           "correlation-id-coverage": 6,
@@ -221,7 +215,6 @@
           "fastify-schema-coverage": 2,
           "throws-documentation": 1,
           "unused-config-options": 13,
-          "error-handling-quality": 4,
           "no-generic-error": 4,
           "numeric-validation": 11,
           "fitness-check-architecture": 4,
@@ -229,9 +222,9 @@
           "unsafe-secret-comparison": 5,
           "canonical-result-usage": 3,
           "logging-standards": 3,
+          "error-handling-quality": 2,
           "sonarjs-backend": 1,
           "stubbed-implementation-detection": 1,
-          "async-waterfall-detection": 1,
           "callback-invocation-safe": 1,
           "silent-early-returns": 2,
           "context-mutation": 1,
@@ -270,8 +263,8 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 87,
-          "fitness/checks-universal": 138
+          "fitness/checks-typescript": 81,
+          "fitness/checks-universal": 136
         }
       },
       "graph": {
@@ -367,8 +360,8 @@
         "actual": 53
       },
       "error-handling-quality": {
-        "budget": 54,
-        "actual": 54
+        "budget": 2,
+        "actual": 2
       },
       "detached-promises": {
         "budget": 19,
@@ -383,8 +376,8 @@
         "actual": 23
       },
       "toctou-race-condition": {
-        "budget": 14,
-        "actual": 14
+        "budget": 0,
+        "actual": 0
       }
     },
     "cosmetic": {
@@ -403,19 +396,19 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 466,
-    "budgetGateFitnessSlugs": 76,
-    "productRuntimeFitness": 239,
-    "productRuntimeFitnessSlugs": 33,
+    "budgetGateFitness": 394,
+    "budgetGateFitnessSlugs": 74,
+    "productRuntimeFitness": 175,
+    "productRuntimeFitnessSlugs": 30,
     "productRuntimeGraph": 7,
     "productRuntimeGraphRuleIds": 2,
-    "productRuntimeCombined": 246,
-    "checkPackageFitness": 225,
+    "productRuntimeCombined": 182,
+    "checkPackageFitness": 217,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
-    "budgetGateSafetyTotal": 201,
-    "productRuntimeSafetyTotal": 152,
-    "unbudgetedProductRuntimeSlugs": 26
+    "budgetGateSafetyTotal": 135,
+    "productRuntimeSafetyTotal": 93,
+    "unbudgetedProductRuntimeSlugs": 25
   }
 }

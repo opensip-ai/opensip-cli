@@ -5,6 +5,7 @@
 import * as ts from 'typescript';
 
 import {
+  getReceiverChainText,
   isFunctionLikeNode,
   isInMemoryCacheReceiverText,
   type FunctionLikeNode,
@@ -53,19 +54,15 @@ function isDrizzleAtomicWrite(call: ts.CallExpression): boolean {
 function getReceiverName(call: ts.CallExpression): { name: string; isThisField: boolean } | null {
   if (!ts.isPropertyAccessExpression(call.expression)) return null;
   const receiver = call.expression.expression;
-  if (ts.isIdentifier(receiver)) {
-    return { name: receiver.text, isThisField: false };
+  if (receiver.kind === ts.SyntaxKind.ThisKeyword) {
+    return { name: call.expression.name.text, isThisField: true };
   }
-  if (
-    ts.isPropertyAccessExpression(receiver) &&
-    receiver.expression.kind === ts.SyntaxKind.ThisKeyword
-  ) {
-    return { name: receiver.name.text, isThisField: true };
+  const chain = getReceiverChainText(receiver);
+  if (!chain) return null;
+  if (chain.startsWith('this.')) {
+    return { name: chain.slice('this.'.length), isThisField: true };
   }
-  if (ts.isPropertyAccessExpression(receiver) && ts.isIdentifier(receiver.expression)) {
-    return { name: `${receiver.expression.text}.${receiver.name.text}`, isThisField: false };
-  }
-  return null;
+  return { name: chain, isThisField: false };
 }
 
 function isLocalReceiver(

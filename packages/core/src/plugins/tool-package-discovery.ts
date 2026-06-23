@@ -155,7 +155,6 @@ function readAuthoredSidecarEntry(dir: string): ToolPackageMetadata | undefined 
   try {
     parsed = JSON.parse(readFileSync(sidecarPath, 'utf8'));
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- malformed sidecar surfaces via undefined return; caller treats as "no resolvable entry" (mirrors resolvePackageEntryPoint's package.json contract).
     return undefined;
   }
   if (!isRecord(parsed)) return undefined;

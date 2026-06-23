@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- safeIsDirectory/safeIsFile/isPathInside are filesystem probes where exception → false is the function's contract; missing path or unresolvable realpath legitimately means "not present" / "not inside", not a swallowed error.
 /**
  * @fileoverview Plugin discovery for the project-local layout.
  *

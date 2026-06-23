@@ -1,5 +1,4 @@
 // @fitness-ignore-file throws-documentation -- Functions throw self-documenting typed errors
-// @fitness-ignore-file toctou-race-condition -- local nested Map `functionsByName`; synchronous get-then-set that lazily creates a per-name group, no await between read and write
 /**
  * @fileoverview Duplicate Utility Functions check
  *

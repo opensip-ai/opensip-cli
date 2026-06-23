@@ -339,7 +339,6 @@ export async function runGateMode(
   emitWarningsToStderr(fitResult);
   try {
     if (args.gateSave === true) {
-      // @fitness-ignore-next-line async-waterfall-detection -- ordered side-effects: the "Baseline saved" confirmation (and the subsequent deliver) must follow a SUCCESSFUL save (if saveBaseline throws, nothing downstream runs), so these awaits cannot be parallelized.
       await cli.saveBaseline('fitness', envelope);
       await cli.render({
         type: 'gate-done',

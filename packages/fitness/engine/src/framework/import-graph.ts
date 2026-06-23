@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- Tarjan's SCC strongConnect() walks Maps/Sets local to the function; entirely synchronous graph traversal, no async gap, safe in single-threaded Node.js
 /**
  * @fileoverview Project-wide import graph builder.
  *

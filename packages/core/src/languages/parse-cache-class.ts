@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- synchronous Map.get/set in single-threaded Node.js runtime; no async gap between read and write
 /**
  * @fileoverview `LanguageParseCache` class definition.
  *

@@ -1,5 +1,4 @@
 // @fitness-ignore-file batch-operation-limits -- walks a bounded, already-discovered source file list synchronously; no DB, network, async fanout, or unbounded external batch.
-// @fitness-ignore-file toctou-race-condition -- property counts are local in-memory Map updates inside one synchronous detector run; no shared concurrent state.
 /**
  * unused-config-surface — flags required config properties on the public API
  * surface that are never read anywhere in the project.

@@ -1,4 +1,3 @@
-// @fitness-ignore-file toctou-race-condition -- filterContent cache.get + cache.set on a per-RunScope Map; both operations are synchronous, no async gap, safe in single-threaded Node.js
 /**
  * @fileoverview TypeScript scanner-based content filtering
  *

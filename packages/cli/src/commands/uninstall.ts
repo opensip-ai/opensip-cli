@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- file/dir walks for uninstall planning and best-effort tidy-up: missing/unreadable entries (TOCTOU vanish between readdir+stat, permission-denied subdirs, already-removed parent shells) are the expected non-terminal signal to skip; failure-IS-the-signal is the function contract in each catch.
 /**
  * @fileoverview `opensip uninstall` — remove opensip-cli state
  * from a user account and/or project.

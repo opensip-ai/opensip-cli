@@ -42,7 +42,6 @@ function userSourceDirHasUserContent(paths: ProjectPaths): boolean {
   try {
     entries = readdirSync(paths.userSourceDir);
   } catch {
-    // @fitness-ignore-next-line error-handling-quality -- directory probe: an unreadable userSourceDir means "no user content present", treated identically to an empty dir; failure IS the signal.
     return false;
   }
   // Anything other than `.runtime/` (tool-managed) counts as user content.

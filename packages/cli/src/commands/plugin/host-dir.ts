@@ -1,4 +1,3 @@
-// @fitness-ignore-file error-handling-quality -- package.json walks / npm-install probes where unreadable/malformed entries mean "not installable" / "not a candidate" — same as absent; npm errors already stream to stderr via inherited stdio.
 // @fitness-ignore-file unbounded-memory -- reads package.json files; bounded by standard npm package metadata shape.
 /**
  * @fileoverview Plugin host directory + installed-package introspection.
