@@ -31,6 +31,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0057](ADR-0057-yagni-reduction-audit.md) — YAGNI as a bundled Tool with graph evidence seam (the `yagni` reduction-audit tool ships as a first-party bundled tool consuming a read-only graph evidence seam).
+- [ADR-0056](ADR-0056-architecture-audit-remediation.md) — Architecture audit remediation scope (preserve the layered plugin-host DAG; remediate the 2026-06 first-look audit via policy / ratchet / discoverability / documentation fixes only — no de-layering).
 - [ADR-0055](ADR-0055-core-kernel-sub-boundaries.md) — Core Kernel Sub-Boundaries (core remains one publishable package, but its internal ownership areas are documented with extraction triggers).
 - [ADR-0054](ADR-0054-tool-fault-isolation-boundary.md) — External Tool Fault-Isolation Boundary (target policy for external-provenance tools; this change only applies worker isolation to first-party graph live runs). Includes the sequenced M4 Build Plan (increments M4-A…M4-G: provenance threading, IPC protocol, seam→RPC mapping, supervisor + worker entry, config two-pass, capability/lifecycle RPC, capstone guardrail).
   - **Readiness (2026-06-18):** a future external-tool worker spawn MUST reuse the

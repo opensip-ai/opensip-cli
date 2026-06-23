@@ -4,10 +4,10 @@ last_verified: 2026-06-21
 owner: opensip-cli
 ---
 
-# ADR-0056: YAGNI as a bundled Tool with graph evidence seam
+# ADR-0057: YAGNI as a bundled Tool with graph evidence seam
 
 ```yaml
-id: ADR-0056
+id: ADR-0057
 title: YAGNI as a bundled Tool with graph evidence seam
 date: 2026-06-21
 status: active

@@ -17,7 +17,7 @@ release-gate hardening.
   Advisory defaults (`failOnErrors: 0`).
 - **`yagni-ignore-hygiene`** fitness check for `@yagni-ignore-*` directive
   quality.
-- Public docs: `docs/public/55-yagni/`, ADR-0056, configuration and CLI
+- Public docs: `docs/public/55-yagni/`, ADR-0057, configuration and CLI
   reference updates across README and `docs/public/`.
 
 ### Fixed

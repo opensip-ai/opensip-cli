@@ -630,6 +630,6 @@ fresh. The flags are mutually exclusive. See
 for the full state table.
 
 Future tool ideas (not implemented): `audit`, `lint`, `bench`. `yagni` is
-bundled as of the reduction-audit rollout; see ADR-0056 and
+bundled as of the reduction-audit rollout; see ADR-0057 and
 `docs/public/55-yagni/`. Any new tool slots in by writing a Tool
 implementation and shipping a package.
