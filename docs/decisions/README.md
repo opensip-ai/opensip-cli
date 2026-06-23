@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0060](ADR-0060-cli-diagnostic-boundary-and-run-outcomes.md) — CLI Diagnostic Boundary and Run Outcomes (host-owned diagnostic presentation; setup failures before a credible scan become command errors outside findings envelopes; valid scan outcomes are passed, failed, or strict degraded).
 - [ADR-0059](ADR-0059-tool-identity-single-source.md) — Tool Identity Single Source (each Tool declares one required `identity`; host-derived names, config namespaces, layout keys, and manifest identity replace legacy inference).
 - [ADR-0058](ADR-0058-shared-live-run-shell.md) — Shared live-run shell and `@opensip-cli/cli-live` (all first-party live views render through the shared cli-live state machine and cli-ui shell).
 - [ADR-0057](ADR-0057-yagni-reduction-audit.md) — YAGNI as a bundled Tool with graph evidence seam (the `yagni` reduction-audit tool ships as a first-party bundled tool consuming a read-only graph evidence seam).
