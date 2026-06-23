@@ -430,7 +430,7 @@ describe('renderSessionTable / renderDetail', () => {
     ]);
     const badge = panel.querySelector('.badge')?.textContent;
     expect(badge).toBe('ERROR');
-    const scoreCell = panel.querySelector('tbody tr td:nth-child(3)');
+    const scoreCell = panel.querySelector<HTMLElement>('tbody tr td:nth-child(3)');
     expect(scoreCell?.style.color).toContain('var(--error)');
   });
 
