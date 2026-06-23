@@ -103,10 +103,13 @@ describe('renderYagniLive produce mapping', () => {
 
   it('passes the host exit-code hook to runToolLiveView', async () => {
     const setExitCode = vi.fn();
-    await renderYagniLive({ cwd: '/proj', graphMode: 'off' }, {
-      ...stubCli(),
-      setExitCode,
-    } as unknown as ToolCliContext);
+    await renderYagniLive(
+      { cwd: '/proj', graphMode: 'off' },
+      {
+        ...stubCli(),
+        setExitCode,
+      },
+    );
     expect(capturedGlue).toMatchObject({ setExitCode });
   });
 

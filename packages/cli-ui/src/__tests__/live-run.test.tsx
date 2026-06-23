@@ -43,6 +43,10 @@ const PHASE_SURFACE: ProgressSurface = {
   stages: [{ id: 'parse', label: 'Parse project' }],
 };
 
+const noopSubscribe: (cb: ProgressCallback) => void = () => {
+  // no events needed — tests that only inspect chrome (e.g. the banner)
+};
+
 describe('<LiveRun>', () => {
   it('renders the loading frame', () => {
     const { lastFrame } = mount(
@@ -158,5 +162,58 @@ describe('<LiveRun>', () => {
     );
 
     expect(lastFrame()).toContain('42 file(s) (1.2s)');
+  });
+
+  // Banner rendering is shell-owned and uniform: every tool renders it the
+  // same way (a single <Static> banner) with no per-tool opt-in. This guards
+  // against the duplicate-banner regression — the banner must appear exactly
+  // once per frame, in every phase, never zero (missing) and never twice.
+  it('renders the banner exactly once in every phase', () => {
+    const bannerMarker = 'www.opensip.ai'; // mini banner URL — stable substring
+    const ui = (state: React.ComponentProps<typeof LiveRun>['state']) => (
+      <LiveRun
+        meta={{ title: 'Test Tool', description: 'Running test' }}
+        surface={{ shape: 'pool', label: 'Working...' }}
+        state={state}
+        verbose={false}
+        quiet={false}
+        ui={{ bannerSize: 'mini', version: '9.9.9' }}
+      />
+    );
+    const countBanner = (frame: string | undefined): number =>
+      (frame ?? '').split(bannerMarker).length - 1;
+
+    const { lastFrame, rerender } = mount(ui({ phase: 'loading' }));
+    expect(countBanner(lastFrame())).toBe(1);
+
+    rerender(
+      <ThemeProvider>
+        <ClockProvider>{ui({ phase: 'running', subscribe: noopSubscribe })}</ClockProvider>
+      </ThemeProvider>,
+    );
+    expect(countBanner(lastFrame())).toBe(1);
+
+    rerender(
+      <ThemeProvider>
+        <ClockProvider>
+          {ui({ phase: 'done', data: { summary: { passed: true, errors: 0, warnings: 0 } } })}
+        </ClockProvider>
+      </ThemeProvider>,
+    );
+    expect(countBanner(lastFrame())).toBe(1);
+  });
+
+  it('omits the banner when quiet', () => {
+    const { lastFrame } = mount(
+      <LiveRun
+        meta={{ title: 'Test Tool', description: 'Running test' }}
+        surface={{ shape: 'pool', label: 'Working...' }}
+        state={{ phase: 'loading' }}
+        verbose={false}
+        quiet
+        ui={{ bannerSize: 'mini', version: '9.9.9' }}
+      />,
+    );
+    expect(lastFrame()).not.toContain('www.opensip.ai');
   });
 });

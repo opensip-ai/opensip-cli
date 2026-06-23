@@ -60,26 +60,27 @@ function liveRunHeader(props: LiveRunProps): React.ReactElement | null {
       />
     ) : null;
 
-  if (props.staticChrome === true) {
-    const items: ('banner' | 'header')[] = props.quiet ? [] : ['banner'];
-    if (!props.quiet && showHeader) items.push('header');
-    if (items.length === 0) return null;
-    return (
-      <Static items={items}>
-        {(item) =>
-          item === 'banner' ? (
-            <React.Fragment key="banner">{bannerBlock}</React.Fragment>
-          ) : (
-            <React.Fragment key="header">{headerBlock}</React.Fragment>
-          )
-        }
-      </Static>
-    );
-  }
-
+  // Banner rendering is shell-owned and IDENTICAL for every tool — no tool
+  // opts in or out. The banner is immutable chrome, so it is always rendered
+  // through a single <Static>: Ink prints it exactly once and never erases or
+  // redraws it. A banner left in the dynamic frame is re-emitted on every
+  // progress tick and leaves a duplicate behind whenever Ink miscounts the
+  // frame height across a phase transition (the duplicate-banner bug).
+  //
+  // The RunHeader rides in the dynamic frame (below the static banner) so
+  // stream-driven header metadata — e.g. fit's live check counter, updated on
+  // every progress event — renders in place. Immutable headers (sim/graph/
+  // yagni) simply redraw to the same content; the header is small enough that
+  // in-place redraw is free of the mis-erase that plagued the tall banner.
+  //
+  // Exactly ONE <Static> is mounted (the banner): Ink does not reliably
+  // support multiple concurrent <Static> instances — a second one suppresses
+  // the first's output.
   return (
     <>
-      {bannerBlock}
+      <Static items={['banner']}>
+        {() => <React.Fragment key="banner">{bannerBlock}</React.Fragment>}
+      </Static>
       {headerBlock}
     </>
   );
@@ -170,12 +171,17 @@ export function liveRunBody(props: LiveRunProps): React.ReactElement {
         );
       }
       return (
-        <>
+        // Root element type must match the other phases (`<Box
+        // flexDirection="column">`). A Fragment root here would make React
+        // remount the whole subtree on the loading→running transition, which
+        // resets Ink's <Static> "already-printed" count and reprints the
+        // banner (duplicate-banner bug).
+        <Box flexDirection="column">
           {header}
           <Box paddingTop={1}>
             <LiveProgress surface={loadingSurface} subscribe={NO_PROGRESS} />
           </Box>
-        </>
+        </Box>
       );
     }
 

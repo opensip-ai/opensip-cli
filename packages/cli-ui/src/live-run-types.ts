@@ -65,6 +65,5 @@ export interface LiveRunProps {
   readonly walkedUp?: number;
   readonly headerMetadata?: readonly LiveRunHeaderMeta[];
   readonly showRunHeader?: boolean;
-  readonly staticChrome?: boolean;
   readonly loadingMessage?: string;
 }

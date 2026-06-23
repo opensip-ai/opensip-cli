@@ -62,7 +62,6 @@ export async function renderSimLive(
       loadingSurface: SIM_LOADING_SURFACE,
       verbose: args.verbose === true,
       quiet: args.quiet === true,
-      staticChrome: true,
       projectPath: args.cwd,
       walkedUp: currentScope()?.projectContext?.walkedUp,
       initialHeaderMetadata: [{ label: 'Recipe', value: args.recipe ?? 'default' }],

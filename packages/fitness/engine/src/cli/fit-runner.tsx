@@ -82,7 +82,6 @@ export async function renderFitLive(
       loadingSurface: FIT_LOADING_SURFACE,
       verbose: args.verbose === true,
       quiet: args.quiet === true,
-      staticChrome: true,
       initialShowRunHeader: false,
       projectPath: args.cwd,
       walkedUp: currentScope()?.projectContext?.walkedUp,

@@ -62,7 +62,6 @@ export interface LiveRunSpec {
   readonly verbose: boolean;
   readonly quiet: boolean;
   readonly progressOnDone?: boolean;
-  readonly staticChrome?: boolean;
   readonly loadingMessage?: string;
   readonly initialHeaderMetadata?: readonly LiveRunHeaderMeta[];
   readonly initialShowRunHeader?: boolean;
@@ -217,7 +216,6 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
       walkedUp={spec.walkedUp ?? scope?.projectContext?.walkedUp}
       headerMetadata={headerMetadata}
       showRunHeader={showRunHeader}
-      staticChrome={spec.staticChrome}
       loadingMessage={spec.loadingMessage}
     />
   );
