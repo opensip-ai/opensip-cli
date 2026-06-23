@@ -4,6 +4,7 @@ export * from './dependency-version-consistency.js';
 export * from './fitness-ignore-hygiene.js';
 export * from './frontend/index.js';
 export * from './graph-ignore-hygiene.js';
+export * from './yagni-ignore-hygiene.js';
 export * from './linting/index.js';
 export * from './no-compatibility-layer-names.js';
 export * from './no-deprecated-tags.js';

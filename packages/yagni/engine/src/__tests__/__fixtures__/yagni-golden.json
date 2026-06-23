@@ -1,0 +1,95 @@
+{
+  "verdict": {
+    "score": 100,
+    "passed": true,
+    "summary": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 1
+    }
+  },
+  "units": [
+    {
+      "slug": "yagni:unused-config-surface",
+      "passed": true,
+      "violationCount": 1,
+      "durationMs": 0
+    }
+  ],
+  "signals": [
+    {
+      "ruleId": "yagni:unused-config-surface",
+      "message": "Unused public config key 'orphanKnob' in AppConfig (high confidence)",
+      "severity": "medium",
+      "filePath": "<fixture>/src/app-config.ts",
+      "line": 3,
+      "metadata": {
+        "yagni": {
+          "detector": "unused-config-surface",
+          "reductionCategory": "config",
+          "confidence": "high",
+          "locDelta": {
+            "remove": 1,
+            "add": 0,
+            "netEstimate": 1,
+            "estimateKind": "exact"
+          },
+          "preservationArgument": "The property is declared on a public config interface but has zero read sites in the project.",
+          "suggestedAction": "Remove unused key `orphanKnob` from AppConfig.",
+          "validationRequired": [
+            "Confirm no dynamic property access reads this key.",
+            "Run the package test suite after removal."
+          ],
+          "riskTags": ["public-api-surface"],
+          "evidence": [
+            {
+              "id": "unused-config:src/app-config.ts:3:orphanKnob",
+              "kind": "unused-config-property",
+              "summary": "Required property 'orphanKnob' on AppConfig has no read sites.",
+              "data": {
+                "property": "orphanKnob",
+                "interfaceName": "AppConfig",
+                "filePath": "src/app-config.ts",
+                "line": 3,
+                "publicApiSurface": true
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "sessionSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 1,
+    "skippedDetectors": [
+      {
+        "id": "duplicate-body-candidate",
+        "slug": "yagni:duplicate-body-candidate",
+        "reason": "graph-required",
+        "detail": "graph evidence unavailable"
+      }
+    ],
+    "graphMode": "off",
+    "graphBuilt": false,
+    "graphDetail": "graph disabled",
+    "yagni": {
+      "totalCandidates": 1,
+      "byConfidence": { "high": 1, "medium": 0, "low": 0 },
+      "estimatedTotalLocReduction": 1,
+      "graphMode": "off",
+      "skippedDetectors": [
+        {
+          "slug": "yagni:duplicate-body-candidate",
+          "reason": "graph-required",
+          "detail": "graph evidence unavailable"
+        }
+      ]
+    }
+  }
+}

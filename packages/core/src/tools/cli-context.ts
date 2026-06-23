@@ -39,7 +39,7 @@ type WireSignalEnvelope = unknown;
  * `commandSpecs` and the host mounts them (`mountCommandSpec`); a handler has no
  * raw-Commander handle to reach, so the "one command surface" invariant (§8) is
  * structural, not merely guarded. The host owns the program internally and passes
- * it to its own mount step (`mountAllToolCommands(registry, program, ctx)`).
+ * it to its own mount step (`mountAllToolCommands(registry, program, ctx, provenance)`).
  */
 export interface ToolCliContext {
   /**

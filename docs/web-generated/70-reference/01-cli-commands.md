@@ -16,6 +16,7 @@ source-files:
   - packages/fitness/engine/src/tool.ts
   - packages/simulation/engine/src/tool.ts
   - packages/graph/engine/src/tool.ts
+  - packages/yagni/engine/src/tool.ts
 related-docs:
   - ../80-implementation/01-cli-dispatch.md
   - ../70-reference/03-configuration.md
@@ -24,7 +25,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
 
 ---
 
@@ -38,7 +39,7 @@ opensip <command> --help         # per-command help
 ```
 
 Per-command flags that appear on most subcommands. The flags shared across the
-tool run commands (`fit`/`sim`/`graph`) — `--json`, `--cwd`, `-q/--quiet`,
+tool run commands (`fit`/`sim`/`graph`/`yagni`) — `--json`, `--cwd`, `-q/--quiet`,
 `-v/--verbose`, `--debug`, `--report-to`, and `--api-key` — are declared
 **once** in a common-flag registry and applied via `applyCommonFlags`, so their
 names, short aliases, descriptions, and defaults are identical where applied and
@@ -48,7 +49,7 @@ command to open the report. `-v/--verbose` is a uniform "show the detailed
 report body" flag whose output is identical in a TTY and a pipe.
 
 **Host-guaranteed tool-primary surface.** The host mount layer guarantees a
-uniform baseline on **every** tool primary (`fit`/`graph`/`sim`, and any
+uniform baseline on **every** tool primary (`fit`/`graph`/`sim`/`yagni`, and any
 third-party tool's run verb) — a tool need not opt in. Each primary always
 carries `--cwd`, `--json`, `--config`, `--quiet`, `--verbose`, and its own
 `--version`:
@@ -71,8 +72,8 @@ tool's own:
 | `--config <path>` | Path to `opensip-cli.config.yml` (overrides the package.json pointer and default discovery). Guaranteed on every tool primary. |
 | `--debug` | Enable debug-level logging (events of `debug` level appear in stderr and the run log file). |
 | `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. (Where supported.) |
-| `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, and the `<tool> plugin <subcmd>` commands. |
-| `--json` | Emit structured JSON on stdout instead of the table renderer. (Per-command — `init`, `fit`, `sim`, `graph`.) |
+| `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, `yagni`, and the `<tool> plugin <subcmd>` commands. |
+| `--json` | Emit structured JSON on stdout instead of the table renderer. (Per-command — `init`, `fit`, `sim`, `graph`, `yagni`.) |
 | `--no-cloud` | Disable OpenSIP Cloud signal sync for this run (program-level). See below. |
 
 Global startup/admission failures can occur before any subcommand body runs.
@@ -305,6 +306,43 @@ indexes, and report views consume.
 **Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
 
 > **History.** v0.2 originally registered three subcommands — `graph`, `graph-orphans`, and `graph-entry-points`. The two filtered views were folded into the unified `graph` output; all three data slices (rules, entry points, catalog summary) are now reachable from the single `graph` invocation.
+
+---
+
+## `yagni` — advisory reduction audit
+
+Tool-owned: [`packages/yagni/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.10/packages/yagni/engine/src/tool.ts).
+
+`opensip yagni` surfaces evidence-backed opportunities to reduce code while preserving behavior. Findings are **advisory** by default (`failOnErrors: 0`, `failOnWarnings: 0` in config) — the run exits 0 unless you raise those thresholds. Each signal carries `metadata.yagni` (confidence, preservation argument, validation steps, evidence). Deeper narrative: [`55-yagni/01-command-reference.md`](/docs/opensip-cli/55-yagni/01-command-reference/).
+
+```
+opensip yagni
+opensip yagni --json
+opensip yagni --min-confidence high
+opensip yagni --graph build
+opensip yagni packages/cli/src
+```
+
+| Flag / Argument | Type | Default | Effect |
+|---|---|---|---|
+| `[paths...]` | path(s) | — | Positional. Limit analysis to one or more directory subtrees (relative to `--cwd`). |
+| `--json` | bool | `false` | Emit the canonical `SignalEnvelope` on stdout instead of the human renderer. |
+| `--min-confidence <level>` | enum | `medium` | Filter findings to `low`, `medium`, or `high`. |
+| `--detector <slug>` | string | — | Run only named detectors (repeatable). MVP detectors: `unused-config-surface`, `duplicate-body-candidate`. |
+| `--category <name>` | string | — | Filter by `metadata.yagni.reductionCategory` (repeatable). |
+| `--graph <mode>` | enum | `auto` | Graph evidence for graph-backed detectors: `auto`, `reuse`, `build`, or `off`. CI dogfood should pin `build` or `off` for determinism. Graph build failures do not change yagni's advisory exit code. |
+| `--include-tests` | bool | `false` | Include test and fixture files in analysis. |
+| `--show <session>` | string | — | Replay a stored yagni session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
+| `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
+| `--open` | bool | `false` | Launch the HTML report after run. |
+| `-v, --verbose` | bool | `false` | Show evidence, validation steps, and low-confidence findings. |
+| `-q, --quiet` | bool | `false` | Suppress banner. |
+| `--cwd <path>` | path | `process.cwd()` | Target directory. |
+| `--debug` | bool | `false` | Enable debug-level logging. |
+
+**Exit codes:** 0 by default (advisory). Non-zero only when `yagni.failOnErrors` / `yagni.failOnWarnings` thresholds are exceeded, or on configuration/runtime errors (2). Graph evidence subprocess exit codes are isolated — a failing `graph` build during `--graph build` does not fail the yagni run.
+
+**Suppressions:** `@yagni-ignore-file` and `@yagni-ignore-next-line` (ADR-0014). The `yagni-ignore-hygiene` fitness check audits directive quality.
 
 ---
 
@@ -614,7 +652,7 @@ opensip agent-catalog --json
 
 The `--json` output is designed to be consumed directly by agents. It contains:
 
-- Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
+- Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim|yagni> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
 - Common composable agent workflows.
 - Notes on the core output shapes (`SignalEnvelope`, `SessionReplayResult` with `fidelity: "projection"`, etc.).
 - Explicit call-out that human-readable renderers (tables, banners) are unchanged.
@@ -646,7 +684,7 @@ opensip sessions purge -y
 | `list` | (none) | List every stored session, newest first. |
 | `list` | `--summary-only` | Omit heavy per-session tool payloads (agent-friendly "menu" mode). The lightweight summary and `showCommand` hints remain. |
 | `show` | `<ref>` (positional) | Replay a stored session by id, or `latest` (requires `--tool`). Supports relative refs such as `previous` / `latest-N`. |
-| `show` | `--tool <fit\|graph\|sim>` | Required for `latest`; an optional sanity check for an explicit id. |
+| `show` | `--tool <fit\|graph\|sim\|yagni>` | Required for `latest`; an optional sanity check for an explicit id. |
 | `show` | `--json` | Emit the replayed session (projected `SignalEnvelope` under the result). |
 | `show` | `--filter <type>` | Filter the replayed signals (repeatable). Supported values: `errors-only` (high severity), `warnings-only` (medium), `top:<n>`. Composable, e.g. `--filter errors-only --filter top:20`. Adds `filtersApplied`, `originalSignalCount`, and `returnedSignalCount` to the machine output. |
 | `show` | `--raw` | With `--json`: emit only the inner payload (`session` + `envelope` + metadata) without the outer `CommandOutcome` wrapper. Ideal for token-sensitive agents. |
@@ -655,7 +693,7 @@ opensip sessions purge -y
 
 **Session replay.** `sessions show` reconstructs a past run's output from the
 stored payload: each tool contributes a `sessionReplay` projection
-(`fit`/`graph`/`sim`) that decodes the opaque payload back into a
+(`fit`/`graph`/`sim`/`yagni`) that decodes the opaque payload back into a
 `SignalEnvelope`. The replay `fidelity` is always `projection` — it is rebuilt from
 persisted findings, not a re-execution. Each run command also accepts an inline
 `--show <session>` flag (`fit --show latest`, `graph --show <id>`,

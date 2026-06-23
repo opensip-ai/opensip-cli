@@ -133,6 +133,21 @@ const EXPECTED: Record<string, string[]> = {
     '--show',
     '--verbose',
   ],
+  yagni: [
+    '--api-key',
+    '--category',
+    '--cwd',
+    '--debug',
+    '--detector',
+    '--graph',
+    '--include-tests',
+    '--json',
+    '--min-confidence',
+    '--open',
+    '--quiet',
+    '--report-to',
+    '--verbose',
+  ],
 };
 
 describe('first-party tool flag-surface contract', () => {

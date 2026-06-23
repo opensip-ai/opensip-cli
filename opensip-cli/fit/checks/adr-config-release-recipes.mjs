@@ -141,6 +141,11 @@ const CONFIG_READER_ALLOWLIST = new Set([
   'packages/fitness/engine/src/targets/loader.ts',
   'packages/graph/engine/src/cli/graph-config.ts',
   'packages/simulation/engine/src/cli/sim-config.ts',
+  // yagni's per-tool config-loader bridge — scope-first read of the
+  // host-composed `yagni:` block with a best-effort YAML fallback for scope-less
+  // direct callers, the architectural peer of graph-config.ts / sim-config.ts
+  // (ADR-0023).
+  'packages/yagni/engine/src/cli/yagni-config.ts',
 ]);
 
 function analyzeOneConfigDocumentRatchet(content, filePath) {

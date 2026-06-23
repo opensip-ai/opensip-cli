@@ -121,9 +121,29 @@ module.exports = {
       comment:
         "Production code must not import a package's `src/internal.ts` barrel — those are " +
         'test-only surfaces exposed via the `<pkg>/internal` subpath for cross-package test ' +
-        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it.',
-      from: { pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`] },
+        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it. ' +
+        'Carve-out: `packages/yagni/engine/src/evidence/graph-evidence.ts` may reach ' +
+        '`@opensip-cli/graph/internal` (the sole graph-evidence seam).',
+      from: {
+        pathNot: [
+          '/__tests__/',
+          String.raw`\.test\.(ts|tsx)$`,
+          '^packages/yagni/engine/src/evidence/graph-evidence\\.ts$',
+        ],
+      },
       to: { path: String.raw`/src/internal\.ts$` },
+    },
+    {
+      name: 'yagni-graph-evidence-only-graph-internal',
+      severity: 'error',
+      comment:
+        'The yagni graph-evidence seam may import ONLY `@opensip-cli/graph/internal`, ' +
+        'never fitness/simulation internal barrels.',
+      from: { path: '^packages/yagni/engine/src/evidence/graph-evidence\\.ts$' },
+      to: {
+        path: String.raw`/src/internal\.ts$`,
+        pathNot: '^packages/graph/engine/src/internal\\.ts$',
+      },
     },
     {
       name: 'no-prod-import-of-test-support',
@@ -425,7 +445,7 @@ module.exports = {
         'return it; the CLI composition root chooses the formatter and ' +
         'renders. (ADR-0011.)',
       from: {
-        path: '^packages/(fitness/engine|graph/engine|simulation/engine)/src/',
+        path: '^packages/(fitness/engine|graph/engine|simulation/engine|yagni/engine)/src/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: '^packages/output/src/format/' },
@@ -439,7 +459,7 @@ module.exports = {
         'the composition root (pre-action-hook for the sink; the render seam ' +
         'for --report-to). Tools never deliver. (ADR-0011.)',
       from: {
-        path: '^packages/(fitness/engine|graph/engine|simulation/engine)/src/',
+        path: '^packages/(fitness/engine|graph/engine|simulation/engine|yagni/engine)/src/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: '^packages/output/src/sink/' },
@@ -457,7 +477,7 @@ module.exports = {
         '(ADR-0011.) Test files are excluded globally, so graph’s golden ' +
         'SARIF test may import formatSignalSarif from the barrel.',
       from: {
-        path: '^packages/(fitness/engine|graph/engine|simulation/engine)/src/',
+        path: '^packages/(fitness/engine|graph/engine|simulation/engine|yagni/engine)/src/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: String.raw`^packages/output/src/index\.ts$` },
@@ -624,6 +644,34 @@ module.exports = {
         'maybeOpenDashboard.',
       from: { path: '^packages/simulation/' },
       to: { path: '^packages/cli/' },
+    },
+    {
+      name: 'yagni-no-cli',
+      severity: 'error',
+      comment:
+        'YAGNI is a Tool plugin; it must not depend on the CLI entry point. ' +
+        'Tool callbacks happen through the ToolCliContext interface from core.',
+      from: { path: '^packages/yagni/' },
+      to: { path: '^packages/cli/' },
+    },
+    {
+      name: 'yagni-no-check-packs',
+      severity: 'error',
+      comment: 'YAGNI sits in the tools/lang peer layer. It must not import any check pack.',
+      from: { path: '^packages/yagni/engine/src/' },
+      to: { path: '^packages/fitness/checks-' },
+    },
+    {
+      name: 'yagni-no-graph-adapter-packs',
+      severity: 'error',
+      comment:
+        'The yagni engine must not depend on any @opensip-cli/graph-* adapter pack. ' +
+        'Graph evidence reaches the engine via `@opensip-cli/graph/internal` only.',
+      from: {
+        path: '^packages/yagni/engine/src/',
+        pathNot: '^packages/yagni/engine/src/__tests__/',
+      },
+      to: { path: '^packages/graph/graph-' },
     },
 
     // -------------------------------------------------------------------

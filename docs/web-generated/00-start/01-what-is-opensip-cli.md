@@ -71,9 +71,9 @@ OpenSIP CLI is the alternative: **a polyglot, plugin-driven check runner** that 
 
 ---
 
-## The three loops
+## The four loops
 
-opensip-cli ships three first-party tools, all invoked through the same CLI binary. Each answers a different question shape:
+opensip-cli ships four first-party tools, all invoked through the same CLI binary. Each answers a different question shape:
 
 ### `fit` — fitness checks
 
@@ -99,7 +99,15 @@ by an engine feature layer and surfaced both as rule findings and in the
 dashboard's graph view. Five language adapters ship (TypeScript, Python, Rust,
 Go, Java). Has its own baseline-gate flow.
 
-The CLI doesn't know what any of these three do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
+### `yagni` — reduction audit
+
+The fourth loop. *"What could we remove safely?"* An advisory audit that ranks
+evidence-backed reduction candidates — unused config surface, duplicate function
+bodies (via graph `bodyHash` evidence), and future detectors — with confidence,
+preservation arguments, and validation steps. Exit code is 0 by default; findings
+are recommendations, not gate failures. See [`../55-yagni/01-command-reference.md`](/docs/opensip-cli/55-yagni/01-command-reference/).
+
+The CLI doesn't know what any of these four do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
 
 ---
 
@@ -120,7 +128,7 @@ opensip fit --recipe example
 
 | If you want to … | Go to … |
 |---|---|
-| See what real fit / sim / graph code looks like | [Show me each loop](/docs/opensip-cli/00-start/02-show-me-the-loops/) |
+| See what real fit / sim / graph / yagni code looks like | [Show me each loop](/docs/opensip-cli/00-start/02-show-me-the-loops/) |
 | Run the first smoke test right now | [Quick start](/docs/opensip-cli/00-start/00-quick-start/) |
 | Initialize a real repo carefully | [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/) |
 | Learn the vocabulary used across the docs | [Vocabulary](/docs/opensip-cli/00-start/05-vocabulary/) |

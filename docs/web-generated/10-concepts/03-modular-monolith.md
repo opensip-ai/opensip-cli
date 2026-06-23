@@ -175,7 +175,7 @@ A flat package can have any internal structure. With 33 packages, the layer is t
 
 Trade-offs are real. The 33-package layout is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 33 publishable packages (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 34 publishable packages (plus the private workspace-root `package.json` for tooling versions). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/)) is the antidote.
 

@@ -16,6 +16,7 @@ const BUNDLED_TOOL_DIRS = [
   'packages/fitness/engine',
   'packages/simulation/engine',
   'packages/graph/engine',
+  'packages/yagni/engine',
 ];
 
 const log = (msg) => console.error(`[verify-raw-stream-inventory] ${msg}`);

@@ -23,6 +23,7 @@
       "@opensip-cli/simulation": ["packages/simulation/engine/src/index.ts"],
       "@opensip-cli/graph": ["packages/graph/engine/src/index.ts"],
       "@opensip-cli/graph/internal": ["packages/graph/engine/src/internal.ts"],
+      "@opensip-cli/yagni": ["packages/yagni/engine/src/index.ts"],
       "@opensip-cli/graph-adapter-common": ["packages/graph/graph-adapter-common/src/index.ts"],
       "@opensip-cli/graph-typescript": ["packages/graph/graph-typescript/src/index.ts"],
       "@opensip-cli/graph-python": ["packages/graph/graph-python/src/index.ts"],

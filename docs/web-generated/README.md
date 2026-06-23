@@ -21,6 +21,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 | Enforce project-specific quality, security, and architecture rules | `opensip fit` with 151 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
 | Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and ten built-in graph rules |
+| Review evidence-backed code-reduction opportunities (advisory) | `opensip yagni` with bundled detectors and optional graph evidence |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
 | Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
@@ -41,7 +42,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 |---|---|
 | Install, initialize, and run the first smoke test | [Quick start](/docs/opensip-cli/00-start/00-quick-start/) |
 | Understand what OpenSIP CLI is for | [What is opensip-cli?](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) |
-| See fit, sim, and graph side by side | [Show me each loop](/docs/opensip-cli/00-start/02-show-me-the-loops/) |
+| See fit, sim, graph, and yagni side by side | [Show me each loop](/docs/opensip-cli/00-start/02-show-me-the-loops/) |
 | Initialize a repo carefully | [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/) |
 | Write a custom fitness check | [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/) |
 | Use graph on a real project | [Use graph](/docs/opensip-cli/60-guides/06-use-graph/) |
@@ -62,6 +63,8 @@ opensip fit --gate-compare
 opensip graph
 opensip graph --list-files
 opensip graph --workspace
+opensip yagni
+opensip yagni --json --graph build
 opensip sim --recipe <name>
 opensip report
 ```
@@ -131,54 +134,59 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 23. [Adding a language](/docs/opensip-cli/40-graph/03-adding-a-language/)
 24. [Suppressing findings](/docs/opensip-cli/40-graph/04-suppressing-findings/)
 
+### 55 - Yagni
+
+25. [Command reference](/docs/opensip-cli/55-yagni/01-command-reference/)
+
 ### 50 - Extend
 
-25. [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/)
-26. [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/)
-27. [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/)
-28. [Check pack architecture](/docs/opensip-cli/50-extend/04-check-pack-architecture/)
-29. [Language adapters](/docs/opensip-cli/50-extend/05-language-adapters/)
-30. [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/)
+26. [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/)
+27. [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/)
+28. [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/)
+29. [Check pack architecture](/docs/opensip-cli/50-extend/04-check-pack-architecture/)
+30. [Language adapters](/docs/opensip-cli/50-extend/05-language-adapters/)
+31. [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/)
 
 ### 60 - Guides
 
-31. [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/)
-32. [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/)
-33. [Ban an API pattern](/docs/opensip-cli/60-guides/02-ban-an-api-pattern/)
-34. [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/)
-35. [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/)
-36. [Migrate from ESLint](/docs/opensip-cli/60-guides/05-migrate-from-eslint/)
-37. [Use graph](/docs/opensip-cli/60-guides/06-use-graph/)
-38. [Create your first Tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/)
+32. [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/)
+33. [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/)
+34. [Ban an API pattern](/docs/opensip-cli/60-guides/02-ban-an-api-pattern/)
+35. [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/)
+36. [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/)
+37. [Migrate from ESLint](/docs/opensip-cli/60-guides/05-migrate-from-eslint/)
+38. [Use graph](/docs/opensip-cli/60-guides/06-use-graph/)
+39. [Create your first Tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/)
 
 ### 70 - Reference
 
-39. [CLI commands](/docs/opensip-cli/70-reference/01-cli-commands/)
-40. [Package catalog](/docs/opensip-cli/70-reference/02-package-catalog/)
-41. [Configuration](/docs/opensip-cli/70-reference/03-configuration/)
-42. [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)
-43. [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/)
-44. [Report](/docs/opensip-cli/70-reference/06-dashboard/)
-45. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
-46. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
-47. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
+40. [CLI commands](/docs/opensip-cli/70-reference/01-cli-commands/)
+41. [Package catalog](/docs/opensip-cli/70-reference/02-package-catalog/)
+42. [Configuration](/docs/opensip-cli/70-reference/03-configuration/)
+43. [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)
+44. [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/)
+45. [Report](/docs/opensip-cli/70-reference/06-dashboard/)
+46. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
+47. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
+48. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
 
 ### 80 - Internals
 
-48. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-49. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-50. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-51. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
-52. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
-53. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
-54. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
+49. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+50. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+51. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+52. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+53. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
+54. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
+55. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
 
 ## Factual Baseline
 
 This v0.1.10 doc set was rechecked against the source on 2026-06-15:
 
 - 151 built-in fitness checks across seven packs.
-- 33 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- 34 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.
 - First-party Tool commands are mounted through `CommandSpec`; third-party Tool plugins use the same contract.

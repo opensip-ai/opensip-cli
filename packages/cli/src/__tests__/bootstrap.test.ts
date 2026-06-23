@@ -101,6 +101,7 @@ describe('registerFirstPartyTools', () => {
       'fit',
       'sim',
       'graph',
+      'yagni',
     ]);
   });
 });

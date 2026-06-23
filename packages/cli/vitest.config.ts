@@ -24,6 +24,7 @@ export default mergeConfig(
           // tested helpers.
           'src/index.ts',
           'src/bootstrap/pre-action-hook.ts',
+          'src/commands/tools/runtime-probe-entry.ts',
           'src/ui/App.tsx',
           'src/ui/render.tsx',
           // The plugin command shells out to `npm install/uninstall` and

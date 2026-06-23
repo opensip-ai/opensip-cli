@@ -55,6 +55,9 @@ export interface DashboardInput {
   // structurally (entry shapes are sim domain vocabulary owned by the sim tool).
   simScenarioCatalog?: readonly unknown[];
   simRecipeCatalog?: readonly unknown[];
+  // Yagni-owned catalog data. DISTINCT keys for the Object.assign merge reason.
+  yagniSummary?: unknown;
+  yagniCatalog?: readonly unknown[];
   editorProtocol?: string | null;
 }
 
@@ -116,6 +119,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
     graphRecipeCatalog = [],
     simScenarioCatalog = [],
     simRecipeCatalog = [],
+    yagniSummary = null,
+    yagniCatalog = [],
     editorProtocol = null,
   } = input;
 
@@ -133,6 +138,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog));
   const safeSimScenarioCatalogJson = escapeForScriptContext(JSON.stringify(simScenarioCatalog));
   const safeSimRecipeCatalogJson = escapeForScriptContext(JSON.stringify(simRecipeCatalog));
+  const safeYagniSummaryJson = escapeForScriptContext(JSON.stringify(yagniSummary));
+  const safeYagniCatalogJson = escapeForScriptContext(JSON.stringify(yagniCatalog));
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
@@ -206,6 +213,8 @@ const graphRuleCatalog = ${safeGraphRuleCatalogJson};
 const graphRecipeCatalog = ${safeGraphRecipeCatalogJson};
 const simScenarioCatalog = ${safeSimScenarioCatalogJson};
 const simRecipeCatalog = ${safeSimRecipeCatalogJson};
+const yagniSummary = ${safeYagniSummaryJson};
+const yagniCatalog = ${safeYagniCatalogJson};
 ${editorProtocolJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');

@@ -20,13 +20,13 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **155 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **156 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(94 checks)*
+## Universal  *(95 checks)*
 
 Language-agnostic; runs against every project.
 
@@ -73,7 +73,7 @@ Language-agnostic; runs against every project.
 | [`use-centralized-crypto`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/security/use-centralized-crypto.ts) | Enforce use of centralized crypto module instead of direct crypto operations |
 | [`webhook-signature-verification`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/security/webhook-signature-verification.ts) | Detect webhook endpoints without signature verification |
 
-### Quality  *(27)*
+### Quality  *(28)*
 
 | Slug | Description |
 |---|---|
@@ -103,6 +103,7 @@ Language-agnostic; runs against every project.
 | [`pino-serializer-coverage`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/quality/observability/pino-serializer-coverage.ts) | Validates that complex objects logged have proper Pino serializers |
 | [`sentry-release-set`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/sentry/sentry-release-set.ts) | Detects Sentry.init() without release — cannot track regressions across deploys |
 | [`sentry-source-maps`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/sentry/sentry-source-maps.ts) | Detects missing Sentry source map upload — stack traces will be unreadable |
+| [`yagni-ignore-hygiene`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/quality/yagni-ignore-hygiene.ts) | Validates that @yagni-ignore directives have valid detector slugs and reason comments |
 | [`zod-openapi-sync`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/quality/api/zod-openapi-sync.ts) | Ensures Zod schemas use .satisfies z.ZodType<> pattern |
 
 ### Resilience  *(26)*

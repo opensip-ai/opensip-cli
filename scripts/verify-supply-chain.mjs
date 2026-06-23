@@ -193,14 +193,7 @@ function checkTrustedPublish(workflows) {
     ) {
       problems.push(`${workflow.relPath}: npm publish without provenance`);
     }
-    // A token is acceptable when it authenticates SOLELY the OIDC-uncovered
-    // `npm dist-tag` promotion (OIDC trusted publishing covers `npm publish`, not
-    // dist-tag operations) within an OIDC workflow — the staged-publish→promote
-    // lane. Flag only a token WITHOUT OIDC, or a token with no dist-tag use. Keeps
-    // parity with the shipped `package-supply-chain-policy` fitness check.
-    const usesDistTag = /\bnpm\s+dist-tag\b/.test(workflow.content);
-    const usesOidc = /id-token:\s*write/.test(workflow.content);
-    if (/(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(workflow.content) && !(usesDistTag && usesOidc)) {
+    if (publishStepReferencesLongLivedToken(workflow.content)) {
       problems.push(`${workflow.relPath}: publish workflow references long-lived npm token`);
     }
   }
@@ -210,6 +203,17 @@ function checkTrustedPublish(workflows) {
   } else {
     fail(5, `trusted publishing problems:\n    ${problems.join('\n    ')}`);
   }
+}
+
+function publishStepReferencesLongLivedToken(content) {
+  const steps = content.split(/\n(?=\s*-\s+name:)/);
+  return steps.some((step) => {
+    const executable = step
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('#'))
+      .join('\n');
+    return /\bnpm\s+publish\b/.test(executable) && /(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(executable);
+  });
 }
 
 await checkNoPublishedInstallHooks();
