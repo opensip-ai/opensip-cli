@@ -10,7 +10,7 @@ export function dashboardCssTheme(): string {
   --bg: #1a1210; --bg-surface: #231a16; --bg-card: #231a16;
   --bg-hover: #3a2e27; --text: #f4ede5; --text-secondary: #e6ddd2;
   --text-muted: #c0b2a2; --text-dim: #958474; --accent: #c49a6c;
-  --accent-fitness: #7ca068; --accent-sim: #9b8aa5;
+  --accent-fitness: #7ca068; --accent-sim: #9b8aa5; --accent-yagni: #6f9fb0;
   --success: #8fbc8f; --success-light: rgba(143,188,143,0.2);
   --warning: #d4a574; --warning-light: rgba(212,165,116,0.2);
   --error: #c75b4a; --error-light: rgba(199,91,74,0.2);

@@ -24,6 +24,9 @@ const SIMULATION_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 2
 
 const CODE_PATHS_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="7" x2="10" y2="10"/><line x1="17" y1="7" x2="14" y2="10"/><line x1="7" y1="17" x2="10" y2="14"/><line x1="17" y1="17" x2="14" y2="14"/></svg>`;
 
+// Scissors — "cut what you aren't gonna need" (YAGNI is a reduction audit).
+const YAGNI_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>`;
+
 defineToolTab({
   id: 'fitness',
   tool: 'fit',
@@ -49,4 +52,13 @@ defineToolTab({
   icon: CODE_PATHS_ICON,
   badgeStyle: 'background:rgba(196,154,108,0.15);color:var(--accent)',
   renderFunctionName: 'renderCodePathsTab',
+});
+
+defineToolTab({
+  id: 'yagni',
+  tool: 'yagni',
+  label: 'YAGNI',
+  icon: YAGNI_ICON,
+  badgeStyle: 'background:rgba(111,159,176,0.15);color:var(--accent-yagni)',
+  renderFunctionName: 'renderYagniTab',
 });

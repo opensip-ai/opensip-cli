@@ -39,6 +39,24 @@ function relPath(cwd: string, filePath: string): string {
   return relative(cwd, filePath).split('\\').join('/');
 }
 
+function displayFunctionName(occ: GraphFunctionOccurrence): string {
+  const simple = occ.simpleName.trim();
+  if (simple.startsWith('<arrow:')) return 'arrow function';
+  if (simple !== '' && !simple.includes('/') && simple.length <= 60) return simple;
+
+  if (occ.qualifiedName.includes('<arrow:')) return 'arrow function';
+  if (occ.qualifiedName.includes('/')) return 'function';
+  const qualifiedTail = occ.qualifiedName.split('.').at(-1)?.trim() ?? '';
+  if (qualifiedTail !== '' && !qualifiedTail.includes('/') && qualifiedTail.length <= 60) {
+    return qualifiedTail;
+  }
+  return 'function';
+}
+
+function displayOccurrence(cwd: string, occ: GraphFunctionOccurrence): string {
+  return `${relPath(cwd, occ.filePath)}:${String(occ.line)} (${displayFunctionName(occ)})`;
+}
+
 function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDetectorResult> {
   const started = Date.now();
   const settings = ctx.config.detectorSettings?.[DETECTOR_ID] ?? {};
@@ -64,7 +82,7 @@ function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDete
     const netEstimate = bodyLines * (occs.length - 1);
     const anchorRel = relPath(ctx.cwd, anchor.filePath);
     const peer = occs.find((o) => o.qualifiedName !== anchor.qualifiedName) ?? anchor;
-    const peerRel = relPath(ctx.cwd, peer.filePath);
+    const peerDisplay = displayOccurrence(ctx.cwd, peer);
     signals.push(
       createYagniSignal({
         source: SLUG,
@@ -90,7 +108,7 @@ function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDete
           },
           preservationArgument:
             'Occurrences share an identical bodyHash from the graph catalog; behavior should match after hoisting.',
-          suggestedAction: `Consolidate with ${peerRel} (${peer.qualifiedName}).`,
+          suggestedAction: `Consolidate with ${peerDisplay}.`,
           validationRequired: [
             'Confirm neither occurrence is published public API.',
             'Run tests covering each duplicate site after extraction.',
@@ -109,6 +127,11 @@ function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDete
                   qualifiedName: anchor.qualifiedName,
                   filePath: anchorRel,
                   line: anchor.line,
+                },
+                peer: {
+                  qualifiedName: peer.qualifiedName,
+                  filePath: relPath(ctx.cwd, peer.filePath),
+                  line: peer.line,
                 },
               },
             },

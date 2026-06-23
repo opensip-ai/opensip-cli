@@ -154,3 +154,83 @@ export function renderSimulationTab(): void {
     recipesData: simRecipeCatalog,
   });
 }
+
+/** A yagni detector catalog entry (yagni domain vocabulary, read structurally). */
+interface YagniDetectorEntry {
+  id: string;
+  slug: string;
+  description?: string;
+  requiresGraph?: boolean;
+}
+
+// Render the bundled YAGNI detectors as rows (slug + graph badge + description).
+// Only invoked when the catalog is non-empty (renderToolTab shows a graceful
+// empty state otherwise).
+function renderYagniDetectorsCatalog(
+  container: HTMLElement,
+  catalogData: readonly unknown[],
+): void {
+  // A short summary line above the table — detector count + how many need the
+  // call graph. yagniSummary is null when yagni contributed no data.
+  if (yagniSummary) {
+    const parts: string[] = [];
+    if (typeof yagniSummary.detectorCount === 'number')
+      parts.push(yagniSummary.detectorCount + ' detectors');
+    if (typeof yagniSummary.graphBackedCount === 'number')
+      parts.push(yagniSummary.graphBackedCount + ' graph-backed');
+    if (parts.length > 0)
+      container.append(
+        el('div', { class: 'muted', style: 'margin-bottom:12px', text: parts.join(' · ') }),
+      );
+  }
+
+  const detectors = catalogData as readonly YagniDetectorEntry[];
+  const table = el('table', { class: 'session-table' });
+  const tbody = el('tbody');
+  [...detectors]
+    .sort((a, b) => a.slug.localeCompare(b.slug))
+    .forEach((d) => {
+      const row = el('tr');
+      const nameCell = el('td');
+      nameCell.append(el('strong', { text: d.slug }));
+      if (d.requiresGraph)
+        nameCell.append(el('span', { class: 'badge', text: 'graph', style: 'margin-left:8px' }));
+      if (d.description)
+        nameCell.append(
+          el('div', { class: 'muted', style: 'font-size:12px', text: d.description }),
+        );
+      row.append(nameCell);
+      tbody.append(row);
+    });
+  table.append(tbody);
+  container.append(table);
+}
+
+// Yagni has no recipe namespace, so it uses a two-subtab shape (Sessions |
+// Detectors) built directly on renderSubtabBar rather than the three-subtab
+// renderToolTab — same pattern the Code Paths tab uses for its two subtabs. The
+// first subtab keeps the stable id 'overview' for cross-tab routing.
+export function renderYagniTab(): void {
+  const panel = document.querySelector<HTMLElement>('#panel-yagni');
+  if (!panel) return;
+  renderSubtabBar(panel, [
+    {
+      id: 'overview',
+      label: 'Sessions',
+      render: (p) => {
+        renderSessionTable(p, yagniSessions, 'var(--accent-yagni)');
+      },
+    },
+    {
+      id: 'catalog',
+      label: 'Detectors',
+      render: (p) => {
+        if (yagniCatalog && yagniCatalog.length > 0) {
+          renderYagniDetectorsCatalog(p, yagniCatalog);
+        } else {
+          p.append(el('div', { class: 'empty', text: 'No detectors available yet.' }));
+        }
+      },
+    },
+  ]);
+}

@@ -17,8 +17,18 @@ export interface YagniSessionFinding {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
-export interface YagniSessionDetector {
-  readonly detectorSlug: string;
+/**
+ * One persisted YAGNI detector result.
+ *
+ * Conforms to the host dashboard's shared cross-tool session-detail contract:
+ * per-item detail is rendered from `payload.checks[]` keyed by `checkSlug`
+ * (fitness "checks", graph "rules", and yagni "detectors" all persist under the
+ * same generic keys; the dashboard relabels the column per tool at display
+ * time). For YAGNI, one "check" IS one detector — `checkSlug` holds the
+ * detector slug.
+ */
+export interface YagniSessionCheck {
+  readonly checkSlug: string;
   readonly passed: boolean;
   readonly violationCount: number;
   readonly findings: readonly YagniSessionFinding[];
@@ -39,7 +49,9 @@ export interface YagniSessionPayload {
     readonly graphDetail?: string;
     readonly yagni: YagniRunSummary;
   };
-  readonly detectors: readonly YagniSessionDetector[];
+  // Shared key with fitness/graph/sim so the host dashboard's session-detail
+  // renderer picks it up; each entry is one yagni detector (see YagniSessionCheck).
+  readonly checks: readonly YagniSessionCheck[];
 }
 
 export function buildYagniSessionPayload(
@@ -59,7 +71,7 @@ export function buildYagniSessionPayload(
     else bySource.set(signal.source, [signal]);
   }
 
-  const detectors = envelope.units.map((unit) => {
+  const checks = envelope.units.map((unit) => {
     const findings = (bySource.get(unit.slug) ?? []).map((signal) => ({
       ruleId: signal.ruleId,
       message: signal.message,
@@ -71,7 +83,7 @@ export function buildYagniSessionPayload(
       metadata: signal.metadata,
     }));
     return {
-      detectorSlug: unit.slug,
+      checkSlug: unit.slug,
       passed: unit.passed,
       violationCount: unit.violationCount ?? findings.length,
       findings,
@@ -94,6 +106,6 @@ export function buildYagniSessionPayload(
       ...(graph.graphDetail === undefined ? {} : { graphDetail: graph.graphDetail }),
       yagni: graph.yagniSummary,
     },
-    detectors,
+    checks,
   };
 }

@@ -39,7 +39,7 @@ import { renderSessionTable } from './sessions.js';
 import { makeSortable } from './sortable.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { activateTabForSession, registerTabActivator } from './tab-activators.js';
-import { renderFitnessTab, renderSimulationTab } from './tool-tabs.js';
+import { renderFitnessTab, renderSimulationTab, renderYagniTab } from './tool-tabs.js';
 import { defineRankedView } from './view-template.js';
 import { activateView, views } from './views-registry.js';
 // Side-effect-only module: tab-bar wires the #tab-bar click handler at load.
@@ -68,6 +68,7 @@ interface ClientGlobals {
   renderOverview: typeof renderOverview;
   renderFitnessTab: typeof renderFitnessTab;
   renderSimulationTab: typeof renderSimulationTab;
+  renderYagniTab: typeof renderYagniTab;
   // Code Paths panel entry (L4): `renderCodePathsTab` is invoked by name in
   // generator.ts's render block (the registry-derived `renderCodePathsTab();`
   // call), and `openCodePathsSession` is read by the end-to-end validation test
@@ -116,6 +117,7 @@ g.renderRecipesPanel = renderRecipesPanel;
 g.renderOverview = renderOverview;
 g.renderFitnessTab = renderFitnessTab;
 g.renderSimulationTab = renderSimulationTab;
+g.renderYagniTab = renderYagniTab;
 // Code Paths panel entry + prelude bridge globals (L4).
 g.renderCodePathsTab = renderCodePathsTab;
 g.openCodePathsSession = openCodePathsSession;

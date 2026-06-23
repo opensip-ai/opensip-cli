@@ -318,12 +318,14 @@ function renderEmptyChecks(detailContainer: HTMLElement, session: DashboardSessi
 
 /** Build the populated detail table (header + rows) for a non-empty checks payload. */
 function buildDetailTable(checks: readonly Check[], tool: string, filterUid: string): HTMLElement {
-  // Graph groups findings by rule, not by check — relabel that one column so the
-  // header reads in the tool's own vocabulary (same structural payload shape).
+  // Tools share the structural payload.checks shape but name their items
+  // differently — relabel the column so the header reads in the tool's own
+  // vocabulary (graph "rules", yagni "detectors", fitness/sim "checks").
   // Graph rules are dataset queries, not timed units — their per-rule duration is
-  // always 0ms, so drop the Duration column for graph sessions; fitness/sim checks
-  // ARE timed, so keep it for them.
-  const itemColumn = tool === 'graph' ? 'Rule' : 'Check';
+  // always 0ms, so drop the Duration column for graph sessions; fitness/sim/yagni
+  // items ARE timed, so keep it for them.
+  const itemColumnByTool: Record<string, string> = { graph: 'Rule', yagni: 'Detector' };
+  const itemColumn = itemColumnByTool[tool] ?? 'Check';
   const showDuration = tool !== 'graph';
   const itemHeaders = ['', itemColumn, 'Status', 'Errors', 'Warnings', 'Findings'];
   if (showDuration) itemHeaders.push('Duration');

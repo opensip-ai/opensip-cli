@@ -18,7 +18,7 @@ import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 interface StoredSessionLike {
   id: string;
-  tool: 'fit' | 'sim' | 'graph';
+  tool: 'fit' | 'sim' | 'graph' | 'yagni';
   startedAt: string;
   completedAt: string;
   cwd: string;
@@ -120,6 +120,47 @@ describe('renderSessionTable / renderDetail', () => {
     expect(headers).not.toContain('Rule');
     // The check's slug renders in a row.
     expect(detail!.textContent).toContain('no-console-log');
+  });
+
+  it('renders per-detector detail with a "Detector" column for a yagni payload', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        id: 'y1',
+        tool: 'yagni',
+        payload: {
+          summary: { total: 1, passed: 0, failed: 1, errors: 0, warnings: 1 },
+          // Yagni conforms to the shared payload.checks contract — one "check"
+          // per detector, keyed by checkSlug (host relabels the column).
+          checks: [
+            {
+              checkSlug: 'unused-export',
+              passed: false,
+              violationCount: 1,
+              durationMs: 4,
+              findings: [
+                {
+                  ruleId: 'unused-export',
+                  message: 'export with no importers',
+                  severity: 'warning',
+                  filePath: 'src/a.ts',
+                  line: 7,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const detail = detailSection(panel);
+    expect(detail).not.toBeNull();
+    const headers = [...detail!.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(headers).toContain('Detector');
+    expect(headers).not.toContain('Check');
+    expect(headers).not.toContain('Rule');
+    // The detector's slug renders in a row (detail was actually recorded — the
+    // regression was an empty "No per-rule detail" panel from a mismatched key).
+    expect(detail!.textContent).toContain('unused-export');
   });
 
   it('renders per-rule detail with a "Rule" column for a graph payload', () => {

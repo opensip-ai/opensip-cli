@@ -54,11 +54,25 @@ declare global {
   const sessions: readonly DashboardSession[];
   const fitSessions: readonly DashboardSession[];
   const simSessions: readonly DashboardSession[];
+  const yagniSessions: readonly DashboardSession[];
 
   const checkCatalog: readonly unknown[];
   const recipeCatalog: readonly unknown[];
   const simScenarioCatalog: readonly unknown[];
   const simRecipeCatalog: readonly unknown[];
+
+  /**
+   * Yagni-owned detector catalog + run summary, emitted by generator.ts as
+   * `const yagniCatalog = …;` / `const yagniSummary = …;`. The YAGNI tab reads
+   * them structurally (entry shapes are yagni domain vocabulary owned by
+   * @opensip-cli/yagni). `yagniSummary` is `null` when yagni contributed nothing.
+   */
+  const yagniCatalog: readonly unknown[];
+  const yagniSummary: {
+    detectorCount?: number;
+    graphBackedCount?: number;
+    contractVersion?: string;
+  } | null;
 
   /**
    * Graph-owned rule/recipe catalogs (Plan B), emitted by generator.ts as

@@ -218,6 +218,7 @@ const yagniCatalog = ${safeYagniCatalogJson};
 ${editorProtocolJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
+const yagniSessions = sessions.filter(s => s.tool === 'yagni');
 // Registry-derived Overview maps (tool → badge style / tab id), consumed as page
 // globals by the bundled overview renderer (src/client/overview.ts).
 const toolBadgeStyles = ${toolBadgeStylesJson};
