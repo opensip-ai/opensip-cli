@@ -19,7 +19,9 @@
  * and never reaches `isValidTool`.
  */
 
-import { validateCommandSpec, type Tool } from '@opensip-cli/core';
+import { validateCommandSpec, validateToolIdentity, type Tool } from '@opensip-cli/core';
+
+type NormalizedIdentity = ReturnType<typeof validateToolIdentity>;
 
 /** Top-level hook keys removed in the tool-author-simplify contract. */
 const LEGACY_TOP_LEVEL_HOOK_KEYS = [
@@ -46,17 +48,50 @@ function metadataValidationFailure(metadata: unknown): string | undefined {
   if (typeof (metadata as { id?: unknown }).id !== 'string') {
     return 'tool.metadata.id must be a string';
   }
+  if (typeof (metadata as { name?: unknown }).name !== 'string') {
+    return 'tool.metadata.name must be a string';
+  }
   return undefined;
 }
 
-function commandSpecsValidationFailure(commandSpecs: unknown): string | undefined {
+function identityValidationFailure(identity: unknown): string | undefined {
+  try {
+    validateToolIdentity(identity as never);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'tool.identity is invalid';
+  }
+}
+
+function commandSpecsValidationFailure(
+  commandSpecs: unknown,
+  identity: NormalizedIdentity,
+): string | undefined {
   if (!Array.isArray(commandSpecs) || commandSpecs.length === 0) {
     return 'tool.commandSpecs must be a non-empty array (the declarative command surface)';
   }
+  let primaryCount = 0;
   for (const spec of commandSpecs) {
     if (!validateCommandSpec(spec)) {
       return 'tool.commandSpecs contains an invalid CommandSpec';
     }
+    const command = spec as { name?: unknown; parent?: unknown; aliases?: unknown };
+    if (command.parent !== undefined && command.parent !== identity.name) {
+      return `tool.commandSpecs parent '${String(command.parent)}' must equal identity.name '${identity.name}'`;
+    }
+    if (command.parent === undefined && command.name === identity.name) {
+      primaryCount += 1;
+      const aliases = Array.isArray(command.aliases) ? command.aliases : [];
+      if (
+        aliases.length !== identity.aliases.length ||
+        aliases.some((value, index) => value !== identity.aliases[index])
+      ) {
+        return 'tool.commandSpecs primary command aliases must match tool.identity.aliases';
+      }
+    }
+  }
+  if (primaryCount !== 1) {
+    return `tool.commandSpecs must contain exactly one primary command named '${identity.name}'`;
   }
   return undefined;
 }
@@ -87,6 +122,14 @@ export function toolValidationFailure(value: unknown): string | undefined {
   const metadataFailure = metadataValidationFailure(candidate.metadata);
   if (metadataFailure !== undefined) return metadataFailure;
 
+  const identityFailure = identityValidationFailure(candidate.identity);
+  if (identityFailure !== undefined) return identityFailure;
+  const identity = validateToolIdentity(candidate.identity as never);
+
+  if ((candidate.metadata as { name?: unknown }).name !== identity.name) {
+    return `tool.metadata.name '${String((candidate.metadata as { name?: unknown }).name)}' must equal tool.identity.name '${identity.name}'`;
+  }
+
   const legacy = legacyTopLevelHookKeys(candidate);
   if (legacy.length > 0) {
     return (
@@ -95,7 +138,7 @@ export function toolValidationFailure(value: unknown): string | undefined {
     );
   }
 
-  const specsFailure = commandSpecsValidationFailure(candidate.commandSpecs);
+  const specsFailure = commandSpecsValidationFailure(candidate.commandSpecs, identity);
   if (specsFailure !== undefined) return specsFailure;
 
   return optionalCommandsValidationFailure(candidate.commands);

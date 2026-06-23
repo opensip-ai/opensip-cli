@@ -59,11 +59,17 @@ describe('CLI e2e', () => {
   // Per-tool --version (decorateToolPrimary): `opensip <tool> --version` prints
   // the TOOL's own version (`<verb> <semver>`), distinct from `opensip
   // --version` (the CLI). The host guarantees this uniformly on every primary.
+  const VERSION_LABEL: Record<string, string> = {
+    fit: 'fitness',
+    sim: 'simulation',
+    graph: 'graph',
+  };
+
   it.each(['fit', 'graph', 'sim'])('%s --version prints the tool version', (tool) => {
     const { stdout, exitCode } = cli.run([tool, '--version'], { cwd: FIXTURE });
     expect(exitCode).toBe(0);
-    // `<verb> <semver>` — the tool name aligns to the command verb (Task 2.4).
-    expect(stdout.trim()).toMatch(new RegExp(`^${tool} \\d+\\.\\d+\\.\\d+`));
+    const label = VERSION_LABEL[tool] ?? tool;
+    expect(stdout.trim()).toMatch(new RegExp(`^${label} \\d+\\.\\d+\\.\\d+`));
   });
 
   // The guaranteed baseline flags are present uniformly on every tool primary.

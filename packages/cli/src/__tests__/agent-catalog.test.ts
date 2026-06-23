@@ -23,7 +23,7 @@ describe('buildAgentCatalog', () => {
     }
     expect(c.entryPoints.map((e) => e.command)).toEqual(
       expect.arrayContaining([
-        'fit',
+        'fitness',
         'graph',
         'yagni',
         'sessions list',
@@ -57,7 +57,7 @@ describe('buildAgentCatalog', () => {
     it('fit/graph are tool-tier; the host commands are platform-tier', () => {
       const c = buildAgentCatalog();
       const tierOf = (command: string) => c.entryPoints.find((e) => e.command === command)?.tier;
-      expect(tierOf('fit')).toBe('tool');
+      expect(tierOf('fitness')).toBe('tool');
       expect(tierOf('graph')).toBe('tool');
       expect(tierOf('sessions list')).toBe('platform');
       expect(tierOf('sessions show')).toBe('platform');

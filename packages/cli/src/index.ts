@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     toolSpecs: registrationInput.toolCommandSpecs,
     hostSpecs: buildTopLevelHostSpecs(commandCtx),
     hostGroups: buildHostSubcommandGroups(commandCtx),
-    toolPluginGroups: buildToolPluginGroups(commandCtx),
+    toolPluginGroups: buildToolPluginGroups(commandCtx, toolRegistry),
   });
 
   // Install the pre-action hook AFTER bootstrap + command-scope indexing so the

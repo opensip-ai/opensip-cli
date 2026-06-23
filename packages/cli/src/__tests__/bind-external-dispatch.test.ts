@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { buildMaybeDispatchExternal } from '../bootstrap/bind-external-dispatch.js';
 
 const TOOL: Tool = {
+  identity: { name: 'external-dispatch-tool', aliases: ['ext-run'] },
   metadata: {
     id: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567',
     name: 'external-dispatch-tool',
@@ -28,7 +29,8 @@ const TOOL: Tool = {
   },
   commandSpecs: [
     {
-      name: 'ext-run',
+      name: 'external-dispatch-tool',
+      aliases: ['ext-run'],
       description: 'fixture',
       commonFlags: [],
       scope: 'project',
@@ -141,19 +143,23 @@ describe('buildMaybeDispatchExternal', () => {
     const manifest: ToolPluginManifest = {
       kind: 'tool',
       id: 'external-dispatch-tool',
+      identity: { name: 'external-dispatch-tool', aliases: ['ext-run'] },
       stableId: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567',
       name: 'external-dispatch-tool',
       version: '0.0.0',
       apiVersion: 1,
-      commands: [{ name: 'ext-run', description: 'fixture' }],
-      config: { namespace: 'extns', schema: { type: 'object', properties: {} } },
+      commands: [{ name: 'external-dispatch-tool', aliases: ['ext-run'], description: 'fixture' }],
+      config: {
+        namespace: 'external-dispatch-tool',
+        schema: { type: 'object', properties: {} },
+      },
     };
     const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
     await expect(
       runWithScope(
         scopeWith([provenance('installed')], {
           toolManifests: [manifest],
-          configDocument: { extns: { k: 'v' } },
+          configDocument: { 'external-dispatch-tool': { k: 'v' } },
         }),
         () => hook('ext-run', {}, []),
       ),

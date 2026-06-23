@@ -289,7 +289,7 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
 });
 
 describe('isValidTool — command-surface requirement', () => {
-  const base = { metadata: { id: 'x' }, commands: [] };
+  const base = { identity: { name: 'c' }, metadata: { id: 'x', name: 'c' }, commands: [] };
 
   it('accepts a tool with a non-empty commandSpecs', () => {
     expect(isValidTool({ ...base, commandSpecs: [makeSpec('c')] })).toBe(true);

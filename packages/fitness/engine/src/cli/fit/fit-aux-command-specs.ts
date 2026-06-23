@@ -23,7 +23,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, logger } from '@opensip-cli/core';
+import { ConfigurationError, defineCommand, defineNestedCommand, logger } from '@opensip-cli/core';
 
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';
@@ -34,19 +34,19 @@ import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 // =============================================================================
 // GROUPED <tool> <verb> CHILDREN (the canonical Tier-2 grammar)
 //
-// `fit list` / `fit recipes` mount as SUBCOMMANDS of the `fit` primary
-// (`parent: 'fit'`) via the nested-mount capability. They own their handler
-// bodies directly (calling the shared `listChecks` / `listRecipes` engine
-// functions) — the legacy flat `fit-list` / `fit-recipes` aliases were removed.
+// `fitness list` / `fitness recipes` mount as subcommands of the canonical
+// primary, and `fit list` / `fit recipes` work through the primary alias. They
+// own their handler bodies directly (calling the shared `listChecks` /
+// `listRecipes` engine functions) — the legacy flat `fit-list` / `fit-recipes`
+// aliases were removed.
 // =============================================================================
 
 /** `fit list` — list available fitness checks. */
-export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'list',
-  parent: 'fit',
   description: 'List available fitness checks',
   commonFlags: ['cwd', 'json'],
   scope: 'project',
@@ -58,12 +58,11 @@ export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = d
 });
 
 /** `fit recipes` — list available fitness recipes. */
-export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'recipes',
-  parent: 'fit',
   description: 'List available fitness recipes',
   commonFlags: ['cwd', 'json'],
   scope: 'project',
@@ -131,17 +130,16 @@ async function runFitBaselineExport(
 }
 
 /**
- * `fit export --format baseline` — the canonical fitness export command. Mounts
- * as a SUBCOMMAND of the `fit` primary (`parent: 'fit', via the nested-mount
- * capability), so it shares the root with `graph export` without colliding (both
- * declare `name: 'export'`).
+ * `fitness export --format baseline` — the canonical fitness export command.
+ * defineTool mounts this draft as a subcommand of the canonical primary, and
+ * `fit export` works through the primary alias. It shares the root with
+ * `graph export` without colliding because both declare `name: 'export'`.
  */
-export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'export',
-  parent: 'fit',
   description: 'Export fit artifacts: --format baseline (the SARIF-shaped gate baseline)',
   commonFlags: ['cwd', 'json'],
   options: [

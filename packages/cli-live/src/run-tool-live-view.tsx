@@ -32,7 +32,7 @@ import { scrubErrorMessage } from './scrub-error-message.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 
-export type LiveRunTool = 'fit' | 'graph' | 'sim' | 'yagni';
+export type LiveRunTool = 'fitness' | 'graph' | 'simulation' | 'yagni';
 
 export type LiveRunOutcome =
   | {

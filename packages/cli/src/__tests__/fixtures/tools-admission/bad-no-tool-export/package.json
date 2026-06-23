@@ -7,10 +7,11 @@
   "opensipTools": {
     "kind": "tool",
     "id": "no-tool-export",
+    "identity": { "name": "no-tool-export" },
     "apiVersion": 1,
     "commands": [
       {
-        "name": "ghost-cmd",
+        "name": "no-tool-export",
         "description": "noop"
       }
     ]

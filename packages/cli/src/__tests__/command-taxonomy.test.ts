@@ -90,10 +90,10 @@ describe('command taxonomy — canonical resolves, legacy is gone (Step 2)', () 
     { legacy: 'sarif-export', parent: 'graph', verb: 'export' },
     { legacy: 'catalog-export', parent: 'graph', verb: 'export' },
     { legacy: 'graph-baseline-export', parent: 'graph', verb: 'export' },
-    { legacy: 'fit-baseline-export', parent: 'fit', verb: 'export' },
+    { legacy: 'fit-baseline-export', parent: 'fitness', verb: 'export' },
     // Cosmetic grouped forms.
-    { legacy: 'fit-list', parent: 'fit', verb: 'list' },
-    { legacy: 'fit-recipes', parent: 'fit', verb: 'recipes' },
+    { legacy: 'fit-list', parent: 'fitness', verb: 'list' },
+    { legacy: 'fit-recipes', parent: 'fitness', verb: 'recipes' },
     { legacy: 'graph-recipes', parent: 'graph', verb: 'recipes' },
     { legacy: 'graph-lookup', parent: 'graph', verb: 'lookup' },
     { legacy: 'graph-symbol-index', parent: 'graph', verb: 'index' },
@@ -116,8 +116,9 @@ describe('command taxonomy — canonical resolves, legacy is gone (Step 2)', () 
 });
 
 describe('command taxonomy — new discoverability commands exist (Step 3)', () => {
-  it('mounts `sim recipes` (new — no legacy predecessor)', () => {
+  it('mounts `simulation recipes` (new — no legacy predecessor)', () => {
     const program = buildFullProgram();
+    expect(resolveNested(program, 'simulation', 'recipes')).toBeDefined();
     expect(resolveNested(program, 'sim', 'recipes')).toBeDefined();
     // No flat `sim-recipes` ever existed.
     expect(resolveTopLevel(program, 'sim-recipes')).toBeUndefined();
@@ -131,19 +132,25 @@ describe('command taxonomy — new discoverability commands exist (Step 3)', () 
 });
 
 describe('command taxonomy — metadata.name parity (Step 4)', () => {
-  it('each bundled tool metadata.name equals its primary command verb', () => {
-    // tool-command-surface-taxonomy Task 2.4 (Q1): the SHORT verb is both
-    // metadata.name AND the mounted command name. The config namespace literal
-    // (fitness:/simulation:/graph:) is decoupled and unchanged.
-    expect(fitnessTool.metadata.name).toBe('fit');
-    expect(simulationTool.metadata.name).toBe('sim');
+  it('each bundled tool metadata.name equals its canonical primary command verb', () => {
+    expect(fitnessTool.metadata.name).toBe('fitness');
+    expect(simulationTool.metadata.name).toBe('simulation');
     expect(graphTool.metadata.name).toBe('graph');
 
-    // And each of those verbs is actually a mounted top-level command.
     const program = buildFullProgram();
-    for (const verb of ['fit', 'sim', 'graph']) {
+    for (const verb of ['fitness', 'simulation', 'graph']) {
       expect(resolveTopLevel(program, verb), `'${verb}' must be a mounted command`).toBeDefined();
     }
+  });
+
+  it('short CLI aliases resolve to the same primary commands', () => {
+    const program = buildFullProgram();
+    const fitness = resolveTopLevel(program, 'fitness');
+    const fit = resolveTopLevel(program, 'fit');
+    expect(fit).toBe(fitness);
+    const simulation = resolveTopLevel(program, 'simulation');
+    const sim = resolveTopLevel(program, 'sim');
+    expect(sim).toBe(simulation);
   });
 });
 

@@ -32,7 +32,7 @@ const TOOL_ID = '11111111-1111-1111-1111-111111111111';
 const TOOL_NAME = 'demo';
 
 function makeTool(): Tool {
-  return { metadata: { id: TOOL_ID, name: TOOL_NAME } } as unknown as Tool;
+  return { identity: { name: TOOL_NAME }, metadata: { id: TOOL_ID, name: TOOL_NAME } } as unknown as Tool;
 }
 
 function makeCtx(): ToolCliContext {
@@ -54,6 +54,7 @@ function manifest(overrides: Partial<ToolPluginManifest>): ToolPluginManifest {
     kind: 'tool',
     apiVersion: 1,
     id: TOOL_NAME,
+    identity: { name: TOOL_NAME },
     name: 'Demo',
     version: '1.0.0',
     commands: [],

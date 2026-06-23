@@ -373,8 +373,9 @@ function buildHostCompletionSurface(ctx: CliCommandsContext): {
   return {
     specs: [...buildNonCompletionHostSpecs(ctx), COMPLETION_SELF_SPEC],
     groups: buildHostSubcommandGroups(ctx),
-    toolPluginGroups: buildToolPluginGroups(ctx).map((g) => ({
+    toolPluginGroups: buildToolPluginGroups(ctx, ctx.tools).map((g) => ({
       toolVerb: g.toolVerb,
+      parentAliases: g.parentAliases,
       leaves: g.leaves.map((l) => ({ name: l.name })),
     })),
   };
@@ -421,5 +422,5 @@ export function mountHostCommands(program: CliProgram, ctx: CliCommandsContext):
       mountCommandSpec(parent, leaf, ctx);
     }
   }
-  mountToolPluginGroups(program, ctx);
+  mountToolPluginGroups(program, ctx, ctx.tools);
 }

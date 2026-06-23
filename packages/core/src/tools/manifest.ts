@@ -24,6 +24,7 @@
  */
 
 import type { ToolCapabilityDeclaration } from './capability.js';
+import type { ToolIdentity } from './identity.js';
 import type {
   ArgSpec,
   CommandOutputMode,
@@ -143,6 +144,12 @@ export interface ToolCommandManifest {
 interface ToolPluginManifestBase {
   /** Discriminator — always `'tool'` (matches `opensipTools.kind`). */
   readonly kind: 'tool';
+  /**
+   * Author-facing identity block. Required for every tool manifest.
+   * `id` must equal `identity.name`; `pluginLayout.domain` must equal
+   * `identity.layoutKey ?? identity.name`.
+   */
+  readonly identity: ToolIdentity;
   /**
    * Human/programmatic key (the value used for current storage, short ids,
    * config, etc.). For published tools this is the "declared" identifier.

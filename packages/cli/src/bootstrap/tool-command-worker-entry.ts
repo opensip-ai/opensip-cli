@@ -101,7 +101,9 @@ function resolveTool(spec: ToolCommandWorkerSpec): Tool {
 
 /** Resolve the command spec the worker should run, or throw `command-not-found`. */
 function findCommandSpec(tool: Tool, commandName: string): CommandSpec<unknown, ToolCliContext> {
-  const spec = tool.commandSpecs?.find((s) => s.name === commandName);
+  const spec = tool.commandSpecs?.find(
+    (s) => s.name === commandName || s.aliases?.includes(commandName) === true,
+  );
   if (spec === undefined) {
     const err = new Error(
       `tool command worker: tool '${tool.metadata.id}' has no command '${commandName}'`,

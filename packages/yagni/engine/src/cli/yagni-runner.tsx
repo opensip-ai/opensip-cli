@@ -25,7 +25,7 @@ const YAGNI_TOOL_DESCRIPTION = 'Scanning for speculative surface to remove.';
 const YAGNI_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running detectors...' };
 const YAGNI_LOADING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Loading detectors...' };
 
-export const YAGNI_LIVE_VIEW_KEY = 'yagni';
+export { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
 
 export interface YagniLiveArgs {
   readonly cwd: string;

@@ -38,13 +38,21 @@
   ],
   "opensipTools": {
     "kind": "tool",
-    "id": "sim",
+    "id": "simulation",
+    "identity": {
+      "name": "simulation",
+      "aliases": ["sim"],
+      "layoutKey": "sim"
+    },
     "stableId": "715d32c2-692c-4ed4-985b-a35deaf186aa",
     "apiVersion": 1,
     "commands": [
       {
-        "name": "sim",
+        "name": "simulation",
         "description": "Run simulation scenarios",
+        "aliases": [
+          "sim"
+        ],
         "commonFlags": [
           "cwd",
           "json",
@@ -74,7 +82,7 @@
       {
         "name": "recipes",
         "description": "List available simulation recipes",
-        "parent": "sim",
+        "parent": "simulation",
         "commonFlags": [
           "cwd",
           "json"

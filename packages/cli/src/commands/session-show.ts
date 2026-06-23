@@ -1,18 +1,20 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { currentScope, SystemError } from '@opensip-cli/core';
+import { buildToolIdentityIndex, currentScope, SystemError } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
-import type { ToolShortId } from '@opensip-cli/core';
+import type { ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 export interface ExecuteSessionShowOptions {
   readonly replayRegistry?: SessionReplayRegistry;
   readonly ref: string;
   readonly tool?: ToolShortId;
+  /** Live tool registry — maps stored layout keys to canonical display names. */
+  readonly registry?: ToolRegistry;
   readonly json?: boolean;
   /** Agent ergonomics filters (from --filter, repeatable). See Phase 1 plan. */
   readonly filters?: string[];
@@ -49,6 +51,9 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
       { code: 'SYSTEM.SCOPE.DATASTORE_UNAVAILABLE' },
     );
   }
+  const registry = opts.registry ?? currentScope()?.tools;
+  const identityIndex =
+    registry === undefined ? undefined : buildToolIdentityIndex(registry);
   const resolved = resolveSession(datastore as DataStore, { ref: opts.ref, tool: opts.tool });
   if (!resolved.ok) {
     await emitSessionShowError(opts, resolved.reason, resolved.detail);
@@ -99,6 +104,7 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
       filteredReplay,
       opts.filters,
       originalSignalCount,
+      identityIndex,
     );
 
     if (opts.raw) {
@@ -118,8 +124,21 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
     return;
   }
   await opts.render(
-    sessionReplayResult(resolved.session, filteredReplay, opts.filters, originalSignalCount),
+    sessionReplayResult(
+      resolved.session,
+      filteredReplay,
+      opts.filters,
+      originalSignalCount,
+      identityIndex,
+    ),
   );
+}
+
+function canonicalToolForDisplay(
+  tool: string,
+  identityIndex?: ReturnType<typeof buildToolIdentityIndex>,
+): string {
+  return identityIndex === undefined ? tool : identityIndex.canonicalForStoredTool(tool);
 }
 
 /** Sort rank for `top:N` severity ordering: high (0) before medium (1) before low (2). */
@@ -213,12 +232,13 @@ function sessionReplayResult(
   replay: ToolSessionReplay<CommandResult>,
   filters?: string[],
   originalSignalCount?: number,
+  identityIndex?: ReturnType<typeof buildToolIdentityIndex>,
 ): CommandResult {
   return {
     type: 'session-replay',
     session: {
       id: session.id,
-      tool: session.tool,
+      tool: canonicalToolForDisplay(session.tool, identityIndex),
       startedAt: session.startedAt,
       completedAt: session.completedAt,
       ...(session.recipe === undefined ? {} : { recipe: session.recipe }),
@@ -237,11 +257,12 @@ function sessionShowJson(
   replay: ToolSessionReplay<CommandResult>,
   filters?: string[],
   originalSignalCount?: number,
+  identityIndex?: ReturnType<typeof buildToolIdentityIndex>,
 ): unknown {
   return {
     session: {
       id: session.id,
-      tool: session.tool,
+      tool: canonicalToolForDisplay(session.tool, identityIndex),
       startedAt: session.startedAt,
       completedAt: session.completedAt,
       recipe: session.recipe,

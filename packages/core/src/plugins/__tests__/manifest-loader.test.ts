@@ -43,6 +43,7 @@ describe('loadToolManifest', () => {
       opensipTools: {
         kind: 'tool',
         id: 'audit',
+        identity: { name: 'audit' },
         apiVersion: 1,
         commands: [
           { name: 'audit', description: 'Run an audit' },
@@ -71,7 +72,7 @@ describe('loadToolManifest', () => {
     writePackageManifest(testDir, {
       name: 'installed-tool',
       version: '0.1.0',
-      opensipTools: { kind: 'tool', id: 'installed', commands: [] },
+      opensipTools: { kind: 'tool', id: 'installed', identity: { name: 'installed' }, commands: [] },
     });
     const manifest = loadToolManifest('installed', testDir);
     expect(manifest?.id).toBe('installed');
@@ -83,10 +84,11 @@ describe('loadToolManifest', () => {
     writeSidecar(testDir, {
       kind: 'tool',
       id: 'local-tool',
+      identity: { name: 'local-tool' },
       name: 'My Local Tool',
       version: '0.0.1',
       apiVersion: 1,
-      commands: [{ name: 'go', description: 'Do the thing' }],
+      commands: [{ name: 'local-tool', description: 'Do the thing' }],
     });
 
     const manifest = loadToolManifest('project-local', testDir);
@@ -106,10 +108,11 @@ describe('loadToolManifest', () => {
     writeSidecar(testDir, {
       kind: 'tool',
       id: 'global-tool',
+      identity: { name: 'global-tool' },
       name: 'My Global Tool',
       version: '2.0.0',
       apiVersion: 1,
-      commands: [{ name: 'go', description: 'Do the thing' }],
+      commands: [{ name: 'global-tool', description: 'Do the thing' }],
     });
 
     const manifest = loadToolManifest('user-global', testDir);
@@ -129,6 +132,7 @@ describe('loadToolManifest', () => {
       opensipTools: {
         kind: 'tool',
         id: 'ext',
+        identity: { name: 'ext' },
         apiVersion: 1,
         pluginLayout: { domain: 'ext', userSubdirs: ['checks', 'recipes'] },
         commands: [
@@ -182,6 +186,7 @@ describe('loadToolManifest', () => {
       opensipTools: {
         kind: 'tool',
         id: 'x',
+        identity: { name: 'x' },
         apiVersion: 1,
         commands: [{ name: 'x', description: 'x', output: 'not-a-mode' }],
       },
@@ -196,6 +201,7 @@ describe('loadToolManifest', () => {
       opensipTools: {
         kind: 'tool',
         id: 'x',
+        identity: { name: 'x' },
         apiVersion: 1,
         pluginLayout: { domain: 'x' },
         commands: [{ name: 'x', description: 'x' }],
@@ -237,7 +243,7 @@ describe('loadToolManifest', () => {
   it('returns undefined when name/version cannot be derived', () => {
     writePackageManifest(testDir, {
       // no name/version
-      opensipTools: { kind: 'tool', id: 'x', commands: [] },
+      opensipTools: { kind: 'tool', id: 'x', identity: { name: 'x' }, commands: [] },
     });
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
@@ -246,7 +252,7 @@ describe('loadToolManifest', () => {
     writePackageManifest(testDir, {
       name: 'x',
       version: '1.0.0',
-      opensipTools: { kind: 'tool', id: 'x', commands: 'nope' },
+      opensipTools: { kind: 'tool', id: 'x', identity: { name: 'x' }, commands: 'nope' },
     });
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
@@ -258,6 +264,7 @@ describe('loadToolManifest', () => {
       opensipTools: {
         kind: 'tool',
         id: 'x',
+        identity: { name: 'x' },
         commands: [{ name: 'ok', description: 'fine' }, { name: 42 }],
       },
     });
@@ -268,7 +275,86 @@ describe('loadToolManifest', () => {
     writePackageManifest(testDir, {
       name: 'x',
       version: '1.0.0',
-      opensipTools: { kind: 'tool', id: 'x', apiVersion: 'one', commands: [] },
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        apiVersion: 'one',
+        commands: [],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+  });
+
+  it('returns undefined when identity is missing', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: { kind: 'tool', id: 'x', apiVersion: 1, commands: [] },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+  });
+
+  it('returns undefined when manifest id does not match identity.name', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'other' },
+        apiVersion: 1,
+        commands: [{ name: 'other', description: 'other' }],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+  });
+
+  it('returns undefined when pluginLayout.domain does not match identity.layoutKey', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x', layoutKey: 'x-layout' },
+        apiVersion: 1,
+        pluginLayout: { domain: 'wrong', userSubdirs: ['checks'] },
+        commands: [{ name: 'x', description: 'x' }],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+  });
+
+  it('preserves config descriptors and rejects config namespace drift', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        apiVersion: 1,
+        config: { namespace: 'x', schema: { type: 'object', properties: {} } },
+        commands: [{ name: 'x', description: 'x' }],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)?.config).toEqual({
+      namespace: 'x',
+      schema: { type: 'object', properties: {} },
+    });
+
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        apiVersion: 1,
+        config: { namespace: 'wrong', schema: { type: 'object' } },
+        commands: [{ name: 'x', description: 'x' }],
+      },
     });
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
@@ -281,7 +367,11 @@ describe('loadToolManifest', () => {
     expect(manifest).toBeDefined();
     expect(manifest?.id).toBe('throw-on-import');
     expect(manifest?.commands).toEqual([
-      { name: 'boom', description: 'A command from a tool that explodes on import' },
+      {
+        name: 'throw-on-import',
+        aliases: ['boom'],
+        description: 'A command from a tool that explodes on import',
+      },
     ]);
 
     // And importing it for real DOES throw — proving the fixture is a real
@@ -296,6 +386,7 @@ function manifest(overrides: Partial<{ apiVersion: number | undefined; id: strin
   return {
     kind: 'tool' as const,
     id: overrides.id ?? 'audit',
+    identity: { name: overrides.id ?? 'audit' },
     name: 'Audit',
     version: '1.2.3',
     apiVersion: 'apiVersion' in overrides ? overrides.apiVersion : PLUGIN_API_VERSION,
@@ -311,6 +402,7 @@ function withCapability(discovery: unknown): void {
     opensipTools: {
       kind: 'tool',
       id: 'disc',
+      identity: { name: 'disc' },
       apiVersion: 1,
       commands: [{ name: 'disc', description: 'd' }],
       capabilities: [
@@ -446,6 +538,7 @@ describe('admitTool', () => {
       manifest: {
         kind: 'tool',
         id: 'audit',
+        identity: { name: 'audit' },
         name: 'Audit',
         version: '1.2.3',
         apiVersion: 1,
@@ -462,6 +555,7 @@ describe('admitTool', () => {
         apiVersion: 1,
         version: '1.2.3',
         name: 'Audit',
+        identity: { name: 'audit' },
         id: 'audit',
         kind: 'tool',
       },

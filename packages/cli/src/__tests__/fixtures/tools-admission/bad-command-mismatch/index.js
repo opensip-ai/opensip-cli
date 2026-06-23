@@ -1,16 +1,17 @@
 // Fixture: manifest declares `declared-cmd`; the runtime exports a DIFFERENT
 // command name — the coherence drift guard must reject it.
 export const tool = {
+  identity: { name: 'command-mismatch-tool' },
   metadata: {
     id: 'command-mismatch-tool',
-    name: 'CmdMismatch',
+    name: 'command-mismatch-tool',
     version: '0.0.0',
     description: 'fixture',
   },
   commands: [{ name: 'other-cmd', description: 'not the declared one' }],
   commandSpecs: [
     {
-      name: 'other-cmd',
+      name: 'command-mismatch-tool',
       description: 'not the declared one',
       commonFlags: [],
       scope: 'project',

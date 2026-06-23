@@ -55,14 +55,14 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
   it("admits fit's static manifest through the compatibility gate (apiVersion declared)", () => {
     const manifest = loadToolManifest('installed', FIT_DIR);
     expect(manifest, 'fit package.json#opensipTools must load as a manifest').toBeDefined();
-    // Task 2.4: the manifest `id` (human key) equals metadata.name = `fit`.
-    expect(manifest?.id).toBe('fit');
+    expect(manifest?.id).toBe('fitness');
+    expect(manifest?.identity?.name).toBe('fitness');
     // 3.0.0: the manifest MUST declare apiVersion (the grace window ended).
     expect(typeof manifest?.apiVersion).toBe('number');
     // The canonical fit commands are declared in the manifest (the legacy flat
     // aliases were removed).
     const cmdNames = (manifest?.commands ?? []).map((c) => c.name);
-    expect(cmdNames).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    expect(cmdNames).toEqual(expect.arrayContaining(['fitness', 'list', 'recipes', 'export']));
     expect(cmdNames).not.toContain('fit-list');
     expect(cmdNames).not.toContain('fit-recipes');
     expect(cmdNames).not.toContain('fit-baseline-export');
@@ -81,7 +81,7 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
       tool?: Tool;
     };
     expect(mod.tool, 'the built module must export `tool`').toBeDefined();
-    expect(mod.tool?.metadata.name).toBe('fit');
+    expect(mod.tool?.metadata.name).toBe('fitness');
     expect(mod.tool?.metadata.id).toBe('afd68bd3-ff3c-4935-a5b6-76d8fc7a5224');
     // fit, list (nested), recipes (nested), export (canonical nested),
     // fit-run-worker (internal). The legacy flat aliases were removed.
@@ -124,7 +124,7 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
     // child is mounted onto `program` by its leaf name — the canonical
     // list/recipes/export names are present at this level. The two-pass nesting
     // under the `fit` primary is covered by the parity snapshot + taxonomy tests.
-    expect(mounted).toEqual(expect.arrayContaining(['fit', 'list', 'recipes', 'export']));
+    expect(mounted).toEqual(expect.arrayContaining(['fitness', 'list', 'recipes', 'export']));
     // The legacy flat aliases are gone entirely.
     for (const legacy of ['fit-list', 'fit-recipes', 'fit-baseline-export']) {
       expect(mounted).not.toContain(legacy);
@@ -132,7 +132,7 @@ describe('fit externalization acceptance test (§1 / §8 — the GA bar)', () =>
 
     // The `fit` command carries the host-provided `--json` common flag + its own
     // `--recipe` option — proving flags + options travel the plugin path intact.
-    const fitCmd = program.commands.find((c) => c.name() === 'fit');
+    const fitCmd = program.commands.find((c) => c.name() === 'fitness');
     const flagNames = (fitCmd?.options ?? []).map((o) => o.long);
     expect(flagNames).toContain('--json');
     expect(flagNames).toContain('--recipe');

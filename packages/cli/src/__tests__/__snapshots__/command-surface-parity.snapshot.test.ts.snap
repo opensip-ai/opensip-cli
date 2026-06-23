@@ -121,8 +121,25 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     },
     {
       "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "fit-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [
+        "fit",
+      ],
       "args": [],
-      "name": "fit",
+      "name": "fitness",
       "options": [
         {
           "choices": undefined,
@@ -573,21 +590,6 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       ],
       "synopsis": "Run fitness checks",
       "usage": "[options] [command]",
-    },
-    {
-      "aliases": [],
-      "args": [
-        {
-          "name": "specPath",
-          "required": true,
-          "variadic": false,
-        },
-      ],
-      "name": "fit-run-worker",
-      "options": [],
-      "subcommands": [],
-      "synopsis": "[internal] Run fit headless and stream progress + result over IPC (forked by the live view)",
-      "usage": "[options] <specPath>",
     },
     {
       "aliases": [],
@@ -1430,8 +1432,25 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     },
     {
       "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "sim-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [
+        "sim",
+      ],
       "args": [],
-      "name": "sim",
+      "name": "simulation",
       "options": [
         {
           "choices": undefined,
@@ -1730,21 +1749,6 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       ],
       "synopsis": "Run simulation scenarios",
       "usage": "[options] [command]",
-    },
-    {
-      "aliases": [],
-      "args": [
-        {
-          "name": "specPath",
-          "required": true,
-          "variadic": false,
-        },
-      ],
-      "name": "sim-run-worker",
-      "options": [],
-      "subcommands": [],
-      "synopsis": "[internal] Run sim headless and stream progress + result over IPC (forked by the live view)",
-      "usage": "[options] <specPath>",
     },
     {
       "aliases": [],
@@ -2067,7 +2071,9 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "usage": "[options]",
     },
     {
-      "aliases": [],
+      "aliases": [
+        "yag",
+      ],
       "args": [
         {
           "name": "paths",

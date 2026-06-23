@@ -50,13 +50,15 @@
 
 import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
+import { FITNESS_IDENTITY, FITNESS_LIVE_VIEW_KEY } from './identity.js';
+
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
 import {
   fitExportCommandSpec,
   fitListGroupedCommandSpec,
   fitRecipesGroupedCommandSpec,
 } from './cli/fit/fit-aux-command-specs.js';
-import { buildFitCommandSpec, FIT_LIVE_VIEW_KEY } from './cli/fit/fit-command-spec.js';
+import { buildFitCommandSpec } from './cli/fit/fit-command-spec.js';
 import { renderFitLive } from './cli/fit-runner.js';
 import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
 import { collectFitnessReportData } from './cli/report-data.js';
@@ -107,7 +109,7 @@ import type {
  * to the old mount-time registration.
  */
 function setUpFitLiveView(cli: ToolCliContext): void {
-  cli.registerLiveView(FIT_LIVE_VIEW_KEY, async (args, liveContext) => {
+  cli.registerLiveView(FITNESS_LIVE_VIEW_KEY, async (args, liveContext) => {
     const fitArgs = args as FitOptions;
     // The host always supplies the LiveViewContext (carrying the run timer for
     // the summary provider). The renderer returns a ToolRunCompletion; the HOST
@@ -141,7 +143,7 @@ function setUpFitLiveView(cli: ToolCliContext): void {
  * The primary `fit` spec is built with `setUpFitLiveView` so the renderer wiring
  * stays next to the `renderFitLive` import in this module.
  */
-const fitCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[] = [
+const fitCommandSpecs = [
   buildFitCommandSpec(setUpFitLiveView),
   // Grouped Tier-2 children — `fit list` / `fit recipes` nest under the `fit`
   // primary via the nested-mount capability (the canonical `<tool> <verb>`
@@ -238,30 +240,26 @@ export const FITNESS_CONTRACT_VERSION = '1.0.0';
 export const FITNESS_STABLE_ID = 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224';
 
 export const fitnessTool: Tool = defineTool({
+  identity: FITNESS_IDENTITY,
   metadata: {
-    id: FITNESS_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
-    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
-    // verb (`fit`). The config namespace key stays `fitness:` — it keys off the
-    // DECOUPLED `fitnessConfigDeclaration.namespace = 'fitness'` literal, NOT
-    // metadata.name, so existing `fitness:` config blocks keep validating. The
-    // session `tool` column is already `'fit'` (sessionReplay.tool + the session
-    // contributions), so aligning the name REDUCES mismatch. Q6 (decided): keep
-    // the `fitness:` config namespace — no `fit:` alias or migration.
-    name: 'fit', // command verb + human key (was 'fitness')
+    id: FITNESS_STABLE_ID,
     version: readPackageVersion(import.meta.url),
     description: 'Run fitness checks against a codebase',
   },
-  pluginLayout: FIT_PLUGIN_LAYOUT,
+  pluginLayout: { userSubdirs: FIT_PLUGIN_LAYOUT.userSubdirs },
   commandSpecs: fitCommandSpecs,
   extensionPoints: {
     fitnessContractVersion: FITNESS_CONTRACT_VERSION,
     contributeScope,
     collectReportData: collectFitnessReportData,
     sessionReplay: {
-      tool: 'fit',
       replaySession: fitReplayFromSession,
     },
-    config: fitnessConfigDeclaration,
+    config: {
+      schema: fitnessConfigDeclaration.schema,
+      defaults: fitnessConfigDeclaration.defaults,
+      env: fitnessConfigDeclaration.env,
+    },
     capabilityRegistrars: { 'fit-pack': registerFitCheck, 'fit-recipe': registerFitRecipe },
     fingerprintStrategy: fitnessFingerprintStrategy,
     scaffoldExamples: fitScaffoldExamples,

@@ -16,19 +16,38 @@ import { describe, expect, it, vi } from 'vitest';
 import { registerCliCommands } from '../commands/index.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
-import type { PluginLayout } from '@opensip-cli/core';
+import { ToolRegistry, type PluginLayout } from '@opensip-cli/core';
 
 function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
   setExitCode: ReturnType<typeof vi.fn>;
   render: (result: CommandResult) => Promise<void>;
   datastore: () => unknown;
   pluginLayouts: readonly PluginLayout[];
+  tools?: ToolRegistry;
 } {
+  const tools = new ToolRegistry();
+  if (pluginLayouts.some((l) => l.domain === 'fit')) {
+    tools.register({
+      identity: { name: 'fitness', layoutKey: 'fit' },
+      metadata: { id: 'f', name: 'fitness', version: '0', description: '' },
+      commandSpecs: [],
+      pluginLayout: { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+    } as never);
+  }
+  if (pluginLayouts.some((l) => l.domain === 'sim')) {
+    tools.register({
+      identity: { name: 'simulation', layoutKey: 'sim' },
+      metadata: { id: 's', name: 'simulation', version: '0', description: '' },
+      commandSpecs: [],
+      pluginLayout: { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
+    } as never);
+  }
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     datastore: () => undefined,
     pluginLayouts,
+    tools,
   };
 }
 
@@ -74,8 +93,8 @@ describe('registerCliCommands', () => {
     const program = new Command('opensip');
     // Stub the pack-supporting tool primaries (the composition root mounts tools
     // before the host commands), then mount host commands with their layouts.
-    program.command('fit').description('Run fitness checks');
-    program.command('sim').description('Run simulation scenarios');
+    program.command('fitness').description('Run fitness checks');
+    program.command('simulation').description('Run simulation scenarios');
     registerCliCommands(
       program,
       makeContext([
@@ -86,7 +105,7 @@ describe('registerCliCommands', () => {
 
     // No top-level `plugin` group.
     expect(program.commands.find((c) => c.name() === 'plugin')).toBeUndefined();
-    for (const toolVerb of ['fit', 'sim']) {
+    for (const toolVerb of ['fitness', 'simulation']) {
       const primary = program.commands.find((c) => c.name() === toolVerb)!;
       expect(subcommandNames(primary, 'plugin')).toEqual(['add', 'list', 'remove', 'sync']);
     }
@@ -96,8 +115,8 @@ describe('registerCliCommands', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     const names = topLevelNames(program);
-    expect(names).not.toContain('fit');
-    expect(names).not.toContain('sim');
+    expect(names).not.toContain('fitness');
+    expect(names).not.toContain('simulation');
     expect(names).not.toContain('graph');
   });
 });

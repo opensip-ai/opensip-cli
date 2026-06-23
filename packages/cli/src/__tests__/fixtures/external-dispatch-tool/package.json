@@ -7,11 +7,13 @@
   "opensipTools": {
     "kind": "tool",
     "id": "external-dispatch-tool",
+    "identity": { "name": "external-dispatch-tool", "aliases": ["ext-run"] },
     "stableId": "f1e2d3c4-b5a6-4789-90ab-cdef01234567",
     "apiVersion": 1,
     "commands": [
       {
-        "name": "ext-run",
+        "name": "external-dispatch-tool",
+        "aliases": ["ext-run"],
         "description": "fixture external command exercising the ADR-0054 dispatch boundary"
       }
     ],

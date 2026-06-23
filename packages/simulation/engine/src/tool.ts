@@ -12,7 +12,14 @@
  */
 
 import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/contracts';
-import { createToolScope, defineCommand, defineTool, readPackageVersion } from '@opensip-cli/core';
+import {
+  createToolScope,
+  definePrimaryCommand,
+  defineTool,
+  readPackageVersion,
+} from '@opensip-cli/core';
+
+import { SIMULATION_IDENTITY, SIMULATION_LIVE_VIEW_KEY } from './identity.js';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { collectSimulationReportData } from './cli/report-data.js';
@@ -48,11 +55,8 @@ import type {
 } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
-// Live-view key — matches the `sim` subcommand name so the dispatcher's
-// renderLive(key) lookup resolves it (ADR-0016). sim's Ink/React renderer
-// (renderSimLive) is registered directly; the prior static-only path remains
-// for json / non-TTY runs.
-const SIM_LIVE_VIEW_KEY = 'sim';
+/** @deprecated Use {@link SIMULATION_LIVE_VIEW_KEY} from `identity.ts`. */
+const SIM_LIVE_VIEW_KEY = SIMULATION_LIVE_VIEW_KEY;
 
 /** Parsed `sim` options — the ADR-0021 common flags plus sim's `--recipe`. */
 type SimOptions = ToolOptions & {
@@ -294,8 +298,7 @@ function sessionReplayResult(
  * `emitEnvelope`/`render`), so the host renders nothing and the handler stays
  * authoritative — byte-identical to the former action body.
  */
-const simCommand: CommandSpec<unknown, ToolCliContext> = defineCommand<unknown, ToolCliContext>({
-  name: 'sim',
+const simCommand = definePrimaryCommand<unknown, ToolCliContext>({
   description: 'Run simulation scenarios',
   // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,
   // --verbose, --debug, --report-to, --api-key, --open. sim carries -v/--verbose
@@ -361,30 +364,26 @@ export const SIMULATION_CONTRACT_VERSION = '1.0.0';
 export const SIMULATION_STABLE_ID = '715d32c2-692c-4ed4-985b-a35deaf186aa';
 
 export const simulationTool: Tool = defineTool({
+  identity: SIMULATION_IDENTITY,
   metadata: {
-    id: SIMULATION_STABLE_ID, // stable UUID (per ADR-0048; matches Checks `id` naming)
-    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
-    // verb (`sim`). The config namespace key stays `simulation:` — it keys off
-    // the DECOUPLED `simulationConfigDeclaration.namespace = 'simulation'`
-    // literal, NOT metadata.name, so existing `simulation:` config blocks keep
-    // validating. The session `tool` column is already `'sim'`, so aligning the
-    // name REDUCES mismatch. Q6 (decided): keep the `simulation:` namespace — no
-    // `sim:` config alias is added.
-    name: 'sim', // command verb + human key (was 'simulation')
+    id: SIMULATION_STABLE_ID,
     version: readPackageVersion(import.meta.url),
     description: 'Run simulation scenarios against a codebase',
   },
-  pluginLayout: SIM_PLUGIN_LAYOUT,
+  pluginLayout: { userSubdirs: SIM_PLUGIN_LAYOUT.userSubdirs },
   commandSpecs: [simCommand, simRecipesCommandSpec, simRunWorkerCommandSpec],
   extensionPoints: {
     simulationContractVersion: SIMULATION_CONTRACT_VERSION,
     contributeScope: simulationScope.contributeScope,
     collectReportData: collectSimulationReportData,
     sessionReplay: {
-      tool: 'sim',
       replaySession: simReplayFromSession,
     },
-    config: simulationConfigDeclaration,
+    config: {
+      schema: simulationConfigDeclaration.schema,
+      defaults: simulationConfigDeclaration.defaults,
+      env: simulationConfigDeclaration.env,
+    },
     capabilityRegistrars: {
       'sim-pack': registerSimScenario,
       'sim-recipe': registerSimRecipe,

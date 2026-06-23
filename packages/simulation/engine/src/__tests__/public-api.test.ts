@@ -54,8 +54,12 @@ describe('@opensip-cli/simulation public barrel', () => {
 
   it('exposes `simulationTool` (and its `tool` alias) as the Tool descriptor', () => {
     expect(barrel.simulationTool).toBeDefined();
-    // Task 2.4 (Q1): metadata.name == the command verb (`sim`).
-    expect(barrel.simulationTool.metadata.name).toBe('sim');
+    expect(barrel.simulationTool.identity).toEqual({
+      name: 'simulation',
+      aliases: ['sim'],
+      layoutKey: 'sim',
+    });
+    expect(barrel.simulationTool.metadata.name).toBe('simulation');
     expect(barrel.simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(barrel.tool).toBe(barrel.simulationTool);
   });

@@ -29,6 +29,7 @@ describe('contracts manifest re-export', () => {
     const manifest: ToolPluginManifest = {
       kind: 'tool',
       id: 'fitness',
+      identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
       name: 'Fitness',
       version: '2.8.0',
       apiVersion: PLUGIN_API_VERSION,

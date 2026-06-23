@@ -174,19 +174,25 @@ function registerProbeScenario(): void {
 
 describe('simulationTool metadata', () => {
   it('exposes name (human), id (stable UUID), version, description', () => {
-    // tool-command-surface-taxonomy Task 2.4 (Q1): metadata.name == the command
-    // verb (`sim`). The config namespace literal stays `simulation` (decoupled).
-    expect(simulationTool.metadata.name).toBe('sim');
+    expect(simulationTool.identity).toEqual({
+      name: 'simulation',
+      aliases: ['sim'],
+      layoutKey: 'sim',
+    });
+    expect(simulationTool.metadata.name).toBe('simulation');
     expect(simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
     expect(simulationTool.metadata.version).toBe(PKG.version);
     expect(simulationTool.metadata.description).toContain('simulation');
+    expect(simulationTool.pluginLayout?.domain).toBe('sim');
   });
 
   it('declares the user-facing sim subcommand (+ recipes + the internal worker)', () => {
     const names = (simulationTool.commands ?? []).map((c) => c.name);
-    expect(names).toContain('sim');
-    // tool-command-surface-taxonomy Task 3.3: the new `sim recipes`
-    // discoverability child (name 'recipes', parent 'sim').
+    expect(names).toContain('simulation');
+    // `sim` remains an alias for the canonical `simulation` primary.
+    expect(simulationTool.commands?.[0]?.aliases).toEqual(['sim']);
+    // The `simulation recipes` discoverability child is also reachable through
+    // the primary alias as `sim recipes`.
     expect(names).toContain('recipes');
     // The internal off-main-process worker (ADR-0028), forked by the live view.
     expect(names).toContain('sim-run-worker');
@@ -196,7 +202,7 @@ describe('simulationTool metadata', () => {
 
 describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
   it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () => {
-    // `sim` + the new `sim recipes` (taxonomy Task 3.3) + the internal
+    // `simulation` + `simulation recipes` + the internal
     // `sim-run-worker` (ADR-0028).
     expect(simulationTool.commandSpecs).toHaveLength(3);
     // `register` is no longer a Tool member (3.0.0) — its absence is structural,
@@ -205,7 +211,8 @@ describe('simulationTool command surface (Phase 3 — CommandSpec migration)', (
 
   it('declares the sim command name/description/output/scope', () => {
     const spec = simSpec();
-    expect(spec.name).toBe('sim');
+    expect(spec.name).toBe('simulation');
+    expect(spec.aliases).toEqual(['sim']);
     expect(spec.description).toBe('Run simulation scenarios');
     // The handler owns its full output surface (TTY-vs-static branch + egress).
     expect(spec.output).toBe('raw-stream');

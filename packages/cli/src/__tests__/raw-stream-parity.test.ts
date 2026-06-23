@@ -34,7 +34,7 @@ function collectRawStreamSpecs(toolName: string, specs: readonly CommandSpec[]):
   return entries;
 }
 
-const PRIMARY_RUNTIME_DISPATCH = new Set(['fit', 'graph', 'sim']);
+const PRIMARY_RUNTIME_DISPATCH = new Set(['fitness', 'graph', 'simulation']);
 
 describe('raw-stream inventory (bundled tools)', () => {
   const inventory = [

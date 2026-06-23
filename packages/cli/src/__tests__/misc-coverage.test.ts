@@ -45,7 +45,8 @@ describe('isValidTool', () => {
   it('accepts a minimally well-formed tool', () => {
     expect(
       isValidTool({
-        metadata: { id: 'fake' },
+        identity: { name: 'fake' },
+        metadata: { id: 'fake', name: 'fake' },
         commandSpecs: [
           {
             name: 'fake',
@@ -81,16 +82,20 @@ describe('isValidTool', () => {
     );
   });
 
-  it('rejects when register is missing or non-function', () => {
-    expect(isValidTool({ metadata: { id: 'x' }, commands: [] })).toBe(false);
-    expect(isValidTool({ metadata: { id: 'x' }, register: 'nope', commands: [] })).toBe(false);
+  it('rejects when identity is missing or invalid', () => {
+    expect(isValidTool({ metadata: { id: 'x', name: 'x' }, commands: [] })).toBe(false);
+    expect(
+      isValidTool({ identity: { name: 'Not Valid' }, metadata: { id: 'x', name: 'x' }, commands: [] }),
+    ).toBe(false);
   });
 
-  it('rejects when commands is missing or non-array', () => {
-    expect(isValidTool({ metadata: { id: 'x' }, register: () => undefined })).toBe(false);
-    expect(isValidTool({ metadata: { id: 'x' }, register: () => undefined, commands: {} })).toBe(
+  it('rejects when metadata.name is missing or drifts from identity', () => {
+    expect(isValidTool({ identity: { name: 'x' }, metadata: { id: 'x' }, commands: [] })).toBe(
       false,
     );
+    expect(
+      isValidTool({ identity: { name: 'x' }, metadata: { id: 'x', name: 'y' }, commands: [] }),
+    ).toBe(false);
   });
 });
 

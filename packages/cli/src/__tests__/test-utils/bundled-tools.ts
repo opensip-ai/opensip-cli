@@ -25,9 +25,8 @@ import type { Tool } from '@opensip-cli/core';
 export const BUNDLED_TOOLS: readonly Tool[] = [fitnessTool, simulationTool, graphTool, yagniTool];
 
 /**
- * The bundled tool ids (human keys = `metadata.name`), in registration order —
- * the discovery skip-set. tool-command-surface-taxonomy Task 2.4 aligned
- * `metadata.name` to the short command verb, so these are `fit`/`sim`/`graph`
- * (the config namespace literals `fitness`/`simulation` are decoupled).
+ * The bundled tool ids (human keys = `metadata.name` = `identity.name`), in
+ * registration order — the discovery skip-set. Canonical names are the full tool
+ * verbs (`fitness`/`simulation`/`graph`/`yagni`); short forms are CLI aliases.
  */
-export const BUNDLED_TOOL_IDS: readonly string[] = ['fit', 'sim', 'graph', 'yagni'];
+export const BUNDLED_TOOL_IDS: readonly string[] = ['fitness', 'simulation', 'graph', 'yagni'];

@@ -152,6 +152,7 @@ function buildFullProgram(): Command {
       render: vi.fn(() => Promise.resolve()),
       datastore: () => undefined,
       pluginLayouts,
+      tools: registry,
     });
 
     return program;
@@ -338,9 +339,9 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     // NOTE: `plugin` is NO LONGER a top-level verb — the pack ops mount under
     // each pack-supporting tool primary (`opensip fit plugin …`), asserted below.
     for (const verb of [
-      'fit',
+      'fitness',
       'graph',
-      'sim',
+      'simulation',
       'init',
       'report',
       'configure',
@@ -359,16 +360,16 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     // The canonical nested export forms (Phase 2) are mounted children under
     // their tool primary — `graph export` and `fit export`.
     expect(nestedChild(program, 'graph', 'export'), '`graph export` must be mounted').toBeDefined();
-    expect(nestedChild(program, 'fit', 'export'), '`fit export` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'fitness', 'export'), '`fitness export` must be mounted').toBeDefined();
 
-    // The new discoverability commands (Phase 3) — `sim recipes` and `graph list`.
-    expect(nestedChild(program, 'sim', 'recipes'), '`sim recipes` must be mounted').toBeDefined();
+    // The new discoverability commands (Phase 3) — `simulation recipes` and `graph list`.
+    expect(nestedChild(program, 'simulation', 'recipes'), '`simulation recipes` must be mounted').toBeDefined();
     expect(nestedChild(program, 'graph', 'list'), '`graph list` must be mounted').toBeDefined();
 
     // The per-tool `plugin` groups mount UNDER the pack-supporting tool primaries
     // (fit + sim; graph has no pluginLayout, so no `plugin` group).
-    expect(nestedChild(program, 'fit', 'plugin'), '`fit plugin` must be mounted').toBeDefined();
-    expect(nestedChild(program, 'sim', 'plugin'), '`sim plugin` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'fitness', 'plugin'), '`fitness plugin` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'simulation', 'plugin'), '`simulation plugin` must be mounted').toBeDefined();
     expect(
       nestedChild(program, 'graph', 'plugin'),
       '`graph plugin` must NOT exist (graph supports no packs)',
@@ -391,7 +392,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
   // same baseline on EVERY tool primary — a per-tool `--version` plus
   // `--cwd`/`--json`/`--config`/`--quiet`/`--verbose` — and ONLY on the primary.
   describe('host-guaranteed uniform tool-primary surface', () => {
-    it.each(['fit', 'graph', 'sim'])(
+    it.each(['fitness', 'graph', 'simulation'])(
       '%s primary carries --version + the guaranteed baseline flags',
       (toolVerb) => {
         const program = buildFullProgram();
@@ -418,11 +419,11 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       const program = buildFullProgram();
       // `fit list` is a Tier-2 nested child — it must NOT pick up the primary-only
       // `--version` decoration (only the host adds it, and only to the primary).
-      const fitList = nestedChild(program, 'fit', 'list');
-      expect(fitList, '`fit list` must be mounted').toBeDefined();
+      const fitList = nestedChild(program, 'fitness', 'list');
+      expect(fitList, '`fitness list` must be mounted').toBeDefined();
       expect(
         longFlagsOf(fitList!),
-        '`fit list` must not carry the primary --version',
+        '`fitness list` must not carry the primary --version',
       ).not.toContain('--version');
     });
   });

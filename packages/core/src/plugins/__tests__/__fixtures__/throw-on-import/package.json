@@ -6,9 +6,14 @@
   "opensipTools": {
     "kind": "tool",
     "id": "throw-on-import",
+    "identity": { "name": "throw-on-import", "aliases": ["boom"] },
     "apiVersion": 1,
     "commands": [
-      { "name": "boom", "description": "A command from a tool that explodes on import" }
+      {
+        "name": "throw-on-import",
+        "aliases": ["boom"],
+        "description": "A command from a tool that explodes on import"
+      }
     ]
   }
 }

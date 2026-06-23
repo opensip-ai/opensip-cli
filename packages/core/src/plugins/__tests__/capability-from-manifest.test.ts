@@ -27,6 +27,7 @@ function fixturePackageJson(capabilities: unknown): object {
     opensipTools: {
       kind: 'tool',
       id: 'audit',
+      identity: { name: 'audit' },
       apiVersion: 1,
       commands: [{ name: 'audit', description: 'Run audit rules' }],
       capabilities,
@@ -90,6 +91,7 @@ describe('loadToolManifest — capabilities slot', () => {
       opensipTools: {
         kind: 'tool',
         id: 'audit',
+        identity: { name: 'audit' },
         commands: [{ name: 'audit', description: 'Run audit rules' }],
       },
     });
@@ -179,6 +181,7 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
       opensipTools: {
         kind: 'tool',
         id: 'audit',
+        identity: { name: 'audit' },
         apiVersion: 1,
         commands: [{ name: 'audit', description: 'Run audit rules' }],
       },

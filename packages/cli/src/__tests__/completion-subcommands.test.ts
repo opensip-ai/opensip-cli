@@ -86,7 +86,7 @@ function makeStubToolContext(): ToolCliContext {
  *  are never invoked here — only the static declarations are read). The pack
  *  `plugin` groups are derived from `pluginLayouts`, so supply the real fit/sim
  *  layouts (graph has none) — matching what the composition root threads in. */
-function makeStubHostContext(): CliCommandsContext {
+function makeStubHostContext(registry: ToolRegistry): CliCommandsContext {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
@@ -97,6 +97,7 @@ function makeStubHostContext(): CliCommandsContext {
       { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
     ],
     datastore: () => undefined,
+    tools: registry,
   };
 }
 
@@ -112,15 +113,16 @@ async function buildLiveInventory(): Promise<{
   await registerFirstPartyTools(registry);
   const toolCtx = makeStubToolContext();
   mountAllToolCommands(registry, program, toolCtx, []);
-  const hostCtx = makeStubHostContext();
+  const hostCtx = makeStubHostContext(registry);
   registerCliCommands(program, hostCtx);
 
   const inventory = assembleCompletionInventory({
     toolSpecs: registry.list().flatMap((t) => t.commandSpecs ?? []),
     hostSpecs: buildTopLevelHostSpecs(hostCtx),
     groups: buildHostSubcommandGroups(hostCtx),
-    toolPluginGroups: buildToolPluginGroups(hostCtx).map((g) => ({
+    toolPluginGroups: buildToolPluginGroups(hostCtx, registry).map((g) => ({
       toolVerb: g.toolVerb,
+      parentAliases: g.parentAliases,
       leaves: g.leaves.map((l) => ({ name: l.name })),
     })),
   });
@@ -169,10 +171,12 @@ describe('completion flag parity', () => {
     expect(inventory.commandFlags.graph, 'graph must be completable').toBeDefined();
     // The audit named these specific fit/sim flags as missing. They are now
     // derived from the live specs — assert they survive into completion.
-    expect(inventory.commandFlags.fit).toEqual(
+    expect(inventory.commandFlags.fitness).toEqual(
       expect.arrayContaining(['--gate-save', '--gate-compare', '--show']),
     );
-    expect(inventory.commandFlags.sim).toContain('--show');
+    expect(inventory.commandFlags.fit).toEqual(inventory.commandFlags.fitness);
+    expect(inventory.commandFlags.simulation).toContain('--show');
+    expect(inventory.commandFlags.sim).toEqual(inventory.commandFlags.simulation);
   });
 
   it('emitted bash/zsh scripts carry the derived flags', async () => {
@@ -187,12 +191,12 @@ describe('completion flag parity', () => {
 });
 
 describe('completion plugin sub-subcommand parity (now under each pack-supporting tool)', () => {
-  it('there is NO top-level plugin command; the pack ops mount under fit/sim', async () => {
+  it('there is NO top-level plugin command; the pack ops mount under fitness/simulation', async () => {
     const { program } = await buildLiveInventory();
     // The retired top-level `plugin` group must not exist; the pack ops live
     // under each pack-supporting tool primary.
     expect(program.commands.find((c) => c.name() === 'plugin')).toBeUndefined();
-    for (const toolVerb of ['fit', 'sim']) {
+    for (const toolVerb of ['fitness', 'simulation']) {
       const primary = program.commands.find((c) => c.name() === toolVerb);
       expect(primary, `${toolVerb} primary should be registered`).toBeDefined();
       const pluginGroup = primary!.commands.find((c) => c.name() === 'plugin');
@@ -203,9 +207,9 @@ describe('completion plugin sub-subcommand parity (now under each pack-supportin
   it('emitted bash/zsh scripts list the live <tool> plugin subcommands (no install/add drift)', async () => {
     const { inventory, program } = await buildLiveInventory();
     const fitPlugin = program.commands
-      .find((c) => c.name() === 'fit')!
+      .find((c) => c.name() === 'fitness')!
       .commands.find((c) => c.name() === 'plugin');
-    expect(fitPlugin, 'fit plugin group should be registered').toBeDefined();
+    expect(fitPlugin, 'fitness plugin group should be registered').toBeDefined();
     const liveSubs = (fitPlugin?.commands ?? []).map((c) => c.name()).sort();
 
     const bash = buildCompletionScript('bash', inventory);
@@ -216,15 +220,19 @@ describe('completion plugin sub-subcommand parity (now under each pack-supportin
     }
     // `plugin` is offered as a leaf under each pack-supporting tool verb, and the
     // bound leaves under `${toolVerb} plugin`.
+    expect(inventory.groupSubcommands.fitness).toContain('plugin');
     expect(inventory.groupSubcommands.fit).toContain('plugin');
-    expect(inventory.groupSubcommands.sim).toContain('plugin');
-    expect(inventory.groupSubcommands['fit plugin']).toEqual(
+    expect(inventory.groupSubcommands.simulation).toContain('plugin');
+    expect(inventory.groupSubcommands['fitness plugin']).toEqual(
       expect.arrayContaining(['list', 'add', 'remove', 'sync']),
+    );
+    expect(inventory.groupSubcommands['fit plugin']).toEqual(
+      inventory.groupSubcommands['fitness plugin'],
     );
     // No top-level `plugin` group in the inventory anymore.
     expect(inventory.groupSubcommands.plugin).toBeUndefined();
     // The historical drift was `install` (canonical action is `add` post-F7).
-    expect(inventory.groupSubcommands['fit plugin']).not.toContain('install');
+    expect(inventory.groupSubcommands['fitness plugin']).not.toContain('install');
   });
 });
 
@@ -276,12 +284,15 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
     expect(inventory.groupSubcommands.graph, 'graph must offer the nested `export` leaf').toContain(
       'export',
     );
-    expect(inventory.groupSubcommands.fit, 'fit must offer the nested `export` leaf').toContain(
-      'export',
-    );
+    expect(
+      inventory.groupSubcommands.fitness,
+      'fitness must offer the nested `export` leaf',
+    ).toContain('export');
+    expect(inventory.groupSubcommands.fit).toEqual(inventory.groupSubcommands.fitness);
     // The nested forms carry their own flag set keyed under `${parent} export`.
     expect(inventory.commandFlags['graph export']).toBeDefined();
-    expect(inventory.commandFlags['fit export']).toBeDefined();
+    expect(inventory.commandFlags['fitness export']).toBeDefined();
+    expect(inventory.commandFlags['fit export']).toEqual(inventory.commandFlags['fitness export']);
     // The removed flat export verbs are NOT offered as subcommands (no spec
     // declares them anymore).
     for (const removed of REMOVED_FLAT_EXPORTS) {
@@ -295,7 +306,7 @@ describe('completion taxonomy — internal excluded, canonical exports advertise
   it('OPENSIP_CLI_SHOW_INTERNAL=1 flips internal commands INTO the offered subcommands', async () => {
     const { registry } = await buildLiveInventory();
     const toolSpecs = registry.list().flatMap((t) => t.commandSpecs ?? []);
-    const hostCtx = makeStubHostContext();
+    const hostCtx = makeStubHostContext(registry);
 
     const build = (): CompletionInventory => {
       // Mirror the live call-site internal-set computation

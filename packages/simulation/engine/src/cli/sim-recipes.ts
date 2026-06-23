@@ -11,12 +11,12 @@
  * change. `checkCount` is a free-form label; sim reuses it for tags / a built-in
  * marker.
  *
- * The command mounts only in the canonical nested `<tool> <verb>` form
- * (`sim recipes`, `parent: 'sim'`) via the Phase 0 nested-mount capability — sim
- * never had a legacy flat `sim-recipes`, so there is nothing to alias.
+ * The command mounts in the canonical nested `<tool> <verb>` form under
+ * `simulation`; the primary alias keeps `sim recipes` working. Sim never had a
+ * legacy flat `sim-recipes`, so there is nothing to alias.
  */
 
-import { defineCommand } from '@opensip-cli/core';
+import { defineNestedCommand } from '@opensip-cli/core';
 
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 
@@ -54,18 +54,18 @@ export async function listSimRecipes(projectDir?: string): Promise<ListRecipesRe
 }
 
 /**
- * `sim recipes` — list available simulation recipes. Mounts as a SUBCOMMAND of
- * the `sim` primary (`parent: 'sim'`, via the Phase 0 nested-mount capability).
+ * `simulation recipes` — list available simulation recipes. defineTool mounts
+ * this draft as a subcommand of the canonical primary; `sim recipes` works via
+ * the primary alias.
  * `command-result`: the host dispatches the returned result through the shared
  * seam (`--json` → JSON, else the shared `viewListRecipes` renderer) — the same
  * path `graph recipes` / `fit recipes` use.
  */
-export const simRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineCommand<
+export const simRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
   ToolCliContext
 >({
   name: 'recipes',
-  parent: 'sim',
   description: 'List available simulation recipes',
   commonFlags: ['cwd', 'json'],
   scope: 'project',

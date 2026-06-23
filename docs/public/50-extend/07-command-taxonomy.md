@@ -41,20 +41,20 @@ pack-supporting tool primary — there is no top-level `opensip plugin`.
 
 ### Primary command
 
-Each Tool exposes exactly one **primary** command. Its `CommandSpec.name` equals
-`metadata.name` (the short verb users type):
+Each Tool exposes exactly one **primary** command. Authors declare a single
+`ToolIdentity`; `defineTool` derives `CommandSpec.name`, `metadata.name`, and the
+config namespace from `identity.name`. Short forms are **CLI aliases** only.
 
-| Tool package | `metadata.id` (registry key) | `metadata.name` (command verb) | Config namespace |
-|--------------|------------------------------|--------------------------------|------------------|
-| `@opensip-cli/fitness` | UUID (`afd68bd3-…`) | `fit` | `fitness:` |
-| `@opensip-cli/simulation` | UUID | `sim` | `simulation:` |
-| `@opensip-cli/graph` | UUID | `graph` | `graph:` |
-| `@opensip-cli/yagni` | UUID | `yagni` | `yagni:` |
+| Tool package | `metadata.id` (UUID) | `identity.name` (canonical verb) | CLI aliases | Config namespace | `layoutKey` (paths / `session.tool`) |
+|--------------|----------------------|----------------------------------|-------------|------------------|----------------------------------------|
+| `@opensip-cli/fitness` | `afd68bd3-…` | `fitness` | `fit` | `fitness:` | `fit` |
+| `@opensip-cli/simulation` | `715d32c2-…` | `simulation` | `sim` | `simulation:` | `sim` |
+| `@opensip-cli/graph` | UUID | `graph` | — | `graph:` | `graph` |
+| `@opensip-cli/yagni` | UUID | `yagni` | `yag` | `yagni:` | `yagni` |
 
-The command verb and config namespace are **decoupled**. Existing
-`opensip-cli.config.yml` blocks keep using `fitness:` / `simulation:` / `graph:` / `yagni:`.
-Config namespaces stay `fitness:` / `simulation:` / `graph:` / `yagni:` permanently — command
-verbs (`fit`, `sim`, `graph`, `yagni`) do not drive config keys (see [Resolved decisions](#resolved-decisions)).
+`opensip fitness` and `opensip fit` invoke the same handler. Config blocks use the
+canonical namespace (`fitness:`, not `fit:`). Plugin pins and on-disk layout remain
+`plugins.fit:` and `opensip-cli/fit/` via `layoutKey`.
 
 ### Nested discoverability children
 
@@ -132,40 +132,43 @@ Bundled internal commands today:
 
 ## Declaring nested commands in code
 
-Use `defineCommand` (or a plain `CommandSpec` object) with `parent` set to your
-primary verb:
+Use `definePrimaryCommand` for the primary command and `defineNestedCommand` for
+discoverability children. `defineTool` fills in the primary name, aliases, and
+nested `parent` from `identity`.
 
 ```ts
-import { defineCommand, defineTool, type ToolCliContext } from '@opensip-cli/core';
+import {
+  defineNestedCommand,
+  definePrimaryCommand,
+  defineTool,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 
 export const tool = defineTool({
+  identity: { name: 'audit-sec', aliases: ['audit'] },
   metadata: {
-    id: 'audit-sec',
-    name: 'audit-sec', // primary verb == metadata.name
+    id: '0c9d1b75-1d6c-4d42-a2f7-76907c3f0181',
     version: '1.0.0',
     description: 'Lightweight security audit',
   },
   commandSpecs: [
-    defineCommand({
-      name: 'audit-sec',
+    definePrimaryCommand<unknown, ToolCliContext>({
       description: 'Run the security audit',
       commonFlags: ['cwd', 'json'],
       scope: 'project',
       output: 'command-result',
-      handler: async (opts, cli) => { /* … */ },
+      handler: async () => ({ type: 'text-lines', title: 'Audit', lines: [] }),
     }),
-    defineCommand({
+    defineNestedCommand<unknown, ToolCliContext>({
       name: 'list',
-      parent: 'audit-sec',
       description: 'List audit rules',
       commonFlags: ['cwd', 'json'],
       scope: 'project',
       output: 'command-result',
-      handler: async (opts) => { /* … */ },
+      handler: async () => ({ type: 'text-lines', title: 'Audit rules', lines: [] }),
     }),
-    defineCommand({
+    defineNestedCommand<unknown, ToolCliContext>({
       name: 'export',
-      parent: 'audit-sec',
       description: 'Export audit artifacts',
       commonFlags: ['cwd', 'json'],
       options: [
@@ -175,38 +178,45 @@ export const tool = defineTool({
       scope: 'project',
       output: 'raw-stream',
       rawStreamReason: 'file-export',
-      handler: async () => { /* … */ },
+      handler: async (_opts, cli) => {
+        cli.emitRaw('wrote audit.sarif');
+        return {};
+      },
     }),
   ],
 });
 ```
 
-`defineTool` derives `commands[]` from `commandSpecs` (including `parent` and
-`visibility`). Prefer `defineTool` over hand-maintaining a parallel `commands`
-array.
+`defineTool` derives `metadata.name`, `commands[]`, the primary command name and
+aliases, nested `parent`, the config namespace, and plugin/session layout keys
+from `identity`.
 
 ## Manifest drift (`opensipTools.commands`)
 
-The static manifest lists every command **by short name** (not as nested paths).
-Nested mounting is expressed only in `commandSpecs` via `parent`:
+The static manifest declares the same required `identity` block. It lists every
+command by short name, not as nested paths; nested mounting is represented by the
+serializable `parent` field:
 
 ```json
+"id": "audit-sec",
+"identity": { "name": "audit-sec", "aliases": ["audit"] },
 "commands": [
-  { "name": "audit-sec", "description": "Run the security audit" },
-  { "name": "list", "description": "List audit rules" },
-  { "name": "export", "description": "Export audit artifacts (--format sarif)" }
+  { "name": "audit-sec", "aliases": ["audit"], "description": "Run the security audit" },
+  { "name": "list", "parent": "audit-sec", "description": "List audit rules" },
+  { "name": "export", "parent": "audit-sec", "description": "Export audit artifacts (--format sarif)" }
 ]
 ```
 
-At load, `assertManifestMatchesTool` compares the manifest name set to the
-runtime descriptors derived from `commandSpecs`. All three surfaces — manifest,
-derived `commands`, and `commandSpecs` — must agree.
+At load, `assertManifestMatchesTool` compares manifest identity and command names
+to the runtime descriptors derived from `commandSpecs`. Manifest `id`,
+`identity.name`, runtime `metadata.name`, and the primary command name must agree.
 
 ## Resolved decisions
 
-**Q6 — Config namespace (decided: keep as-is).** Config keys remain `fitness:`,
-`simulation:`, and `graph:`. Command verbs (`fit`, `sim`, `graph`) are decoupled
-from config namespaces and will not be aliased (`fit:`, `sim:`) or migrated.
+**Q6 — Config namespace (updated: aligns with `identity.name`).** Config keys are
+the canonical tool name (`fitness:`, `simulation:`, `graph:`, `yagni:`). CLI aliases
+(`fit`, `sim`, `yag`) do not introduce config aliases (`fit:` is not valid). Layout
+paths and plugin pins still use `layoutKey` (`plugins.fit:`, `opensip-cli/fit/`).
 
 **Q7 — `graph index` semantics (decided: single command + `--build`).** Default
 behavior queries the persisted catalog and writes `symbolindex.json` (same as
@@ -216,8 +226,8 @@ graph pipeline first, refresh the catalog, then emit the artifact. A nested
 
 ## Authoring checklist
 
-- [ ] `metadata.name` equals the primary `CommandSpec.name`
-- [ ] Discoverability verbs (`list`, `recipes`, `export`, …) use `parent: '<tool>'`
+- [ ] `defineTool` declares `identity`; `metadata.name` and the primary `CommandSpec.name` equal `identity.name`
+- [ ] Discoverability verbs use `defineNestedCommand` (or `parent: identity.name`)
 - [ ] Export uses `name: 'export'` + required `--format` (no `*-export` top-level names)
 - [ ] Workers declare `visibility: 'internal'`
 - [ ] `opensipTools.commands` lists every spec name (flat), matching derived descriptors

@@ -10,6 +10,7 @@ import { ConfigurationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { fitExportCommandSpec, FIT_EXPORT_FORMATS } from '../fit-aux-command-specs.js';
+import { fitnessTool } from '../../../tool.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';
 
@@ -58,9 +59,11 @@ afterEach(() => {
 });
 
 describe('fit export (canonical) command spec', () => {
-  it('is a nested child of the fit primary (parent: fit, name: export)', () => {
+  it('is a nested command draft normalized under the fitness primary', () => {
     expect(fitExportCommandSpec.name).toBe('export');
-    expect(fitExportCommandSpec.parent).toBe('fit');
+    expect(fitExportCommandSpec.parent).toBeUndefined();
+    const normalized = fitnessTool.commandSpecs?.find((spec) => spec.name === 'export');
+    expect(normalized?.parent).toBe('fitness');
     expect(FIT_EXPORT_FORMATS).toContain('baseline');
   });
 
