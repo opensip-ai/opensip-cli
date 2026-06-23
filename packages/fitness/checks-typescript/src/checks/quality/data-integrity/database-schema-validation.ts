@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 /**
  * @fileoverview Database Schema Validation check

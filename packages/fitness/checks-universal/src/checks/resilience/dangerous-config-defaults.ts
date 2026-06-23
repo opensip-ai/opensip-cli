@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 // @fitness-ignore-file unsafe-secret-comparison -- keyIndex comparisons are search index positions, not cryptographic keys
 // @fitness-ignore-file dangerous-config-defaults -- Fitness check definition references config patterns in longDescription, not actual configuration
 /**

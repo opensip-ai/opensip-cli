@@ -2,7 +2,12 @@
  * @fileoverview Detects hardcoded correlation ID values
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  isCheckAuthoringSource,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-cli/fitness';
 import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
 
 /**
@@ -72,7 +77,7 @@ export const noHardcodedCorrelationId = defineCheck({
     if (isTestFile(filePath)) {
       return [];
     }
-    if (filePath.includes('/fitness/src/checks/')) {
+    if (isCheckAuthoringSource(filePath)) {
       return [];
     }
     if (!content.includes('correlationId')) {

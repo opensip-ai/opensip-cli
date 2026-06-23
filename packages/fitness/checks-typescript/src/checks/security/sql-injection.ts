@@ -211,7 +211,6 @@ function isInOutputCall(node: ts.Node): boolean {
 function getTemplateText(node: ts.TemplateExpression): string {
   const parts: string[] = [node.head.text];
   for (const span of node.templateSpans) {
-    // @fitness-ignore-next-line performance-anti-patterns -- string literal placeholder for template span, not a spread operator
     parts.push('${...}', span.literal.text);
   }
   return parts.join('');

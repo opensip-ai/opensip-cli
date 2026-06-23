@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { getCheckIcon, getCheckDisplayName, makeDisplayHelpers } from '../check-utils/display.js';
 import { createPathMatcher } from '../check-utils/path-matching.js';
 import { isCommentLine } from '../check-utils/source-analysis.js';
+import { isCheckAuthoringSource } from '../check-utils/check-authoring-helpers.js';
 import { isTestFile } from '../check-utils/test-helpers.js';
 
 import type { CheckDisplayEntry } from '../plugins/types.js';
@@ -155,6 +156,24 @@ describe('isCommentLine', () => {
     it('rejects whitespace-only line', () => {
       expect(isCommentLine('   ')).toBe(false);
     });
+  });
+});
+
+describe('isCheckAuthoringSource', () => {
+  it('matches fitness check-pack source paths', () => {
+    expect(
+      isCheckAuthoringSource(
+        'packages/fitness/checks-typescript/src/checks/quality/patterns/foo.ts',
+      ),
+    ).toBe(true);
+    expect(
+      isCheckAuthoringSource('packages/fitness/checks-universal/src/checks/security/bar.ts'),
+    ).toBe(true);
+  });
+
+  it('does not match fitness engine or product runtime', () => {
+    expect(isCheckAuthoringSource('packages/fitness/engine/src/tool.ts')).toBe(false);
+    expect(isCheckAuthoringSource('packages/core/src/lib/registry.ts')).toBe(false);
   });
 });
 

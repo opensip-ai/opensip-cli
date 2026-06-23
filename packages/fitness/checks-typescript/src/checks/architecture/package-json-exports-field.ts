@@ -1,4 +1,3 @@
-// @fitness-ignore-file performance-anti-patterns -- sequential package.json read across workspace is bounded by workspace package count; controls memory peak
 /**
  * @fileoverview Package.json exports field validation
  * @module checks-builtin/checks/architecture/package-json-exports-field

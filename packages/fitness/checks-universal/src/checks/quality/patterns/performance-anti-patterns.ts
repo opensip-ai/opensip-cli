@@ -1,5 +1,4 @@
 // @fitness-ignore-file no-unbounded-concurrency -- Concurrency bounded by design in this context
-// @fitness-ignore-file performance-anti-patterns -- this file IS the performance-anti-patterns check; loop body iterates the PATTERNS array (small, constant) and "await" appears in surrounding comments describing what the check detects
 /**
  * @fileoverview Performance Anti-Patterns Check
  *
@@ -10,7 +9,12 @@
  * - Nested O(n^2) loops
  */
 
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  isCheckAuthoringSource,
+  isTestFile,
+  type CheckViolation,
+} from '@opensip-cli/fitness';
 
 /**
  * Performance anti-pattern types
@@ -260,9 +264,8 @@ export const performanceAntiPatterns = defineCheck({
     // Skip test files — performance anti-patterns in tests are low-risk
     if (isTestFile(filePath)) return [];
 
-    // Skip fitness check definitions — they iterate files with sequential async operations
-    // as part of analysis, which is bounded by the check's file set
-    if (filePath.includes('/fitness/src/checks/')) return [];
+    // Check-pack source contains literal pattern examples and bounded analyzeAll loops.
+    if (isCheckAuthoringSource(filePath)) return [];
 
     // Skip diagnostic/debug endpoints — sequential processing is acceptable for diagnostics
     if (filePath.includes('/diagnostics')) return [];

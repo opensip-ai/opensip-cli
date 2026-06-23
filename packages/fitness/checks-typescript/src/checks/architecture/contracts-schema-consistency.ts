@@ -34,9 +34,7 @@ export const contractsSchemaConsistency = defineCheck({
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = [];
 
-    // @fitness-ignore-next-line batch-operation-limits -- files.paths is bounded by contracts package scope (typically <100 files)
     for (const filePath of files.paths) {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath);
       /* v8 ignore next -- defensive guard */
       if (!content) continue;
@@ -44,7 +42,6 @@ export const contractsSchemaConsistency = defineCheck({
 
       // --- Check 1: Types alongside schemas should use z.infer ---
       const schemaNames = new Set<string>();
-      // @fitness-ignore-next-line batch-operation-limits -- iterating over lines of a single file, bounded by file-length-limits check
       for (const line of lines) {
         const schemaMatch = /export\s+const\s+(\w+Schema)\s*=\s*z\./.exec(line);
         if (schemaMatch?.[1]) {

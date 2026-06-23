@@ -3,7 +3,13 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  isCheckAuthoringSource,
+  isTestFile,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-cli/fitness';
 import { stripStringsAndCommentsPreservingPositions } from '@opensip-cli/fitness';
 
 const COLLECTION_TYPES = ['new Map(', 'new Set(', '= []', ': []'] as const;
@@ -194,7 +200,7 @@ export const unboundedMemory = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     if (isTestFile(filePath)) return [];
-    if (filePath.includes('/fitness/src/checks/')) return [];
+    if (isCheckAuthoringSource(filePath)) return [];
 
     logger.debug({
       evt: 'fitness.checks.batch_operations.analyze_file_operations',
@@ -249,7 +255,6 @@ export const unboundedMemory = defineCheck({
           column: 0,
           message: 'File read without size validation may cause OOM',
           severity: 'warning',
-          // @fitness-ignore-next-line performance-anti-patterns -- 'await' appears in suggestion string literal, not actual await expression
           suggestion:
             'Check fs.stat().size before reading to prevent OOM on large files. Example: const stats = await fs.stat(path); if (stats.size > MAX_FILE_SIZE) throw new Error("File too large");',
           match: readCall.match,

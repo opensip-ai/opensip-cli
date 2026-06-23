@@ -165,7 +165,6 @@ async function collectConfigProperties(files: FileAccessor): Promise<ConfigPrope
     if (shouldExcludePath(filePath) || !isConfigFilePath(filePath)) continue;
 
     try {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const props = await extractConfigPropertiesFromFile(filePath, files);
       configProperties.push(...props);
       /* v8 ignore next 1 -- defensive catch: parse failures already handled */
@@ -191,7 +190,6 @@ async function countPropertyAccesses(files: FileAccessor): Promise<Map<string, n
 
   for (const filePath of files.paths) {
     try {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath);
       const sourceFile = getSharedSourceFile(filePath, content);
       /* v8 ignore next -- defensive guard */

@@ -67,8 +67,12 @@ function isBarrelFile(content: string): boolean {
   // Single boolean expression — no early `return false` (which the
   // silent-early-returns check would flag as a swallowed failure path).
   const reExportRe = /^export\s+(?:type\s+)?[*{]/;
+  const sideEffectImportRe = /^import\s+['"][^'"]+['"]\s*;?$/;
   /* v8 ignore next -- empty-input branch is a defensive guard, not hit by fixtures */
-  return logicalLines.length > 0 && logicalLines.every((line) => reExportRe.test(line));
+  return (
+    logicalLines.length > 0 &&
+    logicalLines.every((line) => reExportRe.test(line) || sideEffectImportRe.test(line))
+  );
 }
 
 export const moduleCouplingFanOut = defineCheck({
@@ -80,7 +84,8 @@ export const moduleCouplingFanOut = defineCheck({
     `imports get a warning; files exceeding ${ERROR_THRESHOLD} get an error. Composition ` +
     'roots (DI, plugin registries) legitimately exceed this — exempt them with ' +
     '`// @fitness-ignore-file module-coupling-fan-out` at the top of the file. ' +
-    'Pure barrel files (only `export ... from` re-exports) are auto-exempt: ' +
+    'Pure barrel files (only `export ... from` re-exports, plus optional ' +
+    'side-effect `import "./…"` for scope augmentation) are auto-exempt: ' +
     "fanning out is the barrel's job, not a god-file pathology.",
   scope: {
     languages: ['typescript', 'tsx', 'javascript', 'jsx'],

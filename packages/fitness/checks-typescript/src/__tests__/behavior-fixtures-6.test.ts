@@ -2000,6 +2000,18 @@ describe('module-coupling-fan-out — analyzeAll branches', () => {
     expect(result.signals.filter((s) => s.message.includes('High fan-out'))).toHaveLength(0);
   });
 
+  it('auto-exempts barrels with only re-exports plus a scope-augmentation side-effect import', async () => {
+    const leaves = buildLeaves('pkg', 20);
+    const lines = [
+      "import './scope-augmentation.js'",
+      ...leaves.map((_, i) => `export { v${i} } from "./pkg/leaf${i}.js"`),
+    ].join('\n');
+    const barrel = fx('packages/graph/engine/src/index.ts', lines);
+
+    const result = await runAbsolute('module-coupling-fan-out', [barrel, ...leaves]);
+    expect(result.signals.filter((s) => s.message.includes('High fan-out'))).toHaveLength(0);
+  });
+
   it('auto-exempts .d.ts type-declaration files', async () => {
     const leaves = buildLeaves('types', 18);
     // A .d.ts file with import + non-re-export content so isBarrelFile is false,

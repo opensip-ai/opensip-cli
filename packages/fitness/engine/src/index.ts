@@ -109,6 +109,7 @@ export {
 
 // ── Check-author display / util helpers (extracted from per-pack copies) ──
 export {
+  isCheckAuthoringSource,
   isCommentLine,
   isTestFile,
   applyCheckDisplay,

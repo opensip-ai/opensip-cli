@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- reviewed: pattern is architecturally justified or false positive
 /**
  * @fileoverview Semgrep static analysis security scan
  *

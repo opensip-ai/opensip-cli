@@ -1,4 +1,3 @@
-// @fitness-ignore-file performance-anti-patterns -- the only async op is reading the analyzed workspace's package.json files in parallel; concurrency is bounded by the package.json count (a handful, not attacker-controlled), matching register-tools.ts's identical bounded-IO waiver.
 /**
  * @fileoverview Every first-party tool package must declare a conformant
  * static plugin manifest (release 2.9.0, identity & compatibility — Phase 5).

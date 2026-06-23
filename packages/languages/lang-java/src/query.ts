@@ -1,4 +1,3 @@
-// @fitness-ignore-file duplicate-utility-functions -- ADR-0010/M10: the per-language tree-sitter query config intentionally shares helper names (callee/import/string extractors) across lang-* with grammar-specific implementations; consolidating would defeat the substrate design.
 /**
  * Java {@link LanguageQueryAPI} (ADR-0010, M10) — the grammar config for the
  * shared `createTreeSitterQuery` factory. Node types are from tree-sitter-java;

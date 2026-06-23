@@ -7,8 +7,13 @@ import * as ts from 'typescript';
 
 import {
   DOMAIN_SPECIFIC_FUNCTION_NAMES,
+  LANG_SUBSTRATE_PATH,
   type DuplicateUtilityFunctionsConfig,
 } from './duplicate-utility-functions-config.js';
+
+export function isLangSubstratePath(filePath: string): boolean {
+  return LANG_SUBSTRATE_PATH.test(filePath.replaceAll('\\', '/'));
+}
 
 const UTILITY_PATTERNS = [
   /^format[A-Z]/,
@@ -280,8 +285,11 @@ export async function collectFunctionsFromFiles(
   const functionsByName: FunctionsByName = new Map();
 
   for (const filePath of files.paths) {
+    if (isLangSubstratePath(filePath)) {
+      continue;
+    }
+
     try {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath);
       const functions = extractUtilityFunctionsWithBody(filePath, content, domainSpecific);
       const validFunctions = functions.filter((fn) => fn.bodyLength >= MIN_FUNCTION_BODY_LENGTH);

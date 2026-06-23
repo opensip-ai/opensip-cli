@@ -172,7 +172,6 @@ export const gracefulShutdown = defineCheck({
 
     // Find service entry violation
     for (const pattern of SERVICE_ENTRY_PATTERNS) {
-      // @fitness-ignore-next-line performance-anti-patterns -- false positive: keyword in comment text below, not an async call
       // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
       pattern.lastIndex = 0;
       const match = pattern.exec(content);

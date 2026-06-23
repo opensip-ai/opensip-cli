@@ -235,7 +235,6 @@ export const dockerVersionSync = defineCheck({
       : null;
 
     for (const filePath of files.paths) {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath);
       const lines = content.split('\n');
       const relPath = path.relative(process.cwd(), filePath);

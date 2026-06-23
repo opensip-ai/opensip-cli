@@ -214,6 +214,26 @@ describe('defineRegexListCheck', () => {
       expect(signals.length).toBe(0);
     });
 
+    it('skipCheckAuthoringSources: true skips fitness check-pack paths', async () => {
+      const check = defineRegexListCheck({
+        id: FIXED_ID,
+        slug: 'skip-check-authoring',
+        description: 'd',
+        tags: ['demo'],
+        fileTypes: ['ts'],
+        options: { skipCheckAuthoringSources: true },
+        patterns: [
+          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+        ],
+      });
+      const signals = await runOnContent(
+        check,
+        'FOO\n',
+        'packages/fitness/checks-typescript/src/checks/demo.ts',
+      );
+      expect(signals.length).toBe(0);
+    });
+
     it('skipTestFiles: false (default) does not skip test files', async () => {
       const check = defineRegexListCheck({
         id: FIXED_ID,

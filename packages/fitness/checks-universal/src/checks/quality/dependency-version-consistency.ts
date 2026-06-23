@@ -1,6 +1,5 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
 // @fitness-ignore-file fitness-check-standards -- Uses fs for package.json reading, not source file content
-// @fitness-ignore-file performance-anti-patterns -- spread used to aggregate version sets across bounded workspace package list
 /**
  * @fileoverview Dependency Version Consistency check
  *

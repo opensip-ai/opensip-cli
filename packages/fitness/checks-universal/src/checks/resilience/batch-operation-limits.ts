@@ -3,7 +3,13 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  isCheckAuthoringSource,
+  isTestFile,
+  type CheckViolation,
+  getLineNumber,
+} from '@opensip-cli/fitness';
 
 interface UnboundedBatchPattern {
   pattern: string;
@@ -132,6 +138,7 @@ export const batchOperationLimits = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     if (isTestFile(filePath)) return [];
+    if (isCheckAuthoringSource(filePath)) return [];
 
     logger.debug({
       evt: 'fitness.checks.batch_operations.analyze_unbounded_batch',

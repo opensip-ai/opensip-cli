@@ -6,7 +6,7 @@
  * false positives from string literal and comment content.
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck, isCheckAuthoringSource, type CheckViolation } from '@opensip-cli/fitness';
 
 const REGEX_USAGE_PATTERN = /\.(test|match|exec|search)\s*\(/;
 const CONTENT_FILTER_PATTERN =
@@ -33,8 +33,7 @@ export const noRawRegexOnCode = defineCheck({
   fileTypes: ['ts'],
 
   analyze(content, filePath): CheckViolation[] {
-    // Only analyze fitness check files
-    if (!filePath.includes('fitness/src/checks/')) return [];
+    if (!isCheckAuthoringSource(filePath)) return [];
 
     // Must be a defineCheck file
     if (!DEFINE_CHECK_PATTERN.test(content)) return [];

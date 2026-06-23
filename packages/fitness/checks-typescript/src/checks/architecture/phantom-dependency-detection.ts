@@ -1,6 +1,5 @@
 // @fitness-ignore-file fitness-check-standards -- Check requires direct fs access for package.json parsing outside of standard file scanning pipeline
 // @fitness-ignore-file unbounded-memory -- reads workspace package.json files; bounded by standard package metadata size
-// @fitness-ignore-file performance-anti-patterns -- sequential package.json reads keep peak memory bounded; small N per workspace
 /**
  * @fileoverview Detect phantom dependencies - packages used in code but not declared in package.json (v3, AST-based)
  * @invariants
@@ -384,7 +383,6 @@ export const phantomDependencyDetection = defineCheck({
     // @lazy-ok -- validations inside loop depend on file content from await
     for (const filePath of files.paths) {
       try {
-        // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
         const content = await files.read(filePath);
         if (!content) continue;
         violations.push(...collectFileViolations(filePath, content, pkgJsonCache));

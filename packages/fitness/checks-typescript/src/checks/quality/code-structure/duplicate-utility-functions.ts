@@ -44,6 +44,7 @@ export const duplicateUtilityFunctions = defineCheck({
 - **Similar implementations:** Same-named utility functions with different bodies across directories (consolidation with options pattern)
 - Targets functions matching utility name patterns: \`format*\`, \`parse*\`, \`is*\`, \`has*\`, \`to*\`, \`get*\`, \`validate*\`, \`sanitize*\`, \`normalize*\`, \`debounce\`, \`throttle\`, \`sleep\`, \`retry\`, etc.
 - Skips domain-specific functions listed in \`DOMAIN_SPECIFIC_FUNCTIONS\` and bodies under 50 characters
+- Skips \`packages/languages/lang-*\` substrate files (ADR-0010 parallel helpers by design)
 
 **Why it matters:** Duplicated utilities create maintenance risk and inconsistent behavior. A single shared implementation in \`foundation/utils\` ensures consistent behavior and reduces code volume.
 
@@ -57,7 +58,6 @@ export const duplicateUtilityFunctions = defineCheck({
     const violations: CheckViolation[] = [];
 
     for (const [name, hashGroups] of functionsByName) {
-      // @fitness-ignore-next-line performance-anti-patterns -- spread aggregates small violation arrays from pure function
       violations.push(...processFunctionGroup(name, hashGroups));
     }
 

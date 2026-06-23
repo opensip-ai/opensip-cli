@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 // @fitness-ignore-file fitness-check-standards -- Uses fs for .dockerignore reading, not source file content
 /**
  * @fileoverview Docker .dockerignore validation fitness check

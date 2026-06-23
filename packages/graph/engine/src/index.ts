@@ -1,4 +1,3 @@
-// @fitness-ignore-file module-coupling-fan-out -- Public barrel: re-exports the surface of each pipeline stage; fan-out is the contract of this file
 /**
  * @opensip-cli/graph — public barrel.
  *

@@ -35,6 +35,11 @@ tightens graph and release guardrails.
 - Tightened the `async-waterfall-detection` check: backoff/yield recognition,
   setup-then-run orchestration, and collect-then-count scan pairs; removed 6
   stale waivers.
+- Phase 3 suppression reduction: `duplicate-utility-functions` excludes
+  `packages/languages/lang-*` (ADR-0010); `isCheckAuthoringSource` skips
+  check-pack paths for `performance-anti-patterns`, `batch-operation-limits`,
+  and `unbounded-memory`; `module-coupling-fan-out` auto-exempts scope-augmentation
+  barrels and documents a permanent floor of 4.
 
 ### Fixed
 

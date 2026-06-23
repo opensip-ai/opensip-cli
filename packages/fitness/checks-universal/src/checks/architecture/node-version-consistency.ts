@@ -263,7 +263,6 @@ export const nodeVersionConsistency = defineCheck({
     if (expectedMajor === null) return violations;
 
     for (const filePath of files.paths) {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(filePath);
       const basename = path.basename(filePath);
 

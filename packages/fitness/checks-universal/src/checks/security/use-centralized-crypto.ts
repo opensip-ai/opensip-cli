@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
  * @fileoverview Enforce use of centralized crypto module
  */
@@ -169,8 +168,8 @@ const CRYPTO_IMPL_PATTERNS = [
   '/security/providers/cognito/',
   // Webhook verifiers implement provider-specific signature algorithms
   '/webhooks/verifiers/',
-  // Fitness check definitions contain pattern strings, not actual crypto usage
-  '/fitness/src/checks/',
+  // Fitness check-pack source contains pattern strings, not actual crypto usage
+  /packages\/fitness\/checks-[^/]+\//,
 ];
 
 const isExcludedCryptoPath = createPathMatcher(CRYPTO_IMPL_PATTERNS);

@@ -665,10 +665,9 @@ describe('no-hardcoded-correlation-id — branch coverage', () => {
     expect(result.signals).toHaveLength(0);
   });
 
-  it('skips files inside fitness/src/checks/', async () => {
-    // Mimic the path-based exemption.
+  it('skips files inside fitness check packs', async () => {
     fx(
-      'packages/fitness/src/checks/foo.ts',
+      'packages/fitness/checks-typescript/src/checks/foo.ts',
       ['export const ctx = { correlationId: "static" }'].join('\n'),
     );
     const result = await runCheck('no-hardcoded-correlation-id');

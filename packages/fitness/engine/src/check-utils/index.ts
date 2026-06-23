@@ -10,6 +10,7 @@
 export { isCommentLine } from './source-analysis.js';
 export type { IsCommentLineOptions } from './source-analysis.js';
 
+export { isCheckAuthoringSource } from './check-authoring-helpers.js';
 export { isTestFile } from './test-helpers.js';
 export type { IsTestFileOptions } from './test-helpers.js';
 

@@ -44,6 +44,7 @@
  */
 
 import { isCommentLine } from '../check-utils/source-analysis.js';
+import { isCheckAuthoringSource } from '../check-utils/check-authoring-helpers.js';
 import { isTestFile } from '../check-utils/test-helpers.js';
 
 import { defineCheck } from './define-check.js';
@@ -101,6 +102,12 @@ export interface RegexListCheckOptions {
    * Default: `false`.
    */
   readonly skipTestFiles?: boolean;
+  /**
+   * Skip files under `packages/fitness/checks-*` — check-pack source often
+   * contains literal examples of the patterns this helper detects.
+   * Default: `false`.
+   */
+  readonly skipCheckAuthoringSources?: boolean;
   /**
    * Custom file-path predicate. When provided AND it returns `true`,
    * the file is skipped entirely. Used by sites with site-specific
@@ -284,6 +291,7 @@ function processLine(
 export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check {
   const skipComments = config.options?.skipCommentLines ?? true;
   const skipTests = config.options?.skipTestFiles ?? false;
+  const skipCheckAuthoring = config.options?.skipCheckAuthoringSources ?? false;
   const skipFile = config.options?.skipFile;
   const skipLine = config.options?.skipLine;
   const oneViolationPerLine = config.options?.oneViolationPerLine ?? false;
@@ -306,6 +314,7 @@ export function defineRegexListCheck(config: DefineRegexListCheckConfig): Check 
 
     analyze(content: string, filePath: string): CheckViolation[] {
       if (skipTests && isTestFile(filePath)) return [];
+      if (skipCheckAuthoring && isCheckAuthoringSource(filePath)) return [];
       if (skipFile?.(filePath) === true) return [];
       return processFile({
         content,

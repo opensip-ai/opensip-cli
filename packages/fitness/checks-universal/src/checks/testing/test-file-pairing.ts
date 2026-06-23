@@ -10,7 +10,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { logger } from '@opensip-cli/core';
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  isCheckAuthoringSource,
+  type CheckViolation,
+  type FileAccessor,
+} from '@opensip-cli/fitness';
 
 /**
  * Directories to skip during scanning
@@ -87,12 +92,8 @@ function isSourceFile(filename: string, relativePath?: string): boolean {
   // Skip files in types/ or interfaces/ directories
   if (relativePath && (relativePath.includes('/types/') || relativePath.includes('/interfaces/')))
     return false;
-  // Skip fitness check definition directories (declarative defineCheck files)
-  if (
-    relativePath &&
-    relativePath.includes('/fitness/src/checks/') &&
-    !relativePath.includes('__tests__')
-  )
+  // Skip fitness check-pack source (declarative defineCheck files)
+  if (relativePath && isCheckAuthoringSource(relativePath) && !relativePath.includes('__tests__'))
     return false;
   return true;
 }
@@ -247,7 +248,6 @@ async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   const allViolations: CheckViolation[] = [];
   for (const dir of scanDirs) {
     if (!fs.existsSync(dir)) continue;
-    // @fitness-ignore-next-line performance-anti-patterns -- sequential directory scanning required: each scan depends on shared file system state
     const dirViolations = await scanDirectory(dir, cwd, files);
     for (const violation of dirViolations) {
       allViolations.push(violation);

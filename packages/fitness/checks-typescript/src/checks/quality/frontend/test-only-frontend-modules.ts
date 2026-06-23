@@ -81,7 +81,6 @@ async function buildImportMap(files: FileAccessor): Promise<Map<string, string[]
 
   for (const fp of files.paths) {
     try {
-      // @fitness-ignore-next-line performance-anti-patterns -- sequential file reading to control memory; FileAccessor is lazy
       const content = await files.read(fp);
       const importPaths = extractImportPaths(content);
 

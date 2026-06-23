@@ -1,4 +1,3 @@
-// @fitness-ignore-file performance-anti-patterns -- bounded parallel package.json reads; same waiver as tool-has-manifest.
 /**
  * @fileoverview First-party tool packages must declare a single `identity` block
  * in package.json#opensipTools that matches the normalized runtime surface.

@@ -41,6 +41,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'getLineNumber',
   'isAPIFile',
   'isCheck',
+  'isCheckAuthoringSource',
   'isCommentLine',
   'isInsideStringLiteral',
   'isTestFile',
