@@ -3,7 +3,7 @@
   "description": "Reviewed safety-waiver residual (no net-new). Each suppression was triaged: stale ones removed, the rest carry a specific verifiable justification. Counts include the yagni tool's suppressions (reviewed via its own PR). Cosmetic slugs are report-only.",
   "safety": {
     "batch-operation-limits": 53,
-    "error-handling-quality": 53,
+    "error-handling-quality": 54,
     "detached-promises": 52,
     "performance-anti-patterns": 37,
     "unbounded-memory": 23,

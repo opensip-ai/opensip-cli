@@ -2,19 +2,28 @@
  * @fileoverview Single-`@opensip-cli/core` guard for discovered packages.
  *
  * A capability pack (check pack, scenario pack, graph adapter) that resolves a
- * DIFFERENT physical `@opensip-cli/core` than the running engine registers its
- * contributions against a core whose `currentScope()` is always `undefined` here
- * (a different `AsyncLocalStorage`). That silently degrades the run — the failure
- * mode seen when a globally-installed CLI discovers packs in a project that
- * vendors its own `@opensip-cli/*`. Such packs are refused at discovery time.
+ * core whose `currentScope()` is always `undefined` here registers its
+ * contributions against a dead `AsyncLocalStorage` and silently degrades the
+ * run — the failure mode seen when a globally-installed CLI discovers packs in
+ * a project that vendors a DIFFERENT `@opensip-cli/core`. Such packs are refused
+ * at discovery time.
+ *
+ * Identity is by core VERSION, not file path. `runWithScope` pins its
+ * `AsyncLocalStorage` on `globalThis` (see run-scope.ts), so every
+ * SAME-VERSION copy of core — including pnpm's hard-copied injected duplicates
+ * under `.pnpm/...`, which resolve a different PATH than the workspace copy —
+ * shares one scope store and is safe. Only a DIFFERENT-version core is a
+ * genuine split-scope risk and is refused. (A path comparison would wrongly
+ * reject the injected duplicates and load zero packs.)
  *
  * Packs that don't depend on core at all resolve nothing and pass. The guard is
  * tool-agnostic: the generic discovery substrate applies it to EVERY domain's
  * packs, so the policy lives here once instead of in each tool's loader.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -57,6 +66,53 @@ function resolveFitnessFromAnchor(anchor: string): string | undefined {
   }
 }
 
+/** Version from a `package.json` iff it is `@opensip-cli/core`; else undefined. */
+function coreVersionFromManifest(manifestPath: string): string | undefined {
+  if (!existsSync(manifestPath)) return undefined;
+  try {
+    const json: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const record = (typeof json === 'object' && json !== null ? json : {}) as {
+      name?: unknown;
+      version?: unknown;
+    };
+    if (record.name !== '@opensip-cli/core' || typeof record.version !== 'string') return undefined;
+    return record.version;
+  } catch {
+    // @fitness-ignore-next-line error-handling-quality -- malformed manifest → version unknown → treated as foreign by the caller.
+    return undefined;
+  }
+}
+
+/** Read the `@opensip-cli/core` version that owns a resolved entry path. */
+function coreVersionAt(coreEntry: string): string | undefined {
+  // Walk up from the resolved entry (.../core/dist/index.js) to the package root.
+  let dir = dirname(coreEntry);
+  for (let depth = 0; depth < 6; depth += 1) {
+    const version = coreVersionFromManifest(join(dir, 'package.json'));
+    if (version !== undefined) return version;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
+
+/** This runtime's core version, captured once (paired with {@link selfCorePath}). */
+const selfCoreVersion: string | undefined =
+  selfCorePath === undefined ? undefined : coreVersionAt(selfCorePath);
+
+/**
+ * Whether a resolved core entry is THE SAME core as this runtime's: the same
+ * physical path, or a same-version duplicate (pnpm's injected hard-copy under
+ * `.pnpm/...`) that shares the globalThis-pinned scope ALS. A different version
+ * — or an unreadable one — is foreign.
+ */
+function isSameCore(coreEntry: string): boolean {
+  if (coreEntry === selfCorePath) return true;
+  if (selfCoreVersion === undefined) return false;
+  return coreVersionAt(coreEntry) === selfCoreVersion;
+}
+
 /**
  * The pack's resolved `@opensip-cli/core` if it differs from {@link selfCore}; else
  * undefined. Probes both the pack's direct core dep and the core that
@@ -71,14 +127,14 @@ export function foreignCorePath(packageDir: string): string | undefined {
   const anchor = pathToFileURL(join(packageDir, 'noop.js')).href;
 
   const directCore = resolveCoreFromAnchor(anchor);
-  if (directCore !== undefined && directCore !== selfCorePath) {
+  if (directCore !== undefined && !isSameCore(directCore)) {
     return directCore;
   }
 
   const fitnessEntry = resolveFitnessFromAnchor(anchor);
   if (fitnessEntry !== undefined) {
     const transitiveCore = resolveCoreFromAnchor(fitnessEntry);
-    if (transitiveCore !== undefined && transitiveCore !== selfCorePath) {
+    if (transitiveCore !== undefined && !isSameCore(transitiveCore)) {
       return transitiveCore;
     }
   }
