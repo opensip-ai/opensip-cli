@@ -97,7 +97,6 @@ export async function replayResult(
   // action took the early-return dispatch branch, so it did NOT call completeRun —
   // the supervisor drives it here with the worker's session.
   if (result.session !== undefined) {
-    // @fitness-ignore-next-line detached-promises -- RunActionHooks.completeRun returns void (run-plane.ts:95; freezes + persists synchronously); the name-based heuristic misfires on the optional-chain call.
     ctx.completeRun?.({ session: result.session });
   }
 }

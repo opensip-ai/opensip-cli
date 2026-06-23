@@ -80,7 +80,6 @@ export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Pro
       total: result.signals.length,
     };
   } finally {
-    // @fitness-ignore-next-line detached-promises -- scope.dispose() is synchronous (void); the heuristic false-positives on the sync call adjacent to the awaited rm() cleanup
     scope.dispose();
     await rm(root, { recursive: true, force: true });
   }

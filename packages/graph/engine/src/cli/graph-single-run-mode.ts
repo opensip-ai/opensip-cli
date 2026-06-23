@@ -95,7 +95,6 @@ export async function executeSinglePathGraph(
     cwd: runCwd,
     mode: shards.length > 1 ? 'sharded' : 'single-process',
   });
-  // @fitness-ignore-next-line detached-promises -- sync profiling bookkeeping helper.
   recordPartitionStage(profileRun, resolution.partition);
 
   const result =
@@ -119,7 +118,6 @@ export async function executeSinglePathGraph(
           emitFeatures: DASHBOARD_FEATURE_COLUMNS,
           onProgress: profileRun?.onProgress,
         });
-  // @fitness-ignore-next-line detached-promises -- sync profiling bookkeeping helper.
   finishProfileRun(profileRun, result);
 
   if (shards.length > 1) {
@@ -134,11 +132,9 @@ export async function executeSinglePathGraph(
     }
   }
 
-  // @fitness-ignore-next-line detached-promises -- sync validation helper; throws synchronously on mismatch.
   enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
   const scope = currentScope();
   if (scope !== undefined) {
-    // @fitness-ignore-next-line detached-promises -- DiagnosticsBus.event is synchronous.
     scope.diagnostics.event('execute', 'debug', 'graph build complete', {
       mode: shards.length > 1 ? 'sharded' : 'exact',
       shards: shards.length,

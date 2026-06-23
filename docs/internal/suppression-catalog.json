@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T23:02:54.148Z",
+  "generatedAt": "2026-06-23T23:08:50.632Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,13 +11,13 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 526,
+        "total": 493,
         "bySlug": {
           "throws-documentation": 10,
           "batch-operation-limits": 53,
           "error-handling-quality": 54,
           "env-secret-exposure": 3,
-          "detached-promises": 52,
+          "detached-promises": 19,
           "null-safety": 16,
           "performance-anti-patterns": 38,
           "unbounded-memory": 23,
@@ -92,22 +92,22 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 46,
+          "cli": 36,
           "cli-ui": 1,
           "config": 6,
-          "core": 40,
+          "core": 39,
           "dashboard": 4,
           "datastore": 1,
           "fitness/checks-typescript": 87,
-          "fitness/checks-universal": 139,
-          "fitness/engine": 50,
-          "graph/engine": 56,
+          "fitness/checks-universal": 138,
+          "fitness/engine": 49,
+          "graph/engine": 44,
           "graph/graph-adapter-common": 3,
           "graph/graph-go": 4,
           "graph/graph-java": 1,
           "graph/graph-python": 2,
           "graph/graph-rust": 3,
-          "graph/graph-typescript": 21,
+          "graph/graph-typescript": 17,
           "languages/lang-go": 4,
           "languages/lang-java": 4,
           "languages/lang-python": 4,
@@ -115,10 +115,10 @@
           "languages/lang-typescript": 9,
           "output": 8,
           "session-store": 1,
-          "simulation": 19,
+          "simulation": 18,
           "targeting": 1,
-          "test-support": 3,
-          "yagni": 5
+          "test-support": 2,
+          "yagni": 3
         }
       },
       "graph": {
@@ -129,13 +129,13 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 297,
+        "total": 266,
         "bySlug": {
           "throws-documentation": 9,
           "batch-operation-limits": 41,
           "error-handling-quality": 50,
           "env-secret-exposure": 2,
-          "detached-promises": 49,
+          "detached-promises": 18,
           "null-safety": 9,
           "performance-anti-patterns": 15,
           "unbounded-memory": 19,
@@ -167,20 +167,20 @@
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 46,
+          "cli": 36,
           "cli-ui": 1,
           "config": 6,
-          "core": 40,
+          "core": 39,
           "dashboard": 4,
           "datastore": 1,
-          "fitness/engine": 50,
-          "graph/engine": 56,
+          "fitness/engine": 49,
+          "graph/engine": 44,
           "graph/graph-adapter-common": 3,
           "graph/graph-go": 4,
           "graph/graph-java": 1,
           "graph/graph-python": 2,
           "graph/graph-rust": 3,
-          "graph/graph-typescript": 21,
+          "graph/graph-typescript": 17,
           "languages/lang-go": 4,
           "languages/lang-java": 4,
           "languages/lang-python": 4,
@@ -188,9 +188,9 @@
           "languages/lang-typescript": 9,
           "output": 8,
           "session-store": 1,
-          "simulation": 19,
+          "simulation": 18,
           "targeting": 1,
-          "yagni": 5
+          "yagni": 3
         }
       },
       "graph": {
@@ -211,7 +211,7 @@
     },
     "check-package": {
       "fitness": {
-        "total": 226,
+        "total": 225,
         "bySlug": {
           "batch-operation-limits": 12,
           "performance-anti-patterns": 23,
@@ -244,7 +244,7 @@
           "concurrency-safety": 8,
           "semgrep-scan": 7,
           "interface-implementation-consistency": 1,
-          "detached-promises": 2,
+          "detached-promises": 1,
           "semgrep-justifications": 3,
           "no-todo-comments": 4,
           "no-unimplemented-markers": 1,
@@ -277,7 +277,7 @@
         },
         "byPackage": {
           "fitness/checks-typescript": 87,
-          "fitness/checks-universal": 139
+          "fitness/checks-universal": 138
         }
       },
       "graph": {
@@ -288,14 +288,13 @@
     },
     "test-support": {
       "fitness": {
-        "total": 3,
+        "total": 2,
         "bySlug": {
-          "detached-promises": 1,
           "no-unbounded-concurrency": 1,
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "test-support": 3
+          "test-support": 2
         }
       },
       "graph": {
@@ -378,8 +377,8 @@
         "actual": 54
       },
       "detached-promises": {
-        "budget": 52,
-        "actual": 52
+        "budget": 19,
+        "actual": 19
       },
       "performance-anti-patterns": {
         "budget": 38,
@@ -410,19 +409,19 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 526,
+    "budgetGateFitness": 493,
     "budgetGateFitnessSlugs": 77,
-    "productRuntimeFitness": 297,
+    "productRuntimeFitness": 266,
     "productRuntimeFitnessSlugs": 34,
     "productRuntimeGraph": 7,
     "productRuntimeGraphRuleIds": 2,
-    "productRuntimeCombined": 304,
-    "checkPackageFitness": 226,
-    "testSupportFitness": 3,
+    "productRuntimeCombined": 273,
+    "checkPackageFitness": 225,
+    "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
-    "budgetGateSafetyTotal": 234,
-    "productRuntimeSafetyTotal": 183,
+    "budgetGateSafetyTotal": 201,
+    "productRuntimeSafetyTotal": 152,
     "unbudgetedProductRuntimeSlugs": 27
   }
 }

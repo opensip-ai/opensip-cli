@@ -199,7 +199,6 @@ export async function executeEquivalenceCheck(
     for (const line of verdict.lines) process.stdout.write(`${line}\n`);
 
     if (opts.updateBudget === true) {
-      // @fitness-ignore-next-line detached-promises -- writeBudget is a synchronous void helper (writeFileSync); there is no promise to await.
       writeBudget(budgetPath, verdict);
       process.stdout.write(
         `Wrote budget phantom=${String(verdict.phantomCount)} ` +
@@ -210,13 +209,11 @@ export async function executeEquivalenceCheck(
       // exit 0 so a maintainer can record the new floor without the (now-stale)
       // budget failing the same invocation.
       cli.setExitCode(EXIT_CODES.SUCCESS);
-      // @fitness-ignore-next-line detached-promises -- logEnd is a synchronous void helper (logger.info); there is no promise to await.
       logEnd(report, verdict, false);
       return;
     }
 
     cli.setExitCode(verdict.failed ? EXIT_CODES.RUNTIME_ERROR : EXIT_CODES.SUCCESS);
-    // @fitness-ignore-next-line detached-promises -- logEnd is a synchronous void helper (logger.info); there is no promise to await.
     logEnd(report, verdict, verdict.failed);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

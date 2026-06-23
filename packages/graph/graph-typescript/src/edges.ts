@@ -80,7 +80,6 @@ export async function resolveEdgesFromRecords(
     );
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
       pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
@@ -100,7 +99,6 @@ export async function resolveEdgesFromRecords(
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
-    // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 
@@ -146,7 +144,6 @@ export async function resolveEdgesSyntactic(
     );
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
-      // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
       pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
       continue;
     }
@@ -164,7 +161,6 @@ export async function resolveEdgesSyntactic(
       importIndex,
     });
     if (verdict === null) continue;
-    // @fitness-ignore-next-line detached-promises -- pushCallEdge/pushSharedCreationEdge return void (synchronous edge-sink writes), not promises
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 

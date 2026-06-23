@@ -84,7 +84,6 @@ async function deliverYagniRun(
   });
 
   // Re-affirm after delivery (--report-to may set exit 4; advisory policy wins otherwise).
-  // @fitness-ignore-next-line detached-promises -- applyAdvisoryExitCode is synchronous exit-code bookkeeping, not a promise-returning call.
   applyAdvisoryExitCode(cli, config);
 }
 
@@ -132,7 +131,6 @@ async function runYagniCommand(
 
   // Clear exit codes leaked by in-process `executeGraph` before the host wraps
   // the envelope (emitEnvelope snapshots getExitCode at write time).
-  // @fitness-ignore-next-line detached-promises -- applyAdvisoryExitCode is synchronous exit-code bookkeeping, not a promise-returning call.
   applyAdvisoryExitCode(cli, config);
 
   if (opts.json === true) {

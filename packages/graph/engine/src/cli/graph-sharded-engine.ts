@@ -228,7 +228,6 @@ export async function runProfiledShardedBuild(
   const started = Date.now();
   const result = await runShardedBuild(ctx);
   if (profileRun !== undefined) {
-    // @fitness-ignore-next-line detached-promises -- GraphProfileRunRecorder.recordStage is synchronous timing bookkeeping, not a promise-returning call.
     profileRun.recordStage(
       'sharded-build',
       Date.now() - started,

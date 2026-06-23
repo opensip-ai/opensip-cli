@@ -153,7 +153,6 @@ export async function registerFirstPartyTools(
     });
 
     if (!report.ok) {
-      // @fitness-ignore-next-line detached-promises -- synchronous never-returning thrower; the heuristic mistakes the bare call for an unawaited promise
       throwBundledAdmissionFailure(packageName, report);
     }
     /* v8 ignore next 3 -- throwBundledAdmissionFailure never returns on a failed report; this guard narrows types */

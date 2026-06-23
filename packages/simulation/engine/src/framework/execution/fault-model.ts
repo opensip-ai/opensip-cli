@@ -90,7 +90,6 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
         // signal so it cancels, but guarantee the request fails regardless of
         // whether the target honours the signal (we throw deterministically).
         const controller = new AbortController();
-        // @fitness-ignore-next-line detached-promises -- AbortController.abort() is a synchronous void call, not a promise
         controller.abort();
         const signal =
           typeof AbortSignal.any === 'function'

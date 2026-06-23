@@ -106,7 +106,6 @@ async function composeReportInput(): Promise<HtmlReportInput> {
       hostCtx ??= buildHostDispatchCtx(log);
       contribution = await collectExternalReportData(tool, provenance, hostCtx, log);
     }
-    // @fitness-ignore-next-line detached-promises -- mergeContribution returns void (a synchronous Object.assign + warn); the name-based heuristic misfires on a bare call statement.
     mergeContribution(input, contribution, tool, log);
   }
 

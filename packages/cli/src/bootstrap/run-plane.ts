@@ -238,9 +238,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         // Both calls are SYNCHRONOUS best-effort writes (they return a value /
         // void, not a promise); the detached-promise heuristic flags un-awaited
         // calls inside this async fn by name. Nothing to await.
-        // @fitness-ignore-next-line detached-promises -- completeAndPersist is synchronous (returns RecordedToolRunSession | undefined)
         completeAndPersist(completion.session);
-        // @fitness-ignore-next-line detached-promises -- recordHostMetrics is synchronous (returns void)
         recordHostMetrics({ ttyBusyMs });
       }
       return completion;

@@ -1,7 +1,7 @@
-async function persist(): Promise<void> {
+async function fetchRemote(): Promise<void> {
   await Promise.resolve()
 }
 
 export async function handler(): Promise<void> {
-  await persist()
+  await fetchRemote()
 }

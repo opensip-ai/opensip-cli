@@ -149,7 +149,6 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    workspace-unit id derived by bare basename collapsing nested packages),
   //    never a recoverable runtime condition — so we throw rather than return a
   //    quietly-wrong graph.
-  // @fitness-ignore-next-line detached-promises -- assertUniqueShardIds is a synchronous void assertion (throws on a duplicate id); there is no promise to await.
   assertUniqueShardIds(shards);
 
   // The seven canonical stages, mapped onto the sharded work so the live view
@@ -285,7 +284,6 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    unified full catalog (with materialized features when requested) so
   //    whole-catalog consumers (incl. the dashboard) still work.
   if (useCache && catalogRepo) {
-    // @fitness-ignore-next-line detached-promises -- persistShardedCatalog is a synchronous void helper (better-sqlite3/Drizzle writes); there is no promise to await.
     persistShardedCatalog(catalogRepo, built.fragments, shards, catalogToPersist);
   }
 
@@ -344,9 +342,7 @@ function persistShardedCatalog(
   shards: readonly Shard[],
   catalogToPersist: Catalog,
 ): void {
-  // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); upsertShardFragment returns void, not a Promise.
   for (const fragment of builtFragments) catalogRepo.upsertShardFragment(fragment);
-  // @fitness-ignore-next-line detached-promises -- CatalogRepo is synchronous (better-sqlite3/Drizzle); pruneShardFragmentsExcept returns void, not a Promise.
   catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
   try {
     catalogRepo.replaceAll(catalogToPersist);

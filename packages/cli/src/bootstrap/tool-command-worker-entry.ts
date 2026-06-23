@@ -282,7 +282,6 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
       value: toResult(commandSpec.output, acc, returned?.session, returned),
     };
   } finally {
-    // @fitness-ignore-next-line detached-promises -- WorkerRpcClient.dispose() returns void (removes the reply listener + clears the pending map, synchronous); the name-based heuristic misfires inside this async fn.
     rpcClient.dispose();
   }
 }
@@ -359,7 +358,6 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
  * rejects cleanly. This is the host CommandSpec handler's body.
  */
 export async function executeToolCommandWorker(specPath: string): Promise<void> {
-  // @fitness-ignore-next-line detached-promises -- the promise IS awaited; `send(...)` is a synchronous void IPC post of the already-resolved value. The name-based heuristic misfires on `send(await ...)`.
   send(await runToolCommandWorker(specPath));
 }
 

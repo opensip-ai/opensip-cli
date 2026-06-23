@@ -105,7 +105,6 @@ class FileAccessorImpl implements FileAccessor {
 
   async read(filePath: string): Promise<string> {
     // in-memory: single-threaded Node.js access pattern
-    // @fitness-ignore-next-line detached-promises -- throwIfAborted() is synchronous, optional chaining is not a detached promise
     this.signal?.throwIfAborted();
 
     if (!this.pathSet.has(filePath)) {

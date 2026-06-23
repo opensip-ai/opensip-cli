@@ -6,6 +6,7 @@ import { type CheckViolation } from '@opensip-cli/fitness';
 import { getSharedSourceFile, isInAsyncContext } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
+import { isSyncTopLevelCallable } from './detached-promises-sync-detection.js';
 import {
   buildEffectiveSyncSets,
   FILE_SKIP_PATTERNS,
@@ -75,7 +76,11 @@ function matchesSyncNamePattern(name: string, sets: EffectiveSyncSets): boolean 
   return false;
 }
 
-function isKnownSyncCall(node: ts.CallExpression, sets: EffectiveSyncSets): boolean {
+function isKnownSyncCall(
+  node: ts.CallExpression,
+  sets: EffectiveSyncSets,
+  sourceFile: ts.SourceFile,
+): boolean {
   const expr = node.expression;
 
   if (expr.kind === ts.SyntaxKind.SuperKeyword) {
@@ -87,7 +92,8 @@ function isKnownSyncCall(node: ts.CallExpression, sets: EffectiveSyncSets): bool
     if (
       sets.syncFunctions.has(name) ||
       FIRE_AND_FORGET_PATTERNS.has(name) ||
-      matchesSyncNamePattern(name, sets)
+      matchesSyncNamePattern(name, sets) ||
+      isSyncTopLevelCallable(sourceFile, name)
     ) {
       return true;
     }
@@ -235,7 +241,7 @@ export function analyzeFileForDetachedPromises(
       const expr = node.expression;
       if (!ts.isCallExpression(expr)) return;
       if (!isInAsyncContext(node)) return;
-      if (isKnownSyncCall(expr, sets)) return;
+      if (isKnownSyncCall(expr, sets, sourceFile)) return;
       if (isDefinedAsSyncInSameFile(expr)) return;
       if (!isFloatingExpression(node)) return;
 

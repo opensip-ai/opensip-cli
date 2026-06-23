@@ -20,6 +20,9 @@ tightens graph and release guardrails.
 - Consolidated live-run terminal rendering around `@opensip-cli/cli-live` and
   `@opensip-cli/cli-ui`, including one terminal-table renderer, consistent run
   banners, preserved shared progress, and rounded sub-second summary durations.
+- Tightened the `detached-promises` check: same-file sync helper detection,
+  expanded sync-call allowlists, and removal of 33 stale line-level waivers
+  (budget 52 → 19).
 
 ### Fixed
 

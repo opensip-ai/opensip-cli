@@ -178,7 +178,6 @@ export async function handleHostRpc(
     // Validate the inbound IPC request against the recognized-seam allowlist
     // before dispatching (defense-in-depth for the trust boundary; fail loud on
     // a malformed or version-skewed upcall rather than silently no-op'ing).
-    // @fitness-ignore-next-line detached-promises -- validateHostRpcRequest is a synchronous void validator (it throws or returns); the name-based heuristic misfires on a bare call statement.
     validateHostRpcRequest(request);
     const value = await performHostRpc(request, ctx);
     return { kind: 'rpc-reply', rpcId: request.rpcId, ok: true, value };

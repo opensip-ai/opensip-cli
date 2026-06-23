@@ -623,7 +623,6 @@ export async function analyzePackageSupplyChainPolicy(
     checkTrustedPublishing,
   ];
   for (const runCheck of subChecks) {
-    // @fitness-ignore-next-line detached-promises -- sub-checks are synchronous (each returns void, mutating `violations`), not promises
     runCheck(snapshot, violations);
   }
   return violations;
