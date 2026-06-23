@@ -33,7 +33,9 @@ describe('error-handling-quality — probe and Result.match heuristics', () => {
       '  return pattern.match(line)',
       '}',
     ].join('\n');
-    expect(analyze(content, 'packages/fitness/checks-universal/src/checks/security/jwt-validation.ts')).toHaveLength(0);
+    expect(
+      analyze(content, 'packages/fitness/checks-universal/src/checks/security/jwt-validation.ts'),
+    ).toHaveLength(0);
   });
 
   it('still flags Result.match error handlers without logging', () => {

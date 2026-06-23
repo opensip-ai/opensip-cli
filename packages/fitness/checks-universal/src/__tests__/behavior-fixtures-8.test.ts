@@ -517,7 +517,7 @@ describe('performance-anti-patterns skip paths', () => {
     // Inside a fitness check dir -> skipped.
     writeFixture(
       cwd,
-      'fitness/src/checks/some-check.ts',
+      'packages/fitness/checks-universal/src/checks/some-check.ts',
       [
         'export async function f(items: number[]) {',
         '  for (const i of items) { await use(i); }',
@@ -566,7 +566,7 @@ describe('performance-anti-patterns skip paths', () => {
 
   it('skips files inside a fitness check directory', async () => {
     const result = await findCheck('performance-anti-patterns').run(cwd, {
-      targetFiles: [join(cwd, 'fitness/src/checks/some-check.ts')],
+      targetFiles: [join(cwd, 'packages/fitness/checks-universal/src/checks/some-check.ts')],
     });
     expect(result.signals.length).toBe(0);
   });

@@ -104,6 +104,8 @@ const PHASE4_REOPEN_THRESHOLD = 5;
 
 const log = (msg) => console.error(`[catalog-suppressions] ${msg}`);
 
+const fmtDelta = (n) => (n > 0 ? `+${n}` : String(n));
+
 function isTestPath(rel, fileName) {
   return (
     rel.includes('/__tests__/') ||
@@ -357,8 +359,7 @@ function buildPhase4Audit(catalog) {
     productRuntimeCombined:
       catalog.summary.productRuntimeCombined - PHASE0_BASELINE.productRuntimeCombined,
     budgetGateFitness: catalog.summary.budgetGateFitness - PHASE0_BASELINE.budgetGateFitness,
-    checkPackageFitness:
-      catalog.summary.checkPackageFitness - PHASE0_BASELINE.checkPackageFitness,
+    checkPackageFitness: catalog.summary.checkPackageFitness - PHASE0_BASELINE.checkPackageFitness,
     productRuntimeSafetyTotal:
       catalog.summary.productRuntimeSafetyTotal - PHASE0_BASELINE.productRuntimeSafetyTotal,
     budgetGateSafetyTotal:
@@ -456,7 +457,6 @@ function renderTriageMarkdown(catalog) {
   }
 
   const audit = catalog.phase4Audit;
-  const fmtDelta = (n) => (n > 0 ? `+${n}` : String(n));
   lines.push(
     '',
     '## Phase 0 → current delta',
@@ -486,12 +486,12 @@ function renderTriageMarkdown(catalog) {
       '|------|------:|:-----------:|:----:|-------------|',
     );
     for (const row of audit.reopenCandidates) {
-      const action =
-        row.disposition === 'c' || row.disposition === 'b/c'
-          ? 'Further heuristic tightening (future release)'
-          : row.disposition === 'a/b'
-            ? 'Spot-fix @throws / docs where cheap; keep remainder waived'
-            : 'Assign disposition in TRIAGE_DISPOSITION';
+      let action = 'Assign disposition in TRIAGE_DISPOSITION';
+      if (row.disposition === 'c' || row.disposition === 'b/c') {
+        action = 'Further heuristic tightening (future release)';
+      } else if (row.disposition === 'a/b') {
+        action = 'Spot-fix @throws / docs where cheap; keep remainder waived';
+      }
       lines.push(
         `| \`${row.slug}\` | ${row.count} | ${row.disposition} | ${row.kind} | ${action} |`,
       );

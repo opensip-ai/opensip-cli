@@ -78,7 +78,10 @@ describe('async-waterfall-detection — sequential orchestration', () => {
       }
     `;
     expect(
-      analyze(src, 'packages/fitness/checks-typescript/src/checks/quality/unused-config-options.ts'),
+      analyze(
+        src,
+        'packages/fitness/checks-typescript/src/checks/quality/unused-config-options.ts',
+      ),
     ).toHaveLength(0);
   });
 

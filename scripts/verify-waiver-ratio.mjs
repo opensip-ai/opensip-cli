@@ -114,7 +114,9 @@ function main() {
         );
       }
       if (audit.successCriteria?.sc6Met === true) {
-        log(`phase-4 SC6 met: product-runtime safety ${audit.successCriteria.sc6ProductRuntimeSafetyActual} ≤ 143`);
+        log(
+          `phase-4 SC6 met: product-runtime safety ${audit.successCriteria.sc6ProductRuntimeSafetyActual} ≤ 143`,
+        );
       }
     }
   } catch {

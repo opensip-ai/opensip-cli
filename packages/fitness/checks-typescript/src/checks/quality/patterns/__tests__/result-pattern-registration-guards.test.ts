@@ -27,7 +27,9 @@ describe('result-pattern-consistency — registration and invariant guards', () 
       '  }',
       '}',
     ].join('\n');
-    expect(analyze(content, 'packages/simulation/engine/src/framework/result-builder.ts')).toHaveLength(0);
+    expect(
+      analyze(content, 'packages/simulation/engine/src/framework/result-builder.ts'),
+    ).toHaveLength(0);
   });
 
   it('does not flag build() terminal preconditions', () => {
@@ -40,7 +42,9 @@ describe('result-pattern-consistency — registration and invariant guards', () 
       '  }',
       '}',
     ].join('\n');
-    expect(analyze(content, 'packages/simulation/engine/src/framework/result-builder.ts')).toHaveLength(0);
+    expect(
+      analyze(content, 'packages/simulation/engine/src/framework/result-builder.ts'),
+    ).toHaveLength(0);
   });
 
   it('does not flag exhaustiveness throws after a never binding', () => {

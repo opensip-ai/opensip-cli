@@ -134,7 +134,7 @@ function buildEffectiveThrowAllowedPaths(): readonly RegExp[] {
 }
 
 function isRecipeOrchestratorPath(filePath: string): boolean {
-  return /\/recipes\//.test(filePath) && /service\.ts$/i.test(filePath);
+  return filePath.includes('/recipes/') && /service\.ts$/i.test(filePath);
 }
 
 function isThrowAllowedPath(filePath: string): boolean {
@@ -284,7 +284,7 @@ function isExhaustivenessThrow(node: ts.ThrowStatement, sourceFile: ts.SourceFil
     return false;
   }
 
-  const statements = ts.isCaseClause(parent) ? parent.statements : parent.statements;
+  const statements = parent.statements;
   for (const stmt of statements) {
     if (stmt === node) {
       break;

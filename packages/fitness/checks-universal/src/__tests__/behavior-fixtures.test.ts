@@ -802,7 +802,7 @@ describe('no-raw-regex-on-code', () => {
     files.push(
       writeFixture(
         cwd,
-        'fitness/src/checks/missing-filter.ts',
+        'packages/fitness/checks-universal/src/checks/missing-filter.ts',
         [
           'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
@@ -819,7 +819,7 @@ describe('no-raw-regex-on-code', () => {
       ),
       writeFixture(
         cwd,
-        'fitness/src/checks/has-filter.ts',
+        'packages/fitness/checks-universal/src/checks/has-filter.ts',
         [
           'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
@@ -837,7 +837,7 @@ describe('no-raw-regex-on-code', () => {
       ),
       writeFixture(
         cwd,
-        'fitness/src/checks/strip-strings-filter.ts',
+        'packages/fitness/checks-universal/src/checks/strip-strings-filter.ts',
         [
           'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
@@ -855,7 +855,7 @@ describe('no-raw-regex-on-code', () => {
       ),
       writeFixture(
         cwd,
-        'fitness/src/checks/no-regex.ts',
+        'packages/fitness/checks-universal/src/checks/no-regex.ts',
         [
           'import { defineCheck } from "@opensip-cli/fitness";',
           'export const myCheck = defineCheck({',
@@ -881,7 +881,7 @@ describe('no-raw-regex-on-code', () => {
 
   it('flags fitness check files using regex without contentFilter', async () => {
     const result = await findCheck('no-raw-regex-on-code').run(cwd, {
-      targetFiles: [join(cwd, 'fitness/src/checks/missing-filter.ts')],
+      targetFiles: [join(cwd, 'packages/fitness/checks-universal/src/checks/missing-filter.ts')],
     });
     const types = result.signals.map((s) => s.metadata.type);
     expect(types).toContain('missing-content-filter');
@@ -889,21 +889,23 @@ describe('no-raw-regex-on-code', () => {
 
   it('does not fire when contentFilter is declared', async () => {
     const result = await findCheck('no-raw-regex-on-code').run(cwd, {
-      targetFiles: [join(cwd, 'fitness/src/checks/has-filter.ts')],
+      targetFiles: [join(cwd, 'packages/fitness/checks-universal/src/checks/has-filter.ts')],
     });
     expect(result.signals.length).toBe(0);
   });
 
   it('does not fire when contentFilter: strip-strings is declared', async () => {
     const result = await findCheck('no-raw-regex-on-code').run(cwd, {
-      targetFiles: [join(cwd, 'fitness/src/checks/strip-strings-filter.ts')],
+      targetFiles: [
+        join(cwd, 'packages/fitness/checks-universal/src/checks/strip-strings-filter.ts'),
+      ],
     });
     expect(result.signals.length).toBe(0);
   });
 
   it('does not fire on a fitness check that does not use regex', async () => {
     const result = await findCheck('no-raw-regex-on-code').run(cwd, {
-      targetFiles: [join(cwd, 'fitness/src/checks/no-regex.ts')],
+      targetFiles: [join(cwd, 'packages/fitness/checks-universal/src/checks/no-regex.ts')],
     });
     expect(result.signals.length).toBe(0);
   });

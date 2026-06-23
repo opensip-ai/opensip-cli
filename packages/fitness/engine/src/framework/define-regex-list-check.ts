@@ -43,8 +43,8 @@
  * ```
  */
 
-import { isCommentLine } from '../check-utils/source-analysis.js';
 import { isCheckAuthoringSource } from '../check-utils/check-authoring-helpers.js';
+import { isCommentLine } from '../check-utils/source-analysis.js';
 import { isTestFile } from '../check-utils/test-helpers.js';
 
 import { defineCheck } from './define-check.js';

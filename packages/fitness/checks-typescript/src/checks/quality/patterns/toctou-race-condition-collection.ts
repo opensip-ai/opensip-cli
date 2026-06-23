@@ -74,6 +74,47 @@ export function getReceiverChainText(expr: ts.Expression): string | null {
   return null;
 }
 
+function collectThisDestructuringAliases(
+  decl: ts.VariableDeclaration,
+  classCacheFields: ReadonlySet<string>,
+  aliases: Set<string>,
+): void {
+  if (
+    !ts.isObjectBindingPattern(decl.name) ||
+    decl.initializer?.kind !== ts.SyntaxKind.ThisKeyword
+  ) {
+    return;
+  }
+  for (const element of decl.name.elements) {
+    if (!ts.isBindingElement(element) || !ts.isIdentifier(element.name)) continue;
+    const propName =
+      element.propertyName && ts.isIdentifier(element.propertyName)
+        ? element.propertyName.text
+        : element.name.text;
+    if (classCacheFields.has(propName)) {
+      aliases.add(element.name.text);
+    }
+  }
+}
+
+function collectThisPropertyAccessAlias(
+  decl: ts.VariableDeclaration,
+  classCacheFields: ReadonlySet<string>,
+  aliases: Set<string>,
+): void {
+  const init = decl.initializer;
+  if (
+    !ts.isIdentifier(decl.name) ||
+    !init ||
+    !ts.isPropertyAccessExpression(init) ||
+    init.expression.kind !== ts.SyntaxKind.ThisKeyword ||
+    !classCacheFields.has(init.name.text)
+  ) {
+    return;
+  }
+  aliases.add(decl.name.text);
+}
+
 /** `const { byId } = this` aliases for class-owned Map/Set fields. */
 export function collectThisCollectionFieldAliases(
   node: FunctionLikeNode,
@@ -89,31 +130,8 @@ export function collectThisCollectionFieldAliases(
       return;
     }
 
-    if (
-      ts.isObjectBindingPattern(n.name) &&
-      n.initializer.kind === ts.SyntaxKind.ThisKeyword
-    ) {
-      for (const element of n.name.elements) {
-        if (!ts.isBindingElement(element) || !ts.isIdentifier(element.name)) continue;
-        const propName =
-          element.propertyName && ts.isIdentifier(element.propertyName)
-            ? element.propertyName.text
-            : element.name.text;
-        if (classCacheFields.has(propName)) {
-          aliases.add(element.name.text);
-        }
-      }
-    }
-
-    if (
-      ts.isIdentifier(n.name) &&
-      ts.isPropertyAccessExpression(n.initializer) &&
-      n.initializer.expression.kind === ts.SyntaxKind.ThisKeyword &&
-      classCacheFields.has(n.initializer.name.text)
-    ) {
-      aliases.add(n.name.text);
-    }
-
+    collectThisDestructuringAliases(n, classCacheFields, aliases);
+    collectThisPropertyAccessAlias(n, classCacheFields, aliases);
     ts.forEachChild(n, visit);
   };
 

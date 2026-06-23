@@ -85,7 +85,9 @@ describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
         ensure('a');
       }
     `;
-    expect(analyzeFileForToctou('packages/dashboard/src/code-paths/graph-view-model.ts', src)).toHaveLength(0);
+    expect(
+      analyzeFileForToctou('packages/dashboard/src/code-paths/graph-view-model.ts', src),
+    ).toHaveLength(0);
   });
 
   it('does NOT flag parse-cache filteredContent chains', () => {
@@ -97,7 +99,9 @@ describe('toctou-race-condition — state-bag-of-Maps FP regression', () => {
         return content;
       }
     `;
-    expect(analyzeFileForToctou('packages/languages/lang-typescript/src/filter.ts', src)).toHaveLength(0);
+    expect(
+      analyzeFileForToctou('packages/languages/lang-typescript/src/filter.ts', src),
+    ).toHaveLength(0);
   });
 
   it('STILL flags genuine read-then-update on a shared persistent receiver', () => {
