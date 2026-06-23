@@ -165,8 +165,8 @@ export function buildYagniCommandSpec(
       {
         flag: '--graph',
         value: '<mode>',
-        description: 'Graph evidence mode: auto (reuse or build), reuse, build, or off',
-        default: 'auto',
+        description:
+          'Graph evidence mode: auto (reuse or build), reuse, build, or off (default from config)',
         choices: ['auto', 'reuse', 'build', 'off'],
       },
       {

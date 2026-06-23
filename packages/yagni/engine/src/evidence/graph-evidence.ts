@@ -3,9 +3,11 @@
  * `@opensip-cli/graph/internal` (dependency-cruiser carve-out).
  */
 
-import { CatalogRepo, executeGraph } from '@opensip-cli/graph/internal';
+import { CatalogRepo, runGraph } from '@opensip-cli/graph/internal';
 
 import { withPreservedExitCode } from '../lib/isolate-exit-code.js';
+
+import { ensureGraphAdaptersLoaded } from './load-graph-adapters.js';
 
 import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
@@ -50,6 +52,7 @@ export async function resolveGraphEvidence(
   }
 
   if (mode === 'build') {
+    await ensureGraphAdaptersLoaded(cwd);
     const built = await buildGraphCatalog(cwd, cli, { force: true });
     return {
       catalog: built,
@@ -59,18 +62,10 @@ export async function resolveGraphEvidence(
     };
   }
 
-  // auto: best-effort enrichment. With a graph adapter in scope, delegate to
-  // graph's cache-invalidation path so stale persisted rows are rebuilt or
-  // incrementally refreshed. A plain `yagni` invocation, though, only loads
-  // yagni's own capabilities — no graph adapter is registered — so calling
-  // executeGraph would throw "no language adapter is registered" and graph's
-  // own error handler would log it to stderr, leaking a confusing warning.
-  // In that case degrade gracefully: reuse a previously-persisted catalog if
-  // the datastore has one (we can't rebuild without an adapter), else nothing.
-  // (Explicit `--graph build` still surfaces the actionable message.)
-  // The `graph` subscope is added to RunScope by the graph tool's module
-  // augmentation, which isn't visible in yagni's compilation (it's not part of
-  // `@opensip-cli/graph/internal`), so read the adapter count structurally.
+  // auto: best-effort enrichment — load graph adapters (yagni owns the command,
+  // so the host did not), then delegate to graph's cache-invalidation path.
+  // When adapters still cannot be resolved, degrade to a cached catalog only.
+  await ensureGraphAdaptersLoaded(cwd);
   const graphScope = cli.scope as { graph?: { adapters?: { size?: number } } };
   if ((graphScope.graph?.adapters?.size ?? 0) === 0) {
     const catalog = new CatalogRepo(datastore).loadCatalogContract();
@@ -99,10 +94,28 @@ async function buildGraphCatalog(
   cli: ToolCliContext,
   opts: { readonly force: boolean },
 ): Promise<GraphCatalog | null> {
-  await withPreservedExitCode(cli, () =>
-    executeGraph({ cwd, json: true, noCache: opts.force }, cli),
-  );
+  const graphScope = cli.scope as { graph?: { adapters?: { size?: number } } };
+  if ((graphScope.graph?.adapters?.size ?? 0) === 0) return null;
+
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) return null;
+
+  // Evidence-only in-process build: `executeGraph` fans out sharded workers that
+  // re-bootstrap under yagni (no graph-adapter domain), so fragments never land.
+  // `runGraph` reuses the adapters yagni loaded above without emitting a graph
+  // CLI envelope onto stdout. Persist explicitly afterward: the orchestrator
+  // skips `replaceAll` when `noCache: true` (build mode), but yagni needs the
+  // catalog row for duplicate-body-candidate regardless.
+  const result = await withPreservedExitCode(cli, () =>
+    runGraph({
+      cwd,
+      noCache: opts.force,
+      rules: [],
+      datastore,
+    }),
+  );
+  if (result.catalog !== undefined && result.catalog !== null) {
+    new CatalogRepo(datastore).replaceAll(result.catalog);
+  }
   return new CatalogRepo(datastore).loadCatalogContract();
 }

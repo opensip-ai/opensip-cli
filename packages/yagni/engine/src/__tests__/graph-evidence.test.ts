@@ -1,4 +1,3 @@
-import { EXIT_CODES } from '@opensip-cli/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveGraphEvidence } from '../evidence/graph-evidence.js';
@@ -8,16 +7,17 @@ import type { ToolCliContext } from '@opensip-cli/core';
 
 const graphMocks = vi.hoisted(() => {
   const loadCatalogContract = vi.fn();
-  const executeGraph = vi.fn();
+  const runGraph = vi.fn();
+  const replaceAll = vi.fn();
   const CatalogRepo = vi.fn().mockImplementation(function CatalogRepo() {
-    return { loadCatalogContract };
+    return { loadCatalogContract, replaceAll };
   });
-  return { CatalogRepo, executeGraph, loadCatalogContract };
+  return { CatalogRepo, runGraph, loadCatalogContract, replaceAll };
 });
 
 vi.mock('@opensip-cli/graph/internal', () => ({
   CatalogRepo: graphMocks.CatalogRepo,
-  executeGraph: graphMocks.executeGraph,
+  runGraph: graphMocks.runGraph,
 }));
 
 const CATALOG: GraphCatalog = {
@@ -31,7 +31,7 @@ const CATALOG: GraphCatalog = {
 function cliWithDatastore(exit?: { prior?: number; current?: number }): ToolCliContext {
   const state = { code: exit?.prior };
   return {
-    // A graph adapter is registered → `auto` rebuilds via executeGraph.
+    // A graph adapter is registered → `auto` rebuilds via runGraph.
     scope: { datastore: () => ({}), graph: { adapters: { size: 1 } } },
     getExitCode: () => state.code,
     setExitCode: (code: number) => {
@@ -57,8 +57,8 @@ function cliWithoutDatastore(): ToolCliContext {
 describe('resolveGraphEvidence', () => {
   beforeEach(() => {
     graphMocks.CatalogRepo.mockClear();
-    graphMocks.executeGraph.mockReset();
-    graphMocks.executeGraph.mockResolvedValue(undefined);
+    graphMocks.runGraph.mockReset();
+    graphMocks.runGraph.mockResolvedValue({ catalog: CATALOG, signals: [] });
     graphMocks.loadCatalogContract.mockReset();
   });
 
@@ -68,10 +68,12 @@ describe('resolveGraphEvidence', () => {
 
     const result = await resolveGraphEvidence('/repo', 'build', cli);
 
-    expect(graphMocks.executeGraph).toHaveBeenCalledWith(
-      { cwd: '/repo', json: true, noCache: true },
-      cli,
-    );
+    expect(graphMocks.runGraph).toHaveBeenCalledWith({
+      cwd: '/repo',
+      noCache: true,
+      rules: [],
+      datastore: {},
+    });
     expect(result).toMatchObject({
       catalog: CATALOG,
       mode: 'build',
@@ -86,10 +88,12 @@ describe('resolveGraphEvidence', () => {
 
     const result = await resolveGraphEvidence('/repo', 'auto', cli);
 
-    expect(graphMocks.executeGraph).toHaveBeenCalledWith(
-      { cwd: '/repo', json: true, noCache: false },
-      cli,
-    );
+    expect(graphMocks.runGraph).toHaveBeenCalledWith({
+      cwd: '/repo',
+      noCache: false,
+      rules: [],
+      datastore: {},
+    });
     expect(result).toMatchObject({
       catalog: CATALOG,
       mode: 'auto',
@@ -98,14 +102,13 @@ describe('resolveGraphEvidence', () => {
     });
   });
 
-  it('auto mode without a graph adapter reuses the cached catalog (no executeGraph, no warning)', async () => {
+  it('auto mode without a graph adapter reuses the cached catalog (no runGraph)', async () => {
     graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
 
     const result = await resolveGraphEvidence('/repo', 'auto', cliNoGraphAdapter());
 
-    // executeGraph would log "no language adapter is registered" to stderr;
-    // the degraded path must NOT call it.
-    expect(graphMocks.executeGraph).not.toHaveBeenCalled();
+    // No adapters in scope — the degraded path must NOT call runGraph.
+    expect(graphMocks.runGraph).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       catalog: CATALOG,
       mode: 'auto',
@@ -119,7 +122,7 @@ describe('resolveGraphEvidence', () => {
 
     const result = await resolveGraphEvidence('/repo', 'auto', cliNoGraphAdapter());
 
-    expect(graphMocks.executeGraph).not.toHaveBeenCalled();
+    expect(graphMocks.runGraph).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       catalog: null,
       mode: 'auto',
@@ -128,43 +131,13 @@ describe('resolveGraphEvidence', () => {
     });
   });
 
-  it('clears exit codes set by executeGraph so yagni stays advisory', async () => {
-    graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
-    graphMocks.executeGraph.mockImplementation((_opts, cli) => {
-      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-      return Promise.resolve();
-    });
-    const cli = cliWithDatastore();
-
-    await resolveGraphEvidence('/repo', 'build', cli);
-
-    expect((cli as ToolCliContext & { _exitState: { code?: number } })._exitState.code).toBe(
-      EXIT_CODES.SUCCESS,
-    );
-  });
-
-  it('restores a pre-existing exit code when graph mutates it', async () => {
-    graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
-    graphMocks.executeGraph.mockImplementation((_opts, cli) => {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-      return Promise.resolve();
-    });
-    const cli = cliWithDatastore({ prior: EXIT_CODES.REPORT_FAILED });
-
-    await resolveGraphEvidence('/repo', 'auto', cli);
-
-    expect((cli as ToolCliContext & { _exitState: { code?: number } })._exitState.code).toBe(
-      EXIT_CODES.REPORT_FAILED,
-    );
-  });
-
   it('reuses a persisted catalog without invoking graph in reuse mode', async () => {
     graphMocks.loadCatalogContract.mockReturnValue(CATALOG);
     const cli = cliWithDatastore();
 
     const result = await resolveGraphEvidence('/repo', 'reuse', cli);
 
-    expect(graphMocks.executeGraph).not.toHaveBeenCalled();
+    expect(graphMocks.runGraph).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       catalog: CATALOG,
       mode: 'reuse',
