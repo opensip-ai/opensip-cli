@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  BootstrapDiagnosticsCollector,
+  CLI_DIAGNOSTIC_CODES,
   PluginIncompatibleError,
   ToolRegistry as ToolRegistryClass,
   type Tool,
@@ -15,6 +17,7 @@ import {
 import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
+import { resetBootstrapDiagnosticsBuffer } from '../bootstrap/bootstrap-diagnostics-buffer.js';
 import {
   BUNDLED_TOOL_PACKAGES,
   discoverAndRegisterToolPackages,
@@ -512,7 +515,42 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.get('fixture-valid')).toBeDefined();
   });
 
-  it('skips a discovered installed package when not allowlisted (trust gate precedes import)', async () => {
+  it('skips a stale bundled installed copy without user-facing stderr (ADR-0060 Phase 1)', async () => {
+    staged.push(
+      stageFixture('stale-bundled-fitness', {
+        packageJson: {
+          name: '@opensip-cli/fitness',
+          version: '0.0.0',
+          type: 'module',
+          main: './index.js',
+          opensipTools: {
+            kind: 'tool',
+            id: 'fitness',
+            apiVersion: 0,
+            commands: [{ name: 'fitness', description: 'stale copy' }],
+          },
+        },
+        indexJs: "throw new Error('stale bundled copy must never be imported');",
+      }),
+    );
+    const registry = new ToolRegistryClass();
+    const collector = resetBootstrapDiagnosticsBuffer();
+    const stderr = captureStderr();
+    try {
+      await discoverAndRegisterToolPackages(
+        registry,
+        { sources: WALK_UP_SOURCE_LIST, env: ALLOW_ALL_INSTALLED, bootstrapDiagnostics: collector },
+        BUILTIN_IDS,
+      );
+    } finally {
+      stderr.restore();
+    }
+    expect(registry.get('fitness')).toBeUndefined();
+    expect(stderr.read()).toBe('');
+    expect(collector.list()).toHaveLength(0);
+  });
+
+  it('records trust denial as a typed diagnostic without user-facing stderr (ADR-0060 Phase 3)', async () => {
     staged.push(
       stageFixture('trust-denied', {
         packageJson: {
@@ -531,18 +569,25 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       }),
     );
     const registry = new ToolRegistryClass();
+    const collector = new BootstrapDiagnosticsCollector();
     const stderr = captureStderr();
     try {
       await discoverAndRegisterToolPackages(
         registry,
-        { sources: WALK_UP_SOURCE_LIST, env: {} },
+        { sources: WALK_UP_SOURCE_LIST, env: {}, bootstrapDiagnostics: collector },
         BUILTIN_IDS,
       );
     } finally {
       stderr.restore();
     }
     expect(registry.get('fixture-trust-denied')).toBeUndefined();
-    expect(stderr.read()).toContain('not trusted to load');
+    expect(stderr.read()).toBe('');
+    expect(collector.list()).toEqual([
+      expect.objectContaining({
+        code: CLI_DIAGNOSTIC_CODES.OPENSIP_DISCOVERY_TOOL_TRUST_DENIED,
+        provenance: expect.objectContaining({ toolId: 'fixture-trust-denied' }),
+      }),
+    ]);
     expect(stderr.read()).not.toContain('trust-denied tool must never be imported');
   });
 

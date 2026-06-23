@@ -44,7 +44,13 @@ export function createRecipeRegistry(): FitnessRecipeRegistry {
 
 /** Construct a fresh, empty `ensureChecksLoaded` lifecycle slot for a `RunScope`. */
 export function createFitnessLoadState(): FitnessLoadState {
-  return { loadedFor: null, pluginLoadErrors: [], loadWarnings: [] };
+  return {
+    loadedFor: null,
+    pluginLoadErrors: [],
+    checkPackErrors: [],
+    loadWarnings: [],
+    degradedDiagnostics: [],
+  };
 }
 
 /**

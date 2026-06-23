@@ -210,6 +210,8 @@ export interface ToolCliContext {
      * without parsing `message`.
      */
     readonly code?: string;
+    /** Structured bootstrap/setup diagnostic (ADR-0060 command-error substrate). */
+    readonly diagnostic?: import('../lib/cli-diagnostic.js').CliDiagnostic;
   }) => void;
   /**
    * Emit a **raw, unwrapped** value as machine-output for a command that

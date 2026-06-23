@@ -25,6 +25,7 @@ import { LanguageRegistry } from '../languages/registry.js';
 import { noopSignalSink } from '../signals/signal-sink.js';
 import { ToolRegistry } from '../tools/registry.js';
 
+import { BootstrapDiagnosticsCollector } from './bootstrap-diagnostics.js';
 import { DiagnosticsBus } from './diagnostics-bus.js';
 import { SystemError } from './errors.js';
 import { logger as defaultLogger } from './logger.js';
@@ -35,6 +36,7 @@ import type { RunCorrelation } from './run-correlation.js';
 import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
+import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
 
 // RecipeUnitConfigSlot, DataStoreThunk, ToolScope, and ScopeContribution
@@ -133,6 +135,12 @@ export interface RunScopeOptions {
    * tests and bare scopes omit it (`RunScope.correlation` is then `undefined`).
    */
   readonly correlation?: RunCorrelation;
+  /**
+   * Bootstrap/setup diagnostics gathered during startup discovery/load and any
+   * later capability registration for this run (ADR-0060). Defaults to an empty
+   * collector; the CLI bootstrap transfers startup diagnostics here.
+   */
+  readonly bootstrapDiagnostics?: readonly CliDiagnostic[];
 }
 
 /**
@@ -198,6 +206,11 @@ export class RunScope {
    * (tests / bare scopes). See {@link RunScopeOptions.correlation}.
    */
   readonly correlation: RunCorrelation | undefined;
+  /**
+   * Buffered bootstrap/setup diagnostics for this invocation (ADR-0060). Host
+   * commands filter or surface the full stream via `tools doctor`.
+   */
+  readonly bootstrapDiagnostics: BootstrapDiagnosticsCollector;
 
   /**
    * Tool-registered teardown callbacks, invoked once during {@link dispose}.
@@ -227,6 +240,10 @@ export class RunScope {
     // No default: `undefined` when no caller supplies one (the test/bare-scope
     // contract). Production paths assemble it at the composition root (B2).
     this.correlation = opts.correlation;
+    this.bootstrapDiagnostics = new BootstrapDiagnosticsCollector();
+    for (const diagnostic of opts.bootstrapDiagnostics ?? []) {
+      this.bootstrapDiagnostics.record(diagnostic);
+    }
   }
 
   /**

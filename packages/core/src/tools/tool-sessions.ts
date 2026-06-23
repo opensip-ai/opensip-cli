@@ -10,6 +10,7 @@
 
 import type { ToolShortId } from './ids.js';
 import type { RunTimer } from '../lib/run-timer.js';
+import type { ToolRunOutcome } from './run-outcome.js';
 
 /**
  * Canonical generic stored-session leaf shape accepted by tool replay hooks.
@@ -28,6 +29,11 @@ export interface ToolSessionRecord {
   readonly recipe?: string;
   readonly score: number;
   readonly passed: boolean;
+  /**
+   * Persisted run health (ADR-0060, Phase 6). Absent on legacy rows — readers
+   * infer `passed`/`failed` from `passed` and never infer `degraded`/`error`.
+   */
+  readonly runOutcome?: ToolRunOutcome;
   readonly durationMs: number;
   readonly payload?: unknown;
 }
@@ -58,6 +64,8 @@ export interface ToolSessionContribution {
   readonly recipe?: string;
   readonly score: number;
   readonly passed: boolean;
+  /** Host-stamped when persisting; tools may supply for strict degraded runs. */
+  readonly runOutcome?: ToolRunOutcome;
   /** Tool-owned opaque payload (same contract as StoredSession.payload). */
   readonly payload?: unknown;
 }

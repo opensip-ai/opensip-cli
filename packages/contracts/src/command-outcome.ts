@@ -29,6 +29,7 @@
  * contract type, or a readonly array thereof.
  */
 
+import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { RunDiagnostics } from '@opensip-cli/core';
 
@@ -45,6 +46,8 @@ export interface ErrorDetail {
   readonly message: string;
   readonly suggestion?: string;
   readonly code?: string;
+  /** Optional structured diagnostic substrate when the error is host-classified (ADR-0060). */
+  readonly diagnostic?: CliDiagnostic;
 }
 
 /** One non-fatal warning attached to an outcome. */
@@ -87,6 +90,12 @@ export interface CommandOutcome<T = unknown> {
   readonly envelope?: SignalEnvelope;
   readonly errors?: readonly ErrorDetail[];
   readonly warnings?: readonly WarningDetail[];
+  /**
+   * Primary structured command error when bootstrap/setup failed before a credible
+   * scan (ADR-0060). Complements `errors[]` for machine consumers that want the
+   * full diagnostic substrate on a `status:'error'` outcome.
+   */
+  readonly commandError?: CliDiagnostic;
   readonly diagnostics?: RunDiagnostics;
   readonly renderHints?: RenderHints;
 }

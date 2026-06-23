@@ -21,6 +21,7 @@
 
 import {
   createRunLifecycle,
+  deriveRunOutcome,
   generatePrefixedId,
   logger as defaultLogger,
   type Logger,
@@ -156,6 +157,10 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       const persistStart = performance.now();
       try {
         const repo = new SessionRepo(datastore);
+        const runOutcome = deriveRunOutcome({
+          passed: contribution.passed,
+          explicit: contribution.runOutcome,
+        });
         repo.save({
           id,
           tool: contribution.tool,
@@ -165,6 +170,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           recipe: contribution.recipe,
           score: contribution.score,
           passed: contribution.passed,
+          runOutcome,
           durationMs: snapshot.durationMs,
           payload: contribution.payload,
         });

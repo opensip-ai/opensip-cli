@@ -30,7 +30,6 @@ import {
 import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
 import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
-import { getPluginLoadErrors } from './check-loader.js';
 import { buildFitVerboseDetail } from './envelope-view.js';
 import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 
@@ -122,10 +121,10 @@ export function buildFitEnvelope(
     signals,
     // ADR-0035: the host-owned verdict reads fit's resolved
     // failOnErrors/failOnWarnings (scope.toolConfig.fitness, signalersConfig
-    // fallback, then {1,0}). Plugin-load errors occur before any unit exists, so
-    // they ride runFaulted.
+    // fallback, then {1,0}). Setup failures are command-errors before the envelope
+    // (ADR-0060) — runFaulted stays false for user-facing envelopes.
     policy: resolveFitVerdictPolicy(signalersConfig),
-    runFaulted: getPluginLoadErrors().length > 0,
+    runFaulted: false,
     // ADR-0036: fit's message-hash identity (line-shift-tolerant), stamped at
     // construction so EVERY fit envelope — live/json/cloud, not only the gate
     // path — carries gate-ready fingerprints.

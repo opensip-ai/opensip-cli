@@ -24,7 +24,43 @@ import {
   resolveToolHooks,
   runWithScope,
 } from '@opensip-cli/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../fit/check-loader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../fit/check-loader.js')>();
+  const { currentCheckRegistry, currentFitnessLoadState } =
+    await import('../../framework/scope-registry.js');
+  const { defineCheck } = await import('../../framework/define-check.js');
+  return {
+    ...actual,
+    ensureChecksLoaded: vi.fn(async (projectDir?: string) => {
+      const key = projectDir ?? '';
+      const load = currentFitnessLoadState();
+      if (load.loadedFor === key) return;
+      const registry = currentCheckRegistry();
+      if (registry.listEnabled().length === 0) {
+        registry.register(
+          defineCheck({
+            id: '00000000-0000-4000-8000-000000000098',
+            slug: 'catalog-stub',
+            description: 'catalog stub',
+            tags: ['test'],
+            analyze: () => [],
+          }),
+          '@opensip-cli/test',
+        );
+      }
+      load.loadedFor = key;
+      load.pluginLoadErrors = [];
+      load.checkPackErrors = [];
+      load.loadWarnings = [];
+      load.degradedDiagnostics = [];
+      load.commandError = undefined;
+      load.loadDegraded = undefined;
+      load.outcomeFinalized = true;
+    }),
+  };
+});
 
 /** Fresh scope with empty registries — local equivalent of the retired
  *  `@opensip-cli/core/test-utils` helper. The fitness engine's own tests

@@ -220,4 +220,29 @@ describe('runJsonMode', () => {
     expect(emitEnvelope).not.toHaveBeenCalled();
     expect(deliverSignals).not.toHaveBeenCalled();
   });
+
+  it('emits structured command-error diagnostic on fail-closed load (ADR-0060)', async () => {
+    const diagnostic = {
+      severity: 'error' as const,
+      code: 'OPENSIP_FIT_EMPTY_CHECK_REGISTRY',
+      category: 'integrity' as const,
+      message: 'No checks loaded',
+      impact: 'No credible scan',
+    };
+    executeFitMock.mockResolvedValue({
+      result: {
+        type: 'error',
+        exitCode: 1,
+        message: 'No checks loaded',
+        code: diagnostic.code,
+        diagnostic,
+      },
+    });
+    const { cli, emitError, deliverSignals } = mockCli();
+    await runJsonMode(args, cli);
+    expect(emitError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: diagnostic.code, diagnostic }),
+    );
+    expect(deliverSignals).not.toHaveBeenCalled();
+  });
 });

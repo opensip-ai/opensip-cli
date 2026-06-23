@@ -28,6 +28,8 @@
  * no `scope.fitness`, and reads return `undefined`.
  */
 
+import type { CliDiagnostic } from '@opensip-cli/core';
+
 import type { FileCache } from './framework/file-cache.js';
 import type { CheckRegistry } from './framework/registry.js';
 import type { FitnessRecipeRegistry } from './recipes/registry.js';
@@ -46,9 +48,19 @@ export interface FitnessLoadState {
   loadedFor: string | null;
   /** Plugin load failures from the most recent `ensureChecksLoaded` call. */
   pluginLoadErrors: readonly string[];
+  /** Fit-pack domain load/routing errors from the most recent load. */
+  checkPackErrors: readonly string[];
   /** Non-fatal user-facing warnings collected during the most recent
    *  `ensureChecksLoaded` call. */
   loadWarnings: string[];
+  /** Fail-closed command-error diagnostic when setup prevents a credible scan. */
+  commandError?: CliDiagnostic;
+  /** Optional-only failures while built-in checks still loaded (strict degraded). */
+  loadDegraded?: boolean;
+  /** Typed diagnostics for optional failures surfaced as degraded warnings. */
+  degradedDiagnostics: readonly CliDiagnostic[];
+  /** Guards `finalizeFitLoadOutcome` idempotency per run. */
+  outcomeFinalized?: boolean;
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   extractPayloadVersion,
   isToolShortId,
   logger,
+  type ToolRunOutcome,
 } from '@opensip-cli/core';
 import {
   requireDrizzleDataStore,
@@ -19,6 +20,16 @@ import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contr
 import type { ToolShortId } from '@opensip-cli/core';
 
 const MODULE_NAME = 'session-store:session-repo';
+
+const RUN_OUTCOMES = new Set<ToolRunOutcome>(['passed', 'failed', 'degraded', 'error']);
+
+/** Hydrate runOutcome from the column; legacy NULL rows omit the field on read. */
+function normalizeRunOutcome(stored: string | null | undefined): ToolRunOutcome | undefined {
+  if (stored !== null && stored !== undefined && RUN_OUTCOMES.has(stored as ToolRunOutcome)) {
+    return stored as ToolRunOutcome;
+  }
+  return undefined;
+}
 
 /** The stored tool-payload projection (opaque blob + its outer schema version). */
 interface StoredPayloadRow {
@@ -81,6 +92,7 @@ export class SessionRepo {
             recipe: session.recipe ?? null,
             score: session.score,
             passed: session.passed,
+            run_outcome: session.runOutcome ?? null,
             durationMs: session.durationMs,
           })
           .run();
@@ -346,6 +358,9 @@ export class SessionRepo {
         ? new Date(row.timestamp + row.durationMs).toISOString() // legacy synth
         : new Date(row.completed_at).toISOString());
 
+    const passed = row.passed;
+    const runOutcome = normalizeRunOutcome(row.run_outcome);
+
     return {
       id: row.id,
       tool: row.tool,
@@ -354,7 +369,8 @@ export class SessionRepo {
       cwd: row.cwd,
       recipe: row.recipe ?? undefined,
       score: row.score,
-      passed: row.passed,
+      passed,
+      ...(runOutcome === undefined ? {} : { runOutcome }),
       durationMs: row.durationMs,
       ...(hostMetrics ? { hostMetrics } : {}),
       payload: payloadRow?.payload,

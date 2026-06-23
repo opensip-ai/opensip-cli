@@ -30,27 +30,58 @@ export function scoreColorStyle(score: number): string {
 /** Empty per-session summary used when a tool persists no summary payload. */
 const EMPTY_SUMMARY = { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } as const;
 
-type SessionStatus = 'fail' | 'warn' | 'pass';
+type SessionStatus = 'fail' | 'warn' | 'pass' | 'error' | 'degraded';
 
-/**
- * Derive a 3-state session status. Counts live in the tool-owned opaque payload
- * (summary).
- */
-export function sessionStatus(s: DashboardSession): SessionStatus {
+/** Legacy rows without runOutcome: infer passed/failed only — never degraded/error. */
+function legacyRunOutcome(s: DashboardSession): 'passed' | 'failed' {
+  return s.passed === false ? 'failed' : 'passed';
+}
+
+/** Resolve persisted outcome; legacy rows infer passed/failed only. */
+export function resolvedRunOutcome(s: DashboardSession): SessionStatus {
+  const stored = s.runOutcome ?? legacyRunOutcome(s);
+  if (stored === 'error') return 'error';
+  if (stored === 'degraded') return 'degraded';
+  if (stored === 'failed') return 'fail';
+  if (stored === 'passed') return 'pass';
   const sm = s.payload?.summary ?? {};
   if ((sm.failed ?? 0) > 0) return 'fail';
   if ((sm.warnings ?? 0) > 0) return 'warn';
   return 'pass';
 }
 
+/**
+ * Derive session status for badges. Prefers persisted {@link runOutcome}; falls
+ * back to legacy passed + payload summary counts.
+ */
+export function sessionStatus(s: DashboardSession): SessionStatus {
+  return resolvedRunOutcome(s);
+}
+
 export function statusBadge(status: SessionStatus): HTMLElement {
-  const labels: Record<SessionStatus, string> = { fail: 'FAIL', warn: 'WARN', pass: 'PASS' };
+  const labels: Record<SessionStatus, string> = {
+    fail: 'FAIL',
+    warn: 'WARN',
+    pass: 'PASS',
+    error: 'ERROR',
+    degraded: 'DEGRADED',
+  };
   const classes: Record<SessionStatus, string> = {
     fail: 'badge-fail',
     warn: 'badge-warn',
     pass: 'badge-pass',
+    error: 'badge-fail',
+    degraded: 'badge-warn',
   };
   return el('span', { class: 'badge ' + classes[status], text: labels[status] });
+}
+
+/** Score cell style — error/degraded runs must not show green 100%. */
+export function sessionScoreStyle(s: DashboardSession): string {
+  const outcome = resolvedRunOutcome(s);
+  if (outcome === 'error') return 'color:var(--error)';
+  if (outcome === 'degraded') return 'color:var(--warning)';
+  return scoreColorStyle(s.score);
 }
 
 /** Build the session table's header row. */
@@ -97,7 +128,7 @@ export function renderSessionTable(
 
   const tbody = el('tbody');
   toolSessions.forEach((s, idx) => {
-    const sc = scoreColorStyle(s.score);
+    const sc = sessionScoreStyle(s);
     const sm = s.payload?.summary ?? EMPTY_SUMMARY;
     const row = el('tr', {
       class: 'clickable',

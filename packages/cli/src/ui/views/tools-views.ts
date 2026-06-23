@@ -13,9 +13,12 @@ import {
   type ViewNode,
 } from '@opensip-cli/cli-ui';
 
+import { renderDiagnosticHuman } from '../render-diagnostic.js';
+
 import type {
   ToolsCreateResult,
   ToolsDataPurgeResult,
+  ToolsDoctorResult,
   ToolsInstallResult,
   ToolsListResult,
   ToolsListRow,
@@ -132,6 +135,30 @@ export function viewToolsCreate(result: ToolsCreateResult): ViewNode {
     children.push(SPACER, line([{ text: result.hint, tone: 'warning' }]));
   }
   return group(children, 2);
+}
+
+export function viewToolsDoctor(result: ToolsDoctorResult): ViewNode {
+  if (result.diagnostics.length === 0) {
+    return group(
+      [line([{ text: 'No bootstrap diagnostics were recorded for this run.', dim: true }])],
+      2,
+    );
+  }
+  return group(
+    [
+      line([
+        { text: 'Bootstrap diagnostics', bold: true },
+        { text: ` (${result.totalCount})`, dim: true },
+      ]),
+      SPACER,
+      ...result.diagnostics.flatMap((diag) =>
+        renderDiagnosticHuman(diag)
+          .split('\n')
+          .map((text) => line([{ text, tone: diag.severity === 'error' ? 'error' : 'warning' }])),
+      ),
+    ],
+    2,
+  );
 }
 
 export function viewToolsList(result: ToolsListResult): ViewNode {

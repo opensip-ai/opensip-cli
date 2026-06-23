@@ -127,7 +127,7 @@ describe('renderFitLive produce mapping', () => {
   it('routes through runToolLiveView with the fit tool key', async () => {
     await renderFitLive(fitArgs({ cwd: '/proj' }));
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
-    expect(capturedSpec?.tool).toBe('fit');
+    expect(capturedSpec?.tool).toBe('fitness');
   });
 
   it('omits the per-check table unless --verbose', async () => {

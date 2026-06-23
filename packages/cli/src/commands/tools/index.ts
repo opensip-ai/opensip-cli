@@ -17,6 +17,7 @@ import {
 } from '@opensip-cli/core';
 
 import { toolsCreate } from './create.js';
+import { toolsDoctor } from './doctor.js';
 import { toolsDataPurge } from './data-purge.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
@@ -44,6 +45,20 @@ interface ScopeFilterOpts {
  */
 function effectiveCwd(opts: ScopeFilterOpts): string {
   return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd();
+}
+
+function buildToolsDoctorSpec(): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: 'doctor',
+    description: 'Show every buffered bootstrap diagnostic for this run',
+    commonFlags: ['json'],
+    scope: 'none',
+    output: COMMAND_RESULT_OUTPUT,
+    handler: () => {
+      const scope = currentScope();
+      return Promise.resolve(toolsDoctor(scope?.bootstrapDiagnostics.list() ?? []));
+    },
+  });
 }
 
 function buildToolsListSpec(): HostSpec {
@@ -265,6 +280,7 @@ function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
 export function buildToolsGroupLeaves(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildToolsListSpec(),
+    buildToolsDoctorSpec(),
     buildToolsCreateSpec(ctx),
     buildToolsValidateSpec(ctx),
     buildToolsInstallSpec(ctx),

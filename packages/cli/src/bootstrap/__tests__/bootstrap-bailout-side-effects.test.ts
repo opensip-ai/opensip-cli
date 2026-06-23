@@ -54,6 +54,7 @@ function runtime(): PreActionRuntime {
     tools: new ToolRegistry(),
     manifests: [],
     provenance: [],
+    bootstrapDiagnostics: [],
   };
 }
 

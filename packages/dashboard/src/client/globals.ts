@@ -34,6 +34,9 @@ declare global {
     startedAt: string;
     recipe?: string;
     score: number;
+    passed?: boolean;
+    /** Persisted run health (ADR-0060). Legacy rows omit — infer from passed. */
+    runOutcome?: 'passed' | 'failed' | 'degraded' | 'error';
     durationMs: number;
     cwd: string;
     /** Tool-owned opaque payload (fitness/sim/graph carry their own shapes). */

@@ -123,4 +123,6 @@ export {
   isToolShortId,
 } from './ids.js';
 export type { BundledToolShortId, ToolLongId, ToolShortId } from './ids.js';
+export type { ToolRunOutcome } from './run-outcome.js';
+export { deriveRunOutcome, inferStoredRunOutcome } from './run-outcome.js';
 export { isRegisteredToolId, registeredToolShortIds } from './registered-ids.js';

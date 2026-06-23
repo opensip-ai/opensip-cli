@@ -119,6 +119,7 @@ function emptyRuntime(): PreActionRuntime {
     tools: new ToolRegistry(),
     manifests: [],
     provenance: [],
+    bootstrapDiagnostics: [],
   };
 }
 

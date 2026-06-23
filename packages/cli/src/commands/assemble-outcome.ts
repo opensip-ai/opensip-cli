@@ -20,6 +20,7 @@ import {
   EXIT_CODES,
   getErrorSuggestion,
   mapToolErrorToExitCode,
+  type CliDiagnostic,
   type CommandOutcome,
   type ErrorDetail,
   type ErrorResult,
@@ -75,13 +76,7 @@ export function outcomeFromEnvelope(envelope: SignalEnvelope, exitCode: number):
 export function outcomeFromResult(value: unknown, exitCode: number): CommandOutcome {
   if ((value as { readonly type?: unknown } | null)?.type === 'error') {
     const err = value as ErrorResult;
-    return withDiagnostics({
-      kind: 'error',
-      status: 'error',
-      exitCode: err.exitCode,
-      data: value,
-      errors: [{ message: err.message, ...(err.suggestion ? { suggestion: err.suggestion } : {}) }],
-    });
+    return withDiagnostics(errorOutcomeFromDetail(err, err.exitCode, value));
   }
   return withDiagnostics({ kind: kindFromResult(value), status: 'ok', exitCode, data: value });
 }
@@ -129,18 +124,51 @@ export function outcomeFromErrorMessage(opts: {
   readonly suggestion?: string;
   /** Optional machine-readable error category, surfaced as `ErrorDetail.code`. */
   readonly code?: string;
+  readonly diagnostic?: CliDiagnostic;
   readonly kind?: string;
 }): CommandOutcome {
-  return withDiagnostics({
-    kind: opts.kind ?? 'command.error',
-    status: 'error',
-    exitCode: opts.exitCode,
-    errors: [
+  return withDiagnostics(
+    errorOutcomeFromDetail(
       {
         message: opts.message,
-        ...(opts.suggestion ? { suggestion: opts.suggestion } : {}),
-        ...(opts.code ? { code: opts.code } : {}),
+        exitCode: opts.exitCode,
+        ...(opts.suggestion === undefined ? {} : { suggestion: opts.suggestion }),
+        ...(opts.code === undefined ? {} : { code: opts.code }),
+        ...(opts.diagnostic === undefined ? {} : { diagnostic: opts.diagnostic }),
+      },
+      opts.exitCode,
+      undefined,
+      opts.kind,
+    ),
+  );
+}
+
+function errorOutcomeFromDetail(
+  detail: {
+    readonly message: string;
+    readonly exitCode: number;
+    readonly suggestion?: string;
+    readonly code?: string;
+    readonly diagnostic?: CliDiagnostic;
+  },
+  exitCode: number,
+  data?: unknown,
+  kind = 'command.error',
+): CommandOutcome {
+  const commandError = detail.diagnostic;
+  return {
+    kind,
+    status: 'error',
+    exitCode,
+    ...(data === undefined ? {} : { data }),
+    ...(commandError === undefined ? {} : { commandError }),
+    errors: [
+      {
+        message: detail.message,
+        ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
+        ...(detail.code === undefined ? {} : { code: detail.code }),
+        ...(commandError === undefined ? {} : { diagnostic: commandError }),
       },
     ],
-  });
+  };
 }

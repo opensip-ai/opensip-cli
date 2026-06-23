@@ -25,6 +25,7 @@ interface StoredSessionLike {
   recipe?: string;
   score: number;
   passed: boolean;
+  runOutcome?: 'passed' | 'failed' | 'degraded' | 'error';
   durationMs: number;
   payload?: unknown;
 }
@@ -414,5 +415,32 @@ describe('renderSessionTable / renderDetail', () => {
     );
     expect(sevs[0]).toBe('error');
     expect(sevs.slice(1)).toEqual(['warning', 'warning']);
+  });
+
+  it('shows ERROR badge and error score color for runOutcome:error sessions (ADR-0060)', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        score: 100,
+        passed: false,
+        runOutcome: 'error',
+        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+      }),
+    ]);
+    const badge = panel.querySelector('.badge')?.textContent;
+    expect(badge).toBe('ERROR');
+    const scoreCell = panel.querySelector('tbody tr td:nth-child(3)') as HTMLElement | null;
+    expect(scoreCell?.style.color).toContain('var(--error)');
+  });
+
+  it('shows DEGRADED badge for runOutcome:degraded sessions (ADR-0060)', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        score: 85,
+        passed: true,
+        runOutcome: 'degraded',
+        payload: { summary: { total: 2, passed: 2, failed: 0, errors: 0, warnings: 0 } },
+      }),
+    ]);
+    expect(panel.querySelector('.badge')?.textContent).toBe('DEGRADED');
   });
 });

@@ -18,6 +18,7 @@ import {
   resolveProjectContext,
   resolveProjectPaths,
   resolveUserPaths,
+  type CliDiagnostic,
   type LanguageRegistry,
   type ToolPluginManifest,
   type ToolProvenance,
@@ -27,6 +28,11 @@ import {
 import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
 
+import {
+  getBootstrapDiagnosticsBuffer,
+  resetBootstrapDiagnosticsBuffer,
+  takeBootstrapDiagnostics,
+} from './bootstrap-diagnostics-buffer.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
@@ -107,6 +113,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // endpoint env var is set (see telemetry/sdk-init.ts), so standalone startup
   // is byte-for-byte unaffected.
   initTelemetry(opts.cliEntryUrl);
+  resetBootstrapDiagnosticsBuffer();
   registerLanguageAdapters(opts.langRegistry);
 
   // Launch: bundled + installed tools both flow through the shared
@@ -147,7 +154,10 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   } else {
     await discoverAndRegisterToolPackages(
       opts.toolRegistry,
-      { sources: buildToolDiscoverySources(opts.cwd, opts.projectDir) },
+      {
+        sources: buildToolDiscoverySources(opts.cwd, opts.projectDir),
+        bootstrapDiagnostics: getBootstrapDiagnosticsBuffer(),
+      },
       builtInIds,
       provenance,
       manifests,
@@ -182,7 +192,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // discovered here. The pre-action hook drives the generic capability loader
   // per command for the invoked tool's declared domains (§5.3/§4.5) — no
   // host-coupled, eager, per-tool discovery at bootstrap.
-  return { provenance, manifests };
+  return { provenance, manifests, bootstrapDiagnostics: takeBootstrapDiagnostics() };
 }
 
 /** What {@link bootstrapCli} hands back to the composition root. */
@@ -200,4 +210,9 @@ export interface BootstrapResult {
    * cli-context per-run holder.
    */
   readonly manifests: readonly ToolPluginManifest[];
+  /**
+   * Typed bootstrap diagnostics gathered during startup discovery/load (ADR-0060).
+   * Transferred onto the per-run {@link RunScope} by the composition root.
+   */
+  readonly bootstrapDiagnostics: readonly CliDiagnostic[];
 }

@@ -53,6 +53,7 @@ export type {
   GraphStatusResult,
   TextLinesResult,
   ToolsListResult,
+  ToolsDoctorResult,
   ToolsCreateResult,
   ToolsListRow,
   ToolsValidateResult,
@@ -98,6 +99,17 @@ export type {
   WarningDetail,
   RenderHints,
 } from './command-outcome.js';
+
+// CLI diagnostics — typed bootstrap/setup substrate (ADR-0060, Phase 2). DEFINED in
+// @opensip-cli/core; re-exported here for CommandOutcome and machine consumers.
+export type {
+  CliDiagnostic,
+  CliDiagnosticCategory,
+  CliDiagnosticCode,
+  CliDiagnosticProvenance,
+  CliDiagnosticSeverity,
+} from './cli-diagnostic.js';
+export { CLI_DIAGNOSTIC_CODES } from './cli-diagnostic.js';
 
 // Run diagnostics — the shared, JSON-emittable diagnostics stream carried on a
 // `CommandOutcome` (§5.10). One event vocabulary across the uniform tool
@@ -213,7 +225,8 @@ export type {
   StoredSessionHostMetrics,
   ToolSessionReplay,
 } from './session-types.js';
-export type { ToolSessionRecord } from '@opensip-cli/core';
+export type { ToolSessionRecord, ToolRunOutcome } from '@opensip-cli/core';
+export { deriveRunOutcome, inferStoredRunOutcome } from '@opensip-cli/core';
 
 // Graph catalog type surface. This is the contract surface between the
 // graph tool (which writes catalog.json) and the dashboard package
