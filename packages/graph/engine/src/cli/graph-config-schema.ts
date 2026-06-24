@@ -24,6 +24,8 @@
 
 import { z } from 'zod';
 
+import { NEAR_DUP_SIGNATURE_K } from '../lang-adapter/near-duplicate-signature.js';
+
 import type { GraphConfig } from '../types.js';
 import type { ToolConfigDeclaration } from '@opensip-cli/config';
 
@@ -46,7 +48,14 @@ export const GraphConfigSchema = z.object({
   minCrossPackageDuplicateBodySize: z.number().int().min(0).optional(),
   minNearDuplicateSimilarity: z.number().min(0).max(1).optional(),
   minNearDuplicateBodySize: z.number().int().min(0).optional(),
-  nearDuplicateLshBands: z.number().int().min(1).optional(),
+  nearDuplicateLshBands: z
+    .number()
+    .int()
+    .min(1)
+    .refine((n) => NEAR_DUP_SIGNATURE_K % n === 0, {
+      message: `must divide the MinHash signature length (${String(NEAR_DUP_SIGNATURE_K)}) evenly`,
+    })
+    .optional(),
   recipe: z.string().min(1).max(128).optional(),
   partitionStrategy: z.enum(['directory-depth', 'file-count-chunks', 'hybrid']).optional(),
   entryPointHashes: z.array(z.string()).readonly().optional(),

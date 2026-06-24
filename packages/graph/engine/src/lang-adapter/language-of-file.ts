@@ -8,12 +8,21 @@
  * in a follow-up.
  */
 
-/** Extension suffix → canonical graph language id. Longest-match first per path. */
+/**
+ * Extension suffix → canonical graph language id. Longest-match first per path.
+ * `.js`/`.jsx`/`.mjs`/`.cjs` map to `typescript` because the graph-typescript
+ * adapter analyzes them and a `.ts`↔`.js` (or `.js`↔`.js`) near-clone is a real,
+ * actionable clone — omitting them would silently skip every JS clone pair.
+ */
 const EXTENSION_TO_LANGUAGE: Readonly<Record<string, string>> = {
   '.tsx': 'typescript',
   '.mts': 'typescript',
   '.cts': 'typescript',
   '.ts': 'typescript',
+  '.jsx': 'typescript',
+  '.mjs': 'typescript',
+  '.cjs': 'typescript',
+  '.js': 'typescript',
   '.pyi': 'python',
   '.py': 'python',
   '.java': 'java',

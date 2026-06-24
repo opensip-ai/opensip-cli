@@ -32,7 +32,10 @@ export const nearDuplicateFunctionBodyRule = defineRule({
     const minBodySize = config.minNearDuplicateBodySize ?? DEFAULT_MIN_BODY_SIZE;
     const bands = config.nearDuplicateLshBands ?? NEAR_DUP_LSH_BANDS;
     const rows = NEAR_DUP_SIGNATURE_K / bands;
-    if (rows * bands !== NEAR_DUP_SIGNATURE_K || rows < 1) return [];
+    // bands MUST divide k evenly — otherwise `rows` is fractional and the band
+    // slicing in lshBandHashes is misaligned. `rows * bands === k` alone does not
+    // catch this (128/7*7 round-trips to 128 in IEEE-754), so test integrality.
+    if (!Number.isInteger(rows) || rows < 1) return [];
 
     const eligible = collectEligible(catalog, minBodySize);
     if (eligible.length < 2) return [];

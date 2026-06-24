@@ -10,6 +10,15 @@ describe('languageOfFile', () => {
     expect(languageOfFile('src/a.cts')).toBe('typescript');
   });
 
+  it('maps JavaScript extensions to typescript (same adapter; .ts↔.js clones are real)', () => {
+    expect(languageOfFile('src/a.js')).toBe('typescript');
+    expect(languageOfFile('src/a.jsx')).toBe('typescript');
+    expect(languageOfFile('src/a.mjs')).toBe('typescript');
+    expect(languageOfFile('src/a.cjs')).toBe('typescript');
+    // A .ts and a .js file are the same language → clones between them are detected.
+    expect(languageOfFile('a.ts')).toBe(languageOfFile('b.js'));
+  });
+
   it('maps Python extensions without truncating .pyi', () => {
     expect(languageOfFile('mod.py')).toBe('python');
     expect(languageOfFile('stub.pyi')).toBe('python');
