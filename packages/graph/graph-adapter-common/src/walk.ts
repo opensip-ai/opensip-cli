@@ -241,17 +241,56 @@ export { nameOf, childrenOf, namedChildrenOf };
  * resolution targets. Language-agnostic (operates on the engine's
  * `FunctionOccurrence` record), so it is shared by every resolver that
  * needs it (go / java / python; rust resolves differently).
+ *
+ * `keepFile` (optional) gates which occurrences are indexed by their defining
+ * file path. The tree-sitter resolvers link by SIMPLE NAME against the merged
+ * catalog. On the single-program (exact) build that catalog holds occurrences
+ * from EVERY language, so a Go `foo()` could otherwise pin a TypeScript `foo`
+ * — a cross-language false edge that the per-shard (sharded) build, whose shards
+ * are single-language, never forms. Passing {@link sameLanguageFileFilter} keeps
+ * resolution same-language in BOTH engines (symmetric) and is the correct call
+ * graph regardless: a static name match across language boundaries is never a
+ * real in-process call. Omitted ⇒ no filtering (legacy behaviour).
  */
 export function buildNameIndex(
   functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
+  keepFile?: (filePath: string) => boolean,
 ): ReadonlyMap<string, readonly string[]> {
   const out = new Map<string, string[]>();
   for (const [name, occs] of Object.entries(functions)) {
     if (!occs) continue;
     if (name.startsWith('<')) continue;
     const list: string[] = out.get(name) ?? [];
-    for (const o of occs) list.push(o.bodyHash);
+    for (const o of occs) {
+      if (keepFile && !keepFile(o.filePath)) continue;
+      list.push(o.bodyHash);
+    }
     if (list.length > 0) out.set(name, list);
   }
   return out;
+}
+
+/**
+ * Canonical file extensions per tree-sitter resolver language. Used to keep
+ * name-index resolution same-language (see {@link buildNameIndex}). Matched by
+ * LANGUAGE, not a single literal extension, so a language with several
+ * extensions (Python `.py`/`.pyi`) is not split. Only the languages that build a
+ * name index appear here; an unrecognized language disables filtering (fails
+ * safe to legacy behaviour rather than dropping real edges).
+ */
+const LANGUAGE_FILE_EXTENSIONS: Readonly<Record<string, readonly string[]>> = {
+  go: ['.go'],
+  java: ['.java'],
+  python: ['.py', '.pyi'],
+  rust: ['.rs'],
+};
+
+/**
+ * A predicate keeping only files written in `language` (by extension), for
+ * {@link buildNameIndex}'s `keepFile`. Unknown language ⇒ keep everything.
+ */
+export function sameLanguageFileFilter(language: string): (filePath: string) => boolean {
+  const exts = LANGUAGE_FILE_EXTENSIONS[language];
+  if (exts === undefined || exts.length === 0) return () => true;
+  return (filePath) => exts.some((ext) => filePath.endsWith(ext));
 }

@@ -38,7 +38,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex } from '@opensip-cli/graph-adapter-common';
+import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
 
 import type { GoParsedFile, GoParsedProject } from './parse.js';
 import type {
@@ -70,7 +70,9 @@ function goPosition(
 
 export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:go' });
-  const byName = buildNameIndex(input.catalog.functions);
+  // Same-language only: on the exact build the merged catalog holds every
+  // language, so a Go call must not pin a same-named TS/Python/… occurrence.
+  const byName = buildNameIndex(input.catalog.functions, sameLanguageFileFilter('go'));
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner, stats };

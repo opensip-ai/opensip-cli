@@ -34,7 +34,11 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex, isReturnValueDiscarded } from '@opensip-cli/graph-adapter-common';
+import {
+  buildNameIndex,
+  isReturnValueDiscarded,
+  sameLanguageFileFilter,
+} from '@opensip-cli/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -65,7 +69,9 @@ function javaPosition(
 
 export function resolveCallSites(input: ResolveInput<JavaParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:java' });
-  const byName = buildNameIndex(input.catalog.functions);
+  // Same-language only (see graph-go/resolve.ts): keep cross-language false
+  // edges out of the merged exact catalog.
+  const byName = buildNameIndex(input.catalog.functions, sameLanguageFileFilter('java'));
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner, stats };

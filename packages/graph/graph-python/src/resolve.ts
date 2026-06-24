@@ -39,7 +39,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex } from '@opensip-cli/graph-adapter-common';
+import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
 
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type {
@@ -71,7 +71,9 @@ function pythonPosition(
 
 export function resolveCallSites(input: ResolveInput<PythonParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:python' });
-  const byName = buildNameIndex(input.catalog.functions);
+  // Same-language only (see graph-go/resolve.ts): `.py`/`.pyi` only, never a
+  // same-named occurrence from another language in the merged exact catalog.
+  const byName = buildNameIndex(input.catalog.functions, sameLanguageFileFilter('python'));
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner, stats };

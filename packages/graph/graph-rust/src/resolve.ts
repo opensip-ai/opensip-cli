@@ -47,7 +47,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { isReturnValueDiscarded } from '@opensip-cli/graph-adapter-common';
+import { isReturnValueDiscarded, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -86,7 +86,9 @@ function rustPosition(
 
 export function resolveCallSites(input: ResolveInput<RustParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:rust' });
-  const index = buildIndex(input.catalog.functions);
+  // Same-language only (see graph-go/resolve.ts): the merged exact catalog holds
+  // every language, so a Rust call must not pin a same-named foreign occurrence.
+  const index = buildIndex(input.catalog.functions, sameLanguageFileFilter('rust'));
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner, stats };
@@ -126,7 +128,10 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
     : { edgesByOwner, dependenciesByOwner, stats: finalStats };
 }
 
-function buildIndex(functions: Readonly<Record<string, readonly FunctionOccurrence[]>>): NameIndex {
+function buildIndex(
+  functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
+  keepFile: (filePath: string) => boolean,
+): NameIndex {
   const all = new Map<string, FunctionOccurrence[]>();
   const methods = new Map<string, FunctionOccurrence[]>();
   for (const [name, occs] of Object.entries(functions)) {
@@ -134,6 +139,7 @@ function buildIndex(functions: Readonly<Record<string, readonly FunctionOccurren
     if (name.startsWith('<')) continue;
     const list: FunctionOccurrence[] = all.get(name) ?? [];
     for (const o of occs) {
+      if (!keepFile(o.filePath)) continue;
       list.push(o);
       if (o.enclosingClass !== null) {
         const key = `${o.enclosingClass}::${o.simpleName}`;
@@ -142,7 +148,7 @@ function buildIndex(functions: Readonly<Record<string, readonly FunctionOccurren
         methods.set(key, ml);
       }
     }
-    all.set(name, list);
+    if (list.length > 0) all.set(name, list);
   }
   return { all, methods };
 }

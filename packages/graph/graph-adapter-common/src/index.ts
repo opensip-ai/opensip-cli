@@ -40,6 +40,7 @@ export {
   synthesizeModuleInit,
   type SynthesizeModuleInitParams,
   buildNameIndex,
+  sameLanguageFileFilter,
   nameOf,
   childrenOf,
   namedChildrenOf,
