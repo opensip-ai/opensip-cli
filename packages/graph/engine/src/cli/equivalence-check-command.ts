@@ -35,16 +35,20 @@ import { logger } from '@opensip-cli/core';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
 
+import { buildEquivalenceDiagnostic } from './equivalence-diagnostic.js';
 import { resolveShardsForCwd } from './graph.js';
 import {
   buildEquivalenceReport,
   judgeEquivalence,
   type EquivalenceBudget,
+  type EquivalenceReport,
   type EquivalenceVerdict,
 } from './orchestrate/equivalence-check.js';
 import { runGraph, runShardedGraph } from './orchestrate.js';
+import { readGraphEnv } from './pressure-monitor.js';
 
 import type { Catalog } from '../types.js';
+import type { Shard } from './orchestrate/shard-model.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 const MODULE = 'graph:cli';
@@ -176,13 +180,27 @@ export async function executeEquivalenceCheck(
       );
     }
 
+    // Transparent passthrough wrappers: capture both catalogs ONLY to feed the
+    // optional GRAPH_EQUIV_DIAG dump. Behaviourally identical to passing the
+    // builders directly when the diagnostic is not requested.
+    let exactCatalog: Catalog | null = null;
+    let shardedCatalog: Catalog | null = null;
     const report = await buildEquivalenceReport({
       cwd,
       shards,
       cliScript,
-      buildExact: buildExactCatalog,
-      buildSharded: buildShardedCatalog,
+      buildExact: async (root) => {
+        const c = await buildExactCatalog(root);
+        exactCatalog = c;
+        return c;
+      },
+      buildSharded: async (input) => {
+        const c = await buildShardedCatalog(input);
+        shardedCatalog = c;
+        return c;
+      },
     });
+    maybeWriteEquivalenceDiagnostic(report, exactCatalog, shardedCatalog, shards);
 
     const seedMissing = opts.updateBudget === true && !existsSync(budgetPath);
     const budget: EquivalenceBudget = seedMissing
@@ -220,6 +238,28 @@ export async function executeEquivalenceCheck(
     process.stderr.write(`graph-equivalence-check: ${message}\n`);
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   }
+}
+
+/**
+ * Write the structured equivalence diagnostic to the path named by the
+ * `GRAPH_EQUIV_DIAG` env var (read through the governed {@link GRAPH_ENV}
+ * registry), if set and both catalogs were captured. Inert otherwise. Effectful
+ * seam (env gate + file + stdout) — the analysis itself is the pure
+ * {@link buildEquivalenceDiagnostic}. Mirrors {@link writeBudget}'s direct file
+ * write; this is a host CI/diagnostic command, not a tool action body.
+ */
+function maybeWriteEquivalenceDiagnostic(
+  report: EquivalenceReport,
+  exact: Catalog | null,
+  sharded: Catalog | null,
+  shards: readonly Shard[],
+): void {
+  const outPath = readGraphEnv<string>('GRAPH_EQUIV_DIAG');
+  if (outPath === undefined || outPath.length === 0 || exact === null || sharded === null) return;
+  const diagnostic = buildEquivalenceDiagnostic({ report, exact, sharded, shards });
+  const payload = { generatedAt: new Date().toISOString(), ...diagnostic };
+  writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  process.stdout.write(`Wrote graph equivalence diagnostic to ${outPath}\n`);
 }
 
 function logEnd(

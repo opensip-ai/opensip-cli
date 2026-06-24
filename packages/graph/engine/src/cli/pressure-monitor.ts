@@ -33,8 +33,26 @@ export const GRAPH_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     default: false,
     docs: 'Set to 1 to disable the V8 heap-pressure monitor (REPL embedding / custom allocators).',
   },
+  {
+    canonical: 'GRAPH_EQUIV_DIAG',
+    docs:
+      'File path. When set, `graph-equivalence-check` writes a structured JSON diagnostic ' +
+      'of every production decline/phantom divergence (owner, resolved targets, and the ' +
+      'call edge on both engines) to that path. Diagnostic-only; unset in normal runs.',
+  },
 ];
+
+/**
+ * The graph-engine env surface, read through the governed {@link EnvRegistry}.
+ * Module-private (an immutable read model over `process.env`, not per-run state);
+ * callers read it via {@link readGraphEnv}, never a shared mutable export.
+ */
 const GRAPH_ENV = new EnvRegistry(GRAPH_ENV_SPECS);
+
+/** Read a graph-engine env var through the governed registry (canonical → coerced). */
+export function readGraphEnv<T = string>(canonical: string): T | undefined {
+  return GRAPH_ENV.get<T>(canonical);
+}
 
 const DEFAULT_THRESHOLD = 0.9;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
