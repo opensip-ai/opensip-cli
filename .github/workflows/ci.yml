@@ -53,6 +53,25 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Test the repo's own tooling under scripts/. These are deliberately
+      # dependency-free .mjs (no build, no per-script package.json), so they
+      # live OUTSIDE the pnpm workspace and `turbo run test` (workspace
+      # packages only) never visits them — without this step a green
+      # scripts/**/*.test.mjs would run nowhere. node:test is the matching
+      # zero-dep runner; the glob auto-discovers any future script test.
+      # Currently covers verify-pnpm-injection.mjs's pure helpers (a `pnpm
+      # lint` gate). Pass the glob QUOTED so node, not the shell, expands it.
+      - name: Test repo scripts (node:test)
+        run: pnpm test:scripts
+
+      # Lint the shell scripts under scripts/ (the public curl|sh installer and
+      # the first-publish bootstrap). shellcheck ships preinstalled on
+      # ubuntu-latest. The glob auto-covers any future scripts/*.sh; both
+      # current files are clean at default severity (install.sh carries one
+      # justified inline `shellcheck disable` for an intentional `sh -c` body).
+      - name: Shellcheck shell scripts
+        run: shellcheck scripts/*.sh
+
       # PR-time version-surface drift guard. verify-release.mjs (which enforces
       # single-version lockstep) runs only in the tag-driven release.yml, so a
       # half-bumped version — some package.json at the new version, some not, or

@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test --continue -- --coverage",
     "test:coverage:fresh": "turbo run test --continue --force -- --coverage",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write --config .config/prettier.config.mjs --ignore-path .prettierignore '**/*.{ts,tsx,mjs,cjs,js,json,yml,yaml}'",
     "format:check": "prettier --check --config .config/prettier.config.mjs --ignore-path .prettierignore '**/*.{ts,tsx,mjs,cjs,js,json,yml,yaml}'",

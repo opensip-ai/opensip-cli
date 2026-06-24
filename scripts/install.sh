@@ -182,6 +182,10 @@ if [ -n "$OPEN_CMD" ]; then
       printf '\n%s\n' "You can skip the smoke test with OPENSIP_CLI_SKIP_SMOKE=1, but the CLI may not be usable until this is resolved." >&2
       exit 1
     fi
+    # The single-quoted string is the BODY passed to `sh -c`; $1/$2 are
+    # positional params expanded by THAT inner shell (supplied by the trailing
+    # `sh "$SMOKE_DIR" "$OPEN_CMD"`), not here — so single quotes are correct.
+    # shellcheck disable=SC2016
     if ! run_with_spinner "Verifying install data store" sh -c 'cd "$1" && "$2" sessions list --json' sh "$SMOKE_DIR" "$OPEN_CMD"; then
       error "Smoke test failed while opening the SQLite data store."
       if [ -s "$LOG_FILE" ]; then
