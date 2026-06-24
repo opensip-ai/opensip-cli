@@ -1,4 +1,3 @@
-
 /**
  * `opensip graph --list-files` — discovery-only mode.
  *

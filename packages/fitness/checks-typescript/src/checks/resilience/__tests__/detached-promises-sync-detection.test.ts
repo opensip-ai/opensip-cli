@@ -41,7 +41,11 @@ describe('isSyncCallableInScope', () => {
     expect(call).toBeDefined();
     let callExpr: ts.CallExpression | undefined;
     const visit = (node: ts.Node): void => {
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'walk') {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'walk'
+      ) {
         callExpr = node;
       }
       ts.forEachChild(node, visit);
@@ -105,10 +109,7 @@ describe('analyzeFileForDetachedPromises — same-file sync helpers', () => {
       '}',
     ].join('\n');
     expect(
-      analyzeFileForDetachedPromises(
-        content,
-        'packages/graph/engine/src/cli/list-files.ts',
-      ),
+      analyzeFileForDetachedPromises(content, 'packages/graph/engine/src/cli/list-files.ts'),
     ).toHaveLength(0);
   });
 });

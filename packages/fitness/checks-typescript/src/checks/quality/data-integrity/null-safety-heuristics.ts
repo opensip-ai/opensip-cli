@@ -157,6 +157,29 @@ function calleeRootEndsWithSchema(expr: ts.Expression, sourceFile: ts.SourceFile
   return false;
 }
 
+function schemaBuilderCallMatches(
+  call: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): { matched: boolean; next: ts.Expression } {
+  const callee = call.expression;
+  if (
+    ts.isPropertyAccessExpression(callee) &&
+    SCHEMA_BUILDER_METHODS.has(callee.name.text) &&
+    calleeRootEndsWithSchema(callee.expression, sourceFile)
+  ) {
+    return { matched: true, next: callee };
+  }
+  if (
+    ts.isIdentifier(callee) &&
+    (callee.text.endsWith('Schema') || callee.text.endsWith('Namespace'))
+  ) {
+    return { matched: true, next: callee };
+  }
+  let next: ts.Expression = callee;
+  if (ts.isPropertyAccessExpression(next)) next = next.expression;
+  return { matched: false, next };
+}
+
 /**
  * Zod and project schema-builder chains (including `FooSchema.strict().safeParse`).
  */
@@ -169,15 +192,9 @@ export function isSchemaBuilderChain(
   let current: ts.Expression = node.expression;
   while (current) {
     if (ts.isCallExpression(current)) {
-      const callee = current.expression;
-      if (ts.isPropertyAccessExpression(callee) && SCHEMA_BUILDER_METHODS.has(callee.name.text)) {
-        if (calleeRootEndsWithSchema(callee.expression, sourceFile)) return true;
-      }
-      if (ts.isIdentifier(callee)) {
-        if (callee.text.endsWith('Schema') || callee.text.endsWith('Namespace')) return true;
-      }
-      current = callee;
-      if (ts.isPropertyAccessExpression(current)) current = current.expression;
+      const result = schemaBuilderCallMatches(current, sourceFile);
+      if (result.matched) return true;
+      current = result.next;
       continue;
     }
     if (ts.isIdentifier(current)) {
@@ -198,7 +215,7 @@ function isFunctionParameter(name: string, fn: ts.SignatureDeclaration): boolean
  */
 export function isCallbackIndexGuarded(
   node: ts.PropertyAccessExpression,
-  sourceFile: ts.SourceFile,
+  _sourceFile: ts.SourceFile,
 ): boolean {
   const receiver = node.expression;
   if (!ts.isElementAccessExpression(receiver)) return false;
@@ -208,12 +225,12 @@ export function isCallbackIndexGuarded(
 
   let current: ts.Node | undefined = node.parent;
   while (current) {
-    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      if (isFunctionParameter(indexName, current)) return true;
-    }
-    if (ts.isFunctionDeclaration(current)) {
-      if (isFunctionParameter(indexName, current)) return true;
-    }
+    if (
+      (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) &&
+      isFunctionParameter(indexName, current)
+    )
+      return true;
+    if (ts.isFunctionDeclaration(current) && isFunctionParameter(indexName, current)) return true;
     current = current.parent;
   }
   return false;

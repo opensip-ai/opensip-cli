@@ -1,4 +1,3 @@
-
 /**
  * graph-config-schema — the graph tool's namespaced Zod config schema
  * (launch, ADR-0023, Phase 4 Task 4.1).

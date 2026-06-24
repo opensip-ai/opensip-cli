@@ -1,4 +1,3 @@
-
 /**
  * graph-config — load the `graph:` block of `opensip-cli.config.yml`
  * into a {@link GraphConfig}.

@@ -73,9 +73,12 @@ export function isSyncCallableInScope(
   let current: ts.Node | undefined = callSite;
   while (current) {
     if (ts.isSourceFile(current)) break;
-    if (ts.isBlock(current) && isDirectFunctionBodyBlock(current)) {
-      if (blockDeclaresSyncCallable(current, name)) return true;
-    }
+    if (
+      ts.isBlock(current) &&
+      isDirectFunctionBodyBlock(current) &&
+      blockDeclaresSyncCallable(current, name)
+    )
+      return true;
     current = current.parent;
   }
   return false;

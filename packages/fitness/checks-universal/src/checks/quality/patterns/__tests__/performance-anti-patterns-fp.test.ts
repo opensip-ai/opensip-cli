@@ -6,7 +6,10 @@ import { describe, expect, it } from 'vitest';
 
 import { analyzeFileForPerformancePatterns } from '../performance-anti-patterns.js';
 
-function analyze(src: string, path = 'src/svc/sample.ts'): ReturnType<typeof analyzeFileForPerformancePatterns> {
+function analyze(
+  src: string,
+  path = 'src/svc/sample.ts',
+): ReturnType<typeof analyzeFileForPerformancePatterns> {
   return analyzeFileForPerformancePatterns(src, path);
 }
 

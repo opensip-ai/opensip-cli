@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Generic plugin loader.
  *

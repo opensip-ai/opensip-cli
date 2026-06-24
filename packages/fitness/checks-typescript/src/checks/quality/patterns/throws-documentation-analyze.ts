@@ -42,10 +42,7 @@ function findThrowStatements(node: ts.Node): ts.ThrowStatement[] {
   return throws;
 }
 
-function commentRangesIncludeThrows(
-  fullText: string,
-  pos: number,
-): boolean {
+function commentRangesIncludeThrows(fullText: string, pos: number): boolean {
   const comments = ts.getLeadingCommentRanges(fullText, pos);
   if (!comments) return false;
   for (const comment of comments) {
@@ -106,12 +103,12 @@ function hasEnclosingFactoryThrowsJSDoc(
   let current: ts.Node | undefined = node.parent;
   while (current) {
     if (
-      ts.isFunctionDeclaration(current) ||
-      ts.isFunctionExpression(current) ||
-      ts.isMethodDeclaration(current)
-    ) {
-      if (hasThrowsJSDoc(current, sourceFile)) return true;
-    }
+      (ts.isFunctionDeclaration(current) ||
+        ts.isFunctionExpression(current) ||
+        ts.isMethodDeclaration(current)) &&
+      hasThrowsJSDoc(current, sourceFile)
+    )
+      return true;
     current = current.parent;
   }
   return false;
@@ -138,21 +135,22 @@ function isInsideTopLevelTry(throwStmt: ts.ThrowStatement, fnNode: FunctionLikeN
   return false;
 }
 
+function catchClauseContainsThrow(n: ts.Node): boolean {
+  if (ts.isThrowStatement(n)) return true;
+  if (isFunctionLikeNode(n)) return false;
+  let found = false;
+  ts.forEachChild(n, (child) => {
+    if (catchClauseContainsThrow(child)) found = true;
+  });
+  return found;
+}
+
 function topLevelTryCatchRethrows(fnNode: FunctionLikeNode): boolean {
   const body = getFunctionBody(fnNode);
   if (!body || !ts.isBlock(body)) return false;
   for (const stmt of body.statements) {
     if (!ts.isTryStatement(stmt)) continue;
-    const visit = (n: ts.Node): boolean => {
-      if (ts.isThrowStatement(n)) return true;
-      if (isFunctionLikeNode(n)) return false;
-      let found = false;
-      ts.forEachChild(n, (child) => {
-        if (visit(child)) found = true;
-      });
-      return found;
-    };
-    if (stmt.catchClause && visit(stmt.catchClause)) return true;
+    if (stmt.catchClause && catchClauseContainsThrow(stmt.catchClause)) return true;
   }
   return false;
 }

@@ -1,4 +1,3 @@
-
 /**
  * pre-action-hook — Commander `preAction` adapter (ADR-0052).
  *

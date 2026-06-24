@@ -1,4 +1,3 @@
-
 /**
  * register-tools — populate the kernel ToolRegistry with bundled, installed,
  * and authored tools (ADR-0027 / ADR-0041).

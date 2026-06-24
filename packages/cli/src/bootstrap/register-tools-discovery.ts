@@ -1,4 +1,3 @@
-
 /**
  * register-tools-discovery — installed + authored tool admission and discovery.
  *
