@@ -92,25 +92,33 @@ function encodedWorkspaceFromPnpmDir(pnpmDir: string): string | null {
   const marker = '@file+';
   const fileAt = pnpmDir.indexOf(marker);
   if (fileAt === -1) return null;
-  let pos = fileAt + marker.length;
-  if (!pnpmDir.startsWith('packages', pos)) return null;
-  pos += 'packages'.length;
+  const start = fileAt + marker.length;
+  if (!pnpmDir.startsWith('packages', start)) return null;
+  const end = scanEncodedSegments(pnpmDir, start + 'packages'.length);
+  if (end === -1) return null;
+  const encoded = pnpmDir.slice(start, end);
+  return encoded.length > 0 ? encoded : null;
+}
+
+/**
+ * From `pos`, consume `+segment` groups (`segment` = `[a-z0-9-]+`), stopping at a
+ * peer-dep suffix (`_`), a `/`, or end-of-string. Returns the stop index, or `-1`
+ * on a malformed run (an empty segment, or any char that is neither `+`/`_`/`/`).
+ */
+function scanEncodedSegments(pnpmDir: string, from: number): number {
+  let pos = from;
   while (pos < pnpmDir.length) {
     const ch = pnpmDir[pos];
-    if (ch === '_' || ch === '/') break;
-    if (ch === '+') {
-      pos++;
-      const segStart = pos;
-      while (pos < pnpmDir.length) {
-        const c = pnpmDir[pos];
-        if (c === undefined || !/[a-z0-9-]/.test(c)) break;
-        pos++;
-      }
-      if (pos === segStart) return null;
-      continue;
-    }
-    return null;
+    if (ch === '_' || ch === '/') return pos;
+    if (ch !== '+') return -1;
+    pos++;
+    const segStart = pos;
+    while (pos < pnpmDir.length && isEncodedSegmentChar(pnpmDir[pos])) pos++;
+    if (pos === segStart) return -1;
   }
-  const encoded = pnpmDir.slice(fileAt + marker.length, pos);
-  return encoded.length > 0 ? encoded : null;
+  return pos;
+}
+
+function isEncodedSegmentChar(c: string | undefined): boolean {
+  return c !== undefined && /[a-z0-9-]/.test(c);
 }
