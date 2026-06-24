@@ -142,7 +142,10 @@ function mix32(h: number, seed: number): number {
 /** k fixed permutation seeds, derived deterministically (SHA-256 of the index). */
 function derivePermSeeds(k: number): readonly number[] {
   return Array.from({ length: k }, (_, i) =>
-    createHash('sha256').update(`opensip-minhash-perm:${String(i)}`, 'utf8').digest().readUInt32LE(0),
+    createHash('sha256')
+      .update(`opensip-minhash-perm:${String(i)}`, 'utf8')
+      .digest()
+      .readUInt32LE(0),
   );
 }
 

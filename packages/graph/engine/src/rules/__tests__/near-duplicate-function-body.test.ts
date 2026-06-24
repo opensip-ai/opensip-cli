@@ -192,7 +192,10 @@ describe('near-duplicate-function-body', () => {
   it('emits nothing when nearDuplicateLshBands does not divide k (fractional rows)', () => {
     // 128 / 7 is fractional → band slicing would be misaligned. The integer guard
     // must reject it (the schema also refuses this value at config load).
-    const a = withSignature({ bodyHash: 'hash-a', simpleName: 'pA', filePath: 'src/a.ts' }, BASE_BODY);
+    const a = withSignature(
+      { bodyHash: 'hash-a', simpleName: 'pA', filePath: 'src/a.ts' },
+      BASE_BODY,
+    );
     const b = withSignature(
       { bodyHash: 'hash-b', simpleName: 'pB', filePath: 'src/b.ts', qualifiedName: 'src/b.pB' },
       NEAR_BODY,

@@ -228,7 +228,10 @@ function buildComponentSignal(
   });
 }
 
-function nearIndicesInComponent(component: readonly number[], edges: readonly NearEdge[]): Set<number> {
+function nearIndicesInComponent(
+  component: readonly number[],
+  edges: readonly NearEdge[],
+): Set<number> {
   const nearIndices = new Set<number>();
   const componentSet = new Set(component);
   for (const e of edges) {
