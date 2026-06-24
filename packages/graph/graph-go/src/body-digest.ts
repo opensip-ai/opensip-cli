@@ -15,11 +15,15 @@
  *   3. SHA-256.
  */
 
-import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-cli/graph';
+import {
+  digestCanonicalBody,
+  normalizeWhitespace,
+  type BodyDigestWithSignature,
+} from '@opensip-cli/graph';
 import { skipBlockComment, skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
 
-export function digestGoBody(text: string): BodyDigest {
-  return hashBody(normalizeWhitespace(stripGoComments(text)));
+export function digestGoBody(text: string): BodyDigestWithSignature {
+  return digestCanonicalBody(normalizeWhitespace(stripGoComments(text)));
 }
 
 // Synthetic bodies (module-init) use the same normalization as real

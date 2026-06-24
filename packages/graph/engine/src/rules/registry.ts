@@ -24,6 +24,7 @@ import { cycleRule } from './cycle.js';
 import { duplicatedFunctionBodyRule } from './duplicated-function-body.js';
 import { highBlastUntestedRule } from './high-blast-untested.js';
 import { largeFunctionRule } from './large-function.js';
+import { nearDuplicateFunctionBodyRule } from './near-duplicate-function-body.js';
 import { noSideEffectPathRule } from './no-side-effect-path.js';
 import { orphanSubtreeRule } from './orphan-subtree.js';
 import { testOnlyReachableRule } from './test-only-reachable.js';
@@ -44,6 +45,7 @@ interface RegisterableRule extends Registerable {
 const BUILT_IN_RULES: readonly Rule[] = [
   orphanSubtreeRule,
   duplicatedFunctionBodyRule,
+  nearDuplicateFunctionBodyRule,
   noSideEffectPathRule,
   testOnlyReachableRule,
   alwaysThrowsBranchRule,

@@ -4,11 +4,12 @@ last_verified: 2026-06-07
 release: v0.1.11
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
-purpose: "The ten graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
+purpose: "The eleven graph rules, what each one detects, and how the save/compare gate flow integrates with CI."
 source-files:
   - packages/graph/engine/src/rules/registry.ts
   - packages/graph/engine/src/rules/orphan-subtree.ts
   - packages/graph/engine/src/rules/duplicated-function-body.ts
+  - packages/graph/engine/src/rules/near-duplicate-function-body.ts
   - packages/graph/engine/src/rules/no-side-effect-path.ts
   - packages/graph/engine/src/rules/test-only-reachable.ts
   - packages/graph/engine/src/rules/always-throws-branch.ts
@@ -29,10 +30,10 @@ related-docs:
 ---
 # Rules and gating (graph)
 
-[`01-stages-and-catalog.md`](/docs/opensip-cli/40-graph/01-stages-and-catalog/) explained how `graph` builds its picture of the codebase. This doc covers what happens at stage 4 — the ten rules that turn that picture into actionable findings — and the gate workflow that lets you keep new regressions out of `main` without forcing a clean-up of everything that exists today.
+[`01-stages-and-catalog.md`](/docs/opensip-cli/40-graph/01-stages-and-catalog/) explained how `graph` builds its picture of the codebase. This doc covers what happens at stage 4 — the eleven rules that turn that picture into actionable findings — and the gate workflow that lets you keep new regressions out of `main` without forcing a clean-up of everything that exists today.
 
 > **What you'll understand after this:**
-> - The ten rules graph ships with, what each detects, and the false-positive shape of each.
+> - The eleven rules graph ships with, what each detects, and the false-positive shape of each.
 > - The gate save/compare model and how it differs from `fit`'s architecture gate.
 > - How graph's SARIF output integrates with the same CI infrastructure `fit` uses.
 
@@ -98,6 +99,24 @@ Both paths apply the same exclusions: `arrow` / `function-expression` / `module-
 | `minCrossPackageDuplicateBodySize` | 80 | Aggregate: minimum normalized body characters (no line floor). Lighter than the per-instance floor — drops only trivial bodies while keeping small shared utilities visible. |
 
 **False-positive shape**: the rule matches function bodies *textually* and does not currently resolve called identifiers through lexical scope. On the per-instance path, thin wrapper functions are suppressed by `minDuplicateBodySize`, but two larger functions with identical text and different lexical bindings can still look like duplicates. The aggregate cross-package path is the high-signal subset: ≥3 distinct packages is unambiguously shared infra that should be hoisted into a common package.
+
+### `graph:near-duplicate-function-body`
+
+[`rules/near-duplicate-function-body.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.11/packages/graph/engine/src/rules/near-duplicate-function-body.ts) — detect **near-clones** (copy-paste-with-edits) using MinHash signatures (`bodySignature`, k=128) persisted at walk time from the same normalized body string as `bodyHash`. LSH-banded candidate generation, Jaccard estimation, and union-find clustering emit one signal per near-clone component. Exact-duplicate pairs (identical `bodyHash`) are excluded — `graph:duplicated-function-body` owns those. Candidate pairs are gated to the **same language** (by file extension) because fuzzy char shingles can false-match across languages.
+
+Skips `arrow` / `function-expression` / `module-init` kinds and test-file occurrences (same exclusions as the exact-duplication rule). Pre-feature catalogs without `bodySignature` produce no findings (graceful). v1 is per-instance only (no cross-package aggregate path).
+
+**Config** ([`GraphConfig`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.11/packages/graph/engine/src/types.ts)):
+
+| Knob | Default | Effect |
+| --- | --- | --- |
+| `minNearDuplicateSimilarity` | 0.85 | Minimum estimated Jaccard similarity for a near-clone edge. |
+| `minNearDuplicateBodySize` | 200 | Minimum normalized body characters (same intent as exact-duplication size gate). |
+| `nearDuplicateLshBands` | 8 | LSH band count override; rows = `128 / bands` (must divide evenly). |
+
+Signal metadata includes `nearMembers`, `exactMembers` (exact-hash twins in the same component, context only), and `estimatedSimilarity`.
+
+**False-positive shape**: char 5-gram shingles are identifier-rename-sensitive — renamed clones may score below threshold. Python bodies use indentation-sensitive normalization. Cross-language pairs are never clustered.
 
 ### `graph:no-side-effect-path`
 

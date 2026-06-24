@@ -211,6 +211,7 @@ function visitFunctionDefinition(
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: name,
     qualifiedName,
     filePath: filePathProjectRel,
@@ -248,6 +249,7 @@ function visitLambda(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName,
     qualifiedName: `${qualifiedBase}.<lambda:${String(startLine)}:${String(startCol)}>`,
     filePath: filePathProjectRel,

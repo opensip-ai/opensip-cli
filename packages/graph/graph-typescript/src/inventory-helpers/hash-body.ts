@@ -7,8 +7,7 @@
  * new hash."
  */
 
-import { createHash } from 'node:crypto';
-
+import { digestCanonicalBody } from '@opensip-cli/graph';
 import { stripComments } from '@opensip-cli/lang-typescript';
 
 import type ts from 'typescript';
@@ -21,6 +20,7 @@ import type ts from 'typescript';
 export interface BodyDigest {
   readonly hash: string;
   readonly size: number;
+  readonly signature?: readonly number[];
 }
 
 /**
@@ -46,7 +46,7 @@ export function hashFunctionBody(node: ts.Node, sourceFile: ts.SourceFile): stri
 export function digestFunctionBody(node: ts.Node, sourceFile: ts.SourceFile): BodyDigest {
   const text = sourceFile.text.slice(node.getStart(sourceFile), node.getEnd());
   const normalized = normalizeWhitespace(stripComments(text));
-  return { hash: sha256(normalized), size: normalized.length };
+  return digestCanonicalBody(normalized);
 }
 
 /**
@@ -59,13 +59,9 @@ export function hashSyntheticBody(input: string): string {
 
 export function digestSyntheticBody(input: string): BodyDigest {
   const normalized = normalizeWhitespace(stripComments(input));
-  return { hash: sha256(normalized), size: normalized.length };
+  return digestCanonicalBody(normalized);
 }
 
 function normalizeWhitespace(s: string): string {
   return s.replaceAll(/\s+/g, ' ').trim();
-}
-
-function sha256(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
 }

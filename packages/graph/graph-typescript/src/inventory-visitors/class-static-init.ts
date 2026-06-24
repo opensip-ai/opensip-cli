@@ -33,6 +33,7 @@ export const visitClassStaticBlock: InventoryVisitor<ts.ClassStaticBlockDeclarat
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: '<static-init>',
     qualifiedName: qualified,
     filePath: ctx.filePathProjectRel,

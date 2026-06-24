@@ -27,6 +27,8 @@
 
 import { readPackageVersion } from '@opensip-cli/core';
 
+import { NEAR_DUP_SIGNATURE_K } from '../lang-adapter/near-duplicate-signature.js';
+
 /**
  * The running `@opensip-cli/graph` package version, resolved once from
  * the nearest `package.json`. In a published install this is the version
@@ -57,6 +59,9 @@ export type EngineMode = 'exact' | 'sharded';
 /** Cache-key segment carrying the build engine mode. */
 const ENGINE_MODE_PREFIX = 'mode=';
 
+/** Cache-key segment carrying the near-duplicate signature schema version. */
+const SIGNATURE_VERSION_PREFIX = 'sig=';
+
 /**
  * Prefix an adapter's `cacheKey` with the running engine version AND the
  * build engine mode so (a) a tool upgrade invalidates persisted
@@ -77,5 +82,5 @@ const ENGINE_MODE_PREFIX = 'mode=';
  * rebuild is diagnosable.
  */
 export function stampEngineVersion(adapterCacheKey: string, mode: EngineMode = 'exact'): string {
-  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${adapterCacheKey}`;
+  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${String(NEAR_DUP_SIGNATURE_K)}|${adapterCacheKey}`;
 }

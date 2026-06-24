@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0062](ADR-0062-near-clone-detection.md) — Near-clone detection via persisted MinHash (walk-time `bodySignature?` on `FunctionOccurrence`; LSH-banded `graph:near-duplicate-function-body` rule; same-language gate; `sig=k` cache-key segment).
 - [ADR-0061](ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md) — Tool-platform launch posture and extension trust tiers (ecosystem-ready, ecosystem-gated; external isolation is fault isolation, not capability isolation; the canonical six-tier extension trust matrix; the public untrusted ecosystem stays closed behind capability-model, contract-versioning, and consumption-side-verification gates).
 - [ADR-0060](ADR-0060-cli-diagnostic-boundary-and-run-outcomes.md) — CLI Diagnostic Boundary and Run Outcomes (host-owned diagnostic presentation; setup failures before a credible scan become command errors outside findings envelopes; valid scan outcomes are passed, failed, or strict degraded).
 - [ADR-0059](ADR-0059-tool-identity-single-source.md) — Tool Identity Single Source (each Tool declares one required `identity`; host-derived names, config namespaces, layout keys, and manifest identity replace legacy inference).

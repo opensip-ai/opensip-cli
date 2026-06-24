@@ -204,6 +204,7 @@ export function synthesizeModuleInit<F extends TreeSitterParsedFile>(
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: `<module-init:${filePathProjectRel}>`,
     qualifiedName,
     filePath: filePathProjectRel,

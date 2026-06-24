@@ -13,15 +13,19 @@
  *     synthetic text isn't a function body.
  */
 
-import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-cli/graph';
+import {
+  digestCanonicalBody,
+  normalizeWhitespace,
+  type BodyDigestWithSignature,
+} from '@opensip-cli/graph';
 import { skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
 
-export function digestPythonBody(text: string): BodyDigest {
-  return hashBody(normalizePythonBody(text));
+export function digestPythonBody(text: string): BodyDigestWithSignature {
+  return digestCanonicalBody(normalizePythonBody(text));
 }
 
-export function digestSyntheticBody(text: string): BodyDigest {
-  return hashBody(normalizeWhitespace(stripPythonComments(text)));
+export function digestSyntheticBody(text: string): BodyDigestWithSignature {
+  return digestCanonicalBody(normalizeWhitespace(stripPythonComments(text)));
 }
 
 /**

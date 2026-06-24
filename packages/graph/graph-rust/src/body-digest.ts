@@ -14,7 +14,11 @@
  * to warrant its own file.
  */
 
-import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-cli/graph';
+import {
+  digestCanonicalBody,
+  normalizeWhitespace,
+  type BodyDigestWithSignature,
+} from '@opensip-cli/graph';
 import { skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
 
 /**
@@ -24,8 +28,8 @@ import { skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
  * (module-init aggregations) share this implementation; an alias keeps
  * the call site self-documenting without duplicating logic.
  */
-export function digestRustBody(text: string): BodyDigest {
-  return hashBody(normalizeWhitespace(stripRustComments(text)));
+export function digestRustBody(text: string): BodyDigestWithSignature {
+  return digestCanonicalBody(normalizeWhitespace(stripRustComments(text)));
 }
 
 /**

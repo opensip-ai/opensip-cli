@@ -305,6 +305,7 @@ function buildFunctionOccurrence(
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: name,
     qualifiedName,
     filePath: ctx.filePathProjectRel,
@@ -332,6 +333,7 @@ function buildClosureOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | 
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName,
     qualifiedName: `${qualifiedBase}.<closure:${String(startLine)}:${String(startCol)}>`,
     filePath: ctx.filePathProjectRel,

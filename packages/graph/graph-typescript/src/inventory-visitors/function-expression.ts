@@ -29,6 +29,7 @@ export const visitFunctionExpression: InventoryVisitor<ts.FunctionExpression> = 
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: name,
     qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`,
     filePath: ctx.filePathProjectRel,

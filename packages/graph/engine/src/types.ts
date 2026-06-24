@@ -170,6 +170,11 @@ export interface FunctionOccurrence {
    * absent values are treated as "passes the threshold."
    */
   readonly bodySize?: number;
+  /**
+   * MinHash signature (k=128) of the normalized body for near-clone detection.
+   * Optional for pre-feature catalogs; absent values skip the near-duplicate rule.
+   */
+  readonly bodySignature?: readonly number[];
   /** "saveBaseline", "<arrow:gate.ts:42:7>", "<module-init:gate.ts>". */
   readonly simpleName: string;
   /** "fitness/engine/src/gate.saveBaseline" — for human display. */
@@ -572,6 +577,21 @@ export interface GraphConfig {
    * predates `bodySize` skip this check. Default: 80.
    */
   readonly minCrossPackageDuplicateBodySize?: number;
+  /**
+   * Minimum estimated Jaccard similarity for `graph:near-duplicate-function-body`
+   * (0–1). Default: 0.85.
+   */
+  readonly minNearDuplicateSimilarity?: number;
+  /**
+   * Minimum normalized body size (chars) for near-duplicate detection.
+   * Default: 200.
+   */
+  readonly minNearDuplicateBodySize?: number;
+  /**
+   * LSH band count override for near-duplicate candidate generation. Rows are
+   * `NEAR_DUP_SIGNATURE_K / bands` (must divide evenly). Default: 8.
+   */
+  readonly nearDuplicateLshBands?: number;
   /**
    * Default recipe for `graph` runs when no `--recipe` flag is given (ADR-0022).
    * Tool-scoped: this is the graph tool's recipe namespace, distinct from

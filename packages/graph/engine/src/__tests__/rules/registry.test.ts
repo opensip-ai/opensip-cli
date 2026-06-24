@@ -53,6 +53,7 @@ describe('rules registry conformance', () => {
     const slugs = rules.map((r) => r.slug);
     expect(slugs).toContain('graph:orphan-subtree');
     expect(slugs).toContain('graph:duplicated-function-body');
+    expect(slugs).toContain('graph:near-duplicate-function-body');
     expect(slugs).toContain('graph:no-side-effect-path');
     expect(slugs).toContain('graph:test-only-reachable');
     expect(slugs).toContain('graph:always-throws-branch');

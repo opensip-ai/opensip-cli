@@ -30,6 +30,7 @@ export const visitMethodDeclaration: InventoryVisitor<ts.MethodDeclaration> = (n
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: name,
     qualifiedName: qualified,
     filePath: ctx.filePathProjectRel,

@@ -76,7 +76,11 @@ export interface EquivalenceDiagnostic {
     readonly productionDecline: number;
     readonly productionPhantom: number;
   };
-  readonly shards: readonly { readonly id: string; readonly rootDir: string; readonly fileCount: number }[];
+  readonly shards: readonly {
+    readonly id: string;
+    readonly rootDir: string;
+    readonly fileCount: number;
+  }[];
   /** Histogram: `<resolution>:<crossShard>` of the exact edge for each decline. */
   readonly declineByExactResolution: Record<string, number>;
   /** Histogram: `<resolution>:<crossShard>` of the sharded edge for each phantom. */
@@ -92,7 +96,11 @@ export interface BuildEquivalenceDiagnosticInput {
   };
   readonly exact: Catalog;
   readonly sharded: Catalog;
-  readonly shards: readonly { readonly id: string; readonly rootDir: string; readonly files: readonly string[] }[];
+  readonly shards: readonly {
+    readonly id: string;
+    readonly rootDir: string;
+    readonly files: readonly string[];
+  }[];
 }
 
 /** Build the structured equivalence diagnostic. Pure: no I/O, no clock. */

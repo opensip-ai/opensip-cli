@@ -23,6 +23,7 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: className,
     qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${className}.constructor`,
     filePath: ctx.filePathProjectRel,

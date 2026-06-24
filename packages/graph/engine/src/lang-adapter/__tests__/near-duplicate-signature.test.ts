@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  NEAR_DUP_LSH_BANDS,
+  NEAR_DUP_LSH_ROWS,
+  NEAR_DUP_SIGNATURE_K,
+  bodySignature,
+  digestCanonicalBody,
+  estimateJaccard,
+  lshBandHashes,
+  shingle,
+} from '../near-duplicate-signature.js';
+
+describe('near-duplicate-signature', () => {
+  const base =
+    'function processItems(items) { const out = []; for (const item of items) { out.push(transform(item)); } return out; }';
+  const nearEdit =
+    'function processItems(items) { const result = []; for (const item of items) { result.push(transform(item)); } return result; }';
+  const unrelated =
+    'export function validateConfig(cfg) { if (!cfg.apiKey) throw new Error("missing"); return cfg; }';
+
+  it('identical canonical text yields Jaccard 1.0', () => {
+    const a = bodySignature(base);
+    const b = bodySignature(base);
+    expect(estimateJaccard(a, b)).toBe(1);
+  });
+
+  it('one-token edit yields high but sub-1.0 Jaccard', () => {
+    const j = estimateJaccard(bodySignature(base), bodySignature(nearEdit));
+    expect(j).toBeGreaterThan(0.5);
+    expect(j).toBeLessThan(1);
+  });
+
+  it('unrelated bodies yield low Jaccard', () => {
+    expect(estimateJaccard(bodySignature(base), bodySignature(unrelated))).toBeLessThan(0.5);
+  });
+
+  it('signatures are stable across runs', () => {
+    expect(bodySignature(base)).toEqual(bodySignature(base));
+  });
+
+  it('bands × rows equals k', () => {
+    expect(NEAR_DUP_LSH_BANDS * NEAR_DUP_LSH_ROWS).toBe(NEAR_DUP_SIGNATURE_K);
+  });
+
+  it('LSH knee is near the 0.85 threshold', () => {
+    const knee = (1 / NEAR_DUP_LSH_BANDS) ** (1 / NEAR_DUP_LSH_ROWS);
+    expect(knee).toBeCloseTo(0.878, 2);
+  });
+
+  it('shingle emits char 5-grams', () => {
+    expect(shingle('abcdef').size).toBe(2);
+    expect(shingle('ab').size).toBe(1);
+    expect(shingle('').size).toBe(0);
+  });
+
+  it('digestCanonicalBody returns hash, size, and signature', () => {
+    const d = digestCanonicalBody(base);
+    expect(d.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(d.size).toBeGreaterThan(0);
+    expect(d.signature?.length).toBe(NEAR_DUP_SIGNATURE_K);
+  });
+
+  it('lshBandHashes returns one hash per band', () => {
+    const sig = bodySignature(base);
+    expect(lshBandHashes(sig, NEAR_DUP_LSH_BANDS, NEAR_DUP_LSH_ROWS).length).toBe(
+      NEAR_DUP_LSH_BANDS,
+    );
+  });
+});

@@ -26,6 +26,7 @@ export const visitGetterSetter: InventoryVisitor<ts.AccessorDeclaration> = (node
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
+    bodySignature: digest.signature,
     simpleName: name,
     qualifiedName: qualified,
     filePath: ctx.filePathProjectRel,

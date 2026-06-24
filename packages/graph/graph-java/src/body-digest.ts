@@ -14,11 +14,15 @@
  *   3. SHA-256.
  */
 
-import { hashBody, normalizeWhitespace, type BodyDigest } from '@opensip-cli/graph';
+import {
+  digestCanonicalBody,
+  normalizeWhitespace,
+  type BodyDigestWithSignature,
+} from '@opensip-cli/graph';
 import { skipBlockComment, skipToEndOfLine } from '@opensip-cli/graph-adapter-common';
 
-export function digestJavaBody(text: string): BodyDigest {
-  return hashBody(normalizeWhitespace(stripJavaComments(text)));
+export function digestJavaBody(text: string): BodyDigestWithSignature {
+  return digestCanonicalBody(normalizeWhitespace(stripJavaComments(text)));
 }
 
 export const digestSyntheticBody = digestJavaBody;

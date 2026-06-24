@@ -32,6 +32,8 @@ import { createHash } from 'node:crypto';
 export interface BodyDigest {
   readonly hash: string;
   readonly size: number;
+  /** MinHash signature for near-clone detection; absent when not computed. */
+  readonly signature?: readonly number[];
 }
 
 /**

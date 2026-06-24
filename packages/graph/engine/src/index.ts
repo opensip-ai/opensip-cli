@@ -147,6 +147,18 @@ export type { EdgePosition, EdgeSink, MutableStats } from './lang-adapter/edge-h
 // audit 2026-05-30, finding D). Mirrors the edge-helpers rationale.
 export { normalizeWhitespace, hashBody } from './lang-adapter/body-digest.js';
 export type { BodyDigest } from './lang-adapter/body-digest.js';
+export {
+  NEAR_DUP_SIGNATURE_K,
+  NEAR_DUP_LSH_BANDS,
+  NEAR_DUP_LSH_ROWS,
+  shingle,
+  bodySignature,
+  estimateJaccard,
+  lshBandHashes,
+  digestCanonicalBody,
+} from './lang-adapter/near-duplicate-signature.js';
+export type { BodyDigestWithSignature } from './lang-adapter/near-duplicate-signature.js';
+export { languageOfFile } from './lang-adapter/language-of-file.js';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md:
 // first-party adapters live in their own graph-* packages, so the

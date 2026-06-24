@@ -33,6 +33,7 @@ import { ValidationError } from '@opensip-cli/core';
 export const RULE_ID_MAPPING: Readonly<Record<string, string>> = Object.freeze({
   'graph:orphan-subtree': 'graph.dead-code.orphan-subtree',
   'graph:duplicated-function-body': 'graph.duplication.duplicated-function-body',
+  'graph:near-duplicate-function-body': 'graph.duplication.near-duplicate-function-body',
   'graph:no-side-effect-path': 'graph.dead-code.no-side-effect-path',
   'graph:always-throws-branch': 'graph.safety.always-throws-branch',
   'graph:test-only-reachable': 'graph.dead-code.test-only-reachable',
