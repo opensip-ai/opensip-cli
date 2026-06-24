@@ -150,6 +150,7 @@ export function parseTscOutput(stdout: string, cwd: string): CheckViolation[] {
 export const typescriptFrontend = defineCheck({
   id: 'a32ab706-f817-404c-835f-da79f64505c7',
   slug: 'typescript-frontend',
+  contentFilter: 'strip-strings',
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
 
   confidence: 'medium',

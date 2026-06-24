@@ -97,4 +97,8 @@ export const FROM_STAGE_PATTERN = /\bAS\s{1,10}(\w{1,100})/i;
 export const USER_PATTERN = /USER\s{1,10}(\S{1,100})/i;
 export const NODE_ENV_PROD_PATTERN = /NODE_ENV\s{0,10}=\s{0,10}production/i;
 
-export const RUNNER_STAGE_NAMES = new Set(['runner', 'production', 'prod', 'final', 'runtime']);
+const RUNNER_STAGE_NAMES = ['runner', 'production', 'prod', 'final', 'runtime'] as const;
+
+export function isRunnerStageName(stageName: string): boolean {
+  return (RUNNER_STAGE_NAMES as readonly string[]).includes(stageName);
+}

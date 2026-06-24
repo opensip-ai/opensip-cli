@@ -6,7 +6,7 @@
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 import {
-  ALLOWED_EXTRA_METHODS,
+  isAllowedExtraMethod,
   TEST_DOUBLE_CLASS_NAME_PATTERN,
 } from './interface-implementation-consistency-constants.js';
 import {
@@ -46,7 +46,7 @@ function checkConsistencyForClass(
 
   const reportInterface = cls.implements[0] ?? 'unknown';
   const extraMethods = cls.methods.filter(
-    (method) => !ALLOWED_EXTRA_METHODS.has(method) && !allowedMethods.has(method),
+    (method) => !isAllowedExtraMethod(method) && !allowedMethods.has(method),
   );
 
   for (const method of extraMethods) {

@@ -13,6 +13,8 @@ import { defineCheck, getCheckConfig, type CheckViolation } from '@opensip-cli/f
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
+import { getContainingFunctionName } from './containing-function-name.js';
+
 /**
  * Recipe-config shape for result-pattern-consistency. Project-specific boundary
  * directories (where throwing is the intended pattern) belong in a recipe's
@@ -71,6 +73,9 @@ const LEGITIMATE_THROW_FUNCTION_PATTERNS = [
   /Guard$/,
   /Validator$/,
   /Assertion$/,
+  /^normalizeCommand/,
+  /^buildToolIdentityIndex$/,
+  /^assertIdentityInputAvailable$/,
 ];
 
 /** Method names that guard registry/registerable invariants (throw, not Result). */
@@ -172,33 +177,6 @@ function isInCatchBlock(node: ts.Node): boolean {
     current = current.parent;
   }
   return false;
-}
-
-/**
- * Get the containing function name for a node
- */
-function getContainingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
-  let current: ts.Node | undefined = node.parent;
-
-  while (current) {
-    if (ts.isFunctionDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile);
-    }
-
-    /* v8 ignore next -- defensive AST/type guard */
-    if (ts.isMethodDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile);
-    }
-    /* v8 ignore next -- defensive AST/type guard */
-    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      const parent = current.parent;
-      if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
-        return parent.name.getText(sourceFile);
-      }
-    }
-    current = current.parent;
-  }
-  return undefined;
 }
 
 /**

@@ -1,3 +1,4 @@
+// @fitness-ignore-file context-leakage -- OTLP trace parent for a single CLI invocation, not HTTP request context shared across concurrent requests
 /**
  * OpenTelemetry SDK init — the application half of the OTel library/application
  * split, wired ONLY at the CLI composition root.

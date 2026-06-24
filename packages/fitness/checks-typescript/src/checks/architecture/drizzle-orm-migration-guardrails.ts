@@ -60,6 +60,7 @@ const DATA_LOSS_CONFIRMATION = /DATA-LOSS.*intentional/i;
 export const drizzleOrmMigrationGuardrails = defineCheck({
   id: 'b67ccead-3731-40c5-9a90-6fc4b88c2bc5',
   slug: 'drizzle-orm-migration-guardrails',
+  contentFilter: 'strip-strings',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   confidence: 'high',
   description:

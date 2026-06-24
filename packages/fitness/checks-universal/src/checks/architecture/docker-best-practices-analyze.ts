@@ -13,7 +13,7 @@ import {
   PACKAGE_MANAGER_PATTERNS,
   PKG_INSTALL_PATTERN,
   PROD_DEPS_FLAG_PATTERN,
-  RUNNER_STAGE_NAMES,
+  isRunnerStageName,
   SECRET_PATTERNS,
   USER_PATTERN,
   safeDockerLine,
@@ -168,7 +168,7 @@ function processFromLine(line: string, lineNum: number, state: AnalysisState): v
   const stageName = stageMatch?.[1]?.toLowerCase() ?? null;
 
   if (stageName) {
-    state.isInRunnerStage = RUNNER_STAGE_NAMES.has(stageName);
+    state.isInRunnerStage = isRunnerStageName(stageName);
   } else if (state.fromCount > 1) {
     state.isInRunnerStage = true;
   }

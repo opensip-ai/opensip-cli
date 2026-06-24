@@ -50,6 +50,7 @@ const NAMED_IMPORT_PATTERN = /import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/;
 export const heavyImportDetection = defineCheck({
   id: 'ebd495d1-ae48-478d-a1cc-4823a18cada6',
   slug: 'heavy-import-detection',
+  contentFilter: 'strip-strings',
   scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
   confidence: 'high',
   description:

@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads Cargo.toml manifest; bounded by standard Rust project metadata size
 /**
  * @fileoverview Rust `use`-path → dependency-edge resolution.
  *

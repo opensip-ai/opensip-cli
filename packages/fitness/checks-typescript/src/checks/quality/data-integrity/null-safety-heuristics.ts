@@ -4,7 +4,10 @@
 
 import * as ts from 'typescript';
 
-import { SAFE_FLUENT_METHODS, SAFE_METHOD_PREFIXES } from './null-safety-config.js';
+import {
+  isSafeFluentMethod as isListedSafeFluentMethod,
+  SAFE_METHOD_PREFIXES,
+} from './null-safety-config.js';
 
 /**
  * Check if a call expression is a known safe builder pattern.
@@ -42,11 +45,11 @@ export function isSafeBuilderPattern(
 
 /**
  * Check if a method name is a known safe fluent API method.
- * Matches either an exact entry in SAFE_FLUENT_METHODS or a method whose name
+ * Matches either an exact entry in SAFE_FLUENT_METHOD_NAMES or a method whose name
  * starts with a common safe prefix (get, set, is, has, to, etc.).
  */
 export function isSafeFluentMethod(methodName: string): boolean {
-  if (SAFE_FLUENT_METHODS.has(methodName)) return true;
+  if (isListedSafeFluentMethod(methodName)) return true;
   return SAFE_METHOD_PREFIXES.some((prefix) => methodName.startsWith(prefix));
 }
 

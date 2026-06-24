@@ -1,34 +1,10 @@
 /**
- * host-command-specs — the CLI-owned (host) commands expressed as declarative
- * {@link CommandSpec}s, mounted through the SAME `mountCommandSpec` plane the
- * tools use (launch Phase 6).
- *
- * Host commands (`init` / `configure` / `sessions` / `report` / `completion` /
- * `uninstall` / `tools`) are NOT tool plugins — they don't ride on a
- * `Tool.commandSpecs` and aren't discovered. Mounting them via the same
- * `mountCommandSpec` means the Phase 7 `command-surface-parity` guardrail sees
- * ONE uniform command surface: no second, more-privileged raw-Commander path for
- * "blessed" CLI-owned commands. The pack-management `plugin {add,list,remove,
- * sync}` ops are host-owned too, but mount UNDER each pack-supporting tool
- * primary (`opensip fit plugin …`) via {@link mountToolPluginGroups} — there is
- * no top-level `opensip plugin`.
- *
- * Each spec's handler closes over the per-invocation {@link CliCommandsContext}
- * (render / setExitCode / datastore thunk / pluginLayouts). The mount layer only
- * reaches for `render` / `setExitCode` (the `command-result` + thrown-`ToolError`
- * arms) — the `signal-envelope` / `live-view` arms are never exercised by a host
- * command, so `CliCommandsContext` is a valid (leaner) `CommandMountContext`.
- *
- * The action-less subcommand GROUPS (`sessions`, `tools`) + the domain-bound
- * per-tool `plugin` group leaves (and {@link mountToolPluginGroups}) live in
- * `host-subcommand-groups.ts` (a leaf module that lets `completion.ts` source its
- * sub-subcommand names without a cycle). This module assembles the TOP-LEVEL
- * specs and mounts the whole surface.
- *
- * Specs are built per-invocation (in the builders below, not at module load) so
- * the `--cwd` defaults that resolve to `process.cwd()` are evaluated fresh each
- * run — byte-identical to the former `.option(spec, desc, process.cwd())`
- * registrars.
+ * host-command-specs — CLI-owned commands as declarative {@link CommandSpec}s,
+ * mounted via the same `mountCommandSpec` plane as tools (Phase 6/7 parity).
+ * Host commands (`init`, `configure`, `sessions`, `report`, `completion`,
+ * `uninstall`, `tools`) are not tool plugins. Action-less groups and per-tool
+ * `plugin` leaves live in `host-subcommand-groups.ts`; this module assembles
+ * top-level specs. Built per-invocation so `--cwd` defaults stay fresh.
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';

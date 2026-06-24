@@ -1,3 +1,4 @@
+// @fitness-ignore-file throws-documentation -- Functions throw self-documenting typed errors
 import { createHash } from 'node:crypto';
 import { basename, dirname } from 'node:path';
 

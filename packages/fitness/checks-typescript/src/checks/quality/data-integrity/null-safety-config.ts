@@ -6,7 +6,11 @@ import { getCheckConfig } from '@opensip-cli/fitness';
 
 import { SAFE_BUILDER_PREFIXES } from './null-safety-prefixes.js';
 
-export { SAFE_BUILDER_PREFIXES, SAFE_FLUENT_METHODS } from './null-safety-prefixes.js';
+export {
+  SAFE_BUILDER_PREFIXES,
+  SAFE_FLUENT_METHOD_NAMES,
+  isSafeFluentMethod,
+} from './null-safety-prefixes.js';
 
 /**
  * Recipe-config shape for null-safety. Project-specific safe-by-construction

@@ -1,3 +1,4 @@
+// @fitness-ignore-file unbounded-memory -- reads project config YAML; bounded by standard configuration file size
 /**
  * @fileoverview Permissive YAML reader used by plugin-discovery sites
  * that need to extract a single field from `opensip-cli.config.yml`

@@ -611,20 +611,15 @@ export async function analyzePackageSupplyChainPolicy(
   if (!snapshot) return [];
 
   const violations: CheckViolation[] = [];
-  const subChecks = [
-    checkPackageManagerPin,
-    checkLockfilePosture,
-    checkLockfileIntegrity,
-    checkExoticDependencies,
-    checkInstallLifecycleScripts,
-    checkInstallScriptPolicy,
-    checkMinimumReleaseAge,
-    checkFrozenCiInstalls,
-    checkTrustedPublishing,
-  ];
-  for (const runCheck of subChecks) {
-    runCheck(snapshot, violations);
-  }
+  checkPackageManagerPin(snapshot, violations);
+  checkLockfilePosture(snapshot, violations);
+  checkLockfileIntegrity(snapshot, violations);
+  checkExoticDependencies(snapshot, violations);
+  checkInstallLifecycleScripts(snapshot, violations);
+  checkInstallScriptPolicy(snapshot, violations);
+  checkMinimumReleaseAge(snapshot, violations);
+  checkFrozenCiInstalls(snapshot, violations);
+  checkTrustedPublishing(snapshot, violations);
   return violations;
 }
 

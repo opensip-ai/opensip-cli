@@ -9,7 +9,7 @@ import * as ts from 'typescript';
 import {
   buildEffectiveSyncSets,
   FILE_SKIP_PATTERNS,
-  FIRE_AND_FORGET_PATTERNS,
+  isFireAndForgetPattern,
   KNOWN_SYNC_RECEIVER_PATTERNS,
   KNOWN_SYNC_SUFFIXES,
   type EffectiveSyncSets,
@@ -28,8 +28,8 @@ function isKnownSyncMethodCall(
   const receiverExpr = expr.expression;
 
   if (
-    sets.syncFunctions.has(methodName) ||
-    FIRE_AND_FORGET_PATTERNS.has(methodName) ||
+    sets.syncFunctions.includes(methodName) ||
+    isFireAndForgetPattern(methodName) ||
     matchesSyncNamePattern(methodName, sets)
   ) {
     return true;
@@ -37,7 +37,7 @@ function isKnownSyncMethodCall(
 
   if (ts.isIdentifier(receiverExpr)) {
     const receiverName = receiverExpr.text;
-    if (sets.syncReceivers.has(receiverName)) {
+    if (sets.syncReceivers.includes(receiverName)) {
       return true;
     }
     if (receiverName === 'this') {
@@ -47,7 +47,7 @@ function isKnownSyncMethodCall(
 
   if (ts.isPropertyAccessExpression(receiverExpr)) {
     const nestedName = receiverExpr.name.text;
-    if (sets.syncReceivers.has(nestedName)) {
+    if (sets.syncReceivers.includes(nestedName)) {
       return true;
     }
     let cursor: ts.Node = receiverExpr.expression;
@@ -55,7 +55,7 @@ function isKnownSyncMethodCall(
     while (cursor && ts.isPropertyAccessExpression(cursor)) {
       cursor = cursor.expression;
     }
-    if (ts.isIdentifier(cursor) && sets.syncReceivers.has(cursor.text)) {
+    if (ts.isIdentifier(cursor) && sets.syncReceivers.includes(cursor.text)) {
       return true;
     }
   }
@@ -90,8 +90,8 @@ function isKnownSyncCall(
   if (ts.isIdentifier(expr)) {
     const name = expr.text;
     if (
-      sets.syncFunctions.has(name) ||
-      FIRE_AND_FORGET_PATTERNS.has(name) ||
+      sets.syncFunctions.includes(name) ||
+      isFireAndForgetPattern(name) ||
       matchesSyncNamePattern(name, sets) ||
       isSyncCallableInScope(node, sourceFile, name)
     ) {

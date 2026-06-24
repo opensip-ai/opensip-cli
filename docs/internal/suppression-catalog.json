@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-23T23:47:07.219Z",
+  "generatedAt": "2026-06-24T00:19:29.423Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,13 +11,14 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 289,
+        "total": 295,
         "bySlug": {
           "batch-operation-limits": 41,
           "env-secret-exposure": 3,
-          "unbounded-memory": 23,
+          "unbounded-memory": 26,
           "silent-early-returns": 7,
           "one-outcome-shape": 1,
+          "context-leakage": 1,
           "duplicate-utility-functions": 6,
           "interface-implementation-consistency": 2,
           "stream-buffer-size-limits": 1,
@@ -29,7 +30,7 @@
           "duplicate-implementation-detection": 10,
           "no-raw-regex-on-code": 1,
           "fastify-schema-coverage": 2,
-          "throws-documentation": 1,
+          "throws-documentation": 3,
           "unused-config-options": 13,
           "no-generic-error": 4,
           "numeric-validation": 11,
@@ -87,20 +88,20 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 10,
+          "cli": 11,
           "cli-ui": 1,
           "config": 1,
-          "core": 8,
+          "core": 9,
           "dashboard": 2,
-          "fitness/checks-typescript": 64,
+          "fitness/checks-typescript": 66,
           "fitness/checks-universal": 117,
           "fitness/engine": 26,
-          "graph/engine": 21,
+          "graph/engine": 22,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
           "graph/graph-java": 1,
           "graph/graph-python": 2,
-          "graph/graph-rust": 1,
+          "graph/graph-rust": 2,
           "graph/graph-typescript": 15,
           "languages/lang-typescript": 4,
           "output": 2,
@@ -118,13 +119,14 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 106,
+        "total": 110,
         "bySlug": {
           "batch-operation-limits": 41,
           "env-secret-exposure": 2,
-          "unbounded-memory": 19,
+          "unbounded-memory": 22,
           "silent-early-returns": 5,
           "one-outcome-shape": 1,
+          "context-leakage": 1,
           "duplicate-utility-functions": 2,
           "interface-implementation-consistency": 1,
           "stream-buffer-size-limits": 1,
@@ -148,18 +150,18 @@
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 10,
+          "cli": 11,
           "cli-ui": 1,
           "config": 1,
-          "core": 8,
+          "core": 9,
           "dashboard": 2,
           "fitness/engine": 26,
-          "graph/engine": 21,
+          "graph/engine": 22,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
           "graph/graph-java": 1,
           "graph/graph-python": 2,
-          "graph/graph-rust": 1,
+          "graph/graph-rust": 2,
           "graph/graph-typescript": 15,
           "languages/lang-typescript": 4,
           "output": 2,
@@ -186,7 +188,7 @@
     },
     "check-package": {
       "fitness": {
-        "total": 181,
+        "total": 183,
         "bySlug": {
           "shipped-checks-must-be-generic": 5,
           "fitness-check-standards": 17,
@@ -197,7 +199,7 @@
           "duplicate-implementation-detection": 10,
           "no-raw-regex-on-code": 1,
           "fastify-schema-coverage": 2,
-          "throws-documentation": 1,
+          "throws-documentation": 3,
           "unused-config-options": 13,
           "no-generic-error": 4,
           "numeric-validation": 11,
@@ -246,7 +248,7 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 64,
+          "fitness/checks-typescript": 66,
           "fitness/checks-universal": 117
         }
       },
@@ -355,8 +357,8 @@
         "actual": 0
       },
       "unbounded-memory": {
-        "budget": 23,
-        "actual": 23
+        "budget": 26,
+        "actual": 26
       },
       "toctou-race-condition": {
         "budget": 0,
@@ -379,20 +381,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 289,
-    "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 106,
-    "productRuntimeFitnessSlugs": 26,
+    "budgetGateFitness": 295,
+    "budgetGateFitnessSlugs": 73,
+    "productRuntimeFitness": 110,
+    "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 7,
     "productRuntimeGraphRuleIds": 2,
-    "productRuntimeCombined": 113,
-    "checkPackageFitness": 181,
+    "productRuntimeCombined": 117,
+    "checkPackageFitness": 183,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
-    "budgetGateSafetyTotal": 66,
-    "productRuntimeSafetyTotal": 60,
-    "unbudgetedProductRuntimeSlugs": 23
+    "budgetGateSafetyTotal": 69,
+    "productRuntimeSafetyTotal": 63,
+    "unbudgetedProductRuntimeSlugs": 24
   },
   "phase4Audit": {
     "baseline": {
@@ -405,13 +407,13 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -199,
+      "productRuntimeFitness": -195,
       "productRuntimeGraph": 0,
-      "productRuntimeCombined": -199,
-      "budgetGateFitness": -253,
-      "checkPackageFitness": -53,
-      "productRuntimeSafetyTotal": -123,
-      "budgetGateSafetyTotal": -168
+      "productRuntimeCombined": -195,
+      "budgetGateFitness": -247,
+      "checkPackageFitness": -51,
+      "productRuntimeSafetyTotal": -120,
+      "budgetGateSafetyTotal": -165
     },
     "reopenCandidates": [],
     "acceptedHighCount": [
@@ -423,7 +425,7 @@
       },
       {
         "slug": "unbounded-memory",
-        "count": 19,
+        "count": 22,
         "disposition": "b",
         "kind": "fitness"
       },
@@ -436,7 +438,7 @@
     ],
     "successCriteria": {
       "sc6ProductRuntimeSafetyTarget": 143,
-      "sc6ProductRuntimeSafetyActual": 60,
+      "sc6ProductRuntimeSafetyActual": 63,
       "sc6Met": true
     }
   }

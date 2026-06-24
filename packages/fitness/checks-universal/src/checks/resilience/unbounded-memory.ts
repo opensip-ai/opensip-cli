@@ -184,6 +184,7 @@ function hasGrowthMethod(content: string): boolean {
 export const unboundedMemory = defineCheck({
   id: '1f3c347d-3511-4157-87e0-050fd57c28b3',
   slug: 'unbounded-memory',
+  contentFilter: 'strip-strings',
   description: 'Detect unbounded collections and file reads that may cause OOM',
   longDescription: `**Purpose:** Identifies potential memory leaks from collections that grow without bounds and file reads without size validation.
 

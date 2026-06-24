@@ -72,8 +72,11 @@ import {
 import { FITNESS_IDENTITY, FITNESS_LIVE_VIEW_KEY } from './identity.js';
 import { fitReplayFromSession } from './persistence/session-replay.js';
 import { FIT_PLUGIN_LAYOUT } from './plugins/loader.js';
-import { fitScaffoldConfigBlock } from './scaffold/config-block.js';
-import { fitScaffoldExamples, fitStableExampleIds } from './scaffold/examples.js';
+import {
+  fitScaffoldConfigBlock,
+  fitScaffoldExamples,
+  fitStableExampleIds,
+} from './scaffold/index.js';
 // Side-effect import: ensures the RunScope.fitness augmentation is loaded so
 // `scope.fitness` is the correctly-typed slot here.
 import './scope-augmentation.js';

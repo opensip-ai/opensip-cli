@@ -84,6 +84,7 @@ export function analyzeBootstrapToolImport(content: string, filePath: string): C
 export const noBootstrapToolImport = defineCheck({
   id: '09453917-4f95-446d-a6d1-3a5445b00902',
   slug: 'no-bootstrap-tool-import',
+  contentFilter: 'raw',
   description:
     'The CLI host must not statically import a tool runtime — bundled tools load via the dynamic plugin path (§1 install-source independence)',
   scope: { languages: ['typescript'], concerns: ['backend'] },

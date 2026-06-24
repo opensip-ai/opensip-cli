@@ -11,13 +11,13 @@ import {
   type FunctionLikeNode,
 } from './toctou-race-condition-collection.js';
 import {
-  DRIZZLE_ATOMIC_WRITE_METHODS,
+  isDrizzleAtomicWriteMethod,
+  isReadMethod,
+  isUpdateMethod,
   KIND_READ_LOCAL,
   KIND_READ_SHARED,
   KIND_UPDATE_LOCAL,
   KIND_UPDATE_SHARED,
-  READ_METHODS,
-  UPDATE_METHODS,
 } from './toctou-race-condition-constants.js';
 
 /** Classification of a `<receiver>.<method>(...)` call site. */
@@ -42,7 +42,7 @@ function isAtomicSqlExecute(call: ts.CallExpression): boolean {
 function isDrizzleAtomicWrite(call: ts.CallExpression): boolean {
   if (!ts.isPropertyAccessExpression(call.expression)) return false;
   const methodName = call.expression.name.text;
-  if (!DRIZZLE_ATOMIC_WRITE_METHODS.has(methodName)) return false;
+  if (!isDrizzleAtomicWriteMethod(methodName)) return false;
   const receiver = call.expression.expression;
   if (ts.isIdentifier(receiver)) {
     const r = receiver.text;
@@ -96,8 +96,8 @@ function classifyCall(
 
   if (!ts.isPropertyAccessExpression(call.expression)) return { kind: 'unrelated' };
   const methodName = call.expression.name.text;
-  const isRead = READ_METHODS.has(methodName);
-  const isUpdate = UPDATE_METHODS.has(methodName);
+  const isRead = isReadMethod(methodName);
+  const isUpdate = isUpdateMethod(methodName);
   if (!isRead && !isUpdate) return { kind: 'unrelated' };
 
   const receiver = getReceiverName(call);

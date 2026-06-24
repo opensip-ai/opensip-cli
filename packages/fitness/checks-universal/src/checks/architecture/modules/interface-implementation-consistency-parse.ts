@@ -8,7 +8,7 @@ import {
   CLASS_PATTERN,
   INTERFACE_EXTENDS_CONTINUATION,
   INTERFACE_PATTERN,
-  JS_KEYWORDS,
+  isJsKeyword,
   METHOD_BODY_PATTERN,
   METHOD_IN_CLASS_PATTERN,
   METHOD_IN_INTERFACE_PATTERN,
@@ -100,7 +100,7 @@ function extractInterfaceMethod(line: string): string | null {
   const methodMatch = METHOD_IN_INTERFACE_PATTERN.exec(line);
   if (!methodMatch?.[1]) return null;
   /* v8 ignore next 2 */
-  if (JS_KEYWORDS.has(methodMatch[1])) return null;
+  if (isJsKeyword(methodMatch[1])) return null;
   if (line.includes('//')) return null;
   return methodMatch[1];
 }
@@ -197,7 +197,7 @@ function extractClassMethod(line: string): string | null {
   const methodMatch = METHOD_IN_CLASS_PATTERN.exec(line);
   if (!methodMatch?.[1]) return null;
   if (methodMatch[1] === 'constructor') return null;
-  if (JS_KEYWORDS.has(methodMatch[1])) return null;
+  if (isJsKeyword(methodMatch[1])) return null;
   if (!isMethodDefinition(line)) return null;
 
   return methodMatch[1];

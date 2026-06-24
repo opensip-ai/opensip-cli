@@ -15,7 +15,12 @@ import {
 } from '@opensip-cli/datastore';
 import { count, desc, eq, inArray, lt } from 'drizzle-orm';
 
-import { sessionHostMetrics, sessions, sessionToolPayload } from './schema/sessions.js';
+import { sessions, sessionToolPayload } from './schema/sessions.js';
+import {
+  hostMetricsBySessionId,
+  readHostMetrics,
+  upsertHostMetricsRow,
+} from './session-repo-host-metrics.js';
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
 
@@ -159,7 +164,7 @@ export class SessionRepo {
       // (was two point queries per row — a 1 + 2N N+1).
       const ids = sessionRows.map((row) => row.id);
       const payloadsById = this.payloadsBySessionId(ids);
-      const metricsById = this.hostMetricsBySessionId(ids);
+      const metricsById = hostMetricsBySessionId(this.datastore, ids);
       const results = sessionRows.map((row) =>
         this.buildSession(row, payloadsById.get(row.id), metricsById.get(row.id)),
       );
@@ -265,7 +270,7 @@ export class SessionRepo {
       .from(sessionToolPayload)
       .where(eq(sessionToolPayload.sessionId, row.id))
       .get();
-    return this.buildSession(row, payloadRow, this.readHostMetrics(row.id));
+    return this.buildSession(row, payloadRow, readHostMetrics(this.datastore, row.id));
   }
 
   /** Batch-load tool payloads for a page of session ids (avoids list()'s N+1). */
@@ -286,22 +291,6 @@ export class SessionRepo {
         payload: r.payload,
         payload_version: r.payload_version,
       });
-    }
-    return byId;
-  }
-
-  /** Batch-load host-metrics for a page of session ids (avoids list()'s N+1). */
-  private hostMetricsBySessionId(ids: readonly string[]): Map<string, StoredSessionHostMetrics> {
-    const byId = new Map<string, StoredSessionHostMetrics>();
-    if (ids.length === 0) return byId;
-    const rows = this.datastore.db
-      .select()
-      .from(sessionHostMetrics)
-      .where(inArray(sessionHostMetrics.sessionId, ids))
-      .all();
-    for (const row of rows) {
-      const metrics = this.projectHostMetrics(row);
-      if (metrics) byId.set(row.sessionId, metrics);
     }
     return byId;
   }
@@ -379,73 +368,8 @@ export class SessionRepo {
     };
   }
 
-  /**
-   * Read the sibling host-metrics record for a session, or `undefined` when no
-   * metrics row exists. Null columns are dropped so the projection only carries
-   * metrics that were actually captured.
-   */
-  private readHostMetrics(sessionId: string): StoredSessionHostMetrics | undefined {
-    const row = this.datastore.db
-      .select()
-      .from(sessionHostMetrics)
-      .where(eq(sessionHostMetrics.sessionId, sessionId))
-      .get();
-    return row ? this.projectHostMetrics(row) : undefined;
-  }
-
-  /** Project a raw host-metrics row, dropping null columns (only captured metrics). */
-  private projectHostMetrics(
-    row: typeof sessionHostMetrics.$inferSelect,
-  ): StoredSessionHostMetrics | undefined {
-    const metrics: Record<string, number> = {};
-    if (row.ttyBusyMs != null) metrics.ttyBusyMs = row.ttyBusyMs;
-    if (row.renderMs != null) metrics.renderMs = row.renderMs;
-    if (row.persistMs != null) metrics.persistMs = row.persistMs;
-    if (row.egressMs != null) metrics.egressMs = row.egressMs;
-    if (row.totalCommandMs != null) metrics.totalCommandMs = row.totalCommandMs;
-    return Object.keys(metrics).length > 0 ? metrics : undefined;
-  }
-
-  /**
-   * Best-effort upsert of host-side overhead metrics for a session
-   * (host-owned-run-timing §5.3). The host run plane calls this as render /
-   * persist / egress metrics become known; only the provided fields are written,
-   * merging onto any existing row. Never throws — metrics are observability.
-   */
+  /** Best-effort upsert of host-side overhead metrics (host-owned-run-timing §5.3). */
   upsertHostMetrics(sessionId: string, metrics: StoredSessionHostMetrics): void {
-    try {
-      // `set` keys are the Drizzle COLUMN PROPERTY names (camelCase), NOT the
-      // SQL column names — Drizzle silently ignores unknown keys, so snake_case
-      // here would no-op the ON CONFLICT update and the merge would be lost.
-      const patch: Partial<typeof sessionHostMetrics.$inferInsert> = {};
-      if (metrics.ttyBusyMs !== undefined) patch.ttyBusyMs = metrics.ttyBusyMs;
-      if (metrics.renderMs !== undefined) patch.renderMs = metrics.renderMs;
-      if (metrics.persistMs !== undefined) patch.persistMs = metrics.persistMs;
-      if (metrics.egressMs !== undefined) patch.egressMs = metrics.egressMs;
-      if (metrics.totalCommandMs !== undefined) patch.totalCommandMs = metrics.totalCommandMs;
-      if (Object.keys(patch).length === 0) return;
-      this.datastore.db
-        .insert(sessionHostMetrics)
-        .values({
-          sessionId,
-          ttyBusyMs: metrics.ttyBusyMs ?? null,
-          renderMs: metrics.renderMs ?? null,
-          persistMs: metrics.persistMs ?? null,
-          egressMs: metrics.egressMs ?? null,
-          totalCommandMs: metrics.totalCommandMs ?? null,
-        })
-        .onConflictDoUpdate({
-          target: sessionHostMetrics.sessionId,
-          set: patch,
-        })
-        .run();
-    } catch (error) {
-      logger.warn({
-        evt: 'session.host_metrics.upsert_failed',
-        module: MODULE_NAME,
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    upsertHostMetricsRow(this.datastore, sessionId, metrics);
   }
 }

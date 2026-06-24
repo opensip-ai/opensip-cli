@@ -354,28 +354,7 @@ export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
   return scopeStorage().run(scope, fn);
 }
 
-/**
- * Set `scope` as the current scope for the rest of the calling async
- * context — without needing a callback wrapper. Backed by
- * `AsyncLocalStorage.enterWith`. Use this in Commander's `preAction`
- * hook where the action body runs after the hook returns but in the
- * same async chain: `enterWith` propagates the scope forward without
- * needing to wrap the action invocation, which Commander does not let
- * us do directly.
- *
- * `enterScope` is the **Commander single-command path only** — exactly
- * one entry per CLI invocation, in the pre-action hook. It mutates the
- * single ALS slot for the rest of the async context, so it is unsafe for
- * concurrent or nested work.
- *
- * Always-on re-entrancy guard: throws `SystemError`
- * (`SYSTEM.SCOPE.REENTRANT`) if a *different* scope is already current.
- * Re-entering the **same** scope (idempotent — e.g. a retried pre-action
- * path) is a no-op and does NOT throw; entering when **none** is current
- * (the normal single-command path) is allowed. For concurrent or nested
- * scopes use {@link runWithScope}/{@link runWithScopeSync}, which bind via
- * `AsyncLocalStorage.run` and nest cleanly without touching the shared slot.
- */
+/** Bind `scope` via `enterWith` for the Commander single-command pre-action path only. */
 export function enterScope(scope: RunScope): void {
   const current = scopeStorage().getStore();
   if (current !== undefined && current !== scope) {
@@ -388,20 +367,7 @@ export function enterScope(scope: RunScope): void {
   scopeStorage().enterWith(scope);
 }
 
-/**
- * Clear the ambient scope slot — the symmetric counterpart to {@link enterScope}.
- * Backed by `AsyncLocalStorage.enterWith(undefined)`, so it resets the single ALS
- * slot for the rest of the calling async context.
- *
- * Host-only, single-command path: the Commander `postAction` hook calls this after
- * disposing the entered scope, completing the per-command lifecycle (enter in
- * `preAction` → dispose + exit in `postAction`). Clearing the slot leaves a clean
- * ALS state for any *subsequent* command run in the same process — so a long-lived
- * host that drives Commander sequentially (or a test that parses twice) does not
- * trip the always-on re-entrancy guard on the next `enterScope`. A no-op when no
- * scope is current. Concurrent/nested work never needs this — {@link runWithScope}
- * restores the prior slot on its own when its `fn` returns.
- */
+/** Clear the ambient scope slot — symmetric to {@link enterScope}; host postAction only. */
 export function exitScope(): void {
   // `enterWith(undefined)` clears the slot for this async context. The storage
   // is typed `AsyncLocalStorage<RunScope>` so `getStore()` stays non-nullable at

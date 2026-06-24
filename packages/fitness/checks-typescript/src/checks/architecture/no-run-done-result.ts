@@ -105,6 +105,7 @@ export function analyzeNoRunDoneResult(content: string, filePath: string): Check
 export const noRunDoneResult = defineCheck({
   id: 'a3d9f1c4-7b2e-4f6a-9c1d-8e5b0a2f4d63',
   slug: 'architecture-no-run-done-result',
+  contentFilter: 'raw',
   description:
     'Run commands render via the single RunPresentation variant; the contracts surface must not re-introduce a per-tool *DoneResult run type',
   longDescription: `**Purpose:** Guard the \`@opensip-cli/contracts\` command-result surface against re-growing one run-result interface per tool.

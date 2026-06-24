@@ -25,6 +25,7 @@ function profileMode(opts: GraphCommandOptions): string {
   return 'graph';
 }
 
+/** Create a profile builder when `--profile-output` is set. */
 export function createProfileBuilder(
   opts: GraphCommandOptions,
   startedAt: string,
@@ -40,6 +41,7 @@ export function createProfileBuilder(
   });
 }
 
+/** Write the timing profile when `--profile-output` was requested. */
 export function writeProfileIfRequested(
   opts: GraphCommandOptions,
   profile: GraphProfileBuilder | undefined,
@@ -75,15 +77,10 @@ function envelopeFor(
   });
 }
 
-// Exported for the per-mode dispatch test (audit P1-2). Not re-exported by
-// the package barrel (only `executeGraph` is), so it stays package-internal.
-//
-// Returns the run's {@link GraphRunOutcome} for every mode that should deliver
-// signals (gate, catalog, `--report-to`, default render) so the composition
-// root can cloud-emit + report-to it ONCE (ADR-0011 / ADR-0008) and the host
-// can persist the optional session contribution (host-owned-run-timing Phase
-// 3). Returns `undefined` for plain `--json` (the `--workspace` child carrier —
-// children must not each emit cloud signals).
+/**
+ * Dispatch a completed graph run to its output mode and return the run outcome
+ * for signal delivery and session persistence (undefined for plain `--json`).
+ */
 export async function dispatchGraphResult(
   opts: GraphCommandOptions,
   rawResult: RunGraphResult,

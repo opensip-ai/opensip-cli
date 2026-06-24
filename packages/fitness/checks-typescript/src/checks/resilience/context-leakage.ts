@@ -390,6 +390,7 @@ function collectContextLeakage(sourceFile: ts.SourceFile): ContextLeakageFinding
 export const contextLeakage = defineCheck({
   id: '037b58ef-7b7d-404c-896b-2d40efe02a95',
   slug: 'context-leakage',
+  contentFilter: 'raw',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   description: 'Detect potential request context leakage',
   longDescription: `**Purpose:** Detects request context stored in module or class scope, which can leak between concurrent requests.

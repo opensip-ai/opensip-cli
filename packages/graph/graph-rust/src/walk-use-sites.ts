@@ -13,7 +13,6 @@ interface UseSiteContext {
   readonly ownerHash: string;
   readonly line: number;
   readonly column: number;
-  readonly out: DependencySiteRecord[];
 }
 
 /** Walk top-level `use` and `extern crate` declarations as dependency sites. */
@@ -44,9 +43,8 @@ function collectFromUseDeclaration(
     ownerHash,
     line: decl.startPosition.row + 1,
     column: decl.startPosition.column,
-    out,
   };
-  emitFromUseSegment(body, [], ctx);
+  emitFromUseSegment(body, [], ctx, out);
 }
 
 function pickUsePathNode(decl: Node): Node | null {
@@ -60,65 +58,90 @@ function pickUsePathNode(decl: Node): Node | null {
   return null;
 }
 
-function emitFromUseSegment(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitFromUseSegment(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   switch (node.type) {
     case 'scoped_identifier':
     case 'identifier':
     case 'crate':
     case 'super':
     case 'self': {
-      emitFromPathLeaf(node, prefix, ctx);
+      emitFromPathLeaf(node, prefix, ctx, out);
       return;
     }
     case 'use_as_clause': {
-      emitFromUseAsClause(node, prefix, ctx);
+      emitFromUseAsClause(node, prefix, ctx, out);
       return;
     }
     case 'use_wildcard': {
-      emitFromUseWildcard(node, prefix, ctx);
+      emitFromUseWildcard(node, prefix, ctx, out);
       return;
     }
     case 'scoped_use_list': {
-      emitFromScopedUseList(node, prefix, ctx);
+      emitFromScopedUseList(node, prefix, ctx, out);
       return;
     }
     case 'use_list': {
-      emitFromUseList(node, prefix, ctx);
+      emitFromUseList(node, prefix, ctx, out);
       return;
     }
     /* v8 ignore start */
     default: {
-      emitFromUnknownUseShape(node, prefix, ctx);
+      emitFromUnknownUseShape(node, prefix, ctx, out);
       return;
     }
     /* v8 ignore stop */
   }
 }
 
-function emitFromPathLeaf(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitFromPathLeaf(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   const segments = decodePathSegments(node);
-  pushDepSite([...prefix, ...segments], node, ctx);
+  pushDepSite([...prefix, ...segments], node, ctx, out);
 }
 
-function emitFromUseAsClause(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitFromUseAsClause(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   const inner = node.namedChild(0);
   if (inner) {
-    emitFromUseSegment(inner, prefix, ctx);
+    emitFromUseSegment(inner, prefix, ctx, out);
   }
 }
 
-function emitFromUseWildcard(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitFromUseWildcard(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   const inner = node.namedChild(0);
   const segments = inner ? decodePathSegments(inner) : [];
-  pushDepSite([...prefix, ...segments, '*'], node, ctx);
+  pushDepSite([...prefix, ...segments, '*'], node, ctx, out);
 }
 
 // @graph-ignore-next-line graph:cycle -- intentional recursion over nested `use` scoped-list AST nodes
-function emitFromScopedUseList(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitFromScopedUseList(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   const split = splitScopedUseListChildren(node);
   if (split.list === null) return;
   const newPrefix = [...prefix, ...split.pathSegs];
-  emitUseListItems(split.list, newPrefix, ctx);
+  emitUseListItems(split.list, newPrefix, ctx, out);
 }
 
 function splitScopedUseListChildren(node: Node): {
@@ -137,25 +160,40 @@ function splitScopedUseListChildren(node: Node): {
   return { pathSegs, list };
 }
 
-function emitFromUseList(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
-  emitUseListItems(node, prefix, ctx);
+function emitFromUseList(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
+  emitUseListItems(node, prefix, ctx, out);
 }
 
-function emitUseListItems(list: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitUseListItems(
+  list: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   for (const item of namedChildrenOf(list)) {
     if (item.type === 'self') {
-      pushDepSite([...prefix], item, ctx);
+      pushDepSite([...prefix], item, ctx, out);
       continue;
     }
-    emitFromUseSegment(item, prefix, ctx);
+    emitFromUseSegment(item, prefix, ctx, out);
   }
 }
 
 /* v8 ignore start */
-function emitFromUnknownUseShape(node: Node, prefix: readonly string[], ctx: UseSiteContext): void {
+function emitFromUnknownUseShape(
+  node: Node,
+  prefix: readonly string[],
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   const text = node.text;
   if (text.length > 0) {
-    pushDepSite([...prefix, text], node, ctx);
+    pushDepSite([...prefix, text], node, ctx, out);
   }
 }
 /* v8 ignore stop */
@@ -180,12 +218,17 @@ function decodePathSegments(node: Node): readonly string[] {
   return [];
 }
 
-function pushDepSite(segments: readonly string[], node: Node, ctx: UseSiteContext): void {
+function pushDepSite(
+  segments: readonly string[],
+  node: Node,
+  ctx: UseSiteContext,
+  out: DependencySiteRecord[],
+): void {
   if (segments.length === 0) {
     /* v8 ignore next */
     return;
   }
-  ctx.out.push({
+  out.push({
     nodeRef: node,
     sourceFileRef: ctx.file,
     ownerHash: ctx.ownerHash,

@@ -32,6 +32,7 @@ export type ToolCommandSpecInput<TOpts = unknown, TCtx = CommandContext> =
   | PrimaryCommandSpecDraft<TOpts, TCtx>
   | NestedCommandSpecDraft<TOpts, TCtx>;
 
+/** Type guard for a primary command draft (name/aliases filled by defineTool). */
 export function isPrimaryCommandDraft<TOpts, TCtx>(
   spec: ToolCommandSpecInput<TOpts, TCtx>,
 ): spec is PrimaryCommandSpecDraft<TOpts, TCtx> {
@@ -42,6 +43,7 @@ export function isPrimaryCommandDraft<TOpts, TCtx>(
   );
 }
 
+/** Type guard for a nested command draft (parent filled by defineTool). */
 export function isNestedCommandDraft<TOpts, TCtx>(
   spec: ToolCommandSpecInput<TOpts, TCtx>,
 ): spec is NestedCommandSpecDraft<TOpts, TCtx> {

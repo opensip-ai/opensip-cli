@@ -155,6 +155,7 @@ export async function executeGraph(
   }
 }
 
+/** Map graph CLI errors to exit codes and emit a stderr message. */
 export function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
   logger.error({
     evt: `graph.cli.${label}.error`,

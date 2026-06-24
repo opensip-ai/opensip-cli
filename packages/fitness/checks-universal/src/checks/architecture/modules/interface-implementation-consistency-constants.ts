@@ -24,7 +24,7 @@ export const TYPE_ANNOTATION_PATTERN = /\):\s{0,5}[a-zA-Z]/;
 export const METHOD_BODY_PATTERN = /\)\s{0,5}\{/;
 export const CLASS_LEVEL_METHOD_PATTERN = /^[a-zA-Z_]\w{0,99}\s{0,5}\(/;
 
-export const JS_KEYWORDS = new Set([
+const JS_KEYWORD_NAMES = [
   'if',
   'else',
   'while',
@@ -63,9 +63,13 @@ export const JS_KEYWORDS = new Set([
   'get',
   'set',
   'async',
-]);
+] as const;
 
-export const ALLOWED_EXTRA_METHODS = new Set([
+export function isJsKeyword(name: string): boolean {
+  return (JS_KEYWORD_NAMES as readonly string[]).includes(name);
+}
+
+const ALLOWED_EXTRA_METHOD_NAMES = [
   'dispose',
   'destroy',
   'cleanup',
@@ -183,6 +187,10 @@ export const ALLOWED_EXTRA_METHODS = new Set([
   'fromConfig',
   'createCacheKey',
   'toEnvVarName',
-]);
+] as const;
+
+export function isAllowedExtraMethod(methodName: string): boolean {
+  return (ALLOWED_EXTRA_METHOD_NAMES as readonly string[]).includes(methodName);
+}
 
 export const TEST_DOUBLE_CLASS_NAME_PATTERN = /^(Fake|Mock|Stub|Spy)[A-Z]/;

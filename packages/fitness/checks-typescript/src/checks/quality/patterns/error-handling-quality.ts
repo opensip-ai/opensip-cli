@@ -12,6 +12,8 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitne
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
+import { getContainingFunctionName } from './containing-function-name.js';
+
 // =============================================================================
 // WHITELIST PATTERNS
 // =============================================================================
@@ -86,6 +88,8 @@ const PROBE_FUNCTION_NAME_PATTERNS = [
   /^resolveProjectConfigPath$/,
   /^isFile$/,
   /^isDirectory$/,
+  /^normalizeIdentity$/,
+  /^analyzeFileConvention$/,
 ];
 
 /** Paths where best-effort / composition-root degradation is intentional. */
@@ -139,27 +143,6 @@ const COMPOSITION_ROOT_PATH_PATTERNS = [
 
 function isCompositionRootPath(filePath: string): boolean {
   return COMPOSITION_ROOT_PATH_PATTERNS.some((pattern) => pattern.test(filePath));
-}
-
-function getContainingFunctionName(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
-  let current: ts.Node | undefined = node.parent;
-
-  while (current) {
-    if (ts.isFunctionDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile);
-    }
-    if (ts.isMethodDeclaration(current) && current.name) {
-      return current.name.getText(sourceFile);
-    }
-    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      const parent = current.parent;
-      if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
-        return parent.name.getText(sourceFile);
-      }
-    }
-    current = current.parent;
-  }
-  return undefined;
 }
 
 function isModuleInitResolutionProbe(node: ts.CatchClause, sourceFile: ts.SourceFile): boolean {

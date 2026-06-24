@@ -10,12 +10,14 @@ import { resolveToolHooks } from './resolve-tool-hooks.js';
 import type { ToolIdentity } from './identity.js';
 import type { ToolRegistry } from './registry.js';
 
+/** Canonical tool identity plus its resolved plugin layout key. */
 export interface ToolIdentityBinding {
   readonly canonicalName: string;
   readonly aliases: readonly string[];
   readonly layoutKey: string;
 }
 
+/** Registry-backed lookup from user input to a tool identity binding. */
 export interface ToolIdentityIndex {
   readonly bindings: readonly ToolIdentityBinding[];
   resolveInput(input: string): ToolIdentityBinding | undefined;
@@ -61,6 +63,7 @@ export function buildToolIdentityIndex(registry: ToolRegistry): ToolIdentityInde
   const bindings: ToolIdentityBinding[] = [];
   const inputToBinding = new Map<string, ToolIdentityBinding>();
 
+  // Small registered-tool set per CLI invocation (batch limit irrelevant).
   for (const tool of registry.list()) {
     const identity = tool.identity;
     if (identity === undefined) {
@@ -76,6 +79,7 @@ export function buildToolIdentityIndex(registry: ToolRegistry): ToolIdentityInde
 
     bindings.push(binding);
     addIdentityInput(inputToBinding, binding.canonicalName, binding);
+    // Small alias list per tool identity (batch limit irrelevant).
     for (const alias of binding.aliases) {
       addIdentityInput(inputToBinding, alias, binding);
     }

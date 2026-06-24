@@ -43,8 +43,8 @@ function getCalleeName(expressionText: string): string | null {
   return direct?.[1] ?? null;
 }
 
-const SETUP_THEN_RUN_FIRST = /^(?:ensure|load|maybeShow|save)/i;
-const SETUP_THEN_RUN_SECOND = /^(?:build|emit|render|deliver)/i;
+const SETUP_THEN_RUN_FIRST = /^(?:ensure|load|maybeShow|save|check)/i;
+const SETUP_THEN_RUN_SECOND = /^(?:build|emit|render|deliver|maybeShow)/i;
 const SEQUENTIAL_SCAN_FIRST = /^collect/i;
 const SEQUENTIAL_SCAN_SECOND = /^count/i;
 
@@ -181,6 +181,11 @@ function isSequentialOrchestration(current: AwaitInfo, next: AwaitInfo): boolean
   }
 
   if (SETUP_THEN_RUN_FIRST.test(first) && SETUP_THEN_RUN_SECOND.test(second)) {
+    return true;
+  }
+
+  // Post-emit auth/cache cleanup must run after the sink attempt, not in parallel.
+  if (first === 'emit' && second.startsWith('invalidate')) {
     return true;
   }
 

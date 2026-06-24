@@ -17,6 +17,7 @@ const PACKAGES_SEGMENT = /(?:^|\/)packages\//;
 export const packageJsonExportsField = defineCheck({
   id: 'b4203be3-3308-4fb1-8b20-44e23b8e3eff',
   slug: 'package-json-exports-field',
+  contentFilter: 'strip-strings',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
   confidence: 'high',
   description:

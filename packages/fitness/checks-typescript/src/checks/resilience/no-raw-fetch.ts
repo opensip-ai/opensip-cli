@@ -50,6 +50,7 @@ const RAW_FETCH_PATTERN = /(?<![\w$.])fetch\s{0,10}\(/g;
 export const noRawFetch = defineCheck({
   id: 'cfeba2d8-0f62-4b64-b625-f5ba8a0f3b11',
   slug: 'no-raw-fetch',
+  contentFilter: 'strip-strings',
   fileTypes: ['ts', 'tsx', 'js', 'jsx'],
   description: 'Detect direct fetch() calls that should use wrapped HTTP clients',
   longDescription: `**Purpose:** Enforces use of the platform HTTP client wrapper instead of raw \`fetch()\` calls.

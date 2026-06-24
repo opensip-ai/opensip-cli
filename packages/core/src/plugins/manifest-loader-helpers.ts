@@ -122,6 +122,7 @@ function configMatchesIdentity(
   return config === undefined || config.namespace === identity.name;
 }
 
+/** Validate and normalize a raw `opensipTools` or sidecar manifest block. */
 export function validateManifest(
   block: Record<string, unknown>,
   name: unknown,
@@ -191,6 +192,7 @@ const CONTRIBUTION_KINDS: readonly CapabilityContributionKind[] = [
 function normalizeCapabilities(value: unknown): readonly ToolCapabilityDeclaration[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: ToolCapabilityDeclaration[] = [];
+  // Small per-plugin manifest list (batch limit irrelevant).
   for (const entry of value) {
     if (!isRecord(entry)) return undefined;
     if (typeof entry.id !== 'string' || entry.id === '') return undefined;
@@ -253,6 +255,7 @@ function normalizeCommandShell(
 function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: ToolCommandManifest[] = [];
+  // Small per-plugin manifest list (batch limit irrelevant).
   for (const entry of value) {
     if (!isRecord(entry)) return undefined;
     if (typeof entry.name !== 'string' || entry.name === '') return undefined;
@@ -289,6 +292,7 @@ function normalizeConfig(value: unknown): ConfigParseResult {
   return { ok: true, config: { namespace, schema } };
 }
 
+/** Compute a stable SHA-256 fingerprint of a normalized tool manifest. */
 export function hashManifest(manifest: RawToolPluginManifest): string {
   const canonical = JSON.stringify({
     kind: manifest.kind,
@@ -324,6 +328,7 @@ function readJson(path: string): Record<string, unknown> | undefined {
   }
 }
 
+/** Emit a structured debug log when manifest discovery or parsing fails. */
 export function diagnose(dir: string, source: ToolSource, reason: string): void {
   logger.debug({
     evt: 'plugin.manifest.read_failed',

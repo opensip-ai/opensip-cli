@@ -26,42 +26,13 @@ import { commonFlags, type CommonFlagKey } from '@opensip-cli/contracts';
 
 export type Shell = 'bash' | 'zsh' | 'fish';
 
-/**
- * Internal/machine-facing command names never offered in shell completion.
- * These are spawned by the host (sharded build, off-process engine workers,
- * machine exports), never typed by a user.
- *
- * This is the STATIC FALLBACK / default for {@link assembleCompletionInventory}'s
- * `internalCommands` argument. The live path passes a descriptor-driven set
- * (`visibility: 'internal'` + this fallback), keeping the runtime filter in
- * lockstep with the `--help` hide pass. The set still backs the completion-drift
- * test, and matters whenever a caller does not supply the descriptor-derived set.
- *
- * Note: the four `*-run-worker` / `*-shard-worker` names AND
- * `graph-equivalence-check` are the Tier-3 `visibility: 'internal'` commands —
- * they also flow through the descriptor-driven set. They are listed here so the
- * static fallback is correct on its own (the historical gap was the missing
- * `graph-equivalence-check`).
- */
-/**
- * Internal/machine-facing command names never offered in shell completion — the
- * `visibility: 'internal'` Tier-3 commands: `*-run-worker` / `*-shard-worker` and
- * `graph-equivalence-check` are machine-only IPC/CI bootstrap entry points
- * (ADR-0028), revealed by `OPENSIP_CLI_SHOW_INTERNAL=1`.
- *
- * The legacy flat-root export aliases (`catalog-export` / `sarif-export` /
- * `graph-baseline-export` / `fit-baseline-export`) were removed entirely, so they
- * no longer appear in the tool registry and need no completion suppression — the
- * canonical nested `<tool> export` forms are the only export surface.
- */
+/** Internal/machine-facing commands excluded from shell completion (host-spawned workers). */
 export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'graph-shard-worker',
   'graph-equivalence-check',
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
-  // ADR-0054 M4-E: the host-owned dispatch worker subcommand (forked by the
-  // supervisor; never a public surface).
   '__tool-command-worker',
 ]);
 

@@ -24,6 +24,7 @@ import type { Signal } from '@opensip-cli/core';
 const ENTRY_POINTS_PREVIEW = 10;
 const FINDINGS_PREVIEW = 10;
 
+/** Inputs for building the unified human-readable graph report. */
 export interface UnifiedReportInput {
   readonly catalog: Catalog | null;
   readonly indexes: Indexes | null;
@@ -88,6 +89,7 @@ export async function buildLiveGraphOutput(
   };
 }
 
+/** Count distinct source files referenced in a catalog. */
 export function countFiles(catalog: Catalog): number {
   const files = new Set<string>();
   for (const name of Object.keys(catalog.functions)) {
@@ -107,12 +109,7 @@ function countOccurrences(catalog: Catalog): number {
   return n;
 }
 
-/**
- * Build the unified terminal report lines: catalog summary, findings
- * grouped by rule, top-N entry points, and a single-line summary. The
- * caller decides where to write them (raw stdout for non-interactive
- * paths, or the Ink view in the default human-report path).
- */
+/** Options for {@link buildUnifiedReportLines}. */
 export interface BuildUnifiedReportOptions {
   /**
    * Whether to append the trailing "== Summary ==" footer block.
@@ -123,6 +120,7 @@ export interface BuildUnifiedReportOptions {
   readonly includeSummary?: boolean;
 }
 
+/** Build unified terminal report lines from catalog, indexes, and signals. */
 export function buildUnifiedReportLines(
   input: UnifiedReportInput,
   options?: BuildUnifiedReportOptions,

@@ -14,7 +14,7 @@ export interface ThrowsDocConfig extends Record<string, unknown> {
 }
 
 /** Typed error classes that are self-documenting without @throws JSDoc. */
-export const SELF_DOCUMENTING_ERRORS = new Set([
+const SELF_DOCUMENTING_ERROR_NAMES = [
   'ValidationError',
   'AuthorizationError',
   'NotFoundError',
@@ -55,7 +55,7 @@ export const SELF_DOCUMENTING_ERRORS = new Set([
   'DuplicateResourceError',
   'DataIntegrityError',
   'ToolError',
-]);
+] as const;
 
 export const SELF_DOCUMENTING_SUFFIXES = [
   'ValidationError',
@@ -100,7 +100,7 @@ export function buildEffectiveSuffixes(): readonly string[] {
 }
 
 export function isSelfDocumentingError(errorType: string, suffixes: readonly string[]): boolean {
-  if (SELF_DOCUMENTING_ERRORS.has(errorType)) {
+  if ((SELF_DOCUMENTING_ERROR_NAMES as readonly string[]).includes(errorType)) {
     return true;
   }
   return suffixes.some((suffix) => errorType.endsWith(suffix));

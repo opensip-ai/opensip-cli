@@ -13,8 +13,8 @@ export interface DuplicateUtilityFunctionsConfig extends Record<string, unknown>
  * as duplicates. Limited to genuinely generic identifiers — config / factory
  * / logger / common type-guard names — that almost any TS codebase will hit.
  */
-/** ADR-0010 lang substrate — parallel helper names are intentional across lang-* packs. */
-export const LANG_SUBSTRATE_PATH = /packages\/languages\/lang-[^/]+\//;
+/** Lang substrate packs — parallel helper names are intentional across lang-* packs. */
+export const LANG_SUBSTRATE_PATH = /\/lang-[a-z-]+\//;
 
 export const DOMAIN_SPECIFIC_FUNCTION_NAMES: readonly string[] = [
   'getConfig',

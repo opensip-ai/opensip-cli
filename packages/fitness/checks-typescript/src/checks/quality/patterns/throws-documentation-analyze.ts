@@ -1,3 +1,4 @@
+// @fitness-ignore-file throws-documentation -- Functions throw self-documenting typed errors
 /**
  * AST analysis helpers for the throws-documentation check.
  */

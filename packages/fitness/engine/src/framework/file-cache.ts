@@ -33,6 +33,7 @@ interface PrewarmStats {
  */
 const PREWARM_BATCH_SIZE = 100;
 
+/** In-memory file cache with optional prewarm for fitness check runs. */
 export class FileCache {
   private readonly cache = new Map<string, string>();
   private _prewarmed = false;

@@ -68,7 +68,7 @@ export const SAFE_BUILDER_PREFIXES = [
 ];
 
 /** Known safe method names in fluent APIs that always return `this` or non-null values. */
-export const SAFE_FLUENT_METHODS = new Set([
+export const SAFE_FLUENT_METHOD_NAMES = [
   'then',
   'catch',
   'finally',
@@ -328,4 +328,8 @@ export const SAFE_FLUENT_METHODS = new Set([
   'storeOptionsAsProperties',
   'copyInheritedSettings',
   'combineFlagAndOptionalValue',
-]);
+] as const;
+
+export function isSafeFluentMethod(methodName: string): boolean {
+  return (SAFE_FLUENT_METHOD_NAMES as readonly string[]).includes(methodName);
+}

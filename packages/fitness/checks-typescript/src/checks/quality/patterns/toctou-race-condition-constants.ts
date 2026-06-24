@@ -86,7 +86,7 @@ export const SAFE_TOCTOU_PATHS = [
 ];
 
 /** Read operation method names */
-export const READ_METHODS = new Set([
+const READ_METHOD_NAMES = [
   'get',
   'find',
   'findOne',
@@ -96,13 +96,25 @@ export const READ_METHODS = new Set([
   'fetch',
   'load',
   'read',
-]);
+] as const;
 
 /** Update operation method names */
-export const UPDATE_METHODS = new Set(['update', 'save', 'put', 'set', 'patch', 'modify']);
+const UPDATE_METHOD_NAMES = ['update', 'save', 'put', 'set', 'patch', 'modify'] as const;
 
 /** Drizzle-style ORM writes treated as atomic SQL. */
-export const DRIZZLE_ATOMIC_WRITE_METHODS = new Set(['update', 'insert', 'delete']);
+const DRIZZLE_ATOMIC_WRITE_METHOD_NAMES = ['update', 'insert', 'delete'] as const;
+
+export function isReadMethod(methodName: string): boolean {
+  return (READ_METHOD_NAMES as readonly string[]).includes(methodName);
+}
+
+export function isUpdateMethod(methodName: string): boolean {
+  return (UPDATE_METHOD_NAMES as readonly string[]).includes(methodName);
+}
+
+export function isDrizzleAtomicWriteMethod(methodName: string): boolean {
+  return (DRIZZLE_ATOMIC_WRITE_METHOD_NAMES as readonly string[]).includes(methodName);
+}
 
 export const KIND_READ_SHARED = 'read-shared' as const;
 export const KIND_UPDATE_SHARED = 'update-shared' as const;

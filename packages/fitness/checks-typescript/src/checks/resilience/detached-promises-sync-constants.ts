@@ -25,7 +25,7 @@ export interface DetachedPromisesConfig extends Record<string, unknown> {
  * generic JS / TS / Node defaults; framework-specific entries live in
  * recipe config under `additionalSyncFunctions`.
  */
-export const KNOWN_SYNC_FUNCTIONS = new Set([
+const KNOWN_SYNC_FUNCTION_NAMES = [
   // Node.js sync filesystem / process methods
   'execSync',
   'readFileSync',
@@ -46,6 +46,10 @@ export const KNOWN_SYNC_FUNCTIONS = new Set([
   'clearImmediate',
   // Console (synchronous)
   'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
   'time',
   'timeEnd',
   // Promise resolution helpers (sync wrappers)
@@ -196,12 +200,12 @@ export const KNOWN_SYNC_FUNCTIONS = new Set([
   'toLocaleTimeString',
   'toLocaleString',
   'now',
-]);
+] as const;
 
 /**
  * Known synchronous receiver identifiers — generic JS / Node namespaces.
  */
-export const KNOWN_SYNC_RECEIVERS = new Set([
+const KNOWN_SYNC_RECEIVER_NAMES = [
   'console',
   'log',
   'path',
@@ -225,7 +229,7 @@ export const KNOWN_SYNC_RECEIVERS = new Set([
   'Reflect',
   'Proxy',
   'Intl',
-]);
+] as const;
 
 /** Substrings matched against receiver variable names (case-insensitive). */
 export const KNOWN_SYNC_RECEIVER_PATTERNS = [
@@ -255,9 +259,8 @@ export const FILE_SKIP_PATTERNS = [
   // Tool CLI dispatch layers: async handlers invoke synchronous render/error helpers.
   '/engine/src/cli/',
   // Composition root + bootstrap: synchronous registration/mount helpers inside async setup.
-  '/packages/cli/src/bootstrap/',
   '/cli/src/bootstrap/',
-  'packages/cli/src/index.ts',
+  '/cli/src/index.ts',
 ];
 
 /** Method-name prefixes that indicate synchronous calls. */
@@ -297,28 +300,31 @@ export const KNOWN_SYNC_PREFIXES = [
 export const KNOWN_SYNC_SUFFIXES = ['Sync'];
 
 /** Fire-and-forget patterns that are intentionally not awaited. */
-export const FIRE_AND_FORGET_PATTERNS = new Set([
+const FIRE_AND_FORGET_PATTERN_NAMES = [
   'setImmediate',
   'setTimeout',
   'setInterval',
   'nextTick',
   'queueMicrotask',
-]);
+] as const;
+
+export function isFireAndForgetPattern(name: string): boolean {
+  return (FIRE_AND_FORGET_PATTERN_NAMES as readonly string[]).includes(name);
+}
 
 /** Built-in defaults merged with the recipe's `detached-promises` config slice. */
 export interface EffectiveSyncSets {
-  syncFunctions: ReadonlySet<string>;
-  syncReceivers: ReadonlySet<string>;
+  syncFunctions: readonly string[];
+  syncReceivers: readonly string[];
   syncPrefixes: readonly string[];
 }
 
-/** Build effective sync-call lookup sets from defaults + recipe config. */
+/** Build effective sync-call lookup lists from defaults + recipe config. */
 export function buildEffectiveSyncSets(): EffectiveSyncSets {
   const cfg = getCheckConfig<DetachedPromisesConfig>('detached-promises');
-  const fns = new Set(KNOWN_SYNC_FUNCTIONS);
-  for (const name of cfg.additionalSyncFunctions ?? []) fns.add(name);
-  const recvs = new Set(KNOWN_SYNC_RECEIVERS);
-  for (const name of cfg.additionalSyncReceivers ?? []) recvs.add(name);
-  const prefixes = [...KNOWN_SYNC_PREFIXES, ...(cfg.additionalSyncPrefixes ?? [])];
-  return { syncFunctions: fns, syncReceivers: recvs, syncPrefixes: prefixes };
+  return {
+    syncFunctions: [...KNOWN_SYNC_FUNCTION_NAMES, ...(cfg.additionalSyncFunctions ?? [])],
+    syncReceivers: [...KNOWN_SYNC_RECEIVER_NAMES, ...(cfg.additionalSyncReceivers ?? [])],
+    syncPrefixes: [...KNOWN_SYNC_PREFIXES, ...(cfg.additionalSyncPrefixes ?? [])],
+  };
 }
