@@ -47,26 +47,16 @@ function registryName(token) {
 
 function npmView(name, version, tag) {
   try {
-    const out = execFileSync('npm', ['view', `${name}@${version}`, 'version', '--json'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const parsed = JSON.parse(out.trim());
-    if (parsed !== version) return false;
-    if (tag === 'latest') {
-      const tags = execFileSync('npm', ['dist-tag', 'ls', name, '--json'], {
+    const out = execFileSync(
+      'npm',
+      ['view', `${name}@${version}`, 'version', 'dist-tags', '--json'],
+      {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      const map = JSON.parse(tags.trim());
-      return map.latest === version;
-    }
-    const tags = execFileSync('npm', ['dist-tag', 'ls', name, '--json'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const map = JSON.parse(tags.trim());
-    return map[tag] === version;
+      },
+    );
+    const parsed = JSON.parse(out.trim());
+    return parsed?.version === version && parsed?.['dist-tags']?.[tag] === version;
   } catch {
     return false;
   }
