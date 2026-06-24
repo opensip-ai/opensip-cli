@@ -7,7 +7,7 @@
  * new hash."
  */
 
-import { digestCanonicalBody } from '@opensip-cli/graph';
+import { digestCanonicalBody, normalizeWhitespace } from '@opensip-cli/graph';
 import { stripComments } from '@opensip-cli/lang-typescript';
 
 import type ts from 'typescript';
@@ -60,8 +60,4 @@ export function hashSyntheticBody(input: string): string {
 export function digestSyntheticBody(input: string): BodyDigest {
   const normalized = normalizeWhitespace(stripComments(input));
   return digestCanonicalBody(normalized);
-}
-
-function normalizeWhitespace(s: string): string {
-  return s.replaceAll(/\s+/g, ' ').trim();
 }

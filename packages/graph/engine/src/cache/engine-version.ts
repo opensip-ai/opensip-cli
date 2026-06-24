@@ -27,7 +27,10 @@
 
 import { readPackageVersion } from '@opensip-cli/core';
 
-import { NEAR_DUP_SIGNATURE_K } from '../lang-adapter/near-duplicate-signature.js';
+import {
+  NEAR_DUP_SIGNATURE_K,
+  NEAR_DUP_SIGNATURE_VERSION,
+} from '../lang-adapter/near-duplicate-signature.js';
 
 /**
  * The running `@opensip-cli/graph` package version, resolved once from
@@ -82,5 +85,6 @@ const SIGNATURE_VERSION_PREFIX = 'sig=';
  * rebuild is diagnosable.
  */
 export function stampEngineVersion(adapterCacheKey: string, mode: EngineMode = 'exact'): string {
-  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${String(NEAR_DUP_SIGNATURE_K)}|${adapterCacheKey}`;
+  const sig = `${String(NEAR_DUP_SIGNATURE_K)}.${String(NEAR_DUP_SIGNATURE_VERSION)}`;
+  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${sig}|${adapterCacheKey}`;
 }

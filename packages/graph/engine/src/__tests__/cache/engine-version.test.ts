@@ -19,7 +19,7 @@ import type { Catalog } from '../../types.js';
 describe('stampEngineVersion', () => {
   it('prefixes the adapter cacheKey with the running engine version and the default exact mode', () => {
     expect(stampEngineVersion('ts-6.0.3-exact-abc')).toBe(
-      `eng=${ENGINE_VERSION}|mode=exact|sig=128|ts-6.0.3-exact-abc`,
+      `eng=${ENGINE_VERSION}|mode=exact|sig=128.2|ts-6.0.3-exact-abc`,
     );
   });
 
@@ -33,7 +33,7 @@ describe('stampEngineVersion', () => {
   it('is polyglot — wraps every adapter prefix identically', () => {
     for (const adapterKey of ['ts-6-x', 'go-abc', 'java-abc', 'rs-abc', 'py-abc']) {
       expect(stampEngineVersion(adapterKey)).toBe(
-        `eng=${ENGINE_VERSION}|mode=exact|sig=128|${adapterKey}`,
+        `eng=${ENGINE_VERSION}|mode=exact|sig=128.2|${adapterKey}`,
       );
     }
   });
@@ -47,8 +47,8 @@ describe('stampEngineVersion', () => {
     // mode ⇒ different cacheKey.
     const exact = stampEngineVersion('ts-6.0.3-exact-abc', 'exact');
     const sharded = stampEngineVersion('ts-6.0.3-exact-abc', 'sharded');
-    expect(exact).toBe(`eng=${ENGINE_VERSION}|mode=exact|sig=128|ts-6.0.3-exact-abc`);
-    expect(sharded).toBe(`eng=${ENGINE_VERSION}|mode=sharded|sig=128|ts-6.0.3-exact-abc`);
+    expect(exact).toBe(`eng=${ENGINE_VERSION}|mode=exact|sig=128.2|ts-6.0.3-exact-abc`);
+    expect(sharded).toBe(`eng=${ENGINE_VERSION}|mode=sharded|sig=128.2|ts-6.0.3-exact-abc`);
     expect(exact).not.toBe(sharded);
   });
 });
