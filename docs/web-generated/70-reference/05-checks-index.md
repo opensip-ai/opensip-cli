@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-23
+last_verified: 2026-06-24
 release: v0.1.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,17 +20,17 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **157 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **158 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
 ---
 
-## Universal  *(95 checks)*
+## Universal  *(96 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(15)*
+### Architecture  *(16)*
 
 | Slug | Description |
 |---|---|
@@ -47,6 +47,7 @@ Language-agnostic; runs against every project.
 | [`project-readme-existence`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/project-readme-existence.ts) | Ensures every package has a README.md file |
 | [`stale-build-artifacts`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/stale-build-artifacts.ts) | Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/ |
 | [`tool-has-manifest`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-has-manifest.ts) | Every first-party tool package must declare a conformant opensipTools manifest (kind/id/apiVersion/commands) the host can read before import |
+| [`tool-identity-single-source`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/tool-identity-single-source.ts) | Tool packages declare opensipTools.identity once; manifest id, primary command, aliases, and pluginLayout.domain must match the normalized runtime surface |
 | [`vitest-config-extends-base`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-extends-base.ts) | Per-package vitest configs must extend the shared .config/vitest.base (when one exists) |
 | [`vitest-config-required-with-tests`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/vitest-config-required-with-tests.ts) | Ensures packages with tests have a vitest.config at the package root |
 
@@ -110,7 +111,7 @@ Language-agnostic; runs against every project.
 
 | Slug | Description |
 |---|---|
-| [`batch-operation-limits`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/batch-operations.ts) | Detect batch operations that may process unbounded data |
+| [`batch-operation-limits`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/batch-operation-limits.ts) | Detect batch operations that may process unbounded data |
 | [`cache-ttl-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/cache-ttl-validation.ts) | Validate cache TTL values for appropriate caching behavior |
 | [`catch-clause-safety`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/catch-clause-safety.ts) | Detects unsafe catch clause patterns: as Error casts without instanceof, catch(e: any) |
 | [`dangerous-config-defaults`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/dangerous-config-defaults.ts) | Detect dangerous default configurations |
@@ -135,7 +136,7 @@ Language-agnostic; runs against every project.
 | [`timer-lifecycle`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/timer-lifecycle.ts) | Detects setInterval() calls without corresponding clearInterval() cleanup — prevents timer leaks |
 | [`transaction-boundary-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/transaction-patterns.ts) | Validate transaction boundaries are properly managed |
 | [`transaction-timeout`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/transaction-patterns.ts) | Validate transactions have timeout configurations |
-| [`unbounded-memory`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/batch-operations.ts) | Detect unbounded collections and file reads that may cause OOM |
+| [`unbounded-memory`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/resilience/unbounded-memory.ts) | Detect unbounded collections and file reads that may cause OOM |
 
 ### Documentation  *(4)*
 

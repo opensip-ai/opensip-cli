@@ -78,7 +78,6 @@ function isBarrelFile(content: string): boolean {
 export const moduleCouplingFanOut = defineCheck({
   id: 'c0b7289b-984c-4f39-b2be-7d9b0692abec',
   slug: 'module-coupling-fan-out',
-  contentFilter: 'strip-strings',
   description: 'Flags files with high outbound import fan-out (god-files)',
   longDescription:
     `Counts each file's outbound intra-project imports. Files exceeding ${WARNING_THRESHOLD} ` +
@@ -95,6 +94,7 @@ export const moduleCouplingFanOut = defineCheck({
   confidence: 'medium',
   tags: ['architecture', 'modularity'],
   fileTypes: ['ts', 'tsx', 'js', 'jsx'],
+  contentFilter: 'raw',
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const fileMap = await files.readAll();

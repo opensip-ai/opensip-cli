@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from 'vitest';
 
 import { ToolError } from '../../lib/errors.js';
+import { deriveRunOutcome, inferStoredRunOutcome } from '../run-outcome.js';
 import { UnknownLiveViewError } from '../types.js';
 
 import type { RunTimer } from '../../lib/run-timer.js';
@@ -57,5 +58,20 @@ describe('ToolRunSessions launch surface (host-owned-run-timing Phase 6)', () =>
     // ToolRunSessions, `keyof` drifts from `'timing'` and this fails to compile.
     expectTypeOf<keyof ToolRunSessions>().toEqualTypeOf<'timing'>();
     expectTypeOf<ToolRunSessions['timing']>().toEqualTypeOf<RunTimer>();
+  });
+});
+
+describe('run outcome helpers', () => {
+  it('derives explicit outcomes before passed/failed inference', () => {
+    expect(deriveRunOutcome({ passed: true })).toBe('passed');
+    expect(deriveRunOutcome({ passed: false })).toBe('failed');
+    expect(deriveRunOutcome({ passed: true, explicit: 'degraded' })).toBe('degraded');
+    expect(deriveRunOutcome({ passed: false, explicit: 'error' })).toBe('error');
+  });
+
+  it('preserves stored runOutcome and infers legacy rows from passed', () => {
+    expect(inferStoredRunOutcome({ passed: true })).toBe('passed');
+    expect(inferStoredRunOutcome({ passed: false })).toBe('failed');
+    expect(inferStoredRunOutcome({ passed: true, runOutcome: 'degraded' })).toBe('degraded');
   });
 });

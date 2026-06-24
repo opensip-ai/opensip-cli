@@ -90,4 +90,140 @@ describe('defineTool', () => {
       expect((error as { code?: string }).code).toBe('TOOL.IDENTITY.REQUIRED');
     }
   });
+
+  it('rejects hand-written identity-derived extension fields', () => {
+    const base = {
+      identity: { name: 'demo' },
+      metadata: {
+        id: '00000000-0000-4000-8000-000000000003',
+        version: '0.0.0',
+        description: 'bad',
+      },
+      commandSpecs: [
+        definePrimaryCommand({
+          description: 'Run',
+          commonFlags: [],
+          scope: 'project',
+          output: 'command-result',
+          handler: noopHandler,
+        }),
+      ],
+    } as const;
+
+    expect(() =>
+      defineTool({
+        ...base,
+        extensionPoints: { config: { schema: {}, namespace: 'manual' } as never },
+      }),
+    ).toThrow(/config\.namespace/);
+    expect(() =>
+      defineTool({
+        ...base,
+        extensionPoints: {
+          sessionReplay: { tool: 'manual', replaySession: () => ({}) } as never,
+        },
+      }),
+    ).toThrow(/sessionReplay\.tool/);
+    expect(() =>
+      defineTool({
+        ...base,
+        pluginLayout: { domain: 'manual', userSubdirs: [] } as never,
+      }),
+    ).toThrow(/pluginLayout\.domain/);
+  });
+
+  it('rejects command specs that drift from the declared identity', () => {
+    expect(() =>
+      defineTool({
+        identity: { name: 'demo', aliases: ['d'] },
+        metadata: {
+          id: '00000000-0000-4000-8000-000000000004',
+          version: '0.0.0',
+          description: 'bad',
+        },
+        commandSpecs: [
+          defineCommand({
+            name: 'demo',
+            aliases: ['wrong'],
+            description: 'Run',
+            commonFlags: [],
+            scope: 'project',
+            output: 'command-result',
+            handler: noopHandler,
+          }),
+        ],
+      }),
+    ).toThrow(/aliases must match/);
+
+    expect(() =>
+      defineTool({
+        identity: { name: 'demo' },
+        metadata: {
+          id: '00000000-0000-4000-8000-000000000005',
+          version: '0.0.0',
+          description: 'bad',
+        },
+        commandSpecs: [
+          defineCommand({
+            name: 'child',
+            parent: 'other',
+            description: 'Child',
+            commonFlags: [],
+            scope: 'project',
+            output: 'command-result',
+            handler: noopHandler,
+          }),
+        ],
+      }),
+    ).toThrow(/declares parent/);
+  });
+
+  it('requires exactly one primary command', () => {
+    const metadata = {
+      id: '00000000-0000-4000-8000-000000000006',
+      version: '0.0.0',
+      description: 'bad',
+    };
+
+    expect(() =>
+      defineTool({
+        identity: { name: 'demo' },
+        metadata,
+        commandSpecs: [
+          defineNestedCommand({
+            name: 'list',
+            description: 'List',
+            commonFlags: [],
+            scope: 'project',
+            output: 'command-result',
+            handler: noopHandler,
+          }),
+        ],
+      }),
+    ).toThrow(/exactly one primary command/);
+
+    expect(() =>
+      defineTool({
+        identity: { name: 'demo' },
+        metadata,
+        commandSpecs: [
+          definePrimaryCommand({
+            description: 'Run',
+            commonFlags: [],
+            scope: 'project',
+            output: 'command-result',
+            handler: noopHandler,
+          }),
+          defineCommand({
+            name: 'demo',
+            description: 'Run again',
+            commonFlags: [],
+            scope: 'project',
+            output: 'command-result',
+            handler: noopHandler,
+          }),
+        ],
+      }),
+    ).toThrow(/exactly one primary command/);
+  });
 });

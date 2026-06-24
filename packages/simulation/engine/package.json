@@ -28,7 +28,8 @@
   },
   "publishConfig": {
     "exports": {
-      ".": "./dist/index.js"
+      ".": "./dist/index.js",
+      "./internal": "./dist/internal.js"
     }
   },
   "files": [

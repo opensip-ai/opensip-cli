@@ -7,8 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { ValidationError } from '../../lib/errors.js';
 import { assertManifestMatchesTool } from '../manifest-assert.js';
 
+import type { CommandSpec } from '../command-spec.js';
 import type { ToolPluginManifest } from '../manifest.js';
-import type { Tool } from '../types.js';
+import type { Tool, ToolCliContext } from '../types.js';
 
 /** Minimal Tool stub — only the fields the guard inspects are meaningful. */
 function makeTool(
@@ -100,6 +101,123 @@ describe('assertManifestMatchesTool', () => {
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(ValidationError);
     expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
       /declared in manifest but not in tool: \[graph-ghost\]/,
+    );
+  });
+
+  it('throws when manifest identity fields drift from runtime identity', () => {
+    const tool = { ...makeTool('fitness', ['fitness']), identity: { name: 'fitness' } };
+    expect(() =>
+      assertManifestMatchesTool(
+        { ...makeManifest('fitness', ['fitness']), identity: { name: 'fit' } },
+        tool,
+      ),
+    ).toThrow(/identity\.name/);
+    expect(() =>
+      assertManifestMatchesTool({ ...makeManifest('fitness', ['fitness']), id: 'fit' }, tool),
+    ).toThrow(/manifest id 'fit'/);
+    expect(() =>
+      assertManifestMatchesTool(
+        { ...makeManifest('fitness', ['fitness']), identity: { name: 'fit' } },
+        { ...tool, identity: { name: 'fit' } },
+      ),
+    ).toThrow(/must equal identity\.name/);
+    expect(() =>
+      assertManifestMatchesTool(
+        { ...makeManifest('fitness', ['fitness']), identity: { name: 'fitness', aliases: ['f'] } },
+        { ...tool, identity: { name: 'fitness', aliases: ['fit'] } },
+      ),
+    ).toThrow(/identity\.aliases/);
+    expect(() =>
+      assertManifestMatchesTool(
+        {
+          ...makeManifest('fitness', ['fitness']),
+          identity: { name: 'fitness', aliases: ['fit', 'f'] },
+        },
+        { ...tool, identity: { name: 'fitness', aliases: ['fit'] } },
+      ),
+    ).toThrow(/identity\.aliases/);
+  });
+
+  it('throws when manifest or runtime layout/config derived fields drift', () => {
+    const tool = { ...makeTool('fitness', ['fitness']), identity: { name: 'fitness' } };
+
+    expect(() =>
+      assertManifestMatchesTool(
+        {
+          ...makeManifest('fitness', ['fitness']),
+          identity: { name: 'fitness', layoutKey: 'fit' },
+          pluginLayout: { domain: 'wrong', userSubdirs: [] },
+        },
+        tool,
+      ),
+    ).toThrow(/pluginLayout\.domain/);
+
+    expect(() =>
+      assertManifestMatchesTool(makeManifest('fitness', ['fitness']), {
+        ...tool,
+        pluginLayout: { domain: 'wrong', userSubdirs: [] },
+      }),
+    ).toThrow(/runtime pluginLayout\.domain/);
+
+    expect(() =>
+      assertManifestMatchesTool(
+        {
+          ...makeManifest('fitness', ['fitness']),
+          config: { namespace: 'wrong', schema: {} },
+        },
+        tool,
+      ),
+    ).toThrow(/config\.namespace/);
+  });
+
+  it('throws when primary command aliases or replay layout drift', () => {
+    const primary: CommandSpec<unknown, ToolCliContext> = {
+      name: 'fitness',
+      aliases: ['wrong'],
+      description: 'Run',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      handler: () => undefined,
+    };
+    const tool = {
+      ...makeTool('fitness', ['fitness']),
+      identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
+      commandSpecs: [primary],
+    };
+    const manifest = {
+      ...makeManifest('fitness', ['fitness']),
+      identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
+    };
+
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(/primary command aliases/);
+
+    expect(() =>
+      assertManifestMatchesTool(manifest, {
+        ...makeTool('fitness', ['fitness']),
+        identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
+        commandSpecs: [{ ...primary, aliases: ['fit'] }],
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      assertManifestMatchesTool(manifest, {
+        ...makeTool('fitness', ['fitness']),
+        identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
+        pluginLayout: { domain: 'fit', userSubdirs: [] },
+        extensionPoints: {
+          sessionReplay: { tool: 'wrong', replaySession: () => ({}) },
+        },
+      }),
+    ).toThrow(/sessionReplay\.tool/);
+  });
+
+  it('reports sorted multi-command drift on both sides', () => {
+    const tool = makeTool('graph', ['graph', 'graph-lookup', 'graph-index']);
+    const manifest = makeManifest('graph', ['graph', 'graph-alpha', 'graph-beta']);
+
+    expect(() => assertManifestMatchesTool(manifest, tool)).toThrow(
+      /missing from manifest: \[graph-index, graph-lookup\].*declared in manifest but not in tool: \[graph-alpha, graph-beta\]/,
     );
   });
 });

@@ -13,6 +13,7 @@ export default mergeConfig(
           'src/**/__tests__/**',
           // Pure type / re-export barrels — no executable code.
           'src/**/index.ts',
+          'src/index-*.ts',
           'src/types/index.ts',
           'src/tools/index.ts',
           'src/tools/types.ts',
