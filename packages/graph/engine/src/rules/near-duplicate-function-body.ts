@@ -1,3 +1,4 @@
+// @fitness-ignore-file batch-operation-limits -- pure in-memory synchronous scans over the already-materialized catalog (functions, LSH buckets, candidate pairs, union-find components), bounded by repo size; data→data, no async/IO/DB to batch or paginate. The heuristic mis-reads the nested for-of loops as async/unbounded batches (cf. rules/registry.ts, pipeline/indexes.ts which suppress the same check for the same reason).
 /**
  * graph:near-duplicate-function-body — LSH-banded MinHash near-clone detection.
  *
