@@ -276,8 +276,22 @@ export function resolveCrossBoundaryCalls(
       .flat()
       .map((o) => o.filePath),
   );
+  // name → re-export records exposing it (for following a relative import that
+  // lands on a re-exporting module rather than the definition).
+  const reExportsByName = new Map<string, ReExportRecord[]>();
+  for (const r of merged.reExports ?? []) {
+    const bucket = reExportsByName.get(r.exportedName);
+    if (bucket) bucket.push(r);
+    else reExportsByName.set(r.exportedName, [r]);
+  }
 
-  const ctx: ResolveContext = { exportIndex, manifestIndex, nameIndex, knownFiles };
+  const ctx: ResolveContext = {
+    exportIndex,
+    manifestIndex,
+    nameIndex,
+    knownFiles,
+    reExportsByName,
+  };
   const stats = createMutableStats();
 
   // Resolve each boundary call to a recovered edge first (counting as we go).
@@ -322,6 +336,9 @@ interface ResolveContext {
   /** name → all occurrences with that name (the relative-import pin candidates). */
   readonly nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>;
   readonly knownFiles: ReadonlySet<string>;
+  /** exportedName → re-export records, for following a relative import that lands
+   *  on a re-exporting module (`export { x } from '@scope/pkg'`) not the definition. */
+  readonly reExportsByName: ReadonlyMap<string, readonly ReExportRecord[]>;
 }
 
 /**
@@ -377,7 +394,27 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
     const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
     const pinned = pinBySpecifier(bc, candidates, ctx.knownFiles);
     const distinct = [...new Set(pinned.map((o) => o.bodyHash))];
-    const edge = distinct.length === 1 ? { ...base, to: distinct } : { ...base, to: [] };
+    if (distinct.length === 1) {
+      const edge = { ...base, to: distinct };
+      traceResolveOne(bc, 'relative-pin', edge.to);
+      return edge;
+    }
+    if (distinct.length === 0) {
+      // The relative import landed on a module that RE-EXPORTS the name
+      // (`export { defineCommand } from '@scope/pkg'`) rather than defining it.
+      // Follow the re-export to the SAME source occurrence the exact engine's
+      // whole-catalog name fallback recovers. Mark it `unknown` (NAME_GUESSED) so
+      // constrainCrossPackageEdges applies the SAME reachability gate exact's
+      // fallback gets: a relative re-export adds NO package to the caller's import
+      // set, so an unreachable target drops in BOTH engines (no sharded-only phantom).
+      const reTarget = followReExport(bc, ctx);
+      if (reTarget !== undefined) {
+        const edge: CallEdge = { ...base, resolution: 'unknown', to: [reTarget] };
+        traceResolveOne(bc, 'relative-pin', edge.to);
+        return edge;
+      }
+    }
+    const edge = { ...base, to: [] };
     traceResolveOne(bc, 'relative-pin', edge.to);
     return edge;
   }
@@ -393,6 +430,41 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   const edge = linked === undefined ? { ...base, to: [] } : { ...base, to: [linked.bodyHash] };
   traceResolveOne(bc, 'workspace-export', edge.to);
   return edge;
+}
+
+/**
+ * Follow a relative import that resolves to a module RE-EXPORTING the callee
+ * (`export { x } from '@scope/pkg'`) instead of defining it. Returns the UNIQUE
+ * source-occurrence bodyHash the re-export points at, or undefined (decline) on
+ * no/ambiguous match — the same edge the exact engine's whole-catalog name
+ * resolution recovers, so the two engines converge. Workspace re-export
+ * specifiers link through the shared export index (the path bare imports use);
+ * a relative re-export chain is left declined (rare; would need recursion).
+ */
+function followReExport(bc: CrossBoundaryCall, ctx: ResolveContext): string | undefined {
+  const spec = bc.importSpecifier;
+  if (!spec?.startsWith('.')) return undefined;
+  // Match the exact engine's whole-catalog name fallback (resolveByCatalogFallback):
+  // it only resolves a GLOBALLY-UNIQUE simple name. A name with >1 distinct body
+  // declines there, so following the re-export to a (locally-unique export) target
+  // would resolve sharded-only — a phantom. Gate on global uniqueness for parity.
+  const all = ctx.nameIndex.get(bc.calleeName) ?? [];
+  if (new Set(all.map((o) => o.bodyHash)).size > 1) return undefined;
+  const resolved = stripExt(posix.normalize(posix.join(posix.dirname(bc.ownerFile), spec)));
+  const hashes = new Set<string>();
+  for (const r of ctx.reExportsByName.get(bc.calleeName) ?? []) {
+    const rf = stripExt(r.fromFile);
+    if (rf !== resolved && rf !== `${resolved}/index`) continue;
+    if (r.specifier.startsWith('.')) continue; // relative re-export chain — out of scope
+    const linked = resolveCrossPackageCall({
+      importSpecifier: r.specifier,
+      calleeName: r.sourceName,
+      exportIndex: ctx.exportIndex,
+      manifestIndex: ctx.manifestIndex,
+    });
+    if (linked !== undefined) hashes.add(linked.bodyHash);
+  }
+  return hashes.size === 1 ? [...hashes][0] : undefined; // unique-or-decline
 }
 
 /**

@@ -641,3 +641,89 @@ describe('resolveCrossBoundaryCalls — body-twin keying (F1, ADR-0003)', () => 
     expect(twinB?.calls.flatMap((e) => [...e.to])).not.toContain('HA');
   });
 });
+
+describe('resolveCrossBoundaryCalls — re-export follow (relative import to a re-exporter)', () => {
+  // pkg-a/cmd.ts imports `defineThing` from the RELATIVE './shared.js', which only
+  // RE-EXPORTS it from @scope/pkgc (where it is DEFINED). The relative pin finds no
+  // definition in shared.ts; the re-export follow recovers the same target the exact
+  // engine's whole-catalog name fallback does — keeping sharded≡exact. (The real
+  // case: `host-subcommand-*.ts` → `./host-subcommand-shared.js` → `@opensip-cli/core`'s
+  // `defineCommand`.)
+  const base = mergeShardFragments(
+    [
+      fragment('typescript', occ('mainA', 'packages/pkg-a/cmd.ts', 'A')),
+      fragment('typescript', occ('defineThing', 'packages/pkg-c/index.ts', 'C')),
+    ],
+    ['packages/pkg-a/cmd.ts', 'packages/pkg-c/index.ts'],
+  );
+  const merged: Catalog = {
+    ...base,
+    reExports: [
+      {
+        fromFile: 'packages/pkg-a/shared.ts',
+        exportedName: 'defineThing',
+        sourceName: 'defineThing',
+        specifier: '@scope/pkgc',
+      },
+    ],
+  };
+  const mIndex = manifests(manifest('@scope/pkgc', 'packages/pkg-c'));
+
+  it('follows a workspace re-export reached through a relative import', () => {
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/cmd.ts',
+      calleeName: 'defineThing',
+      importSpecifier: './shared.js', // → packages/pkg-a/shared.ts (a re-exporter)
+      line: 5,
+      column: 9,
+      text: 'defineThing()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
+    const edge = catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard);
+    expect(edge?.to).toEqual(['C']);
+    // `unknown` (NAME_GUESSED) so constrainCrossPackageEdges applies the SAME
+    // reachability gate the exact engine's catalog name fallback gets.
+    expect(edge?.resolution).toBe('unknown');
+    expect(edge?.crossShard).toBe(true);
+  });
+
+  it('declines a globally-ambiguous name (parity with the exact name fallback)', () => {
+    const ambiguous: Catalog = {
+      ...mergeShardFragments(
+        [
+          fragment('typescript', occ('mainA', 'packages/pkg-a/cmd.ts', 'A')),
+          fragment('typescript', occ('defineThing', 'packages/pkg-c/index.ts', 'C')),
+          fragment('typescript', occ('defineThing', 'packages/pkg-d/index.ts', 'D')),
+        ],
+        ['packages/pkg-a/cmd.ts', 'packages/pkg-c/index.ts', 'packages/pkg-d/index.ts'],
+      ),
+      reExports: merged.reExports,
+    };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/cmd.ts',
+      calleeName: 'defineThing',
+      importSpecifier: './shared.js',
+      line: 5,
+      column: 9,
+      text: 'defineThing()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(ambiguous, [bc], mIndex);
+    expect(crossEdge(catalog)).toBeUndefined();
+  });
+
+  it('declines a relative miss with no matching re-export', () => {
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/cmd.ts',
+      calleeName: 'defineThing',
+      importSpecifier: './other.js', // no re-export records `defineThing` from ./other
+      line: 5,
+      column: 9,
+      text: 'defineThing()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
+    expect(crossEdge(catalog)).toBeUndefined();
+  });
+});
