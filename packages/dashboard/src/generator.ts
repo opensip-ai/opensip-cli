@@ -12,10 +12,10 @@
 // subtab-bar / overview / sessions / checks / recipes / tool-tabs renderers now
 // live in that bundle (src/client/*.ts).
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
-import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
 import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
+import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { listToolTabs } from './tool-tab-registry.js';
 import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
 

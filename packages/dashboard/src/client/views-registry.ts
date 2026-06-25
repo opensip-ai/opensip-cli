@@ -7,8 +7,9 @@
  * orchestrator iterates the registry to render tabs and to fan out
  * filter-change notifications.
  *
- * `activateView(id)` updates `location.hash` to `#code-paths/<id>` so
- * each view is deep-linkable.
+ * `activateView(id)` activates a Code Paths Explore view. By default it also
+ * updates `location.hash` to `#code-paths/<id>` so each view is deep-linkable;
+ * pass `{ updateHash: false }` on silent init when the URL has no hash yet.
  *
  * Reads the page globals `graphCatalog` / `graphIndexes` (declared by the panel
  * orchestrator, still string-emitted; typed in globals.ts).
@@ -42,7 +43,12 @@ export function renderActiveView(): void {
   view.render(container, graphCatalog, graphIndexes, filterState);
 }
 
-export function activateView(id: string): void {
+export interface ActivateViewOptions {
+  /** When false, activate the view without writing `#code-paths/<id>` to the URL. */
+  updateHash?: boolean;
+}
+
+export function activateView(id: string, options: ActivateViewOptions = {}): void {
   const view = getView(id);
   if (!view) return;
   activeViewId = id;
@@ -52,9 +58,10 @@ export function activateView(id: string): void {
   document.querySelectorAll('.code-paths-view').forEach((p) => {
     p.classList.toggle('active', p.id === 'code-paths-view-' + id);
   });
+  const updateHash = options.updateHash !== false;
   // Deep-link via hash, but don't loop on programmatic updates.
   const next = '#code-paths/' + id;
-  if (globalThis.window !== undefined && globalThis.location.hash !== next) {
+  if (updateHash && globalThis.window !== undefined && globalThis.location.hash !== next) {
     try {
       history.replaceState(null, '', next);
     } catch {

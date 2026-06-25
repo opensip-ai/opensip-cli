@@ -207,8 +207,11 @@ function renderCodePathsExplore(host: HTMLElement): void {
     const container = document.querySelector<HTMLElement>('#code-paths-view-' + view.id);
     if (container) view.render(container, cg.graphCatalog, cg.graphIndexes, filterState);
   }
-  const initialId = readViewIdFromHash() ?? views[0]?.id;
-  if (initialId) activateView(initialId);
+  const hashId = readViewIdFromHash();
+  const initialId = hashId ?? views[0]?.id;
+  // Only write the hash when the URL already deep-links a view (Option 1).
+  // Silent init keeps `latest.html` clean until the reader clicks an Explore tab.
+  if (initialId) activateView(initialId, { updateHash: hashId !== null });
 }
 
 // =======================================================

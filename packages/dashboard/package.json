@@ -34,7 +34,7 @@
   "scripts": {
     "build": "tsc -p src/client/tsconfig.json --noEmit && node scripts/bundle-client.mjs && tsc && node scripts/copy-vendor.mjs",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit && tsc -p src/client/tsconfig.json --noEmit",
+    "typecheck": "tsc -p src/client/tsconfig.json --noEmit && node scripts/bundle-client.mjs && tsc --noEmit",
     "vendor:cytoscape": "node scripts/vendor-cytoscape.mjs",
     "clean": "rm -rf dist"
   },
