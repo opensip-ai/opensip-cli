@@ -290,24 +290,36 @@ Commander and passes the parsed options to your handler as the first argument.
 You never touch Commander or take a `commander` dependency — the host owns the
 program.
 
-## External tool trust boundary (ADR-0054)
+## External tool trust boundary (ADR-0054, ADR-0061)
 
 Bundled first-party tools (`fitness`, `graph`, `simulation`) execute in the CLI host
 process and are fail-closed on admission or mount failure (exit 5).
 
 **External-provenance tools** (installed npm, project-local, user-global) use a
-different posture:
+different posture — **fault isolation**, not capability isolation:
 
 - **Host registration (M4-G)** — the host mounts command shells from the static
   manifest via `synthesizeExternalTool` and does **not** import the untrusted
   runtime module in the host process.
 - **Worker dispatch (M4-E)** — command handlers for external provenance fork a
-  `__tool-command-worker` child that loads and runs the real runtime in an
-  isolation boundary; results replay through the same `ToolCliContext` seams.
+  `__tool-command-worker` child that loads and runs the real runtime in a
+  **fault-isolation** boundary; results replay through the same `ToolCliContext` seams.
 - **Lifecycle gating (M4-F)** — external lifecycle/capability hooks run in the
   worker, not the host.
 - **Enforcement** — `host-tool-runtime-import-boundary` fitness check forbids
   host-side runtime imports outside the admission/dispatch modules.
+
+> An admitted external tool runs at full user privilege: it can read the filesystem (including `~/.ssh` and `.env`), and make arbitrary network calls. It is fault-isolated (a crash/hang/OOM does not take down the host), not capability-isolated.
+
+**In-process capability packs** (custom checks, graph adapters loaded via
+`plugins.<domain>`) are the **least isolated** extension surface: they load in the
+host process with import-error isolation only — no worker boundary. The external
+worker fork does **not** cover them.
+
+For the full extension trust-tier matrix, see
+[ADR-0061](../../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
+(canonical) and the contributor reference
+[`docs/internal/plugin-isolation-surface.md`](../../internal/plugin-isolation-surface.md).
 
 What is enforced at admission:
 
@@ -315,15 +327,18 @@ What is enforced at admission:
   (`admit-tool-package.ts`).
 - Deny-by-default allowlists for project-local and installed tools
   (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`).
-  The `*` wildcard admits all and emits `cli.trust.wildcard_allowlist`.
+  The `*` wildcard admits all and emits a per-invocation `cli.trust.wildcard_allowlist`
+  deprecation warning (DEPRECATED — every matching tool runs at full user privilege).
 - **Mount isolation** — a broken external `commandSpecs` declaration warns and
   continues; bundled mount failures abort startup (exit 5).
 - **`tools validate`** — probes a not-yet-trusted package in a child process
   (`staticOnly` on the admission pipeline).
 
-What is **not** landed yet: npm package attestation (signatures, hash-lock at
-install). Public third-party ecosystem launch is blocked until that plan ships
-(Q7). Until then, pin versions, review source, and use `opensip tools validate`
+What is **not** landed yet: **consumption-side** npm package verification at
+install/load (publish-side `npm publish --provenance` already ships —
+`.github/workflows/release.yml:236,248`). Public third-party ecosystem launch is
+blocked until consumption-side verification + a capability/permission model ship
+(ADR-0061). Until then, pin versions, review source, and use `opensip tools validate`
 before enabling a new tool in CI.
 
 ## Tips that come up

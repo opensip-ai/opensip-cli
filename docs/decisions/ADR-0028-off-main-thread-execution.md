@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-06-08
+last_verified: 2026-06-25
 owner: opensip-cli
 ---
 
@@ -17,12 +17,13 @@ related: [ADR-0016, ADR-0011, ADR-0027]
 tags: [cli, ux, performance, graph, simulation, fitness, architecture]
 enforcement: mechanizable
 enforcement-reason: >
-  A `live-runs-off-thread` fitness check (checks-universal) asserts the tool live
-  runners (`*-runner.tsx`) drive the engine through the off-thread selector
-  (`runOffThreadOrInProcess`), not a bare in-process transport, and that the
-  worker entries (`*-worker.ts`) + the persistence-free `executeFit`/`executeSim`
-  never import `@opensip-cli/datastore`. Runs in `pnpm fit:ci`. The transport
-  relay/buffer/error/fallback behaviour is covered by unit tests in core.
+  The surviving ADR-0058 enforcement is `live-view-through-cli-live`
+  (checks-typescript), which forbids `import { render } from 'ink'` in tool
+  engines — it does NOT assert the off-thread selector (`runOffThreadOrInProcess`).
+  The former `live-runs-off-thread` check that asserted runners route through the
+  off-thread selector has lapsed (no longer present under `packages/`). The
+  transport relay/buffer/error/fallback behaviour is covered by unit tests in core.
+  Restoring off-thread-selector coverage is deferred (spec 01 / OQ4).
 ```
 
 **Decision:** Interactive (TTY) runs execute the engine **off the main process**.
@@ -98,7 +99,10 @@ the transport implementation behind it, exactly as that ADR anticipated.
   path forks.
 - The in-process fallback path reduces to the **same** result shape the worker
   returns, so TTY ≡ pipe ≡ fallback on output.
-- A `live-runs-off-thread` guardrail check locks the fix in under the dogfood gate.
+- ADR-0058's `live-view-through-cli-live` check forbids ink `render` imports in
+  tool engines (the live-view shell constraint). The off-thread selector
+  (`runOffThreadOrInProcess`) is live but no longer guarded by a fitness check —
+  restoring that assertion is an open follow-up (spec 01 / OQ4).
 
 **Related specs / ADRs:** `docs/plans/ready/offload-engine-to-worker-thread/`
 (local). Exercises the reversibility ADR-0016 reserved; the progress currency +

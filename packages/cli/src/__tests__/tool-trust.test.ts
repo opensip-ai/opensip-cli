@@ -40,15 +40,17 @@ function stageProjectLocalTool(id: string, apiVersion?: number): string {
 }
 
 describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
-  it('admits all on the wildcard and emits cli.trust.wildcard_allowlist once', () => {
+  it('admits all on the wildcard and emits a per-invocation deprecation warning', () => {
     const warnSpy = vi.spyOn(logger, 'warn');
     expect(isInstalledToolTrusted('anything', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
     expect(isInstalledToolTrusted('again', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         evt: 'cli.trust.wildcard_allowlist',
         envVar: INSTALLED_TOOL_ALLOWLIST_ENV,
+        deprecated: true,
+        detail: expect.stringContaining('DEPRECATED'),
       }),
     );
     warnSpy.mockRestore();
@@ -82,6 +84,29 @@ describe('isProjectLocalToolTrusted (deny-by-default allowlist)', () => {
 
   it('admits all on the wildcard', () => {
     expect(isProjectLocalToolTrusted('anything', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+  });
+});
+
+describe('wildcard allowlist broadening guard', () => {
+  it('admits via * on each surface independently but does not cross-leak surfaces', () => {
+    expect(isProjectLocalToolTrusted('x', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    expect(isInstalledToolTrusted('x', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    expect(isProjectLocalToolTrusted('x', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
+    expect(isInstalledToolTrusted('x', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
+  });
+
+  it('denies any id when no allowlist env is set (wildcard is not implicit)', () => {
+    expect(isProjectLocalToolTrusted('any-id', {})).toBe(false);
+    expect(isInstalledToolTrusted('any-id', {})).toBe(false);
+  });
+
+  it('denies a non-matching id even when another id is allowlisted', () => {
+    const projectEnv = { [PROJECT_TOOL_ALLOWLIST_ENV]: 'allowed-only' };
+    const installedEnv = { [INSTALLED_TOOL_ALLOWLIST_ENV]: 'allowed-only' };
+    expect(isProjectLocalToolTrusted('allowed-only', projectEnv)).toBe(true);
+    expect(isProjectLocalToolTrusted('denied', projectEnv)).toBe(false);
+    expect(isInstalledToolTrusted('allowed-only', installedEnv)).toBe(true);
+    expect(isInstalledToolTrusted('denied', installedEnv)).toBe(false);
   });
 });
 

@@ -131,10 +131,11 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   // preserved (M2). The child env is built only when there is something to add
   // beyond `process.env` (an `env` override or correlation), else left undefined
   // so `fork` inherits the parent env wholesale.
+  const traceparentEnv = traceId !== undefined ? { TRACEPARENT: traceId } : {};
   const childEnv =
-    descriptor.env || descriptor.correlation
+    descriptor.env || descriptor.correlation || traceId !== undefined
       ? // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; correlation env carries NO secret (Task 0.1) and this object is passed to fork, never logged.
-        { ...process.env, ...descriptor.env, ...correlationEnv }
+        { ...process.env, ...descriptor.env, ...correlationEnv, ...traceparentEnv }
       : undefined;
 
   const child = fork(descriptor.command, [...descriptor.argv], {

@@ -2,6 +2,24 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- External-tool dispatch worker child environment is now filtered to an explicit
+  allow-list (`PATH`, `HOME`, `TMPDIR`, `OTEL_*`, etc.) instead of inheriting the
+  full parent `process.env`. Use `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH=VAR1,VAR2` when
+  a specific tool needs additional parent vars (e.g. `HTTP_PROXY`).
+- Wildcard `*` trust allowlists (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`,
+  `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`) now emit a per-invocation deprecation
+  warning with an explicit full-privilege caveat. Admission behavior is unchanged.
+
+### Added
+
+- `TRACEPARENT` propagation into external-tool dispatch workers and bundled
+  live-run worker forks for full child-process span-nesting parity with graph shard
+  workers.
+
 ## [0.1.12] - 2026-06-24
 
 A graph-focused release, with report and YAGNI polish. It adds near-duplicate

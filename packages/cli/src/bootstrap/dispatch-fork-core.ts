@@ -30,16 +30,17 @@ import { join } from 'node:path';
 import {
   ConfigurationError,
   currentScope,
+  currentTraceparent,
   SystemError,
   type ToolError,
   type ToolProvenance,
   type WorkerMessage,
 } from '@opensip-cli/core';
 
+import { buildExternalWorkerChildEnv } from './build-external-worker-child-env.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { handleHostRpc } from './dispatch-host-rpc-handler.js';
 import { type DispatchHostCtx } from './dispatch-replay-result.js';
-import { IN_TOOL_WORKER_ENV } from './tool-provenance.js';
 
 import type {
   HostRpcRequest,
@@ -138,14 +139,8 @@ function forkAndAwait({
 }: ForkAndAwaitInput): Promise<ToolCommandResult> {
   return new Promise<ToolCommandResult>((resolve, reject) => {
     const runId = currentScope()?.runId;
-    // ADR-0054 M4-F: the child IS the isolation boundary. OPENSIP_CLI_IN_TOOL_WORKER
-    // tells the worker bootstrap to RUN the dispatched external tool's lifecycle
-    // hooks worker-local (the host-skip is disabled there). OPENSIP_RUN_ID stitches
-    // the worker's logs to the parent run. fork() with `env` set REPLACES the child
-    // env, so the parent env is spread in first to preserve PATH/HOME/etc.
-    // @fitness-ignore-next-line env-secret-exposure -- spreading process.env preserves PATH/HOME for the child; only OPENSIP_RUN_ID (no secret) + the OPENSIP_CLI_IN_TOOL_WORKER marker are added; this object is passed to fork, never logged (parity with subprocess-transport's childEnv).
-    const childEnv: NodeJS.ProcessEnv = { ...process.env, [IN_TOOL_WORKER_ENV]: '1' };
-    if (runId !== undefined && runId.length > 0) childEnv.OPENSIP_RUN_ID = runId;
+    const traceparent = currentTraceparent();
+    const childEnv = buildExternalWorkerChildEnv({ runId, traceparent });
 
     // Fork the CLI binary into the internal worker subcommand. The full bootstrap
     // (preAction) re-builds the per-run scope in the worker before the worker

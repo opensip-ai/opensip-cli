@@ -125,6 +125,20 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'rides in with git clone, so loading it runs untrusted code. Global-authored tools ' +
       '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
   },
+  {
+    canonical: 'OPENSIP_CLI_TOOL_ENV_PASSTHROUGH',
+    coerce: (raw) =>
+      raw
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    default: [] as readonly string[],
+    docs:
+      'Comma/whitespace-separated extra environment variable names to forward into external-tool ' +
+      'dispatch worker children beyond the default allow-list (PATH, HOME, TMPDIR, OTEL_*, etc.). ' +
+      'Use when a specific external tool legitimately needs a parent env var (e.g. HTTP_PROXY). ' +
+      'Does not affect bundled live-run worker forks.',
+  },
 ];
 
 /**
@@ -213,5 +227,10 @@ export const PRE_SCOPE_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
  * of truth for the generated env-surface reference (Phase 6).
  */
 export function describeHostEnv(): readonly EnvVarSpec<unknown>[] {
-  return [...CONFIG_ENV_SPECS, ...BUNDLED_TOOL_ENV_SPECS, ...CLI_ENV_SPECS, ...PRE_SCOPE_ENV_SPECS];
+  return [
+    ...CONFIG_ENV_SPECS,
+    ...BUNDLED_TOOL_ENV_SPECS,
+    ...CLI_ENV_SPECS,
+    ...PRE_SCOPE_ENV_SPECS,
+  ];
 }

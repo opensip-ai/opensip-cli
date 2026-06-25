@@ -12,6 +12,7 @@
  *   env-echo        — a `result` carrying the child's OPENSIP_* env (correlation proof).
  *   env-echo-full   — like env-echo, plus whether PATH/HOME survived the env merge
  *                     (M2: correlation env must NOT clobber the inherited base env).
+ *   traceparent-echo — a `result` carrying the child's TRACEPARENT env (span-nesting proof).
  *   correlation-check — the missing-correlation DEGRADATION (M2): if no
  *                     OPENSIP_RUN_ID is present the child "warns" (proceeds on a
  *                     fresh runId) and reports it through the result so the parent
@@ -49,6 +50,10 @@ switch (mode) {
     process.exit(0);
     break;
   }
+  case 'huge-payload': {
+    send({ kind: 'result', value: 'x'.repeat(2_000_000) });
+    break;
+  }
   case 'map-result': {
     send({ kind: 'progress', event: 1 });
     send({ kind: 'result', value: { tag: 'm', map: new Map([['a', 1]]) } });
@@ -73,6 +78,10 @@ switch (mode) {
         hasHome: process.env.HOME !== undefined,
       },
     });
+    break;
+  }
+  case 'traceparent-echo': {
+    send({ kind: 'result', value: process.env.TRACEPARENT });
     break;
   }
   case 'correlation-check': {

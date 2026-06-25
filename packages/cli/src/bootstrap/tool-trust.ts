@@ -36,9 +36,6 @@ export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS';
  */
 export const INSTALLED_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS';
 
-/** One-time process warning when a trust allowlist resolves to the `*` wildcard. */
-let wildcardAllowlistWarned = false;
-
 /**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
  * unset ⇒ empty set (deny-by-default). The wildcard `'*'` admits all
@@ -55,12 +52,14 @@ function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
 }
 
 function warnWildcardAllowlist(envVar: string, allow: ReadonlySet<string>): void {
-  if (wildcardAllowlistWarned || !allow.has('*')) return;
-  wildcardAllowlistWarned = true;
+  if (!allow.has('*')) return;
   logger.warn({
     evt: 'cli.trust.wildcard_allowlist',
     envVar,
-    detail: 'trust allowlist contains wildcard * — all matching tools are admitted',
+    deprecated: true,
+    detail:
+      'DEPRECATED: trust allowlist contains wildcard * — every matching tool runs at full user privilege; ' +
+      'this is fault-isolation only, not a sandbox',
   });
 }
 

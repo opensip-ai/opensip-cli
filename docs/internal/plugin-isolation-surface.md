@@ -1,7 +1,36 @@
-# Plugin isolation surface (ADR-0054)
+# Plugin isolation surface (ADR-0054, ADR-0061)
 
-Internal reference for external-tool fault isolation. Public docs:
-`docs/public/50-extend/06-full-tool-plugins.md`.
+Internal reference for external-tool **fault** isolation and extension trust tiers.
+Public docs: `docs/public/50-extend/06-full-tool-plugins.md`.
+
+**Canonical trust-tier matrix:** [ADR-0061](../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
+The table below mirrors ADR-0061 for contributor convenience only — if it drifts,
+ADR-0061 wins.
+
+## Two isolation properties (always pair them)
+
+| Property | Status | Meaning |
+|----------|--------|---------|
+| **Fault isolation** | Landed (ADR-0054) | A worker crash/hang/OOM becomes a structured `ToolError`; the host survives. |
+| **Capability / confidentiality isolation** | **Absent** | An admitted external tool runs at **full user privilege** — it can read the filesystem (including `~/.ssh` and `.env`), and make arbitrary network calls. It is fault-isolated, **not** capability-isolated. |
+
+> An admitted external tool runs at full user privilege: it can read the filesystem (including `~/.ssh` and `.env`), and make arbitrary network calls. It is fault-isolated (a crash/hang/OOM does not take down the host), not capability-isolated.
+
+## Trust-tier matrix (contributor reference — canonical source: ADR-0061)
+
+| Surface | Default admission | Process boundary | Ambient authority | Compat policy | Provenance / verify | Docs warning |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Bundled tools** (fit / graph / sim / yagni) | Trusted (manifest) | In-process (TTY-live forks for UX) | Full host — *is* the TCB | Co-built, always matches | First-party, `--provenance` | n/a (trusted core) |
+| **Installed npm tools** (whole Tool) | Deny-by-default (`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`; `*` footgun) | Worker fork (ADR-0054) | Full **user** privilege — fault-isolated, **NOT** capability-isolated | Exact-epoch (`===`) | Publish-side ships; consumption-side missing | Yes — "runs at full privilege" |
+| **Project-local authored** (sidecar) | Deny-by-default (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`; `*`) | Worker fork | Full user privilege | Exact-epoch | Authored content, no verify | Yes — clone-risk |
+| **User-global authored** (`~/.opensip-cli/tools/`) | **Trusted-by-location** (loads w/o allowlist) | Worker fork | Full user privilege | Exact-epoch | Location = trust, no verify | Yes — trust ≠ sandbox |
+| **Bundled capability packs** (`checks-*`, `graph-*`) | Trusted (bundled) | **In-process** (`capability-discovery.ts:307`) | Full host — grows the TCB | Co-built | First-party | Bundled-TCB governance |
+| **External / custom capability packs** (custom checks, graph adapters) | Listed in `plugins.<domain>` | **In-process — NO worker** | Full host; can crash host; full authority | Descriptor-level | No verify | Yes — strongest gap |
+
+**In-process capability-pack gap:** external custom checks and graph adapters load via
+`await import(...)` at `packages/core/src/plugins/capability-discovery.ts:307` with
+per-package try/catch skip-never-throw — import-error isolation only, no worker
+boundary. The "external isolation" story does **not** cover the most common extension.
 
 ## Shipped (M4-E / M4-F / M4-G)
 
@@ -12,17 +41,26 @@ Internal reference for external-tool fault isolation. Public docs:
 | Lifecycle gating | `tool-provenance.ts` (`shouldRunHookInHost`) | External hooks skip in host; run in worker |
 | Runtime import boundary | `host-tool-runtime-import-boundary` check | Host may not `import()` external runtimes outside admission/dispatch |
 | Bundled mount fail-closed | `register-tools-mount.ts` | Bundled `mountOneTool` failure → `PluginIncompatibleError` (exit 5) |
+| External worker child env | `build-external-worker-child-env.ts` | Explicit allow-list + `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH` escape hatch |
 
 ## Trust admission (pre-import)
 
 - Project-local: deny-by-default; `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` allowlist.
 - Installed npm: deny-by-default; `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` allowlist.
-- Wildcard `*` admits all and logs `cli.trust.wildcard_allowlist` once per process.
+- Wildcard `*` admits all and emits a **per-invocation** `cli.trust.wildcard_allowlist`
+  deprecation warning (DEPRECATED + full-privilege caveat).
 
-## Remaining gap (Q7 — out of scope here)
+## Remaining gaps
 
-No npm package attestation (signature verification, hash-lock at install).
-**Public third-party ecosystem MUST NOT open until an attestation plan ships.**
+| Gap | Status |
+|-----|--------|
+| Capability / confidentiality isolation | **Absent** — admitted tools run at full user privilege |
+| In-process capability packs | **Strongest gap** — no worker boundary for custom checks/adapters |
+| Consumption-side provenance verification | Publish-side `npm publish --provenance` ships (`.github/workflows/release.yml:236,248`); **consumption-side** verification at install/load is the gap |
+| Off-thread-selector fitness check | **Lapsed** — `live-runs-off-thread` removed; `live-view-through-cli-live` (ADR-0058) forbids ink `render` imports only |
+
+**Public third-party ecosystem MUST NOT open until consumption-side verification +
+capability/permission model ship (ADR-0061 gates).**
 
 ## Tool independence (ADR-0064)
 
@@ -30,6 +68,7 @@ No npm package attestation (signature verification, hash-lock at install).
 
 ## Related ADRs
 
+- ADR-0061 — tool-platform launch posture and extension trust tiers (canonical matrix)
 - ADR-0054 — tool fault isolation boundary
 - ADR-0056 — audit remediation scope index
 - ADR-0030 — authored tool discovery
