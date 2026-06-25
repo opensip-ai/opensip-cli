@@ -6,7 +6,7 @@ workspace packages to npm with OIDC trusted publishing.
 
 The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 
-## The 35 packages
+## The 36 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -17,6 +17,7 @@ contract tests derive from or verify against that source.
 | Kernel         | `@opensip-cli/core`                 | `packages/core`                       |
 | Persistence    | `@opensip-cli/datastore`            | `packages/datastore`                  |
 | Shared CLI     | `@opensip-cli/contracts`            | `packages/contracts`                  |
+| Substrate      | `@opensip-cli/clone-detection`      | `packages/clone-detection`            |
 | Persistence    | `@opensip-cli/session-store`        | `packages/session-store`              |
 | Output         | `@opensip-cli/output`               | `packages/output`                     |
 | Config         | `@opensip-cli/config`               | `packages/config`                     |
@@ -117,7 +118,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    derived ones (see "Version Surfaces" above):
 
    ```bash
-   node scripts/bump-version.mjs <new-version>   # 35 package.json + docs + SECURITY + prose
+   node scripts/bump-version.mjs <new-version>   # 36 package.json + docs + SECURITY + prose
    pnpm install --lockfile-only                  # refresh the lockfile
    pnpm docs:readmes && pnpm docs:build          # regenerate version-pinned READMEs + web docs
    node scripts/bump-version.mjs --check         # assert no surface drifted
@@ -162,7 +163,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    Or inspect manually:
 
    ```bash
-   for p in core datastore contracts session-store output config targeting cli-ui cli-live tree-sitter \
+   for p in core datastore contracts clone-detection session-store output config targeting cli-ui cli-live tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard fitness simulation graph yagni graph-adapter-common graph-typescript \
             graph-python graph-rust graph-go graph-java checks-universal checks-typescript \

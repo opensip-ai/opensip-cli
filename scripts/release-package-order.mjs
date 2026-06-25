@@ -76,6 +76,14 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/contracts',
     publishReason: 'Tool↔runner contract facade; breaks cycles between core and tools',
   },
+  // Layer 2 — shared clone-detection substrate (node:crypto only; ADR-0064)
+  {
+    unscoped: 'clone-detection',
+    name: '@opensip-cli/clone-detection',
+    dir: 'packages/clone-detection',
+    filter: '@opensip-cli/clone-detection',
+    publishReason: 'Single-sourced clone-detection primitives + algorithms consumed by graph and yagni',
+  },
   // Layer 2 — session-store + output (extracted from contracts)
   {
     unscoped: 'session-store',

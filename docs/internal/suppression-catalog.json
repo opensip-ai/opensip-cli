@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-25T00:34:14.407Z",
+  "generatedAt": "2026-06-25T07:23:48.916Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -90,13 +90,14 @@
         "byPackage": {
           "cli": 11,
           "cli-ui": 1,
+          "clone-detection": 1,
           "config": 1,
           "core": 9,
           "dashboard": 2,
           "fitness/checks-typescript": 66,
           "fitness/checks-universal": 117,
           "fitness/engine": 26,
-          "graph/engine": 23,
+          "graph/engine": 22,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
           "graph/graph-java": 1,
@@ -152,11 +153,12 @@
         "byPackage": {
           "cli": 11,
           "cli-ui": 1,
+          "clone-detection": 1,
           "config": 1,
           "core": 9,
           "dashboard": 2,
           "fitness/engine": 26,
-          "graph/engine": 23,
+          "graph/engine": 22,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
           "graph/graph-java": 1,

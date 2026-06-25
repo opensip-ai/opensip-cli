@@ -10,6 +10,7 @@
       "@opensip-cli/tree-sitter": ["packages/tree-sitter/src/index.ts"],
       "@opensip-cli/datastore": ["packages/datastore/src/index.ts"],
       "@opensip-cli/contracts": ["packages/contracts/src/index.ts"],
+      "@opensip-cli/clone-detection": ["packages/clone-detection/src/index.ts"],
       "@opensip-cli/session-store": ["packages/session-store/src/index.ts"],
       "@opensip-cli/output": ["packages/output/src/index.ts"],
       "@opensip-cli/config": ["packages/config/src/index.ts"],

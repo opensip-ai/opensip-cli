@@ -10,6 +10,7 @@
  *   2. @opensip-cli/contracts      — shared contract types (SignalEnvelope, CommandResult, exit codes)
  *   2. @opensip-cli/tree-sitter    — grammar-agnostic parser substrate
  *   2. @opensip-cli/cli-ui         — shared Ink/React presentational primitives
+ *   2. @opensip-cli/clone-detection — shared function-body clone-detection substrate (node:crypto only; ADR-0064)
  *   3. @opensip-cli/cli-live        — shared live-run runtime (state machine + produce seam)
  *   3. @opensip-cli/session-store  — session persistence over datastore/contracts
  *   3. @opensip-cli/output         — signal-envelope formatters + sinks
@@ -317,6 +318,18 @@ module.exports = {
           '^packages/fitness/checks-',
         ],
       },
+    },
+    {
+      name: 'clone-detection-imports-nothing',
+      severity: 'error',
+      comment:
+        '@opensip-cli/clone-detection is a layer-2 LEAF: the single-sourced clone-detection ' +
+        'primitives + algorithms + curation policy, depending on node:crypto ONLY (ADR-0064). ' +
+        'It must import no other workspace package — that is exactly what lets both graph ' +
+        '(layer 4) and yagni (layer 4) depend on it with no tool→tool edge (A1/A2). If it ' +
+        'needs a shared helper, the helper belongs in core, not a new clone-detection dep.',
+      from: { path: '^packages/clone-detection/src/' },
+      to: { path: '^packages/(?!clone-detection/)' },
     },
 
     // -------------------------------------------------------------------

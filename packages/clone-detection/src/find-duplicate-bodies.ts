@@ -44,7 +44,8 @@ export function findDuplicateBodies(
   const minLines = opts.minLines ?? DEFAULT_MIN_LINES;
   const minBodySize = opts.minBodySize ?? DEFAULT_MIN_BODY_SIZE;
   const minPackages = opts.minCrossPackagePackages ?? DEFAULT_MIN_CROSS_PACKAGE_PACKAGES;
-  const minCrossPackageBodySize = opts.minCrossPackageBodySize ?? DEFAULT_MIN_CROSS_PACKAGE_BODY_SIZE;
+  const minCrossPackageBodySize =
+    opts.minCrossPackageBodySize ?? DEFAULT_MIN_CROSS_PACKAGE_BODY_SIZE;
 
   // Aggregate path first: group every kind/test-eligible candidate by body hash (no
   // line floor) so we can detect cross-package spread and decide which hashes to
