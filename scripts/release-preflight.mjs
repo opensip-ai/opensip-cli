@@ -67,7 +67,7 @@ function main() {
 
   pnpm('install frozen lockfile', ['install', '--frozen-lockfile']);
   pnpm('clean package outputs', ['-r', 'run', 'clean']);
-  pnpm('build', ['build']);
+  run('build with injected workspace re-sync', 'node', ['scripts/build-ci.mjs']);
   pnpm('typecheck', ['typecheck']);
   pnpm('supply-chain policy', ['supply-chain:verify']);
   pnpm('lint', ['lint']);

@@ -6,9 +6,7 @@
   "keywords": [
     "opensip-cli",
     "static-analysis",
-    "code-quality",
-    "clone-detection",
-    "duplicate-code"
+    "code-quality"
   ],
   "repository": {
     "type": "git",

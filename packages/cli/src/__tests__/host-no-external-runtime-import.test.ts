@@ -23,9 +23,9 @@
  * (`@ts-expect-error`), not a runtime guard.
  */
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   SystemError,
@@ -41,15 +41,16 @@ import {
 import { discoverAndRegisterToolPackages } from '../bootstrap/register-tools.js';
 import { INSTALLED_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const CLI_PKG_ROOT = join(HERE, '..', '..');
-const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
-const FIXTURE_DIR = join(FIXTURE_SCOPE, 'm4g-sentinel');
-const SENTINEL_FILE = join(FIXTURE_DIR, 'imported.sentinel');
 const FIXTURE_ID = 'm4g-sentinel-tool';
 const STABLE_ID = '00000000-0000-4000-8000-0000000m4g01';
 
-const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
+let fixtureRoot = '';
+let fixtureDir = '';
+let sentinelFile = '';
+
+function walkUpSourceList(): [{ readonly dir: string; readonly mode: 'walkUp' }] {
+  return [{ dir: fixtureRoot, mode: 'walkUp' }];
+}
 
 /**
  * Stage a fixture whose runtime module writes a sentinel FILE at evaluation time
@@ -59,9 +60,12 @@ const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
  * first evaluation, so the worker case still observes it).
  */
 function stageSentinelFixture(): void {
-  mkdirSync(FIXTURE_DIR, { recursive: true });
+  fixtureRoot = mkdtempSync(join(tmpdir(), 'opensip-m4g-sentinel-'));
+  fixtureDir = join(fixtureRoot, 'node_modules', '@opensip-cli-fixture', 'm4g-sentinel');
+  sentinelFile = join(fixtureDir, 'imported.sentinel');
+  mkdirSync(fixtureDir, { recursive: true });
   writeFileSync(
-    join(FIXTURE_DIR, 'package.json'),
+    join(fixtureDir, 'package.json'),
     JSON.stringify({
       name: '@opensip-cli-fixture/m4g-sentinel',
       version: '0.0.0',
@@ -87,7 +91,7 @@ function stageSentinelFixture(): void {
     'utf8',
   );
   writeFileSync(
-    join(FIXTURE_DIR, 'index.js'),
+    join(fixtureDir, 'index.js'),
     [
       // Top-level side effect: writing this file proves the module was EVALUATED
       // (imported). The host must NEVER trigger it; the worker must.
@@ -113,7 +117,7 @@ function stageSentinelFixture(): void {
 }
 
 function clearSentinel(): void {
-  rmSync(SENTINEL_FILE, { force: true });
+  rmSync(sentinelFile, { force: true });
 }
 
 beforeEach(() => {
@@ -122,7 +126,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(FIXTURE_DIR, { recursive: true, force: true });
+  rmSync(fixtureRoot, { recursive: true, force: true });
+  fixtureRoot = '';
+  fixtureDir = '';
+  sentinelFile = '';
 });
 
 describe('ADR-0054 M4-G capstone — host never imports external runtime', () => {
@@ -132,13 +139,13 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
     await discoverAndRegisterToolPackages(
       registry,
       // HOST env: allowlist the fixture, but NO OPENSIP_CLI_IN_TOOL_WORKER.
-      { sources: WALK_UP_SOURCE_LIST, env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID } },
+      { sources: walkUpSourceList(), env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID } },
       new Set<string>(),
       provenance,
     );
 
     // The runtime module was NEVER imported → no sentinel written.
-    expect(existsSync(SENTINEL_FILE)).toBe(false);
+    expect(existsSync(sentinelFile)).toBe(false);
 
     // The tool IS registered — its command shell mounted from the manifest.
     const tool = registry.get(FIXTURE_ID);
@@ -160,14 +167,14 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
       registry,
       // WORKER env: the isolation boundary — the real runtime legitimately loads.
       {
-        sources: WALK_UP_SOURCE_LIST,
+        sources: walkUpSourceList(),
         env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID, OPENSIP_CLI_IN_TOOL_WORKER: '1' },
       },
       new Set<string>(),
     );
 
     // The runtime module WAS imported → sentinel written.
-    expect(existsSync(SENTINEL_FILE)).toBe(true);
+    expect(existsSync(sentinelFile)).toBe(true);
 
     const tool = registry.get(FIXTURE_ID);
     expect(tool).toBeDefined();

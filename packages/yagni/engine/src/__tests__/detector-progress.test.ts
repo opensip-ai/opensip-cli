@@ -22,6 +22,13 @@ const disabledStub: YagniDetector = {
   run: () => Promise.resolve({ signals: [], durationMs: 0 }),
 };
 
+const throwingStub: YagniDetector = {
+  id: 'throwing-stub',
+  slug: 'yagni:throwing-stub',
+  description: 'stub detector that throws (test only)',
+  run: () => Promise.reject(new Error('detector exploded')),
+};
+
 describe('executeYagni detector progress callbacks (phases live view)', () => {
   it('reports start/done per detector that runs, and skips disabled detectors', async () => {
     const started: string[] = [];
@@ -64,5 +71,28 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
       'start:yagni:unused-config-surface',
       'done:yagni:unused-config-surface',
     ]);
+  });
+
+  it('records a failed unit when a detector throws', async () => {
+    const events: string[] = [];
+    const outcome = await executeYagni(
+      {
+        cwd: FIXTURE_ROOT,
+        config: { defaultMinConfidence: 'low' },
+        includeTests: true,
+        onDetectorStart: (slug) => events.push(`start:${slug}`),
+        onDetectorDone: (slug) => events.push(`done:${slug}`),
+      },
+      stubCli(),
+      [throwingStub],
+    );
+
+    expect(events).toEqual(['start:yagni:throwing-stub', 'done:yagni:throwing-stub']);
+    expect(outcome.envelope.units).toHaveLength(1);
+    expect(outcome.envelope.units[0]).toMatchObject({
+      slug: 'yagni:throwing-stub',
+      passed: false,
+      error: 'detector exploded',
+    });
   });
 });
