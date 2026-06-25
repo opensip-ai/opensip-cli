@@ -1,11 +1,10 @@
-import type { StoredSession } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
-
 import type {
   DecodedSessionCheck,
   DecodedSessionFinding,
   SessionPayloadScalar,
 } from './session-payload-decode.js';
+import type { StoredSession } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 export interface BuildReplaySignalInput {
   readonly stored: StoredSession;

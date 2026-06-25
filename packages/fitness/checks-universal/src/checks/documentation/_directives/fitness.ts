@@ -5,8 +5,9 @@
  * Extracted from `directive-audit.ts` in Phase C4.
  */
 
-import type { DirectiveInfo } from './types.js';
 import { collectDirectives, extractIgnoreDirective } from './shared.js';
+
+import type { DirectiveInfo } from './types.js';
 
 function extractFitnessDirective(
   line: string,

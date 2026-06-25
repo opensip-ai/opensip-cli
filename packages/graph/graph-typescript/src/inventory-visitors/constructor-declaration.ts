@@ -2,14 +2,13 @@
  * Visitor for class constructors: `class X { constructor() {} }`.
  */
 
-import ts from 'typescript';
-
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { findEnclosingClassName } from '../inventory-helpers/enclosing-class.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
 
 import type { InventoryVisitor } from './types.js';
+import type ts from 'typescript';
 
 export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclaration> = (
   node,

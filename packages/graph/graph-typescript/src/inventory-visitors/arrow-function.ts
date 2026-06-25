@@ -3,8 +3,6 @@
  * declaration when possible; otherwise synthesized).
  */
 
-import ts from 'typescript';
-
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
@@ -12,6 +10,7 @@ import { inferNameFromParent } from '../inventory-helpers/infer-parent-name.js';
 import { synthesizeArrowName } from '../inventory-helpers/synthesize-name.js';
 
 import type { InventoryVisitor } from './types.js';
+import type ts from 'typescript';
 
 export const visitArrowFunction: InventoryVisitor<ts.ArrowFunction> = (node, ctx) => {
   const start = node.getStart(ctx.sourceFile);

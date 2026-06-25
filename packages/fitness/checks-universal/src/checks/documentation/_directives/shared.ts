@@ -4,7 +4,12 @@ export function collectDirectives(
   content: string,
   filePath: string,
   file: string,
-  extract: (line: string, lineIndex: number, filePath: string, file: string) => DirectiveInfo | null,
+  extract: (
+    line: string,
+    lineIndex: number,
+    filePath: string,
+    file: string,
+  ) => DirectiveInfo | null,
 ): DirectiveInfo[] {
   const directives: DirectiveInfo[] = [];
   const lines = content.split('\n');

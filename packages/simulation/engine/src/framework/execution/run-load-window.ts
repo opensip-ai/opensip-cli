@@ -15,9 +15,9 @@
  */
 
 import { resolveConcurrency } from '../../types/workload.js';
+import { createEmptyMetrics } from '../result-builder.js';
 
 import { LatencyTracker } from './latency-tracker.js';
-import { createEmptyMetrics } from '../result-builder.js';
 
 import type { Target } from './target.js';
 import type { SimulationMetrics } from '../../types/base-types.js';
