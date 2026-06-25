@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads a single language manifest (go.mod / Cargo.toml / pom.xml / pyproject.toml); bounded by standard project metadata
 /**
  * Shared config-fingerprint helpers for the tree-sitter adapters'
  * `cacheKey`.

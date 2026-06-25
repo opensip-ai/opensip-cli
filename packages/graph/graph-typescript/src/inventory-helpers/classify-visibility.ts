@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (modifiers + export specifiers on a single declaration)
 /**
  * Classify a function/method's visibility — exported, module-local, private.
  */

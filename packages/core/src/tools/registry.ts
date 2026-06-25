@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- getAll() over the registered tool set (a handful of first-party + plugin tools per CLI invocation)
 /**
  * Tool registry — in-memory list of registered Tool implementations.
  *

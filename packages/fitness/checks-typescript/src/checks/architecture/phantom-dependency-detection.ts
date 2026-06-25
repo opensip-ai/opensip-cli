@@ -1,5 +1,4 @@
 // @fitness-ignore-file fitness-check-standards -- Check requires direct fs access for package.json parsing outside of standard file scanning pipeline
-// @fitness-ignore-file unbounded-memory -- reads workspace package.json files; bounded by standard package metadata size
 /**
  * @fileoverview Detect phantom dependencies - packages used in code but not declared in package.json (v3, AST-based)
  * @invariants

@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries implementing a single interface/abstract class)
 /**
  * Resolve method calls on interfaces / abstract classes to all
  * implementations.

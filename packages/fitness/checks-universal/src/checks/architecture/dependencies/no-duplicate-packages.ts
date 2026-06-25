@@ -1,5 +1,4 @@
 // @fitness-ignore-file fitness-check-standards -- Uses fs for directory listing/stat operations, not file content reading
-// @fitness-ignore-file unbounded-memory -- reads workspace package.json files; bounded by standard package metadata size
 /**
  * @fileoverview No Duplicate Packages check
  */
@@ -175,7 +174,6 @@ export const noDuplicatePackages = defineCheck({
 **Scope:** General best practice. Cross-file analysis over all \`packages/**/package.json\` files.`,
   fileTypes: ['json'],
 
-  // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     // Get the cwd from the first file path

@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads a tiny tool-generated entitlement cache file (a single boolean + timestamp).
 /**
  * Entitlement check for OpenSIP Cloud signal sync (ADR-0008).
  *

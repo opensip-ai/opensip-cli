@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (catalog entries within a single graph build)
 /**
  * Entry-point inference (shared by orphan-subtree, test-only-reachable).
  *

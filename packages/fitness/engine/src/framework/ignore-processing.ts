@@ -1,5 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
-// @fitness-ignore-file concurrency-safety -- Single-threaded Node.js; Map-based caches are safe without synchronization
 /**
  * @fileoverview Ignore directive processing for fitness checks
  *

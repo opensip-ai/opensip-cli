@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads only the project's `go.mod` manifest (for the module path); bounded by standard Go module metadata size. Source-file reads go through `readSourceFileGuarded` in the shared parse driver.
 /**
  * Go resolveCallSites — name-based catalog lookup.
  *

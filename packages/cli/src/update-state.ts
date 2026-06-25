@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads ~/.opensip-cli/update-state.json, a tiny tool-generated cache holding a single version string.
 /**
  * update-state — sticky persistence for the "update available" notice.
  *

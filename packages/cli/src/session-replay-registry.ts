@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- fromTools iterates the bounded, in-process tool registry (a handful of first-party + plugin tools registered for the run), not an unbounded external collection.
 import {
   resolveToolHooks,
   type Tool,

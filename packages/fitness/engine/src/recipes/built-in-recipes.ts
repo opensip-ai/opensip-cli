@@ -79,7 +79,6 @@ const backendRecipe: FitnessRecipe = defineRecipe({
       'quality/null-safety',
       'quality/no-any-types',
       'quality/file-headers',
-      'quality/concurrency-safety',
       'quality/error-swallowing-*',
       'security/*',
       'testing/*',

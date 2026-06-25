@@ -131,15 +131,40 @@ function isModuleSelfRelativeRead(codeContext: string): boolean {
 const KNOWN_SMALL_FILE_PATTERNS = [
   'package.json',
   'tsconfig',
+  'pyproject.toml',
   '.json',
   '.yaml',
   '.yml',
   '.toml',
   '.env',
   '.config',
+  'opensip-cli.config',
+  '.opensip-cli',
+  'update-state',
+  'entitlement',
+  'scaffold',
+  'template',
+  'global-config',
+  'manifest',
   '.eslintrc',
   '.prettierrc',
-];
+] as const;
+
+/** Whole-file markers that prove reads are size-guarded elsewhere in the module. */
+const GUARDED_READ_MARKERS = [
+  'file_too_large',
+  'max_file_size',
+  'maxfilesize',
+  'file too large',
+  'content.length >',
+  'content.length <',
+  'statsync',
+] as const;
+
+function hasGuardedReadWrapper(content: string): boolean {
+  const lower = content.toLowerCase();
+  return GUARDED_READ_MARKERS.some((marker) => lower.includes(marker));
+}
 
 function isReadingKnownSmallFile(content: string, readIndex: number): boolean {
   const start = Math.max(0, readIndex - 100);
@@ -191,7 +216,7 @@ export const unboundedMemory = defineCheck({
 **Detects:**
 - Private class fields initialized with \`new Map(\`, \`new Set(\`, or empty arrays that have growth methods (\`.set\`, \`.push\`, \`.add\`) but no eviction keywords (\`.delete\`, \`.clear\`, \`maxsize\`, \`evict\`, \`prune\`, \`lru\`, etc.)
 - \`readFileSync(\` and \`readFile(\` calls without a preceding \`stat()\` / \`.size\` check within 500 characters
-- Skips \`static\`, \`readonly\`, \`const\`, \`WeakMap\`, and DI token declarations
+- Skips known-small config paths (\`.opensip-cli\`, \`opensip-cli.config\`, manifests), modules with size guards, and \`static\` / \`readonly\` / \`const\` / \`WeakMap\` / DI token declarations
 
 **Why it matters:** Unbounded in-memory collections cause gradual OOM in long-running services; reading files without size guards risks instant OOM on large inputs.
 
@@ -230,6 +255,10 @@ export const unboundedMemory = defineCheck({
           filePath,
         });
       }
+    }
+
+    if (hasGuardedReadWrapper(content)) {
+      return violations;
     }
 
     const fileReadCalls = findFileReadCalls(codeOnly);

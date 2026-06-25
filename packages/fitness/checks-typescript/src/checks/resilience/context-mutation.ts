@@ -1,5 +1,4 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
-// @fitness-ignore-file context-mutation -- Local array/object mutations are safe within function scope; not shared context
 // @fitness-ignore-file silent-early-returns -- Guard clauses in pattern matching function return false for non-matching patterns
 /**
  * @fileoverview Context mutation safety check — flags direct mutation of
@@ -63,6 +62,32 @@ function findLocallyDeclaredNames(content: string): Set<string> {
     if (pattern.test(content)) declared.add(name);
   }
   return declared;
+}
+
+/**
+ * Graph/language walkers thread a typed `ctx: WalkCtx` parameter — a
+ * function-scoped traversal accumulator, not shared request context.
+ */
+function findWalkContextParameterNames(content: string): Set<string> {
+  const names = new Set<string>();
+  if (/\bctx\s*:\s*WalkCtx\b/.test(content)) {
+    names.add('ctx');
+  }
+  return names;
+}
+
+/** Extract the context root (`ctx` / `context`) mutated on this line, if any. */
+function mutationContextRoot(line: string): string | null {
+  if (/\breq\.context\b/.test(line) || /\brequest\.context\b/.test(line)) {
+    return null;
+  }
+  if (/\bctx\./.test(line) || /\bctx\[/.test(line) || /\bdelete\s+ctx\b/.test(line)) {
+    return 'ctx';
+  }
+  if (/\bcontext\./.test(line) || /\bdelete\s+context\b/.test(line)) {
+    return 'context';
+  }
+  return null;
 }
 
 /**
@@ -325,7 +350,10 @@ export function analyzeContextMutation(content: string, filePath: string): Check
 
   if (!usesContextPattern(content)) return violations;
 
-  const locallyDeclared = findLocallyDeclaredNames(content);
+  const locallyDeclared = new Set([
+    ...findLocallyDeclaredNames(content),
+    ...findWalkContextParameterNames(content),
+  ]);
 
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -336,8 +364,8 @@ export function analyzeContextMutation(content: string, filePath: string): Check
     const match = findMutationMatch(line);
     if (!match || match.isSafe) continue;
 
-    const rootName = match.detector.patternName.split('.')[0];
-    if (locallyDeclared.has(rootName)) continue;
+    const rootName = mutationContextRoot(line);
+    if (rootName !== null && locallyDeclared.has(rootName)) continue;
 
     const isDefensive = isDefensiveMutation(lines, i);
     const lineNumber = i + 1;

@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (source directories within a single project root)
 /**
  * Shared file-discovery scaffolding for the tree-sitter graph adapters.
  *

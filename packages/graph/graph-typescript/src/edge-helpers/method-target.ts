@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates a bounded collection (one symbol's declarations for a single method-call resolution), mirroring the property-access resolver.
 /**
  * Type-attested cross-package METHOD target resolution (ADR-0033 follow-up).
  *

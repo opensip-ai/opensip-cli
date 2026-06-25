@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (config entries, registry items, or small analysis results)
 /**
  * @fileoverview Shared AST utilities for fitness checks.
  *

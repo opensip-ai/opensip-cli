@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads package.json / pnpm-workspace.yaml manifests; bounded by standard project metadata size
 /**
  * Flat-monorepo discovery strategy — Phase 12 of opensip's substrate
  * consolidation (opensip DEC-498).

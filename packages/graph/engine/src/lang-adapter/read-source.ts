@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- readSourceFileGuarded IS the size-validating wrapper: a statSync pre-check rejects oversized files BEFORE the read, and a post-read length guard closes the stat→read TOCTOU window; both throw at the 10MB cap (mirrors the fitness engine's FileAccessor).
 /**
  * read-source — the single size-guarded source-file reader for graph language
  * adapters.

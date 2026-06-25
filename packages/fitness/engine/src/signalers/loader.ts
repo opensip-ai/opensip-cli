@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collection (signaler entries listed in opensip-cli.config.yml)
 /**
  * @fileoverview Load and cache opensip-cli.config.yml
  *

@@ -121,7 +121,6 @@ export function buildTargets(args: { readonly document: unknown }): TargetResolv
 
   return {
     getByName: (name) => registry.getByName(name),
-    // @fitness-ignore-next-line batch-operation-limits -- getAll() over the project's declared target set (a handful of named file-sets per config document), bounded like core's tool registry getAll.
     getAll: () => registry.getAll(),
     getByTag: (tag) => registry.getByTag(tag),
     has: (name) => registry.has(name),

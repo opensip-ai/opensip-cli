@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates bounded collections (registry items / small analysis results)
 /**
  * @fileoverview Check resolution for fitness recipes.
  *

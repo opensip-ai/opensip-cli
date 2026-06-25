@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- `scenarios.getAll()` reads the per-run IN-MEMORY scenario registry (bounded by pack registration), not a database query; it mirrors fitness's checkRegistry.list() catalog read (which avoids the heuristic only by its method name).
 /**
  * report-data contribution — simulation's inputs to the cross-tool HTML report.
  *

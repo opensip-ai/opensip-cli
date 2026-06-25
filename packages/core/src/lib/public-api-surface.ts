@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads small text files (package.json, src/index.ts barrels) for public-API surface computation; per-file memory bounded by standard config/barrel shape.
 /**
  * @fileoverview Public-API reachability graph — shared kernel helper.
  *

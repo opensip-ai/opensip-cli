@@ -234,7 +234,6 @@ export const vitestConfigRequiredWithTests = defineCheck({
 **Scope:** Cross-file analysis via \`analyzeAll\`. Package roots are discovered generically from \`package.json\` files; nested package roots, \`node_modules\`, fixtures, and build output are skipped when scanning for tests.`,
   tags: ['architecture', 'testing'],
 
-  // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const packageJsonPaths = files.paths.filter((fp) => path.basename(fp) === 'package.json');

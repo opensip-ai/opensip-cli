@@ -35,7 +35,6 @@ export const projectReadmeExistence = defineCheck({
 **Scope:** Cross-file analysis via \`analyzeAll\`. Codebase-specific convention.`,
   tags: ['architecture', 'documentation'],
 
-  // @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
   // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = [];

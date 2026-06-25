@@ -57,4 +57,13 @@ describe('context-mutation — FP regression suite (1.0.7)', () => {
     `;
     expect(analyze(src).length).toBeGreaterThanOrEqual(1);
   });
+
+  it('does NOT flag ctx.callSites.push on a WalkCtx parameter (graph walker)', () => {
+    const src = `
+      function visit(node: Node, ctx: WalkCtx): void {
+        ctx.callSites.push({ name: 'foo', line: 1 })
+      }
+    `;
+    expect(analyze(src)).toHaveLength(0);
+  });
 });

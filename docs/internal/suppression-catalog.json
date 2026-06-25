@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-25T07:23:48.916Z",
+  "generatedAt": "2026-06-25T17:56:50.080Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,11 +11,9 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 296,
+        "total": 210,
         "bySlug": {
-          "batch-operation-limits": 42,
           "env-secret-exposure": 3,
-          "unbounded-memory": 26,
           "silent-early-returns": 7,
           "one-outcome-shape": 1,
           "context-leakage": 1,
@@ -43,8 +41,6 @@
           "sonarjs-backend": 1,
           "stubbed-implementation-detection": 1,
           "callback-invocation-safe": 1,
-          "context-mutation": 5,
-          "concurrency-safety": 11,
           "semgrep-scan": 8,
           "semgrep-justifications": 3,
           "no-todo-comments": 4,
@@ -76,7 +72,6 @@
           "no-stub-tests": 1,
           "no-direct-stdout-in-tool-engine": 2,
           "only-documented-toolcli-seams": 2,
-          "no-non-null-assertions": 2,
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
           "module-coupling-metrics": 2,
@@ -88,28 +83,18 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 11,
+          "cli": 5,
           "cli-ui": 1,
-          "clone-detection": 1,
-          "config": 1,
-          "core": 9,
-          "dashboard": 2,
-          "fitness/checks-typescript": 66,
-          "fitness/checks-universal": 117,
-          "fitness/engine": 26,
-          "graph/engine": 22,
-          "graph/graph-adapter-common": 2,
-          "graph/graph-go": 3,
-          "graph/graph-java": 1,
-          "graph/graph-python": 2,
-          "graph/graph-rust": 2,
-          "graph/graph-typescript": 15,
-          "languages/lang-typescript": 4,
-          "output": 2,
-          "simulation": 5,
-          "targeting": 1,
-          "test-support": 2,
-          "yagni": 1
+          "core": 3,
+          "dashboard": 1,
+          "fitness/checks-typescript": 64,
+          "fitness/checks-universal": 106,
+          "fitness/engine": 12,
+          "graph/engine": 10,
+          "graph/graph-typescript": 2,
+          "languages/lang-typescript": 2,
+          "simulation": 2,
+          "test-support": 2
         }
       },
       "graph": {
@@ -120,11 +105,9 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 111,
+        "total": 38,
         "bySlug": {
-          "batch-operation-limits": 42,
           "env-secret-exposure": 2,
-          "unbounded-memory": 22,
           "silent-early-returns": 5,
           "one-outcome-shape": 1,
           "context-leakage": 1,
@@ -134,42 +117,29 @@
           "module-coupling-fan-out": 4,
           "no-direct-stdout-in-tool-engine": 2,
           "only-documented-toolcli-seams": 2,
-          "no-non-null-assertions": 2,
           "semgrep-scan": 1,
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
           "module-coupling-metrics": 2,
-          "concurrency-safety": 3,
           "no-unbounded-concurrency": 1,
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "no-markdown-references": 2,
           "env-via-registry": 2,
-          "context-mutation": 4,
           "unsafe-secret-comparison": 2,
           "no-raw-fetch": 1,
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 11,
+          "cli": 5,
           "cli-ui": 1,
-          "clone-detection": 1,
-          "config": 1,
-          "core": 9,
-          "dashboard": 2,
-          "fitness/engine": 26,
-          "graph/engine": 22,
-          "graph/graph-adapter-common": 2,
-          "graph/graph-go": 3,
-          "graph/graph-java": 1,
-          "graph/graph-python": 2,
-          "graph/graph-rust": 2,
-          "graph/graph-typescript": 15,
-          "languages/lang-typescript": 4,
-          "output": 2,
-          "simulation": 5,
-          "targeting": 1,
-          "yagni": 1
+          "core": 3,
+          "dashboard": 1,
+          "fitness/engine": 12,
+          "graph/engine": 10,
+          "graph/graph-typescript": 2,
+          "languages/lang-typescript": 2,
+          "simulation": 2
         }
       },
       "graph": {
@@ -197,11 +167,10 @@
     },
     "check-package": {
       "fitness": {
-        "total": 183,
+        "total": 170,
         "bySlug": {
           "shipped-checks-must-be-generic": 5,
           "fitness-check-standards": 17,
-          "unbounded-memory": 4,
           "null-safety": 7,
           "correlation-id-coverage": 6,
           "duplicate-utility-functions": 4,
@@ -222,8 +191,6 @@
           "stubbed-implementation-detection": 1,
           "callback-invocation-safe": 1,
           "silent-early-returns": 2,
-          "context-mutation": 1,
-          "concurrency-safety": 8,
           "semgrep-scan": 7,
           "interface-implementation-consistency": 1,
           "semgrep-justifications": 3,
@@ -257,8 +224,8 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 66,
-          "fitness/checks-universal": 117
+          "fitness/checks-typescript": 64,
+          "fitness/checks-universal": 106
         }
       },
       "graph": {
@@ -355,8 +322,8 @@
   "budget": {
     "safety": {
       "batch-operation-limits": {
-        "budget": 53,
-        "actual": 42
+        "budget": 0,
+        "actual": 0
       },
       "error-handling-quality": {
         "budget": 2,
@@ -371,8 +338,8 @@
         "actual": 0
       },
       "unbounded-memory": {
-        "budget": 26,
-        "actual": 26
+        "budget": 0,
+        "actual": 0
       },
       "toctou-race-condition": {
         "budget": 0,
@@ -395,20 +362,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 296,
-    "budgetGateFitnessSlugs": 73,
-    "productRuntimeFitness": 111,
-    "productRuntimeFitnessSlugs": 27,
+    "budgetGateFitness": 210,
+    "budgetGateFitnessSlugs": 68,
+    "productRuntimeFitness": 38,
+    "productRuntimeFitnessSlugs": 22,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 144,
-    "checkPackageFitness": 183,
+    "productRuntimeCombined": 71,
+    "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
-    "budgetGateSafetyTotal": 70,
-    "productRuntimeSafetyTotal": 64,
-    "unbudgetedProductRuntimeSlugs": 24
+    "budgetGateSafetyTotal": 2,
+    "productRuntimeSafetyTotal": 0,
+    "unbudgetedProductRuntimeSlugs": 21
   },
   "phase4Audit": {
     "baseline": {
@@ -421,28 +388,16 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -194,
+      "productRuntimeFitness": -267,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -168,
-      "budgetGateFitness": -246,
-      "checkPackageFitness": -51,
-      "productRuntimeSafetyTotal": -119,
-      "budgetGateSafetyTotal": -164
+      "productRuntimeCombined": -241,
+      "budgetGateFitness": -332,
+      "checkPackageFitness": -64,
+      "productRuntimeSafetyTotal": -183,
+      "budgetGateSafetyTotal": -232
     },
     "reopenCandidates": [],
     "acceptedHighCount": [
-      {
-        "slug": "batch-operation-limits",
-        "count": 42,
-        "disposition": "b",
-        "kind": "fitness"
-      },
-      {
-        "slug": "unbounded-memory",
-        "count": 22,
-        "disposition": "b",
-        "kind": "fitness"
-      },
       {
         "slug": "graph:near-duplicate-function-body",
         "count": 26,
@@ -458,7 +413,7 @@
     ],
     "successCriteria": {
       "sc6ProductRuntimeSafetyTarget": 143,
-      "sc6ProductRuntimeSafetyActual": 64,
+      "sc6ProductRuntimeSafetyActual": 0,
       "sc6Met": true
     }
   }

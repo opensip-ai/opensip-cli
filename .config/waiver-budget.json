@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Reviewed safety-waiver residual (no net-new). Each suppression was triaged: stale ones removed, the rest carry a specific verifiable justification. Counts include the yagni tool's suppressions (reviewed via its own PR). Cosmetic slugs are report-only. module-coupling-fan-out floor (4): documented composition roots (graph/simulation tool wiring, dashboard bundle entry, graph CLI orchestrators) — not accidental god-files.",
+  "description": "Reviewed safety-waiver residual (no net-new). Check heuristics for batch-operation-limits, unbounded-memory, and context-mutation were improved (suppression-check-improvements) so prior waivers were removed rather than re-budgeted. Cosmetic slugs are report-only. module-coupling-fan-out floor (4): documented composition roots (graph/simulation tool wiring, dashboard bundle entry, graph CLI orchestrators) — not accidental god-files.",
   "safety": {
-    "batch-operation-limits": 53,
+    "batch-operation-limits": 0,
     "error-handling-quality": 2,
     "detached-promises": 0,
     "performance-anti-patterns": 0,
-    "unbounded-memory": 26,
+    "unbounded-memory": 0,
     "toctou-race-condition": 0
   },
   "cosmetic": {

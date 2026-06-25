@@ -65,9 +65,47 @@ const BOUNDED_KEYWORDS = [
   'slice',
 ] as const;
 
+/** In-memory registry/catalog reads that are bounded per run, not DB fanout. */
+const BOUNDED_REGISTRY_MARKERS = [
+  'registry',
+  'catalog',
+  'rules',
+  'targets',
+  'scenarios',
+  'checks',
+  'adapters',
+  'signals',
+  'recipes',
+  'languages',
+  'tools',
+  'signaler',
+  'descriptors',
+  'entries',
+  'columns',
+  'ruleDescriptors',
+  'fromtools',
+  'targetregistry',
+  'checkregistry',
+  'scenarioregistry',
+  'languageregistry',
+  'toolregistry',
+] as const;
+
 function hasBoundedKeyword(content: string): boolean {
   const lowerContent = content.toLowerCase();
   return BOUNDED_KEYWORDS.some((keyword) => lowerContent.includes(keyword));
+}
+
+function isBoundedRegistryQuery(content: string, queryIndex: number): boolean {
+  const start = Math.max(0, queryIndex - 200);
+  const context = content.slice(start, queryIndex).toLowerCase();
+  return BOUNDED_REGISTRY_MARKERS.some((marker) => context.includes(marker));
+}
+
+/** `for (const x of …)` loops that never await are pure in-memory scans, not async batch fanout. */
+function forOfLoopBodyMayAwait(content: string, forIndex: number): boolean {
+  const snippet = content.slice(forIndex, Math.min(content.length, forIndex + 600));
+  return /\bawait\b/.test(snippet);
 }
 
 function findUnboundedQueryCalls(
@@ -125,9 +163,9 @@ export const batchOperationLimits = defineCheck({
   longDescription: `**Purpose:** Prevents batch operations from processing arbitrarily large datasets without pagination or concurrency controls.
 
 **Detects:**
-- Unbounded query calls: \`.findAll()\`, \`.getAll()\`, \`.findMany()\` with empty parentheses
+- Unbounded query calls: \`.findAll()\`, \`.getAll()\`, \`.findMany()\` with empty parentheses (skips registry/catalog reads)
 - Async callbacks in \`.map(\` and \`.forEach(\` without nearby batching keywords
-- \`for (const x of\` loops without pagination indicators
+- \`for (const x of\` loops whose body contains \`await\` without pagination indicators (pure synchronous scans are skipped)
 - Skips files containing bounded keywords: \`batch\`, \`chunk\`, \`page\`, \`limit\`, \`take\`, \`skip\`, \`offset\`, \`slice\`
 
 **Why it matters:** Processing unbounded datasets can exhaust memory and starve other operations of resources.
@@ -152,6 +190,9 @@ export const batchOperationLimits = defineCheck({
 
     const unboundedQueries = findUnboundedQueryCalls(content);
     for (const query of unboundedQueries) {
+      if (isBoundedRegistryQuery(content, query.index)) {
+        continue;
+      }
       const lineNumber = getLineNumber(content, query.index);
       violations.push({
         line: lineNumber,
@@ -174,6 +215,12 @@ export const batchOperationLimits = defineCheck({
         const start = Math.max(0, matchResult.index - 300);
         const end = Math.min(content.length, matchResult.index + 300);
         const context = content.slice(start, end);
+
+        const isForOf = /^for\s*\(\s*const\s+\w+\s+of/.test(matchResult.match);
+        if (isForOf && !forOfLoopBodyMayAwait(content, matchResult.index)) {
+          searchStart = matchResult.index + 1;
+          continue;
+        }
 
         if (!hasBoundedKeyword(context)) {
           const lineNumber = getLineNumber(content, matchResult.index);

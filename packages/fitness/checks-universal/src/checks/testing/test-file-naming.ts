@@ -175,7 +175,6 @@ function scanDirectory(dirPath: string, cwd: string): CheckViolation[] {
 /**
  * Analyze all files for test naming violations
  */
-// @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
 // eslint-disable-next-line @typescript-eslint/require-await -- AnalyzeAllCheckConfig requires Promise<CheckViolation[]>; this implementation is synchronous
 async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   logger.debug({

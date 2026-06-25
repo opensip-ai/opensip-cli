@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- pure in-memory linear/BFS scans over the already-materialized catalog + indexes (bounded by repo size); data→data, no DB/IO/unbounded-async to batch or paginate.
 /**
  * Stage 3.5 — Feature derivation.
  *

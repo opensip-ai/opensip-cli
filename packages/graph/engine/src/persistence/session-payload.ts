@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates the bounded per-run signal set grouped by rule (rule descriptors registered for a single graph run)
 /**
  * Graph-owned session payload (audit 2026-05-29, session split; extended
  * 2026-05-29 to carry per-rule detail for the Code Paths session view;

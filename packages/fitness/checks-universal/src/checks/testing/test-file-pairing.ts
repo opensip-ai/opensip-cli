@@ -225,7 +225,6 @@ async function scanDirectory(
 /**
  * Analyze all files for test pairing
  */
-// @fitness-ignore-next-line concurrency-safety -- async keyword required by analyzeAll interface contract; synchronous analysis implementation
 async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   logger.debug({
     evt: 'fitness.checks.test_file_pairing.analyze_all',

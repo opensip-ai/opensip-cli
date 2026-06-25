@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- findByScope's this.getAll() iterates the project's declared target set (a handful of named file-sets per config document), bounded like core's tool registry getAll.
 /**
  * @fileoverview Fitness Target Registry
  *

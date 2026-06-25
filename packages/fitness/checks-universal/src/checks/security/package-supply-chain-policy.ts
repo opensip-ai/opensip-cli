@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads small repository config files (package.json, lockfiles, workflows); bounded by standard project metadata size
 /**
  * @fileoverview Package supply-chain policy check
  *

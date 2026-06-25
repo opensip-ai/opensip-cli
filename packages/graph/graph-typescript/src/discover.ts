@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- ParseConfigHost.readFile reads tsconfig.json files only; bounded by standard TS configuration shape
 /**
  * Stage 0 — Discover files.
  *

@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- readFileSync reads tsconfig.json files only, bounded by the standard TS configuration shape (mirrors graph-typescript/src/discover.ts).
 /**
  * @fileoverview Shared TypeScript type-checked Program service.
  *

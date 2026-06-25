@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- iterates the AST node arities of a single tree-sitter parse (bounded by source size); not a workspace-fanout loop.
 /**
  * @fileoverview Go-specific metadata extraction from tree-sitter nodes.
  *

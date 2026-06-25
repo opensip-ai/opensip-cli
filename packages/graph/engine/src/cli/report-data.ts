@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- getAll() reads bounded in-memory rule/recipe registries (a handful of entries per RunScope), not a data store (cf. rules/registry.ts which suppresses the same check for the same reason).
 /**
  * @fileoverview Graph report-data catalog builders.
  *

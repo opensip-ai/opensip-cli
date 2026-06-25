@@ -1,5 +1,4 @@
 // @fitness-ignore-file module-coupling-metrics -- central orchestration module with necessary coupling
-// @fitness-ignore-file unbounded-memory -- reads single source files at a time via FileAccessor; per-file memory bounded by source size
 /**
  * @fileoverview defineCheck - Unified check definition API
  *
@@ -305,7 +304,6 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
       // pack's display map is applied via applyCheckDisplay().
       icon: config.icon,
       displayName: config.displayName,
-      // @fitness-ignore-next-line concurrency-safety -- async arrow delegates to executeUnifiedCheck which is async; needed for type compatibility
       execute: async (ctx) => executeUnifiedCheck(config, ctx),
     },
 

@@ -16,7 +16,6 @@ import type { CatalogLike, IndexesLike } from './code-paths-types.js';
 export function inferEntryPointHashes(catalog: CatalogLike | null, indexes: IndexesLike): string[] {
   const entries: string[] = [];
   if (!catalog?.functions) return entries;
-  // @fitness-ignore-next-line batch-operation-limits -- fully synchronous in-memory Map scan (no await / promises); the heuristic mis-flags the Map iteration + .get() inside the loop.
   for (const occ of indexes.byBodyHash.values()) {
     const isCli = occ.filePath === 'packages/cli/src/index.ts';
     const callerList = indexes.callers.get(occ.bodyHash) ?? [];

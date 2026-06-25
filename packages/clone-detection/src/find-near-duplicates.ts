@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- pure in-memory synchronous scans over the already-materialized candidate list (LSH buckets, candidate pairs, union-find components), bounded by input size; data→data, no async/IO/DB to batch or paginate.
 /**
  * Near-duplicate body detection — LSH-banded MinHash, the single implementation graph's
  * `near-duplicate-function-body` rule consumes (ADR-0064). Pure over `CloneCandidate[]`;

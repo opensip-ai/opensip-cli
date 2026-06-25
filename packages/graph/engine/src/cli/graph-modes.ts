@@ -1,4 +1,3 @@
-// @fitness-ignore-file no-non-null-assertions -- narrowing helpers prove the discriminant before access; the assertions encode that proof for the type checker.
 /**
  * @fileoverview Mode dispatch for `opensip graph`.
  *
@@ -141,6 +140,10 @@ export function runCatalogJsonMode(
   if (typeof opts.gitSha !== 'string' || opts.gitSha.length === 0) {
     throw new ConfigurationError('--catalog-output requires --git-sha <sha>.');
   }
+  const catalogOutput = opts.catalogOutput;
+  if (typeof catalogOutput !== 'string' || catalogOutput.length === 0) {
+    throw new ConfigurationError('--catalog-output requires a path.');
+  }
   if (result.catalog === null || result.indexes === null) {
     throw new ToolError(
       'Cannot emit catalog-json: engine returned null catalog / indexes (no parseable input).',
@@ -183,8 +186,8 @@ export function runCatalogJsonMode(
   // opensip `EngineSubprocessPort.runCatalogExport` may point
   // `--catalog-output` at a run-scoped temp dir that doesn't exist yet,
   // so a bare writeFileSync would throw ENOENT.
-  mkdirSync(dirname(opts.catalogOutput!), { recursive: true });
-  writeFileSync(opts.catalogOutput!, json);
+  mkdirSync(dirname(catalogOutput), { recursive: true });
+  writeFileSync(catalogOutput, json);
   logger.info({
     evt: 'graph.render.catalog_json.complete',
     module: MODULE_GRAPH_RENDER,

@@ -1,4 +1,3 @@
-// @fitness-ignore-file unbounded-memory -- reads scaffold template files shipped with the CLI; bounded by the package's own embedded examples
 /**
  * Disk-write phase for `opensip init`.
  *

@@ -119,6 +119,63 @@ describe('unbounded-memory — bounded-read FP regression', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
+  it('does NOT flag synchronous for-of scans without await', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-batch1-'));
+    const file = writeFixture(
+      cwd,
+      'src/indexes.ts',
+      [
+        'export function buildIndex(entries: readonly string[]) {',
+        '  const out = new Map<string, number>();',
+        '  for (const entry of entries) {',
+        '    out.set(entry, out.size);',
+        '  }',
+        '  return out;',
+        '}',
+      ].join('\n'),
+    );
+    const result = await findCheck('batch-operation-limits').run(cwd, { targetFiles: [file] });
+    expect(result.signals).toHaveLength(0);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('does NOT flag registry.getAll() catalog reads', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-batch2-'));
+    const file = writeFixture(
+      cwd,
+      'src/registry.ts',
+      [
+        'export function listRules(registry: { getAll(): readonly string[] }) {',
+        '  const names: string[] = [];',
+        '  for (const rule of registry.getAll()) {',
+        '    names.push(rule);',
+        '  }',
+        '  return names;',
+        '}',
+      ].join('\n'),
+    );
+    const result = await findCheck('batch-operation-limits').run(cwd, { targetFiles: [file] });
+    expect(result.signals).toHaveLength(0);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('does NOT flag opensip-cli user config reads', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-mem4-'));
+    const file = writeFixture(
+      cwd,
+      'src/config.ts',
+      [
+        'import { readFileSync } from "node:fs";',
+        'export function loadUserConfig(home: string): string {',
+        '  return readFileSync(`${home}/.opensip-cli/config.yml`, "utf8");',
+        '}',
+      ].join('\n'),
+    );
+    const result = await findCheck('unbounded-memory').run(cwd, { targetFiles: [file] });
+    expect(result.signals).toHaveLength(0);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
   it('STILL flags an unguarded read of an external path', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-mem3-'));
     const file = writeFixture(

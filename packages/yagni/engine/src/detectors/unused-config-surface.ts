@@ -1,4 +1,3 @@
-// @fitness-ignore-file batch-operation-limits -- walks a bounded, already-discovered source file list synchronously; no DB, network, async fanout, or unbounded external batch.
 /**
  * unused-config-surface — flags required config properties on the public API
  * surface that are never read anywhere in the project.
