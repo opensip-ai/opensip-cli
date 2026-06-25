@@ -11,6 +11,8 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
+import { YAGNI_DETECTORS } from '../detectors/registry.js';
+
 import { executeYagni, type ExecuteYagniOptions } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
 import { buildYagniPresentationLines } from './yagni-presentation.js';
@@ -22,7 +24,33 @@ import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
 
 const YAGNI_TOOL_TITLE = 'YAGNI Audit';
 const YAGNI_TOOL_DESCRIPTION = 'Scanning for speculative surface to remove.';
-const YAGNI_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running detectors...' };
+
+/**
+ * Friendly checklist row label from a detector slug — drops the `yagni:`
+ * namespace and title-cases the kebab tail (`yagni:unused-config-surface` →
+ * `Unused Config Surface`).
+ */
+function detectorLabel(slug: string): string {
+  const name = slug.slice(slug.indexOf(':') + 1);
+  return name
+    .split('-')
+    .map((w) => (w.length === 0 ? w : w[0].toUpperCase() + w.slice(1)))
+    .join(' ');
+}
+
+/**
+ * Per-detector checklist (one phase per detector), mirroring graph's staged view.
+ * Detectors run serially, so each row spins, completes with its duration, then the
+ * next starts; a detector `planDetectors` excludes renders as a skipped row.
+ */
+const YAGNI_RUNNING_SURFACE: ProgressSurface = {
+  shape: 'phases',
+  stages: YAGNI_DETECTORS.map((d) => ({
+    id: d.slug,
+    label: detectorLabel(d.slug),
+    runningDetail: 'Analyzing project...',
+  })),
+};
 const YAGNI_LOADING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Loading detectors...' };
 
 export { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
@@ -82,9 +110,8 @@ export async function renderYagniLive(
       projectPath: args.cwd,
       walkedUp: currentScope()?.projectContext?.walkedUp,
       produce: async (emit, helpers) => {
-        emit({ type: 'stage-start', stage: 'detectors', label: 'Running detectors...' });
         helpers.setRunning(() => {
-          // In-process run — progress events flow through emit() directly.
+          // In-process run — per-detector phase events flow through emit() directly.
         });
 
         const executeOpts: ExecuteYagniOptions = {
@@ -96,8 +123,18 @@ export async function renderYagniLive(
           categories: args.categories,
           includeTests: args.includeTests,
           pathRoots: args.pathRoots,
-          onProgress: (completed, total) => {
-            emit({ type: 'stage-progress', stage: 'detectors', completed, total });
+          // Phases live view: one checklist row per detector (declared in
+          // YAGNI_RUNNING_SURFACE), driven by the detector lifecycle.
+          onDetectorStart: (slug) => {
+            emit({ type: 'stage-start', stage: slug, label: detectorLabel(slug) });
+          },
+          onDetectorDone: (slug, durationMs) => {
+            emit({ type: 'stage-done', stage: slug, durationMs });
+          },
+          onDetectorsSkipped: (slugs) => {
+            for (const slug of slugs) {
+              emit({ type: 'stage-done', stage: slug, durationMs: 0, detail: 'skipped' });
+            }
           },
         };
 

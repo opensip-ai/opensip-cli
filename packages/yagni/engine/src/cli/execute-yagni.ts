@@ -31,7 +31,13 @@ export interface ExecuteYagniOptions {
   readonly categories?: readonly string[];
   readonly includeTests?: boolean;
   readonly pathRoots?: readonly string[];
+  /** Aggregate count progress (pool-shape live view). */
   readonly onProgress?: (completed: number, total: number) => void;
+  /** Per-detector lifecycle, for a phases-shape live view that names each detector. */
+  readonly onDetectorStart?: (slug: string) => void;
+  readonly onDetectorDone?: (slug: string, durationMs: number) => void;
+  /** The detectors `planDetectors` excluded (filtered out or graph-gated), emitted once. */
+  readonly onDetectorsSkipped?: (slugs: readonly string[]) => void;
 }
 
 /** Envelope plus session payload returned to the host command runner. */
@@ -116,9 +122,11 @@ export async function executeYagni(
   const units: UnitResult[] = [];
   const total = run.length;
   opts.onProgress?.(0, total);
+  if (skipped.length > 0) opts.onDetectorsSkipped?.(skipped.map((s) => s.slug));
 
   for (const detector of run) {
     const started = Date.now();
+    opts.onDetectorStart?.(detector.slug);
     try {
       const result = await detector.run({
         cwd: opts.cwd,
@@ -144,6 +152,7 @@ export async function executeYagni(
         error: error instanceof Error ? error.message : String(error),
       });
     }
+    opts.onDetectorDone?.(detector.slug, units.at(-1)?.durationMs ?? Date.now() - started);
     opts.onProgress?.(units.length, total);
   }
 
