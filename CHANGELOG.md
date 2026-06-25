@@ -2,6 +2,48 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.12] - 2026-06-24
+
+A graph-focused release. It adds near-duplicate (copy-paste-with-edits) function
+detection and a structured equivalence diagnostic, and it hardens sharded≡exact
+graph equivalence and cross-language call resolution. All changes are
+backward-compatible; the new catalog signature field and rule are additive.
+
+### Added
+
+- `graph:near-duplicate-function-body` — a new advisory (warning-level) graph rule
+  that flags clusters of near-clone function bodies (copy-paste-with-edits), the
+  more common tech-debt signal that the exact `graph:duplicated-function-body`
+  misses. It uses a per-function MinHash signature computed at graph-build time and
+  LSH banding for O(n) candidate generation. Clusters are same-language and exclude
+  exact-hash twins (which the exact rule already owns). Tunable via the new
+  `graph.minNearDuplicateSimilarity`, `graph.minNearDuplicateBodySize`, and
+  `graph.nearDuplicateLshBands` config keys.
+- `GRAPH_EQUIV_DIAG` — point this environment variable at a file path to have
+  `graph-equivalence-check` write a structured JSON diagnostic of every production
+  decline/phantom divergence (owning occurrence, resolved targets, and the call
+  edge as seen by both engines), making equivalence regressions debuggable in
+  minutes.
+
+### Changed
+
+- Near-duplicate MinHash signatures are computed ~66× faster — each body shingle
+  is hashed once and the signature values are derived with cheap mixers, instead of
+  hashing every shingle k times — so cold graph builds stay fast despite the new
+  per-function signature.
+
+### Fixed
+
+- Restored byte-equivalence between the sharded and exact graph build engines for
+  cross-package edges. The sharded engine now recovers cross-package method-call
+  edges (by decoding pnpm-injected `dist/*.d.ts` paths back to workspace source) and
+  re-export edges (by following relative-import barrels), which previously resolved
+  only in the single-program exact engine — driving the equivalence gate's
+  production divergences to zero.
+- Tree-sitter call resolution (Go, Java, Python, Rust) now matches names within the
+  same language only, so on the single-program build a call no longer falsely
+  resolves to a same-named function in another language.
+
 ## [0.1.11] - 2026-06-23
 
 A polish and hardening patch over 0.1.10. It unifies live-run terminal
