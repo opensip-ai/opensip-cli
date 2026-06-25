@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
 import { buildYagniPresentationLines } from '../cli/yagni-presentation.js';
-import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-candidate.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';
@@ -26,7 +25,7 @@ describe('yagni presentation', () => {
         includeTests: true,
       },
       stubCli(),
-      [unusedConfigSurfaceDetector, duplicateBodyCandidateDetector],
+      [unusedConfigSurfaceDetector],
     );
     const lines = buildYagniPresentationLines(
       outcome.envelope,

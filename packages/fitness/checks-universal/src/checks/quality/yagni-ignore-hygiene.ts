@@ -33,7 +33,7 @@ function analyzeIgnoreHygiene(content: string, _filePath: string): CheckViolatio
           message: `@yagni-ignore references '${detectorSlug}' which is not a valid detector slug (expected kebab-case)`,
           severity: 'warning',
           suggestion:
-            'Use a valid detector slug like "unused-config-surface" or "yagni:duplicate-body-candidate"',
+            'Use a valid detector slug like "unused-config-surface" or "yagni:unused-config-surface"',
           type: 'invalid-ignore-slug',
           match: line.trim().slice(0, 120),
         });

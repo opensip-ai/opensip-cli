@@ -2171,7 +2171,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             "off",
           ],
           "defaultValue": undefined,
-          "description": "Graph evidence mode: auto (reuse or build), reuse, build, or off (default from config)",
+          "description": "Deprecated (ignored since v0.1.12): yagni no longer builds a graph — use \`opensip graph\` for duplicate analysis",
           "flags": "--graph <mode>",
           "negate": false,
           "optional": false,

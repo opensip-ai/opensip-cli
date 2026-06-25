@@ -77,7 +77,7 @@ Ten rules ship today, in a fixed registration order ([`packages/graph/engine/src
 
 ## Detector
 
-A **detector** is the `yagni`-side unit of work — a single, named analysis that emits advisory reduction candidates. Detectors are registered in the yagni engine and selected per run (all enabled by default, or narrowed with `--detector`). Each finding carries `metadata.yagni` (confidence, preservation argument, evidence). Two detectors ship in the MVP: `unused-config-surface` and `duplicate-body-candidate`.
+A **detector** is the `yagni`-side unit of work — a single, named analysis that emits advisory reduction candidates. Detectors are registered in the yagni engine and selected per run (all enabled by default, or narrowed with `--detector`). Each finding carries `metadata.yagni` (confidence, preservation argument, evidence). As of v0.1.12 (ADR-0063) one detector ships: `unused-config-surface`; duplicate-body detection moved to `opensip graph`.
 
 ## Signal
 

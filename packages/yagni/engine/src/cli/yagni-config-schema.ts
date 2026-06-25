@@ -10,6 +10,9 @@ import { z } from 'zod';
 import type { YagniConfig } from '../types/yagni-config.js';
 import type { ToolConfigDeclaration } from '@opensip-cli/config';
 
+// Deprecated (ADR-0063, v0.1.12): yagni no longer builds or reuses a graph.
+// Still accepted (so existing config files keep validating) but inert; the
+// command warns when `--graph` is passed. Slated for removal in 0.1.13.
 const graphMode = z.enum(['auto', 'reuse', 'build', 'off']);
 const confidenceLevel = z.enum(['low', 'medium', 'high']);
 
@@ -17,6 +20,7 @@ export const YagniConfigSchema = z.object({
   failOnErrors: z.number().int().min(0).optional(),
   failOnWarnings: z.number().int().min(0).optional(),
   defaultMinConfidence: confidenceLevel.optional(),
+  // Deprecated & inert since v0.1.12 — duplicate analysis moved to `opensip graph`.
   graphMode: graphMode.optional(),
   includeTests: z.boolean().optional(),
   disabledDetectors: z.array(z.string().min(1)).readonly().optional(),
@@ -38,6 +42,7 @@ export const yagniConfigDeclaration: ToolConfigDeclaration = {
     includeTests: false,
   },
   env: [
+    // Deprecated v0.1.12 (inert) — kept so existing environments don't error.
     { envVar: 'OPENSIP_YAGNI_GRAPH_MODE', key: 'graphMode' },
     { envVar: 'OPENSIP_YAGNI_MIN_CONFIDENCE', key: 'defaultMinConfidence' },
     {

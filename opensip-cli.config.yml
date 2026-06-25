@@ -195,14 +195,14 @@ graph:
 # YAGNI Configuration
 # =============================================================================
 #
-# Advisory reduction audit. CI pins graphMode to build (never auto) for
-# deterministic dogfood runs; findings do not gate merges.
+# Advisory reduction audit. As of v0.1.12 (ADR-0063) yagni owns no graph
+# evidence — it audits config-surface reduction; duplicate/near-duplicate
+# analysis lives in `opensip graph`. Findings do not gate merges.
 
 yagni:
   failOnErrors: 0
   failOnWarnings: 0
   defaultMinConfidence: medium
-  graphMode: build
   includeTests: false
 
 # =============================================================================

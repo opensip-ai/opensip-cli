@@ -122,29 +122,11 @@ module.exports = {
       comment:
         "Production code must not import a package's `src/internal.ts` barrel — those are " +
         'test-only surfaces exposed via the `<pkg>/internal` subpath for cross-package test ' +
-        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it. ' +
-        'Carve-out: `packages/yagni/engine/src/evidence/graph-evidence.ts` may reach ' +
-        '`@opensip-cli/graph/internal` (the sole graph-evidence seam).',
+        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it.',
       from: {
-        pathNot: [
-          '/__tests__/',
-          String.raw`\.test\.(ts|tsx)$`,
-          '^packages/yagni/engine/src/evidence/graph-evidence\\.ts$',
-        ],
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: { path: String.raw`/src/internal\.ts$` },
-    },
-    {
-      name: 'yagni-graph-evidence-only-graph-internal',
-      severity: 'error',
-      comment:
-        'The yagni graph-evidence seam may import ONLY `@opensip-cli/graph/internal`, ' +
-        'never fitness/simulation internal barrels.',
-      from: { path: '^packages/yagni/engine/src/evidence/graph-evidence\\.ts$' },
-      to: {
-        path: String.raw`/src/internal\.ts$`,
-        pathNot: '^packages/graph/engine/src/internal\\.ts$',
-      },
     },
     {
       name: 'no-prod-import-of-test-support',
@@ -700,7 +682,8 @@ module.exports = {
       severity: 'error',
       comment:
         'The yagni engine must not depend on any @opensip-cli/graph-* adapter pack. ' +
-        'Graph evidence reaches the engine via `@opensip-cli/graph/internal` only.',
+        'Since v0.1.12 (ADR-0063) yagni owns no graph evidence at all; duplicate ' +
+        'analysis lives in `opensip graph`.',
       from: {
         path: '^packages/yagni/engine/src/',
         pathNot: '^packages/yagni/engine/src/__tests__/',

@@ -4,7 +4,17 @@
 
 import type { YagniConfidence } from './yagni-metadata.js';
 
-/** Graph evidence strategy used by YAGNI graph-backed detectors. */
+/**
+ * Graph evidence mode. DEPRECATED & INERT since v0.1.12 (ADR-0063): yagni no
+ * longer builds or reuses a graph. The values are still accepted (so existing
+ * config/env keep validating) and carried onto the session for continuity, but
+ * have no effect; the command warns when `--graph` is passed. Targeted for
+ * removal in 0.1.13. Duplicate/near-duplicate analysis lives in `opensip graph`.
+ *
+ * Note: not tagged `@deprecated` because the type is still a live carrier of the
+ * accepted (inert) value across the config/session contract — it is the *mode*
+ * that is deprecated, not the type symbol.
+ */
 export type YagniGraphMode = 'auto' | 'reuse' | 'build' | 'off';
 
 /** Validated values from the `yagni:` config namespace. */

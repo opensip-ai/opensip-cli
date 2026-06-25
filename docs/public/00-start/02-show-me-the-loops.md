@@ -172,10 +172,10 @@ Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catal
 `yagni` is advisory by default — it surfaces ranked reduction candidates for human review, not automatic deletions.
 
 ```bash
-opensip yagni --json --graph build
+opensip yagni --json
 ```
 
-Each finding carries `metadata.yagni`: detector slug, confidence (`low` | `medium` | `high`), a preservation argument, validation steps, and structured evidence. MVP detectors: `unused-config-surface` (AST/config evidence) and `duplicate-body-candidate` (graph `bodyHash` grouping). Deeper detail: [YAGNI command reference](../55-yagni/01-command-reference.md).
+Each finding carries `metadata.yagni`: detector slug, confidence (`low` | `medium` | `high`), a preservation argument, validation steps, and structured evidence. As of v0.1.12 (ADR-0063) the bundled detector is `unused-config-surface` (AST/config evidence); duplicate-body detection moved to `opensip graph`. Deeper detail: [YAGNI command reference](../55-yagni/01-command-reference.md).
 
 ```text
 > opensip yagni

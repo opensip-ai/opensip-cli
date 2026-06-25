@@ -16,7 +16,6 @@ import {
   buildYagniPresentationLines,
 } from '../cli/yagni-presentation.js';
 import { createYagniSignal } from '../detectors/create-yagni-signal.js';
-import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-candidate.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js';
 import { buildYagniSessionPayload } from '../persistence/session-payload.js';
@@ -30,7 +29,7 @@ import {
 } from '../scoring/confidence.js';
 import { YAGNI_CONTRACT_VERSION, YAGNI_STABLE_ID, yagniTool } from '../tool.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence, SignalEnvelope } from '@opensip-cli/contracts';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 const yagniCommandSpec = buildYagniCommandSpec(() => {
@@ -97,27 +96,6 @@ function signal(
       evidence: [{ id, kind: 'test', summary: id }],
     },
   });
-}
-
-function graphOccurrence(
-  overrides: Pick<
-    GraphFunctionOccurrence,
-    'bodyHash' | 'column' | 'endLine' | 'filePath' | 'line' | 'qualifiedName' | 'simpleName'
-  > &
-    Partial<GraphFunctionOccurrence>,
-): GraphFunctionOccurrence {
-  return {
-    kind: 'function-declaration',
-    params: [],
-    returnType: null,
-    enclosingClass: null,
-    decorators: [],
-    visibility: 'exported',
-    inTestFile: false,
-    definedInGenerated: false,
-    calls: [],
-    ...overrides,
-  };
 }
 
 function envelope(input: {
@@ -192,15 +170,15 @@ describe('yagni config, tool metadata, and command handler', () => {
         '  defaultMinConfidence: low',
         '  failOnWarnings: 2',
         '  detectorSettings:',
-        '    duplicate-body-candidate:',
-        '      minOccurrences: 3',
+        '    unused-config-surface:',
+        '      someKnob: 3',
       ].join('\n'),
     );
     expect(loadYagniConfig(dir)).toMatchObject({
       graphMode: 'reuse',
       defaultMinConfidence: 'low',
       failOnWarnings: 2,
-      detectorSettings: { 'duplicate-body-candidate': { minOccurrences: 3 } },
+      detectorSettings: { 'unused-config-surface': { someKnob: 3 } },
     });
 
     const invalidDir = tempDir();
@@ -216,8 +194,8 @@ describe('yagni config, tool metadata, and command handler', () => {
         defaultMinConfidence: 'medium',
         graphMode: 'build',
         includeTests: false,
-        disabledDetectors: ['duplicate-body-candidate'],
-        detectorSettings: { 'duplicate-body-candidate': { minBodyLines: 8 } },
+        disabledDetectors: ['unused-config-surface'],
+        detectorSettings: { 'unused-config-surface': { someKnob: 8 } },
       }),
     ).toMatchObject({ graphMode: 'build' });
     expect(YagniConfigSchema.safeParse({ graphMode: 'sometimes' }).success).toBe(false);
@@ -227,8 +205,8 @@ describe('yagni config, tool metadata, and command handler', () => {
 
     const reportData = collectYagniReportData({} as never);
     expect(reportData.yagniSummary).toMatchObject({
-      detectorCount: 2,
-      graphBackedCount: 1,
+      detectorCount: 1,
+      graphBackedCount: 0,
       contractVersion: YAGNI_CONTRACT_VERSION,
     });
     expect(reportData.yagniCatalog).toEqual(
@@ -292,164 +270,28 @@ describe('yagni config, tool metadata, and command handler', () => {
       jsonOutput: false,
     });
   });
+
+  it('warns (not silently ignores) when the deprecated --graph flag is passed', async () => {
+    const warn = vi.fn();
+    const scope = new RunScope({
+      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() },
+    });
+
+    await runCommandInScope(scope, { cwd: FIXTURE_ROOT, json: true, graph: 'build' }, makeCli());
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.yagni.graph_flag.deprecated' }),
+    );
+
+    // No flag → no deprecation warning.
+    warn.mockClear();
+    await runCommandInScope(scope, { cwd: FIXTURE_ROOT, json: true }, makeCli());
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.yagni.graph_flag.deprecated' }),
+    );
+  });
 });
 
 describe('yagni detectors and scoring helpers', () => {
-  it('emits duplicate-body candidates from graph body hashes', async () => {
-    const catalog: GraphCatalog = {
-      version: '1',
-      tool: 'graph',
-      language: 'typescript',
-      builtAt: '2026-06-22T00:00:00.000Z',
-      functions: {
-        a: [
-          graphOccurrence({
-            qualifiedName: 'pkgA.alpha',
-            simpleName: 'alpha',
-            filePath: join(FIXTURE_ROOT, 'src', 'a.ts'),
-            line: 10,
-            column: 2,
-            endLine: 18,
-            bodyHash: 'same-body-hash',
-            package: '@opensip-cli/a',
-          }),
-        ],
-        b: [
-          graphOccurrence({
-            qualifiedName:
-              'pkgB.strip.test.<arrow:packages/languages/lang-python/src/__tests__/strip.test.ts:69:29>',
-            simpleName: '<arrow:packages/languages/lang-python/src/__tests__/strip.test.ts:69:29>',
-            filePath: join(FIXTURE_ROOT, 'src', 'b.ts'),
-            line: 20,
-            column: 4,
-            endLine: 28,
-            bodyHash: 'same-body-hash',
-            package: '@opensip-cli/b',
-          }),
-          graphOccurrence({
-            qualifiedName: 'pkgB.short',
-            simpleName: 'short',
-            filePath: join(FIXTURE_ROOT, 'src', 'short.ts'),
-            line: 1,
-            column: 1,
-            endLine: 2,
-            bodyHash: 'short-body-hash',
-          }),
-        ],
-      },
-    };
-
-    const result = await duplicateBodyCandidateDetector.run({
-      cwd: FIXTURE_ROOT,
-      config: { detectorSettings: { 'duplicate-body-candidate': { minBodyLines: 3 } } },
-      graphCatalog: catalog,
-      includeTests: false,
-    });
-
-    expect(result.signals).toHaveLength(1);
-    const metadata =
-      result.signals[0] === undefined ? undefined : readYagniMetadata(result.signals[0]);
-    const suggestedAction = metadata?.suggestedAction ?? '';
-    expect(suggestedAction).toBe('Consolidate with src/b.ts:20 (arrow function).');
-    expect(suggestedAction).not.toContain('<arrow:');
-    expect(metadata).toMatchObject({
-      detector: 'duplicate-body-candidate',
-      reductionCategory: 'dedupe',
-      confidence: 'medium',
-      evidence: [
-        expect.objectContaining({
-          data: expect.objectContaining({
-            occurrenceCount: 2,
-            packages: ['@opensip-cli/a', '@opensip-cli/b'],
-            peer: expect.objectContaining({
-              qualifiedName:
-                'pkgB.strip.test.<arrow:packages/languages/lang-python/src/__tests__/strip.test.ts:69:29>',
-            }),
-          }),
-        }),
-      ],
-    });
-
-    const noGraph = await duplicateBodyCandidateDetector.run({
-      cwd: FIXTURE_ROOT,
-      config: {},
-      graphCatalog: null,
-      includeTests: false,
-    });
-    expect(noGraph.signals).toEqual([]);
-  });
-
-  it('formats duplicate-body peer names for human CLI output', async () => {
-    function pair(
-      bodyHash: string,
-      peer: Partial<GraphFunctionOccurrence>,
-    ): GraphFunctionOccurrence[] {
-      return [
-        graphOccurrence({
-          qualifiedName: `${bodyHash}.anchor`,
-          simpleName: 'anchor',
-          filePath: join(FIXTURE_ROOT, 'src', `${bodyHash}-anchor.ts`),
-          line: 10,
-          column: 1,
-          endLine: 16,
-          bodyHash,
-        }),
-        graphOccurrence({
-          qualifiedName: `zz.${bodyHash}`,
-          simpleName: 'peer',
-          filePath: join(FIXTURE_ROOT, 'src', `${bodyHash}-peer.ts`),
-          line: 30,
-          column: 1,
-          endLine: 36,
-          bodyHash,
-          ...peer,
-        }),
-      ];
-    }
-
-    const catalog: GraphCatalog = {
-      version: '1',
-      tool: 'graph',
-      language: 'typescript',
-      builtAt: '2026-06-22T00:00:00.000Z',
-      functions: {
-        normal: pair('normal', { simpleName: 'namedHelper' }),
-        qualifiedArrow: pair('qualified-arrow', {
-          simpleName: 'packages/example/src/file.ts',
-          qualifiedName: 'zz.qualified.<arrow:packages/example/src/file.ts:5:9>',
-        }),
-        qualifiedTail: pair('qualified-tail', {
-          simpleName: 'packages/example/src/file.ts',
-          qualifiedName: 'zz.qualified.namedTail',
-        }),
-        fallback: pair('fallback', {
-          simpleName: 'packages/example/src/file.ts',
-          qualifiedName: 'zz.qualified.packages/example/src/file.ts',
-        }),
-      },
-    };
-
-    const result = await duplicateBodyCandidateDetector.run({
-      cwd: FIXTURE_ROOT,
-      config: { detectorSettings: { 'duplicate-body-candidate': { minBodyLines: 3 } } },
-      graphCatalog: catalog,
-      includeTests: false,
-    });
-
-    const actions = result.signals
-      .map((signal) => readYagniMetadata(signal)?.suggestedAction)
-      .filter((action): action is string => action !== undefined);
-    expect(actions).toEqual(
-      expect.arrayContaining([
-        'Consolidate with src/normal-peer.ts:30 (namedHelper).',
-        'Consolidate with src/qualified-arrow-peer.ts:30 (arrow function).',
-        'Consolidate with src/qualified-tail-peer.ts:30 (namedTail).',
-        'Consolidate with src/fallback-peer.ts:30 (function).',
-      ]),
-    );
-    expect(actions.join('\n')).not.toContain('<arrow:');
-  });
-
   it('sorts, filters, summarizes, and persists YAGNI signal metadata', () => {
     const high = signal('high', 'high', 5, 'exact', 'config');
     const medium = signal('medium', 'medium', 8, 'heuristic', 'dedupe');

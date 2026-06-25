@@ -61,8 +61,6 @@
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
-    "@opensip-cli/datastore": "workspace:*",
-    "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/lang-typescript": "workspace:*",
     "commander": "^15.0.0",
     "react": "^19.2.7",

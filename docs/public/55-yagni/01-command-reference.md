@@ -21,13 +21,14 @@ related-docs:
 
 `opensip yagni` is an **advisory** audit that surfaces evidence-backed opportunities to reduce code while preserving behavior. It emits ranked candidates with proof strength, preservation arguments, and validation steps — not automatic rewrites.
 
+> **Scope (v0.1.12, ADR-0063):** yagni audits **config-surface reduction** (unused public config keys). It no longer performs duplicate-body detection — that re-implemented and diverged from graph's rule. **Duplicate / near-duplicate analysis now lives in [`opensip graph`](../40-graph/01-stages-and-catalog.md)** (`duplicated-function-body`, `near-duplicate-function-body`). yagni owns no graph evidence; the `--graph` flag and `graphMode` config are deprecated and inert (removal in 0.1.13).
+
 ## Quick start
 
 ```bash
 opensip yagni
 opensip yagni --json
 opensip yagni --min-confidence high
-opensip yagni --graph build
 opensip yagni packages/cli/src
 ```
 
@@ -42,21 +43,20 @@ Exit code is **0 by default** (`failOnErrors: 0`, `failOnWarnings: 0`). Findings
 | `--min-confidence <level>` | Filter to `low`, `medium`, or `high` (default `medium`) |
 | `--detector <slug>` | Run only named detectors (repeatable) |
 | `--category <name>` | Filter by `metadata.yagni.reductionCategory` (repeatable) |
-| `--graph <mode>` | Graph evidence: `auto`, `reuse`, `build`, or `off` (default `auto`) |
+| `--graph <mode>` | **Deprecated (ignored since v0.1.12)** — yagni no longer builds a graph; use `opensip graph` for duplicate analysis |
 | `--include-tests` | Include test and fixture code |
 | `--verbose` | Show evidence, validation steps, and low-confidence findings |
 | `--report-to`, `--open` | Host report delivery (same as other tools) |
 
 Common flags: `--cwd`, `--quiet`, `--debug`, `--api-key`.
 
-## Bundled detectors (MVP)
+## Bundled detectors
 
 | Detector | Category | Graph |
 |---|---|---|
 | `unused-config-surface` | `config` | no |
-| `duplicate-body-candidate` | `dedupe` | yes |
 
-Graph-backed detectors are listed in `session.payload.summary.skippedDetectors` when graph evidence is unavailable — never as placeholder `units[]` rows.
+> Duplicate-body detection was removed in v0.1.12 (ADR-0063); it lives in `opensip graph` (`duplicated-function-body` + `near-duplicate-function-body`). A future "reduction coordinator" (ADR-0063 Track 2) will re-ingest graph's curated duplicate findings into the audit.
 
 ## Configuration
 
@@ -65,13 +65,12 @@ yagni:
   failOnErrors: 0
   failOnWarnings: 0
   defaultMinConfidence: medium
-  graphMode: auto
   includeTests: false
   disabledDetectors: []
   detectorSettings: {}
 ```
 
-CI dogfood should pin `graphMode: build` or `off`, never `auto`, for deterministic runs.
+> `graphMode` (and `OPENSIP_YAGNI_GRAPH_MODE`) are **deprecated and inert** as of v0.1.12 — still accepted so existing config keeps validating, but they have no effect. Removal targeted for 0.1.13.
 
 ## Finding model
 

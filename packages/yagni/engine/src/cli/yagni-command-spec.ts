@@ -2,7 +2,7 @@
  * yagni-command-spec — declarative primary `yagni` command.
  */
 
-import { definePrimaryCommand } from '@opensip-cli/core';
+import { currentScope, definePrimaryCommand } from '@opensip-cli/core';
 
 import { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
@@ -95,6 +95,15 @@ async function runYagniCommand(
   const opts = rawOpts as YagniCommandOptions;
   const config = loadYagniConfig(opts.cwd);
   const graphMode = parseGraphMode(opts.graph) ?? config.graphMode ?? 'auto';
+  if (opts.graph !== undefined) {
+    // Deprecated & inert since v0.1.12 (ADR-0063). Surface a notice rather than
+    // silently ignoring an explicit flag; removal targeted for 0.1.13.
+    currentScope()?.logger?.warn({
+      evt: 'cli.yagni.graph_flag.deprecated',
+      module: 'yagni:cli',
+      msg: '`--graph` is deprecated and ignored — yagni no longer builds a graph. Run `opensip graph` for duplicate/near-duplicate analysis.',
+    });
+  }
   const positionals = (opts as unknown as { _args?: readonly unknown[] })._args ?? [];
   const paths = (positionals[0] ?? []) as readonly string[];
   const pathRoots = paths.length > 0 ? resolveYagniPositionalPaths(paths, opts.cwd) : undefined;
@@ -129,8 +138,8 @@ async function runYagniCommand(
     cli,
   );
 
-  // Clear exit codes leaked by in-process `executeGraph` before the host wraps
-  // the envelope (emitEnvelope snapshots getExitCode at write time).
+  // Re-affirm advisory exit policy before the host wraps the envelope
+  // (emitEnvelope snapshots getExitCode at write time; --report-to may set exit 4).
   applyAdvisoryExitCode(cli, config);
 
   if (opts.json === true) {
@@ -162,7 +171,7 @@ export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => vo
         flag: '--graph',
         value: '<mode>',
         description:
-          'Graph evidence mode: auto (reuse or build), reuse, build, or off (default from config)',
+          'Deprecated (ignored since v0.1.12): yagni no longer builds a graph — use `opensip graph` for duplicate analysis',
         choices: ['auto', 'reuse', 'build', 'off'],
       },
       {

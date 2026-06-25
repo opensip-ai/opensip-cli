@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
-import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-candidate.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
+import type { YagniDetector } from '../detectors/types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 const FIXTURE_ROOT = new URL('fixtures/unused-config-surface/pkg', import.meta.url).pathname;
@@ -15,8 +15,21 @@ function stubCli(): ToolCliContext {
   } as unknown as ToolCliContext;
 }
 
+/**
+ * A graph-backed detector can no longer run (ADR-0063, v0.1.12 — yagni owns no
+ * graph). This stub stands in for any future `requiresGraph` detector to assert
+ * the planner skips it rather than crashing on a null catalog.
+ */
+const graphBackedStub: YagniDetector = {
+  id: 'graph-backed-stub',
+  slug: 'yagni:graph-backed-stub',
+  description: 'stub graph-backed detector (test only)',
+  requiresGraph: true,
+  run: () => Promise.resolve({ signals: [], durationMs: 0 }),
+};
+
 describe('executeYagni detector progress callbacks (phases live view)', () => {
-  it('reports start/done per detector that runs, and skipped for graph-gated ones', async () => {
+  it('reports start/done per detector that runs, and skips any graph-backed detector', async () => {
     const started: string[] = [];
     const done: { slug: string; durationMs: number }[] = [];
     const skippedBatches: string[][] = [];
@@ -24,23 +37,22 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
     await executeYagni(
       {
         cwd: FIXTURE_ROOT,
-        config: { graphMode: 'off', defaultMinConfidence: 'low' },
-        graphMode: 'off', // no graph evidence → duplicate-body-candidate is gated out
+        config: { defaultMinConfidence: 'low' },
         includeTests: true,
         onDetectorStart: (slug) => started.push(slug),
         onDetectorDone: (slug, durationMs) => done.push({ slug, durationMs }),
         onDetectorsSkipped: (slugs) => skippedBatches.push([...slugs]),
       },
       stubCli(),
-      [unusedConfigSurfaceDetector, duplicateBodyCandidateDetector],
+      [unusedConfigSurfaceDetector, graphBackedStub],
     );
 
-    // unused-config-surface runs; duplicate-body-candidate needs the graph catalog.
+    // unused-config-surface runs; a graph-backed detector is always skipped now.
     expect(started).toEqual(['yagni:unused-config-surface']);
     expect(done.map((d) => d.slug)).toEqual(['yagni:unused-config-surface']);
     expect(typeof done[0]?.durationMs).toBe('number');
     // The skipped batch is emitted once, before the run loop.
-    expect(skippedBatches).toEqual([['yagni:duplicate-body-candidate']]);
+    expect(skippedBatches).toEqual([['yagni:graph-backed-stub']]);
   });
 
   it('start precedes done for the same detector', async () => {

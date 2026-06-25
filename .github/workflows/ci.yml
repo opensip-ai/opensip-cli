@@ -150,10 +150,11 @@ jobs:
           category: opensip-cli-graph
 
       # Informational YAGNI dogfood — advisory only (failOnErrors/Warnings: 0).
-      # graphMode is pinned via opensip-cli.config.yml (build, not auto).
+      # ADR-0063 (v0.1.12): yagni no longer builds a graph; duplicate analysis
+      # lives in `opensip graph`. No `--graph` flag (deprecated/inert).
       - name: YAGNI (informational dogfood)
         continue-on-error: true
-        run: node packages/cli/dist/index.js yagni --graph build --json
+        run: node packages/cli/dist/index.js yagni --json
 
       # REAL-REPO equivalence guardrail (ADR-0032): assert the SHARDED build is
       # byte-equivalent to the EXACT single-program build on THIS repo — a genuine

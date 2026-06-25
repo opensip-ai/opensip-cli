@@ -319,18 +319,19 @@ Tool-owned: [`packages/yagni/engine/src/tool.ts`](../../../packages/yagni/engine
 opensip yagni
 opensip yagni --json
 opensip yagni --min-confidence high
-opensip yagni --graph build
 opensip yagni packages/cli/src
 ```
+
+> **v0.1.12 (ADR-0063):** yagni audits config-surface reduction only. Duplicate/near-duplicate analysis moved to the `graph` command. The `--graph` flag and `graphMode` config are deprecated and inert.
 
 | Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
 | `[paths...]` | path(s) | — | Positional. Limit analysis to one or more directory subtrees (relative to `--cwd`). |
 | `--json` | bool | `false` | Emit the canonical `SignalEnvelope` on stdout instead of the human renderer. |
 | `--min-confidence <level>` | enum | `medium` | Filter findings to `low`, `medium`, or `high`. |
-| `--detector <slug>` | string | — | Run only named detectors (repeatable). MVP detectors: `unused-config-surface`, `duplicate-body-candidate`. |
+| `--detector <slug>` | string | — | Run only named detectors (repeatable). Bundled detector: `unused-config-surface`. |
 | `--category <name>` | string | — | Filter by `metadata.yagni.reductionCategory` (repeatable). |
-| `--graph <mode>` | enum | `auto` | Graph evidence for graph-backed detectors: `auto`, `reuse`, `build`, or `off`. CI dogfood should pin `build` or `off` for determinism. Graph build failures do not change yagni's advisory exit code. |
+| `--graph <mode>` | enum | — | **Deprecated & inert (v0.1.12, ADR-0063).** Accepted but ignored — yagni no longer builds a graph; use `opensip graph` for duplicate analysis. Removal in 0.1.13. |
 | `--include-tests` | bool | `false` | Include test and fixture files in analysis. |
 | `--show <session>` | string | — | Replay a stored yagni session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
@@ -340,7 +341,7 @@ opensip yagni packages/cli/src
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 
-**Exit codes:** 0 by default (advisory). Non-zero only when `yagni.failOnErrors` / `yagni.failOnWarnings` thresholds are exceeded, or on configuration/runtime errors (2). Graph evidence subprocess exit codes are isolated — a failing `graph` build during `--graph build` does not fail the yagni run.
+**Exit codes:** 0 by default (advisory). Non-zero only when `yagni.failOnErrors` / `yagni.failOnWarnings` thresholds are exceeded, or on configuration/runtime errors (2).
 
 **Suppressions:** `@yagni-ignore-file` and `@yagni-ignore-next-line` (ADR-0014). The `yagni-ignore-hygiene` fitness check audits directive quality.
 

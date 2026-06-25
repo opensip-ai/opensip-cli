@@ -1134,12 +1134,6 @@ importers:
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../../core
-      '@opensip-cli/datastore':
-        specifier: workspace:*
-        version: link:../../datastore
-      '@opensip-cli/graph':
-        specifier: workspace:*
-        version: link:../../graph/engine
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript

@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
-import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-candidate.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
 import type { ToolCliContext } from '@opensip-cli/core';
@@ -76,7 +75,7 @@ describe('yagni golden snapshots', () => {
     });
   });
 
-  it('executeYagni with --graph off matches the checked-in golden envelope', async () => {
+  it('executeYagni matches the checked-in golden envelope', async () => {
     const outcome = await executeYagni(
       {
         cwd: FIXTURE_ROOT,
@@ -90,20 +89,14 @@ describe('yagni golden snapshots', () => {
         includeTests: true,
       },
       stubCli(),
-      [unusedConfigSurfaceDetector, duplicateBodyCandidateDetector],
+      [unusedConfigSurfaceDetector],
     );
 
     expect(outcome.session.passed).toBe(true);
     expect(outcome.envelope.verdict.passed).toBe(true);
     expect(outcome.envelope.units.map((u) => u.slug)).toEqual(['yagni:unused-config-surface']);
-    expect(outcome.session.payload.summary.skippedDetectors).toEqual([
-      {
-        id: 'duplicate-body-candidate',
-        slug: 'yagni:duplicate-body-candidate',
-        reason: 'graph-required',
-        detail: 'graph evidence unavailable',
-      },
-    ]);
+    // No graph-backed detectors remain (ADR-0063); nothing is skipped.
+    expect(outcome.session.payload.summary.skippedDetectors).toEqual([]);
 
     const actual = stableJson({
       verdict: outcome.envelope.verdict,
@@ -133,14 +126,8 @@ describe('yagni golden snapshots', () => {
       graphMode: 'off' as const,
       includeTests: true,
     };
-    const firstRun = await executeYagni(opts, stubCli(), [
-      unusedConfigSurfaceDetector,
-      duplicateBodyCandidateDetector,
-    ]);
-    const secondRun = await executeYagni(opts, stubCli(), [
-      unusedConfigSurfaceDetector,
-      duplicateBodyCandidateDetector,
-    ]);
+    const firstRun = await executeYagni(opts, stubCli(), [unusedConfigSurfaceDetector]);
+    const secondRun = await executeYagni(opts, stubCli(), [unusedConfigSurfaceDetector]);
     const first = stableJson(firstRun.envelope.signals);
     const second = stableJson(secondRun.envelope.signals);
     expect(first).toEqual(second);
