@@ -25,3 +25,18 @@ export {
   digestCanonicalBody,
   type BodyDigestWithSignature,
 } from './near-duplicate-signature.js';
+
+// Tool-neutral candidate + finding types, and the detection algorithms + curation
+// policy (single-sourced — graph rules + yagni detector both consume these).
+export type {
+  FunctionKind,
+  CloneCandidate,
+  DupOpts,
+  NearDupOpts,
+  DuplicateGroup,
+  CrossPackageAggregate,
+  DuplicateFindings,
+  NearDuplicateCluster,
+} from './types.js';
+export { findDuplicateBodies, isEligibleKind } from './find-duplicate-bodies.js';
+export { findNearDuplicates } from './find-near-duplicates.js';
