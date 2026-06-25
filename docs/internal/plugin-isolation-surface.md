@@ -24,8 +24,13 @@ Internal reference for external-tool fault isolation. Public docs:
 No npm package attestation (signature verification, hash-lock at install).
 **Public third-party ecosystem MUST NOT open until an attestation plan ships.**
 
+## Tool independence (ADR-0064)
+
+`@opensip-cli/clone-detection` is the canonical example of the platform's tool-independence rule: when two tools need the same logic, **refactor the shared piece into a leaf substrate** — never add a tool→peer-tool dependency edge. Graph and yagni both depend on `@opensip-cli/clone-detection` for duplicate/near-duplicate detection math; neither depends on the other. Enforcement: dep-cruiser `clone-detection-imports-nothing` (leaf package) + the existing `yagni-no-graph*` rules (yagni must not import graph engine/adapters). See [ADR-0064](../decisions/ADR-0064-shared-clone-detection-substrate.md).
+
 ## Related ADRs
 
 - ADR-0054 — tool fault isolation boundary
 - ADR-0056 — audit remediation scope index
 - ADR-0030 — authored tool discovery
+- ADR-0064 — shared clone-detection substrate (tool independence)

@@ -283,12 +283,11 @@ YAGNI reduction audit settings. Validated against [`yagni-config-schema.ts`](../
 | `failOnErrors` | number | `0` | Exit non-zero when high-severity finding count exceeds this threshold. |
 | `failOnWarnings` | number | `0` | Exit non-zero when medium-severity finding count exceeds this threshold. |
 | `defaultMinConfidence` | `'low' \| 'medium' \| 'high'` | `medium` | Default confidence floor when `--min-confidence` is not passed. |
-| `graphMode` | `'auto' \| 'reuse' \| 'build' \| 'off'` | `auto` | **Deprecated & inert (v0.1.12, ADR-0063).** Accepted but has no effect — yagni no longer builds a graph. Removal in 0.1.13. |
 | `includeTests` | boolean | `false` | Include test and fixture files by default. |
 | `disabledDetectors` | string[] | `[]` | Detector slugs to skip for every run. |
 | `detectorSettings` | map | `{}` | Per-detector opaque settings bag (detector-specific). |
 
-Environment overrides (see [Environment variables](./10-environment-variables.md)): `OPENSIP_YAGNI_MIN_CONFIDENCE`, `OPENSIP_YAGNI_INCLUDE_TESTS` (`OPENSIP_YAGNI_GRAPH_MODE` is deprecated/inert).
+Environment overrides (see [Environment variables](./10-environment-variables.md)): `OPENSIP_YAGNI_MIN_CONFIDENCE`, `OPENSIP_YAGNI_INCLUDE_TESTS`.
 
 ```yaml
 yagni:

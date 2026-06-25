@@ -70,7 +70,6 @@ bypasses the registry.
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_YAGNI_GRAPH_MODE` | **Deprecated & inert (v0.1.12, ADR-0063)** — accepted but has no effect; yagni no longer builds a graph. Removal in 0.1.13. |
 | `OPENSIP_YAGNI_MIN_CONFIDENCE` | Override `yagni.defaultMinConfidence` (`low`, `medium`, `high`). |
 | `OPENSIP_YAGNI_INCLUDE_TESTS` | Override `yagni.includeTests` (`1`/`true` or `0`/`false`). |
 

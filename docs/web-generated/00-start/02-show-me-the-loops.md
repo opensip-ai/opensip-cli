@@ -175,7 +175,7 @@ Like `fit`, `graph` ships with a gate flow: `--gate-save` captures today's catal
 opensip yagni --json
 ```
 
-Each finding carries `metadata.yagni`: detector slug, confidence (`low` | `medium` | `high`), a preservation argument, validation steps, and structured evidence. As of v0.1.12 (ADR-0063) the bundled detector is `unused-config-surface` (AST/config evidence); duplicate-body detection moved to `opensip graph`. Deeper detail: [YAGNI command reference](/docs/opensip-cli/55-yagni/01-command-reference/).
+Each finding carries `metadata.yagni`: detector slug, confidence (`low` | `medium` | `high`), a preservation argument, validation steps, and structured evidence. Two bundled detectors ship today: `unused-config-surface` (AST/config evidence) and `duplicate-body-candidate` (exact-duplicate TS function bodies via `@opensip-cli/clone-detection`, ADR-0064). Near-duplicate analysis remains graph-only. Deeper detail: [YAGNI command reference](/docs/opensip-cli/55-yagni/01-command-reference/).
 
 ```text
 > opensip yagni

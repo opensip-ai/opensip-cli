@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-25
 release: v0.1.12
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -89,6 +89,8 @@ The rule does a forward BFS from the entry-point seeds (computed by [`_entry-poi
 
 Both paths apply the same exclusions: `arrow` / `function-expression` / `module-init` kinds and test-file occurrences are skipped. The aggregate signal carries `metadata: { packages, packageCount, occurrenceCount, bodyHash }` and is anchored at the lexicographically-lowest qualified name for a stable fingerprint.
 
+The detection math (body-hash grouping, test-file exclusion, size floors, cross-package aggregation) and curation policy live in `@opensip-cli/clone-detection`; this rule is a thin wrapper that maps catalog entries to `CloneCandidate[]`, calls `findDuplicateBodies`, and emits graph signals with unchanged fingerprints. See [ADR-0064](../../decisions/ADR-0064-shared-clone-detection-substrate.md).
+
 **Config** ([`GraphConfig`](../../../packages/graph/engine/src/types.ts)), read from the `graph:` block of `opensip-cli.config.yml`:
 
 | Knob | Default | Effect |
@@ -105,6 +107,8 @@ Both paths apply the same exclusions: `arrow` / `function-expression` / `module-
 [`rules/near-duplicate-function-body.ts`](../../../packages/graph/engine/src/rules/near-duplicate-function-body.ts) — detect **near-clones** (copy-paste-with-edits) using MinHash signatures (`bodySignature`, k=128) persisted at walk time from the same normalized body string as `bodyHash`. LSH-banded candidate generation, Jaccard estimation, and union-find clustering emit one signal per near-clone component. Exact-duplicate pairs (identical `bodyHash`) are excluded — `graph:duplicated-function-body` owns those. Candidate pairs are gated to the **same language** (by file extension) because fuzzy char shingles can false-match across languages.
 
 Skips `arrow` / `function-expression` / `module-init` kinds and test-file occurrences (same exclusions as the exact-duplication rule). Pre-feature catalogs without `bodySignature` produce no findings (graceful). v1 is per-instance only (no cross-package aggregate path).
+
+The near-clone detection math (MinHash signatures, LSH-banded candidate generation, Jaccard estimation, union-find clustering) lives in `@opensip-cli/clone-detection`; this rule is a thin wrapper that maps catalog entries to `CloneCandidate[]`, calls `findNearDuplicates`, and emits graph signals with unchanged fingerprints. See [ADR-0064](../../decisions/ADR-0064-shared-clone-detection-substrate.md).
 
 **Config** ([`GraphConfig`](../../../packages/graph/engine/src/types.ts)):
 

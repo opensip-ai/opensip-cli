@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-22
-release: v0.1.12
+last_verified: 2026-06-25
+release: v0.1.13
 title: "YAGNI command reference"
 audience: [contributors, ci-integrators]
 purpose: "How to run the advisory YAGNI reduction audit and interpret its output."
@@ -11,6 +11,8 @@ source-files:
   - packages/yagni/engine/src/cli/yagni-runner.tsx
   - packages/yagni/engine/src/cli/execute-yagni.ts
   - packages/yagni/engine/src/types/yagni-metadata.ts
+  - packages/yagni/engine/src/detectors/duplicate-body-candidate.ts
+  - packages/yagni/engine/src/lib/build-ts-inventory.ts
 related-docs:
   - ../70-reference/01-cli-commands.md
   - ../70-reference/03-configuration.md
@@ -21,7 +23,7 @@ related-docs:
 
 `opensip yagni` is an **advisory** audit that surfaces evidence-backed opportunities to reduce code while preserving behavior. It emits ranked candidates with proof strength, preservation arguments, and validation steps — not automatic rewrites.
 
-> **Scope (v0.1.12, ADR-0063):** yagni audits **config-surface reduction** (unused public config keys). It no longer performs duplicate-body detection — that re-implemented and diverged from graph's rule. **Duplicate / near-duplicate analysis now lives in [`opensip graph`](../40-graph/01-stages-and-catalog.md)** (`duplicated-function-body`, `near-duplicate-function-body`). yagni owns no graph evidence; the `--graph` flag and `graphMode` config are deprecated and inert (removal in 0.1.13).
+> **Scope (ADR-0064):** yagni ships two bundled detectors: `unused-config-surface` (config-surface reduction) and `duplicate-body-candidate` (exact-duplicate TypeScript function bodies). Duplicate detection uses the shared [`@opensip-cli/clone-detection`](../../../packages/clone-detection/src/index.ts) substrate — yagni builds its own TypeScript inventory (`buildTsInventory`, no `@opensip-cli/graph` dependency) and stays complete with graph uninstalled. Near-duplicate analysis remains graph-only (`graph:near-duplicate-function-body`). See [ADR-0064](../../decisions/ADR-0064-shared-clone-detection-substrate.md).
 
 ## Quick start
 
@@ -43,7 +45,6 @@ Exit code is **0 by default** (`failOnErrors: 0`, `failOnWarnings: 0`). Findings
 | `--min-confidence <level>` | Filter to `low`, `medium`, or `high` (default `medium`) |
 | `--detector <slug>` | Run only named detectors (repeatable) |
 | `--category <name>` | Filter by `metadata.yagni.reductionCategory` (repeatable) |
-| `--graph <mode>` | **Deprecated (ignored since v0.1.12)** — yagni no longer builds a graph; use `opensip graph` for duplicate analysis |
 | `--include-tests` | Include test and fixture code |
 | `--verbose` | Show evidence, validation steps, and low-confidence findings |
 | `--report-to`, `--open` | Host report delivery (same as other tools) |
@@ -55,8 +56,9 @@ Common flags: `--cwd`, `--quiet`, `--debug`, `--api-key`.
 | Detector | Category | Graph |
 |---|---|---|
 | `unused-config-surface` | `config` | no |
+| `duplicate-body-candidate` | `dedupe` | no |
 
-> Duplicate-body detection was removed in v0.1.12 (ADR-0063); it lives in `opensip graph` (`duplicated-function-body` + `near-duplicate-function-body`). A future "reduction coordinator" (ADR-0063 Track 2) will re-ingest graph's curated duplicate findings into the audit.
+`duplicate-body-candidate` is TypeScript-only: yagni walks `.ts`/`.tsx` files, hashes normalized function bodies, and calls `findDuplicateBodies` from `@opensip-cli/clone-detection` — the same algorithm + curation policy `graph:duplicated-function-body` uses. A cross-tool parity test guards against the 430-vs-0 divergence class (ADR-0064).
 
 ## Configuration
 
@@ -69,8 +71,6 @@ yagni:
   disabledDetectors: []
   detectorSettings: {}
 ```
-
-> `graphMode` (and `OPENSIP_YAGNI_GRAPH_MODE`) are **deprecated and inert** as of v0.1.12 — still accepted so existing config keeps validating, but they have no effect. Removal targeted for 0.1.13.
 
 ## Finding model
 

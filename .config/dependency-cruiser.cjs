@@ -319,6 +319,8 @@ module.exports = {
         ],
       },
     },
+    // ADR-0064 enforcement: @opensip-cli/clone-detection must remain a leaf package
+    // (no workspace deps) so graph and yagni can both depend on it with no tool→tool edge.
     {
       name: 'clone-detection-imports-nothing',
       severity: 'error',

@@ -64,7 +64,7 @@ opensip graph
 opensip graph --list-files
 opensip graph --workspace
 opensip yagni
-opensip yagni --json --graph build
+opensip yagni --json
 opensip sim --recipe <name>
 opensip report
 ```

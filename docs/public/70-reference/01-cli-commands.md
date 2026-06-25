@@ -322,16 +322,15 @@ opensip yagni --min-confidence high
 opensip yagni packages/cli/src
 ```
 
-> **v0.1.12 (ADR-0063):** yagni audits config-surface reduction only. Duplicate/near-duplicate analysis moved to the `graph` command. The `--graph` flag and `graphMode` config are deprecated and inert.
+> **ADR-0064:** yagni ships two bundled detectors — `unused-config-surface` (config reduction) and `duplicate-body-candidate` (exact-duplicate TS function bodies via `@opensip-cli/clone-detection`). Near-duplicate analysis remains graph-only. Deeper detail: [`55-yagni/01-command-reference.md`](../55-yagni/01-command-reference.md).
 
 | Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
 | `[paths...]` | path(s) | — | Positional. Limit analysis to one or more directory subtrees (relative to `--cwd`). |
 | `--json` | bool | `false` | Emit the canonical `SignalEnvelope` on stdout instead of the human renderer. |
 | `--min-confidence <level>` | enum | `medium` | Filter findings to `low`, `medium`, or `high`. |
-| `--detector <slug>` | string | — | Run only named detectors (repeatable). Bundled detector: `unused-config-surface`. |
+| `--detector <slug>` | string | — | Run only named detectors (repeatable). Bundled: `unused-config-surface`, `duplicate-body-candidate`. |
 | `--category <name>` | string | — | Filter by `metadata.yagni.reductionCategory` (repeatable). |
-| `--graph <mode>` | enum | — | **Deprecated & inert (v0.1.12, ADR-0063).** Accepted but ignored — yagni no longer builds a graph; use `opensip graph` for duplicate analysis. Removal in 0.1.13. |
 | `--include-tests` | bool | `false` | Include test and fixture files in analysis. |
 | `--show <session>` | string | — | Replay a stored yagni session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
