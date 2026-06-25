@@ -19,7 +19,7 @@
  */
 
 import { globalExcludesSchema, targetsRecordSchema, type Target } from '@opensip-cli/config';
-import { ConfigurationError, type TargetResolver } from '@opensip-cli/core';
+import { ConfigurationError, isPlainRecord, type TargetResolver } from '@opensip-cli/core';
 import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-cli/targeting';
 
 /**
@@ -29,11 +29,6 @@ import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-cl
  * `targets/loader.ts`, kept for programmatic/test use) stay byte-identical.
  */
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
-
-/** A plain-object guard that treats arrays and null as non-objects. */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /**
  * Normalize one parsed `targets.<name>` entry into the frozen `Target` shape
@@ -83,7 +78,7 @@ function toTarget(
  */
 export function buildTargets(args: { readonly document: unknown }): TargetResolver | undefined {
   const { document } = args;
-  if (!isPlainObject(document)) return undefined;
+  if (!isPlainRecord(document)) return undefined;
 
   // No `targets:` block → no resolver. A document may carry only tool config
   // (graph/sim namespaces) with no file targeting, exactly like a config-less run.

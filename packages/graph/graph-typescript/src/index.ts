@@ -294,8 +294,9 @@ function buildModuleInitIndex(catalog: Catalog): ReadonlyMap<string, string> {
 function createModuleResolutionHost(): ts.ModuleResolutionHost {
   return {
     fileExists: (fileName: string): boolean => ts.sys.fileExists(fileName),
-    readFile: (fileName: string, encoding?: string): string | undefined =>
-      ts.sys.readFile(fileName, encoding),
+    readFile: (fileName: string, encoding?: string): string | undefined => {
+      return ts.sys.readFile(fileName, encoding);
+    },
     directoryExists: (directoryName: string): boolean => ts.sys.directoryExists(directoryName),
     getCurrentDirectory: (): string => ts.sys.getCurrentDirectory(),
     getDirectories: (path: string): string[] => ts.sys.getDirectories(path),

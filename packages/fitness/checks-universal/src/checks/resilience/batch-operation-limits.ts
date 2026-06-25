@@ -102,6 +102,10 @@ function isBoundedRegistryQuery(content: string, queryIndex: number): boolean {
   return BOUNDED_REGISTRY_MARKERS.some((marker) => context.includes(marker));
 }
 
+function isRegistrySourceFile(filePath: string): boolean {
+  return /(?:^|[/\\])registry\.ts$/.test(filePath);
+}
+
 /** `for (const x of …)` loops that never await are pure in-memory scans, not async batch fanout. */
 function forOfLoopBodyMayAwait(content: string, forIndex: number): boolean {
   const snippet = content.slice(forIndex, Math.min(content.length, forIndex + 600));
@@ -142,6 +146,61 @@ function findUnboundedQueryCalls(
   }
 
   return results;
+}
+
+function queryViolations(content: string, filePath: string): CheckViolation[] {
+  const violations: CheckViolation[] = [];
+  for (const query of findUnboundedQueryCalls(content)) {
+    if (isRegistrySourceFile(filePath) || isBoundedRegistryQuery(content, query.index)) continue;
+    violations.push({
+      line: getLineNumber(content, query.index),
+      column: 0,
+      message: `Unbounded ${query.methodName}() call may load excessive data`,
+      severity: 'warning',
+      suggestion: `Add pagination with limit/offset or use cursor-based pagination. Example: ${query.methodName}({ take: 100, skip: offset }) or use a cursor-based approach for large datasets.`,
+      match: query.match,
+      type: 'unbounded-query',
+      filePath,
+    });
+  }
+  return violations;
+}
+
+function batchPatternViolations(content: string, filePath: string): CheckViolation[] {
+  const violations: CheckViolation[] = [];
+  for (const patternDef of UNBOUNDED_BATCH_PATTERNS) {
+    let searchStart = 0;
+    while (searchStart < content.length) {
+      const matchResult = findUnboundedBatchMatch(content, patternDef, searchStart);
+      if (!matchResult) break;
+
+      const isForOf = /^for\s*\(\s*const\s+\w+\s+of/.test(matchResult.match);
+      if (isForOf && !forOfLoopBodyMayAwait(content, matchResult.index)) {
+        searchStart = matchResult.index + 1;
+        continue;
+      }
+
+      const start = Math.max(0, matchResult.index - 300);
+      const end = Math.min(content.length, matchResult.index + 300);
+      const context = content.slice(start, end);
+      if (!hasBoundedKeyword(context)) {
+        violations.push({
+          line: getLineNumber(content, matchResult.index),
+          column: 0,
+          message: 'Async operation in loop without batching may exhaust resources',
+          severity: 'warning',
+          suggestion:
+            'Add batch processing or concurrency limits. Use chunk() to process in batches or pLimit() to limit concurrent operations.',
+          match: matchResult.match,
+          type: 'unbounded-async-loop',
+          filePath,
+        });
+      }
+
+      searchStart = matchResult.index + 1;
+    }
+  }
+  return violations;
 }
 
 /**
@@ -188,59 +247,10 @@ export const batchOperationLimits = defineCheck({
       return violations;
     }
 
-    const unboundedQueries = findUnboundedQueryCalls(content);
-    for (const query of unboundedQueries) {
-      if (isBoundedRegistryQuery(content, query.index)) {
-        continue;
-      }
-      const lineNumber = getLineNumber(content, query.index);
-      violations.push({
-        line: lineNumber,
-        column: 0,
-        message: `Unbounded ${query.methodName}() call may load excessive data`,
-        severity: 'warning',
-        suggestion: `Add pagination with limit/offset or use cursor-based pagination. Example: ${query.methodName}({ take: 100, skip: offset }) or use a cursor-based approach for large datasets.`,
-        match: query.match,
-        type: 'unbounded-query',
-        filePath,
-      });
-    }
-
-    for (const patternDef of UNBOUNDED_BATCH_PATTERNS) {
-      let searchStart = 0;
-      while (searchStart < content.length) {
-        const matchResult = findUnboundedBatchMatch(content, patternDef, searchStart);
-        if (!matchResult) break;
-
-        const start = Math.max(0, matchResult.index - 300);
-        const end = Math.min(content.length, matchResult.index + 300);
-        const context = content.slice(start, end);
-
-        const isForOf = /^for\s*\(\s*const\s+\w+\s+of/.test(matchResult.match);
-        if (isForOf && !forOfLoopBodyMayAwait(content, matchResult.index)) {
-          searchStart = matchResult.index + 1;
-          continue;
-        }
-
-        if (!hasBoundedKeyword(context)) {
-          const lineNumber = getLineNumber(content, matchResult.index);
-          violations.push({
-            line: lineNumber,
-            column: 0,
-            message: 'Async operation in loop without batching may exhaust resources',
-            severity: 'warning',
-            suggestion:
-              'Add batch processing or concurrency limits. Use chunk() to process in batches or pLimit() to limit concurrent operations.',
-            match: matchResult.match,
-            type: 'unbounded-async-loop',
-            filePath,
-          });
-        }
-
-        searchStart = matchResult.index + 1;
-      }
-    }
-
-    return violations;
+    return [
+      ...violations,
+      ...queryViolations(content, filePath),
+      ...batchPatternViolations(content, filePath),
+    ];
   },
 });

@@ -31,9 +31,7 @@ function walk(dir, out = []) {
 
 function isProductionSrc(rel) {
   return (
-    !rel.includes('__tests__') &&
-    !rel.includes('__fixtures__') &&
-    !/\.test\.(ts|tsx)$/.test(rel)
+    !rel.includes('__tests__') && !rel.includes('__fixtures__') && !/\.test\.(ts|tsx)$/.test(rel)
   );
 }
 

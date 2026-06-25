@@ -1,4 +1,4 @@
-import { isErrorSignal } from '@opensip-cli/core';
+import { isErrorSignal, isPlainRecord } from '@opensip-cli/core';
 
 import type { SkippedDetector } from '../detectors/types.js';
 import type { YagniRunSummary } from '../types/yagni-metadata.js';
@@ -50,17 +50,13 @@ export interface YagniSessionPayload {
   readonly checks: readonly YagniSessionCheck[];
 }
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
 function readNumber(raw: Record<string, unknown>, key: string): number {
   const value = raw[key];
   return typeof value === 'number' ? value : 0;
 }
 
 function parseYagniRunSummary(yagniRaw: Record<string, unknown>): YagniRunSummary {
-  const byConfidence = isPlainObject(yagniRaw.byConfidence) ? yagniRaw.byConfidence : {};
+  const byConfidence = isPlainRecord(yagniRaw.byConfidence) ? yagniRaw.byConfidence : {};
   return {
     totalCandidates: readNumber(yagniRaw, 'totalCandidates'),
     byConfidence: {
@@ -70,7 +66,7 @@ function parseYagniRunSummary(yagniRaw: Record<string, unknown>): YagniRunSummar
     },
     estimatedTotalLocReduction: readNumber(yagniRaw, 'estimatedTotalLocReduction'),
     skippedDetectors: Array.isArray(yagniRaw.skippedDetectors)
-      ? yagniRaw.skippedDetectors.filter(isPlainObject).map((s) => ({
+      ? yagniRaw.skippedDetectors.filter(isPlainRecord).map((s) => ({
           slug: typeof s.slug === 'string' ? s.slug : '',
           reason: typeof s.reason === 'string' ? s.reason : 'disabled',
           ...(typeof s.detail === 'string' ? { detail: s.detail } : {}),
@@ -81,7 +77,7 @@ function parseYagniRunSummary(yagniRaw: Record<string, unknown>): YagniRunSummar
 
 function parseSkippedDetectors(summaryRaw: Record<string, unknown>): SkippedDetector[] {
   if (!Array.isArray(summaryRaw.skippedDetectors)) return [];
-  return summaryRaw.skippedDetectors.filter(isPlainObject).map((s) => ({
+  return summaryRaw.skippedDetectors.filter(isPlainRecord).map((s) => ({
     id: typeof s.id === 'string' ? s.id : '',
     slug: typeof s.slug === 'string' ? s.slug : '',
     reason: 'disabled' as const,
@@ -95,12 +91,12 @@ function parseSkippedDetectors(summaryRaw: Record<string, unknown>): SkippedDete
  * fields — they are ignored rather than rejected.
  */
 export function readYagniSessionPayload(raw: unknown): YagniSessionPayload | undefined {
-  if (!isPlainObject(raw) || raw.__version !== 1) return undefined;
-  if (!isPlainObject(raw.summary) || !Array.isArray(raw.checks)) return undefined;
+  if (!isPlainRecord(raw) || raw.__version !== 1) return undefined;
+  if (!isPlainRecord(raw.summary) || !Array.isArray(raw.checks)) return undefined;
 
   const summaryRaw = raw.summary;
   const yagniRaw = summaryRaw.yagni;
-  if (!isPlainObject(yagniRaw)) return undefined;
+  if (!isPlainRecord(yagniRaw)) return undefined;
 
   return {
     __version: 1,

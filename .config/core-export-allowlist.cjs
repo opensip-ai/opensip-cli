@@ -40,6 +40,7 @@ const EXPORT_ALLOWLIST = {
   isErrorSeverity: 'shared-data-contracts',
   isErrorSignal: 'shared-data-contracts',
   isInPublicApiSurface: 'shared-data-contracts',
+  isPlainRecord: 'shared-data-contracts',
   _resetPublicApiGraphCache: 'shared-data-contracts',
   noopSignalSink: 'shared-data-contracts',
   policyPasses: 'shared-data-contracts',

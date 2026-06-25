@@ -164,6 +164,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'isInPublicApiSurface',
   'isMarkerKind',
   'isPathInside',
+  'isPlainRecord',
   'isRecognizedNonCodeFormat',
   'isRecord',
   'isRegisteredToolId',

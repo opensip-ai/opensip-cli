@@ -33,7 +33,7 @@ import {
   type CloneCandidate,
   type FunctionKind,
 } from '@opensip-cli/clone-detection';
-import { getMeter, withSpan } from '@opensip-cli/core';
+import { getMeter, logger, withSpan } from '@opensip-cli/core';
 import { getSharedSourceFile, stripComments } from '@opensip-cli/lang-typescript';
 import ts from 'typescript';
 
@@ -233,7 +233,13 @@ function readBoundedSource(filePath: string): string | undefined {
   try {
     if (statSync(filePath).size > MAX_SOURCE_FILE_BYTES) return undefined;
     return readFileSync(filePath, 'utf8');
-  } catch {
+  } catch (error) {
+    logger.debug({
+      evt: 'yagni.inventory.source_unreadable',
+      module: 'yagni:build-ts-inventory',
+      path: filePath,
+      err: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
 }
@@ -289,7 +295,11 @@ function recordParseDuration(durationMs: number, candidateCount: number): void {
     getMeter('opensip-cli')
       .createHistogram('opensip_cli.yagni.inventory.parse_duration_ms')
       .record(durationMs, { tool: 'yagni', outcome: candidateCount > 0 ? 'ok' : 'empty' });
-  } catch {
-    /* telemetry is best-effort; never affects the run */
+  } catch (error) {
+    logger.debug({
+      evt: 'yagni.inventory.telemetry_record_failed',
+      module: 'yagni:build-ts-inventory',
+      err: error instanceof Error ? error.message : String(error),
+    });
   }
 }

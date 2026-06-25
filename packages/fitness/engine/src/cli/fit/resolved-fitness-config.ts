@@ -25,7 +25,7 @@
  * included here because they are part of the resolved runtime shape.
  */
 
-import { currentScope } from '@opensip-cli/core';
+import { currentScope, isPlainRecord } from '@opensip-cli/core';
 
 /** The fitness namespace's resolved knobs (mirror of `FitnessNamespaceSchema`). */
 export interface ResolvedFitnessConfig {
@@ -37,11 +37,6 @@ export interface ResolvedFitnessConfig {
   readonly failOnDegraded?: boolean;
   readonly disabledChecks?: readonly string[];
   readonly recipe?: string;
-}
-
-/** A plain-object guard that treats arrays and null as non-objects. */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -58,5 +53,5 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 export function resolvedFitnessConfig(): ResolvedFitnessConfig | undefined {
   const block = currentScope()?.toolConfig?.fitness;
-  return isPlainObject(block) ? block : undefined;
+  return isPlainRecord(block) ? block : undefined;
 }

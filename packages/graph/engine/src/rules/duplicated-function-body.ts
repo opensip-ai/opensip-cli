@@ -22,7 +22,7 @@ import { pkgOf } from '../resolve-callee.js';
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
-import type { Catalog, FeatureTable, FunctionOccurrence } from '../types.js';
+import type { Catalog, FeatureTable, FunctionOccurrence, GraphConfig } from '../types.js';
 import type { CloneCandidate } from '@opensip-cli/clone-detection';
 import type { Signal } from '@opensip-cli/core';
 
@@ -41,58 +41,57 @@ export const duplicatedFunctionBodyRule = defineRule({
       minCrossPackageBodySize: config.minCrossPackageDuplicateBodySize,
     });
 
-    const signals: Signal[] = [];
-
-    // Aggregate (cross-package) signals first — preserves the original emission order.
-    for (const agg of aggregates) {
-      signals.push(
-        createGraphSignal(SLUG, config, {
-          severity: 'low',
-          category: 'quality',
-          message: `This body is duplicated across ${String(agg.packages.length)} packages (${agg.packages.join(', ')}) in ${String(agg.occurrenceCount)} occurrences — hoist it into a shared package.`,
-          code: { file: agg.anchor.filePath, line: agg.anchor.line, column: agg.anchor.column },
-          suggestion:
-            'Hoist the shared body into a single shared package and have every copy import it.',
-          metadata: {
-            packages: agg.packages,
-            packageCount: agg.packages.length,
-            occurrenceCount: agg.occurrenceCount,
-            bodyHash: agg.bodyHash,
-          },
-        }),
-      );
-    }
-
-    // Per-instance signals — N-1 per surviving group.
-    for (const group of groups) {
-      const primary = group.members[0];
-      /* v8 ignore next */
-      if (!primary) continue;
-      for (let i = 1; i < group.members.length; i++) {
-        const occ = group.members[i];
-        /* v8 ignore next */
-        if (!occ) continue;
-        signals.push(
-          createGraphSignal(SLUG, config, {
-            severity: 'low',
-            category: 'quality',
-            message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,
-            code: { file: occ.filePath, line: occ.line, column: occ.column },
-            suggestion:
-              'Extract the shared body to a single function and have both call sites import it.',
-            metadata: {
-              primary: primary.qualifiedName,
-              duplicate: occ.qualifiedName,
-              groupSize: group.members.length,
-            },
-          }),
-        );
-      }
-    }
-
-    return signals;
+    // Aggregate (cross-package) signals first, then per-instance signals — same order
+    // as the prior loops, but built as bounded in-memory projections over rule findings.
+    return [
+      ...aggregates.map((agg) => aggregateSignal(agg, config)),
+      ...groups.flatMap((group) => groupSignals(group, config)),
+    ];
   },
 });
+
+function aggregateSignal(
+  agg: ReturnType<typeof findDuplicateBodies>['aggregates'][number],
+  config: GraphConfig,
+): Signal {
+  return createGraphSignal(SLUG, config, {
+    severity: 'low',
+    category: 'quality',
+    message: `This body is duplicated across ${String(agg.packages.length)} packages (${agg.packages.join(', ')}) in ${String(agg.occurrenceCount)} occurrences — hoist it into a shared package.`,
+    code: { file: agg.anchor.filePath, line: agg.anchor.line, column: agg.anchor.column },
+    suggestion: 'Hoist the shared body into a single shared package and have every copy import it.',
+    metadata: {
+      packages: agg.packages,
+      packageCount: agg.packages.length,
+      occurrenceCount: agg.occurrenceCount,
+      bodyHash: agg.bodyHash,
+    },
+  });
+}
+
+function groupSignals(
+  group: ReturnType<typeof findDuplicateBodies>['groups'][number],
+  config: GraphConfig,
+): readonly Signal[] {
+  const primary = group.members[0];
+  /* v8 ignore next */
+  if (!primary) return [];
+  return group.members.slice(1).map((occ) =>
+    createGraphSignal(SLUG, config, {
+      severity: 'low',
+      category: 'quality',
+      message: `${occ.simpleName} has the same body as ${primary.qualifiedName} (${primary.filePath}:${String(primary.line)}).`,
+      code: { file: occ.filePath, line: occ.line, column: occ.column },
+      suggestion:
+        'Extract the shared body to a single function and have both call sites import it.',
+      metadata: {
+        primary: primary.qualifiedName,
+        duplicate: occ.qualifiedName,
+        groupSize: group.members.length,
+      },
+    }),
+  );
+}
 
 /**
  * Map the catalog to `CloneCandidate[]` in the SAME iteration order the prior in-rule

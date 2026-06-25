@@ -21,16 +21,17 @@
  */
 
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
-import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
+import {
+  currentScope,
+  isPlainRecord,
+  logger,
+  readYamlFile,
+  resolveProjectConfigPath,
+} from '@opensip-cli/core';
 
 import { GraphConfigSchema } from './graph-config-schema.js';
 
 import type { GraphConfig } from '../types.js';
-
-/** Accept anything that looks like a plain object; everything else → `{}`. */
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
 
 /**
  * Best-effort load of the `graph:` block of `opensip-cli.config.yml`.
@@ -54,13 +55,13 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   // only off-CLI (direct unit-test calls), where we fall back to the YAML read.
   const scope = currentScope();
   const scoped = scope?.toolConfig?.graph;
-  if (isPlainObject(scoped)) {
+  if (isPlainRecord(scoped)) {
     // Already validated by the composer (graph's namespaced ToolConfigDeclaration
     // is the same GraphConfigSchema), so this is a pure narrowing read.
     return scoped;
   }
   const documentGraph = scope?.configDocument?.graph;
-  if (isPlainObject(documentGraph)) {
+  if (isPlainRecord(documentGraph)) {
     const parsed = GraphConfigSchema.strict().safeParse(documentGraph);
     if (parsed.success) return parsed.data;
     logger.debug({
@@ -91,9 +92,9 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
     return {};
   }
   const doc = readYamlFile(filePath);
-  if (!isPlainObject(doc)) return {};
+  if (!isPlainRecord(doc)) return {};
   const graphBlock = doc.graph;
-  if (!isPlainObject(graphBlock)) return {};
+  if (!isPlainRecord(graphBlock)) return {};
   // Parse the block through graph's own Zod schema, made `.strict()` to match
   // the dispatch-level composed validation (an unknown key inside `graph:` is
   // rejected, ADR-0023). A schema failure here is NOT fatal at the loader (the

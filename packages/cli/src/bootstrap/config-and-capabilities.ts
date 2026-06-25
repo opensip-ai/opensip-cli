@@ -42,6 +42,7 @@ import {
   type BootstrapDiagnosticsCollector,
   type CapabilityRegistry,
   ConfigurationError,
+  isPlainRecord,
   logger,
   readYamlFileOrThrow,
   resolveToolHooks,
@@ -54,11 +55,6 @@ import {
 } from '@opensip-cli/core';
 
 import { provenanceSourceFor, shouldRunHookInHost } from './tool-provenance.js';
-
-/** A plain-object guard that treats arrays and null as non-objects. */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /**
  * Find the manifest config descriptor for a tool, matching by stable id then by
@@ -165,10 +161,10 @@ function fileBlocksFor(
   validated: unknown,
 ): Record<string, Record<string, unknown>> {
   const file: Record<string, Record<string, unknown>> = {};
-  if (!isPlainObject(validated)) return file;
+  if (!isPlainRecord(validated)) return file;
   for (const decl of declarations) {
     const block = validated[decl.namespace];
-    if (isPlainObject(block)) file[decl.namespace] = block;
+    if (isPlainRecord(block)) file[decl.namespace] = block;
   }
   return file;
 }
@@ -238,7 +234,7 @@ export function composeAndValidateToolConfig(args: {
   // paths elsewhere still use the non-throwing reader).
   const raw: unknown =
     configPath === undefined ? {} : readYamlFileOrThrow(configPath, { loader: 'project-config' });
-  const document = isPlainObject(raw) ? raw : {};
+  const document = isPlainRecord(raw) ? raw : {};
 
   const schema = composeConfigSchema(declarations);
   // STRICT gate: a typo in any tool namespace throws ConfigurationError here,

@@ -113,6 +113,8 @@ const KNOWN_DIRECTIVE_KEYWORDS: readonly string[] = [
   '@fitness-ignore-file',
   '@graph-ignore-next-line',
   '@graph-ignore-file',
+  '@yagni-ignore-next-line',
+  '@yagni-ignore-file',
 ];
 
 // =============================================================================

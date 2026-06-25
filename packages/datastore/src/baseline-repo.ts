@@ -32,6 +32,7 @@ export interface BaselineRow {
 export class BaselineRepo {
   private readonly datastore: DrizzleDataStore;
 
+  // @yagni-ignore-next-line duplicate-body-candidate -- repository constructors intentionally share the same datastore narrowing idiom; a base class would add indirection without reducing behavior.
   constructor(datastore: DataStore) {
     this.datastore = requireDrizzleDataStore(datastore);
   }

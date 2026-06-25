@@ -8,12 +8,13 @@
  */
 
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
-import { currentScope, logger, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
-
-/** Accept anything that looks like a plain object; everything else → undefined. */
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
+import {
+  currentScope,
+  isPlainRecord,
+  logger,
+  readYamlFile,
+  resolveProjectConfigPath,
+} from '@opensip-cli/core';
 
 /**
  * Best-effort read of `simulation.recipe` from the project config.
@@ -30,7 +31,7 @@ function readSimulationRecipe(cwd: string, explicitPath?: string): string | unde
   // Scope-first: the resolved, strict-validated `simulation:` block.
   const scope = currentScope();
   const scoped = scope?.toolConfig?.simulation;
-  if (isPlainObject(scoped)) {
+  if (isPlainRecord(scoped)) {
     return typeof scoped.recipe === 'string' ? scoped.recipe : undefined;
   }
   if (scope !== undefined) {
@@ -52,9 +53,9 @@ function readSimulationRecipe(cwd: string, explicitPath?: string): string | unde
     return undefined;
   }
   const doc = readYamlFile(filePath);
-  if (!isPlainObject(doc)) return undefined;
+  if (!isPlainRecord(doc)) return undefined;
   const block = doc.simulation;
-  if (!isPlainObject(block)) return undefined;
+  if (!isPlainRecord(block)) return undefined;
   return typeof block.recipe === 'string' ? block.recipe : undefined;
 }
 

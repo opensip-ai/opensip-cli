@@ -123,6 +123,9 @@ export {
 export { readYamlFile, readYamlFileOrThrow } from './lib/yaml.js';
 export type { ReadYamlFileOrThrowOptions } from './lib/yaml.js';
 
+// Lib — shallow JSON-value guards shared by config/projector code paths.
+export { isPlainRecord } from './lib/json-guards.js';
+
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';
 

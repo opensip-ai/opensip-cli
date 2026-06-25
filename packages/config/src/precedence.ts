@@ -17,6 +17,8 @@
  * precedence order.
  */
 
+import { isPlainRecord } from '@opensip-cli/core';
+
 import type {
   EnvBindingDeclaration,
   EnvBindingType,
@@ -88,11 +90,6 @@ function readEnvBindings(
   return out;
 }
 
-/** A plain object check that treats arrays and null as non-objects. */
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
 /**
  * Resolve the effective config by merging sources in precedence order.
  *
@@ -112,17 +109,17 @@ export function resolveConfig(input: ResolveConfigInput): ResolvedConfig {
     const merged: Record<string, unknown> = {};
 
     // 1. defaults (lowest)
-    if (isPlainObject(decl.defaults)) {
+    if (isPlainRecord(decl.defaults)) {
       Object.assign(merged, decl.defaults);
     }
     // 2. file
-    if (isPlainObject(file[ns])) {
+    if (isPlainRecord(file[ns])) {
       Object.assign(merged, file[ns]);
     }
     // 3. env bindings
     Object.assign(merged, readEnvBindings(decl.env, env));
     // 4. flags (highest)
-    if (isPlainObject(flags[ns])) {
+    if (isPlainRecord(flags[ns])) {
       Object.assign(merged, flags[ns]);
     }
 

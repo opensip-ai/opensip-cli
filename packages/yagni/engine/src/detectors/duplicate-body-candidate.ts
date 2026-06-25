@@ -34,6 +34,12 @@ function span(occ: CloneCandidate): number {
   return occ.bodyLines ?? occ.endLine - occ.line + 1;
 }
 
+/**
+ * Build a reduction signal for a duplicate group.
+ *
+ * @throws {Error} If the clone-detection substrate returns a structurally invalid
+ *   empty group.
+ */
 function groupSignal(group: DuplicateGroup): Signal {
   const primary = group.members[0];
   /* v8 ignore next */

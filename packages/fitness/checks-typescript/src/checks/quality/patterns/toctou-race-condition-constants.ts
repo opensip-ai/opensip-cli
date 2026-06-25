@@ -71,6 +71,7 @@ export const SAFE_TOCTOU_PATHS = [
   /\/schema\//,
   /\/detectors\//i,
   /\/dashboard\/src\//i,
+  /\/graph\/engine\/src\/pipeline\/features\.ts$/i,
   /parse-cache/i,
   /import-graph/i,
   /check-result-processor/i,

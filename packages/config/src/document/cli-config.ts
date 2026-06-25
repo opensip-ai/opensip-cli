@@ -22,7 +22,7 @@
  * document's job (the `cli` host declaration), not this reader's.
  */
 
-import { readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
+import { isPlainRecord, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 import { z } from 'zod';
 
 /** Config URLs that may carry credentials must use https. */
@@ -106,14 +106,6 @@ export const cliConfigSchema = z.object({
 export type CliDefaults = z.infer<typeof cliConfigSchema>;
 
 /**
- * Type guard for permissive YAML reading. We accept anything that
- * looks like a plain object; everything else collapses to `{}`.
- */
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-/**
  * Project a raw `cli:` YAML object into {@link CliDefaults} by validating each key
  * against its OWN {@link cliConfigSchema} field (M8 — the projector is now DERIVED
  * from the schema, not a hand-maintained third representation alongside the type
@@ -136,7 +128,7 @@ function projectCliDefaults(raw: Record<string, unknown>): CliDefaults {
     if (value === undefined) continue;
     // A nested object that validated to {} (e.g. `cloud: { bogus: 1 }`) reads as
     // absent, not an empty object — preserves the prior projector's behaviour.
-    if (isPlainObject(value) && Object.keys(value).length === 0) continue;
+    if (isPlainRecord(value) && Object.keys(value).length === 0) continue;
     out[key] = value;
   }
   return out;
@@ -161,8 +153,8 @@ export function loadCliDefaults(cwd: string, explicitPath?: string): CliDefaults
     return {};
   }
   const doc = readYamlFile(filePath);
-  if (!isPlainObject(doc)) return {};
+  if (!isPlainRecord(doc)) return {};
   const cliBlock = doc.cli;
-  if (!isPlainObject(cliBlock)) return {};
+  if (!isPlainRecord(cliBlock)) return {};
   return projectCliDefaults(cliBlock);
 }

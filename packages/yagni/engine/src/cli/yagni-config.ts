@@ -20,17 +20,18 @@
  * exactly this reason.
  */
 
-import { currentScope, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
+import {
+  currentScope,
+  isPlainRecord,
+  readYamlFile,
+  resolveProjectConfigPath,
+} from '@opensip-cli/core';
 
 import { DEFAULT_YAGNI_CONFIG } from '../types/yagni-config.js';
 
 import { YagniConfigSchema } from './yagni-config-schema.js';
 
 import type { YagniConfig } from '../types/yagni-config.js';
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
 
 function mergeDefaults(parsed: YagniConfig): YagniConfig {
   return {
@@ -55,7 +56,7 @@ export function loadYagniConfig(cwd: string, explicitPath?: string): YagniConfig
   // YAML read below.
   const scope = currentScope();
   const scoped = scope?.toolConfig?.yagni;
-  if (isPlainObject(scoped)) {
+  if (isPlainRecord(scoped)) {
     const parsed = YagniConfigSchema.safeParse(scoped);
     if (parsed.success) return mergeDefaults(parsed.data);
   }
@@ -68,7 +69,7 @@ export function loadYagniConfig(cwd: string, explicitPath?: string): YagniConfig
 
   const configPath = resolveProjectConfigPath(cwd, explicitPath);
   const doc = readYamlFile(configPath);
-  if (!isPlainObject(doc) || !isPlainObject(doc.yagni)) {
+  if (!isPlainRecord(doc) || !isPlainRecord(doc.yagni)) {
     return mergeDefaults({});
   }
   const parsed = YagniConfigSchema.safeParse(doc.yagni);

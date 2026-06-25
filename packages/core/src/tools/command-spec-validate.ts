@@ -13,6 +13,7 @@
  * import Commander. Deeper, Commander-coupled validation (choices subset enum,
  * flag-string syntax) happens at mount in cli.
  */
+import { isPlainRecord } from '../lib/json-guards.js';
 
 import {
   COMMON_FLAG_KEYS,
@@ -34,11 +35,6 @@ const COMMAND_OUTPUT_MODES: readonly CommandOutputMode[] = [
 
 const COMMAND_SCOPE_REQUIREMENTS: readonly CommandScopeRequirement[] = ['project', 'none'];
 
-/** A plain-object guard that treats arrays and null as non-objects. */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function describeUnknownValue(value: unknown): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean' || value === undefined) {
@@ -49,7 +45,7 @@ function describeUnknownValue(value: unknown): string {
 }
 
 function commandSpecValidationError(value: unknown): Error | undefined {
-  if (!isPlainObject(value)) {
+  if (!isPlainRecord(value)) {
     return new TypeError('defineCommand: command spec must be an object.');
   }
 

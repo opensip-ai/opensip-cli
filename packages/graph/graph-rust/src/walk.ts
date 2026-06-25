@@ -1,4 +1,3 @@
-
 /**
  * Rust walkProject — emit FunctionOccurrences + CallSiteRecords.
  *

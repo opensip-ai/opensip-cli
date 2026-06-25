@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { isErrorSignal, yieldToEventLoop } from '@opensip-cli/core';
+import { filterSignalsBySuppressions, isErrorSignal, yieldToEventLoop } from '@opensip-cli/core';
 
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 import { YAGNI_DETECTORS } from '../detectors/registry.js';
@@ -18,7 +20,7 @@ import type { SkippedDetector, YagniDetector } from '../detectors/types.js';
 import type { YagniConfig } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { ToolCliContext } from '@opensip-cli/core';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 /** Runtime options for one YAGNI detector pass. */
 export interface ExecuteYagniOptions {
@@ -49,6 +51,11 @@ export interface ExecuteYagniResult {
     readonly payload: ReturnType<typeof buildYagniSessionPayload>;
   };
 }
+
+const YAGNI_SUPPRESSION_KEYWORDS = {
+  file: '@yagni-ignore-file',
+  nextLine: '@yagni-ignore-next-line',
+} as const;
 
 function isDisabled(detector: YagniDetector, config: YagniConfig): boolean {
   const disabled = config.disabledDetectors ?? [];
@@ -92,6 +99,62 @@ function planDetectors(
   return { run, skipped };
 }
 
+function yagniDirectiveId(signal: Signal): string {
+  return signal.ruleId.startsWith('yagni:') ? signal.ruleId.slice('yagni:'.length) : signal.ruleId;
+}
+
+function sourcePath(cwd: string, filePath: string): string {
+  return isAbsolute(filePath) ? filePath : join(cwd, filePath);
+}
+
+async function filterYagniSuppressions(
+  cwd: string,
+  signals: readonly Signal[],
+): Promise<{
+  readonly kept: readonly Signal[];
+  readonly suppressed: readonly Signal[];
+}> {
+  const { kept, suppressed } = await filterSignalsBySuppressions({
+    signals,
+    keywords: YAGNI_SUPPRESSION_KEYWORDS,
+    readFile: (filePath) => readFile(sourcePath(cwd, filePath), 'utf8'),
+    ruleIdOf: yagniDirectiveId,
+  });
+  return {
+    kept,
+    suppressed: suppressed.map((match) => match.signal),
+  };
+}
+
+function signalsBySource(signals: readonly Signal[]): ReadonlyMap<string, readonly Signal[]> {
+  const bySource = new Map<string, Signal[]>();
+  for (const signal of signals) {
+    const bucket = bySource.get(signal.source);
+    if (bucket) bucket.push(signal);
+    else bySource.set(signal.source, [signal]);
+  }
+  return bySource;
+}
+
+function suppressionAdjustedUnits(
+  units: readonly UnitResult[],
+  keptSignals: readonly Signal[],
+  suppressedSignals: readonly Signal[],
+): readonly UnitResult[] {
+  const keptBySource = signalsBySource(keptSignals);
+  const suppressedBySource = signalsBySource(suppressedSignals);
+  return units.map((unit) => {
+    const signals = keptBySource.get(unit.slug) ?? [];
+    const ignoredCount = suppressedBySource.get(unit.slug)?.length ?? 0;
+    return {
+      ...unit,
+      passed: unit.error === undefined && signals.every((s) => !isErrorSignal(s)),
+      violationCount: signals.length,
+      ...(ignoredCount === 0 ? {} : { ignoredCount }),
+    };
+  });
+}
+
 /**
  * Run the selected YAGNI detectors and build the persisted signal envelope.
  *
@@ -109,7 +172,7 @@ export async function executeYagni(
   const minConfidence = opts.minConfidence ?? config.defaultMinConfidence ?? 'medium';
 
   const { run, skipped } = planDetectors(detectors, config, opts.detectors ?? []);
-  const allSignals = [];
+  const allSignals: Signal[] = [];
   const units: UnitResult[] = [];
   const total = run.length;
   opts.onProgress?.(0, total);
@@ -153,7 +216,9 @@ export async function executeYagni(
   }
 
   const categoryFiltered = filterByReductionCategories(allSignals, opts.categories ?? []);
-  const sortedSignals = sortYagniSignals(categoryFiltered);
+  const { kept, suppressed } = await filterYagniSuppressions(opts.cwd, categoryFiltered);
+  const sortedSignals = sortYagniSignals(kept);
+  const finalUnits = suppressionAdjustedUnits(units, sortedSignals, suppressed);
 
   const runId = randomUUID();
   const createdAt = new Date().toISOString();
@@ -165,10 +230,10 @@ export async function executeYagni(
     tool: 'yagni',
     runId,
     createdAt,
-    units,
+    units: finalUnits,
     signals: sortedSignals,
     policy,
-    runFaulted: units.some((u) => u.error !== undefined),
+    runFaulted: finalUnits.some((u) => u.error !== undefined),
     fingerprintStrategy: yagniFingerprintStrategy,
   });
 
