@@ -7,9 +7,13 @@
  * `candidate.language`).
  */
 
-import { NEAR_DUP_LSH_BANDS, NEAR_DUP_SIGNATURE_K } from './near-duplicate-signature.js';
-import { estimateJaccard, lshBandHashes } from './near-duplicate-signature.js';
 import { isEligibleKind } from './find-duplicate-bodies.js';
+import {
+  NEAR_DUP_LSH_BANDS,
+  NEAR_DUP_SIGNATURE_K,
+  estimateJaccard,
+  lshBandHashes,
+} from './near-duplicate-signature.js';
 
 import type { CloneCandidate, NearDupOpts, NearDuplicateCluster } from './types.js';
 

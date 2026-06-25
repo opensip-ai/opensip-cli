@@ -57,6 +57,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'GRAPH_CONTRACT_VERSION',
   'hashBody',
   'isBuiltInGraphRecipe',
+  'isTestFilePath',
   'languageOfFile',
   'linkExported',
   'lshBandHashes',
