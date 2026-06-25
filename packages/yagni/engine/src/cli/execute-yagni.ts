@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { buildSignalEnvelope, groupSignalsBySource } from '@opensip-cli/contracts';
 import { filterSignalsBySuppressions, isErrorSignal, yieldToEventLoop } from '@opensip-cli/core';
 
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
@@ -126,23 +126,13 @@ async function filterYagniSuppressions(
   };
 }
 
-function signalsBySource(signals: readonly Signal[]): ReadonlyMap<string, readonly Signal[]> {
-  const bySource = new Map<string, Signal[]>();
-  for (const signal of signals) {
-    const bucket = bySource.get(signal.source);
-    if (bucket) bucket.push(signal);
-    else bySource.set(signal.source, [signal]);
-  }
-  return bySource;
-}
-
 function suppressionAdjustedUnits(
   units: readonly UnitResult[],
   keptSignals: readonly Signal[],
   suppressedSignals: readonly Signal[],
 ): readonly UnitResult[] {
-  const keptBySource = signalsBySource(keptSignals);
-  const suppressedBySource = signalsBySource(suppressedSignals);
+  const keptBySource = groupSignalsBySource(keptSignals);
+  const suppressedBySource = groupSignalsBySource(suppressedSignals);
   return units.map((unit) => {
     const signals = keptBySource.get(unit.slug) ?? [];
     const ignoredCount = suppressedBySource.get(unit.slug)?.length ?? 0;
