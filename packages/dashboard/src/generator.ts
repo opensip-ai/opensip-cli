@@ -12,6 +12,7 @@
 // subtab-bar / overview / sessions / checks / recipes / tool-tabs renderers now
 // live in that bundle (src/client/*.ts).
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
+import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
 import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
@@ -179,7 +180,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenSIP CLI${latest ? ` — Pass Rate: ${latestScoreSafe}%` : ''}</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 8h12a4 4 0 0 1 0 8h-1M4 8v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8M4 8H2M6 4c0 1 .5 2 1 2.5M10 3c0 1.5.5 2.5 1 3M14 4c0 1 .5 2 1 2.5' stroke='%23c4956a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="${REPORT_CUP_FAVICON_DATA_URI}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
 <style>
@@ -189,8 +190,8 @@ ${dashboardCss()}
 <body>
 
 <div class="header">
-  <span class="header-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 8h12a4 4 0 0 1 0 8h-1M4 8v8a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V8M4 8H2M6 4c0 1 .5 2 1 2.5M10 3c0 1.5.5 2.5 1 3M14 4c0 1 .5 2 1 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-  <div><h1><span class="brand-open">Open</span>SIP Tools</h1></div>
+  <span class="header-icon">${REPORT_CUP_HEADER_HTML}</span>
+  <div><h1><span class="brand-open">Open</span>SIP Report</h1></div>
 </div>
 
 <div class="tab-bar" id="tab-bar">
