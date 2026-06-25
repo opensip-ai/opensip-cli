@@ -82,7 +82,8 @@ export const RELEASE_PACKAGE_ORDER = [
     name: '@opensip-cli/clone-detection',
     dir: 'packages/clone-detection',
     filter: '@opensip-cli/clone-detection',
-    publishReason: 'Single-sourced clone-detection primitives + algorithms consumed by graph and yagni',
+    publishReason:
+      'Single-sourced clone-detection primitives + algorithms consumed by graph and yagni',
   },
   // Layer 2 — session-store + output (extracted from contracts)
   {

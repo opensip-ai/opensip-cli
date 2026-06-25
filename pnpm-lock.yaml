@@ -1140,6 +1140,9 @@ importers:
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../../cli-ui
+      '@opensip-cli/clone-detection':
+        specifier: workspace:*
+        version: link:../../clone-detection
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../../config

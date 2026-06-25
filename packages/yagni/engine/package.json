@@ -58,6 +58,7 @@
   "dependencies": {
     "@opensip-cli/cli-live": "workspace:*",
     "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/clone-detection": "workspace:*",
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",

@@ -205,7 +205,7 @@ describe('yagni config, tool metadata, and command handler', () => {
 
     const reportData = collectYagniReportData({} as never);
     expect(reportData.yagniSummary).toMatchObject({
-      detectorCount: 1,
+      detectorCount: 2,
       graphBackedCount: 0,
       contractVersion: YAGNI_CONTRACT_VERSION,
     });
