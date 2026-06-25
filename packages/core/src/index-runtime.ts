@@ -5,6 +5,26 @@ export {
   createSubprocessProgressRun,
   runOffThreadOrInProcess,
 } from './runtime/subprocess-transport.js';
+export { forkAndSettle } from './runtime/fork-and-settle.js';
+export type {
+  ForkAndSettleDescriptor,
+  ForkAndSettleHandle,
+  ForkEnvContext,
+} from './runtime/fork-and-settle.js';
+export { killTree } from './runtime/kill-tree.js';
+export {
+  getWorkerLimits,
+  workerExecArgv,
+  workerLimitsEnv,
+  WORKER_LIMITS_ENV_SPECS,
+} from './runtime/worker-limits.js';
+export type { WorkerLimits } from './runtime/worker-limits.js';
+export { measureIpcPayloadBytes, isIpcPayloadTooLarge } from './runtime/ipc-payload.js';
+export { sendWorkerIpcMessage, IpcPayloadTooLargeError } from './runtime/worker-ipc-send.js';
+export {
+  assertCapturedOutputFits,
+  CapturedOutputTooLargeError,
+} from './runtime/result-accumulator-cap.js';
 export type {
   ProgressTransport,
   ProgressRun,

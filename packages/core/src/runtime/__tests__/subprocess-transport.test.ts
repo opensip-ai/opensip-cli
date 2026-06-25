@@ -10,7 +10,7 @@
 
 import { fileURLToPath } from 'node:url';
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { createSubprocessProgressRun, runOffThreadOrInProcess } from '../subprocess-transport.js';
 
@@ -54,6 +54,18 @@ describe('createSubprocessProgressRun', () => {
   it('rejects when the worker exits cleanly without producing a result', async () => {
     const run = createSubprocessProgressRun<number, string>(descriptorFor('exit-clean'));
     await expect(run.result).rejects.toThrow(/before producing a result/);
+  });
+
+  it('rejects an oversized IPC payload from the worker', async () => {
+    const prev = process.env.OPENSIP_CLI_WORKER_MAX_IPC_BYTES;
+    process.env.OPENSIP_CLI_WORKER_MAX_IPC_BYTES = '1024';
+    try {
+      const run = createSubprocessProgressRun<number, string>(descriptorFor('huge-payload'));
+      await expect(run.result).rejects.toThrow(/payload_too_large|too large/);
+    } finally {
+      if (prev === undefined) delete process.env.OPENSIP_CLI_WORKER_MAX_IPC_BYTES;
+      else process.env.OPENSIP_CLI_WORKER_MAX_IPC_BYTES = prev;
+    }
   });
 
   it('carries a Map across the boundary via advanced serialization', async () => {

@@ -287,6 +287,34 @@ The whole bootstrap is ~30ms on a developer laptop; the run itself is the bulk o
 
 ---
 
+## Worker resource ceilings (forked dispatch + live-engine workers)
+
+External-tool dispatch (`__tool-command-worker`) and bundled live-engine subprocess
+transport share governed resource ceilings via `WorkerLimits` env vars (read only
+through `EnvRegistry`). Defaults are balanced for large-repo `fit` / `graph` runs
+and env-tunable when a legitimate run hits a cap.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OPENSIP_CLI_WORKER_TIMEOUT_MS` | `120000` | Per-run wall-clock hard cap (not reset per host-RPC upcall). |
+| `OPENSIP_CLI_WORKER_MAX_IPC_BYTES` | `33554432` (32 MiB) | Serialized IPC payload cap (worker send + host receive). |
+| `OPENSIP_CLI_WORKER_MAX_OLD_SPACE_MB` | `4096` | V8 old-space cap (`--max-old-space-size`) for forked workers. |
+| `OPENSIP_CLI_WORKER_MAX_RSS_MB` | `6144` | RSS watchdog ceiling; exceeded → child-tree SIGKILL. |
+| `OPENSIP_CLI_WORKER_MAX_CONCURRENT_RPC` | `1` | Concurrent in-flight host-RPC upcalls (dispatch path). |
+| `OPENSIP_CLI_WORKER_MAX_TOTAL_RPC` | `5000` | Total host-RPC upcalls per dispatch run. |
+| `OPENSIP_CLI_WORKER_HEARTBEAT_GRACE_MS` | `60000` | Missed heartbeat grace before `heartbeat_missed` kill. |
+| `OPENSIP_CLI_WORKER_IDLE_RPC_MS` | *(unset)* | Optional per-upcall idle timer; off by default. |
+| `OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES` | `33554432` (32 MiB) | `ResultAccumulator` + captured stderr cap. |
+| `OPENSIP_CLI_WORKER_STDERR_INHERIT` | `0` | Set to `1` to inherit child stderr (debugging). Default captures a truncated stderr tail on worker fault. |
+
+On settle, timeout, limit breach, or Ctrl-C, the supervisor kills the **whole child
+tree** (POSIX process-group kill; Windows `taskkill /T /F`). Limit kills surface as
+structured `failureClass` values on parent-side errors (`timeout`, `payload_too_large`,
+`rss_exceeded`, `rpc_flood`, `heartbeat_missed`, `cancelled`) — never an in-host
+fallback for external tools (ADR-0054).
+
+---
+
 ## What's next
 
 - **[`02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/)** — what happens inside `loadDiscoveredTools()` and inside the Tool's lazy plugin loading.

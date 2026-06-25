@@ -33,10 +33,13 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  CapturedOutputTooLargeError,
   createRunTimer,
   currentScope,
   defineCommand,
+  IpcPayloadTooLargeError,
   resolveToolHooks,
+  sendWorkerIpcMessage,
   type CommandSpec,
   type ToolCliContext,
   type Tool,
@@ -70,7 +73,33 @@ type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
 
 /** Post one IPC message to the parent (no-op when not forked — e.g. a unit call). */
 function send(msg: DispatchWorkerMessage): void {
-  process.send?.(msg);
+  try {
+    sendWorkerIpcMessage(msg);
+  } catch (error) {
+    if (error instanceof IpcPayloadTooLargeError) {
+      process.send?.({
+        kind: 'error',
+        message: error.message,
+        failureClass: 'payload_too_large',
+      });
+      return;
+    }
+    throw error;
+  }
+}
+
+/** Emit periodic heartbeats so the supervisor can detect a wedged worker. */
+function startWorkerHeartbeat(): () => void {
+  if (process.send === undefined) {
+    return () => {
+      /* not forked — no heartbeat channel */
+    };
+  }
+  const timer = setInterval(() => {
+    sendWorkerIpcMessage({ kind: 'heartbeat' });
+  }, 10_000);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
 
 /**
@@ -200,6 +229,8 @@ function toResult(
 /** Map a thrown error to its structured failure class for the IPC `error` message. */
 function classifyThrow(error: unknown): ToolCommandFailureClass {
   if (error instanceof UnsupportedSeamError) return error.failureClass;
+  if (error instanceof CapturedOutputTooLargeError) return error.failureClass;
+  if (error instanceof IpcPayloadTooLargeError) return error.failureClass;
   return (error as { failureClass?: ToolCommandFailureClass }).failureClass ?? 'tool-handler-throw';
 }
 
@@ -358,7 +389,12 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
  * rejects cleanly. This is the host CommandSpec handler's body.
  */
 export async function executeToolCommandWorker(specPath: string): Promise<void> {
-  send(await runToolCommandWorker(specPath));
+  const stopHeartbeat = startWorkerHeartbeat();
+  try {
+    send(await runToolCommandWorker(specPath));
+  } finally {
+    stopHeartbeat();
+  }
 }
 
 /**

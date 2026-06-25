@@ -43,6 +43,16 @@ function build(): {
 }
 
 describe('buildWorkerContext — FRR seams', () => {
+  it('rejects render payloads over the captured-output cap', () => {
+    const acc: ResultAccumulator = {};
+    const { client } = makeStubClient();
+    const scope = new RunScope({ runId: 'r' });
+    const ctx = buildWorkerContext(scope, createRunTimer(), acc, client, 32);
+    expect(() => {
+      void ctx.render({ blob: 'x'.repeat(200) });
+    }).toThrow(/exceeds cap/);
+  });
+
   it('records render / json / envelope / raw / error / exitCode into the accumulator', async () => {
     const { ctx, acc } = build();
     await ctx.render({ r: 1 });

@@ -24,6 +24,8 @@
  */
 
 import {
+  assertCapturedOutputFits,
+  getWorkerLimits,
   type GateCompareResult,
   type HostAudit,
   type HostEntitlements,
@@ -152,23 +154,31 @@ export function buildWorkerContext(
   timing: RunTimer,
   acc: ResultAccumulator,
   rpcClient: WorkerRpcClient,
+  maxCapturedOutputBytes = getWorkerLimits().maxCapturedOutputBytes,
 ): ToolCliContext {
+  const cap = (field: string, value: unknown): void => {
+    assertCapturedOutputFits(field, value, maxCapturedOutputBytes);
+  };
   return {
     scope,
     runSession: { timing },
     logger: scope.logger,
     // ── Final-result-return seams (recorded, replayed host-side) ──────────
     render: (result: unknown) => {
+      cap('render', result);
       acc.render = result;
       return Promise.resolve();
     },
     emitJson: (value: unknown) => {
+      cap('json', value);
       acc.json = value;
     },
     emitEnvelope: (envelope: unknown) => {
+      cap('envelope', envelope);
       acc.envelope = envelope;
     },
     emitRaw: (value: unknown) => {
+      cap('raw', value);
       acc.raw = value;
     },
     emitError: (detail) => {

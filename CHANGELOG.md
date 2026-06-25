@@ -13,12 +13,25 @@ All notable changes to OpenSIP CLI are documented here.
 - Wildcard `*` trust allowlists (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`,
   `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`) now emit a per-invocation deprecation
   warning with an explicit full-privilege caveat. Admission behavior is unchanged.
+- Forked worker child stderr is now captured in a size-capped buffer by default
+  (truncated tail surfaces on worker fault). Set `OPENSIP_CLI_WORKER_STDERR_INHERIT=1`
+  to restore inherited stderr for debugging.
+- Child-tree kill on settle/timeout/limit: POSIX process-group kill; Windows
+  `taskkill /T /F`. Prevents forked grandchildren from leaking after supervisor settle.
 
 ### Added
 
 - `TRACEPARENT` propagation into external-tool dispatch workers and bundled
   live-run worker forks for full child-process span-nesting parity with graph shard
   workers.
+- Worker resource ceilings for forked dispatch and live-engine subprocess paths:
+  IPC payload cap, captured-output cap, child memory limit (`--max-old-space-size` +
+  RSS watchdog), host-RPC backpressure, heartbeat/liveness, and Ctrl-C cancellation.
+  Configurable via `OPENSIP_CLI_WORKER_*` env vars (see dispatch implementation docs).
+- Shared `forkAndSettle` primitive in `@opensip-cli/core` backing both the external
+  dispatch supervisor and bundled live-engine subprocess transport.
+- `failureClass` and truncated child `stderrTail` persisted on supervisor-side
+  `ToolError` instances for operator triage.
 
 ## [0.1.12] - 2026-06-24
 

@@ -119,7 +119,8 @@ export type ToolCommandFailureClass =
   | 'command-not-found'
   | 'runtime-load-failed'
   | 'bad-spec'
-  | 'config-invalid';
+  | 'config-invalid'
+  | 'payload_too_large';
 
 /**
  * The final-result-return payload the worker posts back over IPC once the

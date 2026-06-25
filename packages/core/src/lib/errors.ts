@@ -28,6 +28,10 @@ export type ToolErrorCode =
 /** Constructor options for {@link ToolError}: `code` plus arbitrary diagnostic metadata. */
 export interface ToolErrorOptions extends ErrorOptions {
   code?: string;
+  /** Supervisor/worker failure taxonomy (ADR-0054 resource-control diagnostics). */
+  failureClass?: string;
+  /** Truncated child stderr tail for operator triage on worker fault. */
+  stderrTail?: string;
   [key: string]: unknown;
 }
 
@@ -41,11 +45,17 @@ export class ToolError extends Error {
    * after an `instanceof` check.
    */
   readonly code: string;
+  /** Machine-filterable failure class when the error originated at a worker boundary. */
+  readonly failureClass?: string;
+  /** Captured child stderr tail (truncated) when available. */
+  readonly stderrTail?: string;
 
   constructor(message: string, code: string, options?: ToolErrorOptions) {
     super(message, options);
     this.name = 'ToolError';
     this.code = code;
+    this.failureClass = options?.failureClass;
+    this.stderrTail = options?.stderrTail;
   }
 }
 

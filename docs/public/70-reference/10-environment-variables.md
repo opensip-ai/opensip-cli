@@ -78,6 +78,25 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](../../decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](../../decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
+| `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH` | Comma/whitespace-separated extra env var names to forward into external-tool dispatch worker children beyond the default allow-list. Does not affect bundled live-run worker forks. |
+
+## Worker resource ceilings
+
+Governed limits for forked workers (external-tool dispatch and bundled live-engine
+subprocess transport). See [CLI dispatch](../80-implementation/01-cli-dispatch.md#worker-resource-ceilings-forked-dispatch--live-engine-workers).
+
+| Variable | Default | Effect |
+|---|---|---|
+| `OPENSIP_CLI_WORKER_TIMEOUT_MS` | `120000` | Per-run wall-clock hard cap (ms); not reset per host-RPC upcall. |
+| `OPENSIP_CLI_WORKER_MAX_IPC_BYTES` | `33554432` (32 MiB) | Max serialized IPC payload on worker send and host receive. |
+| `OPENSIP_CLI_WORKER_MAX_OLD_SPACE_MB` | `4096` | V8 old-space cap (`--max-old-space-size`) for forked workers. |
+| `OPENSIP_CLI_WORKER_MAX_RSS_MB` | `6144` | RSS watchdog ceiling; exceeded → child-tree SIGKILL. |
+| `OPENSIP_CLI_WORKER_MAX_CONCURRENT_RPC` | `1` | Max concurrent in-flight host-RPC upcalls (dispatch path). |
+| `OPENSIP_CLI_WORKER_MAX_TOTAL_RPC` | `5000` | Max total host-RPC upcalls per dispatch run. |
+| `OPENSIP_CLI_WORKER_HEARTBEAT_GRACE_MS` | `60000` | Missed heartbeat grace before `heartbeat_missed` kill. |
+| `OPENSIP_CLI_WORKER_IDLE_RPC_MS` | *(unset)* | Optional per-upcall idle timer; off by default. |
+| `OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES` | `33554432` (32 MiB) | `ResultAccumulator` + captured stderr cap. |
+| `OPENSIP_CLI_WORKER_STDERR_INHERIT` | `0` | Set to `1` to inherit child stderr (debugging). Default captures a truncated stderr tail on worker fault. |
 
 ## Subprocess correlation
 
