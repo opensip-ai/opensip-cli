@@ -15,7 +15,7 @@ import {
 } from '../scoring/confidence.js';
 
 import type { SkippedDetector, YagniDetector } from '../detectors/types.js';
-import type { YagniConfig, YagniGraphMode } from '../types/yagni-config.js';
+import type { YagniConfig } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
@@ -24,7 +24,6 @@ import type { ToolCliContext } from '@opensip-cli/core';
 export interface ExecuteYagniOptions {
   readonly cwd: string;
   readonly config?: YagniConfig;
-  readonly graphMode?: YagniGraphMode;
   readonly minConfidence?: YagniConfidence;
   readonly detectors?: readonly string[];
   readonly categories?: readonly string[];
@@ -35,7 +34,7 @@ export interface ExecuteYagniOptions {
   /** Per-detector lifecycle, for a phases-shape live view that names each detector. */
   readonly onDetectorStart?: (slug: string) => void;
   readonly onDetectorDone?: (slug: string, durationMs: number) => void;
-  /** The detectors `planDetectors` excluded (filtered out or graph-gated), emitted once. */
+  /** The detectors `planDetectors` excluded (filtered out or disabled), emitted once. */
   readonly onDetectorsSkipped?: (slugs: readonly string[]) => void;
 }
 
@@ -87,17 +86,6 @@ function planDetectors(
       });
       continue;
     }
-    if (detector.requiresGraph) {
-      // yagni no longer builds a graph (ADR-0063, v0.1.12). A graph-backed detector
-      // cannot run; duplicate/near-duplicate analysis lives in `opensip graph`.
-      skipped.push({
-        id: detector.id,
-        slug: detector.slug,
-        reason: 'graph-unavailable',
-        detail: 'graph evidence removed; run `opensip graph` for duplicate analysis',
-      });
-      continue;
-    }
     run.push(detector);
   }
 
@@ -117,9 +105,6 @@ export async function executeYagni(
   detectors: readonly YagniDetector[] = YAGNI_DETECTORS,
 ): Promise<ExecuteYagniResult> {
   const config = opts.config ?? {};
-  // graphMode is retained as deprecated, inert config (ADR-0063): yagni no longer
-  // builds or reuses a graph. It is recorded on the session for continuity only.
-  const graphMode = opts.graphMode ?? config.graphMode ?? 'auto';
   const includeTests = opts.includeTests ?? config.includeTests ?? false;
   const minConfidence = opts.minConfidence ?? config.defaultMinConfidence ?? 'medium';
 
@@ -187,13 +172,8 @@ export async function executeYagni(
     fingerprintStrategy: yagniFingerprintStrategy,
   });
 
-  const yagniSummary = buildYagniRunSummary(envelope.signals, graphMode, skipped);
-  const sessionPayload = buildYagniSessionPayload(envelope, skipped, {
-    graphMode,
-    graphBuilt: false,
-    graphDetail: 'graph evidence removed in v0.1.12 (duplicate analysis moved to `opensip graph`)',
-    yagniSummary,
-  });
+  const yagniSummary = buildYagniRunSummary(envelope.signals, skipped);
+  const sessionPayload = buildYagniSessionPayload(envelope, skipped, yagniSummary);
 
   return {
     envelope,

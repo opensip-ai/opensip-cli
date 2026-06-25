@@ -17,7 +17,6 @@ import { executeYagni, type ExecuteYagniOptions } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
 import { buildYagniPresentationLines } from './yagni-presentation.js';
 
-import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { LiveRunTableRow, ProgressSurface } from '@opensip-cli/cli-ui';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
@@ -59,7 +58,6 @@ export interface YagniLiveArgs {
   readonly cwd: string;
   readonly verbose?: boolean;
   readonly quiet?: boolean;
-  readonly graphMode: YagniGraphMode;
   readonly minConfidence?: YagniConfidence;
   readonly detectors?: readonly string[];
   readonly categories?: readonly string[];
@@ -117,7 +115,6 @@ export async function renderYagniLive(
         const executeOpts: ExecuteYagniOptions = {
           cwd: args.cwd,
           config,
-          graphMode: args.graphMode,
           minConfidence: args.minConfidence,
           detectors: args.detectors,
           categories: args.categories,
@@ -139,12 +136,10 @@ export async function renderYagniLive(
         };
 
         const outcome = await executeYagni(executeOpts, cli);
-        const graphMode = outcome.session.payload.summary.graphMode ?? args.graphMode;
         const skippedDetectors = outcome.session.payload.summary.skippedDetectors;
         const verboseLines = buildYagniPresentationLines(
           outcome.envelope,
           args.cwd,
-          graphMode,
           skippedDetectors,
           args.verbose === true,
         );

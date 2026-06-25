@@ -6,8 +6,7 @@
  * `defineToolTab` registry (tool-tabs-registrations.ts); this exercises the
  * client-side renderer it points at:
  *   1. Two subtabs — Sessions (id 'overview', stable for routing) + Detectors.
- *   2. The detector catalog renders one row per detector, with a "graph" badge
- *      for graph-backed detectors and the summary line above the table.
+ *   2. The detector catalog renders one row per detector with a static Evidence badge.
  *   3. An empty catalog falls back to a graceful empty state.
  */
 
@@ -19,12 +18,10 @@ interface YagniDetector {
   id: string;
   slug: string;
   description?: string;
-  requiresGraph?: boolean;
 }
 
 interface YagniSummary {
   detectorCount?: number;
-  graphBackedCount?: number;
   contractVersion?: string;
 }
 
@@ -33,10 +30,6 @@ interface Env {
 }
 
 function loadEnv(): Env {
-  // Define the page-global data the generated <script> const block would supply
-  // before the bundle runs (checks.ts reads `sessions` at module load; the YAGNI
-  // renderer reads `yagniSessions` / `yagniCatalog` / `yagniSummary`). `var`
-  // bindings are mutable so each render can re-seed the catalog + summary.
   const dataPrelude = `var sessions = []; var yagniSessions = []; var yagniCatalog = []; var yagniSummary = null;\n`;
   const tail = `
 return {
@@ -74,35 +67,33 @@ describe('renderYagniTab', () => {
   it('renders a data-table card with one row per detector, mirroring the graph catalog', () => {
     const panel = loadEnv().render(
       [
-        { id: '1', slug: 'unused-export', description: 'Export with no importers' },
+        {
+          id: '1',
+          slug: 'yagni:duplicate-body-candidate',
+          description: 'Function bodies duplicated across two or more sites',
+        },
         {
           id: '2',
-          slug: 'unreferenced-symbol',
-          description: 'Symbol never called',
-          requiresGraph: true,
+          slug: 'yagni:unused-config-surface',
+          description: 'Unused required config properties on the public API surface',
         },
       ],
-      { detectorCount: 2, graphBackedCount: 1, contractVersion: '1.0.0' },
+      { detectorCount: 2, contractVersion: '1.0.0' },
     );
     const catalog = panel.querySelector<HTMLElement>('#panel-yagni-catalog')!;
-    // Summary line reflects the counts.
     expect(catalog.querySelector('.muted')?.textContent).toContain('2 detectors');
-    expect(catalog.querySelector('.muted')?.textContent).toContain('1 graph-backed');
-    // Same structural shape as the graph rule catalog: a data-table inside a card.
+    expect(catalog.querySelector('.muted')?.textContent).not.toContain('graph-backed');
     expect(catalog.querySelector('.card table.data-table')).not.toBeNull();
-    // Column headers match the graph catalog's shape (Severity → Evidence).
     const headers = [...catalog.querySelectorAll('thead th')].map((th) => th.textContent);
     expect(headers).toEqual(['Detector', 'Description', 'Evidence', 'Source']);
-    // Detectors are sorted by slug; the first cell of each row is the slug.
     const slugs = [...catalog.querySelectorAll('tbody tr td:first-child')].map(
       (c) => c.textContent,
     );
-    expect(slugs).toEqual(['unreferenced-symbol', 'unused-export']);
-    // First row is the graph-backed detector → Evidence 'graph'; both rows are 'built-in'.
+    expect(slugs).toEqual(['yagni:duplicate-body-candidate', 'yagni:unused-config-surface']);
     const evidence = [...catalog.querySelectorAll('tbody tr td:nth-child(3) .badge')].map(
       (b) => b.textContent,
     );
-    expect(evidence).toEqual(['graph', 'static']);
+    expect(evidence).toEqual(['static', 'static']);
     const sources = [...catalog.querySelectorAll('tbody tr td:nth-child(4) .badge')].map(
       (b) => b.textContent,
     );

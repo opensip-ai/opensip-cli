@@ -57,7 +57,6 @@ export interface YagniRunSummary {
     readonly low: number;
   };
   readonly estimatedTotalLocReduction: number;
-  readonly graphMode: string;
   readonly skippedDetectors: readonly {
     readonly slug: string;
     readonly reason: string;

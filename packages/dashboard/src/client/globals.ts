@@ -73,7 +73,6 @@ declare global {
   const yagniCatalog: readonly unknown[];
   const yagniSummary: {
     detectorCount?: number;
-    graphBackedCount?: number;
     contractVersion?: string;
   } | null;
 

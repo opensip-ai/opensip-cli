@@ -226,6 +226,5 @@ export const unusedConfigSurfaceDetector: YagniDetector = {
   id: DETECTOR_ID,
   slug: SLUG,
   description: 'Unused required config properties on the public API surface',
-  requiresGraph: false,
   run: runUnusedConfigSurface,
 };

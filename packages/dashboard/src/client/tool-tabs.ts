@@ -160,13 +160,11 @@ interface YagniDetectorEntry {
   id: string;
   slug: string;
   description?: string;
-  requiresGraph?: boolean;
 }
 
 // Reused badge style for a neutral "source"-style pill (matches graph's catalog
-// Source column). The graph-evidence pill uses the yagni accent instead.
+// Source column).
 const NEUTRAL_BADGE = 'background:var(--bg-hover);color:var(--text-muted)';
-const GRAPH_EVIDENCE_BADGE = 'background:rgba(111,159,176,0.15);color:var(--accent-yagni)';
 
 // Render the bundled YAGNI detectors as a data-table card — same shape as the
 // graph rule catalog (Code Graph › Catalog): a column header row + a per-row
@@ -177,19 +175,16 @@ function renderYagniDetectorsCatalog(
   container: HTMLElement,
   catalogData: readonly unknown[],
 ): void {
-  // A short summary line above the table — detector count + how many need the
-  // call graph (mirrors fit's "N total checks …" count). yagniSummary is null
-  // when yagni contributed no data.
-  if (yagniSummary) {
-    const parts: string[] = [];
-    if (typeof yagniSummary.detectorCount === 'number')
-      parts.push(yagniSummary.detectorCount + ' detectors');
-    if (typeof yagniSummary.graphBackedCount === 'number')
-      parts.push(yagniSummary.graphBackedCount + ' graph-backed');
-    if (parts.length > 0)
-      container.append(
-        el('div', { class: 'muted', style: 'margin-bottom:12px', text: parts.join(' · ') }),
-      );
+  // A short summary line above the table — detector count (mirrors fit's
+  // "N total checks …" count). yagniSummary is null when yagni contributed no data.
+  if (yagniSummary && typeof yagniSummary.detectorCount === 'number') {
+    container.append(
+      el('div', {
+        class: 'muted',
+        style: 'margin-bottom:12px',
+        text: yagniSummary.detectorCount + ' detectors',
+      }),
+    );
   }
 
   const detectors = catalogData as readonly YagniDetectorEntry[];
@@ -213,8 +208,8 @@ function renderYagniDetectorsCatalog(
       evidenceCell.append(
         el('span', {
           class: 'badge',
-          style: d.requiresGraph ? GRAPH_EVIDENCE_BADGE : NEUTRAL_BADGE,
-          text: d.requiresGraph ? 'graph' : 'static',
+          style: NEUTRAL_BADGE,
+          text: 'static',
         }),
       );
       row.append(evidenceCell);

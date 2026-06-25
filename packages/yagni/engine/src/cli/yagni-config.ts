@@ -37,7 +37,6 @@ function mergeDefaults(parsed: YagniConfig): YagniConfig {
     failOnErrors: parsed.failOnErrors ?? DEFAULT_YAGNI_CONFIG.failOnErrors,
     failOnWarnings: parsed.failOnWarnings ?? DEFAULT_YAGNI_CONFIG.failOnWarnings,
     defaultMinConfidence: parsed.defaultMinConfidence ?? DEFAULT_YAGNI_CONFIG.defaultMinConfidence,
-    graphMode: parsed.graphMode ?? DEFAULT_YAGNI_CONFIG.graphMode,
     includeTests: parsed.includeTests ?? DEFAULT_YAGNI_CONFIG.includeTests,
     ...(parsed.disabledDetectors === undefined
       ? {}

@@ -2164,21 +2164,6 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "variadic": false,
         },
         {
-          "choices": [
-            "auto",
-            "reuse",
-            "build",
-            "off",
-          ],
-          "defaultValue": undefined,
-          "description": "Deprecated (ignored since v0.1.12): yagni no longer builds a graph — use \`opensip graph\` for duplicate analysis",
-          "flags": "--graph <mode>",
-          "negate": false,
-          "optional": false,
-          "required": true,
-          "variadic": false,
-        },
-        {
           "choices": undefined,
           "defaultValue": false,
           "description": "Include test and fixture code in analysis",

@@ -82,10 +82,8 @@ describe('yagni golden snapshots', () => {
         config: {
           failOnErrors: 0,
           failOnWarnings: 0,
-          graphMode: 'off',
           defaultMinConfidence: 'low',
         },
-        graphMode: 'off',
         includeTests: true,
       },
       stubCli(),
@@ -95,7 +93,6 @@ describe('yagni golden snapshots', () => {
     expect(outcome.session.passed).toBe(true);
     expect(outcome.envelope.verdict.passed).toBe(true);
     expect(outcome.envelope.units.map((u) => u.slug)).toEqual(['yagni:unused-config-surface']);
-    // No graph-backed detectors remain (ADR-0063); nothing is skipped.
     expect(outcome.session.payload.summary.skippedDetectors).toEqual([]);
 
     const actual = stableJson({
@@ -119,11 +116,10 @@ describe('yagni golden snapshots', () => {
     expect(actual).toEqual(expected);
   });
 
-  it('executeYagni is deterministic for a fixed graph mode on the fixture', async () => {
+  it('executeYagni is deterministic on the fixture', async () => {
     const opts = {
       cwd: FIXTURE_ROOT,
-      config: { graphMode: 'off' as const, defaultMinConfidence: 'low' as const },
-      graphMode: 'off' as const,
+      config: { defaultMinConfidence: 'low' as const },
       includeTests: true,
     };
     const firstRun = await executeYagni(opts, stubCli(), [unusedConfigSurfaceDetector]);

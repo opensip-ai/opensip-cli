@@ -63,12 +63,10 @@ function stubExecuteOutcome() {
           errors: 0,
           warnings: 1,
           skippedDetectors: [],
-          graphMode: 'off' as const,
           yagni: {
             totalCandidates: 1,
             byConfidence: { high: 1, medium: 0, low: 0 },
             estimatedTotalLocReduction: 10,
-            graphMode: 'off',
             skippedDetectors: [],
           },
         },
@@ -96,7 +94,7 @@ beforeEach(() => {
 
 describe('renderYagniLive produce mapping', () => {
   it('routes through runToolLiveView with the yagni tool key', async () => {
-    await renderYagniLive({ cwd: '/proj', graphMode: 'off' }, stubCli());
+    await renderYagniLive({ cwd: '/proj' }, stubCli());
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
     expect(capturedSpec?.tool).toBe('yagni');
   });
@@ -104,7 +102,7 @@ describe('renderYagniLive produce mapping', () => {
   it('passes the host exit-code hook to runToolLiveView', async () => {
     const setExitCode = vi.fn();
     await renderYagniLive(
-      { cwd: '/proj', graphMode: 'off' },
+      { cwd: '/proj' },
       {
         ...stubCli(),
         setExitCode,
@@ -114,7 +112,7 @@ describe('renderYagniLive produce mapping', () => {
   });
 
   it('omits verbose table and lines on compact runs', async () => {
-    await renderYagniLive({ cwd: '/proj', graphMode: 'off', verbose: false }, stubCli());
+    await renderYagniLive({ cwd: '/proj', verbose: false }, stubCli());
     const outcome = await capturedSpec!.produce(vi.fn(), {
       setRunning: vi.fn(),
       setHeaderMetadata: vi.fn(),
@@ -130,7 +128,7 @@ describe('renderYagniLive produce mapping', () => {
   });
 
   it('includes verbose table and lines when --verbose is set', async () => {
-    await renderYagniLive({ cwd: '/proj', graphMode: 'off', verbose: true }, stubCli());
+    await renderYagniLive({ cwd: '/proj', verbose: true }, stubCli());
     const outcome = await capturedSpec!.produce(vi.fn(), {
       setRunning: vi.fn(),
       setHeaderMetadata: vi.fn(),

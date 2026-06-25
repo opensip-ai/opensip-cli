@@ -155,18 +155,16 @@ describe('buildYagniRunSummary', () => {
         mk({ id: 'l', confidence: 'low', withLocDelta: false }),
         noMeta('/n.ts'),
       ],
-      'build',
       [
-        { id: 'wd', slug: 'with-detail', reason: 'graph-unavailable', detail: 'go' },
+        { id: 'wd', slug: 'with-detail', reason: 'disabled', detail: 'configured' },
         { id: 'nd', slug: 'no-detail', reason: 'disabled' },
       ],
     );
     expect(summary.byConfidence).toEqual({ high: 1, medium: 1, low: 1 });
     expect(summary.estimatedTotalLocReduction).toBe(15);
     expect(summary.totalCandidates).toBe(4);
-    expect(summary.graphMode).toBe('build');
     expect(summary.skippedDetectors).toEqual([
-      { slug: 'with-detail', reason: 'graph-unavailable', detail: 'go' },
+      { slug: 'with-detail', reason: 'disabled', detail: 'configured' },
       { slug: 'no-detail', reason: 'disabled' },
     ]);
   });

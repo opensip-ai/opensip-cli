@@ -11,13 +11,11 @@ export interface YagniDetectorCatalogEntry {
   readonly id: string;
   readonly slug: string;
   readonly description: string;
-  readonly requiresGraph: boolean;
 }
 
 /** Static summary of the bundled detector catalog. */
 export interface YagniSummaryCatalog {
   readonly detectorCount: number;
-  readonly graphBackedCount: number;
   readonly contractVersion: string;
 }
 
@@ -30,11 +28,9 @@ export function collectYagniReportData(_scope: ToolScope): Record<string, unknow
     id: d.id,
     slug: d.slug,
     description: d.description,
-    requiresGraph: d.requiresGraph,
   }));
   const yagniSummary: YagniSummaryCatalog = {
     detectorCount: YAGNI_DETECTORS.length,
-    graphBackedCount: YAGNI_DETECTORS.filter((d) => d.requiresGraph).length,
     contractVersion: '1.0.0',
   };
   return { yagniCatalog, yagniSummary };

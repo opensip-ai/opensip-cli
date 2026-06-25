@@ -19,13 +19,12 @@ export interface YagniDetector {
   readonly id: string;
   readonly slug: string;
   readonly description: string;
-  readonly requiresGraph: boolean;
   run(ctx: YagniDetectorContext): Promise<YagniDetectorResult>;
 }
 
 export interface SkippedDetector {
   readonly id: string;
   readonly slug: string;
-  readonly reason: 'disabled' | 'graph-required' | 'graph-unavailable';
+  readonly reason: 'disabled';
   readonly detail?: string;
 }

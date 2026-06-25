@@ -2,7 +2,7 @@
  * yagni-command-spec — declarative primary `yagni` command.
  */
 
-import { currentScope, definePrimaryCommand } from '@opensip-cli/core';
+import { definePrimaryCommand } from '@opensip-cli/core';
 
 import { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
@@ -13,7 +13,6 @@ import { loadYagniConfig } from './yagni-config.js';
 import { buildYagniRunPresentation } from './yagni-presentation.js';
 
 import type { YagniLiveArgs } from './yagni-runner.js';
-import type { YagniGraphMode } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
@@ -26,16 +25,10 @@ interface YagniCommandOptions {
   reportTo?: string;
   apiKey?: string;
   open?: boolean;
-  graph?: string;
   minConfidence?: string;
   detector?: string | string[];
   category?: string | string[];
   includeTests?: boolean;
-}
-
-function parseGraphMode(raw: string | undefined): YagniGraphMode | undefined {
-  if (raw === 'auto' || raw === 'reuse' || raw === 'build' || raw === 'off') return raw;
-  return undefined;
 }
 
 function parseMinConfidence(raw: string | undefined): YagniConfidence | undefined {
@@ -50,14 +43,12 @@ function normalizeRepeatable(raw: string | string[] | undefined): readonly strin
 
 function buildYagniLiveArgs(
   opts: YagniCommandOptions,
-  graphMode: YagniGraphMode,
   pathRoots: readonly string[] | undefined,
 ): YagniLiveArgs {
   return {
     cwd: opts.cwd,
     verbose: opts.verbose === true,
     quiet: opts.quiet === true,
-    graphMode,
     minConfidence: parseMinConfidence(opts.minConfidence),
     detectors: normalizeRepeatable(opts.detector),
     categories: normalizeRepeatable(opts.category),
@@ -94,16 +85,6 @@ async function runYagniCommand(
 ): Promise<ToolRunCompletion> {
   const opts = rawOpts as YagniCommandOptions;
   const config = loadYagniConfig(opts.cwd);
-  const graphMode = parseGraphMode(opts.graph) ?? config.graphMode ?? 'auto';
-  if (opts.graph !== undefined) {
-    // Deprecated & inert since v0.1.12 (ADR-0063). Surface a notice rather than
-    // silently ignoring an explicit flag; removal targeted for 0.1.13.
-    currentScope()?.logger?.warn({
-      evt: 'cli.yagni.graph_flag.deprecated',
-      module: 'yagni:cli',
-      msg: '`--graph` is deprecated and ignored — yagni no longer builds a graph. Run `opensip graph` for duplicate/near-duplicate analysis.',
-    });
-  }
   const positionals = (opts as unknown as { _args?: readonly unknown[] })._args ?? [];
   const paths = (positionals[0] ?? []) as readonly string[];
   const pathRoots = paths.length > 0 ? resolveYagniPositionalPaths(paths, opts.cwd) : undefined;
@@ -114,7 +95,7 @@ async function runYagniCommand(
     setUpLiveView(cli);
     const completion = await cli.renderLive(
       YAGNI_LIVE_VIEW_KEY,
-      buildYagniLiveArgs(opts, graphMode, pathRoots),
+      buildYagniLiveArgs(opts, pathRoots),
     );
     const envelope = completion?.envelope as SignalEnvelope | undefined;
     if (envelope !== undefined) {
@@ -128,7 +109,6 @@ async function runYagniCommand(
     {
       cwd: opts.cwd,
       config,
-      graphMode,
       minConfidence: parseMinConfidence(opts.minConfidence),
       detectors: normalizeRepeatable(opts.detector),
       categories: normalizeRepeatable(opts.category),
@@ -149,7 +129,6 @@ async function runYagniCommand(
     const presentation = buildYagniRunPresentation({
       envelope: outcome.envelope,
       cwd: opts.cwd,
-      graphMode: outcome.session.payload.summary.graphMode ?? graphMode,
       skippedDetectors: outcome.session.payload.summary.skippedDetectors,
       verbose: opts.verbose === true,
       durationMs,
@@ -167,13 +146,6 @@ export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => vo
     description: 'Run YAGNI reduction audit detectors (advisory; exit 0 by default)',
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     options: [
-      {
-        flag: '--graph',
-        value: '<mode>',
-        description:
-          'Deprecated (ignored since v0.1.12): yagni no longer builds a graph — use `opensip graph` for duplicate analysis',
-        choices: ['auto', 'reuse', 'build', 'off'],
-      },
       {
         flag: '--min-confidence',
         value: '<level>',

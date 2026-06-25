@@ -20,8 +20,7 @@ describe('yagni presentation', () => {
     const outcome = await executeYagni(
       {
         cwd: FIXTURE_ROOT,
-        config: { graphMode: 'off', defaultMinConfidence: 'low' },
-        graphMode: 'off',
+        config: { defaultMinConfidence: 'low' },
         includeTests: true,
       },
       stubCli(),
@@ -30,7 +29,6 @@ describe('yagni presentation', () => {
     const lines = buildYagniPresentationLines(
       outcome.envelope,
       FIXTURE_ROOT,
-      'off',
       outcome.session.payload.summary.skippedDetectors,
       false,
     );
@@ -40,5 +38,6 @@ describe('yagni presentation', () => {
     expect(text).toContain('unused-config-surface');
     expect(text).toContain('net: ~1 LOC possible');
     expect(text).not.toContain('Run with --verbose for evidence');
+    expect(text).not.toContain('Graph:');
   });
 });

@@ -137,7 +137,6 @@ describe('yagni config, tool metadata, and command handler', () => {
     Object.assign(scoped, {
       toolConfig: {
         yagni: {
-          graphMode: 'off',
           defaultMinConfidence: 'high',
           includeTests: true,
           disabledDetectors: ['x'],
@@ -147,7 +146,6 @@ describe('yagni config, tool metadata, and command handler', () => {
 
     const scopedConfig = runWithScopeSync(scoped, () => loadYagniConfig('/unused'));
     expect(scopedConfig).toMatchObject({
-      graphMode: 'off',
       defaultMinConfidence: 'high',
       includeTests: true,
       disabledDetectors: ['x'],
@@ -155,7 +153,6 @@ describe('yagni config, tool metadata, and command handler', () => {
 
     const emptyScope = new RunScope();
     expect(runWithScopeSync(emptyScope, () => loadYagniConfig('/unused'))).toMatchObject({
-      graphMode: 'auto',
       defaultMinConfidence: 'medium',
       includeTests: false,
     });
@@ -166,7 +163,6 @@ describe('yagni config, tool metadata, and command handler', () => {
       [
         'schemaVersion: 1',
         'yagni:',
-        '  graphMode: reuse',
         '  defaultMinConfidence: low',
         '  failOnWarnings: 2',
         '  detectorSettings:',
@@ -175,7 +171,6 @@ describe('yagni config, tool metadata, and command handler', () => {
       ].join('\n'),
     );
     expect(loadYagniConfig(dir)).toMatchObject({
-      graphMode: 'reuse',
       defaultMinConfidence: 'low',
       failOnWarnings: 2,
       detectorSettings: { 'unused-config-surface': { someKnob: 3 } },
@@ -183,7 +178,7 @@ describe('yagni config, tool metadata, and command handler', () => {
 
     const invalidDir = tempDir();
     writeFileSync(join(invalidDir, 'opensip-cli.config.yml'), 'schemaVersion: 1\nyagni: nope\n');
-    expect(loadYagniConfig(invalidDir)).toMatchObject({ graphMode: 'auto' });
+    expect(loadYagniConfig(invalidDir)).toMatchObject({ defaultMinConfidence: 'medium' });
   });
 
   it('exports config schema, report data, and tool metadata', () => {
@@ -192,25 +187,26 @@ describe('yagni config, tool metadata, and command handler', () => {
         failOnErrors: 1,
         failOnWarnings: 0,
         defaultMinConfidence: 'medium',
-        graphMode: 'build',
         includeTests: false,
         disabledDetectors: ['unused-config-surface'],
         detectorSettings: { 'unused-config-surface': { someKnob: 8 } },
       }),
-    ).toMatchObject({ graphMode: 'build' });
-    expect(YagniConfigSchema.safeParse({ graphMode: 'sometimes' }).success).toBe(false);
+    ).toMatchObject({ defaultMinConfidence: 'medium' });
+    expect(YagniConfigSchema.safeParse({ graphMode: 'build' }).success).toBe(false);
     expect(yagniConfigDeclaration.env?.map((entry) => entry.envVar)).toContain(
-      'OPENSIP_YAGNI_GRAPH_MODE',
+      'OPENSIP_YAGNI_MIN_CONFIDENCE',
     );
 
     const reportData = collectYagniReportData({} as never);
     expect(reportData.yagniSummary).toMatchObject({
       detectorCount: 2,
-      graphBackedCount: 0,
       contractVersion: YAGNI_CONTRACT_VERSION,
     });
     expect(reportData.yagniCatalog).toEqual(
-      expect.arrayContaining([expect.objectContaining({ slug: 'yagni:unused-config-surface' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ slug: 'yagni:unused-config-surface' }),
+        expect.objectContaining({ slug: 'yagni:duplicate-body-candidate' }),
+      ]),
     );
 
     expect(yagniTool.metadata).toMatchObject({
@@ -226,14 +222,13 @@ describe('yagni config, tool metadata, and command handler', () => {
     const jsonCli = makeCli();
     const scope = new RunScope();
     Object.assign(scope, {
-      toolConfig: { yagni: { graphMode: 'off', defaultMinConfidence: 'low' } },
+      toolConfig: { yagni: { defaultMinConfidence: 'low' } },
     });
     await runCommandInScope(
       scope,
       {
         cwd: FIXTURE_ROOT,
         json: true,
-        graph: 'off',
         minConfidence: 'low',
         includeTests: true,
         detector: ['unused-config-surface'],
@@ -256,7 +251,6 @@ describe('yagni config, tool metadata, and command handler', () => {
       {
         cwd: FIXTURE_ROOT,
         verbose: true,
-        graph: 'invalid',
         minConfidence: 'invalid',
         category: 'config',
         includeTests: true,
@@ -269,25 +263,6 @@ describe('yagni config, tool metadata, and command handler', () => {
       openRequested: false,
       jsonOutput: false,
     });
-  });
-
-  it('warns (not silently ignores) when the deprecated --graph flag is passed', async () => {
-    const warn = vi.fn();
-    const scope = new RunScope({
-      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() },
-    });
-
-    await runCommandInScope(scope, { cwd: FIXTURE_ROOT, json: true, graph: 'build' }, makeCli());
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.yagni.graph_flag.deprecated' }),
-    );
-
-    // No flag → no deprecation warning.
-    warn.mockClear();
-    await runCommandInScope(scope, { cwd: FIXTURE_ROOT, json: true }, makeCli());
-    expect(warn).not.toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.yagni.graph_flag.deprecated' }),
-    );
   });
 });
 
@@ -333,20 +308,16 @@ describe('yagni detectors and scoring helpers', () => {
       'yagni:beta',
     ]);
 
-    const summary = buildYagniRunSummary([low, medium, high, plain], 'reuse', [
-      { id: 'skipped', slug: 'yagni:skipped', reason: 'disabled' },
-      { id: 'graph', slug: 'yagni:graph', reason: 'graph-required', detail: 'missing' },
-    ]);
+    const summary = buildYagniRunSummary(
+      [low, medium, high, plain],
+      [{ id: 'skipped', slug: 'yagni:skipped', reason: 'disabled' }],
+    );
     expect(summary).toMatchObject({
       totalCandidates: 4,
       byConfidence: { high: 1, medium: 1, low: 1 },
       estimatedTotalLocReduction: 33,
-      graphMode: 'reuse',
     });
-    expect(summary.skippedDetectors).toEqual([
-      { slug: 'yagni:skipped', reason: 'disabled' },
-      { slug: 'yagni:graph', reason: 'graph-required', detail: 'missing' },
-    ]);
+    expect(summary.skippedDetectors).toEqual([{ slug: 'yagni:skipped', reason: 'disabled' }]);
 
     const payload = buildYagniSessionPayload(
       envelope({
@@ -355,18 +326,16 @@ describe('yagni detectors and scoring helpers', () => {
         summary: { total: 1, passed: 0, failed: 1, errors: 0, warnings: 1 },
       }),
       [],
-      {
-        graphMode: 'reuse',
-        graphBuilt: false,
-        yagniSummary: summary,
-      },
+      summary,
     );
     expect(payload.checks[0]).toMatchObject({
       checkSlug: high.source,
       violationCount: 1,
       findings: [expect.objectContaining({ severity: 'warning', metadata: high.metadata })],
     });
-    expect(payload.summary.graphDetail).toBeUndefined();
+    expect(payload.summary).not.toHaveProperty('graphMode');
+    expect(payload.summary).not.toHaveProperty('graphBuilt');
+    expect(payload.summary).not.toHaveProperty('graphDetail');
 
     const errorFinding = {
       ...high,
@@ -383,12 +352,7 @@ describe('yagni detectors and scoring helpers', () => {
         summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 1 },
       }),
       [],
-      {
-        graphMode: 'build',
-        graphBuilt: true,
-        graphDetail: 'built fresh catalog',
-        yagniSummary: summary,
-      },
+      summary,
     );
     expect(detailedPayload.checks[0]).toMatchObject({
       violationCount: 2,
@@ -399,7 +363,7 @@ describe('yagni detectors and scoring helpers', () => {
     });
     expect(detailedPayload.checks[0]?.findings[0]).not.toHaveProperty('line');
     expect(detailedPayload.checks[0]?.findings[0]).not.toHaveProperty('suggestion');
-    expect(detailedPayload.summary.graphDetail).toBe('built fresh catalog');
+    expect(detailedPayload.summary).not.toHaveProperty('graphDetail');
   });
 
   it('covers presentation variants and unreadable/oversized source skips', async () => {
@@ -434,7 +398,6 @@ describe('yagni detectors and scoring helpers', () => {
         summary: { total: 1, passed: 0, failed: 1, errors: 0, warnings: 1 },
       }),
       FIXTURE_ROOT,
-      'off',
       [{ id: 'x', slug: 'yagni:x', reason: 'disabled', detail: 'configured' }],
       true,
     );
@@ -446,7 +409,6 @@ describe('yagni detectors and scoring helpers', () => {
         summary: { total: 0, passed: 1, failed: 0, errors: 0, warnings: 0 },
       }),
       cwd: FIXTURE_ROOT,
-      graphMode: 'off',
       skippedDetectors: [],
       verbose: false,
       durationMs: 12,
@@ -479,7 +441,6 @@ describe('yagni detectors and scoring helpers', () => {
         units: [{ slug: 'yagni:sparse', passed: false, durationMs: 1 }],
       }),
       FIXTURE_ROOT,
-      'reuse',
       [{ id: 'plain', slug: 'yagni:plain', reason: 'disabled' }],
       true,
     );

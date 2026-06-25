@@ -64,11 +64,10 @@ function candidateLines(signals: readonly Signal[], cwd: string, verbose: boolea
 export function buildYagniPresentationLines(
   envelope: SignalEnvelope,
   cwd: string,
-  graphMode: string,
   skippedDetectors: readonly SkippedDetector[],
   verbose: boolean,
 ): string[] {
-  const summary = buildYagniRunSummary(envelope.signals, graphMode, skippedDetectors);
+  const summary = buildYagniRunSummary(envelope.signals, skippedDetectors);
   const visibleSignals = verbose
     ? envelope.signals
     : envelope.signals.filter((s) => {
@@ -80,7 +79,7 @@ export function buildYagniPresentationLines(
   const headline = `YAGNI audit: ${String(summary.totalCandidates)} reduction candidates (${String(high)} high, ${String(medium)} medium)`;
   const ran = envelope.units.length;
   const skipped = skippedDetectors.length;
-  const metaLine = `Graph: ${graphMode} · ${String(ran)} detectors ran · ${String(skipped)} skipped`;
+  const metaLine = `${String(ran)} detectors ran · ${String(skipped)} skipped`;
 
   const lines = [headline, metaLine, ...candidateLines(visibleSignals, cwd, verbose)];
 
@@ -102,7 +101,6 @@ export function buildYagniPresentationLines(
 export function buildYagniRunPresentation(input: {
   readonly envelope: SignalEnvelope;
   readonly cwd: string;
-  readonly graphMode: string;
   readonly skippedDetectors: readonly SkippedDetector[];
   readonly verbose: boolean;
   readonly durationMs?: number;
@@ -110,7 +108,6 @@ export function buildYagniRunPresentation(input: {
   const lines = buildYagniPresentationLines(
     input.envelope,
     input.cwd,
-    input.graphMode,
     input.skippedDetectors,
     input.verbose,
   );

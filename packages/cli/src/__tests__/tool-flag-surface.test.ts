@@ -138,7 +138,6 @@ const EXPECTED: Record<string, string[]> = {
     '--cwd',
     '--debug',
     '--detector',
-    '--graph',
     '--include-tests',
     '--json',
     '--min-confidence',

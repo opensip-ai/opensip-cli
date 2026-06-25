@@ -90,7 +90,6 @@ export function sortYagniSignals(signals: readonly Signal[]): Signal[] {
 
 export function buildYagniRunSummary(
   signals: readonly Signal[],
-  graphMode: string,
   skippedDetectors: readonly SkippedDetector[],
 ): YagniRunSummary {
   let high = 0;
@@ -113,7 +112,6 @@ export function buildYagniRunSummary(
     totalCandidates: signals.length,
     byConfidence: { high, medium, low },
     estimatedTotalLocReduction,
-    graphMode,
     skippedDetectors: skippedDetectors.map((s) => ({
       slug: s.slug,
       reason: s.reason,

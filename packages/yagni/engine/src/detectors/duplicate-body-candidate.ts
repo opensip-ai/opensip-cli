@@ -150,6 +150,5 @@ export const duplicateBodyCandidateDetector: YagniDetector = {
   id: DETECTOR_ID,
   slug: SLUG,
   description: 'Function bodies duplicated across two or more sites (consolidation candidates)',
-  requiresGraph: false,
   run: runDuplicateBodyCandidate,
 };

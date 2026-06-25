@@ -68,14 +68,10 @@
     "errors": 0,
     "warnings": 1,
     "skippedDetectors": [],
-    "graphMode": "off",
-    "graphBuilt": false,
-    "graphDetail": "graph evidence removed in v0.1.12 (duplicate analysis moved to `opensip graph`)",
     "yagni": {
       "totalCandidates": 1,
       "byConfidence": { "high": 1, "medium": 0, "low": 0 },
       "estimatedTotalLocReduction": 1,
-      "graphMode": "off",
       "skippedDetectors": []
     }
   }
