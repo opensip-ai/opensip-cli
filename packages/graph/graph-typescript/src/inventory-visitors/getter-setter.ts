@@ -5,6 +5,7 @@
 import ts from 'typescript';
 
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
+import { findEnclosingClassName } from '../inventory-helpers/enclosing-class.js';
 import { extractDecorators } from '../inventory-helpers/extract-decorators.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
@@ -17,7 +18,7 @@ export const visitGetterSetter: InventoryVisitor<ts.AccessorDeclaration> = (node
   const start = node.getStart(ctx.sourceFile);
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
-  const enclosingClass = ctx.enclosingClass ?? findClassName(node);
+  const enclosingClass = ctx.enclosingClass ?? findEnclosingClassName(node);
   const kind = node.kind === ts.SyntaxKind.GetAccessor ? 'getter' : 'setter';
   const qualified = enclosingClass
     ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.${name}`
@@ -52,16 +53,3 @@ function accessorName(node: ts.AccessorDeclaration): string | null {
   if (ts.isStringLiteral(n)) return n.text;
   return null;
 }
-
-/* v8 ignore start */
-function findClassName(node: ts.AccessorDeclaration): string | null {
-  let p: ts.Node | undefined = node.parent;
-  while (p) {
-    if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) {
-      return p.name?.text ?? null;
-    }
-    p = p.parent;
-  }
-  return null;
-}
-/* v8 ignore stop */

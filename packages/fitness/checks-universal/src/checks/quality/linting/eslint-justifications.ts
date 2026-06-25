@@ -327,6 +327,7 @@ function validateESLintSuppressions(content: string): ESLintSuppressionIssue[] {
 // HELPERS
 // =============================================================================
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- eslint and semgrep checks use parallel suggestion tables for different suppression vocabularies.
 function getSuggestionForIssueType(issueType: IssueType): string {
   switch (issueType) {
     case ISSUE_TYPE_MISSING_JUSTIFICATION: {

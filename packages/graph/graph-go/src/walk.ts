@@ -268,6 +268,7 @@ function visitFunction(node: Node, frame: Frame, ctx: WalkCtx, receiverType: str
   }
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- Go and Rust closure walkers intentionally stay parallel to match each tree-sitter grammar's callable shape.
 function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   const occ = buildClosureOccurrence(node, ctx);
   if (!occ) return false;
@@ -324,6 +325,7 @@ function buildFunctionOccurrence(
   };
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- Go and Rust closure occurrence builders intentionally differ only where grammar metadata differs.
 function buildClosureOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
   const digest = digestGoBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const startLine = node.startPosition.row + 1;

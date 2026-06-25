@@ -72,6 +72,7 @@ export function walkProject(input: WalkInput<PythonParsedProject>): WalkOutput {
   return runWalk({ input, walkFile });
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- Python and Rust file walkers intentionally mirror the adapter contract while traversing different grammars.
 function walkFile(
   absPath: string,
   file: PythonParsedFile,
@@ -163,6 +164,7 @@ function visitClass(node: Node, frame: Frame, ctx: WalkCtx): void {
   for (const child of childrenOf(node)) visit(child, childFrame, ctx);
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- function visitors stay parser-local even when traversal bookkeeping is parallel across adapters.
 function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   const occ = visitFunctionDefinition(node, frame.enclosingClass, ctx);
   if (!occ) return;

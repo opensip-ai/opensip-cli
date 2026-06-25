@@ -6,6 +6,7 @@
  */
 
 import type { DirectiveInfo } from './types.js';
+import { collectDirectives, extractIgnoreDirective } from './shared.js';
 
 function extractFitnessDirective(
   line: string,
@@ -13,53 +14,12 @@ function extractFitnessDirective(
   filePath: string,
   file: string,
 ): DirectiveInfo | null {
-  const fileMarker = '@fitness-ignore-file';
-  const nextLineMarker = '@fitness-ignore-next-line';
-
-  let scopeType: 'file' | 'next-line';
-  let markerEnd: number;
-
-  const fileIdx = line.indexOf(fileMarker);
-  const nextLineIdx = line.indexOf(nextLineMarker);
-
-  if (fileIdx !== -1) {
-    scopeType = 'file';
-    markerEnd = fileIdx + fileMarker.length;
-  } else if (nextLineIdx === -1) {
-    return null;
-  } else {
-    scopeType = 'next-line';
-    markerEnd = nextLineIdx + nextLineMarker.length;
-  }
-
-  // Extract check ID and reason
-  const afterMarker = line.slice(markerEnd).trim();
-  const spaceIdx = afterMarker.indexOf(' ');
-  if (spaceIdx === -1) {
-    return null;
-  }
-
-  const checkId = afterMarker.slice(0, spaceIdx);
-  const rest = afterMarker.slice(spaceIdx).trim();
-
-  // Look for -- separator
-  const separatorIdx = rest.indexOf('--');
-  if (separatorIdx === -1) {
-    return null;
-  }
-
-  const reason = rest.slice(separatorIdx + 2).trim();
-
-  return {
-    file,
-    filePath,
-    line: lineIndex + 1,
+  return extractIgnoreDirective(line, lineIndex, filePath, file, {
+    fileMarker: '@fitness-ignore-file',
+    nextLineMarker: '@fitness-ignore-next-line',
     source: 'fitness',
-    scope: scopeType,
-    rule: `fitness/${checkId}`,
-    reason,
-    raw: line.trim(),
-  };
+    ruleFor: (checkId) => `fitness/${checkId}`,
+  });
 }
 
 export function parseFitnessDirectives(
@@ -67,19 +27,5 @@ export function parseFitnessDirectives(
   filePath: string,
   file: string,
 ): DirectiveInfo[] {
-  const directives: DirectiveInfo[] = [];
-  const lines = content.split('\n');
-
-  for (const [i, line] of lines.entries()) {
-    if (line === undefined) {
-      continue;
-    }
-
-    const directive = extractFitnessDirective(line, i, filePath, file);
-    if (directive) {
-      directives.push(directive);
-    }
-  }
-
-  return directives;
+  return collectDirectives(content, filePath, file, extractFitnessDirective);
 }

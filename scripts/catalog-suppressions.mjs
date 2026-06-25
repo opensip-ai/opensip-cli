@@ -79,6 +79,7 @@ const TRIAGE_DISPOSITION = {
   'public-api-jsdoc': 'a',
   'graph:cycle': 'b',
   'graph:always-throws-branch': 'b',
+  'graph:near-duplicate-function-body': 'b',
   'concurrency-safety': 'b',
   'env-secret-exposure': 'b',
   'env-via-registry': 'b',

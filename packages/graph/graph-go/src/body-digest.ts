@@ -74,6 +74,7 @@ function stripGoComments(text: string): string {
   return out;
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- string-literal scanners are grammar-specific even though their escape-loop structure is intentionally parallel.
 function consumeInterpretedString(
   text: string,
   start: number,
@@ -118,6 +119,7 @@ function consumeRawString(
   return { text: buf, index: i };
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- rune/char literal scanners are kept per grammar to avoid hiding language-specific escape rules.
 function consumeRuneLiteral(
   text: string,
   start: number,

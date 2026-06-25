@@ -5,6 +5,7 @@
 import ts from 'typescript';
 
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
+import { findEnclosingClassName } from '../inventory-helpers/enclosing-class.js';
 import { extractDecorators } from '../inventory-helpers/extract-decorators.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
@@ -22,7 +23,7 @@ export const visitMethodDeclaration: InventoryVisitor<ts.MethodDeclaration> = (n
   const start = node.getStart(ctx.sourceFile);
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
-  const enclosingClass = ctx.enclosingClass ?? findClassName(node);
+  const enclosingClass = ctx.enclosingClass ?? findEnclosingClassName(node);
   const qualified = enclosingClass
     ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.${name}`
     : `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`;
@@ -61,16 +62,3 @@ function methodName(node: ts.MethodDeclaration): string | null {
   return null;
   /* v8 ignore stop */
 }
-
-/* v8 ignore start */
-function findClassName(node: ts.MethodDeclaration): string | null {
-  let p: ts.Node | undefined = node.parent;
-  while (p) {
-    if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) {
-      return p.name?.text ?? null;
-    }
-    p = p.parent;
-  }
-  return null;
-}
-/* v8 ignore stop */

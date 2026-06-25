@@ -55,6 +55,7 @@ export function Spinner({
   );
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- provider-backed and standalone spinner wrappers intentionally share the same render shape while calling different tick hooks.
 function SpinnerCtx({
   total,
   completed,

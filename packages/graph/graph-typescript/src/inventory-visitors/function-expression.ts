@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
+import { inferNameFromParent } from '../inventory-helpers/infer-parent-name.js';
 import { synthesizeFunctionExpressionName } from '../inventory-helpers/synthesize-name.js';
 
 import type { InventoryVisitor } from './types.js';
@@ -47,17 +48,3 @@ export const visitFunctionExpression: InventoryVisitor<ts.FunctionExpression> = 
     calls: [],
   };
 };
-
-function inferNameFromParent(node: ts.FunctionExpression): string | null {
-  const p = node.parent;
-  if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
-  /* v8 ignore next */
-  if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name)) return p.name.text;
-  // class X { foo = function() {} } — both public and #private fields.
-  /* v8 ignore start */
-  if (ts.isPropertyDeclaration(p) && (ts.isIdentifier(p.name) || ts.isPrivateIdentifier(p.name))) {
-    return p.name.text;
-  }
-  /* v8 ignore stop */
-  return null;
-}

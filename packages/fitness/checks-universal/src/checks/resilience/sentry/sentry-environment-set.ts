@@ -3,33 +3,19 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-environment-set
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
+import { createMissingSentryInitOptionAnalyzer } from './_helpers/sentry.js';
 
-function analyze(content: string, _filePath: string): CheckViolation[] {
-  if (!hasSentryInit(content)) return [];
-
-  const initBlock = extractSentryInitBlock(content);
-  if (!initBlock) return [];
-
-  const hasEnvironment =
-    initBlock.block.includes('environment') || initBlock.block.includes('SENTRY_ENVIRONMENT');
-
-  if (hasEnvironment) return [];
-
-  return [
-    {
-      line: initBlock.startLine + 1,
-      message:
-        'Sentry.init() called without environment — production and staging errors will be mixed together',
-      severity: 'warning',
-      suggestion:
-        'Add environment to Sentry.init(): Sentry.init({ environment: process.env.NODE_ENV, ... })',
-      type: 'sentry-missing-environment',
-    },
-  ];
-}
+const analyze = createMissingSentryInitOptionAnalyzer({
+  isConfigured: (block) => block.includes('environment') || block.includes('SENTRY_ENVIRONMENT'),
+  message:
+    'Sentry.init() called without environment — production and staging errors will be mixed together',
+  severity: 'warning',
+  suggestion:
+    'Add environment to Sentry.init(): Sentry.init({ environment: process.env.NODE_ENV, ... })',
+  type: 'sentry-missing-environment',
+});
 
 /**
  * Check: sentry-environment-set

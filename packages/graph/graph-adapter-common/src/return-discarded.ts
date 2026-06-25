@@ -20,6 +20,7 @@ import type { Node } from '@opensip-cli/tree-sitter';
  * entire expression of an enclosing `expression_statement`.
  * `parenthesized_expression` wrappers are transparent.
  */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- common, Go, and Python discard checks intentionally share the base shape while adapters add grammar-specific wrappers.
 export function isReturnValueDiscarded(node: Node): boolean {
   let parent: Node | null = node.parent;
   while (parent) {

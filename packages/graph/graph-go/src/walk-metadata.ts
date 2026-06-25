@@ -71,6 +71,7 @@ export function classifyVisibility(name: string): FunctionOccurrence['visibility
   return 'module-local';
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- parameter extraction stays grammar-local even though Go and Rust node walks are structurally similar.
 export function extractParams(
   node: Node,
 ): readonly { name: string; optional: boolean; rest: boolean }[] {

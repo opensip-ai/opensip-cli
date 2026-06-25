@@ -53,6 +53,7 @@ import type {
 } from '@opensip-cli/graph';
 import type { Node } from '@opensip-cli/tree-sitter';
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- language adapters keep position helpers local because each reads parser-specific node locations.
 function goPosition(
   node: Node,
   file: GoParsedFile,
@@ -68,6 +69,7 @@ function goPosition(
   };
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- call-site resolution loops are intentionally parallel across language adapters for adapter-local grammar handling.
 export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveOutput {
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:go' });
   // Same-language only: on the exact build the merged catalog holds every
@@ -267,6 +269,7 @@ function collectGoPackageMembers(
   return out;
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- Go/Java/Python edge sinks intentionally mirror the shared resolution contract while extracting language-specific call targets.
 function pushCallEdge(
   node: Node,
   file: GoParsedFile,
@@ -298,6 +301,7 @@ interface CallEdgeLoc {
   readonly discarded: boolean;
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- call-edge builders are kept adapter-local so resolution confidence labels can evolve per language.
 function buildGoCallEdge(
   target: string | null,
   byName: ReadonlyMap<string, readonly string[]>,

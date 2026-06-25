@@ -8,6 +8,7 @@ import ts from 'typescript';
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
+import { inferNameFromParent } from '../inventory-helpers/infer-parent-name.js';
 import { synthesizeArrowName } from '../inventory-helpers/synthesize-name.js';
 
 import type { InventoryVisitor } from './types.js';
@@ -47,16 +48,3 @@ export const visitArrowFunction: InventoryVisitor<ts.ArrowFunction> = (node, ctx
     calls: [],
   };
 };
-
-function inferNameFromParent(node: ts.ArrowFunction): string | null {
-  // const foo = () => ...
-  const p = node.parent;
-  if (ts.isVariableDeclaration(p) && ts.isIdentifier(p.name)) return p.name.text;
-  // class X { foo = () => ... } — both public and #private fields.
-  if (ts.isPropertyDeclaration(p) && (ts.isIdentifier(p.name) || ts.isPrivateIdentifier(p.name))) {
-    return p.name.text;
-  }
-  // { foo: () => ... }
-  if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name)) return p.name.text;
-  return null;
-}

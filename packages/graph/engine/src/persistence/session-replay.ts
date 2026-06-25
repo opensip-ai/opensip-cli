@@ -1,4 +1,4 @@
-import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
+import { buildReplaySignals, decodeSessionPayload } from '@opensip-cli/session-store';
 
 import type {
   RunPresentation,
@@ -7,7 +7,6 @@ import type {
   ToolSessionReplay,
   UnitResult,
 } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /**
  * Project a stored graph session back into a {@link SignalEnvelope}/{@link RunPresentation}.
@@ -26,6 +25,7 @@ import type { Signal } from '@opensip-cli/core';
  * @throws {Error | TypeError} when the stored payload is not the expected shape
  *   (propagated from `decodeSessionPayload`).
  */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- graph and sim replay projections intentionally mirror the shared session payload shape while stamping tool-specific envelopes.
 export function graphReplayFromSession(stored: StoredSession): ToolSessionReplay<RunPresentation> {
   const payload = decodeSessionPayload(stored.payload, {
     tool: 'graph',
@@ -39,11 +39,14 @@ export function graphReplayFromSession(stored: StoredSession): ToolSessionReplay
     ...(check.violationCount === undefined ? {} : { violationCount: check.violationCount }),
     durationMs: check.durationMs,
   }));
-  const signals = payload.checks.flatMap((check, checkIndex) =>
-    check.findings.map((finding, findingIndex) =>
-      replaySignal(stored, check.checkSlug, finding, checkIndex, findingIndex),
-    ),
-  );
+  const signals = buildReplaySignals({
+    stored,
+    checks: payload.checks,
+    toolPrefix: 'graph',
+    category: 'architecture',
+    metadata: (finding) => finding.metadata ?? {},
+    alwaysIncludeCode: true,
+  });
   const envelope: SignalEnvelope = {
     schemaVersion: 2,
     tool: 'graph',
@@ -62,35 +65,5 @@ export function graphReplayFromSession(stored: StoredSession): ToolSessionReplay
     fidelity: 'projection',
     envelope,
     result: { type: 'run-presentation', tool: 'graph', envelope },
-  };
-}
-
-function replaySignal(
-  stored: StoredSession,
-  source: string,
-  finding: DecodedSessionFinding,
-  checkIndex: number,
-  findingIndex: number,
-): Signal {
-  const filePath = finding.filePath ?? '';
-  return {
-    id: `${stored.id}:graph:${checkIndex}:${findingIndex}`,
-    source,
-    provider: 'opensip-cli',
-    severity: finding.severity === 'error' ? 'high' : 'medium',
-    category: 'architecture',
-    ruleId: finding.ruleId,
-    message: finding.message,
-    ...(finding.suggestion === undefined ? {} : { suggestion: finding.suggestion }),
-    filePath,
-    ...(finding.line === undefined ? {} : { line: finding.line }),
-    ...(finding.column === undefined ? {} : { column: finding.column }),
-    code: {
-      file: filePath,
-      ...(finding.line === undefined ? {} : { line: finding.line }),
-      ...(finding.column === undefined ? {} : { column: finding.column }),
-    },
-    metadata: finding.metadata ?? {},
-    createdAt: stored.startedAt,
   };
 }

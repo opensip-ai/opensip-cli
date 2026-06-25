@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-24T00:19:29.423Z",
+  "generatedAt": "2026-06-25T00:34:14.407Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,9 +11,9 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 295,
+        "total": 296,
         "bySlug": {
-          "batch-operation-limits": 41,
+          "batch-operation-limits": 42,
           "env-secret-exposure": 3,
           "unbounded-memory": 26,
           "silent-early-returns": 7,
@@ -96,7 +96,7 @@
           "fitness/checks-typescript": 66,
           "fitness/checks-universal": 117,
           "fitness/engine": 26,
-          "graph/engine": 22,
+          "graph/engine": 23,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
           "graph/graph-java": 1,
@@ -119,9 +119,9 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 110,
+        "total": 111,
         "bySlug": {
-          "batch-operation-limits": 41,
+          "batch-operation-limits": 42,
           "env-secret-exposure": 2,
           "unbounded-memory": 22,
           "silent-early-returns": 5,
@@ -156,7 +156,7 @@
           "core": 9,
           "dashboard": 2,
           "fitness/engine": 26,
-          "graph/engine": 22,
+          "graph/engine": 23,
           "graph/graph-adapter-common": 2,
           "graph/graph-go": 3,
           "graph/graph-java": 1,
@@ -171,18 +171,25 @@
         }
       },
       "graph": {
-        "total": 7,
+        "total": 33,
         "byRuleId": {
           "graph:always-throws-branch": 1,
+          "graph:near-duplicate-function-body": 26,
           "graph:cycle": 6
         },
         "byPackage": {
-          "cli": 1,
-          "graph/graph-go": 1,
-          "graph/graph-java": 1,
-          "graph/graph-python": 1,
+          "cli": 3,
+          "cli-ui": 2,
+          "core": 1,
+          "fitness/engine": 1,
+          "graph/engine": 5,
+          "graph/graph-adapter-common": 1,
+          "graph/graph-go": 10,
+          "graph/graph-java": 3,
+          "graph/graph-python": 3,
           "graph/graph-rust": 2,
-          "graph/graph-typescript": 1
+          "graph/graph-typescript": 1,
+          "output": 1
         }
       }
     },
@@ -253,9 +260,14 @@
         }
       },
       "graph": {
-        "total": 0,
-        "byRuleId": {},
-        "byPackage": {}
+        "total": 2,
+        "byRuleId": {
+          "graph:near-duplicate-function-body": 2
+        },
+        "byPackage": {
+          "fitness/checks-typescript": 1,
+          "fitness/checks-universal": 1
+        }
       }
     },
     "test-support": {
@@ -342,7 +354,7 @@
     "safety": {
       "batch-operation-limits": {
         "budget": 53,
-        "actual": 41
+        "actual": 42
       },
       "error-handling-quality": {
         "budget": 2,
@@ -381,19 +393,19 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 295,
+    "budgetGateFitness": 296,
     "budgetGateFitnessSlugs": 73,
-    "productRuntimeFitness": 110,
+    "productRuntimeFitness": 111,
     "productRuntimeFitnessSlugs": 27,
-    "productRuntimeGraph": 7,
-    "productRuntimeGraphRuleIds": 2,
-    "productRuntimeCombined": 117,
+    "productRuntimeGraph": 33,
+    "productRuntimeGraphRuleIds": 3,
+    "productRuntimeCombined": 144,
     "checkPackageFitness": 183,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
-    "budgetGateSafetyTotal": 69,
-    "productRuntimeSafetyTotal": 63,
+    "budgetGateSafetyTotal": 70,
+    "productRuntimeSafetyTotal": 64,
     "unbudgetedProductRuntimeSlugs": 24
   },
   "phase4Audit": {
@@ -407,19 +419,19 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -195,
-      "productRuntimeGraph": 0,
-      "productRuntimeCombined": -195,
-      "budgetGateFitness": -247,
+      "productRuntimeFitness": -194,
+      "productRuntimeGraph": 26,
+      "productRuntimeCombined": -168,
+      "budgetGateFitness": -246,
       "checkPackageFitness": -51,
-      "productRuntimeSafetyTotal": -120,
-      "budgetGateSafetyTotal": -165
+      "productRuntimeSafetyTotal": -119,
+      "budgetGateSafetyTotal": -164
     },
     "reopenCandidates": [],
     "acceptedHighCount": [
       {
         "slug": "batch-operation-limits",
-        "count": 41,
+        "count": 42,
         "disposition": "b",
         "kind": "fitness"
       },
@@ -430,6 +442,12 @@
         "kind": "fitness"
       },
       {
+        "slug": "graph:near-duplicate-function-body",
+        "count": 26,
+        "disposition": "b",
+        "kind": "graph"
+      },
+      {
         "slug": "graph:cycle",
         "count": 6,
         "disposition": "b",
@@ -438,7 +456,7 @@
     ],
     "successCriteria": {
       "sc6ProductRuntimeSafetyTarget": 143,
-      "sc6ProductRuntimeSafetyActual": 63,
+      "sc6ProductRuntimeSafetyActual": 64,
       "sc6Met": true
     }
   }

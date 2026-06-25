@@ -18,6 +18,7 @@ function rowStatus(unit: UnitResult): LiveRunTableRow['status'] {
 }
 
 /** Build one row per unit — mirrors `formatSignalTableRows` (output) for graph. */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- graph and yagni keep local live-table mappers to avoid a UI dependency in contracts/output.
 export function envelopeToLiveRunTableRows(envelope: SignalEnvelope): LiveRunTableRow[] {
   const bySource = groupSignalsBySource(envelope.signals);
   return envelope.units.map((unit) => {

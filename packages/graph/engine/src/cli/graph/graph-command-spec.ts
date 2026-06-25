@@ -365,6 +365,7 @@ async function deliverNonGateEgress(
   });
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- graph and sim show modes share the session-replay contract but remain tool-local command handlers.
 async function runGraphShowMode(opts: GraphCommandOptions, cli: ToolCliContext): Promise<void> {
   const datastore = cli.scope.datastore() as DataStore | undefined;
   if (datastore === undefined) {
@@ -425,6 +426,7 @@ async function emitGraphShowError(
   });
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- fit/graph/sim JSON replay projections intentionally preserve each tool's command surface.
 function sessionShowJson(
   session: StoredSession,
   replay: ReturnType<typeof graphReplayFromSession>,
@@ -448,6 +450,7 @@ function sessionShowJson(
 
 /** The tool-agnostic `session-replay` view result (rendered via the shared
  *  envelope table; no live-run footer). `cli.render` takes `unknown`. */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- graph and sim replay result wrappers differ only by tool vocabulary and stay local to their command specs.
 function sessionReplayResult(
   session: StoredSession,
   replay: ReturnType<typeof graphReplayFromSession>,

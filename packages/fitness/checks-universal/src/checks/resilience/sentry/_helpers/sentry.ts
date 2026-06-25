@@ -3,6 +3,8 @@
  * @module checks-builtin/checks/resilience/sentry/_helpers/sentry
  */
 
+import type { CheckViolation } from '@opensip-cli/fitness';
+
 /**
  * Quick bail-out: returns true if the file references Sentry at all.
  * All Sentry checks should call this first to avoid unnecessary work.
@@ -75,4 +77,39 @@ export function extractSentryInitBlock(
     endLine: lines.length - 1,
     block: blockLines.join('\n'),
   };
+}
+
+export interface MissingSentryInitOptionInput {
+  readonly isConfigured: (initBlock: string) => boolean;
+  readonly message: string;
+  readonly severity: CheckViolation['severity'];
+  readonly suggestion: string;
+  readonly type: string;
+}
+
+export function analyzeMissingSentryInitOption(
+  content: string,
+  input: MissingSentryInitOptionInput,
+): CheckViolation[] {
+  if (!hasSentryInit(content)) return [];
+
+  const initBlock = extractSentryInitBlock(content);
+  if (!initBlock) return [];
+  if (input.isConfigured(initBlock.block)) return [];
+
+  return [
+    {
+      line: initBlock.startLine + 1,
+      message: input.message,
+      severity: input.severity,
+      suggestion: input.suggestion,
+      type: input.type,
+    },
+  ];
+}
+
+export function createMissingSentryInitOptionAnalyzer(
+  input: MissingSentryInitOptionInput,
+): (content: string, filePath: string) => CheckViolation[] {
+  return (content: string, _filePath: string) => analyzeMissingSentryInitOption(content, input);
 }

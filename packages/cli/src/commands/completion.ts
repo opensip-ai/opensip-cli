@@ -292,6 +292,7 @@ export function assembleCompletionInventory(input: {
 // bash
 // ---------------------------------------------------------------------------
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- bash and zsh renderers intentionally mirror the same inventory while emitting different shell syntaxes.
 function bashScript(inv: CompletionInventory): string {
   const subs = inv.subcommands.join(' ');
   const commonFlagList = COMMON_FLAGS.join(' ');

@@ -5,6 +5,7 @@
 import ts from 'typescript';
 
 import { classifyVisibility } from '../inventory-helpers/classify-visibility.js';
+import { findEnclosingClassName } from '../inventory-helpers/enclosing-class.js';
 import { extractParams } from '../inventory-helpers/extract-params.js';
 import { digestFunctionBody } from '../inventory-helpers/hash-body.js';
 
@@ -18,7 +19,7 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
   const startLC = ctx.sourceFile.getLineAndCharacterOfPosition(start);
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
   /* v8 ignore next */
-  const className = ctx.enclosingClass ?? findClassName(node) ?? '<anon-class>';
+  const className = ctx.enclosingClass ?? findEnclosingClassName(node) ?? '<anon-class>';
   const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
     bodyHash: digest.hash,
@@ -41,16 +42,3 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
     calls: [],
   };
 };
-
-/* v8 ignore start */
-function findClassName(node: ts.ConstructorDeclaration): string | null {
-  let p: ts.Node | undefined = node.parent;
-  while (p) {
-    if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) {
-      return p.name?.text ?? null;
-    }
-    p = p.parent;
-  }
-  return null;
-}
-/* v8 ignore stop */

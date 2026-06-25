@@ -17,6 +17,7 @@
 import { resolveConcurrency } from '../../types/workload.js';
 
 import { LatencyTracker } from './latency-tracker.js';
+import { createEmptyMetrics } from '../result-builder.js';
 
 import type { Target } from './target.js';
 import type { SimulationMetrics } from '../../types/base-types.js';
@@ -50,19 +51,6 @@ export interface LoadWindowResult {
 // =============================================================================
 
 const TICK_INTERVAL_MS = 100;
-
-function createMetrics(): SimulationMetrics {
-  return {
-    totalRequests: 0,
-    successfulRequests: 0,
-    failedRequests: 0,
-    avgLatencyMs: 0,
-    p50LatencyMs: 0,
-    p95LatencyMs: 0,
-    p99LatencyMs: 0,
-    errorsGenerated: 0,
-  };
-}
 
 function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -139,7 +127,7 @@ export async function runLoadWindow(
   const { workload } = config;
   const targetRps = workload.rps;
   const maxInFlight = resolveConcurrency(workload);
-  const metrics = createMetrics();
+  const metrics = createEmptyMetrics();
   const latencyTracker = new LatencyTracker();
   const inFlight = new Set<Promise<void>>();
   const state: DispatchState = {

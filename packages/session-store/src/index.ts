@@ -9,8 +9,8 @@
  * Session replay adds the inverse of persistence:
  * `decodeSessionPayload` reads a stored payload back into its STRUCTURAL shape
  * (`{ summary, checks[] }`) so each tool can project it to a `SignalEnvelope`.
- * That decoder still holds zero tool vocabulary — severity→category mapping and
- * signal IDs live in each engine's `session-replay.ts`, not here.
+ * The helper that builds replay `Signal` rows is parameterized by tool/category
+ * vocabulary; the vocabulary itself still lives in each engine.
  *
  * The raw `sessions` / `sessionToolPayload` Drizzle tables are package-private
  * (ADR-0009): cross-module access goes through `SessionRepo`, never the raw
@@ -38,3 +38,9 @@ export {
   type DecodeSessionPayloadOptions,
   type SessionPayloadScalar,
 } from './session-payload-decode.js';
+export {
+  buildReplaySignal,
+  buildReplaySignals,
+  type BuildReplaySignalInput,
+  type BuildReplaySignalsInput,
+} from './session-replay-signal.js';

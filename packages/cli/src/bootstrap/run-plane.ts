@@ -122,6 +122,7 @@ export interface RunPlaneFactory {
   current(): RunPlaneInvocation;
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- factory and invocation closure intentionally share the per-command lifecycle slot.
 export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
   const log = deps.logger ?? defaultLogger;
   // One command per CLI invocation: a single mutable invocation slot is correct.

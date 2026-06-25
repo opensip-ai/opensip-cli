@@ -61,26 +61,38 @@ function buildPluginListSpec(ctx: CliCommandsContext, domain: string): HostSpec 
 }
 
 function buildPluginAddSpec(ctx: CliCommandsContext, domain: string): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
+  return buildPluginMutationSpec(ctx, domain, {
     name: 'add',
     description: `Install a ${domain} pack and record it in opensip-cli.config.yml`,
-    commonFlags: ['json'],
-    options: [pluginCwdOption()],
-    args: [{ name: 'package', description: '' }],
-    scope: PROJECT_SCOPE,
-    output: COMMAND_RESULT,
-    handler: (rawOpts) => {
-      const opts = rawOpts as PluginCwdOpts & { _args: string[] };
-      const packageName = opts._args[0];
-      return pluginAdd(packageName, effectiveCwd(opts), domain, boundLayouts(ctx, domain));
-    },
+    run: pluginAdd,
   });
 }
 
 function buildPluginRemoveSpec(ctx: CliCommandsContext, domain: string): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
+  return buildPluginMutationSpec(ctx, domain, {
     name: 'remove',
     description: `Uninstall a ${domain} pack and remove it from opensip-cli.config.yml`,
+    run: pluginRemove,
+  });
+}
+
+function buildPluginMutationSpec(
+  ctx: CliCommandsContext,
+  domain: string,
+  input: {
+    readonly name: 'add' | 'remove';
+    readonly description: string;
+    readonly run: (
+      packageName: string,
+      cwd: string,
+      domain: string,
+      layouts: readonly PluginLayout[],
+    ) => unknown;
+  },
+): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    name: input.name,
+    description: input.description,
     commonFlags: ['json'],
     options: [pluginCwdOption()],
     args: [{ name: 'package', description: '' }],
@@ -89,7 +101,7 @@ function buildPluginRemoveSpec(ctx: CliCommandsContext, domain: string): HostSpe
     handler: (rawOpts) => {
       const opts = rawOpts as PluginCwdOpts & { _args: string[] };
       const packageName = opts._args[0];
-      return pluginRemove(packageName, effectiveCwd(opts), domain, boundLayouts(ctx, domain));
+      return input.run(packageName, effectiveCwd(opts), domain, boundLayouts(ctx, domain));
     },
   });
 }

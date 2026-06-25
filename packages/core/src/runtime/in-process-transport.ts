@@ -18,6 +18,7 @@ import type { ProgressJob, ProgressRun, ProgressTransport } from './progress-tra
  * emitted before the first `onProgress` listener attaches are buffered and
  * flushed in order on subscription, so no early event is dropped.
  */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- transport factory and run closure deliberately share local buffer/listener state.
 export function createInProcessTransport(): ProgressTransport {
   return {
     run<TEvent, TResult>(job: ProgressJob<TEvent, TResult>): ProgressRun<TEvent, TResult> {

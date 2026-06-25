@@ -6,6 +6,7 @@
  */
 
 import type { DirectiveInfo } from './types.js';
+import { collectDirectives } from './shared.js';
 
 /**
  * Extract semgrep rule ID and reason from a nosemgrep directive line.
@@ -74,19 +75,5 @@ export function parseSemgrepDirectives(
   filePath: string,
   file: string,
 ): DirectiveInfo[] {
-  const directives: DirectiveInfo[] = [];
-  const lines = content.split('\n');
-
-  for (const [i, line] of lines.entries()) {
-    if (line === undefined) {
-      continue;
-    }
-
-    const directive = extractSemgrepDirective(line, i, filePath, file);
-    if (directive) {
-      directives.push(directive);
-    }
-  }
-
-  return directives;
+  return collectDirectives(content, filePath, file, extractSemgrepDirective);
 }

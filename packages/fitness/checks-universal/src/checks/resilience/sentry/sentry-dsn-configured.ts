@@ -3,36 +3,19 @@
  * @module checks-builtin/checks/resilience/sentry/sentry-dsn-configured
  */
 
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck } from '@opensip-cli/fitness';
 
-import { hasSentryInit, extractSentryInitBlock } from './_helpers/sentry.js';
+import { createMissingSentryInitOptionAnalyzer } from './_helpers/sentry.js';
 
-function analyze(content: string, _filePath: string): CheckViolation[] {
-  if (!hasSentryInit(content)) return [];
-
-  const initBlock = extractSentryInitBlock(content);
-  if (!initBlock) return [];
-
-  // Check if DSN is present in the init block
-  const hasDsn =
-    initBlock.block.includes('dsn') ||
-    initBlock.block.includes('DSN') ||
-    initBlock.block.includes('SENTRY_DSN');
-
-  if (hasDsn) return [];
-
-  return [
-    {
-      line: initBlock.startLine + 1,
-      message:
-        'Sentry.init() called without a DSN — Sentry will not report errors without a valid DSN',
-      severity: 'error',
-      suggestion:
-        'Add a dsn property to Sentry.init(): Sentry.init({ dsn: process.env.SENTRY_DSN, ... })',
-      type: 'sentry-missing-dsn',
-    },
-  ];
-}
+const analyze = createMissingSentryInitOptionAnalyzer({
+  isConfigured: (block) =>
+    block.includes('dsn') || block.includes('DSN') || block.includes('SENTRY_DSN'),
+  message: 'Sentry.init() called without a DSN — Sentry will not report errors without a valid DSN',
+  severity: 'error',
+  suggestion:
+    'Add a dsn property to Sentry.init(): Sentry.init({ dsn: process.env.SENTRY_DSN, ... })',
+  type: 'sentry-missing-dsn',
+});
 
 /**
  * Check: sentry-dsn-configured

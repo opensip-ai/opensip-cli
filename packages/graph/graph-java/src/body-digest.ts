@@ -33,6 +33,7 @@ export const digestSyntheticBody = digestJavaBody;
  * NOT nest. Preserve string literals (regular `"…"` and text blocks
  * `"""…"""`) and char literals.
  */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- Java and Rust comment strippers are grammar-local despite sharing block/comment scanner structure.
 function stripJavaComments(text: string): string {
   let out = '';
   let i = 0;

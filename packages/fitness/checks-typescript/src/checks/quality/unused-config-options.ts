@@ -81,6 +81,7 @@ function isConfigInterface(interfaceName: string): boolean {
 /**
  * Extract property from interface member.
  */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- fitness and yagni own separate public findings even though they read the same TypeScript property shape.
 function extractPropertyFromMember(
   member: ts.TypeElement,
   sourceFile: ts.SourceFile,

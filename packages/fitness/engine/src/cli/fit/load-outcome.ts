@@ -69,20 +69,35 @@ function emptyRegistryDiagnostic(): CliDiagnostic {
 }
 
 function checkPackLoadDiagnostic(packageName: string, detail: string): CliDiagnostic {
+  return checkPackDiagnostic(packageName, detail, 'required');
+}
+
+function checkPackDiagnostic(
+  packageName: string,
+  detail: string,
+  mode: 'required' | 'optional',
+): CliDiagnostic {
   const provenance = {
     toolId: 'fit',
     packageName,
     capabilityDomain: 'fit-pack',
   };
   const classified = classifiedLoaderDetail(detail, provenance);
+  const required = mode === 'required';
   return stampDiagnostic({
-    severity: 'error',
+    severity: required ? 'error' : 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
-    category: 'runtime',
-    message: `Required check pack "${packageName}" failed to load.`,
-    impact: 'A required fit-pack could not be loaded, so the run cannot proceed.',
-    action:
-      'Verify the package is installed, built, and listed correctly in plugins.checkPackages.',
+    category: required ? 'runtime' : 'degraded',
+    message: `${required ? 'Required' : 'Optional'} check pack "${packageName}" failed to load.`,
+    impact: required
+      ? 'A required fit-pack could not be loaded, so the run cannot proceed.'
+      : 'Some optional check packs were skipped; required checks still ran.',
+    ...(required
+      ? {
+          action:
+            'Verify the package is installed, built, and listed correctly in plugins.checkPackages.',
+        }
+      : {}),
     provenance,
     detail: classified.detail,
   });
@@ -101,59 +116,46 @@ function classifiedLoaderDetail(
 }
 
 function requiredPluginDiagnostic(source: string, detail: string): CliDiagnostic {
+  return pluginDiagnostic(source, detail, 'required');
+}
+
+function pluginDiagnostic(
+  source: string,
+  detail: string,
+  mode: 'required' | 'optional',
+): CliDiagnostic {
   const provenance = {
     toolId: 'fit',
     packageName: source,
-    discoverySource: 'required-plugin',
+    discoverySource: mode === 'required' ? 'required-plugin' : 'optional-plugin',
   };
   const classified = classifiedLoaderDetail(detail, provenance);
+  const required = mode === 'required';
   return stampDiagnostic({
-    severity: 'error',
+    severity: required ? 'error' : 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_PLUGIN_LOAD_FAILED,
-    category: 'runtime',
-    message: `Required fitness plugin "${source}" failed to load.`,
-    impact: 'A required project-local or declared plugin failed, so the run cannot proceed.',
-    action:
-      'Fix the plugin module or remove it from the project opensip-cli/fit tree / plugins.fit list.',
+    category: required ? 'runtime' : 'degraded',
+    message: `${required ? 'Required' : 'Optional'} fitness plugin "${source}" failed to load.`,
+    impact: required
+      ? 'A required project-local or declared plugin failed, so the run cannot proceed.'
+      : 'Some optional checks were skipped; built-in checks still ran.',
+    ...(required
+      ? {
+          action:
+            'Fix the plugin module or remove it from the project opensip-cli/fit tree / plugins.fit list.',
+        }
+      : {}),
     provenance,
     detail: classified.detail,
   });
 }
 
 function optionalPluginDiagnostic(source: string, detail: string): CliDiagnostic {
-  const provenance = {
-    toolId: 'fit',
-    packageName: source,
-    discoverySource: 'optional-plugin',
-  };
-  const classified = classifiedLoaderDetail(detail, provenance);
-  return stampDiagnostic({
-    severity: 'warning',
-    code: CLI_DIAGNOSTIC_CODES.OPENSIP_PLUGIN_LOAD_FAILED,
-    category: 'degraded',
-    message: `Optional fitness plugin "${source}" failed to load.`,
-    impact: 'Some optional checks were skipped; built-in checks still ran.',
-    provenance,
-    detail: classified.detail,
-  });
+  return pluginDiagnostic(source, detail, 'optional');
 }
 
 function optionalCheckPackDiagnostic(packageName: string, detail: string): CliDiagnostic {
-  const provenance = {
-    toolId: 'fit',
-    packageName,
-    capabilityDomain: 'fit-pack',
-  };
-  const classified = classifiedLoaderDetail(detail, provenance);
-  return stampDiagnostic({
-    severity: 'warning',
-    code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
-    category: 'degraded',
-    message: `Optional check pack "${packageName}" failed to load.`,
-    impact: 'Some optional check packs were skipped; required checks still ran.',
-    provenance,
-    detail: classified.detail,
-  });
+  return checkPackDiagnostic(packageName, detail, 'optional');
 }
 
 function partitionPluginFailures(

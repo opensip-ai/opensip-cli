@@ -224,6 +224,7 @@ function visitMethodOrConstructor(
   }
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- Java lambda and Python lambda-node visitors share adapter bookkeeping but differ by grammar.
 function visitLambda(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   const occ = buildLambdaOccurrence(node, ctx);
   if (!occ) return false;

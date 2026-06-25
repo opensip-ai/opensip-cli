@@ -81,18 +81,15 @@ function checkMissingSchema(
   options: CheckRouteSchemaOptions,
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
-  if (hasProperty(options.routeText, 'schema')) {
-    return null;
-  }
-  if (zodResult.hasAny) {
-    return null;
-  }
-  return createSchemaViolation(
+  return schemaViolationUnlessCovered({
     options,
-    'missing-schema',
-    `Route ${options.method} ${options.routePath} has no schema option`,
-    'Add schema option with body, response, params, and querystring as needed for request validation and OpenAPI documentation. Alternatively, use Zod Schema.parse() or Schema.safeParse() on request properties in the handler.',
-  );
+    propertyName: 'schema',
+    coveredByZod: zodResult.hasAny,
+    type: 'missing-schema',
+    message: `Route ${options.method} ${options.routePath} has no schema option`,
+    suggestion:
+      'Add schema option with body, response, params, and querystring as needed for request validation and OpenAPI documentation. Alternatively, use Zod Schema.parse() or Schema.safeParse() on request properties in the handler.',
+  });
 }
 
 function handlerReadsBody(routeText: string): boolean {
@@ -133,18 +130,32 @@ function checkMissingResponseSchema(
   options: CheckRouteSchemaOptions,
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
-  if (hasProperty(options.routeText, 'response')) {
-    return null;
-  }
-  if (zodResult.hasResponse) {
-    return null;
-  }
-  return createSchemaViolation(
+  return schemaViolationUnlessCovered({
     options,
-    'missing-response-schema',
-    `Route ${options.method} ${options.routePath} missing response schema`,
-    'Add response schema for proper API documentation and type safety. Define schemas for 200, 400, 500 status codes.',
-  );
+    propertyName: 'response',
+    coveredByZod: zodResult.hasResponse,
+    type: 'missing-response-schema',
+    message: `Route ${options.method} ${options.routePath} missing response schema`,
+    suggestion:
+      'Add response schema for proper API documentation and type safety. Define schemas for 200, 400, 500 status codes.',
+  });
+}
+
+function schemaViolationUnlessCovered(input: {
+  readonly options: CheckRouteSchemaOptions;
+  readonly propertyName: string;
+  readonly coveredByZod: boolean;
+  readonly type: string;
+  readonly message: string;
+  readonly suggestion: string;
+}): CheckViolation | null {
+  if (hasProperty(input.options.routeText, input.propertyName)) {
+    return null;
+  }
+  if (input.coveredByZod) {
+    return null;
+  }
+  return createSchemaViolation(input.options, input.type, input.message, input.suggestion);
 }
 
 function checkMissingParamsSchema(

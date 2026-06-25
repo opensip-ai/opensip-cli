@@ -1,4 +1,4 @@
-import { decodeSessionPayload, type DecodedSessionFinding } from '@opensip-cli/session-store';
+import { buildReplaySignals, decodeSessionPayload } from '@opensip-cli/session-store';
 
 import type {
   RunPresentation,
@@ -7,7 +7,6 @@ import type {
   ToolSessionReplay,
   UnitResult,
 } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /**
  * Project a stored sim session back into a {@link SignalEnvelope}/{@link RunPresentation}.
@@ -35,11 +34,12 @@ export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<R
     ...(check.violationCount === undefined ? {} : { violationCount: check.violationCount }),
     durationMs: check.durationMs,
   }));
-  const signals = payload.checks.flatMap((check, checkIndex) =>
-    check.findings.map((finding, findingIndex) =>
-      replaySignal(stored, check.checkSlug, finding, checkIndex, findingIndex),
-    ),
-  );
+  const signals = buildReplaySignals({
+    stored,
+    checks: payload.checks,
+    toolPrefix: 'sim',
+    category: 'testing',
+  });
   const envelope: SignalEnvelope = {
     schemaVersion: 2,
     tool: 'sim',
@@ -58,38 +58,5 @@ export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<R
     fidelity: 'projection',
     envelope,
     result: { type: 'run-presentation', tool: 'simulation', envelope },
-  };
-}
-
-function replaySignal(
-  stored: StoredSession,
-  source: string,
-  finding: DecodedSessionFinding,
-  checkIndex: number,
-  findingIndex: number,
-): Signal {
-  return {
-    id: `${stored.id}:sim:${checkIndex}:${findingIndex}`,
-    source,
-    provider: 'opensip-cli',
-    severity: finding.severity === 'error' ? 'high' : 'medium',
-    category: 'testing',
-    ruleId: finding.ruleId,
-    message: finding.message,
-    ...(finding.suggestion === undefined ? {} : { suggestion: finding.suggestion }),
-    filePath: finding.filePath ?? '',
-    ...(finding.line === undefined ? {} : { line: finding.line }),
-    ...(finding.column === undefined ? {} : { column: finding.column }),
-    ...(finding.filePath === undefined
-      ? {}
-      : {
-          code: {
-            file: finding.filePath,
-            ...(finding.line === undefined ? {} : { line: finding.line }),
-            ...(finding.column === undefined ? {} : { column: finding.column }),
-          },
-        }),
-    metadata: {},
-    createdAt: stored.startedAt,
   };
 }

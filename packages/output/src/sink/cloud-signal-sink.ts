@@ -59,6 +59,7 @@ function chunkBatch(batch: SignalBatch, size: number): ChunkBody[] {
 }
 
 /** Build the OpenSIP Cloud signal sink. Selection/gating happens at the CLI; this just emits. */
+// @graph-ignore-next-line graph:near-duplicate-function-body -- factory and emitted sink method intentionally share one closure over endpoint/auth/chunk policy.
 export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink {
   return {
     async emit(batch: SignalBatch): Promise<EmitResult> {

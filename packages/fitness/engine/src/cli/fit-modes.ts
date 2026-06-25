@@ -425,6 +425,7 @@ async function emitShowError(
   });
 }
 
+// @graph-ignore-next-line graph:near-duplicate-function-body -- fit/graph/sim JSON replay projections intentionally preserve each tool's command surface.
 function sessionShowJson(
   session: StoredSession,
   replay: ReturnType<typeof fitReplayFromSession>,

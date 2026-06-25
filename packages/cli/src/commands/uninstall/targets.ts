@@ -8,13 +8,15 @@
  *  - `collectTargets` (user mode + project mode bucketing)
  *  - The pre-prompt print helpers (`printUserModeTargets`,
  *    `printProjectDefault`, `printProjectPurge`) and supporting
- *    formatters (`formatSize`, `formatKeepLine`).
+ *    formatters (`formatBytes`, `formatKeepLine`).
  */
 
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
 import { resolveProjectPaths } from '@opensip-cli/core';
+
+import { formatBytes } from '../../format-bytes.js';
 
 /**
  * Bucket classification per target:
@@ -57,13 +59,6 @@ function dirSize(path: string): number {
     }
   }
   return total;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 /** Count files recursively under a directory; best-effort (unreadable subdirs skipped). */
@@ -185,9 +180,9 @@ function formatKeepLine(t: Target): string {
 export function printUserModeTargets(write: (s: string) => void, targets: readonly Target[]): void {
   const totalSize = targets.reduce((sum, t) => sum + t.sizeBytes, 0);
   write('\n');
-  write(`About to remove user-level state (${formatSize(totalSize)}):\n`);
+  write(`About to remove user-level state (${formatBytes(totalSize)}):\n`);
   for (const t of targets) {
-    write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''} (${formatSize(t.sizeBytes)})\n`);
+    write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''} (${formatBytes(t.sizeBytes)})\n`);
   }
   write('\n');
 }
@@ -205,7 +200,7 @@ export function printProjectDefault(
   } else {
     write('This will remove (rebuildable runtime state only):\n');
     for (const t of toDelete) {
-      write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatSize(t.sizeBytes)})\n`);
+      write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatBytes(t.sizeBytes)})\n`);
       if (t.bucket === 'runtime') {
         write('    sessions database, cache, logs, baselines\n');
       }
@@ -230,7 +225,7 @@ export function printProjectPurge(
   write(`Project: ${projectRoot}\n\n`);
   write('⚠ This removes EVERYTHING, including your authored content:\n\n');
   for (const t of toDelete) {
-    write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatSize(t.sizeBytes)})\n`);
+    write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatBytes(t.sizeBytes)})\n`);
   }
   write('\n  ⚠ If your custom checks are not committed to git, you will\n');
   write('    lose them. We recommend running `git status` first.\n\n');
