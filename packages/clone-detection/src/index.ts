@@ -40,3 +40,7 @@ export type {
 } from './types.js';
 export { findDuplicateBodies, isEligibleKind } from './find-duplicate-bodies.js';
 export { findNearDuplicates } from './find-near-duplicates.js';
+
+// Canonical TS/JS test-file predicate (single-sourced so every CloneCandidate producer
+// stamps `inTestFile` identically — D1).
+export { isTestFilePath } from './test-file.js';

@@ -159,6 +159,9 @@ export {
 } from './lang-adapter/near-duplicate-signature.js';
 export type { BodyDigestWithSignature } from './lang-adapter/near-duplicate-signature.js';
 export { languageOfFile } from './lang-adapter/language-of-file.js';
+// Canonical TS/JS test-file predicate, single-sourced in the shared substrate (ADR-0064,
+// D1). Re-exported so graph-typescript reaches it via the engine barrel (no new dep).
+export { isTestFilePath } from '@opensip-cli/clone-detection';
 
 // PR 3 of plan 2026-05-23-plan-graph-adapter-package-split.md:
 // first-party adapters live in their own graph-* packages, so the
