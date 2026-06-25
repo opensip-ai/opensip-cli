@@ -15,20 +15,20 @@
  * Generic over `TEvent`/`TResult`: core never names cli-ui's `ProgressEvent`.
  */
 
-import { EnvRegistry } from "../lib/env-registry.js";
-import { correlationToEnv } from "../lib/run-correlation.js";
-import { currentLogger, currentScope } from "../lib/run-scope.js";
-import { currentTraceparent } from "../lib/telemetry.js";
+import { EnvRegistry } from '../lib/env-registry.js';
+import { correlationToEnv } from '../lib/run-correlation.js';
+import { currentLogger, currentScope } from '../lib/run-scope.js';
+import { currentTraceparent } from '../lib/telemetry.js';
 
-import { forkAndSettle } from "./fork-and-settle.js";
-import { createInProcessTransport } from "./in-process-transport.js";
+import { forkAndSettle } from './fork-and-settle.js';
+import { createInProcessTransport } from './in-process-transport.js';
 
 import type {
   ProgressJob,
   ProgressRun,
   SubprocessJobDescriptor,
   WorkerMessage,
-} from "./progress-transport.js";
+} from './progress-transport.js';
 
 /**
  * Governed escape hatch (env-via-registry): force in-process execution.
@@ -42,19 +42,15 @@ import type {
  */
 const WORKER_ENV = new EnvRegistry([
   {
-    canonical: "OPENSIP_CLI_NO_WORKER",
-    coerce: (raw) => raw === "1",
+    canonical: 'OPENSIP_CLI_NO_WORKER',
+    coerce: (raw) => raw === '1',
     default: false,
-    docs: "Set to 1 to run a BUNDLED tool engine in the main process instead of a forked worker (debugging / constrained runtimes). The live view may stutter; output is unchanged. Bundled-only (ADR-0054 trust tier): external tools always fork — this flag never makes an external tool run in-host.",
+    docs: 'Set to 1 to run a BUNDLED tool engine in the main process instead of a forked worker (debugging / constrained runtimes). The live view may stutter; output is unchanged. Bundled-only (ADR-0054 trust tier): external tools always fork — this flag never makes an external tool run in-host.',
   },
 ]);
 
 /** Reconstruct an Error from a worker's `error` message (preserving stack). */
-function workerError(
-  message: string,
-  stack?: string,
-  stderrTail?: string,
-): Error {
+function workerError(message: string, stack?: string, stderrTail?: string): Error {
   const err = new Error(message) as Error & { stderrTail?: string };
   if (stack !== undefined) err.stack = stack;
   if (stderrTail !== undefined) err.stderrTail = stderrTail;
@@ -93,15 +89,13 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   const runId = currentScope()?.runId;
   const traceId = currentTraceparent();
   const runLogger = currentLogger();
-  const workerKind = descriptor.correlation?.workerKind ?? "live-engine";
+  const workerKind = descriptor.correlation?.workerKind ?? 'live-engine';
 
   const diagnostics = currentScope()?.diagnostics;
   const subprocessCorrelation = {
     ...(runId === undefined ? {} : { runId }),
     ...(traceId === undefined ? {} : { traceId }),
-    ...(descriptor.correlation?.tool === undefined
-      ? {}
-      : { tool: descriptor.correlation.tool }),
+    ...(descriptor.correlation?.tool === undefined ? {} : { tool: descriptor.correlation.tool }),
     ...(descriptor.correlation?.parentCommand === undefined
       ? {}
       : { parentCommand: descriptor.correlation.parentCommand }),
@@ -109,48 +103,38 @@ export function createSubprocessProgressRun<TEvent, TResult>(
   };
 
   const correlationEnv = descriptor.correlation
-    ? correlationToEnv({ runId: runId ?? "", ...descriptor.correlation })
+    ? correlationToEnv({ runId: runId ?? '', ...descriptor.correlation })
     : {};
 
   runLogger.info({
-    evt: "cli.subprocess.spawn",
-    module: "core:subprocess-transport",
+    evt: 'cli.subprocess.spawn',
+    module: 'core:subprocess-transport',
     ...(runId === undefined ? {} : { runId }),
     ...(traceId === undefined ? {} : { traceId }),
     workerKind,
     command: descriptor.command,
   });
-  diagnostics?.emitSubprocessEvent(
-    "load",
-    "debug",
-    "subprocess.spawn",
-    subprocessCorrelation,
-    {
-      command: descriptor.command,
-    },
-  );
+  diagnostics?.emitSubprocessEvent('load', 'debug', 'subprocess.spawn', subprocessCorrelation, {
+    command: descriptor.command,
+  });
 
-  const logFailed = (
-    failureClass: string,
-    msg?: WorkerMessage<TEvent, TResult>,
-  ): void => {
+  const logFailed = (failureClass: string, msg?: WorkerMessage<TEvent, TResult>): void => {
     const resolvedWorkerKind =
-      (msg?.kind === "error" ? msg.correlation?.workerKind : undefined) ??
-      workerKind;
+      (msg?.kind === 'error' ? msg.correlation?.workerKind : undefined) ?? workerKind;
     const resolvedFailureClass =
-      (msg?.kind === "error" ? msg.failureClass : undefined) ?? failureClass;
+      (msg?.kind === 'error' ? msg.failureClass : undefined) ?? failureClass;
     runLogger.error({
-      evt: "cli.subprocess.failed",
-      module: "core:subprocess-transport",
+      evt: 'cli.subprocess.failed',
+      module: 'core:subprocess-transport',
       ...(runId === undefined ? {} : { runId }),
       ...(traceId === undefined ? {} : { traceId }),
       workerKind: resolvedWorkerKind,
       failureClass: resolvedFailureClass,
     });
     diagnostics?.emitSubprocessEvent(
-      "load",
-      "warn",
-      "subprocess.failed",
+      'load',
+      'warn',
+      'subprocess.failed',
       { ...subprocessCorrelation, workerKind: resolvedWorkerKind },
       { failureClass: resolvedFailureClass },
     );
@@ -163,8 +147,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       enableHeartbeat: true,
       enableSigintCancellation: true,
       buildChildEnv: (parentEnv) => {
-        const traceparentEnv =
-          traceId !== undefined ? { TRACEPARENT: traceId } : {};
+        const traceparentEnv = traceId === undefined ? {} : { TRACEPARENT: traceId };
         if (descriptor.env || descriptor.correlation || traceId !== undefined) {
           // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; correlation env carries NO secret (Task 0.1) and this object is passed to fork, never logged.
           return {
@@ -178,30 +161,28 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       },
       onMessage: (msg: unknown) => {
         const typed = msg as WorkerMessage<TEvent, TResult>;
-        if (typed.kind === "progress") emit(typed.event);
-        else if (typed.kind === "result") {
+        if (typed.kind === 'progress') emit(typed.event);
+        else if (typed.kind === 'result') {
           handle.done(() => {
             runLogger.info({
-              evt: "cli.subprocess.complete",
-              module: "core:subprocess-transport",
+              evt: 'cli.subprocess.complete',
+              module: 'core:subprocess-transport',
               ...(runId === undefined ? {} : { runId }),
               ...(traceId === undefined ? {} : { traceId }),
               workerKind,
             });
             diagnostics?.emitSubprocessEvent(
-              "load",
-              "debug",
-              "subprocess.complete",
+              'load',
+              'debug',
+              'subprocess.complete',
               subprocessCorrelation,
             );
             settle.resolve(typed.value);
           });
-        } else if (typed.kind === "error") {
+        } else if (typed.kind === 'error') {
           handle.done(() => {
-            logFailed("ipc_error", typed);
-            settle.reject(
-              workerError(typed.message, typed.stack, handle.getStderrTail()),
-            );
+            logFailed('ipc_error', typed);
+            settle.reject(workerError(typed.message, typed.stack, handle.getStderrTail()));
           });
         }
       },
@@ -217,13 +198,13 @@ export function createSubprocessProgressRun<TEvent, TResult>(
     { runId },
   );
 
-  handle.child.on("exit", (code: number | null) => {
+  handle.child.on('exit', (code: number | null) => {
     if (handle.isSettled()) return;
     handle.done(() => {
-      logFailed("exit_nonzero");
+      logFailed('exit_nonzero');
       settle.reject(
         workerError(
-          `worker exited (code ${code ?? "null"}) before producing a result`,
+          `worker exited (code ${code ?? 'null'}) before producing a result`,
           undefined,
           handle.getStderrTail(),
         ),
@@ -257,16 +238,15 @@ export function runOffThreadOrInProcess<TEvent, TResult>(opts: {
   readonly inProcess: ProgressJob<TEvent, TResult>;
   readonly preferWorker?: boolean;
 }): ProgressRun<TEvent, TResult> {
-  const envDisablesWorker =
-    WORKER_ENV.get<boolean>("OPENSIP_CLI_NO_WORKER") === true;
+  const envDisablesWorker = WORKER_ENV.get<boolean>('OPENSIP_CLI_NO_WORKER') === true;
   const preferWorker = (opts.preferWorker ?? true) && !envDisablesWorker;
   if (preferWorker) {
     try {
       return createSubprocessProgressRun<TEvent, TResult>(opts.descriptor);
     } catch (error) {
       currentLogger().warn({
-        evt: "transport.worker.fork_failed",
-        module: "core:subprocess-transport",
+        evt: 'transport.worker.fork_failed',
+        module: 'core:subprocess-transport',
         command: opts.descriptor.command,
         err: error instanceof Error ? error.message : String(error),
       });

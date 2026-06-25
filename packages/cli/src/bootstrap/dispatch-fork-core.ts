@@ -22,10 +22,10 @@
  * runtime NEVER falls back to in-host execution (ADR-0054 trust tier).
  */
 
-import { type ChildProcess } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { type ChildProcess } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   ConfigurationError,
@@ -37,31 +37,31 @@ import {
   type ToolError,
   type ToolProvenance,
   type WorkerMessage,
-} from "@opensip-cli/core";
+} from '@opensip-cli/core';
 
-import { buildExternalWorkerChildEnv } from "./build-external-worker-child-env.js";
-import { BOOTSTRAP_MODULE } from "./constants.js";
-import { handleHostRpc } from "./dispatch-host-rpc-handler.js";
-import { type DispatchHostCtx } from "./dispatch-replay-result.js";
+import { buildExternalWorkerChildEnv } from './build-external-worker-child-env.js';
+import { BOOTSTRAP_MODULE } from './constants.js';
+import { handleHostRpc } from './dispatch-host-rpc-handler.js';
+import { type DispatchHostCtx } from './dispatch-replay-result.js';
 
 import type {
   HostRpcRequest,
   RpcReply,
   ToolCommandResult,
   ToolCommandWorkerSpec,
-} from "./tool-command-dispatch-types.js";
+} from './tool-command-dispatch-types.js';
 
 /** Default supervisor wall-clock timeout for one forked worker run (ms). */
 export const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
 
 /** The internal worker subcommand the supervisor forks the CLI binary into. */
-export const WORKER_SUBCOMMAND = "__tool-command-worker";
+export const WORKER_SUBCOMMAND = '__tool-command-worker';
 
 /** The dispatch IPC binding: host-RPC requests stream on `progress`. */
 type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
 
 /** Narrowing helper: a worker `error` IPC message carries an optional failureClass/stack. */
-type DispatchWorkerError = Extract<DispatchWorkerMessage, { kind: "error" }>;
+type DispatchWorkerError = Extract<DispatchWorkerMessage, { kind: 'error' }>;
 
 /** Resolve the package dir for an external tool, or fail with a structured error. */
 export function requirePackageDir(provenance: ToolProvenance): string {
@@ -69,7 +69,7 @@ export function requirePackageDir(provenance: ToolProvenance): string {
   if (dir === undefined || dir.length === 0) {
     throw new SystemError(
       `external tool '${provenance.id}' has no resolved package path to dispatch from`,
-      { code: "SYSTEM.DISPATCH.NO_PACKAGE_DIR" },
+      { code: 'SYSTEM.DISPATCH.NO_PACKAGE_DIR' },
     );
   }
   return dir;
@@ -88,11 +88,11 @@ export async function runWorkerSpec(args: {
   readonly cliScript?: string;
   readonly timeoutMs?: number;
 }): Promise<ToolCommandResult> {
-  const dir = mkdtempSync(join(tmpdir(), "opensip-tool-dispatch-"));
-  const specPath = join(dir, "spec.json");
-  writeFileSync(specPath, JSON.stringify(args.spec), "utf8");
+  const dir = mkdtempSync(join(tmpdir(), 'opensip-tool-dispatch-'));
+  const specPath = join(dir, 'spec.json');
+  writeFileSync(specPath, JSON.stringify(args.spec), 'utf8');
 
-  const cliScript = args.cliScript ?? process.argv[1] ?? "";
+  const cliScript = args.cliScript ?? process.argv[1] ?? '';
   const timeoutMs = args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS;
 
   try {
@@ -146,7 +146,7 @@ function forkAndAwait({
     const handle = forkAndSettle(
       {
         command: cliScript,
-        argv: [WORKER_SUBCOMMAND, specPath, "--cwd", cwd],
+        argv: [WORKER_SUBCOMMAND, specPath, '--cwd', cwd],
         cwd,
         timeoutMs,
         enableHeartbeat: true,
@@ -155,17 +155,15 @@ function forkAndAwait({
           buildExternalWorkerChildEnv({ parentEnv, runId, traceparent }),
         onMessage: (msg: unknown) => {
           const typed = msg as DispatchWorkerMessage;
-          if (typed.kind === "progress") {
+          if (typed.kind === 'progress') {
             serveRpc(typed.event);
-          } else if (typed.kind === "result") {
+          } else if (typed.kind === 'result') {
             handle.done(() => {
               resolve(typed.value);
             });
-          } else if (typed.kind === "error") {
+          } else if (typed.kind === 'error') {
             handle.done(() => {
-              reject(
-                workerErrorToToolError(spec, typed, handle.getStderrTail()),
-              );
+              reject(workerErrorToToolError(spec, typed, handle.getStderrTail()));
             });
           }
         },
@@ -189,27 +187,17 @@ function forkAndAwait({
       const workerLimits = getWorkerLimits();
       totalRpc += 1;
       if (totalRpc > workerLimits.maxTotalRpc) {
-        handle.killTree("SIGKILL");
+        handle.killTree('SIGKILL');
         handle.done(() => {
-          reject(
-            dispatchError(
-              spec,
-              "host-RPC upcall flood (total cap exceeded)",
-              "rpc_flood",
-            ),
-          );
+          reject(dispatchError(spec, 'host-RPC upcall flood (total cap exceeded)', 'rpc_flood'));
         });
         return;
       }
       if (inFlightRpc >= workerLimits.maxConcurrentRpc) {
-        handle.killTree("SIGKILL");
+        handle.killTree('SIGKILL');
         handle.done(() => {
           reject(
-            dispatchError(
-              spec,
-              "host-RPC upcall flood (concurrency cap exceeded)",
-              "rpc_flood",
-            ),
+            dispatchError(spec, 'host-RPC upcall flood (concurrency cap exceeded)', 'rpc_flood'),
           );
         });
         return;
@@ -226,26 +214,26 @@ function forkAndAwait({
     };
 
     /* v8 ignore next 16 -- defensive isolation-safety arm: `child.on('error')` fires only on a node-executable SPAWN failure (ENOENT on the runtime, EACCES), which is only reachable via impractical fault injection — node always exists in a normal run, so a bad worker entry surfaces via `child.on('exit')` (the covered sibling arm) instead. ADR-0054 trust tier: an external tool that cannot fork is a HARD error, NEVER an in-host fallback (that would run untrusted code in the kernel process). A future explicitly-named developer override (OPENSIP_CLI_DANGEROUSLY_RUN_EXTERNAL_IN_HOST) is reserved, not built. */
-    handle.child.on("error", (err: Error) => {
+    handle.child.on('error', (err: Error) => {
       handle.done(() => {
         reject(
           dispatchError(
             spec,
             `cannot isolate external tool '${spec.toolId}' (worker fork failed: ${err.message}); ` +
-              "refusing to run it in-process",
-            "spawn",
+              'refusing to run it in-process',
+            'spawn',
           ),
         );
       });
     });
-    handle.child.on("exit", (code: number | null) => {
+    handle.child.on('exit', (code: number | null) => {
       if (handle.isSettled()) return;
       handle.done(() => {
         reject(
           dispatchError(
             spec,
-            `worker exited (code ${code ?? "null"}) before producing a result`,
-            "exit_nonzero",
+            `worker exited (code ${code ?? 'null'}) before producing a result`,
+            'exit_nonzero',
             handle.getStderrTail(),
           ),
         );
@@ -261,20 +249,16 @@ function forkAndAwait({
  * racing EPIPE so a reply to a departing worker never surfaces as a spurious
  * dispatch failure — a dropped reply is logged at debug and otherwise ignored.
  */
-function sendRpcReply(
-  child: ChildProcess,
-  reply: RpcReply,
-  spec: ToolCommandWorkerSpec,
-): void {
+function sendRpcReply(child: ChildProcess, reply: RpcReply, spec: ToolCommandWorkerSpec): void {
   if (!child.connected) return;
   child.send(reply, (err) => {
     if (err === null) return;
     /* v8 ignore next 6 -- defensive race arm: the channel can close between the `connected` check and the async `child.send` write (the child settled/exited concurrently). The dropped-reply debug log is only reachable via that microtask-level race, not deterministically testable; a dropped reply to a departing worker is harmless (the worker is gone). */
     currentScope()?.logger.debug({
-      evt: "cli.tool.dispatch_rpc_reply_dropped",
+      evt: 'cli.tool.dispatch_rpc_reply_dropped',
       module: BOOTSTRAP_MODULE,
       toolId: spec.toolId,
-      command: spec.commandName ?? spec.hook ?? "unknown",
+      command: spec.commandName ?? spec.hook ?? 'unknown',
     });
   });
 }
@@ -285,7 +269,7 @@ function sendRpcReply(
  */
 function specLabel(spec: ToolCommandWorkerSpec): string {
   /* v8 ignore next -- defensive: a valid spec always carries a commandName OR a hook (the worker entry rejects one that has neither as bad-spec); the 'unknown' fallback is structurally unreachable. */
-  return spec.commandName ?? spec.hook ?? "unknown";
+  return spec.commandName ?? spec.hook ?? 'unknown';
 }
 
 /** Build a structured supervisor-side dispatch error, logged with its failure class. */
@@ -297,27 +281,24 @@ export function dispatchError(
 ): ToolError {
   const label = specLabel(spec);
   currentScope()?.logger.error({
-    evt: "cli.tool.dispatch_failed",
+    evt: 'cli.tool.dispatch_failed',
     module: BOOTSTRAP_MODULE,
     toolId: spec.toolId,
     command: label,
     failureClass,
   });
-  if (failureClass === "config-invalid") {
+  if (failureClass === 'config-invalid') {
     return new ConfigurationError(message, {
-      code: "CONFIGURATION_ERROR",
+      code: 'CONFIGURATION_ERROR',
       failureClass,
       stderrTail,
     });
   }
-  return new SystemError(
-    `external tool '${spec.toolId}' ${label} failed: ${message}`,
-    {
-      code: "SYSTEM.DISPATCH.WORKER_FAILED",
-      failureClass,
-      stderrTail,
-    },
-  );
+  return new SystemError(`external tool '${spec.toolId}' ${label} failed: ${message}`, {
+    code: 'SYSTEM.DISPATCH.WORKER_FAILED',
+    failureClass,
+    stderrTail,
+  });
 }
 
 /** Convert a worker `error` IPC message into a logged, structured {@link ToolError}. */
@@ -326,10 +307,5 @@ function workerErrorToToolError(
   msg: DispatchWorkerError,
   stderrTail?: string,
 ): ToolError {
-  return dispatchError(
-    spec,
-    msg.message,
-    msg.failureClass ?? "ipc_error",
-    stderrTail,
-  );
+  return dispatchError(spec, msg.message, msg.failureClass ?? 'ipc_error', stderrTail);
 }

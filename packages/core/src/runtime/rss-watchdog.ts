@@ -24,6 +24,7 @@ export function readChildRssBytes(pid: number): number | undefined {
       if (match === null) return undefined;
       return Number.parseInt(match[1] ?? '', 10);
     } catch {
+      // @swallow-ok wmic may be unavailable or the child may have already exited
       return undefined;
     }
   }
@@ -34,6 +35,7 @@ export function readChildRssBytes(pid: number): number | undefined {
     if (!Number.isFinite(kb) || kb <= 0) return undefined;
     return kb * 1024;
   } catch {
+    // @swallow-ok ps may race with child exit; treat unavailable sample as no-op
     return undefined;
   }
 }

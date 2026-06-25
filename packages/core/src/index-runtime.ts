@@ -25,6 +25,8 @@ export {
   assertCapturedOutputFits,
   CapturedOutputTooLargeError,
 } from './runtime/result-accumulator-cap.js';
+export { startWorkerHeartbeat } from './runtime/worker-heartbeat.js';
+export type { WorkerHeartbeatMessage, WorkerHeartbeatOptions } from './runtime/worker-heartbeat.js';
 export type {
   ProgressTransport,
   ProgressRun,

@@ -16,19 +16,36 @@ function isAlive(pid: number): boolean {
   }
 }
 
+async function waitUntilDead(pid: number): Promise<void> {
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    if (!isAlive(pid)) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
 describe('killTree', () => {
   it('reaps a forked grandchild process group', async () => {
     const child = fork(FIXTURE, ['fork-grandchild'], {
       stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     });
-    await new Promise<void>((resolve) => {
-      child.once('spawn', resolve);
+    const grandPid = await new Promise<number>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('grandchild pid not reported')), 2000);
+      child.on('message', (msg: unknown) => {
+        if (
+          typeof msg === 'object' &&
+          msg !== null &&
+          (msg as { kind?: unknown }).kind === 'grandchild'
+        ) {
+          clearTimeout(timer);
+          resolve((msg as { pid: number }).pid);
+        }
+      });
     });
-    await new Promise((r) => setTimeout(r, 300));
-    const grandPid = child.pid;
-    expect(grandPid).toBeDefined();
+    expect(grandPid).toBeGreaterThan(0);
+    const childExited = new Promise((resolve) => child.once('exit', resolve));
     killTree(child, 'SIGKILL');
-    await new Promise((r) => setTimeout(r, 500));
-    if (grandPid !== undefined) expect(isAlive(grandPid)).toBe(false);
+    await Promise.all([childExited, waitUntilDead(grandPid)]);
+    expect(isAlive(grandPid)).toBe(false);
   });
 });

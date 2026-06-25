@@ -30,6 +30,7 @@ switch (mode) {
       detached: true,
       stdio: 'ignore',
     });
+    send({ kind: 'grandchild', pid: grand.pid });
     grand.unref?.();
     setInterval(() => {}, 60_000).unref?.();
     break;
@@ -47,6 +48,10 @@ switch (mode) {
   }
   case 'timeout-sleep': {
     setInterval(() => {}, 60_000).unref?.();
+    break;
+  }
+  case 'rss-hold': {
+    setInterval(() => {}, 60_000);
     break;
   }
   default: {

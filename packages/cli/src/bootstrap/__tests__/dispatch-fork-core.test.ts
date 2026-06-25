@@ -43,15 +43,31 @@ describe('buildExternalWorkerChildEnv', () => {
       parentEnv: {
         PATH: '/bin',
         [TOOL_ENV_PASSTHROUGH_ENV]: 'HTTP_PROXY, MY_CUSTOM_VAR',
-        HTTP_PROXY: 'http://proxy:8080',
+        HTTP_PROXY: 'https://proxy.example.test:8443',
         MY_CUSTOM_VAR: 'needed-by-tool',
         MY_SECRET: 'still-blocked',
       },
     });
 
-    expect(childEnv.HTTP_PROXY).toBe('http://proxy:8080');
+    expect(childEnv.HTTP_PROXY).toBe('https://proxy.example.test:8443');
     expect(childEnv.MY_CUSTOM_VAR).toBe('needed-by-tool');
     expect(childEnv.MY_SECRET).toBeUndefined();
+  });
+
+  it('forwards tool admission env vars needed for worker bootstrap', () => {
+    const childEnv = buildExternalWorkerChildEnv({
+      parentEnv: {
+        OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'external-dispatch-tool',
+        OPENSIP_CLI_ALLOW_PROJECT_TOOLS: 'project-tool',
+        OPENSIP_CLI_SKIP_BUNDLED: 'fitness',
+        OPENSIP_CLI_SKIP_INSTALLED: '1',
+      },
+    });
+
+    expect(childEnv.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS).toBe('external-dispatch-tool');
+    expect(childEnv.OPENSIP_CLI_ALLOW_PROJECT_TOOLS).toBe('project-tool');
+    expect(childEnv.OPENSIP_CLI_SKIP_BUNDLED).toBe('fitness');
+    expect(childEnv.OPENSIP_CLI_SKIP_INSTALLED).toBe('1');
   });
 
   it('omits TRACEPARENT when no recording span is active', () => {

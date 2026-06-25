@@ -8,13 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { SystemError } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { dispatchError } from '../dispatch-fork-core.js';
-
 import { makeDispatchHostCtx } from '../../__tests__/harness/dispatch-host-ctx.js';
 import { dispatchExternalToolCommand } from '../dispatch-external-tool-command.js';
+import { dispatchError } from '../dispatch-fork-core.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const RESULT_WORKER = join(HERE, '../../__tests__/fixtures/dispatch-result-worker.mjs');
 const RPC_FLOOD_WORKER = join(HERE, 'fixtures/dispatch-rpc-flood-worker.mjs');
 
 const SPEC = {

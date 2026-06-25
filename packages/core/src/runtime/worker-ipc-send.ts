@@ -5,6 +5,7 @@
 import { isIpcPayloadTooLarge, measureIpcPayloadBytes } from './ipc-payload.js';
 import { getWorkerLimits } from './worker-limits.js';
 
+/** Error thrown before a worker sends an IPC payload over the configured size cap. */
 export class IpcPayloadTooLargeError extends Error {
   readonly failureClass = 'payload_too_large' as const;
   constructor(bytes: number, maxBytes: number) {
@@ -13,7 +14,11 @@ export class IpcPayloadTooLargeError extends Error {
   }
 }
 
-/** Post one IPC message when under the payload cap; otherwise throw. */
+/**
+ * Post one IPC message when under the payload cap.
+ *
+ * @throws {IpcPayloadTooLargeError} When the serialized message exceeds `maxBytes`.
+ */
 export function sendWorkerIpcMessage(msg: unknown, maxBytes?: number): void {
   const cap = maxBytes ?? getWorkerLimits().maxIpcBytes;
   if (isIpcPayloadTooLarge(msg, cap)) {

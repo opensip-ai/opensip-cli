@@ -25,6 +25,7 @@ export interface ForkEnvContext {
   readonly runId?: string;
 }
 
+/** Declarative input for a forked IPC worker supervised by {@link forkAndSettle}. */
 export interface ForkAndSettleDescriptor {
   readonly command: string;
   readonly argv: readonly string[];
@@ -39,6 +40,7 @@ export interface ForkAndSettleDescriptor {
   readonly onLimitFailure?: (failureClass: string, detail?: string) => void;
 }
 
+/** Runtime control surface returned to protocol-specific fork supervisors. */
 export interface ForkAndSettleHandle {
   readonly child: ChildProcess;
   readonly isSettled: () => boolean;
@@ -70,6 +72,7 @@ function resolveForkChildEnv(
   if (descriptor.env === undefined && ctx.runId === undefined) {
     return undefined;
   }
+  // @fitness-ignore-next-line env-secret-exposure -- this env object is passed directly to fork(), never logged; callers that need stricter inheritance provide buildChildEnv.
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (descriptor.env !== undefined) Object.assign(env, descriptor.env);
   if (ctx.runId !== undefined && ctx.runId.length > 0) {

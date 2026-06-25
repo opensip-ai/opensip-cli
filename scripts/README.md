@@ -32,6 +32,7 @@ detect it):
 
 | Alias                     | Script                           | What it's for                                                             |
 | ------------------------- | -------------------------------- | ------------------------------------------------------------------------- |
+| `pnpm bench:fork-cost`    | `bench-fork-cost.mjs`            | Spec-02 subprocess-all evidence: real fit/graph worker vs in-process wall time. |
 | `pnpm bench:partition`    | `bench-partition-strategies.mjs` | ADR-0045 graph partition-strategy benchmark (cold/warm, shard balance).   |
 | `pnpm graph:catalog-diff` | `graph-catalog-diff.mjs`         | Function-set delta between the `exact` and `sharded` graph build engines. |
 

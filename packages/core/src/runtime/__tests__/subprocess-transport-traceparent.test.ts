@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type * as Telemetry from '../../lib/telemetry.js';
+
 const mockCurrentTraceparent = vi.fn<() => string | undefined>();
 
 vi.mock('../../lib/telemetry.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../lib/telemetry.js')>();
+  const actual = await importOriginal<typeof Telemetry>();
   return {
     ...actual,
     currentTraceparent: () => mockCurrentTraceparent(),

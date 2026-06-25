@@ -14,7 +14,11 @@ export class CapturedOutputTooLargeError extends Error {
   }
 }
 
-/** Assert a value fits the captured-output ceiling before recording it. */
+/**
+ * Assert a value fits the captured-output ceiling before recording it.
+ *
+ * @throws {CapturedOutputTooLargeError} When `value` exceeds `maxBytes` after serialization.
+ */
 export function assertCapturedOutputFits(field: string, value: unknown, maxBytes: number): void {
   const bytes = measureIpcPayloadBytes(value);
   if (bytes > maxBytes) {

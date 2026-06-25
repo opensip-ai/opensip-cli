@@ -79,6 +79,37 @@ describe('forkAndSettle', () => {
     handle.dispose();
   });
 
+  it('kills when RSS exceeds the configured ceiling', async () => {
+    let failureClass: string | undefined;
+    const handle = forkAndSettle({
+      command: FIXTURE,
+      argv: ['rss-hold'],
+      limits: { maxRssMb: 1 },
+      onLimitFailure: (fc) => {
+        failureClass = fc;
+      },
+    });
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(failureClass).toBe('rss_exceeded');
+    handle.dispose();
+  });
+
+  it('settles as cancelled on SIGINT', async () => {
+    let failureClass: string | undefined;
+    const handle = forkAndSettle({
+      command: FIXTURE,
+      argv: ['timeout-sleep'],
+      enableSigintCancellation: true,
+      onLimitFailure: (fc) => {
+        failureClass = fc;
+      },
+    });
+    process.emit('SIGINT');
+    await new Promise((r) => setTimeout(r, 100));
+    expect(failureClass).toBe('cancelled');
+    handle.dispose();
+  });
+
   it('captures truncated stderr tail on failure', async () => {
     let tail: string | undefined;
     const handle = forkAndSettle({

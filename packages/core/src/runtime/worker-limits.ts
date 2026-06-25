@@ -35,7 +35,7 @@ export interface WorkerLimits {
 
 const MIB = 1024 * 1024;
 
-function parsePositiveInt(raw: string, fallback: number): number {
+function parseWorkerPositiveInt(raw: string, fallback: number): number {
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
@@ -50,43 +50,43 @@ function parseOptionalPositiveInt(raw: string): number | undefined {
 export const WORKER_LIMITS_ENV_SPECS = [
   {
     canonical: 'OPENSIP_CLI_WORKER_TIMEOUT_MS',
-    coerce: (raw: string) => parsePositiveInt(raw, 120_000),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 120_000),
     default: 120_000,
     docs: 'Per-run wall-clock hard cap for a forked worker (ms). Not reset per host-RPC upcall.',
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_MAX_IPC_BYTES',
-    coerce: (raw: string) => parsePositiveInt(raw, 32 * MIB),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 32 * MIB),
     default: 32 * MIB,
     docs: 'Max serialized IPC payload size (bytes) on worker send and host receive.',
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_MAX_OLD_SPACE_MB',
-    coerce: (raw: string) => parsePositiveInt(raw, 4096),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 4096),
     default: 4096,
     docs: 'V8 old-space cap for forked workers via --max-old-space-size (MiB).',
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_MAX_RSS_MB',
-    coerce: (raw: string) => parsePositiveInt(raw, 6144),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 6144),
     default: 6144,
     docs: 'Hard RSS ceiling for forked workers; exceeded → SIGKILL (MiB).',
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_MAX_CONCURRENT_RPC',
-    coerce: (raw: string) => parsePositiveInt(raw, 1),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 1),
     default: 1,
     docs: 'Max concurrent in-flight host-RPC upcalls per dispatch worker run.',
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_MAX_TOTAL_RPC',
-    coerce: (raw: string) => parsePositiveInt(raw, 5000),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 5000),
     default: 5000,
     docs: 'Max total host-RPC upcalls per dispatch worker run.',
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_HEARTBEAT_GRACE_MS',
-    coerce: (raw: string) => parsePositiveInt(raw, 60_000),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 60_000),
     default: 60_000,
     docs: 'Grace period after the last worker heartbeat before heartbeat_missed kill (ms).',
   },
@@ -97,7 +97,7 @@ export const WORKER_LIMITS_ENV_SPECS = [
   },
   {
     canonical: 'OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES',
-    coerce: (raw: string) => parsePositiveInt(raw, 32 * MIB),
+    coerce: (raw: string) => parseWorkerPositiveInt(raw, 32 * MIB),
     default: 32 * MIB,
     docs: 'Max bytes for ResultAccumulator serialized output and captured child stderr.',
   },
@@ -110,6 +110,7 @@ export const WORKER_LIMITS_ENV_SPECS = [
 ] as const;
 
 /** Registry for worker limit env reads. */
+// @allow-module-singleton EnvRegistry is an immutable spec table plus on-demand process.env reads; it holds no per-run mutable state.
 export const workerLimitsEnv = new EnvRegistry([...WORKER_LIMITS_ENV_SPECS]);
 
 /** Resolve the current worker limits from env (with safe defaults). */

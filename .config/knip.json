@@ -1,6 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["pgrep", "ps", "taskkill", "wmic"],
   "ignore": ["**/__fixtures__/**"],
   "rules": {
     "duplicates": "off"
@@ -26,6 +27,7 @@
     "packages/cli": {
       "entry": [
         "src/__tests__/fixtures/**/*.{ts,js,mjs}",
+        "src/bootstrap/__tests__/fixtures/**/*.{ts,js,mjs}",
         "src/commands/tools/runtime-probe-entry.ts"
       ],
       "ignoreDependencies": [

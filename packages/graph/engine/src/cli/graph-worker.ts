@@ -23,6 +23,8 @@ import { readFileSync } from 'node:fs';
 
 import {
   defineCommand,
+  sendWorkerIpcMessage,
+  startWorkerHeartbeat,
   type CommandSpec,
   type ToolCliContext,
   type WorkerMessage,
@@ -49,7 +51,11 @@ interface GraphWorkerSpec {
 
 /** Post one IPC message to the parent (no-op when not forked). */
 function send(msg: WorkerMessage<ProgressEvent, LiveGraphOutput>): void {
-  process.send?.(msg);
+  sendWorkerIpcMessage(msg);
+}
+
+function failureClass(error: unknown): string | undefined {
+  return (error as { failureClass?: string }).failureClass;
 }
 
 /**
@@ -58,6 +64,7 @@ function send(msg: WorkerMessage<ProgressEvent, LiveGraphOutput>): void {
  * a failure is sent as a `{ kind: 'error' }` message so the parent rejects cleanly.
  */
 export async function executeGraphWorker(specPath: string, cli: ToolCliContext): Promise<void> {
+  const stopHeartbeat = startWorkerHeartbeat();
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as GraphWorkerSpec;
     const config = loadGraphConfig(args.cwd);
@@ -114,7 +121,10 @@ export async function executeGraphWorker(specPath: string, cli: ToolCliContext):
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
       ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+      ...(failureClass(error) === undefined ? {} : { failureClass: failureClass(error) }),
     });
+  } finally {
+    stopHeartbeat();
   }
 }
 

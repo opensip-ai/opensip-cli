@@ -17,6 +17,8 @@ import { readFileSync } from 'node:fs';
 
 import {
   defineCommand,
+  sendWorkerIpcMessage,
+  startWorkerHeartbeat,
   type CommandSpec,
   type ToolCliContext,
   type WorkerMessage,
@@ -33,7 +35,11 @@ type SimWorkerResult = Awaited<ReturnType<typeof executeSim>>;
 
 /** Post one IPC message to the parent (no-op when not forked). */
 function send(msg: WorkerMessage<ProgressEvent, SimWorkerResult>): void {
-  process.send?.(msg);
+  sendWorkerIpcMessage(msg);
+}
+
+function failureClass(error: unknown): string | undefined {
+  return (error as { failureClass?: string }).failureClass;
 }
 
 /**
@@ -42,6 +48,7 @@ function send(msg: WorkerMessage<ProgressEvent, SimWorkerResult>): void {
  * `{ kind: 'error' }` message so the parent's `result` promise rejects cleanly.
  */
 export async function executeSimWorker(specPath: string): Promise<void> {
+  const stopHeartbeat = startWorkerHeartbeat();
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as SimWorkerArgs;
     send({
@@ -61,7 +68,10 @@ export async function executeSimWorker(specPath: string): Promise<void> {
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
       ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+      ...(failureClass(error) === undefined ? {} : { failureClass: failureClass(error) }),
     });
+  } finally {
+    stopHeartbeat();
   }
 }
 

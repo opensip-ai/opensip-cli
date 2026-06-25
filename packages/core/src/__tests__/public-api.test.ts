@@ -214,6 +214,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'resolveUserPaths',
   'runOffThreadOrInProcess',
   'sendWorkerIpcMessage',
+  'startWorkerHeartbeat',
   'runWithRetry',
   'runWithScope',
   'runWithScopeSync',

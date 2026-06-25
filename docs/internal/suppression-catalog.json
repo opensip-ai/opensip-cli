@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-25T18:18:58.937Z",
+  "generatedAt": "2026-06-25T20:56:31.915Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -13,12 +13,12 @@
       "fitness": {
         "total": 210,
         "bySlug": {
-          "env-secret-exposure": 3,
           "silent-early-returns": 7,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 6,
           "interface-implementation-consistency": 2,
+          "env-secret-exposure": 3,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 4,
           "shipped-checks-must-be-generic": 5,
@@ -83,9 +83,9 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 5,
+          "cli": 4,
           "cli-ui": 1,
-          "core": 3,
+          "core": 4,
           "dashboard": 1,
           "fitness/checks-typescript": 64,
           "fitness/checks-universal": 106,
@@ -107,12 +107,12 @@
       "fitness": {
         "total": 38,
         "bySlug": {
-          "env-secret-exposure": 2,
           "silent-early-returns": 5,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 2,
           "interface-implementation-consistency": 1,
+          "env-secret-exposure": 2,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 4,
           "no-direct-stdout-in-tool-engine": 2,
@@ -131,9 +131,9 @@
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 5,
+          "cli": 4,
           "cli-ui": 1,
-          "core": 3,
+          "core": 4,
           "dashboard": 1,
           "fitness/engine": 12,
           "graph/engine": 10,

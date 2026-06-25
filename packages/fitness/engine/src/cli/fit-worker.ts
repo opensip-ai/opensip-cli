@@ -19,6 +19,8 @@ import { readFileSync } from 'node:fs';
 
 import {
   defineCommand,
+  sendWorkerIpcMessage,
+  startWorkerHeartbeat,
   type CommandSpec,
   type ToolCliContext,
   type WorkerMessage,
@@ -35,7 +37,11 @@ type FitWorkerResult = Awaited<ReturnType<typeof executeFit>>;
 
 /** Post one IPC message to the parent (no-op when not forked). */
 function send(msg: WorkerMessage<ProgressEvent, FitWorkerResult>): void {
-  process.send?.(msg);
+  sendWorkerIpcMessage(msg);
+}
+
+function failureClass(error: unknown): string | undefined {
+  return (error as { failureClass?: string }).failureClass;
 }
 
 /**
@@ -44,6 +50,7 @@ function send(msg: WorkerMessage<ProgressEvent, FitWorkerResult>): void {
  * a `{ kind: 'error' }` message so the parent's `result` promise rejects cleanly.
  */
 export async function executeFitWorker(specPath: string): Promise<void> {
+  const stopHeartbeat = startWorkerHeartbeat();
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as FitOptions;
     send({
@@ -63,7 +70,10 @@ export async function executeFitWorker(specPath: string): Promise<void> {
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
       ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+      ...(failureClass(error) === undefined ? {} : { failureClass: failureClass(error) }),
     });
+  } finally {
+    stopHeartbeat();
   }
 }
 

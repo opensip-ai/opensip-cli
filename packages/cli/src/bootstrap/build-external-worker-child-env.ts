@@ -7,10 +7,15 @@
  * are out of scope — they are TCB and still spread the parent env.
  */
 
+import { SKIP_INSTALLED_PLUGINS_ENV } from './skip-installed-plugins.js';
 import { IN_TOOL_WORKER_ENV } from './tool-provenance.js';
+import { INSTALLED_TOOL_ALLOWLIST_ENV, PROJECT_TOOL_ALLOWLIST_ENV } from './tool-trust.js';
 
 /** Env var listing extra parent vars to forward (comma/whitespace-separated). */
 export const TOOL_ENV_PASSTHROUGH_ENV = 'OPENSIP_CLI_TOOL_ENV_PASSTHROUGH';
+
+/** Env var listing bundled first-party tool ids to skip during bootstrap. */
+const SKIP_BUNDLED_TOOLS_ENV = 'OPENSIP_CLI_SKIP_BUNDLED';
 
 /** Default pass-through set for external-tool worker children (OQ2). */
 export const EXTERNAL_WORKER_CHILD_ENV_ALLOWLIST: readonly string[] = [
@@ -25,6 +30,10 @@ export const EXTERNAL_WORKER_CHILD_ENV_ALLOWLIST: readonly string[] = [
   'NODE_ENV',
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'OPENSIP_PROFILING',
+  SKIP_BUNDLED_TOOLS_ENV,
+  SKIP_INSTALLED_PLUGINS_ENV,
+  INSTALLED_TOOL_ALLOWLIST_ENV,
+  PROJECT_TOOL_ALLOWLIST_ENV,
 ];
 
 function parsePassthroughKeys(raw: string | undefined): readonly string[] {

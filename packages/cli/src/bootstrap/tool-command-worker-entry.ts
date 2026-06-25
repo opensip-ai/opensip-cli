@@ -40,6 +40,7 @@ import {
   IpcPayloadTooLargeError,
   resolveToolHooks,
   sendWorkerIpcMessage,
+  startWorkerHeartbeat,
   type CommandSpec,
   type ToolCliContext,
   type Tool,
@@ -86,20 +87,6 @@ function send(msg: DispatchWorkerMessage): void {
     }
     throw error;
   }
-}
-
-/** Emit periodic heartbeats so the supervisor can detect a wedged worker. */
-function startWorkerHeartbeat(): () => void {
-  if (process.send === undefined) {
-    return () => {
-      /* not forked — no heartbeat channel */
-    };
-  }
-  const timer = setInterval(() => {
-    sendWorkerIpcMessage({ kind: 'heartbeat' });
-  }, 10_000);
-  timer.unref?.();
-  return () => clearInterval(timer);
 }
 
 /**

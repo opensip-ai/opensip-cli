@@ -146,7 +146,9 @@ function analyzeLiveRunnerOffThread(content, filePath) {
       );
     }
   }
-  if (LIVE_WORKER_FILES.has(rel) && !/process\.send(?:\?\.)?\s*\(/.test(content)) {
+  const sendsWorkerIpc =
+    /process\.send(?:\?\.)?\s*\(/.test(content) || /\bsendWorkerIpcMessage\s*\(/.test(content);
+  if (LIVE_WORKER_FILES.has(rel) && !sendsWorkerIpc) {
     violations.push(
       violation(
         filePath,
