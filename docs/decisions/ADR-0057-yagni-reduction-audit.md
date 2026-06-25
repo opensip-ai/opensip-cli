@@ -1,18 +1,25 @@
 ---
-status: active
-last_verified: 2026-06-21
+status: superseded
+last_verified: 2026-06-24
 owner: opensip-cli
 ---
 
 # ADR-0057: YAGNI as a bundled Tool with graph evidence seam
 
+> **Superseded by [ADR-0063](ADR-0063-yagni-reduction-coordinator.md)
+> (2026-06-24).** The "call-graph body-hash grouping is proven machinery" premise
+> below proved to be a *re-implementation* of `graph:duplicated-function-body` that
+> diverged in production (430 yagni warnings vs 0 graph findings on the same
+> catalog). ADR-0063 retires yagni's own detectors and makes it a freshness-gating
+> coordinator over graph rules + fitness checks.
+
 ```yaml
 id: ADR-0057
 title: YAGNI as a bundled Tool with graph evidence seam
 date: 2026-06-21
-status: active
+status: superseded
 supersedes: []
-superseded_by: null
+superseded_by: ADR-0063
 related: [ADR-0014, ADR-0036, ADR-0047]
 tags: [yagni, graph, tools, architecture]
 enforcement: mechanizable
