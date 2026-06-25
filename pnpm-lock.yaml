@@ -683,6 +683,9 @@ importers:
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../../cli-ui
+      '@opensip-cli/clone-detection':
+        specifier: workspace:*
+        version: link:../../clone-detection
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../../config
@@ -1855,6 +1858,9 @@ packages:
 
   '@opensip-cli/cli-ui@file:packages/cli-ui':
     resolution: {directory: packages/cli-ui, type: directory}
+
+  '@opensip-cli/clone-detection@file:packages/clone-detection':
+    resolution: {directory: packages/clone-detection, type: directory}
 
   '@opensip-cli/config@file:packages/config':
     resolution: {directory: packages/config, type: directory}
@@ -5025,6 +5031,8 @@ snapshots:
       - react-devtools-core
       - utf-8-validate
 
+  '@opensip-cli/clone-detection@file:packages/clone-detection': {}
+
   '@opensip-cli/config@file:packages/config':
     dependencies:
       '@opensip-cli/core': file:packages/core
@@ -5378,6 +5386,7 @@ snapshots:
     dependencies:
       '@opensip-cli/cli-live': file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
+      '@opensip-cli/clone-detection': file:packages/clone-detection
       '@opensip-cli/config': file:packages/config
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core

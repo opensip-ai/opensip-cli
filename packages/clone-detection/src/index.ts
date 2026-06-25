@@ -6,8 +6,22 @@
  * near-duplicate detection algorithms + curation policy. Both the graph tool and the
  * yagni tool depend on it (neither on the other), so there is exactly one
  * implementation and they cannot diverge (ADR-0064).
- *
- * Barrel is populated by Tasks 1.2–1.3a.
  */
 
-export {};
+// Body-hash primitives (relocated verbatim from graph — bodyHash is the catalog/cache
+// /equivalence-guardrail identity; the values must never change).
+export { normalizeWhitespace, hashBody, type BodyDigest } from './body-digest.js';
+
+// MinHash / LSH near-duplicate primitives + algorithm constants.
+export {
+  NEAR_DUP_SIGNATURE_K,
+  NEAR_DUP_LSH_BANDS,
+  NEAR_DUP_LSH_ROWS,
+  NEAR_DUP_SIGNATURE_VERSION,
+  shingle,
+  bodySignature,
+  estimateJaccard,
+  lshBandHashes,
+  digestCanonicalBody,
+  type BodyDigestWithSignature,
+} from './near-duplicate-signature.js';
