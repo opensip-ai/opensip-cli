@@ -64,6 +64,7 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OPENSIP_HEAP_NO_MONITOR` | Set to `1` to disable the V8 heap-pressure monitor (REPL embedding / custom allocators). |
+| `GRAPH_EQUIV_DIAG` | File path. When set, the graph `graph-equivalence-check` writes a structured JSON diagnostic of every production decline/phantom divergence (owner, resolved targets, and the call edge on both engines) to that path. Diagnostic-only; unset in normal runs. |
 
 ## YAGNI audit
 

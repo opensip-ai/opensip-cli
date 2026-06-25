@@ -4,9 +4,10 @@ All notable changes to OpenSIP CLI are documented here.
 
 ## [0.1.12] - 2026-06-24
 
-A graph-focused release. It adds near-duplicate (copy-paste-with-edits) function
-detection and a structured equivalence diagnostic, and it hardens sharded≡exact
-graph equivalence and cross-language call resolution. All changes are
+A graph-focused release, with report and YAGNI polish. It adds near-duplicate
+(copy-paste-with-edits) function detection and a structured equivalence diagnostic,
+hardens sharded≡exact graph equivalence and cross-language call resolution, and
+refreshes the HTML report and the `yagni` live view. All changes are
 backward-compatible; the new catalog signature field and rule are additive.
 
 ### Added
@@ -31,6 +32,12 @@ backward-compatible; the new catalog signature field and rule are additive.
   is hashed once and the signature values are derived with cheap mixers, instead of
   hashing every shingle k times — so cold graph builds stay fast despite the new
   per-function signature.
+- `opensip yagni`'s live view now shows each detector as its own checklist row with
+  live timing (matching the `graph` staged view), instead of a single aggregate
+  "Running detectors…" spinner.
+- The HTML report uses the OpenSIP coffee-cup mark, is titled "OpenSIP Report", and
+  supports URL-hash deep links (e.g. `#code-paths/coupling`) so a specific tab/view
+  can be shared or reopened directly.
 
 ### Fixed
 

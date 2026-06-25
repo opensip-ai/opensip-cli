@@ -67,4 +67,42 @@ describe('near-duplicate-signature', () => {
       NEAR_DUP_LSH_BANDS,
     );
   });
+
+  it('bodySignature returns empty for empty canonical (no shingles)', () => {
+    expect(bodySignature('')).toEqual([]);
+  });
+
+  it('bodySignature with custom k derives k seeds and returns k values', () => {
+    const sig = bodySignature(base, 32);
+    expect(sig.length).toBe(32);
+    // Custom-k path is deterministic and stable across calls.
+    expect(bodySignature(base, 32)).toEqual(sig);
+    // Identical body still self-matches under a custom k.
+    expect(estimateJaccard(sig, bodySignature(base, 32))).toBe(1);
+  });
+
+  it('bodySignature produces a full-width signature for sub-gram bodies', () => {
+    // Body shorter than the gram size yields a single whole-string shingle,
+    // exercising the single-base MinHash loop across all k positions.
+    const short = bodySignature('ab');
+    expect(short.length).toBe(NEAR_DUP_SIGNATURE_K);
+    expect(short.every((v) => Number.isInteger(v))).toBe(true);
+  });
+
+  it('estimateJaccard returns 0 when either signature is empty', () => {
+    const sig = bodySignature(base);
+    expect(estimateJaccard([], sig)).toBe(0);
+    expect(estimateJaccard(sig, [])).toBe(0);
+    expect(estimateJaccard([], [])).toBe(0);
+  });
+
+  it('estimateJaccard returns 0 for mismatched signature lengths', () => {
+    expect(estimateJaccard(bodySignature(base), bodySignature(base, 32))).toBe(0);
+  });
+
+  it('digestCanonicalBody omits signature for empty canonical', () => {
+    const d = digestCanonicalBody('');
+    expect(d.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(d.signature).toBeUndefined();
+  });
 });

@@ -173,6 +173,13 @@ export const BUNDLED_TOOL_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
     canonical: 'OPENSIP_HEAP_NO_MONITOR',
     docs: 'Set to 1 to disable the graph V8 heap-pressure monitor (REPL embedding / custom allocators).',
   },
+  {
+    canonical: 'GRAPH_EQUIV_DIAG',
+    docs:
+      'File path. When set, the graph `graph-equivalence-check` writes a structured JSON ' +
+      'diagnostic of every production decline/phantom divergence (owner, resolved targets, ' +
+      'and the call edge on both engines) to that path. Diagnostic-only; unset in normal runs.',
+  },
 ];
 
 /**
