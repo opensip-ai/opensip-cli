@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { isErrorSignal } from '@opensip-cli/core';
+import { isErrorSignal, yieldToEventLoop } from '@opensip-cli/core';
 
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 import { YAGNI_DETECTORS } from '../detectors/registry.js';
@@ -127,6 +127,11 @@ export async function executeYagni(
   for (const detector of run) {
     const started = Date.now();
     opts.onDetectorStart?.(detector.slug);
+    // Yield so a phases live view paints the running spinner + live elapsed on
+    // this detector before a fast/synchronous detector blocks the event loop —
+    // mirrors graph's runStage, which yields right after stage-start so the
+    // spinner moves to the active row instead of jumping straight to done.
+    if (opts.onDetectorStart) await yieldToEventLoop();
     try {
       const result = await detector.run({
         cwd: opts.cwd,
