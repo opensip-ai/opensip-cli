@@ -21,6 +21,10 @@ function makeFixtureTree(): string {
   }
   for (const file of [
     'src/index.ts',
+    'src/view.tsx',
+    'src/types.d.ts',
+    'src/module.mts',
+    'src/common.cts',
     'src/__tests__/unit.test.ts',
     'src/__tests__/fixtures/sample.ts',
     'src/__tests__/__fixtures__/golden.ts',
@@ -42,12 +46,22 @@ describe('walkTypeScriptFiles', () => {
   it('excludes tests and fixtures unless includeTests is enabled', () => {
     const root = makeFixtureTree();
 
-    expect(rel(root, walkTypeScriptFiles(root, false))).toEqual(['src/index.ts']);
+    expect(rel(root, walkTypeScriptFiles(root, false))).toEqual([
+      'src/common.cts',
+      'src/index.ts',
+      'src/module.mts',
+      'src/types.d.ts',
+      'src/view.tsx',
+    ]);
     expect(rel(root, walkTypeScriptFiles(root, true))).toEqual([
       'src/__tests__/__fixtures__/golden.ts',
       'src/__tests__/fixtures/sample.ts',
       'src/__tests__/unit.test.ts',
+      'src/common.cts',
       'src/index.ts',
+      'src/module.mts',
+      'src/types.d.ts',
+      'src/view.tsx',
     ]);
   });
 });

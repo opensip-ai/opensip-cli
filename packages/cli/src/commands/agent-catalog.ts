@@ -119,7 +119,7 @@ export function buildAgentCatalog(): AgentCatalog {
       command: 'yagni',
       description:
         'Run YAGNI reduction audit detectors. Advisory findings; --json yields SignalEnvelope.',
-      examples: ['opensip yagni --json', 'opensip yagni --json --graph off'],
+      examples: ['opensip yagni --json', 'opensip yagni --json packages/yagni/engine'],
       tier: 'tool' as const,
     },
     {

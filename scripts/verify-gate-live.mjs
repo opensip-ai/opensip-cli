@@ -96,6 +96,34 @@ const EXTERNAL_GATE_PROBES = [
   },
 ];
 
+// ADR-0064 clone-detection / yagni graph-independence gate liveness. These
+// probes prove the shared clone substrate remains a leaf and yagni cannot regain
+// a graph engine/adapter production edge while still allowing test-only parity
+// fixtures to import the graph TypeScript adapter.
+const ADR_0064_PROBES = [
+  {
+    file: 'packages/clone-detection/src/__gate_probe_contracts__.ts',
+    source:
+      "import { BUILTIN_DEFAULT_RECIPE } from '@opensip-cli/contracts';\n" +
+      'export const _gateProbe = BUILTIN_DEFAULT_RECIPE;\n',
+    rule: 'clone-detection-imports-nothing',
+  },
+  {
+    file: 'packages/yagni/engine/src/__gate_probe_graph_engine__.ts',
+    source:
+      "import { graphTool } from '@opensip-cli/graph';\n" +
+      'export const _gateProbe = graphTool;\n',
+    rule: 'yagni-no-graph-engine',
+  },
+  {
+    file: 'packages/yagni/engine/src/__gate_probe_graph_adapter__.ts',
+    source:
+      "import { typescriptGraphAdapter } from '@opensip-cli/graph-typescript';\n" +
+      'export const _gateProbe = typescriptGraphAdapter;\n',
+    rule: 'yagni-no-graph-adapter-packs',
+  },
+];
+
 function depcruiseReport(target) {
   // err-long emits the rule name + offending edge; non-zero exit on
   // violations is expected and not an error for the probe.
@@ -155,6 +183,14 @@ function verifyExternalGatesFire() {
   console.log(
     `verify-gate-live: OK — all ${EXTERNAL_GATE_PROBES.length} external-package gates ` +
       'fired on a probe (OTel-SDK-only-in-cli + tree-sitter-parser-only-in-lang-packs are live).',
+  );
+}
+
+function verifyAdr0064GatesFire() {
+  verifyProbesFire(ADR_0064_PROBES, 'ADR-0064 clone-detection/yagni graph-independence gate');
+  console.log(
+    `verify-gate-live: OK — all ${ADR_0064_PROBES.length} ADR-0064 gates ` +
+      'fired on a probe (clone-detection leaf + yagni-no-graph are live).',
   );
 }
 
@@ -252,6 +288,9 @@ function main() {
   // package guards still fire — they go inert if includeOnly stops surfacing
   // those two npm families into the graph.
   verifyExternalGatesFire();
+
+  // Prove the ADR-0064 shared clone-detection substrate rules still fire.
+  verifyAdr0064GatesFire();
 }
 
 main();

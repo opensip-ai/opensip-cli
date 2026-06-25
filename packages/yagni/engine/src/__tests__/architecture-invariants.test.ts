@@ -36,6 +36,7 @@ describe('ADR-0064 architectural invariants', () => {
   it('dependency-cruiser wires clone-detection-imports-nothing and yagni-no-graph rules', () => {
     const config = readFileSync(`${REPO_ROOT}/.config/dependency-cruiser.cjs`, 'utf8');
     expect(config).toContain('clone-detection-imports-nothing');
+    expect(config).toContain('yagni-no-graph-engine');
     expect(config).toContain('yagni-no-graph-adapter-packs');
   });
 

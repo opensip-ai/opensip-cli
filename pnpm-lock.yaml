@@ -1168,6 +1168,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@opensip-cli/graph-typescript':
+        specifier: workspace:*
+        version: file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2

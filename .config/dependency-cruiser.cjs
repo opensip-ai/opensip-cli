@@ -693,12 +693,24 @@ module.exports = {
       to: { path: '^packages/fitness/checks-' },
     },
     {
+      name: 'yagni-no-graph-engine',
+      severity: 'error',
+      comment:
+        'ADR-0064: yagni must not import @opensip-cli/graph or @opensip-cli/graph/internal. ' +
+        'Duplicate detection is owned through @opensip-cli/clone-detection, not a tool→tool edge.',
+      from: {
+        path: '^packages/yagni/engine/src/',
+        pathNot: '^packages/yagni/engine/src/__tests__/',
+      },
+      to: { path: '^packages/graph/engine/' },
+    },
+    {
       name: 'yagni-no-graph-adapter-packs',
       severity: 'error',
       comment:
         'The yagni engine must not depend on any @opensip-cli/graph-* adapter pack. ' +
-        'Since v0.1.12 (ADR-0063) yagni owns no graph evidence at all; duplicate ' +
-        'analysis lives in `opensip graph`.',
+        'ADR-0064 routes duplicate analysis through @opensip-cli/clone-detection while ' +
+        'yagni builds its own TypeScript inventory.',
       from: {
         path: '^packages/yagni/engine/src/',
         pathNot: '^packages/yagni/engine/src/__tests__/',

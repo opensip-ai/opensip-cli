@@ -14,7 +14,8 @@
  *     endLine = getEnd line + 1. bodyLines fallback (`endLine − line + 1`) equals graph's
  *     feature column (features.ts:132).
  *   - inTestFile via the shared `isTestFilePath` (Phase 1 Task 1.3a) — the single predicate.
- *   - kind ∈ the eligible set only (function-declaration/method/constructor/getter/setter).
+ *   - kind ∈ the eligible set only (function-declaration/method/constructor/getter/setter,
+ *     with class static blocks emitted as graph's synthetic '<static-init>' function).
  *     Arrows / function-expressions / module-init are excluded by policy on both tools, so
  *     emitting only the eligible kinds yields the same post-filter groups as graph.
  *
@@ -38,8 +39,10 @@ import ts from 'typescript';
 
 import { walkTypeScriptFiles } from './walk-typescript-files.js';
 
-/** A function body larger than this is skipped (resource bound, H3). 1 MB matches unused-config-surface. */
-const MAX_SOURCE_FILE_BYTES = 1_000_000;
+const UNKNOWN_PACKAGE = '<unknown>';
+
+/** A source file larger than this is skipped (resource bound, H3). Mirrors graph/fitness. */
+const MAX_SOURCE_FILE_BYTES = 10_000_000;
 
 /**
  * Build the function-body inventory for `cwd` (optionally scoped to `pathRoots`).
@@ -50,7 +53,7 @@ const MAX_SOURCE_FILE_BYTES = 1_000_000;
 export function buildTsInventory(cwd: string, pathRoots?: readonly string[]): CloneCandidate[] {
   return withSpan('opensip-cli-yagni', 'yagni.build_ts_inventory', () => {
     const start = Date.now();
-    const filePaths = walkTypeScriptFiles(cwd, true, pathRoots);
+    const filePaths = walkTypeScriptFiles(cwd, true, pathRoots).filter(isGraphTsSourceFile);
     const candidates: CloneCandidate[] = [];
     const packageByDir = new Map<string, string | undefined>();
     for (const filePath of filePaths) {
@@ -59,11 +62,13 @@ export function buildTsInventory(cwd: string, pathRoots?: readonly string[]): Cl
       const sourceFile = getSharedSourceFile(filePath, content);
       if (!sourceFile) continue;
       const projectRel = relative(cwd, filePath).split('\\').join('/');
+      const packageName =
+        resolvePackage(dirname(filePath), cwd, packageByDir) ?? packageFallback(projectRel);
       const ctx: FileContext = {
         sourceFile,
         projectRel,
         inTestFile: isTestFilePath(projectRel),
-        pkg: resolvePackage(dirname(filePath), cwd, packageByDir),
+        pkg: packageName,
       };
       collectFunctions(sourceFile, ctx, undefined, candidates);
     }
@@ -91,7 +96,10 @@ function collectFunctions(
 ): void {
   const candidate = candidateFor(node, ctx, enclosingClass);
   if (candidate) out.push(candidate);
-  const nextClass = ts.isClassDeclaration(node) && node.name ? node.name.text : enclosingClass;
+  const nextClass =
+    ts.isClassDeclaration(node) || ts.isClassExpression(node)
+      ? (node.name?.text ?? '<anon-class>')
+      : enclosingClass;
   ts.forEachChild(node, (child) => collectFunctions(child, ctx, nextClass, out));
 }
 
@@ -137,7 +145,7 @@ interface Shape {
  * Classify a node as one of the ELIGIBLE function kinds (the kinds duplicate detection
  * considers — arrows / function-expressions / module-init are excluded by policy, so they
  * are not emitted). Returns undefined for everything else and for body-less declarations
- * (overload signatures / ambient `declare`), which graph drops too.
+ * (overload signatures / ambient `declare`) for the declarations graph drops too.
  */
 function classify(
   node: ts.Node,
@@ -154,19 +162,28 @@ function classify(
       ? undefined
       : { kind: 'function-declaration', simpleName: name, qualifiedName: `${base}.${name}` };
   }
-  if (ts.isConstructorDeclaration(node) && node.body) {
+  if (ts.isConstructorDeclaration(node)) {
+    const className = enclosingClass ?? '<anon-class>';
     return {
       kind: 'constructor',
-      simpleName: 'constructor',
-      qualifiedName: inClass('constructor'),
+      simpleName: className,
+      qualifiedName: `${base}.${className}.constructor`,
     };
   }
   if (ts.isMethodDeclaration(node) && node.body) {
-    const name = memberName(node);
+    const name = methodName(node, ctxSourceFile(node));
+    if (name === undefined) return undefined;
     return { kind: 'method', simpleName: name, qualifiedName: inClass(name) };
   }
-  if (ts.isGetAccessor(node) && node.body) return accessorShape(node, 'getter', inClass);
-  if (ts.isSetAccessor(node) && node.body) return accessorShape(node, 'setter', inClass);
+  if (ts.isGetAccessor(node)) return accessorShape(node, 'getter', inClass);
+  if (ts.isSetAccessor(node)) return accessorShape(node, 'setter', inClass);
+  if (ts.isClassStaticBlockDeclaration(node)) {
+    return {
+      kind: 'function-declaration',
+      simpleName: '<static-init>',
+      qualifiedName: inClass('<static-init>'),
+    };
+  }
   return undefined;
 }
 
@@ -178,20 +195,37 @@ function functionDeclName(node: ts.FunctionDeclaration): string | undefined {
   return isDefault ? '<default>' : undefined;
 }
 
-/** Member name for a method/accessor, or `<computed>` for a computed property name. */
-function memberName(node: ts.MethodDeclaration | ts.AccessorDeclaration): string {
-  return ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)
-    ? node.name.text
-    : '<computed>';
+/** Method name exactly as graph-typescript records it. */
+function methodName(node: ts.MethodDeclaration, sf: ts.SourceFile): string | undefined {
+  const name = node.name;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  if (ts.isComputedPropertyName(name)) return name.expression.getText(sf);
+  if (ts.isPrivateIdentifier(name)) return name.text;
+  return undefined;
+}
+
+/** Accessor name exactly as graph-typescript records it; computed/private accessors are skipped. */
+function accessorName(node: ts.AccessorDeclaration): string | undefined {
+  const name = node.name;
+  return ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
 }
 
 function accessorShape(
   node: ts.AccessorDeclaration,
   kind: FunctionKind,
   inClass: (name: string) => string,
-): Shape {
-  const name = memberName(node);
+): Shape | undefined {
+  const name = accessorName(node);
+  if (name === undefined) return undefined;
   return { kind, simpleName: name, qualifiedName: inClass(name) };
+}
+
+function ctxSourceFile(node: ts.Node): ts.SourceFile {
+  return node.getSourceFile();
+}
+
+function isGraphTsSourceFile(filePath: string): boolean {
+  return (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts');
 }
 
 /** Read a source file, skipping anything over the byte bound (H3). */
@@ -220,15 +254,29 @@ function resolvePackage(
   try {
     const pkg = readFileSync(join(dir, 'package.json'), 'utf8');
     const name = (JSON.parse(pkg) as { name?: unknown }).name;
-    if (typeof name === 'string') resolved = name;
+    resolved =
+      typeof name === 'string' && name.length > 0 ? name : resolveParentPackage(dir, cwd, cache);
   } catch {
-    const parent = dirname(dir);
-    if (dir !== cwd && parent !== dir && dir.startsWith(cwd)) {
-      resolved = resolvePackage(parent, cwd, cache);
-    }
+    resolved = resolveParentPackage(dir, cwd, cache);
   }
   cache.set(dir, resolved);
   return resolved;
+}
+
+function resolveParentPackage(
+  dir: string,
+  cwd: string,
+  cache: Map<string, string | undefined>,
+): string | undefined {
+  const parent = dirname(dir);
+  return dir !== cwd && parent !== dir && dir.startsWith(cwd)
+    ? resolvePackage(parent, cwd, cache)
+    : undefined;
+}
+
+function packageFallback(projectRel: string): string {
+  const segment = projectRel.split('/')[0];
+  return segment && segment !== projectRel ? segment : UNKNOWN_PACKAGE;
 }
 
 /**
