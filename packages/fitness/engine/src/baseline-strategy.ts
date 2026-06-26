@@ -18,8 +18,12 @@
 
 import { createHash } from 'node:crypto';
 
-import type { FingerprintStrategy } from '@opensip-cli/core';
+import { defineFingerprintStrategy } from '@opensip-cli/core';
 
 /** fitness's message-hash baseline identity: `sha256(filePath\nruleId\nmessage)`. */
-export const fitnessFingerprintStrategy: FingerprintStrategy = (s) =>
-  createHash('sha256').update(`${s.filePath}\n${s.ruleId}\n${s.message}`).digest('hex');
+export const fitnessFingerprintStrategy = defineFingerprintStrategy({
+  id: 'fitness.sha256-file-rule-message',
+  version: 1,
+  fingerprint: (s) =>
+    createHash('sha256').update(`${s.filePath}\n${s.ruleId}\n${s.message}`).digest('hex'),
+});

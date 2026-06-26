@@ -1,9 +1,8 @@
 // Test that the machine-output contract — the signal envelope (ADR-0011) —
 // keeps its documented shape. CliOutput (version '1.0') was retired in Phase 7;
 // the envelope (schemaVersion 2) is the single output currency every tool emits.
+import { DEFAULT_BASELINE_IDENTITY, type SignalEnvelope } from '@opensip-cli/contracts';
 import { describe, it, expect } from 'vitest';
-
-import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 describe('JSON output contract', () => {
   it('SignalEnvelope has required fields', () => {
@@ -20,6 +19,7 @@ describe('JSON output contract', () => {
       },
       units: [{ slug: 'test', passed: true, durationMs: 100 }],
       signals: [],
+      baselineIdentity: DEFAULT_BASELINE_IDENTITY,
     };
     expect(envelope.schemaVersion).toBe(2);
     expect(envelope.tool).toBe('fit');
@@ -40,6 +40,7 @@ describe('JSON output contract', () => {
       },
       units: [],
       signals: [],
+      baselineIdentity: DEFAULT_BASELINE_IDENTITY,
     };
     expect(envelope.schemaVersion).toBe(2);
   });
@@ -58,6 +59,7 @@ describe('JSON output contract', () => {
       verdict,
       units: [],
       signals: [],
+      baselineIdentity: DEFAULT_BASELINE_IDENTITY,
     };
     const simEnvelope: SignalEnvelope = {
       schemaVersion: 2,
@@ -67,6 +69,7 @@ describe('JSON output contract', () => {
       verdict,
       units: [],
       signals: [],
+      baselineIdentity: DEFAULT_BASELINE_IDENTITY,
     };
     expect(fitEnvelope.tool).toBe('fit');
     expect(simEnvelope.tool).toBe('sim');

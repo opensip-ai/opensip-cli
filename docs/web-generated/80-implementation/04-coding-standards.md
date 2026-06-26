@@ -177,6 +177,9 @@ Examples:
 - `cli.fit.run.complete` — the fit run finished.
 - `plugin.loader.discover` — discovery completed.
 - `gate.compare.complete` — gate finished comparing.
+- `state.lock.acquire.complete` / `state.lock.acquire.timeout` — datastore or artifact write lock outcome ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
+- `state.baseline.identity.mismatch` — gate compare/export blocked by incompatible baseline strategy metadata.
+- `state.artifact.write.complete` — SARIF or baseline fingerprint JSON written atomically.
 - `cli.report.chunk.start` / `cli.report.chunk.done` — cloud report chunk lifecycle.
 
 The phase is optional. A simple event like `cli.gate.config_error` doesn't need one.

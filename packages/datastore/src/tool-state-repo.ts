@@ -71,15 +71,17 @@ export class ToolStateRepo {
         { code: 'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE' },
       );
     }
-    const updatedAt = Date.now();
-    this.datastore.db
-      .insert(toolState)
-      .values({ tool, key, payload, updatedAt })
-      .onConflictDoUpdate({
-        target: [toolState.tool, toolState.key],
-        set: { payload, updatedAt },
-      })
-      .run();
+    this.datastore.withWriteLock('tool_state.put', () => {
+      const updatedAt = Date.now();
+      this.datastore.db
+        .insert(toolState)
+        .values({ tool, key, payload, updatedAt })
+        .onConflictDoUpdate({
+          target: [toolState.tool, toolState.key],
+          set: { payload, updatedAt },
+        })
+        .run();
+    });
     logger.debug({
       evt: 'datastore.tool_state.put',
       module: MODULE_NAME,
@@ -91,10 +93,12 @@ export class ToolStateRepo {
 
   /** Delete one key (no-op when absent). */
   delete(tool: string, key: string): void {
-    this.datastore.db
-      .delete(toolState)
-      .where(and(eq(toolState.tool, tool), eq(toolState.key, key)))
-      .run();
+    this.datastore.withWriteLock('tool_state.delete', () => {
+      this.datastore.db
+        .delete(toolState)
+        .where(and(eq(toolState.tool, tool), eq(toolState.key, key)))
+        .run();
+    });
   }
 
   /** List this tool's keys, sorted (never another tool's). */
@@ -110,13 +114,15 @@ export class ToolStateRepo {
 
   /** Delete ALL of this tool's state rows; returns the deleted count. */
   clear(tool: string): number {
-    const result = this.datastore.db.delete(toolState).where(eq(toolState.tool, tool)).run();
-    logger.info({
-      evt: 'datastore.tool_state.clear.complete',
-      module: MODULE_NAME,
-      tool,
-      count: result.changes,
+    return this.datastore.withWriteLock('tool_state.clear', () => {
+      const result = this.datastore.db.delete(toolState).where(eq(toolState.tool, tool)).run();
+      logger.info({
+        evt: 'datastore.tool_state.clear.complete',
+        module: MODULE_NAME,
+        tool,
+        count: result.changes,
+      });
+      return result.changes;
     });
-    return result.changes;
   }
 }

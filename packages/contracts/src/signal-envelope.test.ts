@@ -1,6 +1,7 @@
 import {
   createSignal,
   defaultFingerprintStrategy,
+  defineFingerprintStrategy,
   HOST_VERDICT_POLICY_FALLBACK,
   type Signal,
   type SignalSeverity,
@@ -34,7 +35,11 @@ const BASE = {
 };
 
 /** A recognizable non-default strategy for the stamping cases. */
-const toolStrategy = (s: Signal): string => `tool:${s.ruleId}`;
+const toolStrategy = defineFingerprintStrategy({
+  id: 'test.tool-strategy',
+  version: 1,
+  fingerprint: (s) => `tool:${s.ruleId}`,
+});
 
 describe('buildSignalEnvelope', () => {
   it('stamps the schema version and identity, and passes units through verbatim', () => {
@@ -68,7 +73,11 @@ describe('buildSignalEnvelope', () => {
         signals: [signal('low')],
       });
       const stamped = env.signals[0];
-      expect(stamped.fingerprint).toBe(defaultFingerprintStrategy(stamped));
+      expect(stamped.fingerprint).toBe(defaultFingerprintStrategy.fingerprint(stamped));
+      expect(env.baselineIdentity).toEqual({
+        fingerprintStrategyId: 'opensip.default.rule-file-line-col',
+        fingerprintStrategyVersion: 1,
+      });
     });
 
     it('stamps with the tool strategy when one is passed', () => {
@@ -79,6 +88,7 @@ describe('buildSignalEnvelope', () => {
         fingerprintStrategy: toolStrategy,
       });
       expect(env.signals[0]?.fingerprint).toBe('tool:rule-high');
+      expect(env.baselineIdentity.fingerprintStrategyId).toBe('test.tool-strategy');
     });
 
     it('preserves pre-stamped signals byte-for-byte and by array identity', () => {
@@ -87,7 +97,11 @@ describe('buildSignalEnvelope', () => {
         ...BASE,
         units: [unit('a', true)],
         signals: preStamped,
-        fingerprintStrategy: () => 'would-clobber',
+        fingerprintStrategy: defineFingerprintStrategy({
+          id: 'test.would-clobber',
+          version: 1,
+          fingerprint: () => 'would-clobber',
+        }),
       });
       expect(env.signals[0]?.fingerprint).toBe('pre-existing');
       // fully pre-stamped sets pass through by identity (no re-allocation)

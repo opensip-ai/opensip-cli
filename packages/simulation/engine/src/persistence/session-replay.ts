@@ -1,12 +1,12 @@
-import { buildReplaySignals, decodeSessionPayload } from '@opensip-cli/session-store';
-
-import type {
-  RunPresentation,
-  SignalEnvelope,
-  StoredSession,
-  ToolSessionReplay,
-  UnitResult,
+import {
+  DEFAULT_BASELINE_IDENTITY,
+  type RunPresentation,
+  type SignalEnvelope,
+  type StoredSession,
+  type ToolSessionReplay,
+  type UnitResult,
 } from '@opensip-cli/contracts';
+import { buildReplaySignals, decodeSessionPayload } from '@opensip-cli/session-store';
 
 /**
  * Project a stored sim session back into a {@link SignalEnvelope}/{@link RunPresentation}.
@@ -53,6 +53,7 @@ export function simReplayFromSession(stored: StoredSession): ToolSessionReplay<R
     },
     units,
     signals,
+    baselineIdentity: DEFAULT_BASELINE_IDENTITY,
   };
   return {
     fidelity: 'projection',

@@ -139,6 +139,17 @@ export { extractPayloadVersion } from './lib/payload-version.js';
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';
 
+// Lib — file lock (state concurrency, ADR-0075). Generic lockfile primitive for
+// datastore-file and artifact-file write serialization.
+export { withFileLock, withFileLockAsync } from './lib/file-lock.js';
+export type {
+  FileLockEvent,
+  FileLockEventKind,
+  FileLockMetadata,
+  StateLockPolicy,
+  WithFileLockOptions,
+} from './lib/file-lock.js';
+
 // Lib — execution substrate (north-star §5.8, launch). One bounded
 // scheduler + per-unit timeout/retry that fit + sim recipes run on, so
 // timeout/maxParallel/stopOnFirstFailure mean the same thing in every domain

@@ -110,12 +110,18 @@ function mockCli(datastore?: DataStore): MockCliBag {
       }),
       writeSarif: vi.fn(() => Promise.resolve()),
       saveBaseline: vi.fn((tool: string, env: unknown) => {
+        const e = env as SignalEnvelope;
         repo().save(
           tool,
-          (env as SignalEnvelope).signals.map((s) => ({
+          e.signals.map((s) => ({
             fingerprint: s.fingerprint ?? '',
             payload: s,
           })),
+          {
+            baselineFormatVersion: 1,
+            fingerprintStrategyId: e.baselineIdentity.fingerprintStrategyId,
+            fingerprintStrategyVersion: e.baselineIdentity.fingerprintStrategyVersion,
+          },
         );
         return Promise.resolve();
       }),

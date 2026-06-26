@@ -5,7 +5,12 @@
  * live: purging 'fitness' missed a 'fit' session.
  */
 
-import { DataStoreFactory, BaselineRepo, ToolStateRepo } from '@opensip-cli/datastore';
+import {
+  DataStoreFactory,
+  BaselineRepo,
+  DEFAULT_TEST_BASELINE_IDENTITY,
+  ToolStateRepo,
+} from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -42,7 +47,7 @@ function fitSession(id: string): StoredSession {
 describe('toolsDataPurge', () => {
   it('purging the LONG id clears the SHORT-keyed sessions + LONG-keyed baselines + state', () => {
     new SessionRepo(ds).save(fitSession('FIT_A'));
-    new BaselineRepo(ds).save('fitness', []);
+    new BaselineRepo(ds).save('fitness', [], DEFAULT_TEST_BASELINE_IDENTITY);
     new ToolStateRepo(ds).put('fitness', 'k', { v: 1 });
 
     const result = toolsDataPurge('fitness', ds);
@@ -55,7 +60,7 @@ describe('toolsDataPurge', () => {
 
   it('purging the SHORT id clears the same set', () => {
     new SessionRepo(ds).save(fitSession('FIT_B'));
-    new BaselineRepo(ds).save('fitness', []);
+    new BaselineRepo(ds).save('fitness', [], DEFAULT_TEST_BASELINE_IDENTITY);
 
     const result = toolsDataPurge('fit', ds);
     expect(result.sessions).toBe(1);

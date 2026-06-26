@@ -29,7 +29,19 @@ import {
 
 import { passRate } from './score.js';
 
-import type { FingerprintStrategy, Signal, ToolShortId, VerdictPolicy } from '@opensip-cli/core';
+import type {
+  BaselineIdentity,
+  FingerprintStrategy,
+  Signal,
+  ToolShortId,
+  VerdictPolicy,
+} from '@opensip-cli/core';
+
+/** Default baseline identity for envelopes using the host default fingerprint strategy. */
+export const DEFAULT_BASELINE_IDENTITY: BaselineIdentity = {
+  fingerprintStrategyId: defaultFingerprintStrategy.id,
+  fingerprintStrategyVersion: defaultFingerprintStrategy.version,
+};
 
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";
@@ -88,6 +100,12 @@ export interface SignalEnvelope {
   readonly verdict: RunVerdict;
   readonly units: readonly UnitResult[];
   readonly signals: readonly Signal[];
+  /**
+   * Fingerprint strategy identity used to stamp this envelope's signals
+   * (ADR-0075). Persisted in baseline meta on `--gate-save` and compared on
+   * `--gate-compare`.
+   */
+  readonly baselineIdentity: BaselineIdentity;
   /** Graph-only edge-fidelity marker, carried over from CliOutput.resolutionMode. */
   readonly resolutionMode?: 'exact' | 'fast';
 }
@@ -159,10 +177,12 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
   // (tool strategy, host default when none) guarantees every built envelope is
   // gate-ready, instead of trusting each tool to remember a post-hoc stamp that
   // would otherwise only fail at the first `--gate-save`.
-  const signals = stampFingerprints(
-    input.signals,
-    input.fingerprintStrategy ?? defaultFingerprintStrategy,
-  );
+  const strategy = input.fingerprintStrategy ?? defaultFingerprintStrategy;
+  const signals = stampFingerprints(input.signals, strategy);
+  const baselineIdentity: BaselineIdentity = {
+    fingerprintStrategyId: strategy.id,
+    fingerprintStrategyVersion: strategy.version,
+  };
 
   let errors = 0;
   let warnings = 0;
@@ -195,6 +215,9 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
     verdict,
     units: input.units,
     signals,
+    baselineIdentity,
     resolutionMode: input.resolutionMode,
   };
 }
+
+export type { BaselineIdentity } from '@opensip-cli/core';

@@ -31,4 +31,10 @@ export const toolBaselineEntries = sqliteTable(
 export const toolBaselineMeta = sqliteTable('tool_baseline_meta', {
   tool: text('tool').primaryKey(), // human `name` value — the scoping key
   capturedAt: integer('captured_at').notNull(),
+  /** Baseline format version (ADR-0075). */
+  baselineFormatVersion: integer('baseline_format_version'),
+  /** Fingerprint strategy id that produced stored identities. */
+  fingerprintStrategyId: text('fingerprint_strategy_id'),
+  /** Fingerprint strategy version that produced stored identities. */
+  fingerprintStrategyVersion: integer('fingerprint_strategy_version'),
 });

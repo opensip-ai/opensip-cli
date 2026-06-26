@@ -104,6 +104,10 @@ function replayWithSignals(
       },
       units: [],
       signals: [...signals],
+      baselineIdentity: {
+        fingerprintStrategyId: 'fitness.sha256-file-rule-message',
+        fingerprintStrategyVersion: 1,
+      },
     };
     const result: RunPresentation = {
       type: 'run-presentation',

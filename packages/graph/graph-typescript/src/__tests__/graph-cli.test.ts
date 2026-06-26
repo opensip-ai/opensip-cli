@@ -140,11 +140,19 @@ function makeCli(): CapturedCli {
       return Promise.resolve({ cloudAccepted: 0 });
     }),
     writeSarif: vi.fn(() => Promise.resolve()),
-    saveBaseline: vi.fn((tool: string, env: unknown) => {
-      const signals = (env as { signals: readonly Signal[] }).signals;
+    saveBaseline: vi.fn((tool: string, envelope: unknown) => {
+      const e = envelope as {
+        signals: readonly Signal[];
+        baselineIdentity: { fingerprintStrategyId: string; fingerprintStrategyVersion: number };
+      };
       new BaselineRepo(datastore).save(
         tool,
-        signals.map((s) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+        e.signals.map((s: Signal) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+        {
+          baselineFormatVersion: 1,
+          fingerprintStrategyId: e.baselineIdentity.fingerprintStrategyId,
+          fingerprintStrategyVersion: e.baselineIdentity.fingerprintStrategyVersion,
+        },
       );
       return Promise.resolve();
     }),

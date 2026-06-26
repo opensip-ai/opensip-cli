@@ -56,7 +56,7 @@ function allFingerprints(): string[] {
   const fingerprints: string[] = [];
   for (const rule of RULES) {
     for (const signal of rule.evaluate(catalog, indexes, EMPTY_CONFIG, undefined)) {
-      fingerprints.push(graphFingerprintStrategy(signal));
+      fingerprints.push(graphFingerprintStrategy.fingerprint(signal));
     }
   }
   return fingerprints.sort();

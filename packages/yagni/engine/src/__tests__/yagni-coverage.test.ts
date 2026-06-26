@@ -118,6 +118,10 @@ function envelope(input: {
     verdict: { score: 1, passed: summary.errors === 0, summary },
     units: input.units ?? [],
     signals: input.signals,
+    baselineIdentity: {
+      fingerprintStrategyId: 'yagni.sha256-detector-locations',
+      fingerprintStrategyVersion: 1,
+    },
   };
 }
 

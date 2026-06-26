@@ -31,10 +31,17 @@ function stamp(signals: readonly Signal[]): readonly Signal[] {
   return stampFingerprints(signals, graphFingerprintStrategy);
 }
 
+const GRAPH_BASELINE_IDENTITY = {
+  baselineFormatVersion: 1,
+  fingerprintStrategyId: 'graph.rule-file-line-col',
+  fingerprintStrategyVersion: 1,
+} as const;
+
 function save(tool: string, signals: readonly Signal[]): void {
   new BaselineRepo(ds).save(
     tool,
     signals.map((s) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+    GRAPH_BASELINE_IDENTITY,
   );
 }
 
@@ -66,10 +73,10 @@ describe('graph baseline plane', () => {
   });
 
   it('graphFingerprintStrategy is the byte-preserved `ruleId|filePath|line|col`', () => {
-    expect(graphFingerprintStrategy(gsig('graph:cycle', 'src/a.ts', 5, 2))).toBe(
+    expect(graphFingerprintStrategy.fingerprint(gsig('graph:cycle', 'src/a.ts', 5, 2))).toBe(
       'graph:cycle|src/a.ts|5|2',
     );
     const noLoc = { ...gsig('r', 'f', 1), line: undefined, column: undefined } as Signal;
-    expect(graphFingerprintStrategy(noLoc)).toBe('r|f|0|0');
+    expect(graphFingerprintStrategy.fingerprint(noLoc)).toBe('r|f|0|0');
   });
 });

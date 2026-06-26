@@ -45,11 +45,13 @@ export const DataStoreFactory = {
     const path = requireSqlitePath(opts);
     let handle;
     try {
-      handle = openSqliteBackend({ path });
+      handle = openSqliteBackend({ path, lock: opts.lock });
     } catch (error) {
       // Corrupted file (bad SQLite header), missing dir, permission errors, or a
       // native-binding ABI mismatch (better-sqlite3 built for another Node.js).
-      throw new DataStoreMigrationError(openFailureMessage(opts, error), { cause: error });
+      throw new DataStoreMigrationError(openFailureMessage(opts, error), {
+        cause: error,
+      });
     }
 
     // `undefined` (unreadable journal) means "skip the guard" — migrate() reads
@@ -67,17 +69,20 @@ export const DataStoreFactory = {
       // M12: span the migrate — the prime datastore-open latency source (schema
       // apply on first run). No-op tracer unless OTEL is configured; the span
       // records the exception on failure before we remap it below.
-      withSpan('datastore', 'datastore.migrate', () => migrate(handle.db, { migrationsFolder }), {
-        'datastore.backend': 'sqlite',
+      handle.withWriteLock('datastore.migrate', () => {
+        withSpan('datastore', 'datastore.migrate', () => migrate(handle.db, { migrationsFolder }), {
+          'datastore.backend': 'sqlite',
+        });
+        // Re-stamp on every successful open: a fresh (0) or pre-guard "legacy" DB
+        // gets adopted to the current version; an already-current DB is a no-op write.
+        if (supportedVersion !== undefined) handle.writeUserVersion(supportedVersion);
       });
     } catch (error) {
       handle.close();
-      throw new DataStoreMigrationError(migrateFailureMessage(opts), { cause: error });
+      throw new DataStoreMigrationError(migrateFailureMessage(opts), {
+        cause: error,
+      });
     }
-
-    // Re-stamp on every successful open: a fresh (0) or pre-guard "legacy" DB
-    // gets adopted to the current version; an already-current DB is a no-op write.
-    if (supportedVersion !== undefined) handle.writeUserVersion(supportedVersion);
     return handle;
   },
 };
@@ -99,13 +104,17 @@ function openAndMigrate(
   try {
     datastore = openBackend();
   } catch (error) {
-    throw new DataStoreMigrationError(openFailureMessage(opts, error), { cause: error });
+    throw new DataStoreMigrationError(openFailureMessage(opts, error), {
+      cause: error,
+    });
   }
   try {
     migrate(datastore.db, { migrationsFolder });
   } catch (error) {
     datastore.close();
-    throw new DataStoreMigrationError(migrateFailureMessage(opts), { cause: error });
+    throw new DataStoreMigrationError(migrateFailureMessage(opts), {
+      cause: error,
+    });
   }
   return datastore;
 }

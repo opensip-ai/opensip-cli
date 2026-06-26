@@ -25,6 +25,8 @@ import {
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
+import { buildDatastoreLockContext } from './state-lock-policy.js';
+
 /**
  * Strict reader: the only way to obtain the per-run scope is `currentScope()`
  * (entered by pre-action-hook or explicit runWithScope in tests). All previous
@@ -106,7 +108,11 @@ export function buildDatastoreThunk(
       );
     }
     const path = `${resolveProjectPaths(project.projectRoot).runtimeDir}/datastore.sqlite`;
-    cached = DataStoreFactory.open({ backend: 'sqlite', path });
+    cached = DataStoreFactory.open({
+      backend: 'sqlite',
+      path,
+      lock: buildDatastoreLockContext(log, { cwd: project.projectRoot }),
+    });
     log.info({
       evt: 'cli.datastore.opened',
       module: 'cli:context',

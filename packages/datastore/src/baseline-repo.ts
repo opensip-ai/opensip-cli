@@ -1,4 +1,9 @@
-import { logger, type Signal } from '@opensip-cli/core';
+import {
+  BASELINE_FORMAT_VERSION,
+  logger,
+  type BaselineIdentityMetadata,
+  type Signal,
+} from '@opensip-cli/core';
 import { eq, sql } from 'drizzle-orm';
 
 import { requireDrizzleDataStore, type DataStore, type DrizzleDataStore } from './data-store.js';
@@ -43,56 +48,76 @@ export class BaselineRepo {
    * ordering. The meta row is upserted as the existence marker — an empty
    * baseline is a valid saved state ("saved, no findings" ≠ "never saved").
    */
-  save(tool: string, entries: readonly BaselineEntry[]): void {
-    try {
-      const capturedAt = Date.now();
-      const byFingerprint = new Map<string, Signal>();
-      for (const e of entries) byFingerprint.set(e.fingerprint, e.payload);
-      const rows = [...byFingerprint.entries()]
-        .sort(([a], [b]) => Number(a > b) - Number(a < b))
-        .map(([fingerprint, payload]) => ({ tool, fingerprint, payload, capturedAt }));
+  save(tool: string, entries: readonly BaselineEntry[], identity: BaselineIdentityMetadata): void {
+    this.datastore.withWriteLock('baseline.save', () => {
+      try {
+        const capturedAt = Date.now();
+        const byFingerprint = new Map<string, Signal>();
+        for (const e of entries) byFingerprint.set(e.fingerprint, e.payload);
+        const rows = [...byFingerprint.entries()]
+          .sort(([a], [b]) => Number(a > b) - Number(a < b))
+          .map(([fingerprint, payload]) => ({
+            tool,
+            fingerprint,
+            payload,
+            capturedAt,
+          }));
 
-      this.datastore.transaction((tx) => {
-        tx.delete(toolBaselineEntries).where(eq(toolBaselineEntries.tool, tool)).run();
-        // Chunked insert to avoid hitting SQLite's SQLITE_MAX_VARIABLE_NUMBER (~32766 vars).
-        // Each row uses 4 bound parameters (tool, fingerprint, payload, capturedAt).
-        // 2000-row chunks are comfortably safe even on older SQLite builds.
-        if (rows.length > 0) {
-          const CHUNK = 2000;
-          for (let i = 0; i < rows.length; i += CHUNK) {
-            const chunk = rows.slice(i, i + CHUNK);
-            tx.insert(toolBaselineEntries).values(chunk).run();
+        this.datastore.transaction((tx) => {
+          tx.delete(toolBaselineEntries).where(eq(toolBaselineEntries.tool, tool)).run();
+          // Chunked insert to avoid hitting SQLite's SQLITE_MAX_VARIABLE_NUMBER (~32766 vars).
+          // Each row uses 4 bound parameters (tool, fingerprint, payload, capturedAt).
+          // 2000-row chunks are comfortably safe even on older SQLite builds.
+          if (rows.length > 0) {
+            const CHUNK = 2000;
+            for (let i = 0; i < rows.length; i += CHUNK) {
+              const chunk = rows.slice(i, i + CHUNK);
+              tx.insert(toolBaselineEntries).values(chunk).run();
+            }
           }
-        }
-        // Upsert the existence marker keyed on `tool`.
-        tx.insert(toolBaselineMeta)
-          .values({ tool, capturedAt })
-          .onConflictDoUpdate({
-            target: toolBaselineMeta.tool,
-            set: { capturedAt: sql`excluded.captured_at` },
-          })
-          .run();
-      });
-      logger.info({
-        evt: 'datastore.baseline.save.complete',
-        module: MODULE_NAME,
-        msg: 'Saved tool baseline',
-        tool,
-        count: rows.length,
-      });
-    } catch (error) {
-      /* v8 ignore start */
-      logger.error({
-        evt: 'datastore.baseline.save.error',
-        module: MODULE_NAME,
-        msg: 'Failed to save tool baseline',
-        tool,
-        error: error instanceof Error ? error.message : String(error),
-        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
-      });
-      throw error;
-      /* v8 ignore stop */
-    }
+          // Upsert the existence marker keyed on `tool`.
+          tx.insert(toolBaselineMeta)
+            .values({
+              tool,
+              capturedAt,
+              baselineFormatVersion: identity.baselineFormatVersion,
+              fingerprintStrategyId: identity.fingerprintStrategyId,
+              fingerprintStrategyVersion: identity.fingerprintStrategyVersion,
+            })
+            .onConflictDoUpdate({
+              target: toolBaselineMeta.tool,
+              set: {
+                capturedAt: sql`excluded.captured_at`,
+                baselineFormatVersion: sql`excluded.baseline_format_version`,
+                fingerprintStrategyId: sql`excluded.fingerprint_strategy_id`,
+                fingerprintStrategyVersion: sql`excluded.fingerprint_strategy_version`,
+              },
+            })
+            .run();
+        });
+        logger.info({
+          evt: 'datastore.baseline.save.complete',
+          module: MODULE_NAME,
+          msg: 'Saved tool baseline',
+          tool,
+          count: rows.length,
+          fingerprintStrategyId: identity.fingerprintStrategyId,
+          fingerprintStrategyVersion: identity.fingerprintStrategyVersion,
+        });
+      } catch (error) {
+        /* v8 ignore start */
+        logger.error({
+          evt: 'datastore.baseline.save.error',
+          module: MODULE_NAME,
+          msg: 'Failed to save tool baseline',
+          tool,
+          error: error instanceof Error ? error.message : String(error),
+          ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+        });
+        throw error;
+        /* v8 ignore stop */
+      }
+    });
   }
 
   /** Load this tool's baseline rows (fingerprint + payload). Empty when none saved. */
@@ -113,7 +138,10 @@ export class BaselineRepo {
         tool,
         count: rows.length,
       });
-      return rows.map((r) => ({ fingerprint: r.fingerprint, payload: r.payload as Signal | null }));
+      return rows.map((r) => ({
+        fingerprint: r.fingerprint,
+        payload: r.payload as Signal | null,
+      }));
     } catch (error) {
       /* v8 ignore start */
       logger.error({
@@ -151,28 +179,69 @@ export class BaselineRepo {
   }
 
   /**
+   * Load persisted baseline identity metadata for compare/export (ADR-0075).
+   * Returns `undefined` when no meta row exists; partial/null columns mean legacy.
+   */
+  loadMeta(tool: string): BaselineIdentityMetadata | undefined {
+    const row = this.datastore.db
+      .select({
+        baselineFormatVersion: toolBaselineMeta.baselineFormatVersion,
+        fingerprintStrategyId: toolBaselineMeta.fingerprintStrategyId,
+        fingerprintStrategyVersion: toolBaselineMeta.fingerprintStrategyVersion,
+      })
+      .from(toolBaselineMeta)
+      .where(eq(toolBaselineMeta.tool, tool))
+      .limit(1)
+      .get();
+    if (!row) return undefined;
+    if (
+      row.baselineFormatVersion == null ||
+      row.fingerprintStrategyId == null ||
+      row.fingerprintStrategyVersion == null
+    ) {
+      return undefined;
+    }
+    return {
+      baselineFormatVersion: row.baselineFormatVersion,
+      fingerprintStrategyId: row.fingerprintStrategyId,
+      fingerprintStrategyVersion: row.fingerprintStrategyVersion,
+    };
+  }
+
+  /**
    * Delete this tool's baseline — entries + the meta existence marker, one
    * transaction (`tools data purge`, ADR-0042). After a clear, `exists()` is
    * false (vs. `save(tool, [])`, which leaves an EMPTY-but-saved baseline).
    */
   clear(tool: string): { readonly entries: number; readonly meta: boolean } {
-    let entries = 0;
-    let meta = false;
-    this.datastore.transaction((tx) => {
-      entries = tx
-        .delete(toolBaselineEntries)
-        .where(eq(toolBaselineEntries.tool, tool))
-        .run().changes;
-      meta = tx.delete(toolBaselineMeta).where(eq(toolBaselineMeta.tool, tool)).run().changes > 0;
+    return this.datastore.withWriteLock('baseline.clear', () => {
+      let entries = 0;
+      let meta = false;
+      this.datastore.transaction((tx) => {
+        entries = tx
+          .delete(toolBaselineEntries)
+          .where(eq(toolBaselineEntries.tool, tool))
+          .run().changes;
+        meta = tx.delete(toolBaselineMeta).where(eq(toolBaselineMeta.tool, tool)).run().changes > 0;
+      });
+      logger.info({
+        evt: 'datastore.baseline.clear.complete',
+        module: MODULE_NAME,
+        msg: 'Cleared tool baseline',
+        tool,
+        entries,
+        meta,
+      });
+      return { entries, meta };
     });
-    logger.info({
-      evt: 'datastore.baseline.clear.complete',
-      module: MODULE_NAME,
-      msg: 'Cleared tool baseline',
-      tool,
-      entries,
-      meta,
-    });
-    return { entries, meta };
   }
 }
+
+/** Test/helper default identity matching the host default strategy. */
+export const DEFAULT_TEST_BASELINE_IDENTITY: BaselineIdentityMetadata = {
+  baselineFormatVersion: BASELINE_FORMAT_VERSION,
+  fingerprintStrategyId: 'opensip.default.rule-file-line-col',
+  fingerprintStrategyVersion: 1,
+};
+
+export type { BaselineIdentityMetadata } from '@opensip-cli/core';

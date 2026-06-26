@@ -47,6 +47,10 @@ function envelopeOf(signals: readonly Signal[]): SignalEnvelope {
     },
     units: [],
     signals,
+    baselineIdentity: {
+      fingerprintStrategyId: 'graph.rule-file-line-col',
+      fingerprintStrategyVersion: 1,
+    },
   };
 }
 
@@ -73,6 +77,15 @@ describe('saveBaseline / compareBaseline guards', () => {
 
   it('compareBaseline throws a missing-baseline error before any save', async () => {
     await expect(seams.compareBaseline('graph', envelopeOf([]))).rejects.toThrow(/baseline/i);
+  });
+
+  it('compareBaseline rejects incompatible baseline identity with recapture guidance', async () => {
+    await seams.saveBaseline('graph', envelopeOf([stampedSignal('a|x|1|0')]));
+    const mismatched = envelopeOf([stampedSignal('a|x|1|0')]);
+    (
+      mismatched as { baselineIdentity: { fingerprintStrategyVersion: number } }
+    ).baselineIdentity.fingerprintStrategyVersion = 99;
+    await expect(seams.compareBaseline('graph', mismatched)).rejects.toThrow(/--gate-save/i);
   });
 });
 

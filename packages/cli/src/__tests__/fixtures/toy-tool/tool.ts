@@ -65,6 +65,10 @@ export function buildToyEnvelope(extra: readonly Signal[] = []): SignalEnvelope 
     },
     units: [],
     signals,
+    baselineIdentity: {
+      fingerprintStrategyId: defaultFingerprintStrategy.id,
+      fingerprintStrategyVersion: defaultFingerprintStrategy.version,
+    },
   };
 }
 

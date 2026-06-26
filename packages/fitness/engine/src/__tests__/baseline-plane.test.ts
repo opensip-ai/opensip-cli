@@ -20,7 +20,13 @@ import { fitnessFingerprintStrategy } from '../baseline-strategy.js';
 let ds: DataStore;
 
 function fsig(ruleId: string, file: string, message: string, line = 1): Signal {
-  return createSignal({ source: 'fit', severity: 'high', ruleId, message, code: { file, line } });
+  return createSignal({
+    source: 'fit',
+    severity: 'high',
+    ruleId,
+    message,
+    code: { file, line },
+  });
 }
 
 function stamp(signals: readonly Signal[]): readonly Signal[] {
@@ -31,10 +37,17 @@ function fingerprintSet(signals: readonly Signal[]): Set<string> {
   return new Set(signals.map((s) => s.fingerprint ?? ''));
 }
 
+const FITNESS_BASELINE_IDENTITY = {
+  baselineFormatVersion: 1,
+  fingerprintStrategyId: 'fitness.sha256-file-rule-message',
+  fingerprintStrategyVersion: 1,
+} as const;
+
 function save(signals: readonly Signal[]): void {
   new BaselineRepo(ds).save(
     'fitness',
     signals.map((s) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+    FITNESS_BASELINE_IDENTITY,
   );
 }
 
@@ -68,12 +81,14 @@ describe('fitness baseline plane', () => {
   it('fitnessFingerprintStrategy is sha256(filePath\\nruleId\\nmessage)', () => {
     const s = fsig('no-any', 'src/a.ts', 'Avoid any');
     const expected = createHash('sha256').update('src/a.ts\nno-any\nAvoid any').digest('hex');
-    expect(fitnessFingerprintStrategy(s)).toBe(expected);
+    expect(fitnessFingerprintStrategy.fingerprint(s)).toBe(expected);
   });
 
   it('preserves line-shift tolerance: two signals differing only in line share a fingerprint', () => {
     const a = fsig('no-any', 'src/a.ts', 'Avoid any', 3);
     const b = fsig('no-any', 'src/a.ts', 'Avoid any', 99);
-    expect(fitnessFingerprintStrategy(a)).toBe(fitnessFingerprintStrategy(b));
+    expect(fitnessFingerprintStrategy.fingerprint(a)).toBe(
+      fitnessFingerprintStrategy.fingerprint(b),
+    );
   });
 });

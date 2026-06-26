@@ -71,6 +71,10 @@ exports[`formatSignalJson > serialises the envelope as pretty JSON (snapshot) 1`
       "metadata": {},
       "createdAt": "2026-06-04T00:00:00.000Z"
     }
-  ]
+  ],
+  "baselineIdentity": {
+    "fingerprintStrategyId": "graph.rule-file-line-col",
+    "fingerprintStrategyVersion": 1
+  }
 }"
 `;

@@ -19,6 +19,7 @@ import * as barrel from '../index.js';
 
 /** The complete, intended set of runtime value exports. Keep alphabetised. */
 const EXPECTED_VALUE_EXPORTS = [
+  'BASELINE_FORMAT_VERSION',
   'BootstrapDiagnosticsCollector',
   'CLI_DIAGNOSTIC_CODES',
   'CLI_SUPPORTED_SCHEMA_VERSION',
@@ -55,8 +56,12 @@ const EXPECTED_VALUE_EXPORTS = [
   // Host-owned baseline/ratchet plane (ADR-0036).
   'contentHashFallbackFingerprintStrategy',
   'defaultFingerprintStrategy',
+  'defineFingerprintStrategy',
   'fileLevelFingerprintStrategy',
+  'formatBaselineIdentityMismatch',
+  'isBaselineIdentityCompatible',
   'stampFingerprints',
+  'toBaselineIdentityMetadata',
   'DEFAULT_FAIL_ON_DEGRADED',
   'resolveFailOnDegraded',
   // Subprocess-correlation telemetry: the pure correlation primitive (type +
@@ -236,6 +241,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'validateCommandSpec',
   'validateToolIdentity',
   'withLogRef',
+  'withFileLock',
+  'withFileLockAsync',
   'withRetry',
   'withSpan',
   'withSpanAsync',

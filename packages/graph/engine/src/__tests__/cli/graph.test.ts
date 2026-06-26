@@ -114,6 +114,11 @@ function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry)
     new BaselineRepo(requireDs()).save(
       tool,
       e.signals.map((s) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+      {
+        baselineFormatVersion: 1,
+        fingerprintStrategyId: e.baselineIdentity.fingerprintStrategyId,
+        fingerprintStrategyVersion: e.baselineIdentity.fingerprintStrategyVersion,
+      },
     );
     return Promise.resolve();
   });
@@ -446,7 +451,11 @@ describe('executeGraph — gate modes', () => {
 
   it('--gate-compare FAIL when current findings exceed baseline', async () => {
     // Seed an empty baseline so every current finding is net-new (degraded).
-    new BaselineRepo(datastore).save('graph', []);
+    new BaselineRepo(datastore).save('graph', [], {
+      baselineFormatVersion: 1,
+      fingerprintStrategyId: 'graph.rule-file-line-col',
+      fingerprintStrategyVersion: 1,
+    });
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, cli);
     // degraded → the host runFailed override maps to RUNTIME_ERROR (1).

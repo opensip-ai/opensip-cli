@@ -3,9 +3,12 @@ import { dirname } from 'node:path';
 
 import { buildSqliteDataStore } from './shared.js';
 
-import type { SqliteBackendHandle } from '../data-store.js';
+import type { DataStoreLockContext, SqliteBackendHandle } from '../data-store.js';
 
-export function openSqliteBackend(opts: { path: string }): SqliteBackendHandle {
+export function openSqliteBackend(opts: {
+  path: string;
+  lock?: DataStoreLockContext;
+}): SqliteBackendHandle {
   mkdirSync(dirname(opts.path), { recursive: true });
-  return buildSqliteDataStore(opts.path);
+  return buildSqliteDataStore(opts.path, opts.lock);
 }

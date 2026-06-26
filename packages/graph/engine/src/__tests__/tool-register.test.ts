@@ -348,7 +348,11 @@ describe('graphTool command surface', () => {
     it('--format baseline exports the gate fingerprint JSON', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        new BaselineRepo(datastore).save('graph', []);
+        new BaselineRepo(datastore).save('graph', [], {
+          baselineFormatVersion: 1,
+          fingerprintStrategyId: 'graph.rule-file-line-col',
+          fingerprintStrategyVersion: 1,
+        });
         const outPath = join(workDir, 'baseline.json');
         const { cli } = makeMockCli(datastore);
         await handlerFor('export')({ format: 'baseline', out: outPath, _args: [] }, cli);

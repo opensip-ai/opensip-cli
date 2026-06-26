@@ -120,7 +120,9 @@ describe('DataStoreFactory.open — migrate failure on healthy backend', () => {
 
 describe('native-binding (ABI mismatch) failures are not reported as corruption', () => {
   it('isNativeBindingError detects ERR_DLOPEN_FAILED', () => {
-    const e = Object.assign(new Error('dlopen failed'), { code: 'ERR_DLOPEN_FAILED' });
+    const e = Object.assign(new Error('dlopen failed'), {
+      code: 'ERR_DLOPEN_FAILED',
+    });
     expect(isNativeBindingError(e)).toBe(true);
   });
 
@@ -132,19 +134,25 @@ describe('native-binding (ABI mismatch) failures are not reported as corruption'
   });
 
   it('isNativeBindingError scans the cause chain', () => {
-    const root = Object.assign(new Error('dlopen'), { code: 'ERR_DLOPEN_FAILED' });
+    const root = Object.assign(new Error('dlopen'), {
+      code: 'ERR_DLOPEN_FAILED',
+    });
     const wrapped = new Error('failed to construct Database', { cause: root });
     expect(isNativeBindingError(wrapped)).toBe(true);
   });
 
   it('isNativeBindingError is false for a genuine corrupt-file error', () => {
-    const e = Object.assign(new Error('file is not a database'), { code: 'SQLITE_NOTADB' });
+    const e = Object.assign(new Error('file is not a database'), {
+      code: 'SQLITE_NOTADB',
+    });
     expect(isNativeBindingError(e)).toBe(false);
     expect(isNativeBindingError(undefined)).toBe(false);
   });
 
   it('binding-error message says rebuild, NOT delete the data store', () => {
-    const e = Object.assign(new Error('dlopen failed'), { code: 'ERR_DLOPEN_FAILED' });
+    const e = Object.assign(new Error('dlopen failed'), {
+      code: 'ERR_DLOPEN_FAILED',
+    });
     const msg = openFailureMessage({ backend: 'sqlite', path: 'project/cache.sqlite' }, e);
     expect(msg).toContain('pnpm rebuild better-sqlite3');
     expect(msg).toContain('NOT corrupt');
@@ -152,7 +160,9 @@ describe('native-binding (ABI mismatch) failures are not reported as corruption'
   });
 
   it('a non-binding sqlite open error keeps the delete-to-recover message', () => {
-    const e = Object.assign(new Error('disk image is malformed'), { code: 'SQLITE_CORRUPT' });
+    const e = Object.assign(new Error('disk image is malformed'), {
+      code: 'SQLITE_CORRUPT',
+    });
     const msg = openFailureMessage({ backend: 'sqlite', path: 'project/cache.sqlite' }, e);
     expect(msg).toContain('Delete');
     expect(msg).not.toContain('pnpm rebuild');
@@ -173,7 +183,9 @@ describe('DataStoreMigrationError', () => {
   });
 
   it('stores migrationFile when supplied', () => {
-    const e = new DataStoreMigrationError('outer', { migrationFile: '0001_init.sql' });
+    const e = new DataStoreMigrationError('outer', {
+      migrationFile: '0001_init.sql',
+    });
     expect(e.migrationFile).toBe('0001_init.sql');
   });
 });

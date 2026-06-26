@@ -76,6 +76,7 @@ describe('cross-tool envelope shape', () => {
     }
     // The contracted shape, explicitly.
     expect(shapes[0]).toEqual([
+      'baselineIdentity',
       'createdAt',
       'recipe',
       'runId',

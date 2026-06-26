@@ -278,6 +278,7 @@ function throwingDataStore(thrown: unknown): DataStore {
       delete: explode,
     },
     transaction: explode,
+    withWriteLock: (_op: string, fn: () => unknown) => fn(),
     close: explode,
   } as unknown as DataStore;
 }

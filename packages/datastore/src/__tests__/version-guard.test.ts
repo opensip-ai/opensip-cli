@@ -46,7 +46,9 @@ function writeJournal(migrationsFolder: string, entries: number): void {
     JSON.stringify({
       version: '7',
       dialect: 'sqlite',
-      entries: Array.from({ length: entries }, (_value, index) => ({ idx: index })),
+      entries: Array.from({ length: entries }, (_value, index) => ({
+        idx: index,
+      })),
     }),
     'utf8',
   );

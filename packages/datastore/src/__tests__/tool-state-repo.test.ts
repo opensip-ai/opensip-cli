@@ -27,7 +27,10 @@ afterEach(() => {
 describe('ToolStateRepo', () => {
   it('round-trips an opaque JSON payload', () => {
     repo.put('acme-audit', 'cursor', { page: 3, items: ['a', 'b'] });
-    expect(repo.get('acme-audit', 'cursor')).toEqual({ page: 3, items: ['a', 'b'] });
+    expect(repo.get('acme-audit', 'cursor')).toEqual({
+      page: 3,
+      items: ['a', 'b'],
+    });
   });
 
   it('get of a never-put key is undefined', () => {

@@ -11,11 +11,13 @@
  * file within its size budget.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
-
 import {
+  BASELINE_FORMAT_VERSION,
   ConfigurationError,
+  currentScope,
+  formatBaselineIdentityMismatch,
+  isBaselineIdentityCompatible,
+  toBaselineIdentityMetadata,
   type GateCompareResult,
   type Logger,
   SeverityPolicy,
@@ -24,7 +26,9 @@ import {
 import { BaselineRepo, type DataStore } from '@opensip-cli/datastore';
 import { diffBaseline } from '@opensip-cli/output';
 
+import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { writeEnvelopeSarif } from './deliver-envelope.js';
+import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 
@@ -67,6 +71,38 @@ function requireStampedEntries(
   });
 }
 
+function requireEnvelopeBaselineIdentity(tool: string, envelope: SignalEnvelope) {
+  const id = envelope.baselineIdentity?.fingerprintStrategyId;
+  const version = envelope.baselineIdentity?.fingerprintStrategyVersion;
+  if (!id || !Number.isInteger(version) || version < 1) {
+    throw new ConfigurationError(
+      `saveBaseline(${tool}): envelope is missing baseline identity metadata. ` +
+        `Build the envelope with buildSignalEnvelope so strategy id/version are stamped.`,
+      { code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISSING' },
+    );
+  }
+  return envelope.baselineIdentity;
+}
+
+function emitIdentityMismatchDiagnostic(
+  tool: string,
+  envelope: SignalEnvelope,
+  stored: ReturnType<BaselineRepo['loadMeta']>,
+): void {
+  currentScope()?.diagnostics?.event(
+    'load',
+    'warn',
+    'baseline identity incompatible with stored metadata',
+    {
+      tool,
+      storedStrategyId: stored?.fingerprintStrategyId,
+      storedStrategyVersion: stored?.fingerprintStrategyVersion,
+      currentStrategyId: envelope.baselineIdentity.fingerprintStrategyId,
+      currentStrategyVersion: envelope.baselineIdentity.fingerprintStrategyVersion,
+    },
+  );
+}
+
 /**
  * Build the four baseline seams over a lazy datastore resolver. `getDatastore`
  * throws when accessed outside a project scope (the host's existing contract).
@@ -78,13 +114,32 @@ export function buildBaselineSeams(deps: {
   const { getDatastore, logger } = deps;
   const repoFor = (): BaselineRepo => new BaselineRepo(getDatastore());
 
+  const artifactCtx = () => ({
+    policy: resolveStateLockPolicy(),
+    logger,
+  });
+
   return {
     // Sync-bodied (SQLite is synchronous) but typed Promise to match the seam
     // contract; a sync throw still rejects for an `await`ing caller.
     saveBaseline: (tool, envelope) => {
       const env = envelope as SignalEnvelope;
+      const identity = requireEnvelopeBaselineIdentity(tool, env);
       const entries = requireStampedEntries(tool, env.signals);
-      repoFor().save(tool, entries);
+      const metadata = toBaselineIdentityMetadata(identity);
+      repoFor().save(tool, entries, metadata);
+      logger.info({
+        evt: 'state.baseline.identity.recorded',
+        module: 'cli:baseline-seams',
+        tool,
+        fingerprintStrategyId: metadata.fingerprintStrategyId,
+        fingerprintStrategyVersion: metadata.fingerprintStrategyVersion,
+      });
+      currentScope()?.diagnostics?.event('persist', 'info', 'baseline identity recorded', {
+        tool,
+        fingerprintStrategyId: metadata.fingerprintStrategyId,
+        fingerprintStrategyVersion: metadata.fingerprintStrategyVersion,
+      });
       logger.info({
         evt: 'cli.baseline.save.complete',
         module: 'cli:baseline-seams',
@@ -98,6 +153,27 @@ export function buildBaselineSeams(deps: {
       const repo = repoFor();
       if (!repo.exists(tool)) return Promise.reject(missingBaseline(tool));
       const env = envelope as SignalEnvelope;
+      const stored = repo.loadMeta(tool);
+      if (!isBaselineIdentityCompatible(env.baselineIdentity, stored)) {
+        logger.warn({
+          evt: 'state.baseline.identity.mismatch',
+          module: 'cli:baseline-seams',
+          tool,
+          storedStrategyId: stored?.fingerprintStrategyId,
+          storedStrategyVersion: stored?.fingerprintStrategyVersion,
+          currentStrategyId: env.baselineIdentity.fingerprintStrategyId,
+          currentStrategyVersion: env.baselineIdentity.fingerprintStrategyVersion,
+        });
+        emitIdentityMismatchDiagnostic(tool, env, stored);
+        return Promise.reject(
+          new ConfigurationError(
+            formatBaselineIdentityMismatch(tool, env.baselineIdentity, stored),
+            {
+              code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISMATCH',
+            },
+          ),
+        );
+      }
       return Promise.resolve(diffBaseline(env.signals, repo.load(tool)));
     },
 
@@ -113,16 +189,12 @@ export function buildBaselineSeams(deps: {
           { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
         );
       }
+      const storedMeta = repo.loadMeta(tool);
       const signals = repo
         .load(tool)
         .map((r) => r.payload)
         .filter((s): s is Signal => s !== null);
 
-      // Compute a minimal but truthful verdict/summary from the captured signals
-      // so that SARIF consumers (and any envelope-level logic) see consistent
-      // counts instead of an all-zeroes synthetic. This is a reconstruction of
-      // historical findings; "passed" here means "the captured set contained no
-      // error-severity findings" (matching the spirit of the run verdict).
       let errors = 0;
       let warnings = 0;
       for (const s of signals) {
@@ -137,13 +209,6 @@ export function buildBaselineSeams(deps: {
         warnings,
       };
 
-      // SARIF export RECONSTRUCTS (no stored envelope): formatSignalSarif derives
-      // results from `signals` + the driver name from `tool` only, so the other
-      // envelope fields are mostly inert filler. We now populate a plausible
-      // verdict so downstream SARIF or machine consumers are not misled.
-      // The runId/createdAt make it obvious this is a reconstruction from a
-      // previously captured baseline (units and per-unit facts like filesValidated
-      // are not recoverable without storing the full original envelope).
       const synthetic: SignalEnvelope = {
         schemaVersion: 2,
         tool,
@@ -156,8 +221,17 @@ export function buildBaselineSeams(deps: {
         },
         units: [],
         signals,
+        baselineIdentity: storedMeta
+          ? {
+              fingerprintStrategyId: storedMeta.fingerprintStrategyId,
+              fingerprintStrategyVersion: storedMeta.fingerprintStrategyVersion,
+            }
+          : {
+              fingerprintStrategyId: 'unknown',
+              fingerprintStrategyVersion: 0,
+            },
       };
-      await writeEnvelopeSarif(synthetic, path);
+      await writeEnvelopeSarif(synthetic, path, artifactCtx());
     },
 
     /** @throws {ConfigurationError} (→ exit 2) when no baseline exists for `tool`. */
@@ -172,23 +246,23 @@ export function buildBaselineSeams(deps: {
           { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
         );
       }
+      const storedMeta = repo.loadMeta(tool);
       const rows = repo.load(tool);
       const fingerprints = rows.map((r) => r.fingerprint).sort((a, b) => a.localeCompare(b));
       const file = {
-        version: '1',
+        version: String(BASELINE_FORMAT_VERSION),
         tool,
         capturedAt: new Date(capturedAt).toISOString(),
-        // Reconstruction note: this is a fingerprint list only. It does not
-        // contain the original per-unit (check/rule) metadata or validated counts.
-        // It is suitable for git-trackable ratchet comparison (graph) and for
-        // re-import via --gate-compare style flows that only need identities.
+        baselineFormatVersion: storedMeta?.baselineFormatVersion ?? null,
+        fingerprintStrategyId: storedMeta?.fingerprintStrategyId ?? null,
+        fingerprintStrategyVersion: storedMeta?.fingerprintStrategyVersion ?? null,
         note: 'reconstructed from baseline entries; units and per-finding details are not preserved',
         signalCount: fingerprints.length,
         fingerprints,
       };
       const serialized = JSON.stringify(file, null, 2);
-      await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, serialized, 'utf8');
+      writeArtifactAtomically(path, serialized, artifactCtx());
+      await Promise.resolve();
     },
   };
 }

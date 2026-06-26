@@ -1,5 +1,7 @@
 import { buildReplaySignals, decodeSessionPayload } from '@opensip-cli/session-store';
 
+import { graphFingerprintStrategy } from '../baseline-strategy.js';
+
 import type {
   RunPresentation,
   SignalEnvelope,
@@ -60,6 +62,10 @@ export function graphReplayFromSession(stored: StoredSession): ToolSessionReplay
     },
     units,
     signals,
+    baselineIdentity: {
+      fingerprintStrategyId: graphFingerprintStrategy.id,
+      fingerprintStrategyVersion: graphFingerprintStrategy.version,
+    },
   };
   return {
     fidelity: 'projection',

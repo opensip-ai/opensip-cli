@@ -29,10 +29,22 @@ export type { VerdictPolicy } from './lib/verdict-policy.js';
 export {
   contentHashFallbackFingerprintStrategy,
   defaultFingerprintStrategy,
+  defineFingerprintStrategy,
   fileLevelFingerprintStrategy,
   stampFingerprints,
 } from './baseline/fingerprint-strategy.js';
-export type { FingerprintStrategy } from './baseline/fingerprint-strategy.js';
+export type {
+  DefineFingerprintStrategyInput,
+  FingerprintStrategy,
+  FingerprintStrategyDescriptor,
+} from './baseline/fingerprint-strategy.js';
+export {
+  BASELINE_FORMAT_VERSION,
+  formatBaselineIdentityMismatch,
+  isBaselineIdentityCompatible,
+  toBaselineIdentityMetadata,
+} from './baseline/baseline-identity.js';
+export type { BaselineIdentity, BaselineIdentityMetadata } from './baseline/baseline-identity.js';
 export { createSignalFromViolation } from './signals/create-signal-from-violation.js';
 export type { ViolationInput } from './signals/create-signal-from-violation.js';
 // Cloud signal egress envelope (ADR-0008)

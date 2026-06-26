@@ -84,53 +84,55 @@ export class SessionRepo {
         );
       }
 
-      this.datastore.transaction((tx) => {
-        tx.insert(sessions)
-          .values({
-            id: session.id,
-            tool: session.tool,
-            timestamp: startedMs,
-            timestamp_iso: session.startedAt, // preserve original for fidelity (avoids Date roundtrip loss of sub-ms/lexical form)
-            completed_at: completedMs,
-            completed_at_iso: session.completedAt,
-            cwd: session.cwd,
-            recipe: session.recipe ?? null,
-            score: session.score,
-            passed: session.passed,
-            run_outcome: session.runOutcome ?? null,
-            durationMs: session.durationMs,
-          })
-          .run();
-        // Tool-owned opaque detail (contracts never inspects the shape).
-        if (session.payload !== undefined) {
-          const hasInnerVersion = extractPayloadVersion(session.payload) !== undefined;
-          if (!hasInnerVersion) {
-            // Encourage tools to adopt the __version convention on new writes.
-            logger.warn({
-              evt: 'session.payload.missing_version',
-              module: MODULE_NAME,
-              sessionId: session.id,
-              tool: session.tool,
-              msg: "Tool wrote a session payload without top-level __version (treated as legacy v1). Update the tool's build*SessionPayload to include __version: 1.",
-            });
-            const scope = currentScope();
-            scope?.diagnostics?.event(
-              'persist',
-              'warn',
-              'session payload written without __version (legacy v1 treatment)',
-              { sessionId: session.id, tool: session.tool },
-            );
-          }
-
-          tx.insert(sessionToolPayload)
+      this.datastore.withWriteLock('session.save', () => {
+        this.datastore.transaction((tx) => {
+          tx.insert(sessions)
             .values({
-              sessionId: session.id,
+              id: session.id,
               tool: session.tool,
-              payload: session.payload,
-              payload_version: 1, // outer storage contract version (inner __version lives inside the JSON blob)
+              timestamp: startedMs,
+              timestamp_iso: session.startedAt, // preserve original for fidelity (avoids Date roundtrip loss of sub-ms/lexical form)
+              completed_at: completedMs,
+              completed_at_iso: session.completedAt,
+              cwd: session.cwd,
+              recipe: session.recipe ?? null,
+              score: session.score,
+              passed: session.passed,
+              run_outcome: session.runOutcome ?? null,
+              durationMs: session.durationMs,
             })
             .run();
-        }
+          // Tool-owned opaque detail (contracts never inspects the shape).
+          if (session.payload !== undefined) {
+            const hasInnerVersion = extractPayloadVersion(session.payload) !== undefined;
+            if (!hasInnerVersion) {
+              // Encourage tools to adopt the __version convention on new writes.
+              logger.warn({
+                evt: 'session.payload.missing_version',
+                module: MODULE_NAME,
+                sessionId: session.id,
+                tool: session.tool,
+                msg: "Tool wrote a session payload without top-level __version (treated as legacy v1). Update the tool's build*SessionPayload to include __version: 1.",
+              });
+              const scope = currentScope();
+              scope?.diagnostics?.event(
+                'persist',
+                'warn',
+                'session payload written without __version (legacy v1 treatment)',
+                { sessionId: session.id, tool: session.tool },
+              );
+            }
+
+            tx.insert(sessionToolPayload)
+              .values({
+                sessionId: session.id,
+                tool: session.tool,
+                payload: session.payload,
+                payload_version: 1, // outer storage contract version (inner __version lives inside the JSON blob)
+              })
+              .run();
+          }
+        });
       });
       logger.info({
         evt: 'session.save.complete',
@@ -204,41 +206,45 @@ export class SessionRepo {
 
   /** Delete sessions older than the given Date. Returns affected rowcount. */
   purge(before: Date): number {
-    try {
-      const cutoff = before.getTime();
-      const removed = this.datastore.db
-        .delete(sessions)
-        .where(lt(sessions.timestamp, cutoff))
-        .run();
-      logger.info({
-        evt: 'session.purge.complete',
-        module: MODULE_NAME,
-        msg: 'Purged sessions older than cutoff',
-        cutoff: before.toISOString(),
-        deleted: removed.changes,
-      });
-      return removed.changes;
-    } catch (error) {
-      logger.error({
-        evt: 'session.purge.error',
-        module: MODULE_NAME,
-        msg: 'Failed to purge sessions',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
+    return this.datastore.withWriteLock('session.purge', () => {
+      try {
+        const cutoff = before.getTime();
+        const removed = this.datastore.db
+          .delete(sessions)
+          .where(lt(sessions.timestamp, cutoff))
+          .run();
+        logger.info({
+          evt: 'session.purge.complete',
+          module: MODULE_NAME,
+          msg: 'Purged sessions older than cutoff',
+          cutoff: before.toISOString(),
+          deleted: removed.changes,
+        });
+        return removed.changes;
+      } catch (error) {
+        logger.error({
+          evt: 'session.purge.error',
+          module: MODULE_NAME,
+          msg: 'Failed to purge sessions',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    });
   }
 
   /** Delete every session. Returns affected rowcount. */
   clearAll(): number {
-    const removed = this.datastore.db.delete(sessions).run();
-    logger.info({
-      evt: 'session.clear.complete',
-      module: MODULE_NAME,
-      msg: 'Cleared all sessions',
-      deleted: removed.changes,
+    return this.datastore.withWriteLock('session.clear', () => {
+      const removed = this.datastore.db.delete(sessions).run();
+      logger.info({
+        evt: 'session.clear.complete',
+        module: MODULE_NAME,
+        msg: 'Cleared all sessions',
+        deleted: removed.changes,
+      });
+      return removed.changes;
     });
-    return removed.changes;
   }
 
   /**
@@ -248,15 +254,17 @@ export class SessionRepo {
    * session count.
    */
   clearForTool(toolId: string): number {
-    const removed = this.datastore.db.delete(sessions).where(eq(sessions.tool, toolId)).run();
-    logger.info({
-      evt: 'session.clear_for_tool.complete',
-      module: MODULE_NAME,
-      msg: 'Cleared sessions for tool',
-      tool: toolId,
-      deleted: removed.changes,
+    return this.datastore.withWriteLock('session.clear_for_tool', () => {
+      const removed = this.datastore.db.delete(sessions).where(eq(sessions.tool, toolId)).run();
+      logger.info({
+        evt: 'session.clear_for_tool.complete',
+        module: MODULE_NAME,
+        msg: 'Cleared sessions for tool',
+        tool: toolId,
+        deleted: removed.changes,
+      });
+      return removed.changes;
     });
-    return removed.changes;
   }
 
   /** Hydrate one session via point queries — the single-row get() path. */
@@ -371,6 +379,8 @@ export class SessionRepo {
 
   /** Best-effort upsert of host-side overhead metrics (host-owned-run-timing §5.3). */
   upsertHostMetrics(sessionId: string, metrics: StoredSessionHostMetrics): void {
-    upsertHostMetricsRow(this.datastore, sessionId, metrics);
+    this.datastore.withWriteLock('session.host_metrics.upsert', () => {
+      upsertHostMetricsRow(this.datastore, sessionId, metrics);
+    });
   }
 }

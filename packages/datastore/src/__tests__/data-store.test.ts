@@ -37,9 +37,12 @@ describe('isDrizzleDataStore', () => {
   });
 
   it('rejects when `db` is absent', () => {
-    expect(isDrizzleDataStore({ transaction: () => undefined, close: () => undefined })).toBe(
-      false,
-    );
+    expect(
+      isDrizzleDataStore({
+        transaction: () => undefined,
+        close: () => undefined,
+      }),
+    ).toBe(false);
   });
 
   it('rejects when `transaction` is absent or not a function', () => {
@@ -60,7 +63,10 @@ describe('requireDrizzleDataStore', () => {
   });
 
   it('throws when the store is not Drizzle-backed', () => {
-    const plain = { transaction: () => undefined, close: () => undefined } as unknown as DataStore;
+    const plain = {
+      transaction: () => undefined,
+      close: () => undefined,
+    } as unknown as DataStore;
     expect(() => requireDrizzleDataStore(plain)).toThrow(/Drizzle-backed DataStore is required/);
   });
 });

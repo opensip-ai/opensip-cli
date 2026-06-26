@@ -25,9 +25,6 @@
  * delivery, and report-upload exit-code policy.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
-
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensip-cli/core';
 import {
@@ -37,6 +34,10 @@ import {
   type EgressResult,
 } from '@opensip-cli/output';
 
+import { writeArtifactAtomically } from './atomic-artifact-write.js';
+import { resolveStateLockPolicy } from './state-lock-policy.js';
+
+import type { ArtifactWriteContext } from './atomic-artifact-write.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Logger, RepoIdentity, SignalBatch, SignalDeliveryResult } from '@opensip-cli/core';
 
@@ -289,8 +290,21 @@ export async function deliverEnvelope(
  * `@opensip-cli/output` itself. The formatter is pure; this function owns
  * the effect (fs write).
  */
-export async function writeEnvelopeSarif(envelope: SignalEnvelope, path: string): Promise<void> {
+export function writeEnvelopeSarif(
+  envelope: SignalEnvelope,
+  path: string,
+  artifactCtx?: Partial<ArtifactWriteContext> & {
+    readonly logger?: ArtifactWriteContext['logger'];
+  },
+): Promise<void> {
   const sarif = formatSignalSarif(envelope);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, sarif);
+  const ctx: ArtifactWriteContext = {
+    policy: artifactCtx?.policy ?? resolveStateLockPolicy(),
+    logger: artifactCtx?.logger ?? defaultLogger,
+    runId: artifactCtx?.runId,
+    command: artifactCtx?.command,
+    cwdBasename: artifactCtx?.cwdBasename,
+  };
+  writeArtifactAtomically(path, sarif, ctx);
+  return Promise.resolve();
 }

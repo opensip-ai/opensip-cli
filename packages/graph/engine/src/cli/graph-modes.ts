@@ -100,7 +100,7 @@ export async function runGateMode(
     lines: result.degraded
       ? [
           `Graph gate FAILED: ${String(result.added.length)} new finding(s) since baseline.`,
-          ...result.added.map((s) => `  + ${graphFingerprintStrategy(s)}`),
+          ...result.added.map((s) => `  + ${graphFingerprintStrategy.fingerprint(s)}`),
         ]
       : [
           `Graph gate PASS: no regressions (${String(result.resolved.length)} resolved since baseline).`,

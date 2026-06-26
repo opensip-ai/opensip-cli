@@ -70,6 +70,8 @@ docs/internal/*
 !docs/internal/enterprise-policy-governance.md
 !docs/internal/suppression-catalog.json
 !docs/internal/suppression-triage.md
+!docs/internal/state-observability-concurrency-inventory.md
+!docs/internal/state-observability-contract.md
 !docs/internal/specs/
 !docs/internal/specs/**
 

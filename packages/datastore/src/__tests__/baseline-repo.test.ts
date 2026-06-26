@@ -5,15 +5,24 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   BaselineRepo,
   DataStoreFactory,
+  DEFAULT_TEST_BASELINE_IDENTITY,
   requireDrizzleDataStore,
   type DataStore,
 } from '../index.js';
+
+const ID = DEFAULT_TEST_BASELINE_IDENTITY;
 
 let ds: DataStore;
 let repo: BaselineRepo;
 
 function sig(ruleId: string, file: string): Signal {
-  return createSignal({ source: 's', severity: 'high', ruleId, message: 'm', code: { file } });
+  return createSignal({
+    source: 's',
+    severity: 'high',
+    ruleId,
+    message: 'm',
+    code: { file },
+  });
 }
 
 beforeEach(() => {
@@ -40,7 +49,7 @@ describe('BaselineRepo', () => {
 
   it('round-trips fingerprint + full Signal payload', () => {
     const payload = sig('rule-a', 'src/a.ts');
-    repo.save('graph', [{ fingerprint: 'fp-a', payload }]);
+    repo.save('graph', [{ fingerprint: 'fp-a', payload }], ID);
     const rows = repo.load('graph');
     expect(rows).toHaveLength(1);
     expect(rows[0].fingerprint).toBe('fp-a');
@@ -51,44 +60,69 @@ describe('BaselineRepo', () => {
   it('exists/capturedAt reflect the saved marker', () => {
     expect(repo.exists('graph')).toBe(false);
     expect(repo.capturedAt('graph')).toBeUndefined();
-    repo.save('graph', [{ fingerprint: 'fp', payload: sig('r', 'f') }]);
+    repo.save('graph', [{ fingerprint: 'fp', payload: sig('r', 'f') }], ID);
     expect(repo.exists('graph')).toBe(true);
     expect(typeof repo.capturedAt('graph')).toBe('number');
   });
 
   it('an empty save is a valid saved state (exists, no rows)', () => {
-    repo.save('graph', []);
+    repo.save('graph', [], ID);
     expect(repo.exists('graph')).toBe(true);
     expect(repo.load('graph')).toEqual([]);
   });
 
   it('save replaces the prior baseline atomically', () => {
-    repo.save('graph', [{ fingerprint: 'old', payload: sig('r', 'f') }]);
-    repo.save('graph', [{ fingerprint: 'new', payload: sig('r2', 'f2') }]);
+    repo.save('graph', [{ fingerprint: 'old', payload: sig('r', 'f') }], ID);
+    repo.save('graph', [{ fingerprint: 'new', payload: sig('r2', 'f2') }], ID);
     expect(repo.load('graph').map((r) => r.fingerprint)).toEqual(['new']);
   });
 
   it('dedupes by fingerprint (last wins) and sorts deterministically', () => {
-    repo.save('graph', [
-      { fingerprint: 'b', payload: sig('rb', 'fb') },
-      { fingerprint: 'a', payload: sig('ra1', 'fa') },
-      { fingerprint: 'a', payload: sig('ra2', 'fa') }, // duplicate fingerprint
-    ]);
+    repo.save(
+      'graph',
+      [
+        { fingerprint: 'b', payload: sig('rb', 'fb') },
+        { fingerprint: 'a', payload: sig('ra1', 'fa') },
+        { fingerprint: 'a', payload: sig('ra2', 'fa') }, // duplicate fingerprint
+      ],
+      ID,
+    );
     const rows = repo.load('graph');
     expect(rows.map((r) => r.fingerprint)).toEqual(['a', 'b']);
     expect(rows.find((r) => r.fingerprint === 'a')?.payload?.ruleId).toBe('ra2'); // last won
   });
 
   it('scopes rows per tool — tools never see each other', () => {
-    repo.save('graph', [{ fingerprint: 'g', payload: sig('rg', 'fg') }]);
-    repo.save('fitness', [{ fingerprint: 'f', payload: sig('rf', 'ff') }]);
+    repo.save('graph', [{ fingerprint: 'g', payload: sig('rg', 'fg') }], ID);
+    repo.save('fitness', [{ fingerprint: 'f', payload: sig('rf', 'ff') }], ID);
     expect(repo.load('graph').map((r) => r.fingerprint)).toEqual(['g']);
     expect(repo.load('fitness').map((r) => r.fingerprint)).toEqual(['f']);
     expect(repo.exists('simulation')).toBe(false);
   });
 
+  it('persists and loads baseline identity metadata', () => {
+    repo.save('graph', [{ fingerprint: 'fp', payload: sig('r', 'f') }], {
+      baselineFormatVersion: 1,
+      fingerprintStrategyId: 'graph.rule-file-line-col',
+      fingerprintStrategyVersion: 1,
+    });
+    expect(repo.loadMeta('graph')).toEqual({
+      baselineFormatVersion: 1,
+      fingerprintStrategyId: 'graph.rule-file-line-col',
+      fingerprintStrategyVersion: 1,
+    });
+  });
+
+  it('loadMeta returns undefined for legacy rows without identity columns populated', () => {
+    repo.save('graph', [{ fingerprint: 'fp', payload: sig('r', 'f') }], ID);
+    requireDrizzleDataStore(ds).db.run(
+      sql`UPDATE tool_baseline_meta SET baseline_format_version = NULL, fingerprint_strategy_id = NULL, fingerprint_strategy_version = NULL WHERE tool = 'graph'`,
+    );
+    expect(repo.loadMeta('graph')).toBeUndefined();
+  });
+
   it('clear removes entries + meta marker (unlike empty save)', () => {
-    repo.save('graph', [{ fingerprint: 'g1', payload: sig('r', 'f') }]);
+    repo.save('graph', [{ fingerprint: 'g1', payload: sig('r', 'f') }], ID);
     expect(repo.exists('graph')).toBe(true);
     expect(repo.load('graph')).toHaveLength(1);
 

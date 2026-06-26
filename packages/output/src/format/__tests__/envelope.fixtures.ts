@@ -4,7 +4,8 @@
  * `Date.now()`) so a fixed envelope renders to a fixed string with zero mocks
  * (formatter-purity contract, ADR-0011).
  */
-import type { SignalEnvelope } from '@opensip-cli/contracts';
+import { DEFAULT_BASELINE_IDENTITY, type SignalEnvelope } from '@opensip-cli/contracts';
+
 import type { Signal } from '@opensip-cli/core';
 
 function signal(overrides: Partial<Signal>): Signal {
@@ -57,6 +58,10 @@ export const FIXTURE_ENVELOPE: SignalEnvelope = {
       code: { file: 'src/bar.ts', line: 42, column: 1 },
     }),
   ],
+  baselineIdentity: {
+    fingerprintStrategyId: 'graph.rule-file-line-col',
+    fingerprintStrategyVersion: 1,
+  },
 };
 
 /** Empty run — no units, no signals (the "ran, found nothing" shape). */
@@ -72,4 +77,5 @@ export const EMPTY_ENVELOPE: SignalEnvelope = {
   },
   units: [],
   signals: [],
+  baselineIdentity: DEFAULT_BASELINE_IDENTITY,
 };

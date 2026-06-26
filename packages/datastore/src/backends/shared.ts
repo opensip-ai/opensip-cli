@@ -1,9 +1,13 @@
+import { withFileLock } from '@opensip-cli/core';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 
-import type { DrizzleHandle, SqliteBackendHandle } from '../data-store.js';
+import type { DataStoreLockContext, DrizzleHandle, SqliteBackendHandle } from '../data-store.js';
 
-export function buildSqliteDataStore(dbPath: string): SqliteBackendHandle {
+export function buildSqliteDataStore(
+  dbPath: string,
+  lock?: DataStoreLockContext,
+): SqliteBackendHandle {
   const sqlite = new Database(dbPath);
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');
@@ -12,6 +16,27 @@ export function buildSqliteDataStore(dbPath: string): SqliteBackendHandle {
   sqlite.pragma('busy_timeout = 5000');
   const db: DrizzleHandle = drizzle(sqlite);
   let closed = false;
+
+  const isMemory = dbPath === ':memory:';
+  const lockPath = isMemory ? undefined : `${dbPath}.write.lock`;
+
+  const withWriteLock = <T>(operation: string, fn: () => T): T => {
+    if (!lockPath || !lock) return fn();
+    return withFileLock(
+      lockPath,
+      {
+        policy: lock.policy,
+        resource: 'datastore',
+        operation,
+        runId: lock.runId,
+        command: lock.command,
+        cwdBasename: lock.cwdBasename,
+        onEvent: lock.onLockEvent,
+      },
+      fn,
+    );
+  };
+
   return {
     db,
     close(): void {
@@ -26,6 +51,7 @@ export function buildSqliteDataStore(dbPath: string): SqliteBackendHandle {
     transaction<T>(fn: (tx: DrizzleHandle) => T): T {
       return db.transaction(fn);
     },
+    withWriteLock,
     readUserVersion(): number {
       // `{ simple: true }` returns the scalar (0 on a fresh DB) rather than a row array.
       return Number(sqlite.pragma('user_version', { simple: true }));

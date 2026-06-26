@@ -44,6 +44,10 @@ function envelopeOf(signals: readonly Signal[]): SignalEnvelope {
     },
     units: [],
     signals,
+    baselineIdentity: {
+      fingerprintStrategyId: 'graph.rule-file-line-col',
+      fingerprintStrategyVersion: 1,
+    },
   };
 }
 

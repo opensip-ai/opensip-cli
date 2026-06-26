@@ -78,60 +78,62 @@ export class CatalogRepo {
    * SQLite's transaction semantics guarantee no torn reads.
    */
   replaceAll(catalog: Catalog): void {
-    try {
-      const filesFingerprint = catalog.filesFingerprint ?? '';
-      const payload: CatalogRowPayload = {
-        version: catalog.version,
-        tool: catalog.tool,
-        language: catalog.language,
-        builtAt: catalog.builtAt,
-        cacheKey: catalog.cacheKey,
-        filesFingerprint: catalog.filesFingerprint,
-        resolutionMode: catalog.resolutionMode,
-        functions: catalog.functions,
-        // Carries through whatever the caller attached; `undefined` when none
-        // (a lean run) so the key is omitted from the persisted JSON.
-        reExports: catalog.reExports,
-        features: catalog.features,
-      };
-      this.datastore.db
-        .insert(graphCatalog)
-        .values({
-          id: 1,
+    this.datastore.withWriteLock('graph.catalog.replace', () => {
+      try {
+        const filesFingerprint = catalog.filesFingerprint ?? '';
+        const payload: CatalogRowPayload = {
+          version: catalog.version,
+          tool: catalog.tool,
           language: catalog.language,
-          cacheKey: catalog.cacheKey,
-          filesFingerprint,
           builtAt: catalog.builtAt,
-          payload,
-        })
-        .onConflictDoUpdate({
-          target: graphCatalog.id,
-          set: {
-            language: sql`excluded.language`,
-            cacheKey: sql`excluded.cache_key`,
-            filesFingerprint: sql`excluded.files_fingerprint`,
-            builtAt: sql`excluded.built_at`,
-            payload: sql`excluded.payload`,
-          },
-        })
-        .run();
-      logger.info({
-        evt: 'graph.catalog.write.complete',
-        module: MODULE_NAME,
-        msg: 'Catalog written',
-        functions: Object.keys(catalog.functions).length,
-      });
-    } catch (error) {
-      /* v8 ignore start */
-      logger.error({
-        evt: 'graph.catalog.write.error',
-        module: MODULE_NAME,
-        msg: 'Failed to write catalog',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-      /* v8 ignore stop */
-    }
+          cacheKey: catalog.cacheKey,
+          filesFingerprint: catalog.filesFingerprint,
+          resolutionMode: catalog.resolutionMode,
+          functions: catalog.functions,
+          // Carries through whatever the caller attached; `undefined` when none
+          // (a lean run) so the key is omitted from the persisted JSON.
+          reExports: catalog.reExports,
+          features: catalog.features,
+        };
+        this.datastore.db
+          .insert(graphCatalog)
+          .values({
+            id: 1,
+            language: catalog.language,
+            cacheKey: catalog.cacheKey,
+            filesFingerprint,
+            builtAt: catalog.builtAt,
+            payload,
+          })
+          .onConflictDoUpdate({
+            target: graphCatalog.id,
+            set: {
+              language: sql`excluded.language`,
+              cacheKey: sql`excluded.cache_key`,
+              filesFingerprint: sql`excluded.files_fingerprint`,
+              builtAt: sql`excluded.built_at`,
+              payload: sql`excluded.payload`,
+            },
+          })
+          .run();
+        logger.info({
+          evt: 'graph.catalog.write.complete',
+          module: MODULE_NAME,
+          msg: 'Catalog written',
+          functions: Object.keys(catalog.functions).length,
+        });
+      } catch (error) {
+        /* v8 ignore start */
+        logger.error({
+          evt: 'graph.catalog.write.error',
+          module: MODULE_NAME,
+          msg: 'Failed to write catalog',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+        /* v8 ignore stop */
+      }
+    });
   }
 
   /**
@@ -217,25 +219,27 @@ export class CatalogRepo {
    * are lifted from the result so a reuse check needs no payload parse.
    */
   upsertShardFragment(result: ShardBuildResult): void {
-    this.datastore.db
-      .insert(graphShardFragment)
-      .values({
-        shardId: result.shardId,
-        language: result.fragment.language,
-        cacheKey: result.fragment.cacheKey,
-        shardFingerprint: result.fingerprint,
-        payload: result,
-      })
-      .onConflictDoUpdate({
-        target: graphShardFragment.shardId,
-        set: {
-          language: sql`excluded.language`,
-          cacheKey: sql`excluded.cache_key`,
-          shardFingerprint: sql`excluded.shard_fingerprint`,
-          payload: sql`excluded.payload`,
-        },
-      })
-      .run();
+    this.datastore.withWriteLock('graph.shard_fragment.upsert', () => {
+      this.datastore.db
+        .insert(graphShardFragment)
+        .values({
+          shardId: result.shardId,
+          language: result.fragment.language,
+          cacheKey: result.fragment.cacheKey,
+          shardFingerprint: result.fingerprint,
+          payload: result,
+        })
+        .onConflictDoUpdate({
+          target: graphShardFragment.shardId,
+          set: {
+            language: sql`excluded.language`,
+            cacheKey: sql`excluded.cache_key`,
+            shardFingerprint: sql`excluded.shard_fingerprint`,
+            payload: sql`excluded.payload`,
+          },
+        })
+        .run();
+    });
   }
 
   /**
@@ -269,12 +273,14 @@ export class CatalogRepo {
    */
   pruneShardFragmentsExcept(keepShardIds: readonly string[]): void {
     if (keepShardIds.length === 0) return;
-    const separator = sql`, `;
-    const placeholders = keepShardIds.map((id) => sql`${id}`);
-    const keepList = sql.join(placeholders, separator);
-    this.datastore.db
-      .delete(graphShardFragment)
-      .where(sql`shard_id NOT IN (${keepList})`)
-      .run();
+    this.datastore.withWriteLock('graph.shard_fragment.prune', () => {
+      const separator = sql`, `;
+      const placeholders = keepShardIds.map((id) => sql`${id}`);
+      const keepList = sql.join(placeholders, separator);
+      this.datastore.db
+        .delete(graphShardFragment)
+        .where(sql`shard_id NOT IN (${keepList})`)
+        .run();
+    });
   }
 }

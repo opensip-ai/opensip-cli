@@ -1,6 +1,8 @@
 import { currentScope, extractPayloadVersion } from '@opensip-cli/core';
 import { buildReplaySignals, decodeSessionPayload } from '@opensip-cli/session-store';
 
+import { fitnessFingerprintStrategy } from '../baseline-strategy.js';
+
 import type {
   RunPresentation,
   SignalEnvelope,
@@ -70,6 +72,10 @@ export function fitReplayFromSession(stored: StoredSession): ToolSessionReplay<R
     },
     units,
     signals,
+    baselineIdentity: {
+      fingerprintStrategyId: fitnessFingerprintStrategy.id,
+      fingerprintStrategyVersion: fitnessFingerprintStrategy.version,
+    },
   };
   return {
     fidelity: 'projection',

@@ -80,6 +80,10 @@ const ENVELOPE: SignalEnvelope = {
       createdAt: '2026-06-04T00:00:00.000Z',
     },
   ],
+  baselineIdentity: {
+    fingerprintStrategyId: 'fitness.sha256-file-rule-message',
+    fingerprintStrategyVersion: 1,
+  },
 };
 
 function makeScope(signalSink?: SignalSink): RunScope {

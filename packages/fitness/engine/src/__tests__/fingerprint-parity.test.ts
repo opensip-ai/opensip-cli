@@ -29,10 +29,30 @@ function sig(over: { filePath: string; ruleId: string; message: string; line?: n
 }
 
 const CORPUS: readonly Signal[] = [
-  sig({ filePath: 'src/a.ts', ruleId: 'no-any', message: 'Avoid any', line: 3 }),
-  sig({ filePath: 'src/b.ts', ruleId: 'no-console', message: 'Remove console.log', line: 10 }),
-  sig({ filePath: 'src/a.ts', ruleId: 'no-any', message: 'Avoid any', line: 99 }), // same as #1 but line differs
-  sig({ filePath: 'pkg/c.tsx', ruleId: 'react-key', message: 'Missing key prop', line: 1 }),
+  sig({
+    filePath: 'src/a.ts',
+    ruleId: 'no-any',
+    message: 'Avoid any',
+    line: 3,
+  }),
+  sig({
+    filePath: 'src/b.ts',
+    ruleId: 'no-console',
+    message: 'Remove console.log',
+    line: 10,
+  }),
+  sig({
+    filePath: 'src/a.ts',
+    ruleId: 'no-any',
+    message: 'Avoid any',
+    line: 99,
+  }), // same as #1 but line differs
+  sig({
+    filePath: 'pkg/c.tsx',
+    ruleId: 'react-key',
+    message: 'Missing key prop',
+    line: 1,
+  }),
 ];
 
 // Frozen golden: sha256(filePath\nruleId\nmessage) — byte-identical to the
@@ -50,19 +70,41 @@ describe('fitness fingerprint golden (byte-preserved from the deleted oracle)', 
     for (const s of CORPUS) {
       const golden = GOLDEN[`${s.filePath}|${s.ruleId}|${s.message}`];
       expect(golden, `no golden for ${s.ruleId}`).toBeDefined();
-      expect(fitnessFingerprintStrategy(s)).toBe(golden);
+      expect(fitnessFingerprintStrategy.fingerprint(s)).toBe(golden);
     }
   });
 
   it('preserves line-shift tolerance: two signals differing only in line fingerprint identically', () => {
-    const a = sig({ filePath: 'src/a.ts', ruleId: 'no-any', message: 'Avoid any', line: 3 });
-    const b = sig({ filePath: 'src/a.ts', ruleId: 'no-any', message: 'Avoid any', line: 99 });
-    expect(fitnessFingerprintStrategy(a)).toBe(fitnessFingerprintStrategy(b));
+    const a = sig({
+      filePath: 'src/a.ts',
+      ruleId: 'no-any',
+      message: 'Avoid any',
+      line: 3,
+    });
+    const b = sig({
+      filePath: 'src/a.ts',
+      ruleId: 'no-any',
+      message: 'Avoid any',
+      line: 99,
+    });
+    expect(fitnessFingerprintStrategy.fingerprint(a)).toBe(
+      fitnessFingerprintStrategy.fingerprint(b),
+    );
   });
 
   it('distinguishes a message change (the message IS in the identity)', () => {
-    const a = sig({ filePath: 'src/a.ts', ruleId: 'no-any', message: 'Avoid any' });
-    const b = sig({ filePath: 'src/a.ts', ruleId: 'no-any', message: 'Avoid the any type' });
-    expect(fitnessFingerprintStrategy(a)).not.toBe(fitnessFingerprintStrategy(b));
+    const a = sig({
+      filePath: 'src/a.ts',
+      ruleId: 'no-any',
+      message: 'Avoid any',
+    });
+    const b = sig({
+      filePath: 'src/a.ts',
+      ruleId: 'no-any',
+      message: 'Avoid the any type',
+    });
+    expect(fitnessFingerprintStrategy.fingerprint(a)).not.toBe(
+      fitnessFingerprintStrategy.fingerprint(b),
+    );
   });
 });

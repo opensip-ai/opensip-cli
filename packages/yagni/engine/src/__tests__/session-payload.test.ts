@@ -21,6 +21,10 @@ function minimalEnvelope(): SignalEnvelope {
     },
     units: [],
     signals: [],
+    baselineIdentity: {
+      fingerprintStrategyId: 'yagni.sha256-detector-locations',
+      fingerprintStrategyVersion: 1,
+    },
   };
 }
 

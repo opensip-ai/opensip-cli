@@ -36,12 +36,13 @@ export type { FitOptions, InitOptions, ToolOptions } from './types.js';
 // `CommandResult` payload every tool returns; it replaced the fitness-shaped
 // `CliOutput`/`CheckOutput`/`FindingOutput` husk, which was retired in Phase 7.
 export type {
+  BaselineIdentity,
   SignalEnvelope,
   RunVerdict,
   UnitResult,
   BuildEnvelopeInput,
 } from './signal-envelope.js';
-export { buildSignalEnvelope } from './signal-envelope.js';
+export { buildSignalEnvelope, DEFAULT_BASELINE_IDENTITY } from './signal-envelope.js';
 
 // Command result types (the CommandResult union + per-command variants)
 export type {

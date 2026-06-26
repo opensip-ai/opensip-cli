@@ -1,12 +1,24 @@
+import type { FileLockEvent, StateLockPolicy } from '@opensip-cli/core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 export type DrizzleHandle<TSchema extends Record<string, unknown> = Record<string, unknown>> =
   BetterSQLite3Database<TSchema>;
 
+/** Lock context passed when opening a file-backed datastore (ADR-0075). */
+export interface DataStoreLockContext {
+  readonly policy: StateLockPolicy;
+  readonly runId?: string;
+  readonly command?: string;
+  readonly cwdBasename?: string;
+  readonly onLockEvent?: (event: FileLockEvent) => void;
+}
+
 /** Public persistence handle: lifecycle plus transaction, but no raw query escape hatch. */
 export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
   close(): void;
   transaction<T>(fn: (tx: DrizzleHandle<TSchema>) => T): T;
+  /** Serialize datastore-file writes (no-op for in-memory backends). */
+  withWriteLock<T>(operation: string, fn: () => T): T;
 }
 
 /**
@@ -39,6 +51,7 @@ export interface SqliteBackendHandle<
   writeUserVersion(version: number): void;
 }
 
+/** Type guard for a {@link DrizzleDataStore} handle (db + transaction + close). */
 export function isDrizzleDataStore(value: unknown): value is DrizzleDataStore {
   return (
     typeof value === 'object' &&
@@ -69,6 +82,8 @@ export function requireDrizzleDataStore(datastore: DataStore): DrizzleDataStore 
 export interface DataStoreOpenOptions {
   backend: 'sqlite' | 'memory';
   path?: string;
+  /** Write-lock policy for file-backed SQLite datastores. */
+  lock?: DataStoreLockContext;
 }
 
 /** Thrown when a Drizzle schema migration fails to apply; carries the offending file name. */

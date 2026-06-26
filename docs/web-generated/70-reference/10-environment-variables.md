@@ -86,6 +86,18 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 | `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
 | `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH` | Comma/whitespace-separated extra env var names to forward into external-tool dispatch worker children beyond the default allow-list. The default allow-list also forwards CLI tool admission controls (`OPENSIP_CLI_ALLOW_*_TOOLS` and `OPENSIP_CLI_SKIP_*`) so the worker sees the same explicit trust decisions as the supervising process. Does not affect bundled live-run worker forks. |
 
+## State write locking
+
+Optional overrides for datastore-file and artifact-file write locks
+([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
+Local interactive runs wait longer by default; CI runs fail faster.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `OPENSIP_STATE_LOCK_WAIT_MS` | `30000` (local), `5000` when `CI` is set | Maximum milliseconds to wait for a write lock before timing out. |
+| `OPENSIP_STATE_LOCK_STALE_MS` | `600000` | Treat a lock as stale when the owner process is gone or heartbeat is older than this value (ms). |
+| `CI` | (unset) | Standard CI sentinel; when set, selects the shorter default lock wait. |
+
 ## Worker resource ceilings
 
 Governed limits for forked workers (external-tool dispatch and bundled live-engine

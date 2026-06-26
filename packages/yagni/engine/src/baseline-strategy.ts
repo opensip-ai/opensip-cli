@@ -6,9 +6,9 @@
 
 import { createHash } from 'node:crypto';
 
-import { readYagniMetadata } from './scoring/confidence.js';
+import { defineFingerprintStrategy } from '@opensip-cli/core';
 
-import type { FingerprintStrategy } from '@opensip-cli/core';
+import { readYagniMetadata } from './scoring/confidence.js';
 
 function normalizedLocation(s: {
   readonly filePath: string;
@@ -21,19 +21,23 @@ function normalizedLocation(s: {
 }
 
 /** yagni's baseline identity: sha256(detector|locations|symbolIds|evidenceIds). */
-export const yagniFingerprintStrategy: FingerprintStrategy = (s) => {
-  const meta = readYagniMetadata(s);
-  const detector = meta?.detector ?? s.ruleId;
-  const location = normalizedLocation(s);
-  const symbolIds = meta?.evidence
-    .map((e) => e.data?.qualifiedName)
-    .filter((v): v is string => typeof v === 'string')
-    .sort()
-    .join(',');
-  const evidenceIds = (meta?.evidence ?? [])
-    .map((e) => e.id)
-    .sort()
-    .join(',');
-  const payload = `${detector}|${location}|${symbolIds}|${evidenceIds}`;
-  return createHash('sha256').update(payload).digest('hex');
-};
+export const yagniFingerprintStrategy = defineFingerprintStrategy({
+  id: 'yagni.sha256-detector-locations',
+  version: 1,
+  fingerprint: (s) => {
+    const meta = readYagniMetadata(s);
+    const detector = meta?.detector ?? s.ruleId;
+    const location = normalizedLocation(s);
+    const symbolIds = meta?.evidence
+      .map((e) => e.data?.qualifiedName)
+      .filter((v): v is string => typeof v === 'string')
+      .sort()
+      .join(',');
+    const evidenceIds = (meta?.evidence ?? [])
+      .map((e) => e.id)
+      .sort()
+      .join(',');
+    const payload = `${detector}|${location}|${symbolIds}|${evidenceIds}`;
+    return createHash('sha256').update(payload).digest('hex');
+  },
+});

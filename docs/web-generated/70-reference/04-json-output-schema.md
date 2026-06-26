@@ -54,7 +54,11 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
     }
   },
   "units": [ /* UnitResult[] */ ],
-  "signals": [ /* Signal[] */ ]
+  "signals": [ /* Signal[] */ ],
+  "baselineIdentity": {
+    "fingerprintStrategyId": "opensip.default.rule-file-line-col",
+    "fingerprintStrategyVersion": 1
+  }
 }
 ```
 
@@ -70,6 +74,7 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 | `verdict` | `RunVerdict` | yes | Run-level pass/fail header. See below. |
 | `units` | `UnitResult[]` | yes | Per-unit ran/errored/timing facts. May be `[]`. |
 | `signals` | `Signal[]` | yes | The flat list of findings the run produced. May be `[]`. |
+| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
 | `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
 
 ### `RunVerdict`

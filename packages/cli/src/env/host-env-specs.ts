@@ -131,6 +131,22 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
   },
   {
+    canonical: 'OPENSIP_STATE_LOCK_WAIT_MS',
+    docs:
+      'Override datastore/artifact write-lock wait time in milliseconds. Local default 30000; ' +
+      'CI default 5000 when CI is set.',
+  },
+  {
+    canonical: 'OPENSIP_STATE_LOCK_STALE_MS',
+    docs:
+      'Override stale-lock recovery threshold in milliseconds (default 600000). Abandoned locks ' +
+      'whose owner process is gone or heartbeat is older than this are removed.',
+  },
+  {
+    canonical: 'CI',
+    docs: 'Standard CI sentinel. When set, state write locks use the shorter CI wait default.',
+  },
+  {
     canonical: 'OPENSIP_CLI_TOOL_ENV_PASSTHROUGH',
     coerce: (raw) =>
       raw

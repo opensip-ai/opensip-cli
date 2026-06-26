@@ -100,6 +100,9 @@ describe('hostEnv reads (CLI infra)', () => {
       'OPENSIP_CLI_SKIP_INSTALLED',
       'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
+      'OPENSIP_STATE_LOCK_WAIT_MS',
+      'OPENSIP_STATE_LOCK_STALE_MS',
+      'CI',
       'OPENSIP_CLI_TOOL_ENV_PASSTHROUGH',
     ]);
   });

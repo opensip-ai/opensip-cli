@@ -13,7 +13,7 @@ date: 2026-06-13
 status: active
 supersedes: []
 superseded_by: null
-related: [ADR-0025, ADR-0042]
+related: [ADR-0025, ADR-0042, ADR-0075]
 tags: [persistence, contracts, sessions, tool-state, extensibility]
 enforcement: mechanizable
 enforcement-reason: >
@@ -25,6 +25,8 @@ enforcement-reason: >
 ```
 
 **Decision:** Tool session payloads (`StoredSession.payload`) and versioned `tool_state` values carry a top-level numeric `"__version": N` (double-underscore, starting at 1). The host (contracts, session-store, datastore, CLI) remains ignorant of concrete tool shapes and only provides a small pure `extractPayloadVersion` helper, the outer `payload_version` storage column (for rare host-contract bumps), structured decode tolerance, warnings on future versions, and best-effort projection for legacy payloads. Tools own their evolution rules (additive = free; breaking = bump + deprecation window).
+
+**Out of scope (ADR-0075):** Baseline fingerprint strategy identity (`fingerprintStrategyId` / `fingerprintStrategyVersion` on `SignalEnvelope.baselineIdentity` and in `tool_baseline_meta`) is a separate host-owned ratchet concern — not a tool session or `tool_state` payload. See [ADR-0075](ADR-0075-state-locking-and-baseline-identity-versioning.md).
 
 **Alternatives:**
 - Put version only in the table column and force tools to register current version at load time — rejected (couples host to tool internals; doesn't help multiple versioned keys under toolState).

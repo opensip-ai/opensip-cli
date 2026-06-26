@@ -23,8 +23,11 @@
  * baselines — the next `--gate-save` re-baselines with the new key.
  */
 
-import type { FingerprintStrategy } from '@opensip-cli/core';
+import { defineFingerprintStrategy } from '@opensip-cli/core';
 
 /** graph's byte-preserved baseline identity: `ruleId|filePath|line|column`. */
-export const graphFingerprintStrategy: FingerprintStrategy = (s) =>
-  `${s.ruleId}|${s.filePath}|${String(s.line ?? 0)}|${String(s.column ?? 0)}`;
+export const graphFingerprintStrategy = defineFingerprintStrategy({
+  id: 'graph.rule-file-line-col',
+  version: 1,
+  fingerprint: (s) => `${s.ruleId}|${s.filePath}|${String(s.line ?? 0)}|${String(s.column ?? 0)}`,
+});

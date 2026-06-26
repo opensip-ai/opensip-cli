@@ -201,6 +201,10 @@ SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`pa
 
 The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-cli internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/fitness/engine/src/baseline-strategy.ts) and [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
 
+**Baseline identity (ADR-0075).** Every `SignalEnvelope` carries `baselineIdentity: { fingerprintStrategyId, fingerprintStrategyVersion }` — the fingerprint strategy that stamped each signal's `fingerprint`. On `--gate-save`, the host persists this metadata in `tool_baseline_meta` alongside the captured rows. On `--gate-compare` and `export --format baseline`, the host checks that stored metadata matches the current strategy before diffing fingerprints. A mismatch (missing metadata, strategy id change, or version bump) is a configuration error with recapture guidance: re-run `--gate-save`. This is separate from ADR-0050 session/`tool_state` payload `__version` — baseline identity governs the ratchet plane only.
+
+Concurrent CLI invocations that share one project datastore coordinate writes with datastore-file and per-artifact locks ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). Optional env overrides are documented in [`70-reference/10-environment-variables.md`](/docs/opensip-cli/70-reference/10-environment-variables/#state-write-locking).
+
 ---
 
 ## 5. The Tool plugin contract
