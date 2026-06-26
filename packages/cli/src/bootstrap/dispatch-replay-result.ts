@@ -60,6 +60,9 @@ export async function replayResult(
   ctx: DispatchHostCtx,
   invocation: ReplayContext,
 ): Promise<void> {
+  if (result.reportedFailure !== undefined) {
+    await ctx.reportFailure(result.reportedFailure);
+  }
   if (result.error !== undefined) {
     ctx.emitError(result.error);
   }

@@ -25,6 +25,7 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 // `LoggerImpl.{get,set}RunId` survive for isolated-instance test use.
 export { logger, LoggerImpl, configureLogger, createRunLogger } from './lib/logger.js';
 export type { Logger, LogLevel, LoggerOptions, RunIdProvider } from './lib/logger.js';
+export { createToolLogger } from './lib/create-tool-logger.js';
 
 // Lib — telemetry (tracing). The kernel sibling of `logger`: a thin seam over
 // the OpenTelemetry *API* (`@opentelemetry/api`) only. No-op until an SDK

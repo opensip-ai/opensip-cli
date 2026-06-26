@@ -83,6 +83,7 @@ per-run `ToolCliContext` (ADR-0051). See
 - `renderLive`
 - `maybeOpenReport`
 - `logger`
+- `reportFailure`
 - `setExitCode`
 - `emitJson`
 - `emitEnvelope`

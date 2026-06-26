@@ -113,6 +113,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'configureLogger',
   'createRunLogger',
   'createTool',
+  'createToolLogger',
   'createToolScope',
   'createCapabilityRegistry',
   'createInProcessTransport',

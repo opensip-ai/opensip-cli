@@ -110,13 +110,11 @@ async function runFitBaselineExport(
       message,
       exitCode,
     });
-    if (opts.json) {
-      // 2.12.0 (§5.5): structured error outcome (host wraps + sets exit code).
-      cli.emitError({ message, exitCode });
-      return;
-    }
-    cli.setExitCode(exitCode);
-    process.stderr.write(`Error: ${message}\n`);
+    await cli.reportFailure({
+      message,
+      exitCode,
+      jsonRequested: opts.json === true,
+    });
     return;
   }
   const result = { type: 'fit-baseline-export' as const, outPath: opts.out };

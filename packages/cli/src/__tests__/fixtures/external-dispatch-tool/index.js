@@ -94,7 +94,11 @@ export const tool = {
     // Stamps the worker pid + the config it saw so the test can assert it ran in
     // the worker (pid !== host pid) and read worker-local config.
     collectReportData: () => ({
-      extDispatchReport: { ran: true, pid: process.pid, marker: 'report-from-worker' },
+      extDispatchReport: {
+        ran: true,
+        pid: process.pid,
+        marker: 'report-from-worker',
+      },
     }),
 
     // sessionReplay: rebuilds a ToolSessionReplay from a stored row, worker-side.
@@ -173,7 +177,9 @@ export const tool = {
           //  - toolState.put then get (datastore round-trip, host-side);
           //  - saveBaseline (BaselineRepo write, host-side);
           //  - deliverSignals (egress, host-side; returns SignalDeliveryResult).
-          await cli.toolState.put('external-dispatch-tool', 'k', { v: opts.echo ?? null });
+          await cli.toolState.put('external-dispatch-tool', 'k', {
+            v: opts.echo ?? null,
+          });
           const got = await cli.toolState.get('external-dispatch-tool', 'k');
           await cli.saveBaseline('external-dispatch-tool', {
             tool: 'external-dispatch-tool',
@@ -191,6 +197,15 @@ export const tool = {
           // caught here as a normal thrown error (fault-not-crash).
           await cli.toolState.get('external-dispatch-tool', 'boom');
         }
+        if (mode === 'report-failure') {
+          await cli.reportFailure({
+            message: 'fixture command failed',
+            exitCode: 3,
+            code: 'FIXTURE.FAIL',
+            jsonRequested: opts.json === true,
+          });
+          return;
+        }
         if (mode === 'fp') {
           // ADR-0054 M4-F: apply the tool's OWN fingerprintStrategy to the signal
           // (exactly what buildSignalEnvelope does at construction time) — this
@@ -206,7 +221,13 @@ export const tool = {
             verdict: {
               score: 100,
               passed: true,
-              summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+              summary: {
+                total: 1,
+                passed: 1,
+                failed: 0,
+                errors: 0,
+                warnings: 0,
+              },
             },
             units: [],
             signals: [sig],
@@ -225,11 +246,20 @@ export const tool = {
             verdict: {
               score: 100,
               passed: true,
-              summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+              summary: {
+                total: 1,
+                passed: 1,
+                failed: 0,
+                errors: 0,
+                warnings: 0,
+              },
             },
             units: [],
             signals: [
-              { initialized: initSentinel.initialized, initPid: initSentinel.initPid ?? null },
+              {
+                initialized: initSentinel.initialized,
+                initPid: initSentinel.initPid ?? null,
+              },
             ],
           });
           cli.setExitCode(0);

@@ -24,6 +24,7 @@ import {
   ToolError,
   currentScope,
   type LiveViewContext,
+  type ReportFailureDetail,
   type ToolRunCompletion,
   type ToolRunSessions,
   type CommandSpec,
@@ -69,6 +70,8 @@ export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts
 export interface CommandMountContext extends RunActionHooks {
   readonly render: (result: CommandResult) => Promise<void>;
   readonly setExitCode: (code: number) => void;
+  /** Host-owned command-failure fan-out (Plan 06). Optional on lean host contexts. */
+  readonly reportFailure?: (detail: ReportFailureDetail) => Promise<void>;
   readonly emitEnvelope?: (envelope: unknown) => void;
   /**
    * Optional live view dispatch. When the command declares output:'live-view',
@@ -199,7 +202,13 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
       await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {
       if (error instanceof ToolError) {
-        diagnostics?.event('execute', 'error', `command '${spec.name}' failed: ${error.message}`);
+        if (ctx.reportFailure !== undefined) {
+          await ctx.reportFailure({
+            error,
+            jsonRequested: (optsWithArgs as Record<string, unknown>).json === true,
+          });
+          return;
+        }
         ctx.setExitCode(mapToolErrorToExitCode(error));
         return;
       }
@@ -292,7 +301,9 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       const liveContext: LiveViewContext | undefined = (
         ctx as unknown as { runSession?: ToolRunSessions }
       ).runSession
-        ? { runSession: (ctx as unknown as { runSession: ToolRunSessions }).runSession }
+        ? {
+            runSession: (ctx as unknown as { runSession: ToolRunSessions }).runSession,
+          }
         : undefined;
       await ctx.renderLive(spec.name, { ...opts, _args: positionals }, liveContext);
       return;

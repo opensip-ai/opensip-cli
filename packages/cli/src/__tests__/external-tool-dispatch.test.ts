@@ -138,7 +138,10 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
   it('config deep pass (M4-E): a valid config block lets the run proceed', async () => {
     const cap = makeDispatchHostCtx();
     // The fixture's worker-side schema accepts `{ deep: 'ok' }` → handler runs.
-    await dispatch(cap, 'ok', { opts: { echo: 'cfg-ok' }, config: { deep: 'ok' } });
+    await dispatch(cap, 'ok', {
+      opts: { echo: 'cfg-ok' },
+      config: { deep: 'ok' },
+    });
     expect(cap.envelopes).toHaveLength(1);
     expect(cap.exitCodes).toContain(0);
   });
@@ -187,12 +190,48 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
     await expect(dispatch(cap, 'live-seam')).rejects.toThrow(/failed/);
   });
 
+  it('reportFailure: worker calls cli.reportFailure and the host replays customer output', async () => {
+    const cap = makeDispatchHostCtx();
+    await dispatch(cap, 'report-failure');
+
+    expect(cap.reportedFailures).toHaveLength(1);
+    expect(cap.reportedFailures[0]).toMatchObject({
+      message: 'fixture command failed',
+      exitCode: 3,
+      code: 'FIXTURE.FAIL',
+    });
+    expect(cap.rendered).toHaveLength(1);
+    expect(cap.rendered[0]).toMatchObject({
+      type: 'error',
+      message: 'fixture command failed',
+      exitCode: 3,
+    });
+    expect(cap.exitCodes).toContain(3);
+    expect(cap.envelopes).toHaveLength(0);
+  });
+
+  it('reportFailure with --json: worker failure replays through host emitError', async () => {
+    const cap = makeDispatchHostCtx();
+    await dispatch(cap, 'report-failure', { opts: { json: true } });
+
+    expect(cap.errors).toHaveLength(1);
+    expect(cap.errors[0]).toMatchObject({
+      message: 'fixture command failed',
+      exitCode: 3,
+      code: 'FIXTURE.FAIL',
+    });
+    expect(cap.rendered).toHaveLength(0);
+    expect(cap.exitCodes).toContain(3);
+  });
+
   it('host-RPC (M4-C): worker seam calls upcall the host, which performs the effect host-side', async () => {
     const cap = makeDispatchHostCtx();
     await dispatch(cap, 'rpc', { opts: { echo: 'via-rpc' } });
 
     // The datastore write happened HOST-SIDE via the toolState.put upcall.
-    expect(cap.toolStateStore.get('external-dispatch-tool:k')).toEqual({ v: 'via-rpc' });
+    expect(cap.toolStateStore.get('external-dispatch-tool:k')).toEqual({
+      v: 'via-rpc',
+    });
     // The baseline was saved HOST-SIDE via the saveBaseline upcall.
     expect(cap.baselines).toHaveLength(1);
     expect(cap.baselines[0]?.tool).toBe('external-dispatch-tool');
@@ -203,7 +242,11 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
     // into its envelope (proves the reply crossed back, not just fired).
     const env = cap.envelopes[0] as {
       signals: {
-        rpcEcho: { got: { v: string }; delivery: { cloudAccepted: number }; list: string[] };
+        rpcEcho: {
+          got: { v: string };
+          delivery: { cloudAccepted: number };
+          list: string[];
+        };
       }[];
     };
     const echo = env.signals[0]?.rpcEcho;

@@ -68,11 +68,17 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
+    reportFailure: vi.fn(() => Promise.resolve()),
     deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
     saveBaseline: vi.fn(() => Promise.resolve()),
     compareBaseline: vi.fn(() =>
-      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+      Promise.resolve({
+        added: [],
+        resolved: [],
+        unchanged: [],
+        degraded: false,
+      }),
     ),
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
@@ -182,7 +188,10 @@ describe('graph handler — end-to-end via the real typescript adapter', () => {
       } finally {
         stdoutSpy.mockRestore();
       }
-      const parsed = JSON.parse(stdout) as { tool: string; schemaVersion: number };
+      const parsed = JSON.parse(stdout) as {
+        tool: string;
+        schemaVersion: number;
+      };
       expect(parsed.tool).toBe('graph');
       expect(parsed.schemaVersion).toBe(2);
       expect(setExitCode).toHaveBeenCalledWith(0);
@@ -217,11 +226,17 @@ describe('graph handler — end-to-end via the real typescript adapter', () => {
       // falls back to the static render seam). vitest's stdout is not a TTY, so
       // force it for this assertion.
       const prevTTY = process.stdout.isTTY;
-      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
       try {
         await graphHandler()({ cwd: dir, exact: true, _args: [[]] }, cli);
       } finally {
-        Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
+        Object.defineProperty(process.stdout, 'isTTY', {
+          value: prevTTY,
+          configurable: true,
+        });
       }
       expect(renderLive).toHaveBeenCalledOnce();
       expect(renderLive).toHaveBeenCalledWith('graph', expect.objectContaining({ cwd: dir }));

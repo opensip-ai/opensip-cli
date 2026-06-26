@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { executeGraph } from '../../cli/graph.js';
 import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
+import { makeReportFailureMock } from '../report-failure-mock.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
@@ -116,12 +117,14 @@ interface MockCli {
 
 function mockCli(datastore: DataStore | undefined): MockCli {
   const setExitCode = vi.fn();
+  const render = vi.fn(() => Promise.resolve());
   return {
     cli: {
       datastore,
       setExitCode,
-      render: () => Promise.resolve(),
+      render,
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
+      reportFailure: makeReportFailureMock(setExitCode, render),
     } as unknown as ToolCliContext,
     setExitCode,
   };
@@ -154,7 +157,9 @@ describe('D14 — --language with zero matching files', () => {
     const { cli, setExitCode } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, language: 'typescript' }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+    const err = (cli.render as ReturnType<typeof vi.fn>).mock.calls
+      .map((c) => (c[0] as { message?: string }).message ?? '')
+      .join('\n');
     expect(err).toContain('--language typescript matched 0 files');
     expect(err).toContain('check the flag or paths');
   });

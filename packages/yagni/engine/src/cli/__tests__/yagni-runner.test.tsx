@@ -31,6 +31,7 @@ function stubCli(): ToolCliContext {
   return {
     scope: { datastore: () => undefined },
     deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 
@@ -122,7 +123,11 @@ describe('renderYagniLive produce mapping', () => {
     if (outcome.kind !== 'done') return;
     expect(outcome.done.verboseLines).toBeUndefined();
     expect(outcome.done.table).toBeUndefined();
-    expect(outcome.done.summary).toMatchObject({ passed: true, errors: 0, warnings: 0 });
+    expect(outcome.done.summary).toMatchObject({
+      passed: true,
+      errors: 0,
+      warnings: 0,
+    });
     expect(outcome.session?.tool).toBe('yagni');
     expect(outcome.session?.passed).toBe(false);
   });

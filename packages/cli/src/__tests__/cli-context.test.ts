@@ -2,7 +2,14 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { UnknownLiveViewError, type LiveViewRenderer, type Logger } from '@opensip-cli/core';
+import {
+  LoggerImpl,
+  RunScope,
+  UnknownLiveViewError,
+  runWithScopeSync,
+  type LiveViewRenderer,
+  type Logger,
+} from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -176,6 +183,19 @@ describe('buildToolCliContext', () => {
     expect(out[0]).toMatch(/\n$/);
   });
 
+  it('binds logger to scope.logger inside an entered RunScope', () => {
+    const opts = makeBuildOpts();
+    const scopeLogger = new LoggerImpl({ level: 'debug' });
+    const scope = new RunScope({ logger: scopeLogger });
+    runWithScopeSync(scope, () => {
+      const { ctx } = buildToolCliContext(opts);
+      expect(ctx.logger).toBe(scopeLogger);
+      expect(ctx.logger).toBe(scope.logger);
+    });
+    const { ctx } = buildToolCliContext(opts);
+    expect(ctx.logger).toBe(opts.logger);
+  });
+
   it('uses defaultLogger when no logger is supplied', () => {
     const { ctx } = buildToolCliContext({
       render: vi.fn(() => Promise.resolve()),
@@ -194,11 +214,22 @@ describe('buildToolCliContext', () => {
 // scope condition (best-effort) — never propagate.
 // ---------------------------------------------------------------------------
 
-const RESOLVER_CONTRIBUTION = { tool: 'fit', cwd: '/p', score: 90, passed: true, payload: {} };
+const RESOLVER_CONTRIBUTION = {
+  tool: 'fit',
+  cwd: '/p',
+  score: 90,
+  passed: true,
+  payload: {},
+};
 
 function buildCtxWithDebug(debug: ReturnType<typeof vi.fn>) {
   const base = makeBuildOpts();
-  const logger: Logger = { debug, info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  const logger: Logger = {
+    debug,
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
   return buildToolCliContext({ ...base, logger }).ctx;
 }
 
@@ -354,7 +385,11 @@ describe('ToolCliContext.scope getter', () => {
     const mod = await import('../cli-context.js');
     const { RunScope, runWithScopeSync } = await import('@opensip-cli/core');
     const scope = new RunScope({
-      projectContext: { scope: 'project', projectRoot: '/p', walkedUp: 0 } as never,
+      projectContext: {
+        scope: 'project',
+        projectRoot: '/p',
+        walkedUp: 0,
+      } as never,
     });
 
     const opts = makeBuildOpts();

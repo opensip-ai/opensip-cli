@@ -52,7 +52,10 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
       projectDirAbs: projectDir,
       files: [join(projectDir, 'src', 'a.ts')],
     }),
-    parseProject: (): ParseOutput => ({ project: { dummy: true }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { dummy: true },
+      parseErrors: [],
+    }),
     walkProject: (): WalkOutput => ({
       occurrences: {
         fn: [
@@ -103,6 +106,7 @@ function mockCli(datastore: DataStore, languages?: LanguageRegistry): ToolCliCon
       datastore: () => datastore,
       languages: languages ?? new LanguageRegistry(),
     },
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 

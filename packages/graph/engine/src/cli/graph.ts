@@ -150,34 +150,39 @@ export async function executeGraph(
     writeProfileIfRequested(opts, profile);
     return outcome;
   } catch (error) {
-    handleGraphError('graph', error, cli);
+    await handleGraphError('graph', error, cli, opts.json === true);
     return undefined;
   }
 }
 
-/** Map graph CLI errors to exit codes and emit a stderr message. */
-export function handleGraphError(label: string, error: unknown, cli: ToolCliContext): void {
-  logger.error({
-    evt: `graph.cli.${label}.error`,
-    module: MODULE_GRAPH_CLI,
-    err: error instanceof Error ? error.message : String(error),
-  });
-  if (error instanceof ConfigurationError) {
-    cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-  } else {
-    /* v8 ignore start */
-    if (error instanceof ValidationError) {
-      cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-    } else if (error instanceof MemoryPressureError) {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    } else if (error instanceof ToolError) {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    } else {
-      cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
-    }
-    /* v8 ignore stop */
+/** Map graph CLI errors to exit codes and surface via the host reportFailure seam. */
+export async function handleGraphError(
+  label: string,
+  error: unknown,
+  cli: ToolCliContext,
+  jsonRequested = false,
+): Promise<void> {
+  const message = `${label}: ${error instanceof Error ? error.message : String(error)}`;
+  let exitCode: number = EXIT_CODES.RUNTIME_ERROR;
+  if (error instanceof ConfigurationError || error instanceof ValidationError) {
+    exitCode = EXIT_CODES.CONFIGURATION_ERROR;
+  } else if (error instanceof MemoryPressureError || error instanceof ToolError) {
+    exitCode = EXIT_CODES.RUNTIME_ERROR;
   }
-  process.stderr.write(`${label}: ${error instanceof Error ? error.message : String(error)}\n`);
+  await cli.reportFailure({
+    message,
+    exitCode,
+    ...(error instanceof ToolError ? { error } : {}),
+    jsonRequested,
+    log: {
+      evt: `graph.cli.${label}.error`,
+      level: 'error',
+      data: {
+        module: MODULE_GRAPH_CLI,
+        err: error instanceof Error ? error.message : String(error),
+      },
+    },
+  });
 }
 
 export { contributionFromSignals, evaluatedRuleSlugs } from './graph-session-contribution.js';

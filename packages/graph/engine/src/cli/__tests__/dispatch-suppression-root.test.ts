@@ -58,6 +58,7 @@ function mockCli(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     logger: console,
     scope: { signalSink: { emit: vi.fn() }, datastore: () => undefined },
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 

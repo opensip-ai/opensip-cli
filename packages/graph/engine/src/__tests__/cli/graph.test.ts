@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { buildUnifiedReportLines, executeGraph } from '../../cli/graph.js';
 import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
+import { makeReportFailureMock } from '../report-failure-mock.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
@@ -146,6 +147,7 @@ function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry)
       exportBaselineSarif: vi.fn(() => Promise.resolve()),
       exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
       scope: { datastore: () => datastore, languages: resolvedLanguages },
+      reportFailure: makeReportFailureMock(setExitCode, render),
     } as unknown as ToolCliContext,
     setExitCode,
     render,
@@ -162,6 +164,13 @@ function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry)
 function renderedLines(render: MockInstance): string {
   return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
     .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
+}
+
+function renderedErrorText(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ type?: string; message?: string }][])
+    .filter((c) => c[0]?.type === 'error')
+    .map((c) => c[0]?.message ?? '')
     .join('\n');
 }
 
@@ -312,55 +321,50 @@ describe('executeGraph — human / JSON modes', () => {
   });
 
   it('emits a configuration error when --gate-save and --gate-compare are both set', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, gateSave: true, gateCompare: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('mutually exclusive');
+    expect(renderedErrorText(render)).toContain('mutually exclusive');
   });
 
   it('emits a configuration error when --workspace and positional paths are both set', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, paths: ['foo'], workspace: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('mutually exclusive');
+    expect(renderedErrorText(render)).toContain('mutually exclusive');
   });
 
   it('--catalog-output without --tenant-id raises configuration error', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     const outPath = join(projectDir, 'catalog.json');
     await executeGraph(
       { cwd: projectDir, noCache: true, catalogOutput: outPath, repoId: 'r', gitSha: 'sha' },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('--tenant-id');
+    expect(renderedErrorText(render)).toContain('--tenant-id');
   });
 
   it('--catalog-output without --repo-id raises configuration error', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     const outPath = join(projectDir, 'catalog.json');
     await executeGraph(
       { cwd: projectDir, noCache: true, catalogOutput: outPath, tenantId: 't', gitSha: 'sha' },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('--repo-id');
+    expect(renderedErrorText(render)).toContain('--repo-id');
   });
 
   it('--catalog-output without --git-sha raises configuration error', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     const outPath = join(projectDir, 'catalog.json');
     await executeGraph(
       { cwd: projectDir, noCache: true, catalogOutput: outPath, tenantId: 't', repoId: 'r' },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('--git-sha');
+    expect(renderedErrorText(render)).toContain('--git-sha');
   });
 
   it('--catalog-output happy path writes a valid CatalogExport JSON file', async () => {
@@ -490,14 +494,13 @@ describe('executeGraph — positional paths', () => {
   });
 
   it('errors when a positional path does not exist', async () => {
-    const { cli, setExitCode } = mockCli(datastore);
+    const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph(
       { cwd: projectDir, noCache: true, paths: [join(projectDir, 'missing-pkg')] },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('does not exist');
+    expect(renderedErrorText(render)).toContain('does not exist');
   });
 });
 

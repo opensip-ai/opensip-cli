@@ -26,23 +26,20 @@ interface MockBag {
   cli: ToolCliContext;
   exportBaselineSarif: MockInstance;
   emitJson: MockInstance;
-  emitError: MockInstance;
-  setExitCode: MockInstance;
+  reportFailure: MockInstance;
 }
 
 function makeCli(exportImpl?: () => Promise<void>): MockBag {
   const exportBaselineSarif = vi.fn(exportImpl ?? (() => Promise.resolve()));
   const emitJson = vi.fn();
-  const emitError = vi.fn();
-  const setExitCode = vi.fn();
+  const reportFailure = vi.fn(() => Promise.resolve());
   const cli = {
     exportBaselineSarif,
     emitJson,
-    emitError,
-    setExitCode,
+    reportFailure,
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   } as unknown as ToolCliContext;
-  return { cli, exportBaselineSarif, emitJson, emitError, setExitCode };
+  return { cli, exportBaselineSarif, emitJson, reportFailure };
 }
 
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
@@ -75,30 +72,30 @@ describe('fit export (canonical) command spec', () => {
     expect(out).toContain('Exported fit baseline');
   });
 
-  it('maps the ConfigurationError "no baseline" path to exit 2 + stderr', async () => {
-    const { cli, setExitCode } = makeCli(() =>
+  it('maps the ConfigurationError "no baseline" path to reportFailure exit 2', async () => {
+    const { cli, reportFailure } = makeCli(() =>
       Promise.reject(new ConfigurationError('No fit baseline captured')),
     );
     await fitExportCommandSpec.handler({ format: 'baseline', out: OUT_PATH, _args: [] }, cli);
-    expect(setExitCode).toHaveBeenCalledWith(2);
-    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(err).toContain('Error');
+    expect(reportFailure).toHaveBeenCalledWith({
+      message: 'No fit baseline captured',
+      exitCode: 2,
+      jsonRequested: false,
+    });
   });
 
-  it('emits a structured error on --json + missing baseline', async () => {
-    const { cli, emitError, setExitCode } = makeCli(() =>
+  it('routes --json + missing baseline through reportFailure', async () => {
+    const { cli, reportFailure } = makeCli(() =>
       Promise.reject(new ConfigurationError('No fit baseline captured')),
     );
     await fitExportCommandSpec.handler(
       { format: 'baseline', out: OUT_PATH, json: true, _args: [] },
       cli,
     );
-    // 2.12.0 (§5.5): the --json failure path routes through `emitError` (the host
-    // wraps it in a status:'error' CommandOutcome + sets the exit code from the
-    // payload), NOT a direct `setExitCode` in the handler.
-    expect(setExitCode).not.toHaveBeenCalled();
-    expect(emitError.mock.calls.length).toBe(1);
-    const payload = emitError.mock.calls[0]?.[0] as { exitCode?: number };
-    expect(payload?.exitCode).toBe(2);
+    expect(reportFailure).toHaveBeenCalledWith({
+      message: 'No fit baseline captured',
+      exitCode: 2,
+      jsonRequested: true,
+    });
   });
 });

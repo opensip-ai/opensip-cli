@@ -176,6 +176,53 @@ export const tool = defineTool({
 });
 ```
 
+## Logging and operational telemetry
+
+During a normal command run, `cli.logger` resolves to the **per-run scope logger**
+and writes structured JSONL under `<project>/opensip-cli/.runtime/logs/` when the
+host configures a log directory. Prefer stamping a stable `module` on every entry:
+
+```ts
+import { createToolLogger } from '@opensip-cli/core';
+
+const log = createToolLogger('audit-sec:cli');
+
+handler: async (opts, cli) => {
+  log.info({ evt: 'audit-sec.run.start', cwd: opts.cwd });
+  // …
+};
+```
+
+Or call `cli.logger` directly with both `evt` and `module` fields. Event names follow
+the three-segment convention documented in [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/).
+`--debug` may mirror log lines to stderr; that channel is for operators, not
+customer-facing command output.
+
+## Command failures vs findings
+
+| Situation | Seam |
+|---|---|
+| Scan/analysis results (signals, score, verdict) | Build a `SignalEnvelope` and return it (or call `cli.deliverSignals` after render) |
+| Command cannot run (missing file, bad config, not found) | `await cli.reportFailure({ … })` |
+| Uncaught `ToolError` in a handler | Host catches and calls `reportFailure` for you |
+
+`reportFailure` fans out to structured log, human Ink / `--json` error `CommandOutcome`,
+exit code, and diagnostics — the host owns routing. Example:
+
+```ts
+handler: async (opts, cli) => {
+  try {
+    cli.logger.info({ evt: 'audit-sec.run.start', module: 'audit-sec:cli' });
+    return await runAudit(opts.cwd);
+  } catch (error) {
+    await cli.reportFailure({ error, jsonRequested: opts.json === true });
+    return;
+  }
+};
+```
+
+See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
+
 `defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
 nested children). The manifest lists every command by **short name** — `list`,
 `recipes`, `export` — not as nested paths; external-host mounting uses the

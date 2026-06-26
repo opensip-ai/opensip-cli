@@ -26,6 +26,7 @@ import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { graphTool } from '../tool.js';
 
+import { makeReportFailureMock } from './report-failure-mock.js';
 import { makeGraphTestScope } from './test-utils/with-graph-scope.js';
 
 import type {
@@ -203,6 +204,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     ),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
+    reportFailure: makeReportFailureMock(setExitCode, render),
   } as unknown as ToolCliContext;
   return { cli, setExitCode, emitJson, emitError, registerLiveView, renderLive, render };
 }
@@ -419,11 +421,13 @@ describe('graphTool command surface', () => {
     it('rejects a missing per-format required flag with exit 2 + stderr', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        const { cli, setExitCode } = makeMockCli(datastore);
+        const { cli, setExitCode, render } = makeMockCli(datastore);
         // --format sarif requires --output-sarif/--tenant-id/--repo-id; omit them.
         await handlerFor('export')({ format: 'sarif', cwd: workDir, _args: [] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(2);
-        const err = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
+        const err = render.mock.calls
+          .map((c) => (c[0] as { message?: string }).message ?? '')
+          .join('\n');
         expect(err).toContain('requires');
       } finally {
         datastore.close();
@@ -433,15 +437,20 @@ describe('graphTool command surface', () => {
     it('emits a structured error when --json + missing required flag', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
-        const { cli, emitError, setExitCode } = makeMockCli(datastore);
+        const { cli, setExitCode } = makeMockCli(datastore);
+        const reportFailure = cli.reportFailure as ReturnType<typeof vi.fn>;
         await handlerFor('export')(
           { format: 'baseline', json: true, cwd: workDir, _args: [] },
           cli,
         );
         expect(setExitCode).toHaveBeenCalledWith(2);
-        expect(emitError.mock.calls.length).toBe(1);
-        const payload = emitError.mock.calls[0]?.[0] as { exitCode?: number };
+        expect(reportFailure.mock.calls.length).toBe(1);
+        const payload = reportFailure.mock.calls[0]?.[0] as {
+          exitCode?: number;
+          jsonRequested?: boolean;
+        };
         expect(payload?.exitCode).toBe(2);
+        expect(payload?.jsonRequested).toBe(true);
       } finally {
         datastore.close();
       }

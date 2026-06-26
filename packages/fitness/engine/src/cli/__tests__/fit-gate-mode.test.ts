@@ -70,7 +70,12 @@ function mockCli(opts: { readonly degraded?: boolean } = {}): {
     // contract these tests assert.
     saveBaseline: vi.fn(() => Promise.resolve()),
     compareBaseline: vi.fn(() =>
-      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: opts.degraded ?? false }),
+      Promise.resolve({
+        added: [],
+        resolved: [],
+        unchanged: [],
+        degraded: opts.degraded ?? false,
+      }),
     ),
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
@@ -79,6 +84,7 @@ function mockCli(opts: { readonly degraded?: boolean } = {}): {
       timing: createRunTimer(),
       record: () => undefined,
     },
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
   return { cli, setExitCode, deliverSignals };
 }
@@ -151,8 +157,13 @@ describe('runGateMode --gate-compare (ADR-0036 failOnDegraded)', () => {
   it('passes the host runFailed override as false when a degraded compare is configured as report-only', async () => {
     vi.mocked(executeFit).mockResolvedValue(fitResult(true));
     const { cli, deliverSignals } = mockCli({ degraded: true });
-    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
-    Object.assign(scope, { toolConfig: { fitness: { failOnDegraded: false } } });
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+    });
+    Object.assign(scope, {
+      toolConfig: { fitness: { failOnDegraded: false } },
+    });
 
     await runWithScope(scope, () => runGateMode(gateCompareArgs(), cli));
 

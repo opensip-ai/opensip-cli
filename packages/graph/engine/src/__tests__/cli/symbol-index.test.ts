@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import * as orchestrate from '../../cli/orchestrate.js';
 import { buildArtifact, executeSymbolIndex } from '../../cli/symbol-index.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
+import { makeReportFailureMock } from '../report-failure-mock.js';
 import { occ } from '../rules/_helpers.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
@@ -51,6 +52,7 @@ function mockCli(datastore: DataStore | undefined): MockCli {
       datastore,
       setExitCode,
       scope: { datastore: () => datastore },
+      reportFailure: makeReportFailureMock(setExitCode),
     } as unknown as ToolCliContext,
     setExitCode,
   };

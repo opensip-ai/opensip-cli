@@ -101,7 +101,9 @@ function loadBudget(path: string): EquivalenceBudget {
     const keyList = BUDGET_KEYS.map((k) => `"${k}"`).join(', ');
     throw new Error(`Invalid budget file ${path}: expected numeric { ${keyList} }.`);
   }
-  const obj = parsed as Record<(typeof BUDGET_KEYS)[number], number> & { note?: string };
+  const obj = parsed as Record<(typeof BUDGET_KEYS)[number], number> & {
+    note?: string;
+  };
   return {
     phantomDivergences: obj.phantomDivergences,
     declineDivergences: obj.declineDivergences,
@@ -126,7 +128,12 @@ function writeBudget(path: string, verdict: EquivalenceVerdict): void {
 /** Build the exact single-program catalog (the oracle): cold, no cache, no
  *  datastore, empty rule set. */
 async function buildExactCatalog(cwd: string): Promise<Catalog | null> {
-  const result = await runGraph({ cwd, noCache: true, resolution: 'exact', rules: [] });
+  const result = await runGraph({
+    cwd,
+    noCache: true,
+    resolution: 'exact',
+    rules: [],
+  });
   return result.catalog;
 }
 
@@ -163,7 +170,12 @@ export async function executeEquivalenceCheck(
 ): Promise<void> {
   const cwd = resolve(opts.cwd);
   const budgetPath = opts.budget ? resolve(cwd, opts.budget) : resolve(cwd, DEFAULT_BUDGET_REL);
-  logger.info({ evt: 'graph.cli.equivalence_check.start', module: MODULE, cwd, budgetPath });
+  logger.info({
+    evt: 'graph.cli.equivalence_check.start',
+    module: MODULE,
+    cwd,
+    budgetPath,
+  });
   try {
     const cliScript = process.argv[1] ?? '';
     if (cliScript.length === 0) {
@@ -234,9 +246,15 @@ export async function executeEquivalenceCheck(
     logEnd(report, verdict, verdict.failed);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error({ evt: 'graph.cli.equivalence_check.error', module: MODULE, err: message });
-    process.stderr.write(`graph-equivalence-check: ${message}\n`);
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    await cli.reportFailure({
+      message: `graph-equivalence-check: ${message}`,
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+      log: {
+        evt: 'graph.cli.equivalence_check.error',
+        level: 'error',
+        data: { module: MODULE, err: message },
+      },
+    });
   }
 }
 
@@ -256,7 +274,12 @@ function maybeWriteEquivalenceDiagnostic(
 ): void {
   const outPath = readGraphEnv<string>('GRAPH_EQUIV_DIAG');
   if (outPath === undefined || outPath.length === 0 || exact === null || sharded === null) return;
-  const diagnostic = buildEquivalenceDiagnostic({ report, exact, sharded, shards });
+  const diagnostic = buildEquivalenceDiagnostic({
+    report,
+    exact,
+    sharded,
+    shards,
+  });
   const payload = { generatedAt: new Date().toISOString(), ...diagnostic };
   writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   process.stdout.write(`Wrote graph equivalence diagnostic to ${outPath}\n`);

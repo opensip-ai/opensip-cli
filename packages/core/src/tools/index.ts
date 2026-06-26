@@ -6,6 +6,11 @@
  */
 
 export type {
+  ReportFailureDetail,
+  ReportFailureLogDetail,
+  ResolvedReportFailure,
+} from './report-failure.js';
+export type {
   Tool,
   ToolMetadata,
   ToolCommandDescriptor,

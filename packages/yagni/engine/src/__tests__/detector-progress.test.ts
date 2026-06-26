@@ -12,6 +12,7 @@ function stubCli(): ToolCliContext {
   return {
     scope: { datastore: () => undefined },
     deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 
@@ -38,7 +39,10 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
     await executeYagni(
       {
         cwd: FIXTURE_ROOT,
-        config: { defaultMinConfidence: 'low', disabledDetectors: ['yagni:disabled-stub'] },
+        config: {
+          defaultMinConfidence: 'low',
+          disabledDetectors: ['yagni:disabled-stub'],
+        },
         includeTests: true,
         onDetectorStart: (slug) => started.push(slug),
         onDetectorDone: (slug, durationMs) => done.push({ slug, durationMs }),

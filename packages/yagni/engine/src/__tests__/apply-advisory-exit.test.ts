@@ -1,5 +1,5 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
 
@@ -13,6 +13,7 @@ function cliWithExit(code?: number): ToolCliContext & { _state: { code?: number 
       state.code = next;
     },
     _state: state,
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext & { _state: { code?: number } };
 }
 

@@ -205,6 +205,7 @@ function toResult(
     ...(acc.json === undefined ? {} : { json: acc.json }),
     ...(acc.raw === undefined ? {} : { raw: acc.raw }),
     ...(acc.error === undefined ? {} : { error: acc.error }),
+    ...(acc.reportedFailure === undefined ? {} : { reportedFailure: acc.reportedFailure }),
     ...(acc.exitCode === undefined ? {} : { exitCode: acc.exitCode }),
     ...(session === undefined ? {} : { session }),
     // Carry the handler's return for the return-valued modes so the supervisor
@@ -344,7 +345,10 @@ async function runLoadedHook(
     kind: 'result',
     // `output` is required on the result; the host never replays output for a
     // hook-mode dispatch (it reads `hookResult`), so a benign default suffices.
-    value: { output: 'command-result', ...(hookResult === undefined ? {} : { hookResult }) },
+    value: {
+      output: 'command-result',
+      ...(hookResult === undefined ? {} : { hookResult }),
+    },
   };
 }
 
@@ -403,7 +407,12 @@ export const toolCommandWorkerCommandSpec: CommandSpec<unknown, CliCommandsConte
     '[internal] Run one external tool command headless in a forked worker and stream the result over IPC (forked by the ADR-0054 dispatch supervisor)',
   // The supervisor passes `--cwd`; bootstrap uses it to resolve the project.
   commonFlags: ['cwd'],
-  args: [{ name: 'specPath', description: 'Path to the JSON tool-command worker spec file' }],
+  args: [
+    {
+      name: 'specPath',
+      description: 'Path to the JSON tool-command worker spec file',
+    },
+  ],
   scope: 'project',
   output: 'raw-stream',
   rawStreamReason: 'worker-ipc',

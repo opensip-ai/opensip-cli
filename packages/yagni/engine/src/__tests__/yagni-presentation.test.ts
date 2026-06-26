@@ -12,6 +12,7 @@ function stubCli(): ToolCliContext {
   return {
     scope: { datastore: () => undefined },
     deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 

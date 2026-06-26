@@ -61,6 +61,7 @@ function makeCli(): ToolCliContext & { _state: { code?: number } } {
     writeSarif: vi.fn(() => Promise.resolve()),
     maybeOpenReport: vi.fn(() => Promise.resolve()),
     _state: state,
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext & { _state: { code?: number } };
 }
 
@@ -182,7 +183,9 @@ describe('yagni config, tool metadata, and command handler', () => {
 
     const invalidDir = tempDir();
     writeFileSync(join(invalidDir, 'opensip-cli.config.yml'), 'schemaVersion: 1\nyagni: nope\n');
-    expect(loadYagniConfig(invalidDir)).toMatchObject({ defaultMinConfidence: 'medium' });
+    expect(loadYagniConfig(invalidDir)).toMatchObject({
+      defaultMinConfidence: 'medium',
+    });
   });
 
   it('exports config schema, report data, and tool metadata', () => {
@@ -326,7 +329,14 @@ describe('yagni detectors and scoring helpers', () => {
     const payload = buildYagniSessionPayload(
       envelope({
         signals: [high],
-        units: [{ slug: high.source, passed: false, violationCount: 1, durationMs: 7 }],
+        units: [
+          {
+            slug: high.source,
+            passed: false,
+            violationCount: 1,
+            durationMs: 7,
+          },
+        ],
         summary: { total: 1, passed: 0, failed: 1, errors: 0, warnings: 1 },
       }),
       [],
@@ -335,7 +345,12 @@ describe('yagni detectors and scoring helpers', () => {
     expect(payload.checks[0]).toMatchObject({
       checkSlug: high.source,
       violationCount: 1,
-      findings: [expect.objectContaining({ severity: 'warning', metadata: high.metadata })],
+      findings: [
+        expect.objectContaining({
+          severity: 'warning',
+          metadata: high.metadata,
+        }),
+      ],
     });
     expect(payload.summary).not.toHaveProperty('graphMode');
     expect(payload.summary).not.toHaveProperty('graphBuilt');
@@ -417,7 +432,10 @@ describe('yagni detectors and scoring helpers', () => {
       verbose: false,
       durationMs: 12,
     });
-    expect(presentation.envelope.verdict.summary).toMatchObject({ total: 0, warnings: 0 });
+    expect(presentation.envelope.verdict.summary).toMatchObject({
+      total: 0,
+      warnings: 0,
+    });
 
     const highNoDetails = signal('no-details', 'high', 0, 'exact');
     const metadata = readYagniMetadata(highNoDetails);

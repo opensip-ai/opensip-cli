@@ -11,8 +11,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  ConfigurationError,
   LanguageRegistry,
+  NotFoundError,
   RunScope,
+  ValidationError,
   runWithScope,
   runWithScopeSync,
   applyToolContributeScope,
@@ -25,7 +28,13 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { Signal, ToolCliContext } from '@opensip-cli/core';
+import type { Signal, ToolCliContext, ToolError } from '@opensip-cli/core';
+
+function exitFromToolError(error: ToolError): number {
+  if (error instanceof NotFoundError) return 3;
+  if (error instanceof ConfigurationError || error instanceof ValidationError) return 2;
+  return 1;
+}
 
 /** Minimal structural view of RunPresentation — avoids a contracts dep in this adapter test. */
 // envelope-first-presentation RP-2: executeGraph now hands a RunPresentation
@@ -36,7 +45,10 @@ interface RunPresentationLike {
   readonly verboseDetail?:
     | { readonly kind: 'lines'; readonly lines: readonly string[] }
     | { readonly kind: 'findings'; readonly groups: readonly unknown[] };
-  readonly envelope: { readonly tool: string; readonly verdict: { readonly passed: boolean } };
+  readonly envelope: {
+    readonly tool: string;
+    readonly verdict: { readonly passed: boolean };
+  };
   readonly durationMs?: number;
 }
 
@@ -88,7 +100,7 @@ interface CapturedCli {
 
 function makeCli(): CapturedCli {
   const exitCodes: number[] = [];
-  const render = vi.fn(() => Promise.resolve());
+  const render = vi.fn((_result?: unknown) => Promise.resolve());
   const datastore = DataStoreFactory.open({ backend: 'memory' });
   const project = {
     cwd: '/test',
@@ -128,6 +140,21 @@ function makeCli(): CapturedCli {
     // Mirror the composition root's `emitEnvelope` seam: write the envelope as
     // JSON to stdout so the `--json` integration test can parse it.
     emitError: vi.fn(),
+    reportFailure: vi.fn(
+      async (detail: { exitCode?: number; error?: ToolError; message?: string }) => {
+        let code = detail.exitCode;
+        if (code === undefined && detail.error !== undefined) {
+          code = exitFromToolError(detail.error);
+        }
+        if (code !== undefined) {
+          exitCodes.push(code);
+        }
+        const message = detail.message ?? detail.error?.message ?? '';
+        if (message) {
+          await render({ type: 'error', message, exitCode: code ?? 1 });
+        }
+      },
+    ),
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
@@ -143,11 +170,17 @@ function makeCli(): CapturedCli {
     saveBaseline: vi.fn((tool: string, envelope: unknown) => {
       const e = envelope as {
         signals: readonly Signal[];
-        baselineIdentity: { fingerprintStrategyId: string; fingerprintStrategyVersion: number };
+        baselineIdentity: {
+          fingerprintStrategyId: string;
+          fingerprintStrategyVersion: number;
+        };
       };
       new BaselineRepo(datastore).save(
         tool,
-        e.signals.map((s: Signal) => ({ fingerprint: s.fingerprint ?? '', payload: s })),
+        e.signals.map((s: Signal) => ({
+          fingerprint: s.fingerprint ?? '',
+          payload: s,
+        })),
         {
           baselineFormatVersion: 1,
           fingerprintStrategyId: e.baselineIdentity.fingerprintStrategyId,
@@ -161,7 +194,12 @@ function makeCli(): CapturedCli {
       const added = (env as { signals: readonly Signal[] }).signals.filter(
         (s) => !baseFps.has(s.fingerprint ?? ''),
       );
-      return Promise.resolve({ added, resolved: [], unchanged: [], degraded: added.length > 0 });
+      return Promise.resolve({
+        added,
+        resolved: [],
+        unchanged: [],
+        degraded: added.length > 0,
+      });
     }),
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
@@ -207,6 +245,13 @@ async function runExecuteGraph(
 function renderedLines(render: MockInstance): string {
   return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
     .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
+}
+
+function renderedErrorText(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ type?: string; message?: string }][])
+    .filter((c) => c[0]?.type === 'error')
+    .map((c) => c[0]?.message ?? '')
     .join('\n');
 }
 
@@ -276,7 +321,9 @@ describe('executeGraph', () => {
   });
 
   it('JSON mode emits the signal envelope', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
     const { cli, exitCodes } = makeCli();
     await runExecuteGraph({ cwd: dir, json: true }, cli);
     const parsed = JSON.parse(stdout) as {
@@ -333,19 +380,21 @@ describe('executeGraph', () => {
   });
 
   it('errors when --gate-save and --gate-compare are passed together', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
-    const { cli, exitCodes } = makeCli();
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
+    const { cli, exitCodes, render } = makeCli();
     await runExecuteGraph({ cwd: dir, gateSave: true, gateCompare: true }, cli);
-    expect(stderr).toContain('mutually exclusive');
+    expect(renderedErrorText(render)).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
   });
 
   it('maps a missing tsconfig.json to a configuration-error exit code', async () => {
     // No tsconfig.json -> ConfigurationError surfaces
     mkdirSync(dir, { recursive: true });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes, render } = makeCli();
     await runExecuteGraph({ cwd: dir }, cli);
-    expect(stderr).toContain('graph:');
+    expect(renderedErrorText(render)).toContain('graph:');
     expect(exitCodes).toContain(2);
   });
 
@@ -369,34 +418,42 @@ describe('executeGraph', () => {
   });
 
   it('errors when --workspace and positional paths are passed together', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
-    const { cli, exitCodes } = makeCli();
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
+    const { cli, exitCodes, render } = makeCli();
     await runExecuteGraph({ cwd: dir, paths: ['foo'], workspace: true }, cli);
-    expect(stderr).toContain('mutually exclusive');
+    expect(renderedErrorText(render)).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
   });
 
   it('errors when --workspace is passed but cliScript is empty', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
-    const { cli, exitCodes } = makeCli();
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
+    const { cli, exitCodes, render } = makeCli();
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: '' }, cli);
-    expect(stderr).toContain('CLI entry script');
+    expect(renderedErrorText(render)).toContain('CLI entry script');
     expect(exitCodes).toContain(2);
   });
 
   it('errors when --workspace is passed but no workspace units exist', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
-    const { cli, exitCodes } = makeCli();
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
+    const { cli, exitCodes, render } = makeCli();
     // No packages/** dir exists — discoverWorkspaceUnits returns [].
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: '/usr/bin/node' }, cli);
-    expect(stderr).toContain('no workspace units');
+    expect(renderedErrorText(render)).toContain('no workspace units');
     expect(exitCodes).toContain(2);
   });
 
   it('positional <relative dir> scopes to a sub-package directory', async () => {
     // Create a nested package layout: cwd has its own tsconfig and the
     // sub-package has its own. Pass a positional path.
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
     mkdirSync(join(dir, 'packages', 'inner'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'inner', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
     writeFileSync(
@@ -415,7 +472,9 @@ describe('executeGraph', () => {
     // A clean run still returns an envelope (the root may still cloud-emit it);
     // executeGraph renders the normal graph report rather than a bespoke
     // "report sent" status line now that delivery lives at the root.
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
     const { cli, exitCodes, render } = makeCli();
     const outcome = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
     const done = render.mock.calls[0]?.[0] as RunPresentationLike;
@@ -430,7 +489,9 @@ describe('executeGraph', () => {
     // that prints a known JSON shape so the parent's parsing path is
     // exercised. We use `node -e ...` indirectly by pointing cliScript
     // at a tiny helper script written into the fixture.
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
     // Two packages with tsconfigs.
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     mkdirSync(join(dir, 'packages', 'b'), { recursive: true });
@@ -472,7 +533,11 @@ describe('executeGraph', () => {
       },
       cli,
     );
-    const parsed = JSON.parse(stdout) as { tool: string; mode: string; units: unknown[] };
+    const parsed = JSON.parse(stdout) as {
+      tool: string;
+      mode: string;
+      units: unknown[];
+    };
     expect(parsed.tool).toBe('graph');
     expect(parsed.mode).toBe('workspace');
     expect(parsed.units.length).toBeGreaterThanOrEqual(2);
@@ -480,7 +545,9 @@ describe('executeGraph', () => {
   });
 
   it('--workspace text report renders status + findings sections', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
     writeFileSync(
@@ -520,7 +587,9 @@ describe('executeGraph', () => {
   // was removed here.
 
   it('--workspace surfaces child failure as a runtime-error exit code', async () => {
-    setupFixture(dir, { 'index.ts': `export function x(): number { return 1; }\n` });
+    setupFixture(dir, {
+      'index.ts': `export function x(): number { return 1; }\n`,
+    });
     mkdirSync(join(dir, 'packages', 'a'), { recursive: true });
     writeFileSync(join(dir, 'packages', 'a', 'tsconfig.json'), FIXTURE_TSCONFIG, 'utf8');
     writeFileSync(

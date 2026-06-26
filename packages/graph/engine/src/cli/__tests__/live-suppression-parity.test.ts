@@ -88,6 +88,7 @@ function mockCli(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     logger: console,
     scope: { signalSink: { emit: vi.fn() }, datastore: () => undefined },
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 
@@ -179,9 +180,10 @@ describe('live-view suppression parity', () => {
     const signals = [sig('walk.ts', 2), sig('other.ts', 9)];
 
     const opts = { cwd: buildRoot } as unknown as Parameters<typeof dispatchGraphResult>[0];
-    const result = { signals, catalog: emptyCatalog() } as unknown as Parameters<
-      typeof dispatchGraphResult
-    >[1];
+    const result = {
+      signals,
+      catalog: emptyCatalog(),
+    } as unknown as Parameters<typeof dispatchGraphResult>[1];
     const outcome = await runWithScope(makeGraphTestScope(), () =>
       dispatchGraphResult(opts, result, mockCli(), '2026-06-09T00:00:00.000Z', buildRoot),
     );

@@ -35,6 +35,7 @@ function stubCli(): ToolCliContext {
     deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
     writeSarif: vi.fn(() => Promise.resolve()),
     maybeOpenReport: vi.fn(() => Promise.resolve()),
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 

@@ -197,7 +197,7 @@ async function runGraphSarifExport(opts: GraphSarifExportOpts, cli: ToolCliConte
       cli,
     );
   } catch (error) {
-    handleGraphError('sarif-export', error, cli);
+    await handleGraphError('sarif-export', error, cli);
   }
 }
 
@@ -258,7 +258,7 @@ async function runGraphCatalogExport(
       startedAt,
     );
   } catch (error) {
-    handleGraphError('catalog-export', error, cli);
+    await handleGraphError('catalog-export', error, cli);
   }
 }
 
@@ -285,12 +285,11 @@ async function runGraphBaselineExport(
       message,
       exitCode,
     });
-    if (opts.json === true) {
-      cli.emitError({ message, exitCode });
-      return;
-    }
-    cli.setExitCode(exitCode);
-    process.stderr.write(`Error: ${message}\n`);
+    await cli.reportFailure({
+      message,
+      exitCode,
+      jsonRequested: opts.json === true,
+    });
     return;
   }
   const result = { type: 'graph-baseline-export' as const, outPath: opts.out };
@@ -359,7 +358,11 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
   output: RAW_STREAM,
   rawStreamReason: 'diagnostic-gate',
   handler: async (rawOpts, cli): Promise<void> => {
-    const opts = rawOpts as { cwd: string; budget?: string; updateBudget?: boolean };
+    const opts = rawOpts as {
+      cwd: string;
+      budget?: string;
+      updateBudget?: boolean;
+    };
     await executeEquivalenceCheck(
       { cwd: opts.cwd, budget: opts.budget, updateBudget: opts.updateBudget },
       cli,
@@ -376,37 +379,79 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
 export const GRAPH_EXPORT_FORMATS = ['sarif', 'catalog', 'baseline'] as const;
 type GraphExportFormat = (typeof GRAPH_EXPORT_FORMATS)[number];
 
+/** Flag names map to camelCase opt keys (`--output-sarif` → `outputSarif`). */
+function exportFlagKey(flag: string): string {
+  return flag.replace(/^--/, '').replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
 /**
- * Validate that the per-format required flags are present on the canonical
- * `graph export` opts. Returns `true` when the required subset is satisfied;
- * otherwise reports the missing flags (to the `--json` channel or stderr, like
- * the shared export error paths) + sets exit 2 (CONFIGURATION_ERROR) and returns
- * `false`. Keeps the per-format required-flag validation in one place without
- * making all format-specific subsets simultaneously mandatory on one spec.
+ * Return required `graph export` flags that are absent or empty on `present`.
+ * Keeps per-format validation in one place without making every subset mandatory
+ * on the shared export spec.
  */
-function requireExportFlags(
-  format: GraphExportFormat,
+function missingExportFlags(
   present: Record<string, unknown>,
   required: readonly string[],
-  cli: ToolCliContext,
-): boolean {
-  const missing = required.filter((flag) => {
-    // Flag names map to camelCase opt keys (`--output-sarif` → `outputSarif`).
-    const key = flag.replace(/^--/, '').replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
-    const value = present[key];
+): string[] {
+  return required.filter((flag) => {
+    const value = present[exportFlagKey(flag)];
     return value === undefined || value === '';
   });
-  if (missing.length === 0) return true;
+}
+
+function reportMissingExportFlags(
+  format: GraphExportFormat,
+  present: Record<string, unknown>,
+  missing: readonly string[],
+  cli: ToolCliContext,
+): Promise<void> {
   const message = `graph export --format ${format} requires ${missing.join(', ')}.`;
-  const exitCode = EXIT_CODES.CONFIGURATION_ERROR;
-  logger.warn({ evt: 'cli.graph.export.missing_flags', module: 'graph:cli', format, missing });
-  if (present.json === true) {
-    cli.emitError({ message, exitCode });
-    return false;
-  }
-  cli.setExitCode(exitCode);
-  process.stderr.write(`Error: ${message}\n`);
-  return false;
+  logger.warn({
+    evt: 'cli.graph.export.missing_flags',
+    module: 'graph:cli',
+    format,
+    missing,
+  });
+  return cli.reportFailure({
+    message,
+    exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    jsonRequested: present.json === true,
+  });
+}
+
+function runGraphSarifExportGuarded(
+  opts: GraphSarifExportOpts,
+  present: Record<string, unknown>,
+  cli: ToolCliContext,
+): Promise<void> {
+  const missing = missingExportFlags(present, ['--output-sarif', '--tenant-id', '--repo-id']);
+  if (missing.length > 0) return reportMissingExportFlags('sarif', present, missing, cli);
+  return runGraphSarifExport(opts, cli);
+}
+
+function runGraphCatalogExportGuarded(
+  opts: GraphCatalogExportOpts,
+  present: Record<string, unknown>,
+  cli: ToolCliContext,
+): Promise<void> {
+  const missing = missingExportFlags(present, [
+    '--catalog-output',
+    '--tenant-id',
+    '--repo-id',
+    '--git-sha',
+  ]);
+  if (missing.length > 0) return reportMissingExportFlags('catalog', present, missing, cli);
+  return runGraphCatalogExport(opts, cli);
+}
+
+function runGraphBaselineExportGuarded(
+  opts: { cwd: string; out: string; json?: boolean },
+  present: Record<string, unknown>,
+  cli: ToolCliContext,
+): Promise<void> {
+  const missing = missingExportFlags(present, ['--out']);
+  if (missing.length > 0) return reportMissingExportFlags('baseline', present, missing, cli);
+  return runGraphBaselineExport(opts, cli);
 }
 
 /**
@@ -418,8 +463,8 @@ function requireExportFlags(
  * The legacy flat-root commands (`sarif-export`/`catalog-export`/
  * `graph-baseline-export`) were removed. The canonical spec declares `--format`
  * (required) + the UNION of the per-format flags as OPTIONAL and validates the
- * required subset per format at runtime (`requireExportFlags` →
- * ConfigurationError → exit 2).
+ * required subset per format at runtime (`missingExportFlags` →
+ * `reportFailure` → exit 2).
  */
 export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
   unknown,
@@ -456,31 +501,22 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   output: RAW_STREAM,
   rawStreamReason: REASON_FILE_EXPORT,
   handler: async (rawOpts, cli): Promise<void> => {
-    const opts = rawOpts as Record<string, unknown> & { format: GraphExportFormat };
+    const opts = rawOpts as Record<string, unknown> & {
+      format: GraphExportFormat;
+    };
     switch (opts.format) {
       case 'sarif': {
-        if (!requireExportFlags('sarif', opts, ['--output-sarif', '--tenant-id', '--repo-id'], cli))
-          return;
-        await runGraphSarifExport(opts as unknown as GraphSarifExportOpts, cli);
+        await runGraphSarifExportGuarded(opts as unknown as GraphSarifExportOpts, opts, cli);
         return;
       }
       case 'catalog': {
-        if (
-          !requireExportFlags(
-            'catalog',
-            opts,
-            ['--catalog-output', '--tenant-id', '--repo-id', '--git-sha'],
-            cli,
-          )
-        )
-          return;
-        await runGraphCatalogExport(opts as unknown as GraphCatalogExportOpts, cli);
+        await runGraphCatalogExportGuarded(opts as unknown as GraphCatalogExportOpts, opts, cli);
         return;
       }
       case 'baseline': {
-        if (!requireExportFlags('baseline', opts, ['--out'], cli)) return;
-        await runGraphBaselineExport(
+        await runGraphBaselineExportGuarded(
           opts as unknown as { cwd: string; out: string; json?: boolean },
+          opts,
           cli,
         );
         return;
@@ -521,7 +557,12 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
     name: 'lookup',
     description: 'Look up function occurrences by simple name from the persisted catalog',
     commonFlags: ['json'],
-    args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
+    args: [
+      {
+        name: 'name',
+        description: 'Function simple name to look up (e.g. "saveBaseline")',
+      },
+    ],
     scope: 'project',
     output: 'command-result',
     handler: (rawOpts, cli) => {

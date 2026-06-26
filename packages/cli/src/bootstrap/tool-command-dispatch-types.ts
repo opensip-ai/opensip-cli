@@ -31,7 +31,12 @@
  * (ADR-0054 M4-C mapping table; documented as a later increment).
  */
 
-import type { CommandOutputMode, ToolSessionContribution, ToolSource } from '@opensip-cli/core';
+import type {
+  CliDiagnostic,
+  CommandOutputMode,
+  ToolSessionContribution,
+  ToolSource,
+} from '@opensip-cli/core';
 
 /**
  * The request the host writes to a temp JSON spec file and forks the worker
@@ -149,6 +154,23 @@ export interface ToolCommandResult {
     readonly suggestion?: string;
     readonly code?: string;
   };
+  /**
+   * `ctx.reportFailure(...)` resolved detail — replayed host-side through the
+   * real reportFailure seam (Plan 06). Wire-safe plain data only; no Error instances.
+   */
+  readonly reportedFailure?: {
+    readonly message: string;
+    readonly exitCode: number;
+    readonly suggestion?: string;
+    readonly code?: string;
+    readonly diagnostic?: CliDiagnostic;
+    readonly jsonRequested?: boolean;
+    readonly log?: {
+      readonly level?: 'warn' | 'error';
+      readonly evt: string;
+      readonly data?: Readonly<Record<string, unknown>>;
+    };
+  };
   /** The last `ctx.setExitCode(...)` value (last-write-wins). */
   readonly exitCode?: number;
   /**
@@ -228,23 +250,54 @@ export type HostRpcCall =
       readonly envelope: unknown;
       readonly opts: DeliverSignalsOpts;
     }
-  | { readonly seam: 'writeSarif'; readonly envelope: unknown; readonly path: string }
-  | { readonly seam: 'saveBaseline'; readonly tool: string; readonly envelope: unknown }
-  | { readonly seam: 'compareBaseline'; readonly tool: string; readonly envelope: unknown }
-  | { readonly seam: 'exportBaselineSarif'; readonly tool: string; readonly path: string }
-  | { readonly seam: 'exportBaselineFingerprints'; readonly tool: string; readonly path: string }
-  | { readonly seam: 'toolState.get'; readonly tool: string; readonly key: string }
+  | {
+      readonly seam: 'writeSarif';
+      readonly envelope: unknown;
+      readonly path: string;
+    }
+  | {
+      readonly seam: 'saveBaseline';
+      readonly tool: string;
+      readonly envelope: unknown;
+    }
+  | {
+      readonly seam: 'compareBaseline';
+      readonly tool: string;
+      readonly envelope: unknown;
+    }
+  | {
+      readonly seam: 'exportBaselineSarif';
+      readonly tool: string;
+      readonly path: string;
+    }
+  | {
+      readonly seam: 'exportBaselineFingerprints';
+      readonly tool: string;
+      readonly path: string;
+    }
+  | {
+      readonly seam: 'toolState.get';
+      readonly tool: string;
+      readonly key: string;
+    }
   | {
       readonly seam: 'toolState.put';
       readonly tool: string;
       readonly key: string;
       readonly payload: unknown;
     }
-  | { readonly seam: 'toolState.delete'; readonly tool: string; readonly key: string }
+  | {
+      readonly seam: 'toolState.delete';
+      readonly tool: string;
+      readonly key: string;
+    }
   | { readonly seam: 'toolState.list'; readonly tool: string }
   | {
       readonly seam: 'maybeOpenReport';
-      readonly opts: { readonly openRequested: boolean; readonly jsonOutput: boolean };
+      readonly opts: {
+        readonly openRequested: boolean;
+        readonly jsonOutput: boolean;
+      };
     }
   | { readonly seam: 'getExitCode' }
   | {
@@ -278,5 +331,9 @@ export type RpcReply =
       readonly kind: 'rpc-reply';
       readonly rpcId: number;
       readonly ok: false;
-      readonly error: { readonly message: string; readonly code?: string; readonly stack?: string };
+      readonly error: {
+        readonly message: string;
+        readonly code?: string;
+        readonly stack?: string;
+      };
     };

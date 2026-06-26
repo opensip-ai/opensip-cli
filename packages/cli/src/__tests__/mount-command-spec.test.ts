@@ -16,6 +16,7 @@
  *      → exit-code mapping the mounter owns.
  */
 
+import { mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import { ConfigurationError, defineCommand } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
@@ -70,6 +71,14 @@ function makeCtx(): CapturedCtx {
     }),
     emitJson: vi.fn(),
     emitError: vi.fn(),
+    reportFailure: vi.fn((detail) => {
+      if (detail.error !== undefined) {
+        exitCodes.push(mapToolErrorToExitCode(detail.error));
+      } else if (detail.exitCode !== undefined) {
+        exitCodes.push(detail.exitCode);
+      }
+      return Promise.resolve();
+    }),
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       envelopes.push(envelope);
@@ -404,7 +413,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     expect((liveViews[0]?.args as Record<string, unknown>)._args).toEqual([['a', 'b']]);
   });
 
-  it('maps a thrown typed ToolError to the canonical exit code', async () => {
+  it('routes a thrown typed ToolError through reportFailure', async () => {
     const { ctx, exitCodes } = makeCtx();
     const program = new Command();
     const spec: HostCommandSpec = defineCommand({
@@ -420,8 +429,33 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     mountCommandSpec(program, spec, ctx);
 
     await program.parseAsync(['boom'], { from: 'user' });
-    // ConfigurationError → CONFIGURATION_ERROR (exit 2)
+    expect(ctx.reportFailure).toHaveBeenCalledWith({
+      error: expect.any(ConfigurationError),
+      jsonRequested: false,
+    });
     expect(exitCodes).toEqual([2]);
+  });
+
+  it('passes jsonRequested when --json is set on a thrown ToolError', async () => {
+    const { ctx } = makeCtx();
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'boom-json',
+      description: 'throws json',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => {
+        throw new ConfigurationError('bad json');
+      },
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['boom-json', '--json'], { from: 'user' });
+    expect(ctx.reportFailure).toHaveBeenCalledWith({
+      error: expect.any(ConfigurationError),
+      jsonRequested: true,
+    });
   });
 
   it('re-throws a non-ToolError so the top-level boundary handles it', async () => {

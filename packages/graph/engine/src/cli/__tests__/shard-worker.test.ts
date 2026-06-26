@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { enterScope, LanguageRegistry } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
+import { makeReportFailureMock } from '../../__tests__/report-failure-mock.js';
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
 import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
 import { graphShardWorkerCommandSpec } from '../graph/graph-aux-command-specs.js';
@@ -87,6 +88,7 @@ function mockCli(): { cli: ToolCliContext; setExitCode: MockInstance } {
     cli: {
       setExitCode,
       scope: { languages: new LanguageRegistry() },
+      reportFailure: makeReportFailureMock(setExitCode),
     } as unknown as ToolCliContext,
     setExitCode,
   };

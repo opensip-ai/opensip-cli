@@ -18,6 +18,11 @@ export {
   inferStoredRunOutcome,
 } from './tools/index.js';
 export type {
+  ReportFailureDetail,
+  ReportFailureLogDetail,
+  ResolvedReportFailure,
+} from './tools/report-failure.js';
+export type {
   CreateToolInput,
   DefineToolInput,
   ResolvedToolHooks,

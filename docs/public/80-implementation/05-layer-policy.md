@@ -305,6 +305,16 @@ A few patterns dep-cruiser can't catch but the workspace still cares about:
 
 These are review concerns. The layer rules pin the load-bearing constraint; the rest is the contributor's responsibility.
 
+### Tool failure reporting (ADR-0077)
+
+Handler-time command failures split across three packages by design:
+
+- **`@opensip-cli/core`** — `ReportFailureDetail`, `createToolLogger`, `ToolCliContext.reportFailure` type
+- **`@opensip-cli/contracts`** — `mapToolErrorToExitCode` exit policy
+- **`opensip-cli` (cli package)** — `resolveReportFailure`, `createReportFailure` fan-out, worker `reportedFailure` replay
+
+Core must not import contracts for the failure input type; the CLI composition root combines both.
+
 ---
 
 ## What's next

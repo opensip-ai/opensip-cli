@@ -79,11 +79,17 @@ function makeContext(datastore: DataStore | undefined): {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);
     },
+    reportFailure: vi.fn(() => Promise.resolve()),
     deliverSignals: () => Promise.resolve({ cloudAccepted: 0 }),
     writeSarif: () => Promise.resolve(),
     saveBaseline: () => Promise.resolve(),
     compareBaseline: () =>
-      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+      Promise.resolve({
+        added: [],
+        resolved: [],
+        unchanged: [],
+        degraded: false,
+      }),
     exportBaselineSarif: () => Promise.resolve(),
     exportBaselineFingerprints: () => Promise.resolve(),
     toolState: {

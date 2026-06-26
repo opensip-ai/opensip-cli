@@ -15,6 +15,8 @@
  * handler (fault-not-crash), not a host crash.
  */
 
+import { createReportFailure } from '../../bootstrap/report-failure.js';
+
 import type { ToolCliContext } from '@opensip-cli/core';
 
 /** A captured host context plus the seam-call records the tests assert on. */
@@ -25,6 +27,7 @@ export interface CapturedHostCtx {
   readonly jsons: unknown[];
   readonly raws: unknown[];
   readonly errors: unknown[];
+  readonly reportedFailures: unknown[];
   readonly exitCodes: number[];
   /** Ordered flat log of every replayed seam call (`seam:json` form). */
   readonly calls: string[];
@@ -50,21 +53,41 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
   const jsons: unknown[] = [];
   const raws: unknown[] = [];
   const errors: unknown[] = [];
+  const reportedFailures: unknown[] = [];
   const exitCodes: number[] = [];
   const calls: string[] = [];
   const toolStateStore = new Map<string, unknown>();
   const baselines: { tool: string; envelope: unknown }[] = [];
   const delivered: unknown[] = [];
 
+  const logger = {
+    debug: noop,
+    info: noop,
+    warn: noop,
+    error: noop,
+  } as unknown as ToolCliContext['logger'];
+
+  const reportFailure = createReportFailure({
+    getLogger: () => logger,
+    setExitCode: (c: number) => {
+      exitCodes.push(c);
+      calls.push(`exit:${String(c)}`);
+    },
+    render: (r) => {
+      rendered.push(r);
+      calls.push(`render:${JSON.stringify(r)}`);
+      return Promise.resolve();
+    },
+    emitError: (d) => {
+      errors.push(d);
+      calls.push(`error:${JSON.stringify(d)}`);
+    },
+  });
+
   const ctx = {
     scope: { runId: scopeRunId } as ToolCliContext['scope'],
     runSession: { timing: {} as ToolCliContext['runSession']['timing'] },
-    logger: {
-      debug: noop,
-      info: noop,
-      warn: noop,
-      error: noop,
-    } as unknown as ToolCliContext['logger'],
+    logger,
     render: (r: unknown) => {
       rendered.push(r);
       calls.push(`render:${JSON.stringify(r)}`);
@@ -85,6 +108,11 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
     emitError: (d: unknown) => {
       errors.push(d);
       calls.push(`error:${JSON.stringify(d)}`);
+    },
+    reportFailure: async (d: unknown) => {
+      reportedFailures.push(d);
+      calls.push(`reportFailure:${JSON.stringify(d)}`);
+      await reportFailure(d as Parameters<typeof reportFailure>[0]);
     },
     setExitCode: (c: number) => {
       exitCodes.push(c);
@@ -114,7 +142,12 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
     }) as ToolCliContext['saveBaseline'],
     compareBaseline: ((tool: string) => {
       calls.push(`compareBaseline:${tool}`);
-      return Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false });
+      return Promise.resolve({
+        added: [],
+        resolved: [],
+        unchanged: [],
+        degraded: false,
+      });
     }) as ToolCliContext['compareBaseline'],
     exportBaselineSarif: (() => Promise.resolve()) as ToolCliContext['exportBaselineSarif'],
     exportBaselineFingerprints: (() =>
@@ -154,6 +187,7 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
     jsons,
     raws,
     errors,
+    reportedFailures,
     exitCodes,
     calls,
     toolStateStore,

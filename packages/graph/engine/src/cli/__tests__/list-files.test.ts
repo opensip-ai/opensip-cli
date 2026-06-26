@@ -34,9 +34,15 @@ vi.mock('../../lang-adapter/selector.js', () => ({
     return { pick: h.selectAdapter };
   }),
 }));
-vi.mock('../positional-paths.js', () => ({ resolvePositionalPaths: h.resolvePositionalPaths }));
-vi.mock('../workspace-runner.js', () => ({ discoverPolyglotUnits: h.discoverPolyglotUnits }));
-vi.mock('../resolve-adapters.js', () => ({ resolveAdaptersForRun: h.resolveAdaptersForRun }));
+vi.mock('../positional-paths.js', () => ({
+  resolvePositionalPaths: h.resolvePositionalPaths,
+}));
+vi.mock('../workspace-runner.js', () => ({
+  discoverPolyglotUnits: h.discoverPolyglotUnits,
+}));
+vi.mock('../resolve-adapters.js', () => ({
+  resolveAdaptersForRun: h.resolveAdaptersForRun,
+}));
 vi.mock('../graph.js', () => ({ handleGraphError: h.handleGraphError }));
 
 const adapter = { id: 'typescript', discoverFiles: h.discoverFiles };
@@ -48,13 +54,17 @@ function mockCli(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     logger: console,
     scope: { languages: {} },
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 
 // cwd `/proj` does not exist on disk, so realpathSync throws and the code
 // falls back to the resolved absolute path — exactly the symlink-probe
 // fallback branch, and a stable root for relativization assertions.
-const opts = (o: Partial<GraphCommandOptions>): GraphCommandOptions => ({ cwd: '/proj', ...o });
+const opts = (o: Partial<GraphCommandOptions>): GraphCommandOptions => ({
+  cwd: '/proj',
+  ...o,
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -66,18 +76,29 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('executeListFiles — whole-project scope', () => {
   it('emits relativized, sorted, deduped files under --json', async () => {
-    h.discoverFiles.mockReturnValue({ files: ['/proj/b.ts', '/proj/a.ts', '/proj/a.ts'] });
+    h.discoverFiles.mockReturnValue({
+      files: ['/proj/b.ts', '/proj/a.ts', '/proj/a.ts'],
+    });
     const cli = mockCli();
     await executeListFiles(opts({ json: true }), cli);
-    expect(cli.emitJson).toHaveBeenCalledWith({ count: 2, files: ['a.ts', 'b.ts'] });
+    expect(cli.emitJson).toHaveBeenCalledWith({
+      count: 2,
+      files: ['a.ts', 'b.ts'],
+    });
     expect(cli.setExitCode).toHaveBeenCalledWith(EXIT_CODES.SUCCESS);
-    expect(h.selectAdapter).toHaveBeenCalledWith({ cwd: '/proj', language: undefined });
+    expect(h.selectAdapter).toHaveBeenCalledWith({
+      cwd: '/proj',
+      language: undefined,
+    });
   });
 
   it('renders graph-status lines (paths only, no header) without --json', async () => {
     const cli = mockCli();
     await executeListFiles(opts({}), cli);
-    expect(cli.render).toHaveBeenCalledWith({ type: 'graph-status', lines: ['a.ts', 'b.ts'] });
+    expect(cli.render).toHaveBeenCalledWith({
+      type: 'graph-status',
+      lines: ['a.ts', 'b.ts'],
+    });
     expect(cli.emitJson).not.toHaveBeenCalled();
   });
 });
@@ -91,7 +112,10 @@ describe('executeListFiles — positional subtrees', () => {
     const cli = mockCli();
     await executeListFiles(opts({ json: true, paths: ['pkg1', 'pkg2'] }), cli);
     expect(h.resolvePositionalPaths).toHaveBeenCalledWith(['pkg1', 'pkg2'], '/proj');
-    expect(cli.emitJson).toHaveBeenCalledWith({ count: 2, files: ['pkg1/x.ts', 'pkg2/y.ts'] });
+    expect(cli.emitJson).toHaveBeenCalledWith({
+      count: 2,
+      files: ['pkg1/x.ts', 'pkg2/y.ts'],
+    });
   });
 });
 
@@ -99,8 +123,14 @@ describe('executeListFiles — --language', () => {
   it('uses the named adapter from the registry', async () => {
     const cli = mockCli();
     await executeListFiles(opts({ json: true, language: 'typescript' }), cli);
-    expect(h.selectAdapter).toHaveBeenCalledWith({ cwd: '/proj', language: 'typescript' });
-    expect(cli.emitJson).toHaveBeenCalledWith({ count: 2, files: ['a.ts', 'b.ts'] });
+    expect(h.selectAdapter).toHaveBeenCalledWith({
+      cwd: '/proj',
+      language: 'typescript',
+    });
+    expect(cli.emitJson).toHaveBeenCalledWith({
+      count: 2,
+      files: ['a.ts', 'b.ts'],
+    });
   });
 
   it('routes an unregistered named adapter through handleGraphError', async () => {
@@ -126,7 +156,10 @@ describe('executeListFiles — --workspace', () => {
     const cli = mockCli();
     await executeListFiles(opts({ json: true, workspace: true }), cli);
     expect(h.discoverPolyglotUnits).toHaveBeenCalledWith('/proj', [adapter]);
-    expect(cli.emitJson).toHaveBeenCalledWith({ count: 2, files: ['u1/a.ts', 'u2/b.ts'] });
+    expect(cli.emitJson).toHaveBeenCalledWith({
+      count: 2,
+      files: ['u1/a.ts', 'u2/b.ts'],
+    });
   });
 
   it('skips a unit whose discovery throws (non-fatal)', async () => {

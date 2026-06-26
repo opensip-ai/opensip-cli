@@ -10,6 +10,7 @@
 
 import type { HostAudit, HostEntitlements, HostGovernance } from './host-planes.js';
 import type { LiveViewContext, LiveViewRenderer } from './live-view.js';
+import type { ReportFailureDetail } from './report-failure.js';
 import type { GateCompareResult, SignalDeliveryResult } from './tool-results.js';
 import type { ToolRunCompletion, ToolRunSessions } from './tool-sessions.js';
 import type { CliDiagnostic } from '../lib/cli-diagnostic.js';
@@ -129,8 +130,22 @@ export interface ToolCliContext {
     openRequested: boolean;
     jsonOutput: boolean;
   }) => Promise<void>;
-  /** Shared structured logger. */
+  /**
+   * Shared structured logger — resolves to the per-run scope logger during a
+   * normal command (Plan 06). Writes to `<project>/opensip-cli/.runtime/logs/`
+   * when the host configures `logDir` on the run logger.
+   */
   readonly logger: Logger;
+  /**
+   * Report a handler-time command failure (Plan 06 / ADR-0077). The host fans out
+   * to structured log, customer surface (human Ink / `--json` error outcome /
+   * diagnostic stderr), process exit code, and diagnostics bus.
+   *
+   * Use for "the command could not run or complete" — NOT for scan findings
+   * (`SignalEnvelope` / `deliverSignals`). Bootstrap/setup health during
+   * discovery remains the host `CliDiagnostic` path (ADR-0060).
+   */
+  readonly reportFailure: (detail: ReportFailureDetail) => Promise<void>;
   /**
    * Process exit-code setter — tools call this instead of mutating
    * `process.exitCode` directly so the CLI controls the final exit.

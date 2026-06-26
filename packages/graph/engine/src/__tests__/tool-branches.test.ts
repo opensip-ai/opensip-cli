@@ -32,6 +32,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { graphTool } from '../tool.js';
 
+import { makeReportFailureMock } from './report-failure-mock.js';
 import { makeGraphTestScope } from './test-utils/with-graph-scope.js';
 
 import type { ShardBuildResult, ShardWorkerSpec } from '../cli/orchestrate/shard-model.js';
@@ -107,6 +108,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     writeSarif: vi.fn(() => Promise.resolve()),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
+    reportFailure: makeReportFailureMock(setExitCode, render),
   } as unknown as ToolCliContext;
   return { cli, setExitCode, renderLive, render };
 }

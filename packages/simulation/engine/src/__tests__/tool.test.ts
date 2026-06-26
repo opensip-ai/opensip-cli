@@ -109,6 +109,7 @@ function makeFakeContext(): {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);
     },
+    reportFailure: vi.fn(() => Promise.resolve()),
     deliverSignals: (_envelope: unknown, opts: unknown) => {
       delivered.push(opts);
       return Promise.resolve({ cloudAccepted: 0 });
@@ -253,7 +254,10 @@ describe('sim command handler', () => {
     expect(rendered).toHaveLength(1);
     // envelope-first-presentation: the handler renders the render-only
     // RunPresentation; the recipe rides on `envelope.recipe`, not the result.
-    const result = rendered[0] as { type: string; envelope?: { recipe?: string } };
+    const result = rendered[0] as {
+      type: string;
+      envelope?: { recipe?: string };
+    };
     expect(result.type).toBe('run-presentation');
     expect(result.envelope?.recipe).toBe('default');
   });

@@ -36,6 +36,7 @@ function mockCli(): ToolCliContext {
     render: vi.fn(() => Promise.resolve()),
     logger: console,
     scope: { signalSink: { emit: vi.fn() }, datastore: () => undefined },
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
 }
 
@@ -62,9 +63,10 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
   it('returns the envelope (no session) in --catalog-output mode', async () => {
     // runCatalogJsonMode is mocked, so the path is never written — any
     // non-empty string exercises the branch.
-    const opts = { catalogOutput: 'out/c.json', cwd: '/x' } as unknown as Parameters<
-      typeof dispatchGraphResult
-    >[0];
+    const opts = {
+      catalogOutput: 'out/c.json',
+      cwd: '/x',
+    } as unknown as Parameters<typeof dispatchGraphResult>[0];
     const outcome = await dispatchGraphResult(opts, result, mockCli(), STARTED, '/x');
     expect(outcome?.envelope?.tool).toBe('graph');
     expect(outcome?.session).toBeUndefined();

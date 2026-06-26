@@ -62,11 +62,18 @@ function minimalJsRuntime(ctx: TemplateRenderContext): string {
       commonFlags: ['json'],
       scope: 'none',
       output: 'command-result',
-      handler: async () => ({
-        type: 'text-lines',
-        title: '${ctx.toolId}',
-        lines: ['Your project-local tool is ready — allowlist it, then run opensip ${ctx.commandName}.'],
-      }),
+      handler: async (opts, cli) => {
+        cli.logger.info({ evt: '${ctx.toolId}.run.start', module: '${ctx.toolId}:cli' });
+        try {
+          return {
+            type: 'text-lines',
+            title: '${ctx.toolId}',
+            lines: ['Your project-local tool is ready — allowlist it, then run opensip ${ctx.commandName}.'],
+          };
+        } catch (error) {
+          await cli.reportFailure({ error, jsonRequested: opts.json === true });
+        }
+      },
     },
   ],
 };
@@ -79,12 +86,15 @@ function minimalJsNextSteps(ctx: TemplateRenderContext): readonly string[] {
     `export OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${ctx.toolId}'`,
     `opensip tools validate ${toolDir}`,
     `opensip ${ctx.commandName}`,
+    'Run logs land under opensip-cli/.runtime/logs/ when the host configures logging.',
     'Validation executes candidate code in a child process; it is not a security sandbox.',
   ];
 }
 
 function tsLocalIndexTs(ctx: TemplateRenderContext): string {
-  return `import { createTool } from '@opensip-cli/core';
+  return `import { createTool, createToolLogger } from '@opensip-cli/core';
+
+const log = createToolLogger('${ctx.toolId}:cli');
 
 export const tool = createTool({
   identity: { name: '${ctx.toolId}' },
@@ -98,11 +108,18 @@ export const tool = createTool({
     commonFlags: ['json'],
     scope: 'none',
     output: 'command-result',
-    handler: async () => ({
-      type: 'text-lines',
-      title: '${ctx.toolId}',
-      lines: ['Your typed project-local tool is ready — build, validate, allowlist, then run.'],
-    }),
+    handler: async (opts, cli) => {
+      log.info({ evt: '${ctx.toolId}.run.start' });
+      try {
+        return {
+          type: 'text-lines',
+          title: '${ctx.toolId}',
+          lines: ['Your typed project-local tool is ready — build, validate, allowlist, then run.'],
+        };
+      } catch (error) {
+        await cli.reportFailure({ error, jsonRequested: opts.json === true });
+      }
+    },
   },
 });
 `;
@@ -196,6 +213,7 @@ opensip ${ctx.commandName}
 \`\`\`
 
 Do not use wildcard allowlists unless you trust every project-local tool in the repo.
+Run logs land under \`opensip-cli/.runtime/logs/\` when the host configures logging.
 Validation executes candidate code in a child process; it is not a security sandbox.
 `;
 }
@@ -222,14 +240,20 @@ export function isToolsCreateTemplate(value: string): value is ToolsCreateTempla
 export const TOOLS_CREATE_TEMPLATE_RENDERERS: Record<ToolsCreateTemplate, TemplateRenderer> = {
   'minimal-js': (ctx) => ({
     files: [
-      { relativePath: PROJECT_LOCAL_MANIFEST_FILE, content: manifestJson(ctx, './index.mjs') },
+      {
+        relativePath: PROJECT_LOCAL_MANIFEST_FILE,
+        content: manifestJson(ctx, './index.mjs'),
+      },
       { relativePath: 'index.mjs', content: minimalJsRuntime(ctx) },
     ],
     nextSteps: minimalJsNextSteps(ctx),
   }),
   'ts-local': (ctx) => ({
     files: [
-      { relativePath: PROJECT_LOCAL_MANIFEST_FILE, content: manifestJson(ctx, './dist/index.js') },
+      {
+        relativePath: PROJECT_LOCAL_MANIFEST_FILE,
+        content: manifestJson(ctx, './dist/index.js'),
+      },
       { relativePath: 'package.json', content: tsLocalPackageJson(ctx) },
       { relativePath: 'tsconfig.json', content: tsLocalTsconfig() },
       { relativePath: 'src/index.ts', content: tsLocalIndexTs(ctx) },

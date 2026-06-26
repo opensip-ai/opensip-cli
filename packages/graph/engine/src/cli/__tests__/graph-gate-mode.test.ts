@@ -15,6 +15,7 @@
 import { createSignal, type Signal, type ToolCliContext } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { makeReportFailureMock } from '../../__tests__/report-failure-mock.js';
 import { runGateMode } from '../graph-modes.js';
 
 import type { GraphCommandOptions } from '../graph-options.js';
@@ -68,6 +69,7 @@ function mockCli(): {
     render,
     setExitCode,
     logger: console,
+    reportFailure: makeReportFailureMock(setExitCode, render),
   } as unknown as ToolCliContext;
   return { cli, saveBaseline, deliverSignals, render, setExitCode };
 }

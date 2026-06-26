@@ -35,6 +35,7 @@ interface MockCliBag {
   readonly maybeOpenReport: MockInstance;
   readonly emitEnvelope: MockInstance;
   readonly emitError: MockInstance;
+  readonly reportFailure: MockInstance;
   readonly deliverSignals: MockInstance;
 }
 
@@ -47,6 +48,12 @@ function mockCli(): MockCliBag {
   const emitEnvelope = vi.fn();
   // 2.12.0: the structured-error seam. Mirror the host — it sets the exit code.
   const emitError = vi.fn((detail: { exitCode: number }) => setExitCode(detail.exitCode));
+  const reportFailure = vi.fn((detail: { exitCode?: number; error?: { exitCode?: number } }) => {
+    const code = detail.exitCode ?? detail.error?.exitCode;
+    if (code !== undefined) setExitCode(code);
+    if (detail.exitCode !== undefined) emitError(detail as { exitCode: number; message: string });
+    return Promise.resolve();
+  });
   const deliverSignals = vi.fn().mockResolvedValue(undefined);
   const cli = {
     renderLive,
@@ -56,6 +63,7 @@ function mockCli(): MockCliBag {
     emitJson,
     emitEnvelope,
     emitError,
+    reportFailure,
     deliverSignals,
     logger: console,
     scope: { datastore: () => undefined },
@@ -72,6 +80,7 @@ function mockCli(): MockCliBag {
     maybeOpenReport,
     emitEnvelope,
     emitError,
+    reportFailure,
     deliverSignals,
   };
 }
@@ -216,14 +225,15 @@ describe('runJsonMode', () => {
     executeFitMock.mockResolvedValue({
       result: { type: 'error', exitCode: 2, message: 'no config' },
     });
-    const { cli, emitEnvelope, emitError, deliverSignals, setExitCode } = mockCli();
+    const { cli, emitEnvelope, reportFailure, deliverSignals, setExitCode } = mockCli();
     await runJsonMode(args, cli);
-    // 2.12.0 (§5.5): a failed --json run emits a structured error through the
-    // `emitError` seam (host wraps it + sets the exit code), not a bare envelope.
-    expect(emitError).toHaveBeenCalledWith({
-      message: 'no config',
-      exitCode: 2,
-    });
+    expect(reportFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'no config',
+        exitCode: 2,
+        jsonRequested: true,
+      }),
+    );
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(emitEnvelope).not.toHaveBeenCalled();
     expect(deliverSignals).not.toHaveBeenCalled();
@@ -246,10 +256,14 @@ describe('runJsonMode', () => {
         diagnostic,
       },
     });
-    const { cli, emitError, deliverSignals } = mockCli();
+    const { cli, reportFailure, deliverSignals } = mockCli();
     await runJsonMode(args, cli);
-    expect(emitError).toHaveBeenCalledWith(
-      expect.objectContaining({ code: diagnostic.code, diagnostic }),
+    expect(reportFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: diagnostic.code,
+        diagnostic,
+        jsonRequested: true,
+      }),
     );
     expect(deliverSignals).not.toHaveBeenCalled();
   });

@@ -115,6 +115,27 @@ describe('replayResult', () => {
     expect(cap.envelopes).toHaveLength(0);
   });
 
+  it('replays reportedFailure through ctx.reportFailure before other seams', async () => {
+    const { cap, ctx } = makeCtx();
+    const result: ToolCommandResult = {
+      output: 'command-result',
+      reportedFailure: {
+        message: 'worker failed',
+        exitCode: 2,
+        jsonRequested: false,
+      },
+      exitCode: 9,
+    };
+    await replayResult(result, ctx, invocation());
+    expect(cap.reportedFailures).toHaveLength(1);
+    expect(cap.reportedFailures[0]).toMatchObject({
+      message: 'worker failed',
+      exitCode: 2,
+    });
+    expect(cap.calls[0]).toMatch(/^reportFailure:/);
+    expect(cap.calls.at(-1)).toBe('exit:9');
+  });
+
   it('replays every explicit FRR seam field, exit code LAST', async () => {
     const { cap, ctx } = makeCtx();
     const result: ToolCommandResult = {
@@ -161,7 +182,10 @@ describe('replayResult', () => {
     // chain is a no-op (no throw).
     const cap = makeDispatchHostCtx();
     await replayResult(
-      { output: 'signal-envelope', session: { tool: 'ext', cwd: '/x', score: 1, passed: true } },
+      {
+        output: 'signal-envelope',
+        session: { tool: 'ext', cwd: '/x', score: 1, passed: true },
+      },
       cap.ctx,
       invocation(),
     );

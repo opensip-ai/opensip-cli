@@ -146,6 +146,27 @@ opensip hello-tools
 opensip hello-tools --json
 ```
 
+### Logging and failures in your handler
+
+Log run start with the scope-backed logger (writes to `.runtime/logs/` when configured):
+
+```ts
+cli.logger.info({ evt: 'hello-tools.run.start', module: 'hello-tools:cli' });
+```
+
+When the command cannot run (missing recipe, bad path), report a failure through the host:
+
+```ts
+await cli.reportFailure({
+  message: 'Recipe not found: example',
+  exitCode: 2,
+  jsonRequested: opts.json === true,
+});
+```
+
+Uncaught `ToolError` subclasses are also rendered by the host — prefer `reportFailure`
+when you want a custom message or structured log event.
+
 ## 7. See it in the Tool inventory
 
 ```bash

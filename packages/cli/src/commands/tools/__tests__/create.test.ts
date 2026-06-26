@@ -50,6 +50,8 @@ describe('toolsCreate', () => {
     expect(runtime).not.toContain('@opensip-cli/');
     expect(runtime).toContain('export const tool');
     expect(runtime).toContain(`id: '${manifest.stableId}'`);
+    expect(runtime).toContain('cli.logger.info');
+    expect(runtime).toContain('cli.reportFailure');
   });
 
   it('scaffolds ts-local package files', () => {
@@ -87,6 +89,8 @@ describe('toolsCreate', () => {
     expect(pkg.dependencies['@opensip-cli/core']).toBeDefined();
     const source = readFileSync(join(toolDir, 'src/index.ts'), 'utf8');
     expect(source).toContain('createTool');
+    expect(source).toContain('createToolLogger');
+    expect(source).toContain('reportFailure');
     expect(result.nextSteps?.some((step) => step.includes('pnpm install'))).toBe(true);
   });
 
@@ -156,7 +160,11 @@ describe('writeTemplateFiles', () => {
     const blocked = writeTemplateFiles({ toolDir, files: rendered.files });
     expect(blocked.success).toBe(false);
 
-    const forced = writeTemplateFiles({ toolDir, files: rendered.files, force: true });
+    const forced = writeTemplateFiles({
+      toolDir,
+      files: rendered.files,
+      force: true,
+    });
     expect(forced.success).toBe(true);
     expect(existsSync(join(toolDir, 'src', 'index.ts'))).toBe(false);
     expect(existsSync(join(toolDir, 'index.mjs'))).toBe(true);

@@ -28,7 +28,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { ConfigurationError, ToolError, logger } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
@@ -113,14 +113,16 @@ export async function executeSymbolIndex(
       module: 'graph:cli',
       err: error instanceof Error ? error.message : String(error),
     });
-    cli.setExitCode(
+    const exitCode =
       error instanceof ConfigurationError
         ? EXIT_CODES.CONFIGURATION_ERROR
-        : EXIT_CODES.RUNTIME_ERROR,
-    );
-    process.stderr.write(
-      `graph symbol-index: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
+        : EXIT_CODES.RUNTIME_ERROR;
+    await cli.reportFailure({
+      message: `graph symbol-index: ${error instanceof Error ? error.message : String(error)}`,
+      exitCode,
+      ...(error instanceof ToolError ? { error } : {}),
+      jsonRequested: false,
+    });
   }
 }
 

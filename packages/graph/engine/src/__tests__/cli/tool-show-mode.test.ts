@@ -36,7 +36,12 @@ function graphSession(overrides: Partial<StoredSession> = {}): StoredSession {
           violationCount: 1,
           durationMs: 0,
           findings: [
-            { ruleId: 'graph:god-file', message: 'too big', severity: 'error', filePath: 'a.ts' },
+            {
+              ruleId: 'graph:god-file',
+              message: 'too big',
+              severity: 'error',
+              filePath: 'a.ts',
+            },
           ],
         },
       ],
@@ -80,6 +85,7 @@ function makeContext(datastore: DataStore | undefined): {
     },
     deliverSignals: () => Promise.resolve(),
     writeSarif: () => Promise.resolve(),
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
   return { ctx, rendered, emitted, exitCodes };
 }

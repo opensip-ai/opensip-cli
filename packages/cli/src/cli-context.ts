@@ -19,6 +19,7 @@
 
 import {
   createRunTimer,
+  currentScope,
   type RunScope,
   logger as defaultLogger,
   type Logger,
@@ -29,6 +30,7 @@ import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
 import { createIoPlane, type LiveViewRegistry } from './bootstrap/io-plane.js';
 import { createOutputPlane } from './bootstrap/output-plane.js';
+import { createReportFailure } from './bootstrap/report-failure.js';
 import {
   createRunActionHooks,
   createRunPlaneFactory,
@@ -124,6 +126,14 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     runSession,
   });
 
+  const reportFailure = createReportFailure({
+    getLogger: () => currentScope()?.logger ?? log,
+    setExitCode: outputPlane.setExitCode,
+    render: (result) => opts.render(result),
+    emitError: outputPlane.emits.emitError,
+    getDiagnostics: () => currentScope()?.diagnostics,
+  });
+
   const ctx: ToolCliContext & RunActionHooks = {
     get scope(): RunScope {
       // The pre-action-hook (or explicit runWithScope in tests) enters the
@@ -136,7 +146,10 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     registerLiveView: ioPlane.register,
     renderLive: ioPlane.renderLive,
     maybeOpenReport: opts.maybeOpenReport,
-    logger: log,
+    get logger(): Logger {
+      return currentScope()?.logger ?? log;
+    },
+    reportFailure,
     setExitCode: outputPlane.setExitCode,
     ...outputPlane.emits, // emitJson / emitEnvelope / emitError / emitRaw
     deliverSignals: ioPlane.deliverSignals,
@@ -192,7 +205,10 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
     registerLiveView: deniedHookSeam('registerLiveView'),
     renderLive: deniedHookSeam('renderLive'),
     maybeOpenReport: deniedHookSeam('maybeOpenReport'),
-    logger: log,
+    get logger(): Logger {
+      return currentScope()?.logger ?? log;
+    },
+    reportFailure: deniedHookSeam('reportFailure'),
     setExitCode: outputPlane.setExitCode,
     ...outputPlane.emits,
     // Display-only timing seam (host-owned-run-timing); a hook never records a run.

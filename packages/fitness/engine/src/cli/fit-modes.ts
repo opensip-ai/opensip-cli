@@ -13,7 +13,6 @@
 
 import {
   EXIT_CODES,
-  mapToolErrorToExitCode,
   type FitOptions,
   type SignalEnvelope,
   type StoredSession,
@@ -21,10 +20,8 @@ import {
 import {
   ConfigurationError,
   deriveRunOutcome,
-  formatCliDiagnosticHuman,
   resolveFailOnDegraded,
   SystemError,
-  type CliDiagnostic,
   type ToolCliContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -83,41 +80,6 @@ function fitRunCompletion(
   return {
     session: fitSessionContribution(args, envelope, runOutcome),
   };
-}
-
-/** Emit a fail-closed command error — no findings envelope, no session persistence. */
-function emitFitCommandError(
-  cli: ToolCliContext,
-  result: {
-    message: string;
-    exitCode: number;
-    suggestion?: string;
-    code?: string;
-    diagnostic?: CliDiagnostic;
-  },
-  jsonRequested: boolean,
-): void {
-  cli.setExitCode(result.exitCode);
-  if (jsonRequested) {
-    cli.emitError({
-      message: result.message,
-      exitCode: result.exitCode,
-      ...(result.suggestion === undefined ? {} : { suggestion: result.suggestion }),
-      ...(result.code === undefined ? {} : { code: result.code }),
-      ...(result.diagnostic === undefined ? {} : { diagnostic: result.diagnostic }),
-    });
-    return;
-  }
-  if (result.diagnostic !== undefined) {
-    process.stderr.write(`${formatCliDiagnosticHuman(result.diagnostic)}\n`);
-    return;
-  }
-  void cli.render({
-    type: 'error',
-    message: result.message,
-    ...(result.suggestion === undefined ? {} : { suggestion: result.suggestion }),
-    exitCode: result.exitCode,
-  });
 }
 
 // persistFitRun removed (Phase 3). The three mode bodies (json/live-fallback/gate)
@@ -230,7 +192,7 @@ export async function runJsonMode(
   const fitResult = await executeFit(args);
   if (fitResult.envelope === undefined) {
     // ADR-0060: command-error — structured diagnostic, no findings envelope or session.
-    emitFitCommandError(cli, fitResult.result, true);
+    await cli.reportFailure({ ...fitResult.result, jsonRequested: true });
     return undefined;
   }
   // ADR-0011: emit the signal envelope through the shared `formatSignalJson`
@@ -308,8 +270,11 @@ export async function runGateMode(
       reason: 'mutually-exclusive flags',
       msg: '--gate-save and --gate-compare specified together',
     });
-    cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-    process.stderr.write('Error: --gate-save and --gate-compare are mutually exclusive.\n');
+    await cli.reportFailure({
+      message: 'Error: --gate-save and --gate-compare are mutually exclusive.',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      jsonRequested: args.json === true,
+    });
     return undefined;
   }
   // Run on the main thread (ADR-0028 — engine is persistence-free). The session
@@ -323,7 +288,10 @@ export async function runGateMode(
       mode: args.gateSave === true ? 'save' : 'compare',
       reason: fitResult.result.message,
     });
-    emitFitCommandError(cli, fitResult.result, args.json === true);
+    await cli.reportFailure({
+      ...fitResult.result,
+      jsonRequested: args.json === true,
+    });
     return undefined;
   }
   // ADR-0036: the envelope arrives fingerprint-stamped — `buildFitEnvelope`
@@ -386,15 +354,21 @@ export async function runGateMode(
     // (→ 2); a datastore-integrity SystemError → 1. Unknown errors
     // rethrow to the central handler.
     if (error instanceof ConfigurationError || error instanceof SystemError) {
-      cli.logger.warn({
-        evt: 'cli.gate.baseline_error',
-        module: 'cli:gate',
-        mode: args.gateSave === true ? 'save' : 'compare',
-        errorType: error.name,
-        reason: error.message,
+      await cli.reportFailure({
+        error,
+        message: `Error: ${error.message}`,
+        jsonRequested: args.json === true,
+        log: {
+          evt: 'cli.gate.baseline_error',
+          level: 'warn',
+          data: {
+            module: 'cli:gate',
+            mode: args.gateSave === true ? 'save' : 'compare',
+            errorType: error.name,
+            reason: error.message,
+          },
+        },
       });
-      cli.setExitCode(mapToolErrorToExitCode(error));
-      process.stderr.write(`Error: ${error.message}\n`);
       return undefined;
     }
     throw error;
@@ -407,20 +381,11 @@ async function emitShowError(
   reason: string,
   detail: string,
 ): Promise<void> {
-  if (args.json) {
-    // emitError sets the exit code itself (process exit == reported outcome).
-    cli.emitError({
-      message: detail,
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-      code: reason,
-    });
-    return;
-  }
-  cli.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-  await cli.render({
-    type: 'error',
+  await cli.reportFailure({
     message: detail,
     exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    code: reason,
+    jsonRequested: args.json === true,
   });
 }
 

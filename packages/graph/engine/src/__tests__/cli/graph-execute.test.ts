@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { executeGraph } from '../../cli/graph.js';
 import { currentAdapterRegistry } from '../../lang-adapter/registry.js';
+import { makeReportFailureMock } from '../report-failure-mock.js';
 import { makeGraphTestScope } from '../test-utils/with-graph-scope.js';
 
 import type {
@@ -132,6 +133,7 @@ function mockCli(datastore?: DataStore): MockCliBag {
       exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
       render,
       scope: { datastore: () => datastore, languages: new LanguageRegistry() },
+      reportFailure: makeReportFailureMock(setExitCode, render),
     } as unknown as ToolCliContext,
     setExitCode,
     render,
@@ -143,6 +145,13 @@ function mockCli(datastore?: DataStore): MockCliBag {
 function renderedLines(render: MockInstance): string {
   return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
     .map((c) => c[0].lines?.join('\n') ?? '')
+    .join('\n');
+}
+
+function renderedErrorText(render: MockInstance): string {
+  return (render.mock.calls as unknown as readonly [{ type?: string; message?: string }][])
+    .filter((c) => c[0]?.type === 'error')
+    .map((c) => c[0]?.message ?? '')
     .join('\n');
 }
 
@@ -226,21 +235,21 @@ afterEach(() => {
 describe('executeGraph — mutually-exclusive flags', () => {
   it('rejects --gate-save together with --gate-compare (exit 2)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode } = mockCli();
+    const { cli, setExitCode, render } = mockCli();
     await executeGraph({ cwd: projectDir, noCache: true, gateSave: true, gateCompare: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('mutually exclusive');
+    expect(renderedErrorText(render)).toContain('mutually exclusive');
   });
 
   it('rejects --workspace together with positional paths (exit 2)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode } = mockCli();
+    const { cli, setExitCode, render } = mockCli();
     await executeGraph(
       { cwd: projectDir, noCache: true, workspace: true, paths: [projectDir] },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('mutually exclusive');
+    expect(renderedErrorText(render)).toContain('mutually exclusive');
   });
 });
 
@@ -483,13 +492,13 @@ describe('executeGraph — gate dispatch', () => {
     currentAdapterRegistry().register(populatedAdapter());
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      const { cli, setExitCode } = mockCli(datastore);
+      const { cli, setExitCode, render } = mockCli(datastore);
       await executeGraph(
         { cwd: projectDir, noCache: true, gateSave: true, resolution: 'fast' },
         cli,
       );
       expect(setExitCode).toHaveBeenCalledWith(2);
-      expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('fast');
+      expect(renderedErrorText(render)).toContain('fast');
     } finally {
       datastore.close();
     }
@@ -499,15 +508,15 @@ describe('executeGraph — gate dispatch', () => {
 describe('executeGraph — --workspace guards', () => {
   it('errors when the CLI entry script cannot be determined (exit 2)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode } = mockCli();
+    const { cli, setExitCode, render } = mockCli();
     await executeGraph({ cwd: projectDir, noCache: true, workspace: true, cliScript: '' }, cli);
     expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain('CLI entry script');
+    expect(renderedErrorText(render)).toContain('CLI entry script');
   });
 
   it('errors when --language names an unregistered adapter (exit 2)', async () => {
     currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode } = mockCli();
+    const { cli, setExitCode, render } = mockCli();
     // resolveAdaptersForRun reads cli.scope.languages (empty here) → the
     // language name isn't registered → ConfigurationError.
     await executeGraph(
@@ -515,8 +524,6 @@ describe('executeGraph — --workspace guards', () => {
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join('')).toContain(
-      'not a registered adapter',
-    );
+    expect(renderedErrorText(render)).toContain('not a registered adapter');
   });
 });

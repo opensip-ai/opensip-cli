@@ -56,7 +56,11 @@ export async function executeListFiles(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
 ): Promise<void> {
-  logger.info({ evt: 'graph.cli.list-files.start', module: MODULE_GRAPH_CLI, cwd: opts.cwd });
+  logger.info({
+    evt: 'graph.cli.list-files.start',
+    module: MODULE_GRAPH_CLI,
+    cwd: opts.cwd,
+  });
   try {
     // Same guard the full command applies (validateMutuallyExclusiveFlags):
     // a whole-workspace fan-out and an explicit subtree scope are contradictory.
@@ -88,7 +92,7 @@ export async function executeListFiles(
       fileCount: rel.length,
     });
   } catch (error) {
-    handleGraphError('list-files', error, cli);
+    await handleGraphError('list-files', error, cli);
   }
 }
 

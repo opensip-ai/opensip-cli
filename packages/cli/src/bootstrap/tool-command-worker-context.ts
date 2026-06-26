@@ -30,11 +30,15 @@ import {
   type HostAudit,
   type HostEntitlements,
   type HostGovernance,
+  type ReportFailureDetail,
+  type ResolvedReportFailure,
   type RunScope,
   type RunTimer,
   type SignalDeliveryResult,
   type ToolCliContext,
 } from '@opensip-cli/core';
+
+import { resolveReportFailure, toReportedFailureWire } from './report-failure.js';
 
 import type {
   HostPlaneKind,
@@ -85,6 +89,7 @@ export interface ResultAccumulator {
   json?: unknown;
   raw?: unknown;
   error?: ToolCommandResult['error'];
+  reportedFailure?: ResolvedReportFailure;
   exitCode?: number;
 }
 
@@ -189,6 +194,11 @@ export function buildWorkerContext(
         ...(detail.code === undefined ? {} : { code: detail.code }),
       };
     },
+    reportFailure: (detail: ReportFailureDetail) => {
+      const resolved = resolveReportFailure(detail);
+      acc.reportedFailure = toReportedFailureWire(resolved);
+      return Promise.resolve();
+    },
     setExitCode: (code: number) => {
       acc.exitCode = code;
     },
@@ -209,7 +219,11 @@ export function buildWorkerContext(
     saveBaseline: (tool, envelope) =>
       rpc<void>(rpcClient, { seam: 'saveBaseline', tool, envelope }),
     compareBaseline: (tool, envelope) =>
-      rpc<GateCompareResult>(rpcClient, { seam: 'compareBaseline', tool, envelope }),
+      rpc<GateCompareResult>(rpcClient, {
+        seam: 'compareBaseline',
+        tool,
+        envelope,
+      }),
     exportBaselineSarif: (tool, path) =>
       rpc<void>(rpcClient, { seam: 'exportBaselineSarif', tool, path }),
     exportBaselineFingerprints: (tool, path) =>
@@ -217,7 +231,10 @@ export function buildWorkerContext(
     maybeOpenReport: (opts) =>
       rpc<void>(rpcClient, {
         seam: 'maybeOpenReport',
-        opts: { openRequested: opts.openRequested, jsonOutput: opts.jsonOutput },
+        opts: {
+          openRequested: opts.openRequested,
+          jsonOutput: opts.jsonOutput,
+        },
       }),
     toolState: buildToolStateRpc(rpcClient),
     hostPlanes: buildHostPlanesRpc(rpcClient),
