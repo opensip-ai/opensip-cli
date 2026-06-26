@@ -36,7 +36,7 @@ export const tool = {
       commonFlags: [],
       scope: 'project',
       output: 'raw-stream',
-      rawStreamReason: 'lookup',
+      rawStreamReason: 'diagnostic-gate',
       handler(_opts, cli) {
         cli.emitRaw('audit-demo ran');
         return {};

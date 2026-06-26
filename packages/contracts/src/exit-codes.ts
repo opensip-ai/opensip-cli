@@ -52,11 +52,13 @@ export function mapToolErrorToExitCode(error: ToolError): number {
   return EXIT_CODES.RUNTIME_ERROR;
 }
 
-/** Human-readable diagnosis surfaced when a tool fails, with the exit code it maps to. */
+/**
+ * Human-readable diagnosis for untyped errors. Advice only — exit codes come from
+ * typed {@link mapToolErrorToExitCode}, Commander, or bootstrap errors.
+ */
 export interface ErrorSuggestion {
   message: string;
   action?: string;
-  exitCode: number;
 }
 
 /**
@@ -117,7 +119,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: (capture) => ({
       message: `Recipe '${capture ?? 'unknown'}' not found.`,
       action: 'Run opensip fit --recipes to see available recipes.',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
 
@@ -142,7 +143,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: (capture) => ({
       message: `Check '${capture ?? 'unknown'}' not found.`,
       action: 'Run opensip fit --list to see available checks.',
-      exitCode: EXIT_CODES.CHECK_NOT_FOUND,
     }),
   },
 
@@ -153,7 +153,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: (capture) => ({
       message: capture ?? 'Unknown recipe.',
       action: 'Run opensip fit --recipes to see available recipes.',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
 
@@ -164,7 +163,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: () => ({
       message: 'Configuration error.',
       action: 'Check opensip-cli.config.yml for syntax errors.',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
 
@@ -174,7 +172,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: () => ({
       message: 'Configuration error.',
       action: 'Check opensip-cli.config.yml for syntax errors.',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     }),
   },
 
@@ -185,7 +182,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: () => ({
       message: 'Permission denied reading files.',
       action: 'Check file permissions in the target directory.',
-      exitCode: EXIT_CODES.RUNTIME_ERROR,
     }),
   },
 
@@ -197,7 +193,6 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
       message: 'No checks available to run.',
       action:
         'Install at least one @opensip-cli/checks-* package, or declare plugins.checkPackages in opensip-cli.config.yml.',
-      exitCode: EXIT_CODES.RUNTIME_ERROR,
     }),
   },
 
@@ -208,18 +203,15 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
     suggest: () => ({
       message: 'Network error sending report.',
       action: 'Check the --report-to URL and your network connection.',
-      exitCode: EXIT_CODES.REPORT_FAILED,
     }),
   },
 ];
 
 /**
- * LAST-RESORT exit-code + suggestion derivation for UNSTRUCTURED errors — a bare
- * `Error`/string with no type to map from. The typed {@link mapToolErrorToExitCode}
- * is authoritative for any `ToolError`; the CLI error-handler applies the typed
- * path FIRST (`typed ?? getErrorSuggestion`), so a coincidental substring match
- * here can never override a typed error's exit code (locked by the error-handler
- * "typed mapper wins" test). Returns null if no rule fires.
+ * LAST-RESORT message/action advice for UNSTRUCTURED errors — a bare `Error`/string
+ * with no type to map from. The typed {@link mapToolErrorToExitCode} is
+ * authoritative for any `ToolError`; untyped errors always exit `RUNTIME_ERROR`.
+ * Returns null if no rule fires.
  */
 export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
   const message = err instanceof Error ? err.message : String(err);

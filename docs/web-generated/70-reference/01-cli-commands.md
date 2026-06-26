@@ -8,6 +8,7 @@ purpose: "Lookup-shaped reference for user-facing CLI commands, important machin
 source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/commands/host-subcommand-config.ts
   - packages/cli/src/commands/configure.ts
   - packages/cli/src/commands/plugin.ts
   - packages/cli/src/commands/tools/index.ts
@@ -25,7 +26,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `sessions`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
 
 ---
 
@@ -358,9 +359,9 @@ opensip graph lookup <name> --json
 | Flag / Argument | Type | Default | Effect |
 |---|---|---|---|
 | `<name>` | string | — | Positional. Function simple name to look up (e.g. `saveBaseline`). Required. |
-| `--json` | bool | `false` | Output structured JSON instead of the human-readable list. |
+| `--json` | bool | `false` | Emit a host-stamped `CommandOutcome` with `data.type: "graph-lookup"` (see [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)). |
 
-The command reads from the catalog stored in `<project>/opensip-cli/.runtime/datastore.sqlite`. Run `opensip graph` at least once first to populate the catalog.
+The command reads from the catalog stored in `<project>/opensip-cli/.runtime/datastore.sqlite`. Run `opensip graph` at least once first to populate the catalog. JSON mode routes through the host `command-result` seam — not a bare per-command JSON document.
 
 ---
 
@@ -619,6 +620,24 @@ Detection markers:
 Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to specify `--language`.
 
 **Exit codes:** 0 (created), 0 (already exists, with notice), 2 (ambiguous detection / parse error).
+
+---
+
+## `config` — validate project config and export JSON Schema
+
+CLI-owned: [`packages/cli/src/commands/host-subcommand-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/host-subcommand-config.ts). Operator workflows over the **project** `opensip-cli.config.yml` using the same composed schema the dispatcher validates at pre-action time. Distinct from `opensip configure`, which manages the user-global OpenSIP Cloud API key.
+
+```
+opensip config validate [--config <path>] [--json] [--cwd <path>]
+opensip config schema [--json] [--out <path>] [--cwd <path>]
+```
+
+| Subcommand | Flags | Effect |
+|---|---|---|
+| `validate` | `--json` | Validate the effective project config; on success emit `data.type: "config-validate"`; invalid config exits **2** (`CONFIGURATION_ERROR`). |
+| `schema` | `--json`, `--out <path>` | Export the composed JSON Schema (`data.type: "config-schema"`); `--out` writes the schema file (rejects directory targets). |
+
+Both subcommands compose declarations from the live tool registry and admitted manifests — the same source as [`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/bootstrap/config-and-capabilities.ts). They do not open the SQLite datastore.
 
 ---
 

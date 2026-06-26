@@ -15,11 +15,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, and `opensip graph --json` all emit
-one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0024-command-outcome-and-observability.md)).
-Run commands carry a `SignalEnvelope` under `.envelope`; list/report commands
-carry their result under `.data`; failures carry structured `errors`. This is
-the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. This is the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -250,6 +246,51 @@ opensip fit --json | jq -e '.envelope.verdict.score >= 90'
 ```
 
 For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-cli' — see [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
+
+### `graph lookup --json`
+
+```jsonc
+{
+  "kind": "graph-lookup",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "graph-lookup",
+    "name": "saveBaseline",
+    "resolutionMode": "exact",
+    "matches": [ /* GraphLookupMatch[] */ ]
+  }
+}
+```
+
+### `config validate|schema --json`
+
+```jsonc
+// validate success
+{
+  "kind": "config-validate",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "config-validate",
+    "valid": true,
+    "configPath": "/path/to/opensip-cli.config.yml",
+    "namespaces": ["cli", "fitness", "graph", "targets"]
+  }
+}
+
+// schema success
+{
+  "kind": "config-schema",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "config-schema",
+    "schema": { /* JSON Schema document */ },
+    "namespaces": ["cli", "fitness", "graph"]
+  }
+}
+```
 
 ---
 

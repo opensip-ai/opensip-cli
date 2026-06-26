@@ -11,10 +11,12 @@
  * never triggers an analysis run.
  */
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
 import { ConfigurationError, logger } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
+
+import { buildLookupResult } from './lookup-result.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
@@ -25,45 +27,44 @@ export interface LookupCommandOptions {
   readonly json?: boolean;
 }
 
-export async function executeLookup(
-  opts: LookupCommandOptions,
-  cli: ToolCliContext,
-): Promise<void> {
-  logger.info({ evt: 'graph.cli.lookup.start', module: 'graph:cli', name: opts.name });
+export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): CommandResult {
+  logger.info({
+    evt: 'graph.cli.lookup.start',
+    module: 'graph:cli',
+    name: opts.name,
+  });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
-      throw new ConfigurationError('graph lookup requires a DataStore on ToolCliContext.');
+      return lookupError(
+        cli,
+        new ConfigurationError('graph lookup requires a DataStore on ToolCliContext.'),
+      );
     }
     const catalog = new CatalogRepo(datastore).loadFullCatalog();
     if (!catalog) {
-      throw new ConfigurationError(
-        'No graph catalog found. Run `opensip graph` first to build the catalog.',
+      return lookupError(
+        cli,
+        new ConfigurationError(
+          'No graph catalog found. Run `opensip graph` first to build the catalog.',
+        ),
       );
     }
     const matches = collectMatches(catalog, opts.name);
-    // Absent ⇒ exact (historical catalogs predate the marker).
     const resolutionMode = catalog.resolutionMode ?? 'exact';
-    if (opts.json === true) {
-      // --json is the machine path: structured output straight to stdout,
-      // intentionally bypassing the human render seam.
-      process.stdout.write(
-        `${JSON.stringify({ name: opts.name, resolutionMode, matches }, null, 2)}\n`,
-      );
-    } else {
-      // Human path flows through the render seam (Ink on TTY, plain text in
-      // pipes/CI) rather than writing to stdout directly.
-      await cli.render({
-        type: 'graph-status',
-        lines: humanReportLines(opts.name, matches, resolutionMode),
-      });
-    }
     cli.setExitCode(EXIT_CODES.SUCCESS);
     logger.info({
       evt: 'graph.cli.lookup.complete',
       module: 'graph:cli',
       matches: matches.length,
     });
+    if (opts.json === true) {
+      return buildLookupResult(opts.name, matches, resolutionMode);
+    }
+    return {
+      type: 'graph-status',
+      lines: humanReportLines(opts.name, matches, resolutionMode),
+    };
   } catch (error) {
     logger.error({
       evt: 'graph.cli.lookup.error',
@@ -75,10 +76,16 @@ export async function executeLookup(
         ? EXIT_CODES.CONFIGURATION_ERROR
         : EXIT_CODES.RUNTIME_ERROR,
     );
-    process.stderr.write(
-      `graph lookup: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
+    return lookupError(cli, error);
   }
+}
+
+function lookupError(cli: ToolCliContext, error: unknown): CommandResult {
+  const message = error instanceof Error ? error.message : String(error);
+  const exitCode =
+    error instanceof ConfigurationError ? EXIT_CODES.CONFIGURATION_ERROR : EXIT_CODES.RUNTIME_ERROR;
+  cli.setExitCode(exitCode);
+  return { type: 'error', message, exitCode };
 }
 
 function collectMatches(catalog: Catalog, name: string): readonly FunctionOccurrence[] {
@@ -92,9 +99,6 @@ function humanReportLines(
   resolutionMode: 'exact' | 'fast',
 ): readonly string[] {
   const lines: string[] = [];
-  // Honest caveat: a fast catalog's edges (callers/callees this command
-  // reflects) are approximate, so the reader knows not to treat them as
-  // ground truth.
   if (resolutionMode === 'fast') {
     lines.push(
       'Note: catalog built in fast mode — edges are approximate (syntactic). ' +

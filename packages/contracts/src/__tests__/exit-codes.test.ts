@@ -10,12 +10,7 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import {
-  EXIT_CODES,
-  getErrorSuggestion,
-  mapToolErrorToExitCode,
-  type ErrorSuggestion,
-} from '../exit-codes.js';
+import { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from '../exit-codes.js';
 
 describe('EXIT_CODES', () => {
   it('exposes the documented set', () => {
@@ -51,7 +46,7 @@ describe('getErrorSuggestion', () => {
   interface RuleCase {
     name: string;
     input: string;
-    expect: Pick<ErrorSuggestion, 'exitCode'> & {
+    expect: {
       messageContains?: string;
       actionContains?: string;
     };
@@ -61,7 +56,7 @@ describe('getErrorSuggestion', () => {
     {
       name: 'check-not-found rule fires for "Check not found: <slug>"',
       input: 'Check not found: foo-check',
-      expect: { exitCode: EXIT_CODES.CHECK_NOT_FOUND, messageContains: 'foo-check' },
+      expect: { messageContains: 'foo-check' },
     },
     {
       // The fitness engine throws `Recipe not found: <id>` (recipes/service.ts);
@@ -70,7 +65,7 @@ describe('getErrorSuggestion', () => {
       // ahead of the check-not-found rule precisely for this case.
       name: 'recipe-not-found rule fires for "Recipe not found: <slug>"',
       input: 'Recipe not found: my-recipe',
-      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, messageContains: 'my-recipe' },
+      expect: { messageContains: 'my-recipe' },
     },
     {
       // The `Recipe not found:` substring with no extractable slug — the
@@ -79,7 +74,7 @@ describe('getErrorSuggestion', () => {
       // suggest builder substitutes "unknown".
       name: 'recipe-not-found rule falls back to "unknown" when slug missing',
       input: 'Recipe not found:',
-      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, messageContains: 'unknown' },
+      expect: { messageContains: 'unknown' },
     },
     // NOTE (audit fix): the previous broad "not found: <slug>" / bare "not found"
     // cases were removed from the string suggestion table. They routed too many
@@ -90,47 +85,47 @@ describe('getErrorSuggestion', () => {
     {
       name: 'unknown-recipe rule fires for "Unknown recipe ..."',
       input: 'Unknown recipe foo',
-      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR, actionContains: '--recipes' },
+      expect: { actionContains: '--recipes' },
     },
     {
       name: 'config-file rule fires for opensip-cli.config.yml errors',
       input: 'Failed to parse opensip-cli.config.yml',
-      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR },
+      expect: { actionContains: 'opensip-cli.config.yml' },
     },
     {
       name: 'yaml-parse rule fires for YAML errors',
       input: 'Bad YAML at line 3',
-      expect: { exitCode: EXIT_CODES.CONFIGURATION_ERROR },
+      expect: { actionContains: 'opensip-cli.config.yml' },
     },
     {
       name: 'permission rule fires for EACCES',
       input: 'EACCES: permission denied reading /etc',
-      expect: { exitCode: EXIT_CODES.RUNTIME_ERROR, actionContains: 'permissions' },
+      expect: { actionContains: 'permissions' },
     },
     {
       name: 'no-checks rule fires for "No checks registered"',
       input: 'No checks registered',
-      expect: { exitCode: EXIT_CODES.RUNTIME_ERROR, actionContains: 'checks-*' },
+      expect: { actionContains: 'checks-*' },
     },
     {
       name: 'no-checks rule fires for "No checks to run"',
       input: 'No checks to run',
-      expect: { exitCode: EXIT_CODES.RUNTIME_ERROR },
+      expect: {},
     },
     {
       name: 'network rule fires for fetch errors',
       input: 'fetch failed',
-      expect: { exitCode: EXIT_CODES.REPORT_FAILED },
+      expect: { actionContains: 'network connection' },
     },
     {
       name: 'network rule fires for ECONNREFUSED',
       input: 'ECONNREFUSED',
-      expect: { exitCode: EXIT_CODES.REPORT_FAILED },
+      expect: { actionContains: 'network connection' },
     },
     {
       name: 'network rule fires for generic network errors',
       input: 'network unreachable',
-      expect: { exitCode: EXIT_CODES.REPORT_FAILED },
+      expect: { actionContains: 'network connection' },
     },
   ];
 
@@ -138,7 +133,7 @@ describe('getErrorSuggestion', () => {
     it(c.name, () => {
       const out = getErrorSuggestion(new Error(c.input));
       expect(out).not.toBeNull();
-      expect(out?.exitCode).toBe(c.expect.exitCode);
+      expect(out).not.toHaveProperty('exitCode');
       if (c.expect.messageContains !== undefined) {
         expect(out?.message).toContain(c.expect.messageContains);
       }
@@ -177,7 +172,7 @@ describe('getErrorSuggestion', () => {
     // the YAML rule; the table walks top-down, so the check-not-found
     // arm wins.
     const out = getErrorSuggestion(new Error('Check not found: foo-check (parsing YAML)'));
-    expect(out?.exitCode).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+    expect(out?.action).toContain('--list');
   });
 
   // ---- Regression / behavior parity sanity checks ----

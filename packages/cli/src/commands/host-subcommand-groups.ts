@@ -18,6 +18,7 @@
  * remains the cycle-free assembly + inventory surface.
  */
 
+import { buildConfigGroupLeaves } from './host-subcommand-config.js';
 import { buildSessionsGroupLeaves } from './host-subcommand-sessions.js';
 import { type HostSpec } from './host-subcommand-shared.js';
 import { buildToolsGroupLeaves } from './tools/index.js';
@@ -47,11 +48,16 @@ export interface HostSubcommandGroup {
  * This is the FINITE, NAMED set the Phase 7 `command-surface-parity` guardrail
  * allow-lists as documented host exceptions. Every other host command IS a spec.
  */
-export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['sessions', 'tools'] as const;
+export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['config', 'sessions', 'tools'] as const;
 
 /** Build the subcommand-group parents with their leaf specs. */
 export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly HostSubcommandGroup[] {
   return [
+    {
+      name: 'config',
+      description: 'Project config validation and schema export',
+      leaves: buildConfigGroupLeaves(ctx),
+    },
     {
       name: 'sessions',
       description: 'Manage session data',

@@ -11,6 +11,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { ValidationError } from '@opensip-cli/core';
+
 export type SupportedLanguage = 'typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp';
 
 export const ALL_LANGUAGES: readonly SupportedLanguage[] = [
@@ -79,7 +81,7 @@ export function parseLanguageFlag(raw: string): SupportedLanguage[] {
     if (trimmed.length === 0) continue;
     if (seen.has(trimmed)) continue;
     if (!ALL_LANGUAGES_SET.has(trimmed)) {
-      throw new Error(
+      throw new ValidationError(
         `Unknown language '${trimmed}'. Expected one of: ${ALL_LANGUAGES.join(', ')}`,
       );
     }
@@ -87,7 +89,7 @@ export function parseLanguageFlag(raw: string): SupportedLanguage[] {
     out.push(trimmed as SupportedLanguage);
   }
   if (out.length === 0) {
-    throw new Error('--language received an empty list');
+    throw new ValidationError('--language received an empty list');
   }
   return out;
 }

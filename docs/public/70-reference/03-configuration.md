@@ -8,6 +8,8 @@ purpose: "The opensip-cli.config.yml schema, every field, defaults, and where ea
 source-files:
   - packages/config/src/composer.ts
   - packages/cli/src/bootstrap/config-and-capabilities.ts
+  - packages/cli/src/bootstrap/config-declarations.ts
+  - packages/cli/src/commands/config.ts
   - packages/fitness/engine/src/config/fitness-config-schema.ts
   - packages/simulation/engine/src/cli/sim-config-schema.ts
   - packages/graph/engine/src/cli/graph-config-schema.ts
@@ -29,6 +31,18 @@ opensip-cli reads two config files:
 | `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
 Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](../../../packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
+
+## Validate and export schema
+
+Use the host `config` command group to inspect the same composed schema the dispatcher uses — without running a tool command:
+
+```bash
+opensip config validate --json
+opensip config schema --json
+opensip config schema --out opensip-cli.config.schema.json
+```
+
+`validate` reads the resolved project config path (or `--config`) and runs strict validation. Success returns `data.type: "config-validate"` with the claimed namespace list; failures exit **2**. `schema` emits the composed JSON Schema from [`toJsonSchema`](../../../packages/config/src/json-schema.ts) — suitable for editor completion — and optionally writes it with `--out`. See [ADR-0067](../../decisions/ADR-0067-config-validate-schema-commands.md).
 
 ## Top-level shape
 

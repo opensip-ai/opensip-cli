@@ -42,6 +42,27 @@ function spec(output: string, handlerBody: string, rawStreamReason?: string): st
 }
 
 describe('analyzeCommandHandlerHostOwnedOutput (AST)', () => {
+  it('flags process.stdout.write(JSON.stringify(...)) inside a json command-result handler', () => {
+    const v = analyzeCommandHandlerHostOwnedOutput(
+      [
+        "import { defineCommand } from '@opensip-cli/core';",
+        'export const s = defineCommand({',
+        "  name: 'lookup',",
+        "  description: 'lookup',",
+        "  commonFlags: ['json'],",
+        "  scope: 'project',",
+        "  output: 'command-result',",
+        '  handler: async () => {',
+        '    process.stdout.write(`${JSON.stringify({ ok: true }, null, 2)}\\n`);',
+        '  },',
+        '});',
+      ].join('\n'),
+      TOOL_PATH,
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain('process.stdout.write');
+  });
+
   it('flags process.stdout.write inside a command-result handler', () => {
     const v = analyzeCommandHandlerHostOwnedOutput(
       spec('command-result', "    process.stdout.write('x');\n    return cli;"),

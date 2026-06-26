@@ -208,12 +208,6 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
 }
 
 /** Concatenated text of every lines-bearing result handed to cli.render(). */
-function renderedLines(render: MockInstance): string {
-  return (render.mock.calls as unknown as readonly [{ lines?: readonly string[] }][])
-    .map((c) => c[0].lines?.join('\n') ?? '')
-    .join('\n');
-}
-
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let workDir: string;
@@ -316,15 +310,16 @@ describe('graphTool command surface', () => {
   });
 
   describe('graph lookup handler (nested)', () => {
-    it('routes to executeLookup with the given name', async () => {
+    it('returns a graph-status command-result for the host dispatch seam', () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
         const { cli, setExitCode, render } = makeMockCli(datastore);
-        await handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
+        const result = handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(0);
-        // Human lookup output flows through the render seam, not stdout.
-        expect(renderedLines(render)).toContain('saveBaseline');
+        expect(result).toMatchObject({ type: 'graph-status' });
+        expect((result as { lines: readonly string[] }).lines.join('\n')).toContain('saveBaseline');
+        expect(render).not.toHaveBeenCalled();
       } finally {
         datastore.close();
       }

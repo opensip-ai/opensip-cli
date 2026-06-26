@@ -7,6 +7,7 @@ import {
   currentScope,
   registeredToolShortIds,
   resolveToolFilterToLayoutKey,
+  ValidationError,
   type ToolShortId,
 } from '@opensip-cli/core';
 
@@ -52,7 +53,7 @@ function normalizeFilterOption(filter: string | string[] | undefined): string[] 
 function parsePositiveInt(raw: string): number {
   const n = Number.parseInt(raw, 10);
   if (Number.isNaN(n) || n <= 0) {
-    throw new Error(`Invalid --limit value: '${raw}'. Must be a positive integer.`);
+    throw new ValidationError(`Invalid --limit value: '${raw}'. Must be a positive integer.`);
   }
   return n;
 }
@@ -61,7 +62,9 @@ function parsePositiveInt(raw: string): number {
 function parseOlderThanDays(raw: string): number {
   const n = Number.parseInt(raw, 10);
   if (Number.isNaN(n) || n < 0) {
-    throw new Error(`Invalid --older-than value: '${raw}'. Must be a non-negative integer.`);
+    throw new ValidationError(
+      `Invalid --older-than value: '${raw}'. Must be a non-negative integer.`,
+    );
   }
   return n;
 }

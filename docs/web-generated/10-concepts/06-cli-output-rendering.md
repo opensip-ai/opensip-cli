@@ -82,10 +82,14 @@ presentation primitives.
 
 ## What is not in scope
 
-- **`--json`** is a separate machine contract (the `SignalEnvelope`,
-  `schemaVersion: 2`) with its own `emitEnvelope` seam (the shared
-  `formatSignalJson` formatter at the composition root, ADR-0011); it does
-  not go through the view-model. See [Contract surfaces](/docs/opensip-cli/10-concepts/04-contract-surfaces/).
+- **Public `--json`** is a host-stamped `CommandOutcome` — not a per-command
+  stdout format. Run commands nest the unchanged `SignalEnvelope` under
+  `.envelope`; `command-result` commands nest their `CommandResult` under
+  `.data` (including `graph lookup`, `config validate`, and `config schema`).
+  The host serializes through one `renderOutcome` seam
+  ([ADR-0065](/docs/opensip-cli/decisions/ADR-0065-public-json-output-and-raw-stream-policy/)).
+  Raw-stream remains a reviewed transport escape hatch (worker IPC, file export,
+  completion scripts) — not the normal machine-output path.
 - **Live progress views** (the animated `fit`, `graph`, and `sim` runners) are
   inherently TTY-only and render directly with cli-ui primitives. All three
   share one renderer — `<LiveProgress>` (ADR-0016), driven by a universal

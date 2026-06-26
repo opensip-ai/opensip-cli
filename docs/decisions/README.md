@@ -37,6 +37,9 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0067](ADR-0067-config-validate-schema-commands.md) — Config validate and schema commands (`opensip config validate|schema` reuses composed dispatcher schema; separate from user-global `configure`).
+- [ADR-0066](ADR-0066-typed-errors-own-exit-codes.md) — Typed errors own exit codes (`getErrorSuggestion` is advice-only; untyped errors exit 1).
+- [ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md) — Public JSON output and raw-stream policy (host-stamped `CommandOutcome`; raw-stream is transport-only).
 - [ADR-0064](ADR-0064-shared-clone-detection-substrate.md) — Duplicate detection is a shared substrate — tools own detection independently, never via a peer-tool dependency (supersedes ADR-0063; a new layer-2 `@opensip-cli/clone-detection` package single-sources the body-hash primitives + detection algorithm + curation policy; graph and yagni both depend on it, neither on the other; yagni re-owns duplicate detection via its own TS extractor so it is complete with graph uninstalled; no divergence is enforced by a cross-tool parity test).
 - [ADR-0063](ADR-0063-yagni-reduction-coordinator.md) — _(superseded by [ADR-0064](ADR-0064-shared-clone-detection-substrate.md))_ YAGNI as a freshness-gating reduction coordinator, not an analysis engine (supersedes ADR-0057; deletes `yagni:duplicate-body-candidate` as a divergent re-implementation of `graph:duplicated-function-body` — 430 vs 0 on the same catalog — re-homes `unused-config-surface` to fitness, and reuses content-addressed caches against one coherent snapshot instead of rebuilding the graph or trusting stale persisted findings).
 - [ADR-0062](ADR-0062-near-clone-detection.md) — Near-clone detection via persisted MinHash (walk-time `bodySignature?` on `FunctionOccurrence`; LSH-banded `graph:near-duplicate-function-body` rule; same-language gate; `sig=k` cache-key segment).

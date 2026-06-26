@@ -100,7 +100,6 @@ function suggestionFromTypedError(error: unknown): ErrorSuggestion | null {
   return {
     message: error.message,
     ...(hint ? { action: hint.action } : {}),
-    exitCode: mapToolErrorToExitCode(error),
   };
 }
 
@@ -165,13 +164,22 @@ export async function handleParseError(
     return;
   }
 
-  const typed = suggestionFromTypedError(error);
-  const suggestion = typed ?? getErrorSuggestion(error);
-  const message = error instanceof Error ? error.message : String(error);
-  const exitCode = suggestion?.exitCode ?? EXIT_CODES.RUNTIME_ERROR;
-  opts.setExitCode(exitCode);
+  if (error instanceof ToolError) {
+    await renderTypedParseError(error, opts);
+    return;
+  }
 
-  // `--json`: one outcome shape for every error (no Ink to stdout).
+  await renderUntypedParseError(error, opts);
+}
+
+async function renderTypedParseError(
+  error: ToolError,
+  opts: HandleParseErrorOptions,
+): Promise<void> {
+  const suggestion = suggestionFromTypedError(error);
+  const message = error.message;
+  const exitCode = mapToolErrorToExitCode(error);
+  opts.setExitCode(exitCode);
   if (opts.jsonRequested) {
     await renderOutcome(outcomeFromError(error, { kind: 'command.error' }), {
       jsonRequested: true,
@@ -179,8 +187,29 @@ export async function handleParseError(
     });
     return;
   }
+  await opts.render({
+    type: 'error',
+    message: suggestion?.message ?? message,
+    ...(suggestion?.action ? { suggestion: suggestion.action } : {}),
+    exitCode,
+  });
+}
 
-  // Human: the existing Ink `ErrorResult` render (byte-identical to launch).
+async function renderUntypedParseError(
+  error: unknown,
+  opts: HandleParseErrorOptions,
+): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  const suggestion = getErrorSuggestion(error);
+  const exitCode = EXIT_CODES.RUNTIME_ERROR;
+  opts.setExitCode(exitCode);
+  if (opts.jsonRequested) {
+    await renderOutcome(outcomeFromError(error, { kind: 'command.error' }), {
+      jsonRequested: true,
+      render: NOOP_RENDER,
+    });
+    return;
+  }
   await opts.render({
     type: 'error',
     message: suggestion?.message ?? message,

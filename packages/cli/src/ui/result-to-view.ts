@@ -40,6 +40,9 @@ import {
   viewSimNotice,
   viewReport,
   viewClearDone,
+  viewConfigSchema,
+  viewConfigValidate,
+  viewGraphLookup,
   viewConfigureDone,
   viewUninstallDone,
   viewHelp,
@@ -335,6 +338,15 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'clear-done': {
       return viewClearDone(result);
+    }
+    case 'graph-lookup': {
+      return viewGraphLookup(result);
+    }
+    case 'config-validate': {
+      return viewConfigValidate(result);
+    }
+    case 'config-schema': {
+      return viewConfigSchema(result);
     }
     case 'configure-done': {
       return viewConfigureDone(result);

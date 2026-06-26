@@ -64,6 +64,22 @@ describe('raw-stream inventory (bundled tools)', () => {
     expect(workerCommands).toContain('graph-run-worker');
     expect(workerCommands).toContain('sim-run-worker');
   });
+
+  it('has no lookup raw-stream entries', () => {
+    expect(inventory.some((e) => e.reason === 'lookup')).toBe(false);
+    expect(inventory.some((e) => e.command === 'lookup' && e.tool === 'graph')).toBe(false);
+  });
+
+  it('groups bundled raw-stream commands by reason category', () => {
+    const byReason = Object.groupBy(inventory, (e) => e.reason);
+    expect(byReason['runtime-render-dispatch']?.map((e) => e.command).sort()).toEqual([
+      'fitness',
+      'graph',
+      'simulation',
+    ]);
+    expect(byReason['worker-ipc']?.length).toBeGreaterThanOrEqual(3);
+    expect(byReason['file-export']?.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('raw-stream host parity', () => {

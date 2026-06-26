@@ -139,6 +139,8 @@ async function main(): Promise<void> {
     emitRaw: ctx.emitRaw,
     emitError: ctx.emitError,
     datastore: () => getOrOpenDatastore(logger),
+    manifests,
+    provenance,
     ...registrationInput,
   };
 

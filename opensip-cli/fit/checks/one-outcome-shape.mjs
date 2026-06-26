@@ -11,6 +11,8 @@
  * those seams nor those files, so the rule is opensip-internal, not universal.
  * Inert for adopters per opensip-cli/fit/checks/README.md.
  *
+ * ADR-0065: Public --json output and raw-stream policy.
+ *
  * WHY: Release 2.12.0 made `CommandOutcome<T>` the one outer currency: every
  * `--json` result and error is serialized through the single `renderOutcome`
  * seam, with the (unchanged) `SignalEnvelope` under `.envelope`, a `CommandResult`
@@ -57,9 +59,11 @@ const RULES = [
   {
     re: /\bprocess\.stdout\.write\s*\([^)]*\b(?:JSON\.stringify|formatSignalJson)\s*\(/,
     message:
-      'Machine JSON output must go through the single renderOutcome seam (§5.5), not a ' +
-      'direct process.stdout.write — otherwise the outer CommandOutcome shape re-drifts.',
-    suggestion: 'Build a CommandOutcome and render it via renderOutcome / the cli emit seams.',
+      'Public --json output must go through the host CommandOutcome seam (§5.5), not a ' +
+      'direct process.stdout.write — otherwise the outer shape re-drifts per command.',
+    suggestion:
+      'Return a CommandResult or call cli.emitJson / cli.emitEnvelope / cli.emitError; ' +
+      'reviewed raw-stream transports (IPC, file export) are the only exemptions.',
     allowInRenderer: true,
   },
 ];

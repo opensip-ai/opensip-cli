@@ -24,7 +24,7 @@
         "commonFlags": [],
         "scope": "project",
         "output": "raw-stream",
-        "rawStreamReason": "lookup"
+        "rawStreamReason": "diagnostic-gate"
       }
     ]
   }

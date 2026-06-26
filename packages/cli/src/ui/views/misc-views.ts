@@ -245,6 +245,79 @@ export function viewClearDone(result: ClearDoneResult): ViewNode {
   );
 }
 
+// --- graph lookup ---------------------------------------------------------
+
+export function viewGraphLookup(result: {
+  readonly name: string;
+  readonly resolutionMode: 'exact' | 'fast';
+  readonly matches: readonly unknown[];
+}): ViewNode {
+  const count = result.matches.length;
+  const plural = count === 1 ? '' : 's';
+  return group(
+    [
+      line([
+        { text: `${result.name} — ${String(count)} occurrence${plural}` },
+        ...(result.resolutionMode === 'fast'
+          ? [{ text: ' (fast catalog — edges approximate)', dim: true }]
+          : []),
+      ]),
+    ],
+    2,
+  );
+}
+
+// --- config commands ------------------------------------------------------
+
+export function viewConfigValidate(result: {
+  readonly configPath: string;
+  readonly namespaces: readonly string[];
+  readonly warnings?: readonly string[];
+}): ViewNode {
+  const children: ViewNode[] = [
+    line([
+      { text: '✓', tone: 'success' },
+      { text: ' Configuration valid: ' },
+      { text: result.configPath, bold: true },
+      {
+        text: ` (${String(result.namespaces.length)} namespace${result.namespaces.length === 1 ? '' : 's'})`,
+      },
+    ]),
+  ];
+  if (result.warnings !== undefined) {
+    for (const warning of result.warnings) {
+      children.push(line([{ text: `  ${warning}`, dim: true }]));
+    }
+  }
+  return group(children, 2);
+}
+
+export function viewConfigSchema(result: { readonly outPath?: string }): ViewNode {
+  if (result.outPath !== undefined) {
+    return group(
+      [
+        line([
+          { text: '✓', tone: 'success' },
+          { text: ' Wrote JSON Schema to ' },
+          { text: result.outPath, bold: true },
+        ]),
+      ],
+      2,
+    );
+  }
+  return group(
+    [
+      line([
+        {
+          text: 'Use --json to print the schema or --out <path> to write it to a file.',
+          dim: true,
+        },
+      ]),
+    ],
+    2,
+  );
+}
+
 // --- configure-done -------------------------------------------------------
 
 export function viewConfigureDone(result: ConfigureDoneResult): ViewNode {

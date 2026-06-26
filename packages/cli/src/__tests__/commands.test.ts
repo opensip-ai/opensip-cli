@@ -74,6 +74,7 @@ describe('registerCliCommands', () => {
       '__tool-command-worker',
       'agent-catalog',
       'completion',
+      'config',
       'configure',
       'init',
       'report',

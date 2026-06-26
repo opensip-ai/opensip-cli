@@ -187,10 +187,10 @@ describe('documented subcommand-group exceptions', () => {
   // `command-surface-parity` guardrail allow-lists exactly these. This test
   // locks the list AND asserts every named group is actually a mounted
   // action-less parent (no action handler, has sub-subcommands).
-  it('is exactly [sessions, tools]', () => {
+  it('is exactly [config, sessions, tools]', () => {
     // `plugin` was RETIRED as a top-level group: pack ops now mount under each
     // pack-supporting tool primary (`opensip fit plugin …`), not at the root.
-    expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual(['sessions', 'tools']);
+    expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual(['config', 'sessions', 'tools']);
   });
 
   it('each documented group is a mounted parent with sub-subcommands and no own action', () => {

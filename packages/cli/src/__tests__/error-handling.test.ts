@@ -37,7 +37,7 @@ describe('error handling', () => {
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('no-console-log');
       expect(suggestion!.action).toContain('--list');
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('no longer claims generic "not found" phrasing as a check error (narrowed for correctness)', () => {
@@ -54,7 +54,7 @@ describe('error handling', () => {
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.action).toContain('--recipes');
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects config file errors (opensip-cli.config.yml)', () => {
@@ -62,14 +62,14 @@ describe('error handling', () => {
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('Configuration error');
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects YAML errors', () => {
       const err = new Error('YAML parse error at line 5');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('does not match the bare "config" substring (narrowed to opensip-cli.config.yml + YAML)', () => {
@@ -87,14 +87,14 @@ describe('error handling', () => {
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('Permission denied');
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects "permission denied" errors (lowercase)', () => {
       const err = new Error('permission denied reading /root/file');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects "No checks registered" errors', () => {
@@ -102,14 +102,14 @@ describe('error handling', () => {
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('No checks available');
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects "No checks to run" errors', () => {
       const err = new Error('No checks to run');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects network/fetch errors', () => {
@@ -117,21 +117,21 @@ describe('error handling', () => {
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
       expect(suggestion!.message).toContain('Network error');
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.REPORT_FAILED);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects ECONNREFUSED errors', () => {
       const err = new Error('connect ECONNREFUSED 127.0.0.1:443');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.REPORT_FAILED);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('detects generic network errors', () => {
       const err = new Error('network timeout');
       const suggestion = getErrorSuggestion(err);
       expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.REPORT_FAILED);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('returns null for unknown/unrecognized errors', () => {
@@ -143,7 +143,7 @@ describe('error handling', () => {
     it('handles non-Error values (strings)', () => {
       const suggestion = getErrorSuggestion('Check not found: foo');
       expect(suggestion).not.toBeNull();
-      expect(suggestion!.exitCode).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+      expect(suggestion).not.toHaveProperty('exitCode');
     });
 
     it('handles non-Error values (numbers)', () => {

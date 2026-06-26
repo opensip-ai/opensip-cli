@@ -75,6 +75,10 @@ export type {
   SessionReplayResult,
   HelpResult,
   ErrorResult,
+  GraphLookupMatch,
+  GraphLookupResult,
+  ConfigValidateResult,
+  ConfigSchemaResult,
 } from './command-results.js';
 
 // Render-only run-presentation adjunct (envelope-first-presentation plan). The

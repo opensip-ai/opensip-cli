@@ -286,8 +286,7 @@
           }
         ],
         "scope": "project",
-        "output": "raw-stream",
-        "rawStreamReason": "lookup"
+        "output": "command-result"
       },
       {
         "name": "index",

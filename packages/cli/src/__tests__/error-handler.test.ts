@@ -79,11 +79,28 @@ describe('handleParseError', () => {
     expect(opts.rendered[0]?.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
   });
 
-  it('falls back to getErrorSuggestion for substring-shaped errors (Unknown recipe)', async () => {
+  it('uses getErrorSuggestion for advice but keeps untyped errors at RUNTIME_ERROR (Unknown recipe)', async () => {
     const opts = makeOpts();
     await handleParseError(new Error("Unknown recipe 'foo'"), opts);
-    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
     expect(opts.rendered[0]?.suggestion).toContain('--recipes');
+  });
+
+  it('untyped Check not found exits RUNTIME_ERROR while typed NotFoundError exits CHECK_NOT_FOUND', async () => {
+    const untyped = makeOpts();
+    await handleParseError(new Error('Check not found: foo'), untyped);
+    expect(untyped.setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+
+    const typed = makeOpts();
+    await handleParseError(new NotFoundError('Check not found: foo'), typed);
+    expect(typed.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CHECK_NOT_FOUND);
+  });
+
+  it('untyped Bad YAML may show a suggestion but exits RUNTIME_ERROR', async () => {
+    const opts = makeOpts();
+    await handleParseError(new Error('Bad YAML at line 3'), opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+    expect(opts.rendered[0]?.suggestion).toContain('opensip-cli.config.yml');
   });
 
   it('falls back to RUNTIME_ERROR for completely unknown errors', async () => {

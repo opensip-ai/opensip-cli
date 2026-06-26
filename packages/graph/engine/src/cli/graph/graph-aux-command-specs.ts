@@ -523,11 +523,10 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
     commonFlags: ['json'],
     args: [{ name: 'name', description: 'Function simple name to look up (e.g. "saveBaseline")' }],
     scope: 'project',
-    output: RAW_STREAM,
-    rawStreamReason: 'lookup',
-    handler: async (rawOpts, cli): Promise<void> => {
+    output: 'command-result',
+    handler: (rawOpts, cli) => {
       const opts = rawOpts as { json?: boolean } & Record<string, unknown>;
-      await executeLookup({ name: firstArg(opts), json: opts.json }, cli);
+      return executeLookup({ name: firstArg(opts), json: opts.json }, cli);
     },
   });
 

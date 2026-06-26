@@ -4,6 +4,8 @@
  *
  * `raw-stream` is a sanctioned escape hatch (handler owns full IO). Fitness,
  * graph, and simulation all use it for multi-mode primary commands. This
+ * ADR-0065: Public --json output and raw-stream policy.
+ *
  * check prevents silent spread: any production command-spec file with
  * `raw-stream` must carry an explanatory block comment or `@fitness-ignore`.
  */
@@ -14,8 +16,11 @@ const TOOL_COMMAND_SPEC =
 
 const RAW_STREAM = /output:\s*['"]raw-stream['"]/;
 
+const REASON_CATEGORY =
+  /completion-script|file-export|worker-ipc|runtime-render-dispatch|session-replay|diagnostic-gate/i;
+
 const DOCUMENTED =
-  /raw-stream|RAW_STREAM|handler owns|owns its (entire )?output|documented.*exception/i;
+  /raw-stream|RAW_STREAM|handler owns|owns its (entire )?output|documented.*exception|reason category/i;
 
 export const rawStreamOutputGuarded = defineCheck({
   id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -27,15 +32,17 @@ export const rawStreamOutputGuarded = defineCheck({
   analyze: (content, filePath) => {
     if (!TOOL_COMMAND_SPEC.test(filePath)) return [];
     if (!RAW_STREAM.test(content)) return [];
-    if (DOCUMENTED.test(content)) return [];
-    return [
-      {
-        message:
-          'Command spec declares output: raw-stream without an in-file justification comment',
-        severity: 'error',
-        suggestion:
-          'Add a block comment explaining why the handler owns IO (multi-mode dispatch), or use signal-envelope dispatch via the host.',
-      },
-    ];
+    if (!DOCUMENTED.test(content) || !REASON_CATEGORY.test(content)) {
+      return [
+        {
+          message:
+            'Command spec declares output: raw-stream without an in-file reason-category justification',
+          severity: 'error',
+          suggestion:
+            'Add a block comment naming the raw-stream reason category (completion-script, file-export, worker-ipc, runtime-render-dispatch, session-replay, diagnostic-gate) and why the handler owns IO.',
+        },
+      ];
+    }
+    return [];
   },
 });

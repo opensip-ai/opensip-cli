@@ -4,6 +4,7 @@
  * granularity.
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -78,52 +79,60 @@ afterEach(() => {
 });
 
 describe('graph lookup', () => {
-  it('renders occurrences for a name found in the catalog through the seam', async () => {
+  it('renders occurrences for a name found in the catalog through the seam', () => {
     new CatalogRepo(datastore).replaceAll(
       makeCatalog([occ({ bodyHash: 'a1', simpleName: 'saveBaseline' })]),
     );
     const cli = mockCli(datastore);
-    await executeLookup({ name: 'saveBaseline' }, cli.cli);
+    const result = executeLookup({ name: 'saveBaseline' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
-    // Human output flows through cli.render (a graph-status result), not stdout.
-    expect(cli.render).toHaveBeenCalledWith(expect.objectContaining({ type: 'graph-status' }));
-    const output = cli.renderedText();
-    expect(output).toContain('saveBaseline');
-    expect(output).toContain('1 occurrence');
+    expect(result).toMatchObject({ type: 'graph-status' });
+    expect(cli.render).not.toHaveBeenCalled();
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
-  it('emits structured JSON to stdout when --json is set (bypasses the seam)', async () => {
+  it('returns a graph-lookup result when --json is set (no direct stdout)', () => {
     new CatalogRepo(datastore).replaceAll(makeCatalog([occ({ bodyHash: 'a1', simpleName: 'fn' })]));
     const cli = mockCli(datastore);
-    await executeLookup({ name: 'fn', json: true }, cli.cli);
-    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    const parsed = JSON.parse(output) as { name: string; matches: unknown[] };
-    expect(parsed.name).toBe('fn');
-    expect(parsed.matches).toHaveLength(1);
-    // The machine path does not go through the render seam.
+    const result = executeLookup({ name: 'fn', json: true }, cli.cli);
+    expect(result).toMatchObject({
+      type: 'graph-lookup',
+      name: 'fn',
+      resolutionMode: 'exact',
+    });
+    if (result.type !== 'graph-lookup') throw new Error('expected graph-lookup result');
+    expect(result.matches).toHaveLength(1);
     expect(cli.render).not.toHaveBeenCalled();
+    expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
-  it('exits SUCCESS with a "not found" message when the name has no occurrences', async () => {
+  it('exits SUCCESS with a "not found" message when the name has no occurrences', () => {
     new CatalogRepo(datastore).replaceAll(makeCatalog([]));
     const cli = mockCli(datastore);
-    await executeLookup({ name: 'missing' }, cli.cli);
+    const result = executeLookup({ name: 'missing' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
-    expect(cli.renderedText()).toContain("No function named 'missing'");
+    expect(result).toMatchObject({ type: 'graph-status' });
+    expect((result as { lines: readonly string[] }).lines.join('\n')).toContain(
+      "No function named 'missing'",
+    );
   });
 
-  it('errors with CONFIGURATION_ERROR when no catalog has been built', async () => {
+  it('returns ErrorResult with CONFIGURATION_ERROR when no catalog has been built', () => {
     const cli = mockCli(datastore);
-    await executeLookup({ name: 'anything' }, cli.cli);
+    const result = executeLookup({ name: 'anything' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(2);
-    const errOut = stderrSpy.mock.calls.map((c) => String(c[0])).join('');
-    expect(errOut).toContain('Run `opensip graph` first');
+    expect(result).toMatchObject({
+      type: 'error',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    });
+    expect((result as { message: string }).message).toContain('Run `opensip graph` first');
+    expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('errors with CONFIGURATION_ERROR when no DataStore is wired', async () => {
+  it('returns ErrorResult with CONFIGURATION_ERROR when no DataStore is wired', () => {
     const cli = mockCli(undefined);
-    await executeLookup({ name: 'fn' }, cli.cli);
+    const result = executeLookup({ name: 'fn' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(2);
+    expect(result).toMatchObject({ type: 'error', exitCode: EXIT_CODES.CONFIGURATION_ERROR });
   });
 });

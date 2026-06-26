@@ -30,12 +30,8 @@
 import {
   analyzeNamespaceClaims,
   composeConfigSchema,
-  decorateToolConfigDeclarationsWithGateKeys,
-  hostConfigDeclarations,
-  jsonSchemaObjectToZod,
   resolveConfig,
   validateConfigDocument,
-  type PluginConfigKeyDeclaration,
   type ToolConfigDeclaration,
 } from '@opensip-cli/config';
 import {
@@ -47,108 +43,14 @@ import {
   readYamlFileOrThrow,
   resolveToolHooks,
   type ResolvedToolConfig,
-  type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
   registerCapabilityDomainsFromManifest,
 } from '@opensip-cli/core';
 
-import { provenanceSourceFor, shouldRunHookInHost } from './tool-provenance.js';
-
-/**
- * Find the manifest config descriptor for a tool, matching by stable id then by
- * the manifest's human id. Returns `undefined` when no admitted manifest for the
- * tool declares a `config` descriptor.
- */
-function manifestDescriptorFor(
-  tool: Tool,
-  manifests: readonly ToolPluginManifest[],
-): ToolPluginManifest['config'] {
-  const manifest =
-    manifests.find((m) => m.stableId !== undefined && m.stableId === tool.metadata.id) ??
-    manifests.find((m) => m.id === tool.metadata.name);
-  return manifest?.config;
-}
-
-/**
- * Collect the contributed config declarations from the registered tools —
- * provenance-aware (ADR-0054 M4-E Config two-pass).
- *
- *   - **Bundled** (trusted computing base) → fold the tool's runtime Zod
- *     `config` declaration host-side, exactly as before. A bundled tool's
- *     `config` slot is the kernel-side `ToolConfigContribution` carrier,
- *     structurally a `ToolConfigDeclaration` (schema `unknown` at the kernel
- *     boundary, a Zod schema at the config layer), so narrowing it here — the
- *     composition root, which DOES import `@opensip-cli/config` — is sound.
- *   - **External** (installed / project-local / user-global) → NEVER import the
- *     tool's Zod (executable code — the ADR-0054 load-time hole). Instead derive
- *     a COARSE declaration from the tool's serializable manifest descriptor
- *     ({@link ToolConfigManifestDescriptor}); the host validates the namespace's
- *     top-level shape as pure data. An external tool that ships NO descriptor
- *     contributes no declaration — its namespace (if present) passes through the
- *     document catchall (rule-2) and ALL of its validation defers to the worker
- *     deep pass.
- */
-function collectDeclarations(
-  tools: ToolRegistry,
-  provenance: readonly ToolProvenance[],
-  manifests: readonly ToolPluginManifest[],
-): readonly ToolConfigDeclaration[] {
-  const declarations: ToolConfigDeclaration[] = [];
-  for (const tool of tools.list()) {
-    if (provenanceSourceFor(tool, provenance) === 'bundled') {
-      const config = resolveToolHooks(tool).config;
-      if (config !== undefined) {
-        declarations.push(config as ToolConfigDeclaration);
-      }
-      continue;
-    }
-    // External: coarse, manifest-descriptor-derived schema only — no Zod import.
-    const descriptor = manifestDescriptorFor(tool, manifests);
-    if (descriptor !== undefined) {
-      declarations.push({
-        namespace: descriptor.namespace,
-        schema: jsonSchemaObjectToZod(descriptor.schema),
-      });
-    }
-    // No descriptor → defer entirely to the worker deep pass (catchall passes
-    // any present namespace block through; do NOT host-import its Zod to "help").
-  }
-  return declarations;
-}
-
-function addPluginConfigKey(
-  keys: Map<string, PluginConfigKeyDeclaration['kind']>,
-  key: string | undefined,
-  kind: PluginConfigKeyDeclaration['kind'],
-): void {
-  if (key === undefined) return;
-  const existing = keys.get(key);
-  if (existing !== undefined && existing !== kind) {
-    throw new ConfigurationError(
-      `Plugin config key '${key}' is declared with conflicting value kinds (${existing}, ${kind}).`,
-      { code: 'CONFIGURATION_ERROR', namespace: 'plugins' },
-    );
-  }
-  keys.set(key, kind);
-}
-
-function collectPluginConfigKeys(
-  manifests: readonly ToolPluginManifest[],
-): readonly PluginConfigKeyDeclaration[] {
-  const keys = new Map<string, PluginConfigKeyDeclaration['kind']>();
-  for (const manifest of manifests) {
-    for (const capability of manifest.capabilities ?? []) {
-      const configKeys = capability.discovery?.configKeys;
-      if (configKeys === undefined) continue;
-      addPluginConfigKey(keys, configKeys.packages, 'packages');
-      addPluginConfigKey(keys, configKeys.autoDiscover, 'autoDiscover');
-      addPluginConfigKey(keys, configKeys.scopes, 'scopes');
-    }
-  }
-  return [...keys.entries()].map(([key, kind]) => ({ key, kind }));
-}
+import { buildConfigDeclarations } from './config-declarations.js';
+import { shouldRunHookInHost } from './tool-provenance.js';
 
 /**
  * Project the validated document's per-namespace blocks into the `file`
@@ -204,27 +106,17 @@ export function composeAndValidateToolConfig(args: {
   // host-side (trusted), external tools validate from their serializable
   // manifest descriptor (coarse, NO Zod import); the deep Zod pass runs in the
   // worker.
-  const toolDeclarations = decorateToolConfigDeclarationsWithGateKeys(
-    collectDeclarations(tools, provenance, manifests),
-  );
+  const { declarations, hasToolNamespaces } = buildConfigDeclarations({
+    tools,
+    manifests,
+    provenance,
+  });
   // A run with no tools that declare config (e.g. a project-agnostic context)
   // carries no toolConfig — tools fall back to their in-tool defaults. The host
   // document-level blocks (cli/dashboard/schemaVersion) only need composing when
   // there is a tool dispatch to validate the document for; the real CLI always
   // registers fit/graph/sim, so they are always composed in practice.
-  if (toolDeclarations.length === 0) return { config: undefined, document: {} };
-
-  // Compose the host document-level declarations (cli/dashboard/schemaVersion,
-  // and from Phase 1 the targeting blocks) BESIDE the decorated tool
-  // declarations, so the whole document — not just the tool namespaces —
-  // validates STRICT through the one composed schema (ADR-0023, the launch seam).
-  // Gate keys are added only to tool namespaces; host blocks stay strict.
-  const declarations: readonly ToolConfigDeclaration[] = [
-    ...hostConfigDeclarations({
-      pluginConfigKeys: collectPluginConfigKeys(manifests),
-    }),
-    ...toolDeclarations,
-  ];
+  if (!hasToolNamespaces) return { config: undefined, document: {} };
 
   // When a configPath was resolved by the project context (i.e. a real
   // opensip-cli.config.yml or a package.json pointer), read it *strictly*.

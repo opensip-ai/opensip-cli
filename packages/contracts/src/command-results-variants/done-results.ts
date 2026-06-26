@@ -44,12 +44,11 @@ export interface GateDoneResult {
 
 /**
  * Generic carrier for graph's line-oriented mode output that has no Ink
- * component twin: `graph-lookup`, `--workspace`, and the `--report-to` status
- * line. Carries pre-composed plain lines (no graph types — contracts sits
- * below graph) so the render seam emits them as Ink or plain text instead of
- * the command writing to stdout directly. The `--json` paths for these
- * commands are unaffected and still write their machine output at their own
- * boundary.
+ * component twin: `--workspace`, and the `--report-to` status line. Carries
+ * pre-composed plain lines (no graph types — contracts sits below graph) so the
+ * render seam emits them as Ink or plain text instead of the command writing to
+ * stdout directly. `graph lookup --json` uses {@link GraphLookupResult} through
+ * the host `command-result` seam instead.
  */
 export interface GraphStatusResult {
   type: 'graph-status';

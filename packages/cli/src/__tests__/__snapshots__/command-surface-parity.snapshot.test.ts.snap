@@ -92,6 +92,66 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
     {
       "aliases": [],
       "args": [],
+      "name": "config",
+      "options": [],
+      "subcommands": [
+        {
+          "aliases": [],
+          "args": [],
+          "name": "schema",
+          "options": [
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Output structured JSON",
+              "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": undefined,
+              "description": "Write the JSON Schema to a file instead of stdout",
+              "flags": "--out <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
+          ],
+          "subcommands": [],
+          "synopsis": "Export the composed project config JSON Schema",
+          "usage": "[options]",
+        },
+        {
+          "aliases": [],
+          "args": [],
+          "name": "validate",
+          "options": [
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Output structured JSON",
+              "flags": "--json",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+          ],
+          "subcommands": [],
+          "synopsis": "Validate the effective project config against the composed schema",
+          "usage": "[options]",
+        },
+      ],
+      "synopsis": "Project config validation and schema export",
+      "usage": "[options] [command]",
+    },
+    {
+      "aliases": [],
+      "args": [],
       "name": "configure",
       "options": [
         {

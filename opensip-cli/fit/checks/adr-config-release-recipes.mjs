@@ -136,6 +136,9 @@ const CONFIG_READER_ALLOWLIST = new Set([
   'packages/core/src/lib/yaml.ts',
   'packages/core/src/plugins/discover.ts',
   'packages/cli/src/bootstrap/config-and-capabilities.ts',
+  // Host-owned `opensip config validate|schema` — reads the project config
+  // strictly for validation/schema export (ADR-0067), peer to bootstrap load.
+  'packages/cli/src/commands/config.ts',
   'packages/cli/src/commands/plugin/config-edit.ts',
   'packages/fitness/engine/src/signalers/loader.ts',
   'packages/fitness/engine/src/targets/loader.ts',

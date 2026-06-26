@@ -19,6 +19,14 @@ export type {
   TextLinesResult,
 } from './command-results-variants/done-results.js';
 export type {
+  GraphLookupMatch,
+  GraphLookupResult,
+} from './command-results-variants/graph-results.js';
+export type {
+  ConfigValidateResult,
+  ConfigSchemaResult,
+} from './command-results-variants/config-results.js';
+export type {
   ToolsListRow,
   ToolsCreateResult,
   ToolsListResult,
@@ -53,6 +61,10 @@ export type {
 } from './command-results-variants/session-results.js';
 
 import type {
+  ConfigSchemaResult,
+  ConfigValidateResult,
+} from './command-results-variants/config-results.js';
+import type {
   UninstallDoneResult,
   ClearDoneResult,
   ConfigureDoneResult,
@@ -60,6 +72,7 @@ import type {
   GraphStatusResult,
   TextLinesResult,
 } from './command-results-variants/done-results.js';
+import type { GraphLookupResult } from './command-results-variants/graph-results.js';
 import type { InitResult, SimNoticeResult } from './command-results-variants/init-results.js';
 import type {
   ListChecksResult,
@@ -94,6 +107,9 @@ export type CommandResult =
   | RunPresentation
   | GateDoneResult
   | GraphStatusResult
+  | GraphLookupResult
+  | ConfigValidateResult
+  | ConfigSchemaResult
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult

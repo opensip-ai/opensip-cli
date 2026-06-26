@@ -161,8 +161,7 @@ export type RawStreamReason =
   | 'worker-ipc'
   | 'runtime-render-dispatch'
   | 'session-replay'
-  | 'diagnostic-gate'
-  | 'lookup';
+  | 'diagnostic-gate';
 
 export const RAW_STREAM_REASONS: readonly RawStreamReason[] = [
   'completion-script',
@@ -171,7 +170,6 @@ export const RAW_STREAM_REASONS: readonly RawStreamReason[] = [
   'runtime-render-dispatch',
   'session-replay',
   'diagnostic-gate',
-  'lookup',
 ];
 
 /**

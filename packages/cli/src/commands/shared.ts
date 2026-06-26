@@ -13,7 +13,14 @@
 import type { SpecLike } from './completion.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-cli/contracts';
-import type { PluginLayout, ScaffoldContext, ScaffoldFile, ToolRegistry } from '@opensip-cli/core';
+import type {
+  PluginLayout,
+  ScaffoldContext,
+  ScaffoldFile,
+  ToolPluginManifest,
+  ToolProvenance,
+  ToolRegistry,
+} from '@opensip-cli/core';
 
 /**
  * One registered tool's `init`-scaffold contribution (ADR-0038): its structural
@@ -104,6 +111,10 @@ export interface CliCommandsContext {
   readonly toolInternalCommands?: ReadonlySet<string>;
   /** Live tool registry for identity-aware host commands (optional in tests). */
   readonly tools?: ToolRegistry;
+  /** Admitted tool manifests for config declaration composition (optional in tests). */
+  readonly manifests?: readonly ToolPluginManifest[];
+  /** Per-run tool provenance for config declaration composition (optional in tests). */
+  readonly provenance?: readonly ToolProvenance[];
   /**
    * Persistence accessor (thunk). Calling this returns the project-local
    * DataStore, opening it lazily on first access. Commands that don't read

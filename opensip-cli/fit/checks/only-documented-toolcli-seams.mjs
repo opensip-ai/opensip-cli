@@ -124,9 +124,9 @@ const RAW_DS_PATTERNS = [/\bnew DataStoreFactory\b/, /\bDataStoreFactory\.open\b
 const STDOUT_RULE = {
   patterns: STDOUT_PATTERNS,
   message:
-    'Host command handlers and tool engines must emit via ToolCliContext seams only (render, emitJson, emitEnvelope, deliverSignals, writeSarif, baseline seams, toolState, hostPlanes). Direct stdout bypasses the output contract and entered-scope invariant.',
+    'Host command handlers and tool engines must emit via ToolCliContext seams only (render, emitJson, emitEnvelope, emitError, deliverSignals, writeSarif, baseline seams, toolState, hostPlanes). Direct stdout bypasses the output contract and entered-scope invariant.',
   suggestion:
-    'Route through the ToolCliContext you received, or add `@fitness-ignore-file only-documented-toolcli-seams` with justification if this is deliberate bootstrap/subprocess IPC.',
+    'Route through the ToolCliContext you received (including cli.emitError for --json failures), or add `@fitness-ignore-file only-documented-toolcli-seams` with justification if this is deliberate bootstrap/subprocess IPC.',
 };
 
 const HOLDER_RULE = {
