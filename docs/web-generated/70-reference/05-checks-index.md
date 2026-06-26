@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-24
+last_verified: 2026-06-26
 release: v0.1.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.12
+release: v0.1.13
 title: "Architecture overview"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "A visual map of opensip: package layers, runtime flow, tool pipelines, output, and local persistence."

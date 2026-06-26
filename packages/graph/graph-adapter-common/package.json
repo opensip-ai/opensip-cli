@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/graph-adapter-common",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "license": "Apache-2.0",
   "description": "Shared scaffolding for the tree-sitter graph language adapters (go, java, python, rust)",
   "keywords": [

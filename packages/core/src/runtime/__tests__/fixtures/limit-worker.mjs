@@ -7,6 +7,27 @@ const mode = process.argv[2];
 const send = (msg) => process.send?.(msg);
 
 switch (mode) {
+  case 'env-report': {
+    send({
+      kind: 'env',
+      custom: process.env.OPENSIP_TEST_CUSTOM,
+      runId: process.env.OPENSIP_RUN_ID,
+    });
+    break;
+  }
+  case 'echo': {
+    process.on('message', (msg) => {
+      send({ kind: 'echo', msg });
+    });
+    send({ kind: 'ready' });
+    setInterval(() => {}, 60_000).unref?.();
+    break;
+  }
+  case 'message-then-idle': {
+    send({ kind: 'ready' });
+    setInterval(() => {}, 60_000).unref?.();
+    break;
+  }
   case 'huge-payload': {
     send({ kind: 'result', value: 'x'.repeat(2_000_000) });
     break;

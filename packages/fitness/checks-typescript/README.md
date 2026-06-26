@@ -25,8 +25,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.12/packages/fitness/checks-typescript
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.13/packages/fitness/checks-typescript
 
 ## License
 

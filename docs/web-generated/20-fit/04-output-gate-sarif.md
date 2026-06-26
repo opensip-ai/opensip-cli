@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.12
+release: v0.1.13
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the signals a check produces — formatter/sink routing, JSON output, SARIF, the gate, cloud reporting."
@@ -58,7 +58,7 @@ The paths are mutually exclusive in their effect on stdout, but composable in th
 
 ## The `SignalEnvelope`
 
-Every output path starts from the same shape — a `SignalEnvelope` produced after the recipe runs ([ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md)). Defined at [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/contracts/src/signal-envelope.ts):
+Every output path starts from the same shape — a `SignalEnvelope` produced after the recipe runs ([ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md)). Defined at [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/contracts/src/signal-envelope.ts):
 
 ```ts
 interface SignalEnvelope {
@@ -89,7 +89,7 @@ fix hint.
 
 `SignalEnvelope` is the canonical artifact and the single output currency of every tool. **Tools no longer render their own output**: a tool's action returns the envelope via `CommandResult`, and the CLI composition root maps flags (`--json`, `--report-to`, gate modes) to a (formatter × sink) pair. Output decomposes along two axes:
 
-- **Formatters** — pure `(envelope) => string`, shared across all tools, one per format (`formatSignalJson`, `formatSignalSarif`, the human/table formatter). They live in [`packages/output/src/format/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/output/src/format/) (the package was renamed from `@opensip-cli/reporting` to `@opensip-cli/output`).
+- **Formatters** — pure `(envelope) => string`, shared across all tools, one per format (`formatSignalJson`, `formatSignalSarif`, the human/table formatter). They live in [`packages/output/src/format/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/output/src/format/) (the package was renamed from `@opensip-cli/reporting` to `@opensip-cli/output`).
 - **Sinks** — effectful delivery (stdout, file, chunked HTTPS to OpenSIP Cloud, SQLite), deliberately heterogeneous and resolved only at the composition root.
 
 If you're writing a CI integration, parse the `SignalEnvelope`. The shape is part of the contract surface ([`10-concepts/04-contract-surfaces.md`](/docs/opensip-cli/10-concepts/04-contract-surfaces/)).
@@ -112,7 +112,7 @@ fitnessTool.action()
        → unmounts when the user closes (or process exits)
 ```
 
-The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/cli/src/ui/) and depends on Ink + React. It's the only consumer of those libraries; nothing in `core`, `fitness`, or any check pack imports them. This is why a future GUI front-end could replace the renderer without touching a Tool — the Tool calls `cli.renderLive('fit', args)` and the CLI maps that to whatever rendering layer is in place.
+The renderer is in [`packages/cli/src/ui/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/ui/) and depends on Ink + React. It's the only consumer of those libraries; nothing in `core`, `fitness`, or any check pack imports them. This is why a future GUI front-end could replace the renderer without touching a Tool — the Tool calls `cli.renderLive('fit', args)` and the CLI maps that to whatever rendering layer is in place.
 
 `-v` / `--verbose` adds inline finding details to the table. `--quiet` suppresses the banner and shows only the pass/fail summary line.
 
@@ -208,9 +208,9 @@ Exit code 1 if `degraded`, 0 otherwise. CI gates on the exit code; humans read t
 opensip fit --report-to https://opensip.ai/api --api-key $OPENSIP_API_KEY
 ```
 
-The envelope is formatted to SARIF via the single shared `formatSignalSarif` formatter and POSTed to the configured URL through the shared chunked transport. This is a **composition-root** path (ADR-0011): the tool returns its envelope; `cli.deliverSignals` (→ [`deliver-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/cli/src/bootstrap/deliver-envelope.ts)) owns the SARIF formatting *and* the upload. The tool itself never imports `@opensip-cli/output`. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
+The envelope is formatted to SARIF via the single shared `formatSignalSarif` formatter and POSTed to the configured URL through the shared chunked transport. This is a **composition-root** path (ADR-0011): the tool returns its envelope; `cli.deliverSignals` (→ [`deliver-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/bootstrap/deliver-envelope.ts)) owns the SARIF formatting *and* the upload. The tool itself never imports `@opensip-cli/output`. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
 
-The transport lives in [`packages/output/src/sink/http-egress.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/output/src/sink/http-egress.ts) (`postChunked`). For `--report-to`, the whole SARIF log is sent as one chunk (the envelope is capped upstream):
+The transport lives in [`packages/output/src/sink/http-egress.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/output/src/sink/http-egress.ts) (`postChunked`). For `--report-to`, the whole SARIF log is sent as one chunk (the envelope is capped upstream):
 
 - It POSTs to `<url>/sarif` with `X-API-Key` if provided, and a stable `Idempotency-Key` per chunk (`<runId>:report:<i>`) so a retried-but-stored chunk is de-duplicated server-side.
 - The timeout is `min(300_000, 60_000 + signalCount * 100)` ms — 60s base plus 100ms per signal, capped at 5 minutes. The receiver does per-signal work (dedup, persistence, trace writes); the timeout scales with the workload.
@@ -222,7 +222,7 @@ The `--report-to` path owns **exit code 4** (`REPORT_FAILED`): an upload failure
 
 ## SARIF, specifically
 
-opensip-cli emits SARIF 2.1.0 via the shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/output/src/format/signal-sarif.ts)) — the same formatter `fit`, `graph`, and `sim` all use. The schema URI:
+opensip-cli emits SARIF 2.1.0 via the shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/output/src/format/signal-sarif.ts)) — the same formatter `fit`, `graph`, and `sim` all use. The schema URI:
 
 ```
 https://json.schemastore.org/sarif-2.1.0.json
@@ -249,7 +249,7 @@ The full SARIF spec has many more optional fields (`taxonomies`, `invocations`, 
 
 ### The baseline (SQLite, not SARIF)
 
-The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/output/src/format/baseline-diff.ts) in `@opensip-cli/output`. The on-disk CI artifact stays a SARIF document because `fit export --format baseline` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
+The gate baseline is stored signals (fingerprint + payload rows in the host-owned `tool_baseline_entries` table), not a SARIF document (see the gate section above). `cli.compareBaseline` loads the saved rows and diffs them against the current fingerprint-stamped envelope via the pure [`diffBaseline`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/output/src/format/baseline-diff.ts) in `@opensip-cli/output`. The on-disk CI artifact stays a SARIF document because `fit export --format baseline` converts the stored signals to SARIF via the root `cli.writeSarif` seam.
 
 ---
 

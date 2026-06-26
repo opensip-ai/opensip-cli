@@ -2,7 +2,14 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
-## [Unreleased]
+## [0.1.13] - 2026-06-26
+
+A worker-supervision and external-tool trust hardening release. External tool
+execution now has clearer trust framing, tighter child environment inheritance,
+trace propagation across fork boundaries, bounded worker resources, and shared
+supervisor behavior across external dispatch and bundled live-engine workers.
+All changes are backward-compatible; the new limits use conservative defaults
+and are tunable through documented `OPENSIP_CLI_WORKER_*` environment variables.
 
 ### Changed
 

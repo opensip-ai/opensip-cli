@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-09
-release: v0.1.12
+release: v0.1.13
 title: "The tool-plugin model"
 audience: [contributors, plugin-authors]
 purpose: "How the CLI doesn't know what `fit` does. The Tool contract, the manifest, the unified loader, and what it takes to add a third tool."
@@ -26,7 +26,7 @@ related-docs:
 The CLI is a generic dispatcher. It cannot tell `fit` from `sim` from `graph` from any future Tool. This isn't a stylistic choice — it's an architectural commitment that the layer policy enforces and that buys you the only thing that makes the platform shape-consistent over time: the freedom to add a tool without touching the kernel.
 
 Bundled tools (`fit`/`sim`/`graph`) and installed or project-local tools load
-through the same path ([ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/docs/decisions/ADR-0027-ga-parity-cutover.md)).
+through the same path ([ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0027-ga-parity-cutover.md)).
 The only thing distinguishing them is their **source of installation, never
 their lifecycle**.
 
@@ -40,7 +40,7 @@ their lifecycle**.
 
 ## The contract
 
-A Tool is a TypeScript object. The whole interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/core/src/tools/types.ts); the load-bearing members are:
+A Tool is a TypeScript object. The whole interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/core/src/tools/types.ts); the load-bearing members are:
 
 ```ts
 interface Tool {
@@ -63,9 +63,9 @@ A Tool is anything that satisfies that shape. `metadata`, `commands`, and `comma
 
 The contract has been deliberately kept narrow. Each core member exists for a specific reason:
 
-- **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (first-writer-wins) — see [`packages/core/src/tools/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/core/src/tools/registry.ts). The bootstrap's discovery loop deliberately skips packages whose `id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`.
+- **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (first-writer-wins) — see [`packages/core/src/tools/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/core/src/tools/registry.ts). The bootstrap's discovery loop deliberately skips packages whose `id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`.
 - **`commands[]`** carries metadata only — no handlers. The CLI uses this list for `--help` listings and conflict detection (two tools can't both claim the `fit` subcommand), and its name **set** must equal the manifest's `commands` (asserted at load — see below). Keeping it metadata-only means `--help` is cheap: the CLI doesn't import a tool's runtime to enumerate its commands.
-- **`commandSpecs`** is the tool's **declarative command surface** — typed `CommandSpec`s (name, description, aliases, common-flag selection, per-command options/args, scope, output mode, and the handler). The host's `mountCommandSpec` ([`packages/cli/src/commands/mount-command-spec.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/cli/src/commands/mount-command-spec.ts)) reads them and owns the Commander wiring, the shared flags (`--cwd`/`--json`/…), parsing, help, completion, the `--json` `CommandOutcome` wrapping, and the exit-code pipeline. A handler returns its domain result; it never touches Commander and never writes to stdout. `commandSpecs` is the one command surface — §8 "one command surface" invariant.
+- **`commandSpecs`** is the tool's **declarative command surface** — typed `CommandSpec`s (name, description, aliases, common-flag selection, per-command options/args, scope, output mode, and the handler). The host's `mountCommandSpec` ([`packages/cli/src/commands/mount-command-spec.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/mount-command-spec.ts)) reads them and owns the Commander wiring, the shared flags (`--cwd`/`--json`/…), parsing, help, completion, the `--json` `CommandOutcome` wrapping, and the exit-code pipeline. A handler returns its domain result; it never touches Commander and never writes to stdout. `commandSpecs` is the one command surface — §8 "one command surface" invariant.
 - **`initialize()`** is optional async setup, called once per process — lazily, by the CLI's preAction hook, when a subcommand owned by this tool is about to run (not eagerly for every tool at startup, so an uninvoked tool and the `--help`/welcome paths pay nothing). Most tools don't need it (`fit` doesn't — its setup is lazy inside handlers). A throwing `initialize()` is fatal — the command does not run.
 
 The optional contribution slots (`contributeScope`, `collectReportData`, `config`, `capabilityRegistrars`, `sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool HTML report, the composed config document, a capability domain it owns, and `sessions show` replay — each only if the tool declares it. The `sessions show` surface (and the new `agent-catalog` discovery command) now include agent ergonomics such as `--filter` and `--raw` for focused historical inspection.
@@ -142,7 +142,7 @@ the host owns the program internally and mounts each `commandSpec` itself.
 
 ## How tools get loaded
 
-The flow lives in [`packages/cli/src/bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/cli/src/bootstrap/register-tools.ts) and runs once, at process startup, before argv is parsed. Every tool — bundled or installed — travels the **same** admission path:
+The flow lives in [`packages/cli/src/bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/bootstrap/register-tools.ts) and runs once, at process startup, before argv is parsed. Every tool — bundled or installed — travels the **same** admission path:
 
 ```
 1. Construct a fresh ToolRegistry for this invocation:
@@ -233,8 +233,8 @@ A few alternatives were considered. Worth knowing why they're not what's here.
   `--json` → exit. Letting every tool touch Commander would make "the same flag
   means the same thing across tools" a convention rather than an invariant.
   Centralizing the wiring makes it structural — see
-  [ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/docs/decisions/ADR-0027-ga-parity-cutover.md) and
-  [ADR-0021](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/docs/decisions/ADR-0021-cross-tool-cli-flag-currency.md).
+  [ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0027-ga-parity-cutover.md) and
+  [ADR-0021](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0021-cross-tool-cli-flag-currency.md).
 
 ---
 
@@ -285,8 +285,8 @@ export const tool = defineTool({
     "commands": [{ "name": "audit-sec", "description": "Run the audit" }]
   },
   "peerDependencies": {
-    "opensip-cli": "^0.1.12",
-    "@opensip-cli/core": "^0.1.12"
+    "opensip-cli": "^0.1.13",
+    "@opensip-cli/core": "^0.1.13"
   }
 }
 ```
@@ -309,8 +309,8 @@ If your tool also wants to ship checks (the way `@opensip-cli/checks-typescript`
 
 Three things, in order of importance:
 
-1. **A stable kernel.** `@opensip-cli/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
-2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to compatible first-party tool releases, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec` release while staying on `opensip-cli@0.1.12`.
+1. **A stable kernel.** `@opensip-cli/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
+2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to compatible first-party tool releases, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec` release while staying on `opensip-cli@0.1.13`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in by shipping a manifest + `commandSpecs`, inheriting every host-owned plane (output, progress, config, sessions, dashboard). Today there are three (`fit`, `sim`, `graph`); the CLI grows by zero lines for the fourth.
 
 ---

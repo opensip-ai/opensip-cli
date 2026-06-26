@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { startWorkerHeartbeat, type WorkerHeartbeatMessage } from '../worker-heartbeat.js';
 
 describe('startWorkerHeartbeat', () => {
+  it('returns a noop stop function when not running inside a forked worker', () => {
+    const stop = startWorkerHeartbeat();
+    expect(() => stop()).not.toThrow();
+  });
+
   it('emits heartbeat messages until stopped', async () => {
     const messages: WorkerHeartbeatMessage[] = [];
     const stop = startWorkerHeartbeat({

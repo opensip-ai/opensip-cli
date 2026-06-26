@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-14
-release: v0.1.12
+release: v0.1.13
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
 purpose: "How check packs are structured, the bundled seven, scope filters, parameterization, and the marketplace shape."
@@ -71,7 +71,7 @@ Discovery uses **two paths**, both run on every fit invocation; results are merg
 
 See [`80-implementation/02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/) for the resolution rules.
 
-The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-cli/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
+The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/fitness/engine/src/framework/check-types.ts) helper (re-exported from `@opensip-cli/fitness`) walks a barrel's exports recursively, narrowing each value to a `Check` via `isCheck` and deduplicating by reference. Each pack's `src/index.ts` calls it on `allChecks` (the re-export of `src/checks/index.ts`) so new checks are picked up by simply re-exporting them from the category barrel — no central registration list to update.
 
 ---
 
@@ -176,7 +176,7 @@ The recipe service projects the `config:` map into module-level state before exe
 
 ## The display map — folded onto the check
 
-A pack keeps an authoring `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.12/packages/fitness/checks-universal/src/display/index.ts) and analogues) of `slug → [icon, displayName]`:
+A pack keeps an authoring `CHECK_DISPLAY` map ([`packages/fitness/checks-universal/src/display/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/fitness/checks-universal/src/display/index.ts) and analogues) of `slug → [icon, displayName]`:
 
 ```ts
 export const CHECK_DISPLAY: Record<string, CheckDisplayEntry> = {
@@ -248,8 +248,8 @@ Peer-depend on `@opensip-cli/fitness` and `@opensip-cli/core` so a project on an
 ```json
 {
   "peerDependencies": {
-    "@opensip-cli/fitness": "^0.1.12",
-    "@opensip-cli/core": "^0.1.12"
+    "@opensip-cli/fitness": "^0.1.13",
+    "@opensip-cli/core": "^0.1.13"
   }
 }
 ```
