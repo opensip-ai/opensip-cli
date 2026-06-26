@@ -102,10 +102,10 @@ visible directly in the code:
   isolation only, no worker boundary, so they are neither fault- nor
   capability-isolated, and they do **not** pass through `checkCompatibility`
   (they are selected by marker / export-shape / schema, not the `===` Tool gate).
-- **Compatibility is exact-epoch.** `compatibility.ts` requires
-  `apiVersion === engine`; `manifest.ts:48` pins `PLUGIN_API_VERSION = 1`; the
-  `minApiVersion` slot is reserved but unused (`manifest.ts:226`). Every release
-  is a lockstep flag-day.
+- **Compatibility is bounded integer epoch admission (ADR-0074).**
+  `checkCompatibility` admits `MIN_SUPPORTED_PLUGIN_API_VERSION <= apiVersion <=
+  PLUGIN_API_VERSION`; capability packs declare target domain epochs in
+  `package.json#opensipTools`. Compatibility gates are not capability isolation.
 - **Trust tiers already diverge by location.** `register-authored-tools.ts`:
   project-local authored is deny-by-default (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`),
   but **user-global authored** (`~/.opensip-cli/tools/`) is **trusted-by-location**

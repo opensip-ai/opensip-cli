@@ -368,7 +368,9 @@ export const simulationTool: Tool = defineTool({
   pluginLayout: { userSubdirs: SIM_PLUGIN_LAYOUT.userSubdirs },
   commandSpecs: [simCommand, simRecipesCommandSpec, simRunWorkerCommandSpec],
   extensionPoints: {
-    simulationContractVersion: SIMULATION_CONTRACT_VERSION,
+    contractVersions: {
+      simulation: SIMULATION_CONTRACT_VERSION,
+    },
     contributeScope: simulationScope.contributeScope,
     collectReportData: collectSimulationReportData,
     sessionReplay: {

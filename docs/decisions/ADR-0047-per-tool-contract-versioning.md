@@ -1,6 +1,6 @@
 ---
-status: active
-last_verified: 2026-06-12
+status: superseded
+last_verified: 2026-06-26
 owner: opensip-cli
 ---
 
@@ -10,9 +10,9 @@ owner: opensip-cli
 id: ADR-0047
 title: Per-Tool Contract Versioning
 date: 2026-06-12
-status: active
+status: superseded
 supersedes: []
-superseded_by: null
+superseded_by: ADR-0074
 related: [ADR-0046, ADR-0027, ADR-0012, ADR-0023]
 tags: [tool-contract, versioning, plugins, fitness, graph, simulation, compatibility, architecture]
 enforcement: mechanizable

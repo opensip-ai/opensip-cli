@@ -67,6 +67,7 @@ describe('loadToolManifest — capabilities slot', () => {
         {
           id: 'audit-rule',
           apiVersion: 1,
+          minSupportedApiVersion: 1,
           contributionSchema: { requiredKeys: ['id', 'name'] },
           contributionKind: 'module-export',
         },
@@ -78,6 +79,7 @@ describe('loadToolManifest — capabilities slot', () => {
       {
         id: 'audit-rule',
         apiVersion: 1,
+        minSupportedApiVersion: 1,
         contributionSchema: { requiredKeys: ['id', 'name'] },
         contributionKind: 'module-export',
       },
@@ -108,11 +110,48 @@ describe('loadToolManifest — capabilities slot', () => {
     expect(loadToolManifest('installed', testDir)).toBeUndefined();
   });
 
+  it('rejects a capability declaration missing minSupportedApiVersion', () => {
+    writePackageManifest(
+      testDir,
+      fixturePackageJson([
+        {
+          id: 'audit-rule',
+          apiVersion: 1,
+          contributionSchema: {},
+          contributionKind: 'module-export',
+        },
+      ]),
+    );
+    expect(loadToolManifest('installed', testDir)).toBeUndefined();
+  });
+
+  it('rejects minSupportedApiVersion greater than apiVersion', () => {
+    writePackageManifest(
+      testDir,
+      fixturePackageJson([
+        {
+          id: 'audit-rule',
+          apiVersion: 1,
+          minSupportedApiVersion: 2,
+          contributionSchema: {},
+          contributionKind: 'module-export',
+        },
+      ]),
+    );
+    expect(loadToolManifest('installed', testDir)).toBeUndefined();
+  });
+
   it('rejects an unknown contributionKind', () => {
     writePackageManifest(
       testDir,
       fixturePackageJson([
-        { id: 'x', apiVersion: 1, contributionSchema: {}, contributionKind: 'nope' },
+        {
+          id: 'x',
+          apiVersion: 1,
+          minSupportedApiVersion: 1,
+          contributionSchema: {},
+          contributionKind: 'nope',
+        },
       ]),
     );
     expect(loadToolManifest('installed', testDir)).toBeUndefined();
@@ -127,6 +166,7 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
         {
           id: 'audit-rule',
           apiVersion: 2,
+          minSupportedApiVersion: 1,
           contributionSchema: { requiredKeys: ['id'] },
           contributionKind: 'module-export',
         },
@@ -146,12 +186,14 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
         id: 'audit-rule',
         ownerToolId: 'audit', // stamped from manifest.id
         apiVersion: 2,
+        minSupportedApiVersion: 1,
         contributionSchema: { requiredKeys: ['id'] },
         contributionKind: 'module-export',
       },
     ]);
     expect(registry.hasDomain('audit-rule')).toBe(true);
     expect(registry.getDomain('audit-rule')?.ownerToolId).toBe('audit');
+    expect(registry.getDomain('audit-rule')?.minSupportedApiVersion).toBe(1);
   });
 
   it('emits a structured capability.domain.from_manifest evt per domain', () => {
@@ -159,8 +201,20 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
     writePackageManifest(
       testDir,
       fixturePackageJson([
-        { id: 'd1', apiVersion: 1, contributionSchema: {}, contributionKind: 'file' },
-        { id: 'd2', apiVersion: 1, contributionSchema: {}, contributionKind: 'manifest-entry' },
+        {
+          id: 'd1',
+          apiVersion: 1,
+          minSupportedApiVersion: 1,
+          contributionSchema: {},
+          contributionKind: 'file',
+        },
+        {
+          id: 'd2',
+          apiVersion: 1,
+          minSupportedApiVersion: 1,
+          contributionSchema: {},
+          contributionKind: 'manifest-entry',
+        },
       ]),
     );
     const manifest = loadAdmittedManifest();
@@ -172,6 +226,7 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
     expect(evts).toHaveLength(2);
     expect(evts.map((e) => e.domainId)).toEqual(['d1', 'd2']);
     expect(evts.every((e) => e.ownerToolId === 'audit')).toBe(true);
+    expect(evts.every((e) => e.minSupportedApiVersion === 1)).toBe(true);
   });
 
   it('registers nothing for a manifest without capabilities', () => {
@@ -199,6 +254,7 @@ describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstr
         {
           id: 'audit-rule',
           apiVersion: 1,
+          minSupportedApiVersion: 1,
           contributionSchema: {},
           contributionKind: 'module-export',
         },

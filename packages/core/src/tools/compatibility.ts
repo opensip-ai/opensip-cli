@@ -3,8 +3,8 @@
  *
  * One decision function the bundled and external admission paths share
  * (north-star §5.2): given the epoch a tool was compiled against
- * (`apiVersion`) and the epoch the engine implements
- * (`PLUGIN_API_VERSION`), return a `CompatibilityVerdict` — pure data.
+ * (`apiVersion`) and the supported plugin-API epoch range the engine
+ * implements, return a `CompatibilityVerdict` — pure data.
  * The loader (Phase 2) and CLI (Phase 3) act on the verdict; this module
  * never logs, never exits, never touches the filesystem.
  *
@@ -12,12 +12,24 @@
  *   - `apiVersion` omitted ⇒ **incompatible**. A tool MUST declare the epoch
  *     it was compiled against; an unversioned plugin input is no longer admitted
  *     (north-star Principle 5 — version the inputs).
- *   - `apiVersion === engine` ⇒ compatible.
+ *   - `MIN_SUPPORTED_PLUGIN_API_VERSION <= apiVersion <= PLUGIN_API_VERSION`
+ *     ⇒ compatible.
  *   - otherwise ⇒ incompatible, carrying both integers + a human reason
  *     (future vs. past epoch).
  */
 
-import { PLUGIN_API_VERSION } from './manifest.js';
+import { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from './manifest.js';
+
+const DEFAULT_PLUGIN_API_RANGE: PluginApiCompatibilityRange = {
+  minSupported: MIN_SUPPORTED_PLUGIN_API_VERSION,
+  current: PLUGIN_API_VERSION,
+};
+
+/** The supported plugin-API epoch range the engine implements. */
+export interface PluginApiCompatibilityRange {
+  readonly minSupported: number;
+  readonly current: number;
+}
 
 /**
  * The outcome of the compatibility gate — pure data the caller acts on.
@@ -31,43 +43,64 @@ export type CompatibilityVerdict =
   | {
       readonly kind: 'incompatible';
       readonly declared: number;
+      readonly minSupported: number;
       readonly engine: number;
       readonly reason: string;
     };
 
 /**
  * Decide whether a tool declaring `apiVersion` is compatible with the
- * engine epoch.
+ * engine's supported plugin-API epoch range.
  *
  * @param apiVersion The epoch the tool was compiled against, or `undefined`
  *   (a missing epoch is incompatible).
- * @param engine The epoch the running engine implements. Defaults to
- *   `PLUGIN_API_VERSION`; overridable for tests / as-if-external probes.
+ * @param range The supported epoch range. Defaults to
+ *   `[MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION]`; overridable for
+ *   tests / as-if-external probes.
  * @returns A `CompatibilityVerdict` — never throws.
  */
 export function checkCompatibility(
   apiVersion: number | undefined,
-  engine: number = PLUGIN_API_VERSION,
+  range: PluginApiCompatibilityRange = DEFAULT_PLUGIN_API_RANGE,
 ): CompatibilityVerdict {
+  const { minSupported, current } = range;
+
+  if (minSupported > current) {
+    return {
+      kind: 'incompatible',
+      declared: apiVersion ?? Number.NaN,
+      minSupported,
+      engine: current,
+      reason: `engine plugin API range is misconfigured (${minSupported}..${current}); minSupported must be <= current`,
+    };
+  }
+
   // A tool that declares no `apiVersion` is incompatible: unversioned plugin
   // input is not admitted off the marker alone.
   if (apiVersion === undefined) {
     return {
       kind: 'incompatible',
       declared: Number.NaN,
-      engine,
-      reason: `tool declares no plugin apiVersion; declare \`apiVersion: ${engine}\` in its manifest`,
+      minSupported,
+      engine: current,
+      reason: `tool declares no plugin apiVersion; declare \`apiVersion\` in the supported range ${minSupported}..${current}`,
     };
   }
 
-  if (apiVersion === engine) {
+  if (apiVersion >= minSupported && apiVersion <= current) {
     return { kind: 'compatible' };
   }
 
   const reason =
-    apiVersion > engine
-      ? `tool targets plugin API v${apiVersion} but this engine implements v${engine}; upgrade OpenSIP CLI to load it`
-      : `tool targets plugin API v${apiVersion} which this engine (v${engine}) no longer supports; upgrade the tool`;
+    apiVersion > current
+      ? `tool targets plugin API v${apiVersion} but this engine supports v${minSupported}..v${current}; upgrade OpenSIP CLI to load it`
+      : `tool targets plugin API v${apiVersion} which is below the supported range v${minSupported}..v${current}; upgrade the tool`;
 
-  return { kind: 'incompatible', declared: apiVersion, engine, reason };
+  return {
+    kind: 'incompatible',
+    declared: apiVersion,
+    minSupported,
+    engine: current,
+    reason,
+  };
 }

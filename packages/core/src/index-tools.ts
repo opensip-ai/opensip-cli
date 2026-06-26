@@ -51,7 +51,7 @@ export type {
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
 // (launch raw-vs-admitted contract). Re-exported by @opensip-cli/
 // contracts for the public surface.
-export { PLUGIN_API_VERSION } from './tools/index.js';
+export { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from './tools/index.js';
 export type {
   RawToolPluginManifest,
   ToolPluginManifest,

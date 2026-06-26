@@ -33,7 +33,7 @@ export { TOOL_CONTRACT_VERSION } from './types.js';
 export { ToolRegistry } from './registry.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
 // (launch raw-vs-admitted contract).
-export { PLUGIN_API_VERSION } from './manifest.js';
+export { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from './manifest.js';
 // Command-plane types (launch, §5.4): the declarative command surface a
 // tool exports for the host to mount, plus the CommonFlagKey key type (the pure
 // type lives in core; the Commander-touching applyCommonFlags runtime stays in
@@ -97,7 +97,7 @@ export type {
 // The single pure compatibility gate shared by the bundled + external
 // admission paths.
 export { checkCompatibility } from './compatibility.js';
-export type { CompatibilityVerdict } from './compatibility.js';
+export type { CompatibilityVerdict, PluginApiCompatibilityRange } from './compatibility.js';
 // Load-time manifest⇔Tool drift guard.
 export { assertManifestMatchesTool } from './manifest-assert.js';
 export {

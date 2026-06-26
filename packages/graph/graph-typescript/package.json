@@ -33,7 +33,9 @@
     "NOTICE"
   ],
   "opensipTools": {
-    "kind": "graph-adapter"
+    "kind": "graph-adapter",
+    "targetDomain": "graph-adapter",
+    "targetDomainApiVersion": 1
   },
   "scripts": {
     "build": "tsc",

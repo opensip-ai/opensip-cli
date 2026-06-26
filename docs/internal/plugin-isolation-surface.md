@@ -21,16 +21,18 @@ ADR-0061 wins.
 | Surface | Default admission | Process boundary | Ambient authority | Compat policy | Provenance / verify | Docs warning |
 | --- | --- | --- | --- | --- | --- | --- |
 | **Bundled tools** (fit / graph / sim / yagni) | Trusted (manifest) | In-process (TTY-live forks for UX) | Full host — *is* the TCB | Co-built, always matches | First-party, `--provenance` | n/a (trusted core) |
-| **Installed npm tools** (whole Tool) | Deny-by-default (`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`; `*` footgun) | Worker fork (ADR-0054) | Full **user** privilege — fault-isolated, **NOT** capability-isolated | Exact-epoch (`===`) | Publish-side ships; consumption-side missing | Yes — "runs at full privilege" |
-| **Project-local authored** (sidecar) | Deny-by-default (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`; `*`) | Worker fork | Full user privilege | Exact-epoch | Authored content, no verify | Yes — clone-risk |
-| **User-global authored** (`~/.opensip-cli/tools/`) | **Trusted-by-location** (loads w/o allowlist) | Worker fork | Full user privilege | Exact-epoch | Location = trust, no verify | Yes — trust ≠ sandbox |
-| **Bundled capability packs** (`checks-*`, `graph-*`) | Trusted (bundled) | **In-process** (`capability-discovery.ts:307`) | Full host — grows the TCB | Co-built | First-party | Bundled-TCB governance |
-| **External / custom capability packs** (custom checks, graph adapters) | Listed in `plugins.<domain>` | **In-process — NO worker** | Full host; can crash host; full authority | Descriptor-level | No verify | Yes — strongest gap |
+| **Installed npm tools** (whole Tool) | Deny-by-default (`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`; `*` footgun) | Worker fork (ADR-0054) | Full **user** privilege — fault-isolated, **NOT** capability-isolated | Bounded integer epoch (`MIN..PLUGIN_API_VERSION`, ADR-0074) | Publish-side ships; consumption-side missing | Yes — "runs at full privilege" |
+| **Project-local authored** (sidecar) | Deny-by-default (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`; `*`) | Worker fork | Full user privilege | Bounded integer epoch (current-epoch source, not package artifacts) | Authored content, no verify | Yes — clone-risk |
+| **User-global authored** (`~/.opensip-cli/tools/`) | **Trusted-by-location** (loads w/o allowlist) | Worker fork | Full user privilege | Bounded integer epoch | Location = trust, no verify | Yes — trust ≠ sandbox |
+| **Bundled capability packs** (`checks-*`, `graph-*`) | Trusted (bundled) | **In-process** (`capability-discovery.ts:307`) | Full host — grows the TCB | Target domain epoch (`targetDomain` + `targetDomainApiVersion`) | First-party | Bundled-TCB governance |
+| **External / custom capability packs** (custom checks, graph adapters) | Listed in `plugins.<domain>` | **In-process — NO worker** | Full host; can crash host; full authority | Target domain epoch gate (compatibility ≠ isolation) | No verify | Yes — strongest gap |
 
 **In-process capability-pack gap:** external custom checks and graph adapters load via
 `await import(...)` at `packages/core/src/plugins/capability-discovery.ts:307` with
 per-package try/catch skip-never-throw — import-error isolation only, no worker
-boundary. The "external isolation" story does **not** cover the most common extension.
+boundary. ADR-0074 adds target-domain epoch compatibility before routing; it does
+**not** add capability isolation. The "external isolation" story does **not** cover
+the most common extension.
 
 ## Shipped (M4-E / M4-F / M4-G)
 

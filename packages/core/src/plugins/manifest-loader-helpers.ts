@@ -189,25 +189,34 @@ const CONTRIBUTION_KINDS: readonly CapabilityContributionKind[] = [
   'file',
 ];
 
+function parseCapabilityEntry(entry: unknown): ToolCapabilityDeclaration | undefined {
+  if (!isRecord(entry)) return undefined;
+  if (typeof entry.id !== 'string' || entry.id === '') return undefined;
+  if (typeof entry.apiVersion !== 'number') return undefined;
+  if (typeof entry.minSupportedApiVersion !== 'number') return undefined;
+  if (entry.minSupportedApiVersion > entry.apiVersion) return undefined;
+  const kind = entry.contributionKind;
+  if (!isContributionKind(kind)) return undefined;
+  const discovery = normalizeDiscovery(entry.discovery);
+  if (discovery.status === 'invalid') return undefined;
+  return {
+    id: entry.id,
+    apiVersion: entry.apiVersion,
+    minSupportedApiVersion: entry.minSupportedApiVersion,
+    contributionSchema: entry.contributionSchema,
+    contributionKind: kind,
+    ...(discovery.status === 'ok' ? { discovery: discovery.descriptor } : {}),
+  };
+}
+
 function normalizeCapabilities(value: unknown): readonly ToolCapabilityDeclaration[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: ToolCapabilityDeclaration[] = [];
   // Small per-plugin manifest list (batch limit irrelevant).
   for (const entry of value) {
-    if (!isRecord(entry)) return undefined;
-    if (typeof entry.id !== 'string' || entry.id === '') return undefined;
-    if (typeof entry.apiVersion !== 'number') return undefined;
-    const kind = entry.contributionKind;
-    if (!isContributionKind(kind)) return undefined;
-    const discovery = normalizeDiscovery(entry.discovery);
-    if (discovery.status === 'invalid') return undefined;
-    out.push({
-      id: entry.id,
-      apiVersion: entry.apiVersion,
-      contributionSchema: entry.contributionSchema,
-      contributionKind: kind,
-      ...(discovery.status === 'ok' ? { discovery: discovery.descriptor } : {}),
-    });
+    const parsed = parseCapabilityEntry(entry);
+    if (parsed === undefined) return undefined;
+    out.push(parsed);
   }
   return out;
 }

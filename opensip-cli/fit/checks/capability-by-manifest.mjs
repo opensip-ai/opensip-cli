@@ -87,7 +87,7 @@ export function analyzeCapabilityByManifest(content, filePath) {
       severity: 'error',
       suggestion:
         `Declare the domain in the owning tool's manifest ` +
-        `(package.json#opensipTools.capabilities: [{ id, apiVersion, contributionKind, contributionSchema }]) ` +
+        `(package.json#opensipTools.capabilities: [{ id, apiVersion, minSupportedApiVersion, contributionKind, contributionSchema }]) ` +
         `and let registerCapabilityDomainsFromManifest register it; supply the runtime ` +
         `registrar via Tool.capabilityRegistrars. MARKER_KINDS is the only allowed ` +
         `bootstrap default — a new domain is DATA, not a host enum/literal.`,

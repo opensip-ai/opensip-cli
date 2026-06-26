@@ -167,7 +167,9 @@ export const graphTool: Tool = defineTool({
   },
   commandSpecs: graphCommandSpecs,
   extensionPoints: {
-    graphContractVersion: GRAPH_CONTRACT_VERSION,
+    contractVersions: {
+      graph: GRAPH_CONTRACT_VERSION,
+    },
     contributeScope: graphScope.contributeScope,
     collectReportData,
     sessionReplay: {

@@ -28,6 +28,7 @@
       {
         "id": "extdispatch-domain",
         "apiVersion": 1,
+        "minSupportedApiVersion": 1,
         "contributionKind": "module-export",
         "contributionSchema": {
           "requiredKeys": [

@@ -38,7 +38,7 @@ const VERSION_DEF = /([A-Z_]+CONTRACT_VERSION)\s*=\s*['"][^'"]+['"]/;
  * change to any contract version constant is traceable.
  */
 const POLICY_REFERENCE =
-  /(ADR-0046|ADR-0047|Tool Contract Versioning Policy|per-tool contract versioning)/i;
+  /(ADR-0046|ADR-0047|ADR-0074|Tool Contract Versioning Policy|per-tool contract versioning|open domain contract versions)/i;
 
 /**
  * How many lines upward we look for the policy reference in comments.
@@ -65,9 +65,9 @@ export function analyzeToolContractVersionPolicy(content, _filePath) {
     if (!POLICY_REFERENCE.test(window)) {
       violations.push({
         message:
-          `${constName} definition is missing a reference to ADR-0046 or ADR-0047 ` +
+          `${constName} definition is missing a reference to ADR-0046, ADR-0047, or ADR-0074 ` +
           '(or the "Tool Contract Versioning Policy" / "per-tool contract versioning"). ' +
-          'Per ADR-0046/0047, changes to any contract version constant must be ' +
+          'Per ADR-0046/0047/0074, changes to any contract version constant must be ' +
           'accompanied by an update to the relevant ADR (or a superseding ADR) and ' +
           'an explicit reference in the comment/JSDoc immediately above the definition.',
         severity: 'error',

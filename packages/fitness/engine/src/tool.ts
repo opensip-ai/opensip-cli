@@ -250,7 +250,9 @@ export const fitnessTool: Tool = defineTool({
   pluginLayout: { userSubdirs: FIT_PLUGIN_LAYOUT.userSubdirs },
   commandSpecs: fitCommandSpecs,
   extensionPoints: {
-    fitnessContractVersion: FITNESS_CONTRACT_VERSION,
+    contractVersions: {
+      fitness: FITNESS_CONTRACT_VERSION,
+    },
     contributeScope,
     collectReportData: collectFitnessReportData,
     sessionReplay: {

@@ -223,7 +223,8 @@
               "domainId": "fit-recipe"
             }
           ]
-        }
+        },
+        "minSupportedApiVersion": 1
       },
       {
         "id": "fit-recipe",
@@ -234,7 +235,8 @@
             "id",
             "name"
           ]
-        }
+        },
+        "minSupportedApiVersion": 1
       }
     ],
     "pluginLayout": {

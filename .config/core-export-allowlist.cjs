@@ -205,6 +205,7 @@ const EXPORT_ALLOWLIST = {
   NestedCommandSpecDraft: 'tool-plugin-contract',
   OptionSpec: 'tool-plugin-contract',
   PrimaryCommandSpecDraft: 'tool-plugin-contract',
+  MIN_SUPPORTED_PLUGIN_API_VERSION: 'tool-plugin-contract',
   PLUGIN_API_VERSION: 'tool-plugin-contract',
   PatternSelector: 'tool-plugin-contract',
   RAW_STREAM_REASONS: 'tool-plugin-contract',

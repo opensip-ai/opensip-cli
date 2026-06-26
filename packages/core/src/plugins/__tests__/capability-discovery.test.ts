@@ -73,6 +73,39 @@ afterEach(() => {
 });
 
 describe('discoverCapabilityContributions — marker mode', () => {
+  it('carries package target metadata on discovered contributions', async () => {
+    const dir = join(testDir, 'node_modules', '@acme/items-meta');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/items-meta',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: {
+          kind: 'items-pack',
+          targetDomain: 'items',
+          targetDomainApiVersion: 1,
+        },
+      }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), `export const items = [{ id: 'meta' }];\n`);
+
+    const contributions = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+    });
+
+    expect(contributions).toEqual([
+      {
+        contribution: { id: 'meta' },
+        sourcePackage: '@acme/items-meta',
+        packageTargetDomain: 'items',
+        packageTargetDomainApiVersion: 1,
+      },
+    ]);
+  });
+
   it('finds a marker package and spreads its array export, tagged by source', async () => {
     writeFixturePackage({
       relDir: 'node_modules/@acme/items-a',

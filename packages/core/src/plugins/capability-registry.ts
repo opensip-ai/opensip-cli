@@ -349,6 +349,7 @@ export function registerCapabilityDomainsFromManifest(
       // declare no `stableId` (where `metadata.id` is still the human id).
       ownerToolId: manifest.stableId ?? manifest.id,
       apiVersion: decl.apiVersion,
+      minSupportedApiVersion: decl.minSupportedApiVersion,
       contributionSchema: decl.contributionSchema,
       contributionKind: decl.contributionKind,
       // Carry the discovery descriptor onto the spec so the scope-owned capability
@@ -363,6 +364,7 @@ export function registerCapabilityDomainsFromManifest(
       domainId: spec.id,
       ownerToolId: spec.ownerToolId,
       apiVersion: spec.apiVersion,
+      minSupportedApiVersion: spec.minSupportedApiVersion,
       contributionKind: spec.contributionKind,
     });
     registered.push(spec);

@@ -173,9 +173,8 @@ function analyzePackageManifest(pkg, filePath) {
         ),
       );
     }
-    const actualIds = stringSet(
-      (Array.isArray(block.capabilities) ? block.capabilities : []).map((c) => c?.id),
-    );
+    const capabilities = Array.isArray(block.capabilities) ? block.capabilities : [];
+    const actualIds = stringSet(capabilities.map((c) => c?.id));
     for (const capabilityId of expectedCapabilityIds(pkg.name)) {
       if (!actualIds.has(capabilityId)) {
         violations.push(
@@ -189,7 +188,76 @@ function analyzePackageManifest(pkg, filePath) {
         );
       }
     }
+    for (const capability of capabilities) {
+      if (!jsonObject(capability)) continue;
+      const capabilityId =
+        typeof capability.id === 'string' ? capability.id : '<unknown-capability>';
+      if (typeof capability.apiVersion !== 'number') {
+        violations.push(
+          violation(
+            filePath,
+            1,
+            'tool-manifest-capability-api-version-missing',
+            `${rel}: capability '${capabilityId}' must declare numeric apiVersion.`,
+            'Capability domains declare a current contribution-contract epoch in the manifest (ADR-0074).',
+          ),
+        );
+      }
+      if (typeof capability.minSupportedApiVersion !== 'number') {
+        violations.push(
+          violation(
+            filePath,
+            1,
+            'tool-manifest-capability-min-supported-missing',
+            `${rel}: capability '${capabilityId}' must declare numeric minSupportedApiVersion.`,
+            'Capability domains declare the oldest accepted contribution epoch in the manifest (ADR-0074).',
+          ),
+        );
+      }
+      if (
+        typeof capability.apiVersion === 'number' &&
+        typeof capability.minSupportedApiVersion === 'number' &&
+        capability.minSupportedApiVersion > capability.apiVersion
+      ) {
+        violations.push(
+          violation(
+            filePath,
+            1,
+            'tool-manifest-capability-range-invalid',
+            `${rel}: capability '${capabilityId}' has minSupportedApiVersion > apiVersion.`,
+            'Keep minSupportedApiVersion <= apiVersion for each declared capability domain.',
+          ),
+        );
+      }
+    }
   }
+
+  if (expectedKind === 'fit-pack' || expectedKind === 'graph-adapter') {
+    const expectedTargetDomain = expectedKind;
+    if (typeof block.targetDomain !== 'string' || block.targetDomain !== expectedTargetDomain) {
+      violations.push(
+        violation(
+          filePath,
+          1,
+          'capability-pack-target-domain-missing',
+          `${rel}: ${pkg.name} must declare opensipTools.targetDomain='${expectedTargetDomain}'.`,
+          'Contribution packages declare their target domain for epoch compatibility (ADR-0074).',
+        ),
+      );
+    }
+    if (typeof block.targetDomainApiVersion !== 'number') {
+      violations.push(
+        violation(
+          filePath,
+          1,
+          'capability-pack-target-epoch-missing',
+          `${rel}: ${pkg.name} must declare numeric opensipTools.targetDomainApiVersion.`,
+          'Contribution packages declare the domain API epoch they target (ADR-0074).',
+        ),
+      );
+    }
+  }
+
   return violations;
 }
 

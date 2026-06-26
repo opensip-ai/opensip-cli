@@ -37,13 +37,23 @@ import type { ToolConfigManifestDescriptor } from './manifest-config.js';
 import type { PluginLayout } from '../plugins/types.js'; // leaf import — manifest must not pull the plugins barrel
 
 /**
+ * The oldest plugin-API epoch this engine still admits.
+ *
+ * A coarse integer, bumped only when the host drops support for older
+ * manifest epochs. A tool manifest is accepted when
+ * `MIN_SUPPORTED_PLUGIN_API_VERSION <= apiVersion <= PLUGIN_API_VERSION`.
+ */
+export const MIN_SUPPORTED_PLUGIN_API_VERSION = 1;
+
+/**
  * The plugin-API epoch the running engine implements.
  *
  * A coarse integer, bumped only on a breaking change to the plugin
  * *input* contract. A tool manifest's `apiVersion` is compared against
- * this single value by `checkCompatibility()`. A missing `apiVersion`
- * is incompatible as of launch; raw manifests stay representable so the
- * admission gate can diagnose unversioned inputs before rejecting them.
+ * the supported range `[MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION]`
+ * by `checkCompatibility()`. A missing `apiVersion` is incompatible as of
+ * launch; raw manifests stay representable so the admission gate can
+ * diagnose unversioned inputs before rejecting them.
  */
 export const PLUGIN_API_VERSION = 1;
 

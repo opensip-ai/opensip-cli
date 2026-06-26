@@ -28,7 +28,9 @@
     ".": "./dist/index.js"
   },
   "opensipTools": {
-    "kind": "graph-adapter"
+    "kind": "graph-adapter",
+    "targetDomain": "graph-adapter",
+    "targetDomainApiVersion": 1
   },
   "files": [
     "dist",

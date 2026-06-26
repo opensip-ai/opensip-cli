@@ -102,17 +102,21 @@ The side-effect import is intentional: it makes `scope.audit` visible to the
 TypeScript compiler wherever the tool entry is loaded. First-party tools use the
 same pattern in their `tool.ts` entry modules.
 
-### Tool contract versions (ADR-0046 / ADR-0047)
+### Tool contract versions (ADR-0046 / ADR-0074)
 
 The core `TOOL_CONTRACT_VERSION` (exported from `@opensip-cli/core`) is a marker for the generic `Tool` / `ToolExtensionPoints` / `ToolCliContext` "bus" surface. It is bumped **only** on actual changes to that surface and takes the major.minor of the CLI release that ships the change (it deliberately lags ordinary CLI releases).
 
-Each tool also has (or will have) its own independent contract version for its rich domain surface:
-- `FITNESS_CONTRACT_VERSION` (checks, recipes, defineCheck API, pack loading, etc.)
-- `GRAPH_CONTRACT_VERSION`, `SIMULATION_CONTRACT_VERSION`, etc.
+Each tool also exports its own independent contract version constant for its rich domain surface (`FITNESS_CONTRACT_VERSION`, `GRAPH_CONTRACT_VERSION`, `SIMULATION_CONTRACT_VERSION`, …). Runtime descriptors publish these through the open map:
 
-These per-tool versions are declared on the tool's `Tool` object (typically under `extensionPoints`) and follow the same ADR-driven bumping policy. They let a change to, say, the fitness check API evolve without forcing a bump to the core Tool contract or affecting graph/sim authors.
+```ts
+extensionPoints: {
+  contractVersions: {
+    fitness: FITNESS_CONTRACT_VERSION,
+  },
+}
+```
 
-See ADR-0046 (core) and ADR-0047 (per-tool) for the full rules, and the JSDoc on the constants themselves. Tool authors extending a specific tool can pin against the relevant per-tool version for compatibility.
+Keys are stable domain ids (`fitness`, `graph`, `simulation`, `yagni`, …). Core does not validate domain-specific version semantics. See ADR-0046 (core), ADR-0074 (open map + epoch ranges), and the JSDoc on each constant.
 
 ### The `ToolCliContext` shape
 
@@ -167,8 +171,9 @@ The flow lives in [`packages/cli/src/bootstrap/register-tools.ts`](https://githu
 
 4. admitTool gates every candidate:
    - apiVersion check (compatibility.ts): a tool that declares no `apiVersion`
-     is INCOMPATIBLE and not admitted; a mismatched epoch is rejected with an
-     upgrade hint.
+     is INCOMPATIBLE and not admitted; an epoch outside
+     `MIN_SUPPORTED_PLUGIN_API_VERSION..PLUGIN_API_VERSION` is rejected with an
+     upgrade hint (too old → upgrade the tool; too new → upgrade OpenSIP CLI).
    - assertManifestMatchesTool (manifest-assert.ts): the static manifest's
      `id` + command-name SET must equal the imported Tool's — a typed throw
      on drift, so a half-renamed command fails fast.

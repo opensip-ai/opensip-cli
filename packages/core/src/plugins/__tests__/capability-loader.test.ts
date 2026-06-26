@@ -27,6 +27,7 @@ function itemsDomain(overrides: Partial<CapabilityDomainSpec> = {}): CapabilityD
     id: 'items',
     ownerToolId: 'items-tool',
     apiVersion: 1,
+    minSupportedApiVersion: 1,
     contributionSchema: undefined,
     contributionKind: 'module-export',
     discovery: ITEMS_DISCOVERY,
@@ -35,7 +36,11 @@ function itemsDomain(overrides: Partial<CapabilityDomainSpec> = {}): CapabilityD
 }
 
 /** Write a marker fixture package exporting `items = <source>`. */
-function writeItemsPackage(name: string, source: string): void {
+function writeItemsPackage(
+  name: string,
+  source: string,
+  target: { readonly domain?: string; readonly apiVersion?: number } = {},
+): void {
   const dir = join(testDir, 'node_modules', name);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -44,7 +49,11 @@ function writeItemsPackage(name: string, source: string): void {
       name,
       type: 'module',
       main: './index.mjs',
-      opensipTools: { kind: 'items-pack' },
+      opensipTools: {
+        kind: 'items-pack',
+        targetDomain: target.domain ?? 'items',
+        targetDomainApiVersion: target.apiVersion ?? 1,
+      },
     }),
   );
   writeFileSync(join(dir, 'index.mjs'), `export const items = ${source};\n`);
@@ -136,6 +145,44 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     expect(errors).toEqual([]);
     expect(registrar).not.toHaveBeenCalled();
     expect(registry.isDomainLoaded('items', testDir)).toBe(true);
+  });
+
+  it('captures incompatible package target metadata without routing', async () => {
+    writeItemsPackage('@acme/items-old', "[{ id: 'old' }]", { apiVersion: 0 });
+    const registrar = vi.fn();
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(itemsDomain(), registrar);
+
+    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+
+    expect(registrar).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('supported range is 1..1');
+  });
+
+  it('captures missing package target metadata as a load error', async () => {
+    const dir = join(testDir, 'node_modules', '@acme/items-bare');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/items-bare',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: { kind: 'items-pack' },
+      }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), `export const items = [{ id: 'bare' }];\n`);
+
+    const registrar = vi.fn();
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(itemsDomain(), registrar);
+
+    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+
+    expect(registrar).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('missing opensipTools.targetDomain');
   });
 
   it('emits a capability.<domain>.loaded diagnostics event on the scope bus', async () => {

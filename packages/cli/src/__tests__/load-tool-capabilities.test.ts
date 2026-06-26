@@ -33,6 +33,7 @@ function domain(id: string, ownerToolId: string, marker: string): CapabilityDoma
     id,
     ownerToolId,
     apiVersion: 1,
+    minSupportedApiVersion: 1,
     contributionSchema: undefined,
     contributionKind: 'module-export',
     discovery: {
@@ -45,7 +46,11 @@ function domain(id: string, ownerToolId: string, marker: string): CapabilityDoma
 }
 
 /** Write an explicit capability package that has no discovery marker. */
-function writeExplicitAdapterPackage(name: string, exportSource: string): void {
+function writeExplicitAdapterPackage(
+  name: string,
+  exportSource: string,
+  targetDomain = 'mine',
+): void {
   const dir = join(testDir, 'node_modules', name);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -54,6 +59,10 @@ function writeExplicitAdapterPackage(name: string, exportSource: string): void {
       name,
       type: 'module',
       main: './index.mjs',
+      opensipTools: {
+        targetDomain,
+        targetDomainApiVersion: 1,
+      },
     }),
   );
   writeFileSync(join(dir, 'index.mjs'), `export const adapter = ${exportSource};\n`);
@@ -137,6 +146,7 @@ describe('loadOwningToolCapabilities', () => {
       id: 'nodisco',
       ownerToolId: 'mytool',
       apiVersion: 1,
+      minSupportedApiVersion: 1,
       contributionSchema: undefined,
       contributionKind: 'module-export',
     };

@@ -149,6 +149,11 @@ export interface CapabilityDomainSpec {
    */
   readonly apiVersion: number;
   /**
+   * Oldest contribution-target epoch this domain still accepts. Invariant:
+   * `minSupportedApiVersion <= contributionTargetApiVersion <= apiVersion`.
+   */
+  readonly minSupportedApiVersion: number;
+  /**
    * The contract a contribution must satisfy. `unknown` at the kernel
    * layer — the host validates it structurally (a shallow required-keys
    * record, see {@link StructuralContributionSchema}) or via an
@@ -182,6 +187,11 @@ export interface ToolCapabilityDeclaration {
   readonly id: string;
   /** Contribution-contract epoch for this domain. */
   readonly apiVersion: number;
+  /**
+   * Oldest contribution-target epoch this domain still accepts. Invariant:
+   * `minSupportedApiVersion <= contributionTargetApiVersion <= apiVersion`.
+   */
+  readonly minSupportedApiVersion: number;
   /** The contribution contract (structural record or validator). `unknown` in core. */
   readonly contributionSchema: unknown;
   /** How contributions to this domain are delivered. */

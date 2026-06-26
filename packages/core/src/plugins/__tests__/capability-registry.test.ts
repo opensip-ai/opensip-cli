@@ -26,6 +26,7 @@ function domain(overrides: Partial<CapabilityDomainSpec> = {}): CapabilityDomain
     id: 'audit-rule',
     ownerToolId: 'audit',
     apiVersion: 1,
+    minSupportedApiVersion: 1,
     contributionSchema: { requiredKeys: ['id', 'name'] },
     contributionKind: 'module-export',
     ...overrides,

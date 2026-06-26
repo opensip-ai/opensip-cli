@@ -130,6 +130,10 @@ function assertSessionReplayLayout(tool: Tool, runtimeIdentity: NormalizedToolId
 /**
  * Assert that a static `ToolPluginManifest` matches the runtime `Tool` it
  * declares.
+ *
+ * Runtime-only descriptor data such as `extensionPoints.contractVersions` is
+ * intentionally out of scope — manifests carry admission facts, not per-domain
+ * string contract markers (ADR-0074).
  */
 export function assertManifestMatchesTool(manifest: ToolPluginManifest, tool: Tool): void {
   const manifestIdentity = validateToolIdentity(manifest.identity);

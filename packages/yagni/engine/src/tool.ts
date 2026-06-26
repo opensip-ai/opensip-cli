@@ -33,7 +33,9 @@ export const yagniTool: Tool = defineTool({
   },
   commandSpecs: [buildYagniCommandSpec(setUpYagniLiveView)],
   extensionPoints: {
-    yagniContractVersion: YAGNI_CONTRACT_VERSION,
+    contractVersions: {
+      yagni: YAGNI_CONTRACT_VERSION,
+    },
     config: {
       schema: yagniConfigDeclaration.schema,
       defaults: yagniConfigDeclaration.defaults,

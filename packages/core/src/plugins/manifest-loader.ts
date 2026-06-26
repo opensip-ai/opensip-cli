@@ -39,7 +39,6 @@
 
 import { logger } from '../lib/logger.js';
 import { checkCompatibility, type CompatibilityVerdict } from '../tools/compatibility.js';
-import { PLUGIN_API_VERSION } from '../tools/manifest.js';
 
 import {
   diagnose,
@@ -162,10 +161,10 @@ export function admitTool(args: {
 
   const verdict = checkCompatibility(manifest.apiVersion);
 
-  if (verdict.kind === 'compatible') {
+  if (verdict.kind === 'compatible' && typeof manifest.apiVersion === 'number') {
     const admittedManifest: ToolPluginManifest = {
       ...manifest,
-      apiVersion: manifest.apiVersion ?? PLUGIN_API_VERSION,
+      apiVersion: manifest.apiVersion,
     };
     logger.info({
       evt: 'plugin.manifest.loaded',
@@ -185,6 +184,15 @@ export function admitTool(args: {
     };
   }
 
+  if (verdict.kind !== 'incompatible') {
+    const diagnostic =
+      'tool declares no plugin apiVersion; declare `apiVersion` in the supported plugin API range';
+    if (explicitlyRequested) {
+      return { decision: 'fail-closed', provenance, verdict, diagnostic };
+    }
+    return { decision: 'skip', provenance, verdict, diagnostic };
+  }
+
   const diagnostic = verdict.reason;
   if (explicitlyRequested) {
     logger.error({
@@ -193,6 +201,7 @@ export function admitTool(args: {
       id: manifest.id,
       source,
       apiVersion: verdict.declared,
+      minSupportedPluginApiVersion: verdict.minSupported,
       engine: verdict.engine,
       manifestHash,
       decision: 'fail-closed',
@@ -207,6 +216,7 @@ export function admitTool(args: {
     id: manifest.id,
     source,
     apiVersion: verdict.declared,
+    minSupportedPluginApiVersion: verdict.minSupported,
     engine: verdict.engine,
     manifestHash,
     decision: 'skip',

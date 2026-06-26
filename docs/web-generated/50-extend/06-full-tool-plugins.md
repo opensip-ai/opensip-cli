@@ -71,9 +71,10 @@ The `opensipTools` block is your tool's **static manifest** — read before your
 - **`kind: "tool"`** — the marker that makes the CLI discover your package.
 - **`id`** — your canonical human key; must equal `identity.name` and runtime `tool.metadata.name`.
 - **`identity`** — the single source for the primary command, aliases, config namespace, and layout key.
-- **`apiVersion`** — the plugin-API epoch you target (currently `1`). A tool
-  that declares no `apiVersion` is not admitted (it fail-closes when run
-  explicitly, or is skipped with a diagnostic when discovered).
+- **`apiVersion`** — the plugin-API epoch you declare. The host admits manifests
+  when `MIN_SUPPORTED_PLUGIN_API_VERSION <= apiVersion <= PLUGIN_API_VERSION`
+  (currently `1..1`). A tool that declares no `apiVersion` is not admitted (it
+  fail-closes when run explicitly, or is skipped with a diagnostic when discovered).
 - **`commands`** — the command **names** (with descriptions) your tool mounts. The host asserts this set equals your runtime `tool.commands` at load (`assertManifestMatchesTool`) and throws on drift — the manifest is the cheap, no-import way to enumerate your surface for `--help`/completion, so it must stay in sync with the tool.
 
 Peer-dep on `@opensip-cli/contracts` and `@opensip-cli/core` at `^0.1.0`; the

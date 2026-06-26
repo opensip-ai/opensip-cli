@@ -21,6 +21,7 @@ import { logger } from '../lib/logger.js';
 
 import {
   discoverPackagesByDeclaredKind,
+  readDeclaredCapabilityPackageMetadata,
   type DiscoveredDeclaredPackage,
 } from './marker-discovery.js';
 import { discoverScopedPackages, resolvePackageDir } from './node-modules-walk.js';
@@ -57,6 +58,10 @@ export interface RawCapabilityContribution {
    * primary domain (`descriptor`'s own domain).
    */
   readonly targetDomainId?: string;
+  /** Package-declared target domain from `opensipTools.targetDomain`. */
+  readonly packageTargetDomain?: string;
+  /** Package-declared target epoch from `opensipTools.targetDomainApiVersion`. */
+  readonly packageTargetDomainApiVersion?: number;
 }
 
 /** A structured non-fatal discovery diagnostic (missing package, bad export, import throw). */
@@ -304,11 +309,21 @@ async function loadPackageContributions(
   }
   try {
     const mod = (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
+    const packageMetadata = readDeclaredCapabilityPackageMetadata(pkg.packageDir);
+    const metadataTag = {
+      ...(packageMetadata?.targetDomain === undefined
+        ? {}
+        : { packageTargetDomain: packageMetadata.targetDomain }),
+      ...(packageMetadata?.targetDomainApiVersion === undefined
+        ? {}
+        : { packageTargetDomainApiVersion: packageMetadata.targetDomainApiVersion }),
+    };
     // Primary export (required — a missing/wrong-shape primary is diagnosed).
     const out = readOneExport(mod, pkg.name, onDiagnostic, {
       exportName: descriptor.exportName,
       exportShape: descriptor.exportShape,
       required: true,
+      metadataTag,
     });
     // Co-contributions (§5.3): secondary exports routed to OTHER domains (e.g.
     // `recipes` → fit-recipe). OPTIONAL — a package that exports no recipes is
@@ -320,6 +335,7 @@ async function loadPackageContributions(
           exportShape: co.exportShape,
           targetDomainId: co.domainId,
           required: false,
+          metadataTag,
         }),
       );
     }
@@ -352,6 +368,11 @@ interface ExportSpec {
   readonly targetDomainId?: string;
   /** When true, a missing/wrong-shape export is diagnosed; when false, silent (optional co-export). */
   readonly required: boolean;
+  /** Package-level target metadata attached to every yielded contribution. */
+  readonly metadataTag: {
+    readonly packageTargetDomain?: string;
+    readonly packageTargetDomainApiVersion?: number;
+  };
 }
 
 /**
@@ -366,8 +387,11 @@ function readOneExport(
   onDiagnostic: ((d: CapabilityDiscoveryDiagnostic) => void) | undefined,
   spec: ExportSpec,
 ): RawCapabilityContribution[] {
-  const { exportName, exportShape, targetDomainId, required } = spec;
-  const tag = targetDomainId === undefined ? {} : { targetDomainId };
+  const { exportName, exportShape, targetDomainId, required, metadataTag } = spec;
+  const tag = {
+    ...metadataTag,
+    ...(targetDomainId === undefined ? {} : { targetDomainId }),
+  };
   const value = mod[exportName];
   if (exportShape === 'array') {
     if (value === undefined && !required) return [];

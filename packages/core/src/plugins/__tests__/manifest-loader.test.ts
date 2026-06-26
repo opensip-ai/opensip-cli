@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { logger } from '../../lib/logger.js';
-import { PLUGIN_API_VERSION } from '../../tools/manifest.js';
+import { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from '../../tools/manifest.js';
 import { admitTool, loadToolManifest, PROJECT_LOCAL_MANIFEST_FILE } from '../manifest-loader.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -414,6 +414,7 @@ function withCapability(discovery: unknown): void {
         {
           id: 'disc-pack',
           apiVersion: 1,
+          minSupportedApiVersion: 1,
           contributionKind: 'module-export',
           contributionSchema: { requiredKeys: ['id'] },
           ...(discovery === undefined ? {} : { discovery }),
@@ -478,6 +479,32 @@ describe('capability discovery descriptor (§5.3)', () => {
 });
 
 describe('admitTool', () => {
+  it('admits a tool at an older in-range epoch', () => {
+    const result = admitTool({
+      manifest: manifest({ apiVersion: MIN_SUPPORTED_PLUGIN_API_VERSION }),
+      source: 'installed',
+      dir: '/tools/legacy',
+      explicitlyRequested: false,
+    });
+    expect(result.decision).toBe('admit');
+    expect(result.verdict.kind).toBe('compatible');
+    if (result.decision === 'admit') {
+      expect(result.manifest.apiVersion).toBe(MIN_SUPPORTED_PLUGIN_API_VERSION);
+    }
+  });
+
+  it('skips a below-minimum epoch when not explicitly requested', () => {
+    const result = admitTool({
+      manifest: manifest({ apiVersion: MIN_SUPPORTED_PLUGIN_API_VERSION - 1 }),
+      source: 'installed',
+      dir: '/tools/ancient',
+      explicitlyRequested: false,
+    });
+    expect(result.decision).toBe('skip');
+    expect(result.verdict.kind).toBe('incompatible');
+    expect(result.diagnostic).toContain(String(MIN_SUPPORTED_PLUGIN_API_VERSION));
+  });
+
   it('admits a tool at the current epoch', () => {
     const result = admitTool({
       manifest: manifest({ apiVersion: PLUGIN_API_VERSION }),

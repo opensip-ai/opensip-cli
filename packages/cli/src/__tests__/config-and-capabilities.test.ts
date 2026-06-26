@@ -71,6 +71,7 @@ const capabilityPreferenceManifest: ToolPluginManifest = {
     {
       id: 'fit-pack',
       apiVersion: 1,
+      minSupportedApiVersion: 1,
       contributionSchema: { requiredKeys: ['id'] },
       contributionKind: 'module-export',
       discovery: {
@@ -84,6 +85,7 @@ const capabilityPreferenceManifest: ToolPluginManifest = {
     {
       id: 'sim-pack',
       apiVersion: 1,
+      minSupportedApiVersion: 1,
       contributionSchema: { requiredKeys: ['id'] },
       contributionKind: 'module-export',
       discovery: {
@@ -398,6 +400,7 @@ function manifest(id: string, domainId: string): ToolPluginManifest {
       {
         id: domainId,
         apiVersion: 1,
+        minSupportedApiVersion: 1,
         contributionSchema: { requiredKeys: ['id'] },
         contributionKind: 'module-export',
       },

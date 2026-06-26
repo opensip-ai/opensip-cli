@@ -23,7 +23,9 @@
   },
   "type": "module",
   "opensipTools": {
-    "kind": "fit-pack"
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

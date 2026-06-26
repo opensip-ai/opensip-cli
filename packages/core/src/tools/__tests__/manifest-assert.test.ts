@@ -212,6 +212,25 @@ describe('assertManifestMatchesTool', () => {
     ).toThrow(/sessionReplay\.tool/);
   });
 
+  it('passes when the runtime descriptor exposes extensionPoints.contractVersions', () => {
+    const tool = {
+      ...makeTool('fitness', ['fit']),
+      extensionPoints: {
+        contractVersions: {
+          fitness: '1.0.0',
+        },
+      },
+    };
+    const manifest = makeManifest('fitness', ['fit']);
+    expect(() => assertManifestMatchesTool(manifest, tool)).not.toThrow();
+  });
+
+  it('does not require removed named contract version fields', () => {
+    const tool = makeTool('fitness', ['fit']);
+    const manifest = makeManifest('fitness', ['fit']);
+    expect(() => assertManifestMatchesTool(manifest, tool)).not.toThrow();
+  });
+
   it('reports sorted multi-command drift on both sides', () => {
     const tool = makeTool('graph', ['graph', 'graph-lookup', 'graph-index']);
     const manifest = makeManifest('graph', ['graph', 'graph-alpha', 'graph-beta']);

@@ -19,8 +19,10 @@
  * so this stays in `core` with no edge to the config/cli layer.
  */
 
+import { logger } from '../lib/logger.js';
 import { currentScope } from '../lib/run-scope.js';
 
+import { checkCapabilityContributionCompatibility } from './capability-compatibility.js';
 import {
   discoverCapabilityContributions,
   type CapabilityDiscoveryDiagnostic,
@@ -86,10 +88,44 @@ export async function loadCapabilityDomain(
   });
 
   let routed = 0;
-  for (const { contribution, sourcePackage, targetDomainId } of contributions) {
+  for (const {
+    contribution,
+    sourcePackage,
+    targetDomainId,
+    packageTargetDomain,
+    packageTargetDomainApiVersion,
+  } of contributions) {
     // A co-contribution (§5.3) routes to its OWN domain (e.g. recipes → fit-recipe);
     // a primary contribution routes to the domain being loaded.
     const target = targetDomainId ?? domainId;
+    const domainSpec = registry.getDomain(target);
+    if (domainSpec === undefined) {
+      const msg = `unknown capability domain '${target}'`;
+      errors.push(`${sourcePackage} → ${target}: ${msg}`);
+      continue;
+    }
+    const compatibility = checkCapabilityContributionCompatibility({
+      targetDomainId: target,
+      packageTargetDomain,
+      packageTargetDomainApiVersion,
+      domainSpec,
+    });
+    if (compatibility.kind === 'incompatible') {
+      const msg = compatibility.reason;
+      errors.push(`${sourcePackage} → ${target}: ${msg}`);
+      logger.warn({
+        evt: 'capability.compatibility.rejected',
+        module: 'core:plugins',
+        sourcePackage,
+        targetDomainId: target,
+        declaredTargetDomain: compatibility.declaredTargetDomain,
+        declaredApiVersion: compatibility.declaredApiVersion,
+        minSupportedApiVersion: compatibility.minSupportedApiVersion,
+        currentApiVersion: compatibility.currentApiVersion,
+        message: msg,
+      });
+      continue;
+    }
     try {
       registry.routeContribution(target, contribution);
       routed++;

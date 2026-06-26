@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0074](ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md) — Open domain contract versions and compatibility epochs (`extensionPoints.contractVersions`; bounded whole-tool and capability-pack integer epochs; supersedes ADR-0047 runtime field shape).
 - [ADR-0073](ADR-0073-update-notification-policy.md) — Update notification policy (default-on TTY hourly npm check with opt-out; update-state stores only `{ latest }`).
 - [ADR-0072](ADR-0072-i18n-posture.md) — i18n posture (English-only CLI/docs; localization deferred).
 - [ADR-0071](ADR-0071-credential-handling-policy.md) — Credential handling policy (forbid project `cli.apiKey`; `--api-key` / env / user config only; `0o600` user writes).
@@ -70,7 +71,8 @@ distinct from:
 - [ADR-0052](ADR-0052-bootstrap-orchestration-state-machine.md) — Bootstrap Orchestration State Machine (the Commander hook remains the adapter, while bailout ordering and side-effect gates become explicit, testable phases).
 - [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md) — Host-Owned Run Lifecycle, Timing, and Persistence (one host `RunTimer` stamps `StoredSession.startedAt`/`completedAt`/`durationMs`; tools return a `ToolSessionContribution`; the `runSession.record` writer is removed).
 - [ADR-0048](ADR-0048-tool-stable-uuid-identity.md) — Tool Stable UUID Identity (`id` for stable UUID on Tools, matching Checks; human string renamed to `name`; persisted in DB for collision safety).
-- ADR-0047 — Per-Tool Contract Versioning
+- [ADR-0074](ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md) — Open domain contract versions and compatibility epochs (supersedes ADR-0047 runtime field shape).
+- [ADR-0047](ADR-0047-per-tool-contract-versioning.md) — _(superseded by [ADR-0074](ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md))_ Per-Tool Contract Versioning
 - ADR-0046 — Tool Contract Versioning Policy
 - (earlier ADRs follow the numbered files in this directory)
 

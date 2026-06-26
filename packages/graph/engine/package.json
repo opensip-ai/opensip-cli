@@ -373,7 +373,8 @@
             "autoDiscover": "autoDiscoverGraphAdapters"
           },
           "builtinScope": "@opensip-cli"
-        }
+        },
+        "minSupportedApiVersion": 1
       }
     ]
   },

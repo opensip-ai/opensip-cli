@@ -255,11 +255,16 @@ The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-pa
 ```json
 {
   "name": "@opensip-cli/checks-mything",
-  "opensipTools": { "kind": "fit-pack" },
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
+  },
   "main": "dist/index.js"
 }
 ```
 
+Graph adapters use `targetDomain: "graph-adapter"` with the same epoch fields.
 The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. All first-party `@opensip-cli/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
 
 For packs published under your own scope, declare the marker or pin the package explicitly in the project config:

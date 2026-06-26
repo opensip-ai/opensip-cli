@@ -230,14 +230,13 @@ export interface ToolExtensionPoints {
   readonly stableExampleIds?: () => readonly string[];
   readonly scaffoldConfigBlock?: () => string;
 
-  // Per-tool contract versions (ADR-0047). Each tool declares its own domain
-  // surface version here (the evolution bag) rather than on the main Tool
-  // interface, so the core contract stays narrow while per-tool surfaces evolve
-  // independently of core's TOOL_CONTRACT_VERSION.
-  readonly fitnessContractVersion?: string;
-  readonly graphContractVersion?: string;
-  readonly simulationContractVersion?: string;
-  readonly yagniContractVersion?: string;
+  /**
+   * Open map of domain contract version markers (ADR-0046, ADR-0074).
+   * Keys are stable domain ids (`fitness`, `graph`, `simulation`, `yagni`, …).
+   * Values are string markers governed by per-domain ADR policy. Core does not
+   * validate domain-specific version semantics.
+   */
+  readonly contractVersions?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -252,8 +251,8 @@ export interface ToolExtensionPoints {
  *
  * The surface is deliberately *rich and cohesive* rather than a minimal set of
  * narrow interfaces. New or rare concerns are routed through the `extensionPoints`
- * bag (or top-level optionals that predate the bag) + per-tool `*ContractVersion`
- * fields (ADR-0046, ADR-0047). This keeps the core Tool contract stable while
+ * bag (or top-level optionals that predate the bag) + `extensionPoints.contractVersions`
+ * (ADR-0046, ADR-0074). This keeps the core Tool contract stable while
  * allowing independent evolution of fitness/graph/simulation surfaces. The trade-off
  * (larger surface for tool authors, coordination for new capability *domains*)
  * was accepted in favor of a single place to look for "what can a tool do?" and

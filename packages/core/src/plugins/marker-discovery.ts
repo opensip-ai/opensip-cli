@@ -202,15 +202,21 @@ export function readMarkerKind(packageDir: string): MarkerKind | undefined {
  * declared kinds through this one function so there is no second implementation
  * to drift.
  */
-export function readDeclaredKind(packageDir: string): string | undefined {
+/** Package-level capability contribution target metadata from `opensipTools`. */
+export interface DeclaredCapabilityPackageMetadata {
+  readonly kind?: string;
+  readonly targetDomain?: string;
+  readonly targetDomainApiVersion?: number;
+}
+
+function readOpensipToolsBlock(packageDir: string): unknown {
   const pkgJsonPath = join(packageDir, 'package.json');
   if (!existsSync(pkgJsonPath)) return undefined;
   try {
     const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as {
-      opensipTools?: { kind?: unknown };
+      opensipTools?: unknown;
     };
-    const kind = pkg.opensipTools?.kind;
-    return typeof kind === 'string' ? kind : undefined;
+    return pkg.opensipTools;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.debug({
@@ -221,4 +227,41 @@ export function readDeclaredKind(packageDir: string): string | undefined {
     });
     return undefined;
   }
+}
+
+/**
+ * Read capability package target metadata from a package's `package.json`.
+ * Returns only the generic `opensipTools` fields the compatibility gate needs.
+ */
+export function readDeclaredCapabilityPackageMetadata(
+  packageDir: string,
+): DeclaredCapabilityPackageMetadata | undefined {
+  const block = readOpensipToolsBlock(packageDir);
+  if (block === undefined || typeof block !== 'object' || block === null) return undefined;
+  const record = block as Record<string, unknown>;
+  const kind = typeof record.kind === 'string' ? record.kind : undefined;
+  const targetDomain = typeof record.targetDomain === 'string' ? record.targetDomain : undefined;
+  const targetDomainApiVersion =
+    typeof record.targetDomainApiVersion === 'number' ? record.targetDomainApiVersion : undefined;
+  if (kind === undefined && targetDomain === undefined && targetDomainApiVersion === undefined) {
+    return undefined;
+  }
+  return {
+    ...(kind === undefined ? {} : { kind }),
+    ...(targetDomain === undefined ? {} : { targetDomain }),
+    ...(targetDomainApiVersion === undefined ? {} : { targetDomainApiVersion }),
+  };
+}
+
+/**
+ * Read the RAW `opensipTools.kind` string from a package's package.json — the
+ * string-typed sibling of {@link readMarkerKind}, with no closed-union narrowing.
+ * Returns the string if it parses and is a string; otherwise undefined. Parse
+ * failures are logged at debug (a malformed node_modules package.json is an
+ * entry to skip, not a discovery error). The generic discovery substrate reads
+ * declared kinds through this one function so there is no second implementation
+ * to drift.
+ */
+export function readDeclaredKind(packageDir: string): string | undefined {
+  return readDeclaredCapabilityPackageMetadata(packageDir)?.kind;
 }
