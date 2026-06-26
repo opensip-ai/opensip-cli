@@ -28,7 +28,12 @@
  */
 
 import { commonFlags, EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, defineNestedCommand, logger } from '@opensip-cli/core';
+import {
+  createToolLogger,
+  ConfigurationError,
+  defineCommand,
+  defineNestedCommand,
+} from '@opensip-cli/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { listGraphRules } from '../graph-list.js';
@@ -44,6 +49,8 @@ import { executeSymbolIndex } from '../symbol-index.js';
 import type { ResolutionMode } from '../../types.js';
 import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+
+const log = createToolLogger('graph:cli');
 
 // Shared --cwd flag string for the auxiliary subcommands that declare it as a
 // tool option (the index command keeps a custom description). Sourced from the
@@ -230,7 +237,7 @@ async function runGraphCatalogExport(
       // Advisory only: the incremental path self-derives the changed set from
       // on-disk fingerprint diffs, so a caller-supplied set does not (yet)
       // narrow the walk. Logged for observability.
-      logger.info({
+      log.info({
         evt: 'graph.cli.catalog_export.changed_files_advisory',
         module: 'graph:cli',
         runId: opts.runId,
@@ -279,7 +286,7 @@ async function runGraphBaselineExport(
       error instanceof ConfigurationError
         ? EXIT_CODES.CONFIGURATION_ERROR
         : EXIT_CODES.RUNTIME_ERROR;
-    logger.warn({
+    log.warn({
       evt: 'cli.graph.baseline_export.failed',
       module: 'graph:cli',
       message,
@@ -406,7 +413,7 @@ function reportMissingExportFlags(
   cli: ToolCliContext,
 ): Promise<void> {
   const message = `graph export --format ${format} requires ${missing.join(', ')}.`;
-  logger.warn({
+  log.warn({
     evt: 'cli.graph.export.missing_flags',
     module: 'graph:cli',
     format,

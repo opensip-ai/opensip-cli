@@ -29,7 +29,7 @@ import { realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -42,6 +42,8 @@ import { discoverPolyglotUnits } from './workspace-runner.js';
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 const MODULE_GRAPH_CLI = 'graph:cli';
 
@@ -56,7 +58,7 @@ export async function executeListFiles(
   opts: GraphCommandOptions,
   cli: ToolCliContext,
 ): Promise<void> {
-  logger.info({
+  log.info({
     evt: 'graph.cli.list-files.start',
     module: MODULE_GRAPH_CLI,
     cwd: opts.cwd,
@@ -86,7 +88,7 @@ export async function executeListFiles(
     }
 
     cli.setExitCode(EXIT_CODES.SUCCESS);
-    logger.info({
+    log.info({
       evt: 'graph.cli.list-files.complete',
       module: MODULE_GRAPH_CLI,
       fileCount: rel.length,

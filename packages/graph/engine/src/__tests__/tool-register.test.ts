@@ -312,12 +312,12 @@ describe('graphTool command surface', () => {
   });
 
   describe('graph lookup handler (nested)', () => {
-    it('returns a graph-status command-result for the host dispatch seam', () => {
+    it('returns a graph-status command-result for the host dispatch seam', async () => {
       const datastore = DataStoreFactory.open({ backend: 'memory' });
       try {
         seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
         const { cli, setExitCode, render } = makeMockCli(datastore);
-        const result = handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
+        const result = await handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
         expect(setExitCode).toHaveBeenCalledWith(0);
         expect(result).toMatchObject({ type: 'graph-status' });
         expect((result as { lines: readonly string[] }).lines.join('\n')).toContain('saveBaseline');

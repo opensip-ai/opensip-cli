@@ -24,9 +24,11 @@ import { spawn } from 'node:child_process';
 import os from 'node:os';
 import v8 from 'node:v8';
 
-import { logger } from '@opensip-cli/core';
+import { createToolLogger } from '@opensip-cli/core';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
+
+const log = createToolLogger('graph:cli');
 
 const SENTINEL_ENV = 'OPENSIP_HEAP_ELEVATED';
 const OS_HEADROOM_MB = 2048; // RAM we keep available for the OS + other apps.
@@ -112,7 +114,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
   const fileCount = discovery.files.length;
   const targetMb = decideHeapTargetMb(fileCount);
   if (targetMb === null) {
-    logger.info({
+    log.info({
       evt: 'graph.heap.preflight.skip',
       module: 'graph:cli',
       fileCount,
@@ -123,7 +125,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
 
   const currentMb = currentHeapLimitMb();
   if (currentMb >= targetMb) {
-    logger.info({
+    log.info({
       evt: 'graph.heap.preflight.skip',
       module: 'graph:cli',
       fileCount,
@@ -136,7 +138,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
 
   if (!systemHasMemoryFor(targetMb)) {
     const totalMb = totalSystemMemoryMb();
-    logger.warn({
+    log.warn({
       evt: 'graph.heap.preflight.insufficient',
       module: 'graph:cli',
       fileCount,
@@ -178,7 +180,7 @@ async function reExecWithHeap(
 
   // Structured log always fires — telemetry/log consumers see every
   // elevation regardless of verbosity.
-  logger.info({
+  log.info({
     evt: 'graph.heap.preflight.elevate',
     module: 'graph:cli',
     fileCount,

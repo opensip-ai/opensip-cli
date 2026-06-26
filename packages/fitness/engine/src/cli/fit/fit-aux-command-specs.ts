@@ -23,13 +23,15 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineNestedCommand, logger } from '@opensip-cli/core';
+import { createToolLogger, ConfigurationError, defineNestedCommand } from '@opensip-cli/core';
 
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';
 
 import type { ToolOptions } from '@opensip-cli/contracts';
 import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+
+const log = createToolLogger('fitness:cli');
 
 // =============================================================================
 // GROUPED <tool> <verb> CHILDREN (the canonical Tier-2 grammar)
@@ -104,7 +106,7 @@ async function runFitBaselineExport(
       error instanceof ConfigurationError
         ? EXIT_CODES.CONFIGURATION_ERROR
         : EXIT_CODES.RUNTIME_ERROR;
-    logger.warn({
+    log.warn({
       evt: 'cli.fit.baseline_export.failed',
       module: 'fit:cli',
       message,

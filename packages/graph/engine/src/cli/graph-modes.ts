@@ -18,9 +18,9 @@ import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   ConfigurationError,
   isErrorSignal,
-  logger,
   readPackageVersion,
   resolveFailOnDegraded,
   ToolError,
@@ -33,6 +33,8 @@ import type { GraphCommandOptions } from './graph-options.js';
 import type { Catalog, Indexes } from '../types.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 const MODULE_GRAPH_RENDER = 'graph:render';
 const ENGINE_VERSION = readPackageVersion(import.meta.url);
@@ -168,7 +170,7 @@ export function runCatalogJsonMode(
     tenantId: opts.tenantId,
   };
 
-  logger.info({
+  log.info({
     evt: 'graph.render.catalog_json.start',
     module: MODULE_GRAPH_RENDER,
     runId,
@@ -188,7 +190,7 @@ export function runCatalogJsonMode(
   // so a bare writeFileSync would throw ENOENT.
   mkdirSync(dirname(catalogOutput), { recursive: true });
   writeFileSync(catalogOutput, json);
-  logger.info({
+  log.info({
     evt: 'graph.render.catalog_json.complete',
     module: MODULE_GRAPH_RENDER,
     runId,

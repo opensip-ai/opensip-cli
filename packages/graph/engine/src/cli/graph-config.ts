@@ -22,9 +22,9 @@
 
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   currentScope,
   isPlainRecord,
-  logger,
   readYamlFile,
   resolveProjectConfigPath,
 } from '@opensip-cli/core';
@@ -32,6 +32,8 @@ import {
 import { GraphConfigSchema } from './graph-config-schema.js';
 
 import type { GraphConfig } from '../types.js';
+
+const log = createToolLogger('graph:cli');
 
 /**
  * Best-effort load of the `graph:` block of `opensip-cli.config.yml`.
@@ -64,7 +66,7 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   if (isPlainRecord(documentGraph)) {
     const parsed = GraphConfigSchema.strict().safeParse(documentGraph);
     if (parsed.success) return parsed.data;
-    logger.debug({
+    log.debug({
       evt: 'graph.config.scope_document_schema_rejected',
       module: 'graph:config',
       err: parsed.error.message,
@@ -84,7 +86,7 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   } catch (error) {
     // No config file found — expected; the graph rules use their in-rule
     // defaults. Debug-only so it never adds noise on config-less projects.
-    logger.debug({
+    log.debug({
       evt: 'graph.config.not_found',
       module: 'graph:config',
       err: error instanceof Error ? error.message : String(error),
@@ -103,7 +105,7 @@ export function loadGraphConfig(cwd: string, explicitPath?: string): GraphConfig
   // historical "absent → in-rule default" semantics.
   const parsed = GraphConfigSchema.strict().safeParse(graphBlock);
   if (!parsed.success) {
-    logger.debug({
+    log.debug({
       evt: 'graph.config.schema_rejected',
       module: 'graph:config',
       err: parsed.error.message,

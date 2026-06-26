@@ -20,8 +20,8 @@ import {
   type RunPresentation,
 } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   currentScope,
-  logger,
   resolveVerdictPolicy,
   type Signal,
   type VerdictPolicy,
@@ -36,6 +36,8 @@ import { resolvedFitnessConfig } from './resolved-fitness-config.js';
 import type { FitnessRecipeServiceCallbacks, CheckSummary } from '../../recipes/service-types.js';
 import type { FitnessRecipeResult, RecipeCheckResult } from '../../recipes/types.js';
 import type { SignalersConfig } from '../../signalers/types.js';
+
+const log = createToolLogger('fitness:cli');
 
 /**
  * Resolve fit's findings policy (ADR-0035). Reserved keys
@@ -210,7 +212,7 @@ export function buildFitCallbacks(
   let completedCount = 0;
   return {
     onCheckStart(checkSlug: string, index: number, total: number) {
-      logger.debug({
+      log.debug({
         evt: 'cli.check.start',
         module: 'cli:fit',
         checkSlug,
@@ -220,7 +222,7 @@ export function buildFitCallbacks(
       onProgress?.(completedCount, total);
     },
     onCheckComplete(checkSlug: string, summary: CheckSummary, index: number, total: number) {
-      logger.debug({
+      log.debug({
         evt: 'cli.check.complete',
         module: 'cli:fit',
         checkSlug,

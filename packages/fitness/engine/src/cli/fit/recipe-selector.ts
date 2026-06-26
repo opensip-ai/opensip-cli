@@ -8,13 +8,15 @@
  */
 
 import { BUILTIN_DEFAULT_RECIPE, EXIT_CODES, resolveToolRecipeName } from '@opensip-cli/contracts';
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
 
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
 
 import type { FitnessRecipeResult } from '../../recipes/types.js';
 import type { ErrorResult, FitOptions } from '@opensip-cli/contracts';
+
+const log = createToolLogger('fitness:cli');
 
 /**
  * Tool-scoped recipe defaults for `fit` (ADR-0022), read from the project
@@ -65,7 +67,7 @@ export function selectRecipe(
     // Config-sourced unknown name → fall back to the built-in default rather
     // than abort (it may be a shared/cross-tool default targeting another tool).
     if (resolved.tolerant && resolved.name !== BUILTIN_DEFAULT_RECIPE) {
-      logger.warn({
+      log.warn({
         evt: 'fit.recipe.unknown_config_default',
         module: 'cli:fit',
         requested: resolved.name,

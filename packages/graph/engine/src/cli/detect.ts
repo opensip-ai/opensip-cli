@@ -12,7 +12,9 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { logger, type LanguageRegistry } from '@opensip-cli/core';
+import { createToolLogger, type LanguageRegistry } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 const MODULE_GRAPH_CLI = 'graph:cli';
 
@@ -61,7 +63,7 @@ export interface DetectionResult {
  * `adapterIds` (defensive against partial CLI bootstrap configurations).
  */
 export function detectLanguages(rootDir: string, registry: LanguageRegistry): DetectionResult {
-  logger.info({ evt: 'graph.cli.detect.start', module: MODULE_GRAPH_CLI, rootDir });
+  log.info({ evt: 'graph.cli.detect.start', module: MODULE_GRAPH_CLI, rootDir });
   const matchedMarkers: DetectionMatch[] = [];
   const adapterIdSet = new Set<string>();
   for (const { marker, adapterId } of MARKER_MAP) {
@@ -71,7 +73,7 @@ export function detectLanguages(rootDir: string, registry: LanguageRegistry): De
     adapterIdSet.add(adapterId);
   }
   const adapterIds = [...adapterIdSet];
-  logger.info({
+  log.info({
     evt: adapterIds.length > 1 ? 'graph.cli.detect.polyglot' : 'graph.cli.detect.result',
     module: MODULE_GRAPH_CLI,
     adapterIds,

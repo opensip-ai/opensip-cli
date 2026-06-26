@@ -24,12 +24,14 @@
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   ConfigurationError,
   currentScope,
-  logger,
   ToolError,
   ValidationError,
 } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 import { resolveRecipeToRules } from '../recipes/resolve.js';
 
@@ -85,7 +87,7 @@ export async function executeGraph(
   const startedAt: string = startedAtForProfile;
   const profile = createProfileBuilder(opts, startedAtForProfile);
 
-  logger.info({
+  log.info({
     evt: 'graph.cli.graph.start',
     module: MODULE_GRAPH_CLI,
     cwd: opts.cwd,

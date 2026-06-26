@@ -28,7 +28,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, ToolError, logger } from '@opensip-cli/core';
+import { createToolLogger, ConfigurationError, ToolError } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
@@ -37,6 +37,8 @@ import { loadGraphConfig, runGraph } from './orchestrate.js';
 import type { Catalog } from '../types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+
+const log = createToolLogger('graph:cli');
 
 export interface SymbolIndexCommandOptions {
   readonly cwd: string;
@@ -70,7 +72,7 @@ export async function executeSymbolIndex(
   opts: SymbolIndexCommandOptions,
   cli: ToolCliContext,
 ): Promise<void> {
-  logger.info({
+  log.info({
     evt: 'graph.cli.symbol-index.start',
     module: 'graph:cli',
     build: opts.build === true,
@@ -101,14 +103,14 @@ export async function executeSymbolIndex(
       `wrote ${String(symbolCount)} symbol(s) across ${String(fileCount)} file(s) to ${outPath}\n`,
     );
     cli.setExitCode(EXIT_CODES.SUCCESS);
-    logger.info({
+    log.info({
       evt: 'graph.cli.symbol-index.complete',
       module: 'graph:cli',
       symbols: symbolCount,
       files: fileCount,
     });
   } catch (error) {
-    logger.error({
+    log.error({
       evt: 'graph.cli.symbol-index.error',
       module: 'graph:cli',
       err: error instanceof Error ? error.message : String(error),

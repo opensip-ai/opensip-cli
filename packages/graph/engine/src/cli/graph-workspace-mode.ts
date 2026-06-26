@@ -1,7 +1,7 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   ConfigurationError,
-  logger,
   type Signal,
   type ToolCliContext,
   type ToolSessionContribution,
@@ -19,6 +19,8 @@ import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from './workspace-
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphRunOutcome } from './graph-run-outcome.js';
+
+const log = createToolLogger('graph:cli');
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
@@ -111,7 +113,7 @@ export async function executeWorkspaceGraph(
   } else {
     cli.setExitCode(EXIT_CODES.SUCCESS);
   }
-  logger.info({
+  log.info({
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
     units: result.perUnit.length,

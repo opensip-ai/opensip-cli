@@ -8,7 +8,9 @@
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 const MODULE_GRAPH_CLI = 'graph:cli';
 
@@ -46,7 +48,7 @@ export function resolvePositionalPaths(paths: readonly string[], cwd: string): r
     }
     out.push(abs);
   }
-  logger.info({
+  log.info({
     evt: 'graph.cli.scope.positional',
     module: MODULE_GRAPH_CLI,
     count: out.length,

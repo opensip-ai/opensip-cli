@@ -23,12 +23,16 @@ import { getContainingFunctionName } from './containing-function-name.js';
  */
 const LOGGING_PATTERNS = [
   /logger\.(error|warn|debug|info)\s*\(/,
+  /log\.(error|warn|debug|info)\s*\(/,
   /safeLogger\.(error|warn|debug|info)\s*\(/,
+  /cli\.logger\.(error|warn|debug|info)\s*\(/,
   /console\.(error|warn)\s*\(/,
   /\.log\s*\(/,
   /unwrapOrLog\s*\(/,
   /matchLog\s*\(/,
   /handleErr\s*\(/,
+  /reportFailure\s*\(/,
+  /handleGraphError\s*\(/,
 ];
 
 /**

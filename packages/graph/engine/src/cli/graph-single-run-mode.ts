@@ -1,10 +1,12 @@
 import {
+  createToolLogger,
   ConfigurationError,
   currentScope,
-  logger,
   SystemError,
   type ToolCliContext,
 } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 import { DASHBOARD_FEATURE_COLUMNS } from './graph-feature-columns.js';
 import { countFiles } from './graph-report.js';
@@ -81,7 +83,7 @@ export async function executeSinglePathGraph(
 
   const resolution = await resolveEngineShards(opts, cli, positionalPaths);
   const shards = resolution.shards;
-  logger.info({
+  log.info({
     evt: 'graph.cli.graph.engine',
     module: MODULE_GRAPH_CLI,
     mode: shards.length > 1 ? 'sharded' : 'exact',

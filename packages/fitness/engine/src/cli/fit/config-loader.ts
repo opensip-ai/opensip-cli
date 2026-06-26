@@ -8,13 +8,15 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { logger } from '@opensip-cli/core';
+import { createToolLogger } from '@opensip-cli/core';
 
 import { loadSignalersConfig } from '../../signalers/index.js';
 import { loadTargetsConfig } from '../../targets/index.js';
 
 import type { SignalersConfig } from '../../signalers/types.js';
 import type { ErrorResult, FitOptions } from '@opensip-cli/contracts';
+
+const log = createToolLogger('fitness:cli');
 
 export interface LoadedFitConfig {
   signalersConfig: SignalersConfig;
@@ -42,7 +44,7 @@ export function loadFitConfig(args: FitOptions): LoadedFitConfig | { error: Erro
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn({ evt: 'cli.config.load_failed', module: 'cli:fit', message });
+    log.warn({ evt: 'cli.config.load_failed', module: 'cli:fit', message });
     return {
       error: {
         type: 'error',
@@ -109,7 +111,7 @@ export async function validateLanguagesAgainstAdapters(
   if (unknownLanguages.size === 0) return [];
 
   const list = [...unknownLanguages].sort().join(', ');
-  logger.warn({
+  log.warn({
     evt: 'cli.config.unknown_languages',
     module: 'cli:fit',
     unknown: [...unknownLanguages],

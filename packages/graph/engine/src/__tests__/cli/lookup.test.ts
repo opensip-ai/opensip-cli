@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { executeLookup } from '../../cli/lookup.js';
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
+import { makeReportFailureMock } from '../report-failure-mock.js';
 import { occ } from '../rules/_helpers.js';
 
 import type { Catalog, FunctionOccurrence } from '../../types.js';
@@ -39,26 +40,24 @@ interface MockCli {
   readonly cli: ToolCliContext;
   readonly setExitCode: ReturnType<typeof vi.fn>;
   readonly render: ReturnType<typeof vi.fn>;
-  /** Concatenated text of every `graph-status` result rendered through the seam. */
-  renderedText(): string;
+  readonly reportFailure: ReturnType<typeof makeReportFailureMock>;
 }
 
 function mockCli(datastore: DataStore | undefined): MockCli {
   const setExitCode = vi.fn();
   const render = vi.fn().mockResolvedValue(undefined);
+  const reportFailure = makeReportFailureMock(setExitCode, render);
   return {
     cli: {
       datastore,
       setExitCode,
       render,
+      reportFailure,
       scope: { datastore: () => datastore },
     } as unknown as ToolCliContext,
     setExitCode,
     render,
-    renderedText: () =>
-      render.mock.calls
-        .map((c) => (c[0] as { lines?: readonly string[] }).lines?.join('\n') ?? '')
-        .join('\n'),
+    reportFailure,
   };
 }
 
@@ -79,37 +78,35 @@ afterEach(() => {
 });
 
 describe('graph lookup', () => {
-  it('renders occurrences for a name found in the catalog through the seam', () => {
+  it('renders occurrences for a name found in the catalog through the seam', async () => {
     new CatalogRepo(datastore).replaceAll(
       makeCatalog([occ({ bodyHash: 'a1', simpleName: 'saveBaseline' })]),
     );
     const cli = mockCli(datastore);
-    const result = executeLookup({ name: 'saveBaseline' }, cli.cli);
+    const result = await executeLookup({ name: 'saveBaseline' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
     expect(result).toMatchObject({ type: 'graph-status' });
-    expect(cli.render).not.toHaveBeenCalled();
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
-  it('returns a graph-lookup result when --json is set (no direct stdout)', () => {
+  it('returns a graph-lookup result when --json is set (no direct stdout)', async () => {
     new CatalogRepo(datastore).replaceAll(makeCatalog([occ({ bodyHash: 'a1', simpleName: 'fn' })]));
     const cli = mockCli(datastore);
-    const result = executeLookup({ name: 'fn', json: true }, cli.cli);
+    const result = await executeLookup({ name: 'fn', json: true }, cli.cli);
     expect(result).toMatchObject({
       type: 'graph-lookup',
       name: 'fn',
       resolutionMode: 'exact',
     });
-    if (result.type !== 'graph-lookup') throw new Error('expected graph-lookup result');
+    if (result?.type !== 'graph-lookup') throw new Error('expected graph-lookup result');
     expect(result.matches).toHaveLength(1);
-    expect(cli.render).not.toHaveBeenCalled();
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
-  it('exits SUCCESS with a "not found" message when the name has no occurrences', () => {
+  it('exits SUCCESS with a "not found" message when the name has no occurrences', async () => {
     new CatalogRepo(datastore).replaceAll(makeCatalog([]));
     const cli = mockCli(datastore);
-    const result = executeLookup({ name: 'missing' }, cli.cli);
+    const result = await executeLookup({ name: 'missing' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
     expect(result).toMatchObject({ type: 'graph-status' });
     expect((result as { lines: readonly string[] }).lines.join('\n')).toContain(
@@ -117,22 +114,20 @@ describe('graph lookup', () => {
     );
   });
 
-  it('returns ErrorResult with CONFIGURATION_ERROR when no catalog has been built', () => {
+  it('routes missing catalog through reportFailure with CONFIGURATION_ERROR', async () => {
     const cli = mockCli(datastore);
-    const result = executeLookup({ name: 'anything' }, cli.cli);
-    expect(cli.setExitCode).toHaveBeenCalledWith(2);
-    expect(result).toMatchObject({
-      type: 'error',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    });
-    expect((result as { message: string }).message).toContain('Run `opensip graph` first');
+    const result = await executeLookup({ name: 'anything' }, cli.cli);
+    expect(result).toBeUndefined();
+    expect(cli.reportFailure).toHaveBeenCalled();
+    expect(cli.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('returns ErrorResult with CONFIGURATION_ERROR when no DataStore is wired', () => {
+  it('routes missing DataStore through reportFailure with CONFIGURATION_ERROR', async () => {
     const cli = mockCli(undefined);
-    const result = executeLookup({ name: 'fn' }, cli.cli);
-    expect(cli.setExitCode).toHaveBeenCalledWith(2);
-    expect(result).toMatchObject({ type: 'error', exitCode: EXIT_CODES.CONFIGURATION_ERROR });
+    const result = await executeLookup({ name: 'fn' }, cli.cli);
+    expect(result).toBeUndefined();
+    expect(cli.reportFailure).toHaveBeenCalled();
+    expect(cli.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
   });
 });

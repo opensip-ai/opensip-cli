@@ -9,12 +9,14 @@
 
 import { resolveToolRecipeName, type ResolvedRecipe } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   currentScope,
   isPlainRecord,
-  logger,
   readYamlFile,
   resolveProjectConfigPath,
 } from '@opensip-cli/core';
+
+const log = createToolLogger('simulation:cli');
 
 /**
  * Best-effort read of `simulation.recipe` from the project config.
@@ -45,7 +47,7 @@ function readSimulationRecipe(cwd: string, explicitPath?: string): string | unde
     // No config file found — expected on a config-less project; sim then uses
     // the built-in default. Debug-only so it never adds noise. Mirrors
     // loadGraphConfig's not-found path.
-    logger.debug({
+    log.debug({
       evt: 'sim.config.not_found',
       module: 'cli:sim',
       err: error instanceof Error ? error.message : String(error),

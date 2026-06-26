@@ -1,5 +1,5 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { currentScope, logger } from '@opensip-cli/core';
+import { createToolLogger, currentScope } from '@opensip-cli/core';
 
 import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
@@ -13,6 +13,8 @@ import type { GraphRunOutcome } from './graph-run-outcome.js';
 import type { RunGraphResult } from './orchestrate.js';
 import type { RunPresentation, SignalEnvelope, VerboseDetail } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
@@ -49,7 +51,7 @@ export function writeProfileIfRequested(
   if (profile === undefined) return;
   if (typeof opts.profileOutput !== 'string' || opts.profileOutput.length === 0) return;
   const outPath = writeGraphProfile(opts.profileOutput, opts.cwd, profile.complete());
-  logger.info({
+  log.info({
     evt: 'graph.profile.write.complete',
     module: MODULE_GRAPH_CLI,
     output: outPath,
@@ -149,7 +151,7 @@ export async function deliverGraphResult(
     // (host-derived exit), so the command-spec skips it.
     const envelope = envelopeFor(opts, result, durationMs);
     await runGateMode(opts, envelope, cli, result.catalog?.resolutionMode);
-    logger.info({
+    log.info({
       evt: EVT_GRAPH_COMPLETE,
       module: MODULE_GRAPH_CLI,
       suppressed: suppressedCount,
@@ -158,7 +160,7 @@ export async function deliverGraphResult(
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
     runCatalogJsonMode(opts, result, cli, startedAt);
-    logger.info({
+    log.info({
       evt: EVT_GRAPH_COMPLETE,
       module: MODULE_GRAPH_CLI,
       suppressed: suppressedCount,
@@ -180,7 +182,7 @@ export async function deliverGraphResult(
   const session =
     opts.json !== true && !isReportTo ? buildGraphSessionContribution(opts, finalized) : undefined;
   cli.setExitCode(EXIT_CODES.SUCCESS);
-  logger.info({
+  log.info({
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
     signals: result.signals.length,
@@ -223,18 +225,18 @@ async function renderGraphResult(
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   const envelope = envelopeFor(opts, result, durationMs);
   if (opts.json === true) {
-    logger.info({
+    log.info({
       evt: 'graph.render.json.start',
       module: MODULE_GRAPH_RENDER,
     });
     cli.emitEnvelope(envelope);
-    logger.info({
+    log.info({
       evt: 'graph.render.json.complete',
       module: MODULE_GRAPH_RENDER,
     });
     return envelope;
   }
-  logger.info({ evt: 'graph.render.presentation.start', module: MODULE_GRAPH_RENDER });
+  log.info({ evt: 'graph.render.presentation.start', module: MODULE_GRAPH_RENDER });
   const verbose = opts.verbose === true;
   // ADR-0021: graph's verbose body is carried as VerboseDetail{kind:'lines'} and
   // rendered through the shared resultToView seam — the same path the live runner
@@ -270,7 +272,7 @@ async function renderGraphResult(
     durationMs,
   };
   await cli.render(presentation);
-  logger.info({
+  log.info({
     evt: 'graph.render.presentation.complete',
     module: MODULE_GRAPH_RENDER,
   });

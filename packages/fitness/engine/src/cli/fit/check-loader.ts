@@ -24,14 +24,16 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveCapabilityPreferences } from '@opensip-cli/config';
 import {
+  createToolLogger,
   capabilityDiscoveryToCliDiagnostic,
   currentScope,
   loadCapabilityDomain,
-  logger,
 } from '@opensip-cli/core';
 
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
+
+const log = createToolLogger('fitness:cli');
 
 // ---------------------------------------------------------------------------
 // Public accessors — all read the current RunScope's fitness load state
@@ -97,7 +99,7 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   if (pluginResult.errors.length > 0) {
     // Structured classification happens in finalizeFitLoadOutcome; log only here.
     for (const err of pluginResult.errors) {
-      logger.warn({
+      log.warn({
         evt: 'cli.plugin.warning',
         module: 'cli:fit',
         message: err,

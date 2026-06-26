@@ -21,7 +21,7 @@
  * resolving the same names.
  */
 
-import { logger } from '@opensip-cli/core';
+import { createToolLogger } from '@opensip-cli/core';
 
 import { currentCheckRegistry } from '../framework/scope-registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
@@ -48,6 +48,8 @@ import type {
   RunPresentation,
   ErrorResult,
 } from '@opensip-cli/contracts';
+
+const log = createToolLogger('fitness:cli');
 
 // ---------------------------------------------------------------------------
 // Re-exports — preserve the public surface that external consumers
@@ -127,7 +129,7 @@ export async function executeFit(
     }
   | { result: ErrorResult; envelope?: undefined; warnings?: undefined }
 > {
-  logger.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
+  log.info({ evt: 'cli.checks.loading', module: 'cli:fit' });
   await ensureChecksLoaded(args.cwd);
 
   const loadCommandError = fitLoadCommandError();
@@ -136,7 +138,7 @@ export async function executeFit(
   }
 
   const checkRegistry = currentCheckRegistry();
-  logger.info({
+  log.info({
     evt: 'cli.checks.loaded',
     module: 'cli:fit',
     checkCount: checkRegistry.listEnabled().length,
@@ -212,7 +214,7 @@ export async function executeFit(
     recipeName,
   });
 
-  logger.info({
+  log.info({
     evt: 'cli.fit.complete',
     module: 'cli:fit',
     score: envelope.verdict.score,

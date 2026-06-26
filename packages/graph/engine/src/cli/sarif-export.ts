@@ -23,11 +23,13 @@
 import { randomUUID } from 'node:crypto';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
 
 import { buildGraphEnvelope } from './build-envelope.js';
 
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 const MODULE_GRAPH_RENDER = 'graph:render';
 
@@ -61,7 +63,7 @@ export async function runSarifExportMode(
   }
 
   const runId = opts.runId ?? randomUUID();
-  logger.info({
+  log.info({
     evt: 'graph.render.sarif_export.start',
     module: MODULE_GRAPH_RENDER,
     runId,
@@ -79,7 +81,7 @@ export async function runSarifExportMode(
   });
   await cli.writeSarif(envelope, opts.outputSarif);
 
-  logger.info({
+  log.info({
     evt: 'graph.render.sarif_export.complete',
     module: MODULE_GRAPH_RENDER,
     runId,

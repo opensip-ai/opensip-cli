@@ -31,7 +31,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { logger } from '@opensip-cli/core';
+import { createToolLogger } from '@opensip-cli/core';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
 
@@ -51,6 +51,7 @@ import type { Catalog } from '../types.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
+const log = createToolLogger('graph:cli');
 const MODULE = 'graph:cli';
 
 /** Default committed budget path, relative to the target repo root. */
@@ -170,7 +171,7 @@ export async function executeEquivalenceCheck(
 ): Promise<void> {
   const cwd = resolve(opts.cwd);
   const budgetPath = opts.budget ? resolve(cwd, opts.budget) : resolve(cwd, DEFAULT_BUDGET_REL);
-  logger.info({
+  log.info({
     evt: 'graph.cli.equivalence_check.start',
     module: MODULE,
     cwd,
@@ -295,7 +296,7 @@ function logEnd(
   verdict: EquivalenceVerdict,
   failed: boolean,
 ): void {
-  logger.info({
+  log.info({
     evt: 'graph.cli.equivalence_check.complete',
     module: MODULE,
     failed,

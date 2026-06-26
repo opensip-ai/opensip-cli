@@ -20,12 +20,14 @@ import { cpus } from 'node:os';
 import { relative } from 'node:path';
 
 import {
+  createToolLogger,
   ConfigurationError,
-  logger,
   type LanguageAdapter,
   type Signal,
   type WorkspaceUnit,
 } from '@opensip-cli/core';
+
+const log = createToolLogger('graph:cli');
 
 import { runWorkerPool } from './orchestrate/worker-pool.js';
 
@@ -142,7 +144,7 @@ export async function runWorkspaceUnitsInParallel(
   }
 
   const concurrency = Math.max(1, input.concurrency ?? Math.max(1, cpus().length - 1));
-  logger.info({
+  log.info({
     evt: 'graph.cli.workspace.start',
     module: 'graph:cli',
     units: input.units.length,
@@ -168,7 +170,7 @@ export async function runWorkspaceUnitsInParallel(
   // order — units finish in unpredictable order under parallelism.
   results.sort((a, b) => a.rootDir.localeCompare(b.rootDir));
 
-  logger.info({
+  log.info({
     evt: 'graph.cli.workspace.complete',
     module: 'graph:cli',
     units: input.units.length,
@@ -257,7 +259,7 @@ function parseChildSignals(stdout: string, rootDir: string, stderr: string): rea
     parsed = JSON.parse(trimmed) as SignalEnvelope;
   } catch (error) {
     /* v8 ignore start */
-    logger.warn({
+    log.warn({
       evt: 'graph.cli.workspace.parse-error',
       module: 'graph:cli',
       rootDir,

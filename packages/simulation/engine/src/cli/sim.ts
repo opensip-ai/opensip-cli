@@ -29,9 +29,9 @@ import {
   EXIT_CODES,
 } from '@opensip-cli/contracts';
 import {
+  createToolLogger,
   currentScope,
   loadCapabilityDomain,
-  logger,
   resolveVerdictPolicy,
 } from '@opensip-cli/core';
 
@@ -51,6 +51,8 @@ import type {
   VerboseDetail,
 } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
+
+const log = createToolLogger('simulation:cli');
 
 // ---------------------------------------------------------------------------
 // Lazy-load simulation scenarios
@@ -80,7 +82,7 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
   const pluginResult = await loadAllSimPlugins(projectDir);
   load.pluginLoadErrors = pluginResult.errors;
   for (const err of pluginResult.errors) {
-    logger.warn({ evt: 'cli.plugin.warning', module: 'cli:sim', message: err });
+    log.warn({ evt: 'cli.plugin.warning', module: 'cli:sim', message: err });
   }
 
   // 2. Scenario packages (+ co-located recipes → the sim-recipe domain) through
@@ -94,7 +96,7 @@ export async function ensureScenariosLoaded(projectDir?: string): Promise<void> 
 
   // 3. No-scenarios guard (structured-log only; executeSim owns the fatal exit).
   if (currentScenarioRegistry().size === 0) {
-    logger.warn({
+    log.warn({
       evt: 'cli.scenario_packages.empty',
       module: 'cli:sim',
       msg: 'no scenarios loaded',
@@ -215,7 +217,7 @@ export async function executeSim(
   let recipeName = recipeSelection.name;
   let recipe = currentSimulationRecipeRegistry().loadRecipe(recipeName);
   if (!recipe && recipeSelection.tolerant && recipeName !== BUILTIN_DEFAULT_RECIPE) {
-    logger.warn({
+    log.warn({
       evt: 'sim.recipe.unknown_config_default',
       module: 'cli:sim',
       requested: recipeName,
@@ -253,7 +255,7 @@ export async function executeSim(
   // scenario failure (exit 1). Tailor the guidance to the cause.
   if (scenarios.length === 0) {
     const registryEmpty = currentScenarioRegistry().size === 0;
-    logger.warn({
+    log.warn({
       evt: 'cli.sim.empty_run',
       module: 'cli:sim',
       recipeName,
@@ -276,7 +278,7 @@ export async function executeSim(
   const passed = scenarios.filter((s) => s.passed).length;
   const failed = scenarios.length - passed;
 
-  logger.info({
+  log.info({
     evt: 'cli.sim.complete',
     module: 'cli:sim',
     recipeName,

@@ -9,7 +9,7 @@
 
 import { join, relative, sep } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { createToolLogger } from '@opensip-cli/core';
 
 import { ownerEdgeKey } from './edge-identity.js';
 
@@ -20,6 +20,8 @@ import type {
   WalkOutput,
 } from '../../lang-adapter/types.js';
 import type { Catalog, CallEdge, FunctionOccurrence } from '../../types.js';
+
+const log = createToolLogger('graph:cli');
 
 export interface ClosureInput {
   readonly adapter: GraphLanguageAdapter;
@@ -114,7 +116,7 @@ function expandClosureOnce(walked: WalkOutput, ctx: ClosureExpansionContext): bo
     grew = true;
   }
   if (grew) {
-    logger.info({
+    log.info({
       evt: 'graph.cache.incremental.expand',
       module: 'graph:cache',
       addedDependents: newDependents.length,

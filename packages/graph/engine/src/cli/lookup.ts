@@ -12,50 +12,57 @@
  */
 
 import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
-import { ConfigurationError, logger } from '@opensip-cli/core';
+import { ConfigurationError, createToolLogger } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
+import { handleGraphError } from './graph.js';
 import { buildLookupResult } from './lookup-result.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
+const log = createToolLogger('graph:cli');
+
 export interface LookupCommandOptions {
   readonly name: string;
   readonly json?: boolean;
 }
 
-export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): CommandResult {
-  logger.info({
-    evt: 'graph.cli.lookup.start',
-    module: 'graph:cli',
-    name: opts.name,
-  });
+export async function executeLookup(
+  opts: LookupCommandOptions,
+  cli: ToolCliContext,
+): Promise<CommandResult | undefined> {
+  log.info({ evt: 'graph.cli.lookup.start', name: opts.name });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
-      return lookupError(
-        cli,
+      await handleGraphError(
+        'lookup',
         new ConfigurationError('graph lookup requires a DataStore on ToolCliContext.'),
+        cli,
+        opts.json === true,
       );
+      return undefined;
     }
     const catalog = new CatalogRepo(datastore).loadFullCatalog();
     if (!catalog) {
-      return lookupError(
-        cli,
+      await handleGraphError(
+        'lookup',
         new ConfigurationError(
           'No graph catalog found. Run `opensip graph` first to build the catalog.',
         ),
+        cli,
+        opts.json === true,
       );
+      return undefined;
     }
     const matches = collectMatches(catalog, opts.name);
     const resolutionMode = catalog.resolutionMode ?? 'exact';
     cli.setExitCode(EXIT_CODES.SUCCESS);
-    logger.info({
+    log.info({
       evt: 'graph.cli.lookup.complete',
-      module: 'graph:cli',
       matches: matches.length,
     });
     if (opts.json === true) {
@@ -66,26 +73,13 @@ export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): 
       lines: humanReportLines(opts.name, matches, resolutionMode),
     };
   } catch (error) {
-    logger.error({
+    log.error({
       evt: 'graph.cli.lookup.error',
-      module: 'graph:cli',
       err: error instanceof Error ? error.message : String(error),
     });
-    cli.setExitCode(
-      error instanceof ConfigurationError
-        ? EXIT_CODES.CONFIGURATION_ERROR
-        : EXIT_CODES.RUNTIME_ERROR,
-    );
-    return lookupError(cli, error);
+    await handleGraphError('lookup', error, cli, opts.json === true);
+    return undefined;
   }
-}
-
-function lookupError(cli: ToolCliContext, error: unknown): CommandResult {
-  const message = error instanceof Error ? error.message : String(error);
-  const exitCode =
-    error instanceof ConfigurationError ? EXIT_CODES.CONFIGURATION_ERROR : EXIT_CODES.RUNTIME_ERROR;
-  cli.setExitCode(exitCode);
-  return { type: 'error', message, exitCode };
 }
 
 function collectMatches(catalog: Catalog, name: string): readonly FunctionOccurrence[] {
