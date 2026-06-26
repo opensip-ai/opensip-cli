@@ -39,6 +39,12 @@ bypasses the registry.
 
 ## Update notifier
 
+Product update I/O (not telemetry — see
+[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0073-update-notification-policy.md) and
+[ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)).
+Default-on for interactive TTY; hourly npm version fetch; update-state stores only
+`{ latest }`.
+
 | Variable | Effect |
 |---|---|
 | `OPENSIP_NO_UPDATE` | Set to any non-empty value to skip the CLI update check. |

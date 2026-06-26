@@ -18,6 +18,9 @@
  *     other banner sizes (which have no version line to annotate).
  * The bootstrap calls `checkForUpdate` once and decides which surface to use.
  *
+ * Outbound policy (ADR-0073): default-on TTY product update I/O — not
+ * telemetry. Stores only `{ latest }` in update-state; no user paths or secrets.
+ *
  * Design goals:
  *   - Silent by default when there's nothing to report.
  *   - Persistent while a genuinely newer release exists; self-clearing the

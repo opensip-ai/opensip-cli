@@ -18,7 +18,7 @@
  *      asserts no literal hand-listed `for pkg in …` package list remains.
  *   5. `scripts/bootstrap-publish.sh` — DERIVED (`--print names`); asserts the
  *      literal `PACKAGES=( … )` array is gone.
- *   6. `RELEASING.md` — still authored as prose; its "The 32 packages" table,
+ *   6. `RELEASING.md` — still authored as prose; its "The N packages" table,
  *      its stated count, and its npm-verify `for p in …` loop are parsed and
  *      asserted to equal the reference set/count.
  *
@@ -205,7 +205,7 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
 
   const releasingMd = read('RELEASING.md');
 
-  it('RELEASING.md "The 32 packages" table names == the reference set', () => {
+  it('RELEASING.md package table names == the reference set', () => {
     // Table rows look like: `| Layer | `@opensip-cli/<name>` | `packages/…` |`
     // plus the unscoped CLI row: `| CLI | `opensip-cli` (unscoped) | … |`.
     const tableNames = new Set<string>();
@@ -233,15 +233,26 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
   });
 
   it('RELEASING.md stated package count == the reference length', () => {
-    // The runbook says "all 32 packages" / "The 32 packages" in several spots.
-    // Assert the count matches RELEASE_PACKAGE_ORDER.length so a package add/
-    // remove forces a prose update too.
     const count = RELEASE_PACKAGE_ORDER.length;
+    const privateVersionedPackageJsonCount = 2;
     const headerHasCount = new RegExp(`The ${count} packages`).test(releasingMd);
     expect(
       headerHasCount,
       `RELEASING.md must state "The ${count} packages" (the reference set size); ` +
         'update the prose count after adding/removing a package',
+    ).toBe(true);
+    const publishableProse = new RegExp(`All ${count} publishable packages`).test(releasingMd);
+    expect(
+      publishableProse,
+      `RELEASING.md must state "All ${count} publishable packages" in version surfaces`,
+    ).toBe(true);
+    const versionedJsonCount = count + privateVersionedPackageJsonCount;
+    const versionedProse = new RegExp(`${versionedJsonCount}\\s+\`package\\.json\` files`).test(
+      releasingMd,
+    );
+    expect(
+      versionedProse,
+      `RELEASING.md must state ${versionedJsonCount} package.json files (${count} publishable + ${privateVersionedPackageJsonCount} private)`,
     ).toBe(true);
   });
 

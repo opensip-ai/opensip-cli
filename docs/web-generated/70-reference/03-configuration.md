@@ -168,7 +168,7 @@ config fields are rejected.
 | `verbose` / `json` | bool | Defaults for `--verbose` / `--json`. |
 | `debug` | bool | Default for `--debug`. |
 | `reportTo` | URL | Default for `--report-to`. |
-| `apiKey` | string | Literal API key. **No `${VAR}` interpolation** — use the env-var or user-level config instead. |
+| `apiKey` | — | **Not allowed** in project config (ADR-0071). Use `--api-key`, `OPENSIP_API_KEY`, or `~/.opensip-cli/config.yml#apiKey`. |
 | `fileTypes` | string[] | Restrict the run to these extensions. |
 | `ignore` | string[] | Additional exclude patterns. |
 | `ui.banner` | `'mini' \| 'lg' \| 'md' \| 'sm'` | Banner art above each command. Default `mini` — a compact boxed card (amber cup + version + tagline + `www.opensip.ai` + project path). Set `lg`/`md`/`sm` for the full ASCII wordmark. **No CLI flag** — persistent preference. |
@@ -189,7 +189,10 @@ graph:
   recipe: default
 ```
 
-**API key resolution precedence**: `--api-key` flag > `cli.apiKey` > `OPENSIP_API_KEY` env > `~/.opensip-cli/config.yml`. Prefer the flag, env var, or user-level config for real secrets; `cli.apiKey` exists for controlled environments and still wins over the env var if set.
+**API key resolution precedence**: `--api-key` flag > `OPENSIP_API_KEY` env >
+`~/.opensip-cli/config.yml#apiKey`. Project-level `cli.apiKey` is rejected by
+strict validation to avoid committing secrets. User config is written with mode
+`0o600` (ADR-0071).
 
 CLI flags always override config — `--no-json` overrides a `cli.json: true` setting.
 

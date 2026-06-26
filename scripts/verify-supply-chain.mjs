@@ -17,6 +17,11 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { discoverPublishablePackages } from './release-package-order.mjs';
+import {
+  extractPublishBlocks,
+  publishBlockHasProvenance,
+  publishBlockReferencesLongLivedToken,
+} from './lib/trusted-publish-blocks.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const INSTALL_LIFECYCLE_SCRIPTS = new Set(['preinstall', 'install', 'postinstall']);
@@ -186,15 +191,14 @@ function checkTrustedPublish(workflows) {
     if (!/id-token:\s*write/.test(workflow.content)) {
       problems.push(`${workflow.relPath}: npm publish without permissions.id-token: write`);
     }
-    if (
-      !/(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(
-        workflow.content,
-      )
-    ) {
-      problems.push(`${workflow.relPath}: npm publish without provenance`);
-    }
-    if (publishStepReferencesLongLivedToken(workflow.content)) {
-      problems.push(`${workflow.relPath}: publish workflow references long-lived npm token`);
+    const publishBlocks = extractPublishBlocks(workflow.content);
+    for (const block of publishBlocks) {
+      if (!publishBlockHasProvenance(block)) {
+        problems.push(`${workflow.relPath}: npm publish step lacks provenance`);
+      }
+      if (publishBlockReferencesLongLivedToken(block)) {
+        problems.push(`${workflow.relPath}: npm publish step references long-lived npm token`);
+      }
     }
   }
 
@@ -205,15 +209,38 @@ function checkTrustedPublish(workflows) {
   }
 }
 
-function publishStepReferencesLongLivedToken(content) {
-  const steps = content.split(/\n(?=\s*-\s+name:)/);
-  return steps.some((step) => {
-    const executable = step
-      .split('\n')
-      .filter((line) => !line.trimStart().startsWith('#'))
-      .join('\n');
-    return /\bnpm\s+publish\b/.test(executable) && /(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(executable);
-  });
+function checkDependencyAutomation() {
+  const dependabot = readText('.github/dependabot.yml');
+  const renovate = readText('renovate.json');
+  if (!dependabot && !renovate) {
+    pass(6, 'dependency update automation deferred (no config file).');
+    return;
+  }
+  if (dependabot && renovate) {
+    fail(6, 'both .github/dependabot.yml and renovate.json exist — choose one automation tool.');
+    return;
+  }
+
+  const content = dependabot || renovate;
+  const problems = [];
+  if (/automerge:\s*true/i.test(content) && /update-types:[\s\S]*major/i.test(content)) {
+    problems.push('automation config enables automerge for major updates');
+  }
+  if (/automergeType:\s*["']?all["']?/i.test(content)) {
+    problems.push('automation config enables unsafe automergeType: all');
+  }
+  if (
+    /ignore:\s*\[\s*\*/.test(content) ||
+    /enabled:\s*false[\s\S]*package-ecosystem:\s*npm/i.test(content)
+  ) {
+    problems.push('automation config disables npm dependency updates');
+  }
+
+  if (problems.length === 0) {
+    pass(6, 'dependency automation config is bounded (no unsafe automerge).');
+  } else {
+    fail(6, `dependency automation policy problems:\n    ${problems.join('\n    ')}`);
+  }
 }
 
 await checkNoPublishedInstallHooks();
@@ -222,6 +249,7 @@ checkPnpmPolicy();
 const workflows = readWorkflowFiles();
 checkFrozenInstalls(workflows);
 checkTrustedPublish(workflows);
+checkDependencyAutomation();
 
 for (const p of passes) console.log(`✓ [${p.id}] ${p.msg}`);
 if (failures.length > 0) {

@@ -25,6 +25,15 @@ Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to 
 
 If you don't have a key, none of this runs — no network, no check, no cost. The keyless OSS majority can ignore this page.
 
+### Does this phone home?
+
+Cloud sync is **opt-in** (API key + entitlement). It is separate from
+OpenTelemetry (opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`) and from CLI update
+notifications (default-on TTY product update check — see
+[ADR-0070](../../decisions/ADR-0070-telemetry-and-outbound-network-posture.md)
+and [ADR-0073](../../decisions/ADR-0073-update-notification-policy.md)). Disable
+cloud sync with `--no-cloud`, user config, or project `cli.cloud.sync: false`.
+
 > **What you'll understand after this:**
 > - The pipeline from a run to the cloud, and where each step lives.
 > - Exactly what is sent (the `SignalBatch` payload).

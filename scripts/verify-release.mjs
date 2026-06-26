@@ -7,7 +7,7 @@
 // disagree with package.json, missing CHANGELOG entries, stale
 // generated docs, cross-package deps pointing at the wrong version.
 //
-// Twelve checks (all run; any failure exits 1):
+// Thirteen checks (all run; any failure exits 1):
 //
 //   1. All @opensip-cli/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
@@ -27,6 +27,8 @@
 //      pack/publish. Set comparison only; the ORDER + the workflow/bootstrap/docs
 //      surfaces are the PR-time contract test's job
 //      (packages/cli/src/__tests__/release-package-order-contract.test.ts).
+//  13. Release governance docs/workflow comments match release-package-order.mjs
+//      (scripts/lib/release-governance-surface.mjs).
 //
 // Usage:
 //   node scripts/verify-release.mjs                     # local pre-flight
@@ -41,6 +43,7 @@ import { promises as fs } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { collectGovernanceDriftProblems } from './lib/release-governance-surface.mjs';
 import {
   RELEASE_PACKAGE_ORDER,
   discoverAllScopedPackages,
@@ -332,6 +335,16 @@ try {
       12,
       `package(s) missing a \`files\` allowlist — npm would publish src/coverage/.turbo junk:\n${lines.join('\n')}`,
     );
+  }
+}
+
+// 13 — Release governance docs/workflow comments match release-package-order.mjs.
+{
+  const problems = collectGovernanceDriftProblems();
+  if (problems.length === 0) {
+    pass(13, 'release governance docs/workflow comments match release-package-order.mjs.');
+  } else {
+    fail(13, `release governance surface drift:\n    ${problems.join('\n    ')}`);
   }
 }
 

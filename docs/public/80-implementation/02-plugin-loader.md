@@ -173,6 +173,15 @@ plugins:
 
 No package is privileged — the bundled packs (`@opensip-cli/checks-universal`, `@opensip-cli/checks-typescript`, etc.) carry the marker and are discovered through the same contract as third-party packs. Add a marker-tagged pack to your project's `dependencies`, and it's loaded on the next run with no further wiring.
 
+### Producer vs consumption provenance
+
+First-party OpenSIP packages are published with npm **producer provenance**
+(OIDC + `--provenance`). **Consumption-side** verification — checking provenance
+when a project installs or loads a third-party pack — is a documented trust gate
+([ADR-0068](../../decisions/ADR-0068-consumption-side-verification-policy.md)) that
+is **not implemented** in the loader yet. Until spec 03 lands enforcement, admission
+remains trust-tier + allowlist policy only.
+
 The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `opensip fit plugin add/remove/sync`.
 
 ---

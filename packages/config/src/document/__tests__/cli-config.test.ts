@@ -53,16 +53,22 @@ describe('loadCliDefaults', () => {
   verbose: true
   json: false
   reportTo: ${reportPath}
-  apiKey: sk-test
   debug: true
 `);
     expect(loadCliDefaults(testDir)).toEqual({
       verbose: true,
       json: false,
       reportTo: reportPath,
-      apiKey: 'sk-test',
       debug: true,
     });
+  });
+
+  it('drops project cli.apiKey (ADR-0071 — use env or user config)', () => {
+    writeConfig(`cli:
+  apiKey: sk-forbidden-in-project
+  verbose: true
+`);
+    expect(loadCliDefaults(testDir)).toEqual({ verbose: true });
   });
 
   it('parses string-array fields', () => {

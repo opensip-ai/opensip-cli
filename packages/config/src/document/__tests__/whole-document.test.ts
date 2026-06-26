@@ -107,6 +107,15 @@ describe('composed whole-document validation', () => {
     ).toThrow(ConfigurationError);
   });
 
+  it('rejects project cli.apiKey (ADR-0071)', () => {
+    expect(() =>
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        cli: { reportTo: 'https://cloud.test/api', apiKey: 'sk-forbidden' },
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
   it('rejects the removed cli.recipe fallback', () => {
     expect(() =>
       validateConfigDocument(schema(), {

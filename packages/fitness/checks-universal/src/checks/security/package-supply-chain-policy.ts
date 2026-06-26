@@ -519,6 +519,48 @@ function isMutableInstallLine(line: string): boolean {
   );
 }
 
+function splitWorkflowSteps(content: string): string[] {
+  const lines = content.split('\n');
+  const steps: string[] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    if (/^\s*-\s+name:/.test(line) && current.length > 0) {
+      steps.push(current.join('\n'));
+      current = [line];
+      continue;
+    }
+    current.push(line);
+  }
+  if (current.length > 0) steps.push(current.join('\n'));
+  return steps;
+}
+
+function executableStepText(step: string): string {
+  return step
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+}
+
+function extractPublishBlocks(workflowContent: string): string[] {
+  const blocks: string[] = [];
+  for (const step of splitWorkflowSteps(workflowContent)) {
+    const executable = executableStepText(step);
+    if (/\bnpm\s+publish\b/.test(executable)) {
+      blocks.push(executable);
+    }
+  }
+  return blocks;
+}
+
+function publishBlockHasProvenance(block: string): boolean {
+  return /(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(block);
+}
+
+function publishBlockReferencesLongLivedToken(block: string): boolean {
+  return /\bnpm\s+publish\b/.test(block) && /(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(block);
+}
+
 function checkFrozenCiInstalls(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
   if (snapshot.workflows.length === 0) return;
   let hasFrozenInstall = false;
@@ -565,41 +607,70 @@ function checkTrustedPublishing(snapshot: ProjectSnapshot, violations: CheckViol
         line: lineOf(workflow.content, 'npm publish'),
       });
     }
-    if (
-      !/(--provenance|NPM_CONFIG_PROVENANCE\s*[:=]\s*true|provenance:\s*true)/.test(
-        workflow.content,
-      )
-    ) {
-      pushViolation(violations, {
-        filePath: workflow.filePath,
-        type: 'publish-provenance-missing',
-        message: `${workflow.relPath} publishes to npm without explicit provenance`,
-        suggestion:
-          'Publish with npm trusted publishing and --provenance so consumers can verify build provenance.',
-        line: lineOf(workflow.content, 'npm publish'),
-      });
-    }
-    if (/(NPM_TOKEN|NODE_AUTH_TOKEN)/.test(workflow.content)) {
-      // OIDC trusted publishing covers `npm publish` only — it does NOT cover
-      // `npm dist-tag`. A staged-publish→promote lane that publishes via OIDC
-      // but uses a classic token solely for `npm dist-tag add` (e.g. promoting
-      // a release-candidate tag to `latest`) is the legitimate, OIDC-uncovered
-      // exception, so we do not flag its token. We still flag token-based
-      // publish (a token with no `id-token: write`) and a token alongside
-      // `npm publish` with no `npm dist-tag` justification.
-      const usesDistTag = /\bnpm\s+dist-tag\b/.test(workflow.content);
-      const usesOidc = /id-token:\s*write/.test(workflow.content);
-      if (!(usesDistTag && usesOidc)) {
+    const publishBlocks = extractPublishBlocks(workflow.content);
+    for (const block of publishBlocks) {
+      if (!publishBlockHasProvenance(block)) {
+        pushViolation(violations, {
+          filePath: workflow.filePath,
+          type: 'publish-provenance-missing',
+          message: `${workflow.relPath} publishes to npm without explicit provenance in an npm publish step`,
+          suggestion:
+            'Publish with npm trusted publishing and --provenance (or NPM_CONFIG_PROVENANCE=true) on every npm publish command, including commands inside shell functions. Producer provenance is distinct from consumption-side verification by installers/loaders.',
+          severity: 'error',
+          line: lineOf(workflow.content, 'npm publish'),
+        });
+      }
+      if (publishBlockReferencesLongLivedToken(block)) {
         pushViolation(violations, {
           filePath: workflow.filePath,
           type: 'publish-token-exposure',
-          message: `${workflow.relPath} references a long-lived npm publish token`,
+          message: `${workflow.relPath} references a long-lived npm token in an npm publish step`,
           suggestion:
-            'Prefer npm trusted publishing/OIDC. Remove NPM_TOKEN/NODE_AUTH_TOKEN from publish jobs after migration. A token confined to `npm dist-tag` promotion in an OIDC publish workflow is acceptable (OIDC does not cover dist-tag).',
+            'Prefer npm trusted publishing/OIDC for npm publish. A token confined to `npm dist-tag` promotion in an OIDC workflow is acceptable (OIDC does not cover dist-tag).',
+          severity: 'error',
           line: lineOf(workflow.content, /NPM_TOKEN|NODE_AUTH_TOKEN/),
         });
       }
     }
+  }
+}
+
+function checkDependencyAutomation(snapshot: ProjectSnapshot, violations: CheckViolation[]): void {
+  const rootDir = snapshot.rootDir;
+  const dependabotPath = path.join(rootDir, '.github/dependabot.yml');
+  const renovatePath = path.join(rootDir, 'renovate.json');
+  const dependabotContent = readIfExists(dependabotPath);
+  const renovateContent = readIfExists(renovatePath);
+  if (!dependabotContent && !renovateContent) return;
+  if (dependabotContent && renovateContent) {
+    pushViolation(violations, {
+      filePath: dependabotPath,
+      type: 'dependency-automation-conflict',
+      message: 'Both dependabot.yml and renovate.json are present',
+      suggestion: 'Choose one dependency automation tool (Dependabot or Renovate), not both.',
+      severity: 'error',
+    });
+    return;
+  }
+  const content = dependabotContent ?? renovateContent ?? '';
+  const filePath = dependabotContent ? dependabotPath : renovatePath;
+  if (/automerge:\s*true/i.test(content) && /update-types:[\s\S]*major/i.test(content)) {
+    pushViolation(violations, {
+      filePath,
+      type: 'dependency-automation-unsafe-automerge',
+      message: 'Dependency automation enables automerge for major updates',
+      suggestion: 'Require maintainer review for major runtime dependency updates.',
+      severity: 'error',
+    });
+  }
+  if (/automergeType:\s*["']?all["']?/i.test(content)) {
+    pushViolation(violations, {
+      filePath,
+      type: 'dependency-automation-unsafe-automerge',
+      message: 'Dependency automation enables automergeType: all',
+      suggestion: 'Do not automerge dependency updates in this repo.',
+      severity: 'error',
+    });
   }
 }
 
@@ -619,6 +690,7 @@ export async function analyzePackageSupplyChainPolicy(
   checkMinimumReleaseAge(snapshot, violations);
   checkFrozenCiInstalls(snapshot, violations);
   checkTrustedPublishing(snapshot, violations);
+  checkDependencyAutomation(snapshot, violations);
   return violations;
 }
 
@@ -641,7 +713,10 @@ export const packageSupplyChainPolicy = defineCheck({
 - Install-time lifecycle scripts and missing install-script allowlists
 - Missing dependency release-age gates
 - CI install commands that can rewrite lockfiles
-- npm publish workflows that lack OIDC/provenance or still use long-lived tokens (a token confined to \`npm dist-tag\` promotion in an OIDC publish workflow is exempt — OIDC covers \`npm publish\`, not \`npm dist-tag\`)
+- npm publish workflows that lack OIDC/provenance or still use long-lived tokens in \`npm publish\` steps (a token confined to \`npm dist-tag\` promotion in an OIDC publish workflow is exempt — OIDC covers \`npm publish\`, not \`npm dist-tag\`)
+- Unsafe dependency-automation automerge settings when Dependabot/Renovate config is present
+
+**Producer vs consumer provenance:** this check enforces **producer-side** publish workflow posture. **Consumption-side** verification (install/load provenance for third-party packages) is a separate trust policy and is not enforced by this check.
 
 **Why it matters:** Modern npm-family attacks often execute during installation, exploit fresh compromised versions before takedown, or bypass weakened lockfile/install-script policy. These checks keep the project in a fail-closed posture before dependency code runs in CI or developer machines.
 

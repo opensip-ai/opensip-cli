@@ -50,13 +50,41 @@ boundary. The "external isolation" story does **not** cover the most common exte
 - Wildcard `*` admits all and emits a **per-invocation** `cli.trust.wildcard_allowlist`
   deprecation warning (DEPRECATED + full-privilege caveat).
 
+## Consumption verification inventory (ADR-0068)
+
+Producer provenance for first-party packages ships via OIDC/`npm publish --provenance`.
+**Consumption-side** verification (install/load checks for third-party packages) is
+policy-defined but **not implemented** in the loader yet (spec 03 owns enforcement).
+
+| Consumption point | Package identity | Default admission (ADR-0061) | npm provenance possible? | Likely verify time |
+| --- | --- | --- | --- | --- |
+| Global installed npm whole Tools | npm name + version pin | Deny-by-default (`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`) | Yes (if publisher ships provenance) | Install + load |
+| Project-local authored Tools | Sidecar path + manifest | Deny-by-default (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`) | No (authored source) | Admission (`tools validate`) + load |
+| User-global authored Tools | Sidecar path under `~/.opensip-cli/tools/` | Trusted-by-location | No | Load (explicit policy TBD) |
+| Project-pinned fit/sim packs | npm pin in `plugins.*` | Config-listed | Yes | Sync/install + capability load |
+| Marker-discovered fit packs | `opensipTools.kind: fit-pack` | Trusted when bundled; external = config/markers | Yes for external npm | Capability load |
+| Graph adapters | `plugins.graphAdapters` or marker | Trusted when bundled; external = explicit | Yes for external npm | Per-run capability load |
+
+### Strict-mode target policy (not enforced yet)
+
+| Provenance state | Bundled first-party | Enterprise strict (non-bundled) | Non-strict default |
+| --- | --- | --- | --- |
+| Present + matches | `allow` (TCB) | `allow` when allowlisted | `allow` |
+| Missing | n/a (release gate) | `deny` unless approved exception | `warn` |
+| Mismatch | n/a | `deny` unless approved exception | `warn` |
+| Authored (no npm provenance) | n/a | `deny` without explicit project admission | `warn` at admission |
+
+Bundled first-party packages are trusted TCB — verified by release provenance, not
+per-install consumer checks. User-global authored trust-by-location must be decided
+explicitly in enterprise policy; it does not inherit silently from filesystem path.
+
 ## Remaining gaps
 
 | Gap | Status |
 |-----|--------|
 | Capability / confidentiality isolation | **Absent** — admitted tools run at full user privilege |
 | In-process capability packs | **Strongest gap** — no worker boundary for custom checks/adapters |
-| Consumption-side provenance verification | Publish-side `npm publish --provenance` ships (`.github/workflows/release.yml:236,248`); **consumption-side** verification at install/load is the gap |
+| Consumption-side provenance verification | Publish-side ships; **install/load enforcement is the gap** (ADR-0068 policy only) |
 | Off-thread-selector fitness check | **Lapsed** — `live-runs-off-thread` removed; `live-view-through-cli-live` (ADR-0058) forbids ink `render` imports only |
 
 **Public third-party ecosystem MUST NOT open until consumption-side verification +

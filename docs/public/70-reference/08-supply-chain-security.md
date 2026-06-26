@@ -52,13 +52,46 @@ standard controls explicit and fail closed.
 - GitHub workflows use mutable dependency install commands without lockfile
   enforcement, such as pnpm without `--frozen-lockfile` or Bun without
   `--frozen-lockfile`.
-- An npm publish workflow lacks `id-token: write`, omits `--provenance`, or
-  references long-lived npm publish tokens.
+- An npm publish workflow lacks `id-token: write`, omits `--provenance` on an
+  executable `npm publish` step (including commands inside shell functions), or
+  references long-lived npm publish tokens in a publish step. A classic token used
+  solely for `npm dist-tag add` promotion in an OIDC publish workflow is the
+  documented exception (OIDC does not cover dist-tag).
+
+### Producer provenance lane
+
+Ordinary OpenSIP releases publish with **OIDC trusted publishing** and
+`npm publish <tarball> --provenance`. `pnpm supply-chain:verify` gates this in CI
+and `release.yml` before publish. The only documented non-provenance exception is
+the one-time bootstrap for brand-new package names — see `RELEASING.md`.
+
+**Consumption-side verification** (install/load provenance checks for third-party
+packages) is a separate trust gate coordinated with
+[ADR-0068](../../decisions/ADR-0068-consumption-side-verification-policy.md) and
+[ADR-0061](../../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
+It is **not** enforced by the reusable check or the release gate in this repo yet.
 
 The release workflow still installs npm 11 into a separate prefix because npm
 11 is required for the trusted-publishing token exchange. The supply-chain gate
 allows that package-manager bootstrap while continuing to reject mutable project
 dependency installs.
+
+### Dependency update hygiene
+
+Dependency update PRs are opened by **Dependabot** (see
+[ADR-0069](../../decisions/ADR-0069-dependency-hygiene-automation-policy.md)) on a
+weekly cadence. Automation is additive — it does not replace human review.
+
+Every dependency merge still passes:
+
+- `pnpm install --frozen-lockfile` in CI
+- `pnpm-workspace.yaml` release-age and trust-policy controls (`minimumReleaseAge`,
+  `trustPolicy: no-downgrade`, exact `trustPolicyExclude` / `minimumReleaseAgeExclude`
+  entries reviewed by maintainers)
+- `pnpm supply-chain:verify`
+
+Trust-policy exemptions are exact-version and hand-reviewed; Dependabot does not
+edit `pnpm-workspace.yaml` automatically.
 
 ---
 

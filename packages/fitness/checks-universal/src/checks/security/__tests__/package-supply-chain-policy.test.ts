@@ -199,6 +199,208 @@ describe('package-supply-chain-policy', () => {
     }
   });
 
+  it('flags npm publish inside a shell function without provenance', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'shell-fn-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      writeFixture(
+        cwd,
+        '.github/workflows/release.yml',
+        [
+          'name: Release',
+          'jobs:',
+          '  publish:',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm install --frozen-lockfile',
+          '      - run: |',
+          '          publish_pkg() {',
+          '            npm publish dist/app-1.0.0.tgz --access public',
+          '          }',
+          '          publish_pkg',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).toContain('publish-provenance-missing');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts NPM_CONFIG_PROVENANCE=true on npm publish steps', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'env-provenance-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      writeFixture(
+        cwd,
+        '.github/workflows/release.yml',
+        [
+          'name: Release',
+          'jobs:',
+          '  publish:',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm install --frozen-lockfile',
+          '        env:',
+          '          NPM_CONFIG_PROVENANCE: true',
+          '      - run: npm publish dist/app-1.0.0.tgz --access public',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).not.toContain('publish-provenance-missing');
+      expect(types).not.toContain('publish-token-exposure');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('flags unsafe dependency automation automerge for major updates', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'deps-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      writeFixture(
+        cwd,
+        '.github/dependabot.yml',
+        [
+          'version: 2',
+          'updates:',
+          '  - package-ecosystem: npm',
+          '    directory: /',
+          '    schedule:',
+          '      interval: daily',
+          '    automerge: true',
+          '    update-types:',
+          '      - major',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).toContain('dependency-automation-unsafe-automerge');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not emit a consumer-verification violation for ordinary projects', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'consumer-gap-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).not.toContain('consumption-verification-missing');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('still flags a publish token when the workflow has no dist-tag justification', async () => {
     const cwd = makeProject();
     try {

@@ -161,8 +161,8 @@ jobs:
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
       # workspace:* deps into concrete versions, which `npm publish` then
-      # uploads. We pack all 33 up front so the publish step can run
-      # against a known-good set of tarballs in dependency order.
+      # uploads. Pack every workspace package into tarballs up front so the
+      # publish step can run against a known-good set in dependency order.
       #
       # The pack list + ORDER is DERIVED from scripts/release-package-order.mjs
       # (the single source of truth — ADR-0017): `--print pack` emits the

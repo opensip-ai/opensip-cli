@@ -37,6 +37,12 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0073](ADR-0073-update-notification-policy.md) — Update notification policy (default-on TTY hourly npm check with opt-out; update-state stores only `{ latest }`).
+- [ADR-0072](ADR-0072-i18n-posture.md) — i18n posture (English-only CLI/docs; localization deferred).
+- [ADR-0071](ADR-0071-credential-handling-policy.md) — Credential handling policy (forbid project `cli.apiKey`; `--api-key` / env / user config only; `0o600` user writes).
+- [ADR-0070](ADR-0070-telemetry-and-outbound-network-posture.md) — Telemetry and outbound network posture (OTel opt-in; cloud sync gated; update I/O separate from telemetry).
+- [ADR-0069](ADR-0069-dependency-hygiene-automation-policy.md) — Dependency hygiene automation policy (Dependabot weekly PRs; no automerge; trust-policy exemptions human-reviewed).
+- [ADR-0068](ADR-0068-consumption-side-verification-policy.md) — Consumption-side verification policy (strict-mode install/load provenance policy; enforcement deferred to spec 03).
 - [ADR-0067](ADR-0067-config-validate-schema-commands.md) — Config validate and schema commands (`opensip config validate|schema` reuses composed dispatcher schema; separate from user-global `configure`).
 - [ADR-0066](ADR-0066-typed-errors-own-exit-codes.md) — Typed errors own exit codes (`getErrorSuggestion` is advice-only; untyped errors exit 1).
 - [ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md) — Public JSON output and raw-stream policy (host-stamped `CommandOutcome`; raw-stream is transport-only).

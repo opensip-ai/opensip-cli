@@ -155,6 +155,16 @@ Surface note: this is a flat `data-purge` subcommand (the spec drafted a
 nested `tools data purge`; the host's command machinery is deliberately one
 group level deep).
 
+## Trust tier and provenance (current vs planned)
+
+`tools list` and `tools validate` surface trust tier and install provenance
+metadata where available. **Enforcement** of consumption-side provenance
+(install/load verification for non-bundled npm packages) is defined in
+[ADR-0068](../../decisions/ADR-0068-consumption-side-verification-policy.md) but
+**not active** in the loader yet — enterprise strict mode will deny missing or
+mismatched provenance unless an approved exception exists. Bundled first-party
+tools remain trusted TCB verified by the release provenance lane.
+
 ## See also
 
 - [`01-cli-commands.md`](./01-cli-commands.md) — the full command inventory.

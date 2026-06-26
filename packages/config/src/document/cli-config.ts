@@ -74,7 +74,14 @@ export const cliConfigSchema = z.object({
   // schema silently disagreed with the loader (which accepted any string) AND
   // rejected valid file paths: the M8 drift this single-sourcing exposed.
   reportTo: reportToSchema.optional(),
-  apiKey: z.string().min(1).optional(),
+  // ADR-0071: project config must not store literal API keys (commit risk).
+  apiKey: z
+    .any()
+    .refine((val) => val === undefined, {
+      message:
+        'cli.apiKey is not allowed in project config (ADR-0071). Use --api-key, OPENSIP_API_KEY, or ~/.opensip-cli/config.yml#apiKey.',
+    })
+    .optional(),
   fileTypes: z.array(z.string()).optional(),
   ignore: z.array(z.string()).optional(),
   debug: z.boolean().optional(),

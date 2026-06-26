@@ -149,15 +149,24 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v0.1.13 against:
+Last verified at v0.1.13 against `scripts/release-package-order.mjs` (the publishable
+package source of truth) and the layer tables above:
 
-- `packages/` directory listing — **34 publishable packages** total (all at `0.1.13`), plus one workspace-private test-support package:
+- **36 publishable packages** total (all at `0.1.13`), plus one workspace-private
+  `@opensip-cli/test-support` package and the private root `@opensip-cli/root`:
   - Layer 1 (kernel): 1 — `core`
-  - Layer 2 (datastore + contracts + tree-sitter + cli-ui): 4 — `datastore`, `contracts`, `tree-sitter`, `cli-ui`
-  - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 — `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
+  - Layer 2 (datastore + contracts + tree-sitter + clone-detection + cli-ui): 5 —
+    `datastore`, `contracts`, `tree-sitter`, `clone-detection`, `cli-ui`
+  - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 —
+    `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`,
+    `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
   - Layer 4 Tools: 4 — `fitness`, `simulation`, `graph`, `yagni`
-  - Layer 5 (check packs + graph adapter packs/scaffolding): 13 — `checks-universal`, `checks-typescript`, `checks-python`, `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`, `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
+  - Layer 5 (check packs + graph adapter packs/scaffolding): 13 —
+    `checks-universal`, `checks-typescript`, `checks-python`,
+    `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`,
+    `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 6 (composition root): 1 — `cli`
+  - Publishable but cataloged separately: `@opensip-cli/cli-live` (shared live-run shell, ADR-0058)
 - The graph language adapters are publishable `@opensip-cli/graph-*` packages,
   backed by the shared `@opensip-cli/graph-adapter-common` scaffolding package
   and the `@opensip-cli/tree-sitter` substrate. The config composer

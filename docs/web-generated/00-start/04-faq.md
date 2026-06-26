@@ -18,6 +18,31 @@ Common questions. If yours isn't here, the answer probably lives somewhere in th
 
 ---
 
+### Is the CLI localized / translated?
+
+**No — English only today.** Programming-language adapters (`lang-typescript`,
+`lang-rust`, …) are for parsing source code, not UI localization. Localization
+extraction is deferred unless an enterprise contract requires it — see
+[ADR-0072](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0072-i18n-posture.md).
+
+---
+
+### Does opensip-cli "phone home"?
+
+**Not for telemetry.** Summary by surface ([ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)):
+
+- **OpenTelemetry:** off unless you set `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- **OpenSIP Cloud sync:** off without an API key and entitlement; disable with
+  `--no-cloud` or config.
+- **Update notifications:** default-on for interactive TTY (hourly npm version
+  check); silence with `OPENSIP_NO_UPDATE=1` or `NO_UPDATE_NOTIFIER=1`.
+- **Supply-chain checks:** local inspection of lockfiles/workflows — no hidden
+  telemetry.
+
+Update state stores only `{ latest }` — no user paths or credentials.
+
+---
+
 ### Is opensip-cli a linter replacement?
 
 **No.** ESLint, Ruff, golangci-lint, and clang-tidy still belong in your toolchain — they're sharper at language-specific syntactic patterns. opensip-cli sits *above* linters: it adds the architectural rules, cross-file constraints, and polyglot gates that linters can't express. You run both in CI.

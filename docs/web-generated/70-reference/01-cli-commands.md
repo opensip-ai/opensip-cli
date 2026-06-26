@@ -870,7 +870,13 @@ opensip-cli updates through the same installer used for first-time setup:
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
-The CLI checks npm for a newer version once a day (non-blocking, TTY-only). The *check* is rate-limited to once a day, but once a newer version is found the *notice* persists on **every** run until you upgrade — so it's never lost if you miss it once — and disappears on its own the run after you update. When an update is available it surfaces without nagging:
+The CLI checks npm for a newer version at most once an hour on TTY sessions
+(non-blocking product update I/O, not telemetry — see
+[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0073-update-notification-policy.md)). The *fetch*
+is rate-limited to that interval, but once a newer version is found the *notice*
+persists on **every** run until you upgrade — so it's never lost if you miss it
+once — and disappears on its own the run after you update. When an update is
+available it surfaces without nagging:
 
 - On the default `mini` banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
 - On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
