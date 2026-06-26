@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { analyzeNoFirstPartyContractVersionFields } from '../../../../opensip-cli/fit/checks/no-first-party-contract-version-fields.mjs';
+import { analyzeNoImplicitToolExtensionDefaults } from '../../../../opensip-cli/fit/checks/no-implicit-tool-extension-defaults.mjs';
 import { analyzeToolContractVersionPolicy } from '../../../../opensip-cli/fit/checks/tool-contract-version-policy.mjs';
 
 describe('analyzeNoFirstPartyContractVersionFields', () => {
@@ -35,6 +36,41 @@ describe('analyzeNoFirstPartyContractVersionFields', () => {
       analyzeNoFirstPartyContractVersionFields(
         content,
         '/repo/packages/fitness/engine/src/__tests__/tool.test.ts',
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('analyzeNoImplicitToolExtensionDefaults', () => {
+  it('accepts create-tool passthrough without synthesized hooks', () => {
+    const content = `
+      return defineTool({
+        ...(input.extensionPoints === undefined ? {} : { extensionPoints: input.extensionPoints }),
+      });
+    `;
+    expect(
+      analyzeNoImplicitToolExtensionDefaults(content, 'packages/core/src/tools/create-tool.ts'),
+    ).toEqual([]);
+  });
+
+  it('flags synthesized default extensionPoints hooks', () => {
+    const content = `
+      return defineTool({
+        extensionPoints: input.extensionPoints ?? { initialize: async () => {} },
+      });
+    `;
+    const violations = analyzeNoImplicitToolExtensionDefaults(
+      content,
+      'packages/core/src/tools/create-tool.ts',
+    );
+    expect(violations).toHaveLength(1);
+  });
+
+  it('ignores unrelated files', () => {
+    expect(
+      analyzeNoImplicitToolExtensionDefaults(
+        'extensionPoints: { initialize: async () => {} }',
+        'packages/fitness/engine/src/tool.ts',
       ),
     ).toEqual([]);
   });

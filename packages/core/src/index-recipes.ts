@@ -8,6 +8,14 @@ export type {
 
 // Recipes — generic selector union + resolver (selection half of the
 // substrate; execution stays tool-owned).
+export {
+  allUnitsLabel,
+  builtInOriginLabel,
+  explicitUnitsLabel,
+  PATTERN_BASED_LABEL,
+  recipeDisplayInfo,
+} from './recipes/display.js';
+export type { RecipeDisplayInfo, RecipeDisplaySource } from './recipes/display.js';
 export { resolveSelector } from './recipes/selector.js';
 export type {
   RecipeSelector,

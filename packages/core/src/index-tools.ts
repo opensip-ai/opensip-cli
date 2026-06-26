@@ -6,6 +6,7 @@ export {
   ToolRegistry,
   UnknownLiveViewError,
   TOOL_CONTRACT_VERSION,
+  createTool,
   createToolScope,
   defineTool,
   deriveCommandsFromSpecs,
@@ -17,6 +18,7 @@ export {
   inferStoredRunOutcome,
 } from './tools/index.js';
 export type {
+  CreateToolInput,
   DefineToolInput,
   ResolvedToolHooks,
   Tool,

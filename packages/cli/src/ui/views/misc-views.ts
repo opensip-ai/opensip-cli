@@ -81,12 +81,13 @@ export function viewListChecks(result: ListChecksResult): ViewNode {
 export function viewListRecipes(result: ListRecipesResult): ViewNode {
   const children: ViewNode[] = [line([{ text: 'Available Recipes', bold: true }]), SPACER];
   for (const r of result.recipes) {
+    const label = r.selectionLabel ?? r.checkCount;
     children.push(
       line([
         { text: '  ' },
         { text: r.name, tone: 'brand' },
         { text: ` — ${r.description} ` },
-        { text: `(${r.checkCount})`, dim: true },
+        { text: `(${label})`, dim: true },
       ]),
     );
   }

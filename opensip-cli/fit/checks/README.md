@@ -65,6 +65,10 @@ remain separate because they were previously promoted and then pulled
 back from shipped packs. Together with the ADR check files, they form
 the current local decision-enforcement set.
 
+`no-implicit-tool-extension-defaults.mjs` (ADR-0076) keeps `createTool()` and
+`defineTool()` from synthesizing lifecycle `extensionPoints` when authors omit
+them — safe defaults are absence, not no-op hooks.
+
 ## Promoting to first-party
 
 If a check here proves valuable to other opensip-cli consumers,

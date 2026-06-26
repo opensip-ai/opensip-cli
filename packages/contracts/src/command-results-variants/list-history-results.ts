@@ -16,7 +16,14 @@ export interface ListChecksResult {
 
 export interface ListRecipesResult {
   type: 'list-recipes';
-  recipes: { name: string; description: string; checkCount: string }[];
+  recipes: {
+    name: string;
+    description: string;
+    /** Legacy label field — prefer `selectionLabel` for new producers. */
+    checkCount: string;
+    /** Neutral human label for what the recipe selects (checks, rules, origin, …). */
+    selectionLabel?: string;
+  }[];
 }
 
 export interface HistorySession extends StoredSession {

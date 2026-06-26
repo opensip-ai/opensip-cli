@@ -24,6 +24,19 @@ A Tool plugin contributes its own subcommand. Use this when you want something f
 
 This is the heaviest extension shape. Most teams never need it. If you just want to ship rules, [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) is the right path.
 
+## Project-local authoring paths
+
+| Path | Command | When to use |
+|------|---------|-------------|
+| `minimal-js` | `opensip tools create <id>` | Zero-dependency smoke tests inside a repo |
+| `ts-local` | `opensip tools create <id> --template ts-local` | Typed authoring with `createTool()` before packaging |
+| Publishable npm | `opensip tools install <spec>` | Distribution to other repos (deferred scaffold — see ADR-0076) |
+
+`createTool()` is the ergonomic entry point for typed local tools; `defineTool()`
+remains the explicit low-level contract. Neither helper synthesizes lifecycle
+`extensionPoints` — absence is the safe default
+([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+
 Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.
 
 ## Layout
@@ -254,6 +267,19 @@ Contract versions (core `TOOL_CONTRACT_VERSION` + per-tool versions such as
 governing ADRs (0046/0047). Declare the relevant ones on your `Tool` object
 (under `extensionPoints` is the preferred path) so hosts and `agent-catalog`
 can see the exact surface you were written against.
+
+## Recipe listing (shared display, tool-owned execution)
+
+Fitness, graph, and simulation expose `recipes` list commands that return the
+shared `ListRecipesResult` shape. Core provides display-only helpers
+(`recipeDisplayInfo`, `allUnitsLabel`, …) for name/description/tags and a neutral
+`selectionLabel`. Each tool still owns selector semantics and execution:
+
+- **Fitness** — check selectors, retry/timeout/reporting during runs.
+- **Graph** — rule selectors only; recipes do not execute scenarios.
+- **Simulation** — scenario execution and sim-only selector arms.
+
+There is no generic recipe execution framework in core.
 
 ## Tools that use the kernel registries
 

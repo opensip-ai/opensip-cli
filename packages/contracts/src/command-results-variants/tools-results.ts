@@ -28,6 +28,8 @@ export interface ToolsCreateResult {
   readonly dir: string;
   readonly files: readonly string[];
   readonly success: boolean;
+  readonly template?: 'minimal-js' | 'ts-local';
+  readonly nextSteps?: readonly string[];
   readonly error?: string;
   readonly hint?: string;
 }

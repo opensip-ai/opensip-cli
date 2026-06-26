@@ -11,6 +11,13 @@
  * command action body does).
  */
 
+import {
+  allUnitsLabel,
+  explicitUnitsLabel,
+  PATTERN_BASED_LABEL,
+  recipeDisplayInfo,
+} from '@opensip-cli/core';
+
 import { currentGraphRecipes } from '../recipes/registry.js';
 
 import type { ListRecipesResult } from '@opensip-cli/contracts';
@@ -28,15 +35,21 @@ export function listGraphRecipes(): Promise<ListRecipesResult> {
     .getAllRecipes()
     .map((recipe) => {
       const selector = recipe.rules;
-      let checkCount: string;
+      let selectionLabel: string;
       if (selector.type === 'all') {
-        checkCount = 'all rules';
+        selectionLabel = allUnitsLabel('rules');
       } else if (selector.type === 'explicit') {
-        checkCount = `${selector.ids.length} rules`;
+        selectionLabel = explicitUnitsLabel(selector.ids.length, 'rule', 'rules');
       } else {
-        checkCount = 'pattern-based';
+        selectionLabel = PATTERN_BASED_LABEL;
       }
-      return { name: recipe.name, description: recipe.description, checkCount };
+      const display = recipeDisplayInfo(recipe, selectionLabel);
+      return {
+        name: display.name,
+        description: display.description,
+        checkCount: display.selectionLabel,
+        selectionLabel: display.selectionLabel,
+      };
     });
 
   return Promise.resolve({

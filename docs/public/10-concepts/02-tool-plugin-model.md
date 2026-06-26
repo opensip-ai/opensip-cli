@@ -296,6 +296,16 @@ export const tool = defineTool({
 }
 ```
 
+For project-local authoring inside a repo, `opensip tools create` scaffolds
+conformant sidecars (`minimal-js` or `ts-local`). The typed template uses
+`createTool()` — a thin wrapper over `defineTool()` that accepts a
+`primaryCommand` plus optional nested subcommands without synthesizing lifecycle
+hooks ([ADR-0076](../../decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+
+Recipe-capable tools share listing helpers in core (`recipeDisplayInfo`, neutral
+`selectionLabel` on `ListRecipesResult`) but keep execution domain-owned — fitness
+runs checks, graph selects rules only, simulation runs scenarios.
+
 That's the whole tool. Add `@yourorg/audit-sec` to the project (or run `opensip tools install @yourorg/audit-sec`), and `opensip audit-sec` works. For discoverability verbs (`list`, `recipes`, `export`) use `defineNestedCommand`; `defineTool` mounts them under `identity.name` — see [Command surface taxonomy](../50-extend/07-command-taxonomy.md). For the full walkthrough — installation modes, per-command options, kernel-registry reuse — see [Full Tool plugins](../50-extend/06-full-tool-plugins.md).
 
 What you *don't* need:

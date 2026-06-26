@@ -107,6 +107,8 @@ export {
 } from './derive-commands-from-specs.js';
 export { defineTool } from './define-tool.js';
 export type { DefineToolInput } from './define-tool.js';
+export { createTool } from './create-tool.js';
+export type { CreateToolInput } from './create-tool.js';
 export { createToolScope } from './create-tool-scope.js';
 export { applyToolContributeScope, resolveToolHooks } from './resolve-tool-hooks.js';
 export type { ResolvedToolHooks } from './resolve-tool-hooks.js';

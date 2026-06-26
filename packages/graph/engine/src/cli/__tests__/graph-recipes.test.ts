@@ -16,12 +16,12 @@ describe('listGraphRecipes', () => {
     expect(result.type).toBe('list-recipes');
     const def = result.recipes.find((r) => r.name === 'default');
     expect(def).toBeDefined();
-    expect(def?.checkCount).toBe('all rules');
+    expect(def?.selectionLabel).toBe('all rules');
   });
 
   it('reports a subset recipe with an N-rules count', async () => {
     const result = await runWithScope(makeGraphTestScope(), () => listGraphRecipes());
     const deadCode = result.recipes.find((r) => r.name === 'dead-code');
-    expect(deadCode?.checkCount).toBe('2 rules');
+    expect(deadCode?.selectionLabel).toBe('2 rules');
   });
 });

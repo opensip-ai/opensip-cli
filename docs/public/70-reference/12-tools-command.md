@@ -99,17 +99,30 @@ Exit codes: `0` = `passed`; `2` = `failed` or `incomplete`.
 
 ## `tools create <tool-id>`
 
-Scaffolds a minimal **project-local** Tool under `opensip-cli/tools/<id>/` so you
-can start authoring a whole Tool plugin without hand-writing the manifest +
-contract boilerplate. `<tool-id>` is kebab-case and also becomes the subcommand
-name. Pass `--force` to overwrite the scaffold when the tool directory already
-exists. This is the authoring on-ramp; for the full walkthrough see
-[Create your first tool](../60-guides/07-create-your-first-tool.md).
+Scaffolds a **project-local** Tool under `opensip-cli/tools/<id>/`. `<tool-id>` is
+kebab-case and becomes the primary subcommand name. Generated sidecars include
+`identity` and `stableId` so they pass the real manifest validator.
+
+| Template | Flag | Output |
+|----------|------|--------|
+| `minimal-js` (default) | _(none)_ | Sidecar + dependency-free `index.mjs` |
+| `ts-local` | `--template ts-local` | Typed package (`src/`, `package.json`, tests) |
+
+Pass `--force` to overwrite scaffold files when the directory already exists.
+`tools create` writes files only — it does not install dependencies, build, or
+allowlist the tool. Structured `nextSteps` in `--json` output point at
+`tools validate` and the project-local allowlist.
 
 ```bash
-opensip tools create my-audit          # writes opensip-cli/tools/my-audit/
-opensip tools create my-audit --force  # overwrite an existing scaffold
+opensip tools create my-audit
+opensip tools create my-audit --template ts-local
+opensip tools create my-audit --force
 ```
+
+Project-local tools remain deny-by-default until
+`OPENSIP_CLI_ALLOW_PROJECT_TOOLS` includes the tool id. See
+[Create your first tool](../60-guides/07-create-your-first-tool.md) and
+[ADR-0076](../../decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## `tools install <spec>`
 

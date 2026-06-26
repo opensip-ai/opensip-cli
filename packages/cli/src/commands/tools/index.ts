@@ -270,6 +270,13 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
     ],
     options: [
       {
+        flag: '--template',
+        value: '<name>',
+        description: 'Scaffold template (minimal-js or ts-local)',
+        choices: ['minimal-js', 'ts-local'],
+        default: 'minimal-js',
+      },
+      {
         flag: '--force',
         description: 'Overwrite scaffold files when the tool directory already exists',
         default: false,
@@ -281,12 +288,14 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
       const opts = rawOpts as ScopeFilterOpts & {
         _args: string[];
         force?: boolean;
+        template?: 'minimal-js' | 'ts-local';
       };
       const toolId = opts._args[0] ?? '';
       const result = toolsCreate({
         toolId,
         projectRoot: effectiveCwd(opts),
         force: opts.force,
+        template: opts.template,
       });
       if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
       return Promise.resolve(result);

@@ -25,6 +25,23 @@ enforced for bundled first-party tools (dogfood check
 `tool-command-taxonomy.mjs`) and is the recommended shape for third-party Tool
 plugins.
 
+## Extension taxonomy (author view)
+
+| Extension | Discovery | Trust | Validation |
+|-----------|-----------|-------|------------|
+| Bundled whole tools | Shipped manifests | Trusted | Startup admission |
+| Installed whole tools | `node_modules` marker | Allowlist opt-in | `tools validate` / install |
+| Project-local tools | `opensip-cli/tools/<id>/` sidecar | Deny-by-default | `tools validate` + allowlist |
+| User-global tools | `~/.opensip-cli/tools/` | Trusted-by-default | `tools validate` |
+| Fit / sim packs & recipes | `plugins.<domain>` | In-process; epoch metadata | Domain registrars |
+| Graph adapters & recipes | `plugins.graph` | In-process; epoch metadata | Domain registrars |
+| Loose project files | Plugin dirs | Executable when loaded | Domain-specific |
+
+Authoring on-ramps: `opensip tools create` (`minimal-js`, `ts-local`). See
+[Create your first tool](../60-guides/07-create-your-first-tool.md),
+[ADR-0061](../../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
+[ADR-0076](../../decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+
 ## The three tiers
 
 | Tier | Who owns it | Grammar | Examples |

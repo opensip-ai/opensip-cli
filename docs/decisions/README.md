@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0076](ADR-0076-tool-authoring-template-and-helper-boundary.md) — Tool authoring template and helper boundary (`createTool()` wraps `defineTool()`; `minimal-js` + `ts-local` scaffolds; no implicit extension hooks; publishable npm template deferred).
 - [ADR-0075](ADR-0075-state-locking-and-baseline-identity-versioning.md) — State locking and baseline identity versioning (datastore-file write lock plus per-artifact locks; `baselineIdentity` on envelopes; fingerprint strategy `{id, version}` persisted in baseline meta; ADR-0050 remains generic payload authority).
 - [ADR-0074](ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md) — Open domain contract versions and compatibility epochs (`extensionPoints.contractVersions`; bounded whole-tool and capability-pack integer epochs; supersedes ADR-0047 runtime field shape).
 - [ADR-0073](ADR-0073-update-notification-policy.md) — Update notification policy (default-on TTY hourly npm check with opt-out; update-state stores only `{ latest }`).

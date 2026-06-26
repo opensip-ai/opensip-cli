@@ -16,7 +16,7 @@
  * legacy flat `sim-recipes`, so there is nothing to alias.
  */
 
-import { defineNestedCommand } from '@opensip-cli/core';
+import { builtInOriginLabel, defineNestedCommand, recipeDisplayInfo } from '@opensip-cli/core';
 
 import { currentSimulationRecipeRegistry } from '../recipes/registry.js';
 
@@ -39,13 +39,15 @@ export async function listSimRecipes(projectDir?: string): Promise<ListRecipesRe
 
   const recipes = currentSimulationRecipeRegistry()
     .listForDisplay()
-    .map((recipe) => ({
-      name: recipe.name,
-      description: recipe.description,
-      // `checkCount` is a free-form label the shared renderer prints in dim
-      // parentheses; sim reuses it to surface the built-in/user-defined origin.
-      checkCount: recipe.isBuiltIn ? 'built-in' : 'user-defined',
-    }));
+    .map((recipe) => {
+      const display = recipeDisplayInfo(recipe, builtInOriginLabel(recipe.isBuiltIn));
+      return {
+        name: display.name,
+        description: display.description,
+        checkCount: display.selectionLabel,
+        selectionLabel: display.selectionLabel,
+      };
+    });
 
   return {
     type: 'list-recipes',

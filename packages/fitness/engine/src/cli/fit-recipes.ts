@@ -2,6 +2,13 @@
  * fit-recipes command — list all available fitness recipes
  */
 
+import {
+  allUnitsLabel,
+  explicitUnitsLabel,
+  PATTERN_BASED_LABEL,
+  recipeDisplayInfo,
+} from '@opensip-cli/core';
+
 import { currentRecipeRegistry } from '../framework/scope-registry.js';
 
 import { ensureChecksLoaded } from './fit.js';
@@ -21,15 +28,21 @@ export async function listRecipes(projectDir?: string): Promise<ListRecipesResul
     .getAllRecipes()
     .map((recipe) => {
       const selector = recipe.checks;
-      let checkCount: string;
+      let selectionLabel: string;
       if (selector.type === 'all') {
-        checkCount = 'all checks';
+        selectionLabel = allUnitsLabel('checks');
       } else if (selector.type === 'explicit') {
-        checkCount = `${selector.checkIds.length} checks`;
+        selectionLabel = explicitUnitsLabel(selector.checkIds.length, 'check', 'checks');
       } else {
-        checkCount = 'pattern-based';
+        selectionLabel = PATTERN_BASED_LABEL;
       }
-      return { name: recipe.name, description: recipe.description, checkCount };
+      const display = recipeDisplayInfo(recipe, selectionLabel);
+      return {
+        name: display.name,
+        description: display.description,
+        checkCount: display.selectionLabel,
+        selectionLabel: display.selectionLabel,
+      };
     });
 
   return {

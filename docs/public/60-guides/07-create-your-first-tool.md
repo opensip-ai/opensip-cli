@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-21
+last_verified: 2026-06-26
 release: v0.1.13
 title: "Create your first Tool"
 audience: [plugin-authors, contributors]
@@ -8,156 +8,145 @@ purpose: "Task-led guide for creating a tracked project-local Tool plugin that a
 source-files:
   - packages/core/src/plugins/manifest-loader.ts
   - packages/core/src/tools/command-spec.ts
+  - packages/core/src/tools/create-tool.ts
   - packages/cli/src/bootstrap/register-tools.ts
-  - packages/cli/src/commands/tools/index.ts
+  - packages/cli/src/commands/tools/create.ts
   - packages/cli/src/__tests__/authored-tool-load.test.ts
 related-docs:
   - ../50-extend/06-full-tool-plugins.md
   - ../50-extend/07-command-taxonomy.md
   - ../70-reference/12-tools-command.md
   - ../70-reference/10-environment-variables.md
+  - ../../decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md
 ---
 # Create your first Tool
 
 A Tool plugin adds a whole subcommand to `opensip-cli`. Use this path when your work is not a fitness check, simulation scenario, or graph adapter.
 
-This guide creates a tracked project-local Tool under `opensip-cli/tools/`. It is the fastest way to understand the contract before you package a Tool for npm.
+This guide scaffolds a tracked project-local Tool under `opensip-cli/tools/` using
+`opensip tools create`. It is the fastest way to understand the contract before you
+package a Tool for npm.
 
-The example uses the canonical nested grammar: a `hello-tools` primary plus a
-`hello-tools list` discoverability child (`parent: 'hello-tools'`). See
-[Command surface taxonomy](../50-extend/07-command-taxonomy.md) for the full
-Tier-1/2/3 rules.
+Project-local tools are **executable code**, **deny-by-default**, and **not
+sandboxed** after you allowlist them. Do not use wildcard trust unless you trust
+every project-local tool in the repo.
 
-## 1. Create the directory
+## 1. Scaffold the tool
+
+### Minimal JS (default smoke path)
+
+Zero npm dependencies — ideal for a quick allowlist/run check:
 
 ```bash
-mkdir -p opensip-cli/tools/hello-tools
+opensip tools create hello-tools
 ```
 
-## 2. Add the sidecar manifest
+This writes `opensip-cli/tools/hello-tools/opensip-tool.manifest.json` and
+`index.mjs`.
 
-Create `opensip-cli/tools/hello-tools/opensip-tool.manifest.json`:
+### Typed local package (`ts-local`)
+
+For TypeScript authoring with `createTool()` from `@opensip-cli/core`:
+
+```bash
+opensip tools create hello-tools --template ts-local
+```
+
+This adds `package.json`, `tsconfig.json`, `src/index.ts`, tests, and a README.
+The sidecar points at `./dist/index.js`, so build before validate/run:
+
+```bash
+cd opensip-cli/tools/hello-tools
+pnpm install
+pnpm run build
+pnpm test
+```
+
+## 2. Sidecar manifest shape
+
+Generated manifests include `identity` and `stableId` (required by the real
+sidecar validator):
 
 ```json
 {
   "kind": "tool",
   "id": "hello-tools",
-  "name": "Hello Tools",
-  "version": "1.0.0",
+  "identity": { "name": "hello-tools" },
+  "stableId": "8f1e2d3c-4b5a-6789-0abc-def123456789",
+  "name": "hello-tools",
+  "version": "0.1.0",
   "apiVersion": 1,
   "main": "./index.mjs",
   "commands": [
-    { "name": "hello-tools", "description": "Print a Tool plugin hello" },
-    { "name": "list", "description": "List hello variants" }
+    { "name": "hello-tools", "description": "Run hello-tools" }
   ]
 }
 ```
 
-The manifest is read before the module is imported. Its `id` must match the runtime Tool's `metadata.id`, and its command names must match the runtime descriptors derived from `commandSpecs`.
+The manifest is read before the module is imported. Runtime `metadata.id` must
+match `stableId`; `metadata.name` and command names must match the manifest.
 
-## 3. Add the runtime
+## 3. Runtime entry
 
-Create `opensip-cli/tools/hello-tools/index.mjs`:
+`minimal-js` emits a dependency-free plain object. `ts-local` emits:
 
-```js
-const HELLO_VARIANTS = ['formal', 'casual', 'pirate'];
+```ts
+import { createTool } from '@opensip-cli/core';
 
-export const tool = {
+export const tool = createTool({
+  identity: { name: 'hello-tools' },
   metadata: {
-    id: 'hello-tools',
-    name: 'hello-tools',
-    version: '1.0.0',
-    description: 'Small project-local Tool example',
+    id: '<stableId-from-manifest>',
+    version: '0.1.0',
+    description: 'Project-local typed tool',
   },
-  commandSpecs: [
-    {
-      name: 'hello-tools',
-      description: 'Print a Tool plugin hello',
-      commonFlags: ['json'],
-      scope: 'none',
-      output: 'command-result',
-      handler: () => ({
-        type: 'text-lines',
-        title: 'Hello Tools',
-        lines: ['Your project-local Tool is loaded.'],
-      }),
-    },
-    {
-      name: 'list',
-      parent: 'hello-tools',
-      description: 'List hello variants',
-      commonFlags: ['json'],
-      scope: 'none',
-      output: 'command-result',
-      handler: () => ({
-        type: 'text-lines',
-        title: 'Hello variants',
-        lines: HELLO_VARIANTS,
-      }),
-    },
-  ],
-};
+  primaryCommand: {
+    description: 'Run hello-tools',
+    commonFlags: ['json'],
+    scope: 'none',
+    output: 'command-result',
+    handler: async () => ({
+      type: 'text-lines',
+      title: 'hello-tools',
+      lines: ['Your project-local tool is ready.'],
+    }),
+  },
+});
 ```
 
-This example uses plain objects so it has no package dependencies. A publishable
-Tool package can use `defineCommand`, `defineTool`, and TypeScript types from
-`@opensip-cli/core` — `defineTool` derives `commands[]` from `commandSpecs`, so
-you do not hand-maintain a parallel `commands` array.
+`createTool()` wraps `defineTool()` and does not add hidden lifecycle hooks.
+Advanced tools can still use `defineTool()` directly.
 
-If your TypeScript Tool contributes a typed per-run subscope, add a
-`scope-augmentation.ts` file and import it from the Tool entry for side effects:
+## 4. Validate
 
-```ts
-// scope-augmentation.ts
-export interface HelloScope {
-  readonly greetings: string[];
-}
+```bash
+# minimal-js
+opensip tools validate opensip-cli/tools/hello-tools
 
-declare module '@opensip-cli/core' {
-  interface ScopeContribution {
-    helloTools?: HelloScope;
-  }
-}
+# ts-local (after build + install deps in the tool dir)
+opensip tools validate opensip-cli/tools/hello-tools --install-deps
 ```
 
-```ts
-// index.ts
-import './scope-augmentation.js';
+Validation executes candidate code in a child process. It is a coherence check,
+not a security sandbox.
 
-export const tool = {
-  // ...
-  contributeScope: () => ({ helloTools: { greetings: [] } }),
-};
-```
-
-The import is required even though it has no bindings; it loads the module
-augmentation so `cli.scope.helloTools` is typed when the package is compiled.
-
-## 4. Allowlist the project-local Tool
-
-Tracked project-local Tools are executable code, so they are deny-by-default. Admit this Tool for the current shell:
+## 5. Allowlist the project-local Tool
 
 ```bash
 export OPENSIP_CLI_ALLOW_PROJECT_TOOLS=hello-tools
 ```
 
-Use a comma-separated list for more than one Tool, or `*` only when you trust every project-local Tool in the repo.
+Use a comma-separated list for more than one Tool. Avoid `'*'` unless you trust
+every project-local tool in the repo.
 
-## 5. Run it
+## 6. Run it
 
 ```bash
 opensip hello-tools
-opensip hello-tools list
-```
-
-You can also ask for JSON because both commands declared the shared `json` flag:
-
-```bash
 opensip hello-tools --json
-opensip hello-tools list --json
 ```
 
-## 6. See it in the Tool inventory
+## 7. See it in the Tool inventory
 
 ```bash
 opensip tools list --project
@@ -165,15 +154,18 @@ opensip tools list --project
 
 The row should show the `hello-tools` id, `project` source, and `hello-tools` command.
 
-## 7. What changes for publishable Tools
+## 8. What changes for publishable Tools
 
 The tracked sidecar layout is ideal while authoring inside one repo. To distribute a Tool:
 
 1. Move the runtime into an npm package.
-2. Put the manifest under `package.json#opensipTools` with `kind: "tool"`.
+2. Put the manifest under `package.json#opensipTools` with `kind: "tool"`, `identity`, and `stableId`.
 3. Export `tool` from the package main.
 4. Run `opensip tools validate <spec>`.
 5. Install with `opensip tools install <spec>`.
+
+A publishable npm scaffold is deferred until consumption-side verification and
+trust enforcement mature (see [ADR-0076](../../decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 `tools validate` and `tools install` execute the candidate package module as part of validation. Install scripts are blocked and runtime probing has a timeout, but this is still code execution with your user privileges.
 
