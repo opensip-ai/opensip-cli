@@ -159,7 +159,7 @@ export async function deliverGraphResult(
     return { envelope };
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
-    runCatalogJsonMode(opts, result, cli, startedAt);
+    await runCatalogJsonMode(opts, result, cli, startedAt);
     log.info({
       evt: EVT_GRAPH_COMPLETE,
       module: MODULE_GRAPH_CLI,

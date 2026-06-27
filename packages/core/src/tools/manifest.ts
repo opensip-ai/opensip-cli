@@ -80,6 +80,20 @@ export const PLUGIN_API_VERSION = 1;
  */
 export type ToolSource = 'bundled' | 'installed' | 'user-global' | 'project-local';
 
+/** Coarse classes of host resources a tool or capability pack may declare it needs. */
+export type ToolResourceClass = 'filesystem' | 'network' | 'env' | 'subprocess';
+
+/**
+ * Declaration-only permission need. The loader validates and carries this shape
+ * for install/review tooling; admission and runtime enforcement are ADR-gated
+ * follow-on work.
+ */
+export interface ToolResourceRequirement {
+  readonly resource: ToolResourceClass;
+  readonly scope?: string;
+  readonly reason?: string;
+}
+
 /**
  * The serializable subset of {@link OptionSpec} a tool may declare in its static
  * manifest — every field EXCEPT the `parse` coercion closure (ADR-0054 M4-G).
@@ -221,8 +235,8 @@ interface ToolPluginManifestBase {
   readonly sessions?: unknown;
   /** Later: declared plugin domains the tool hosts. */
   readonly pluginDomains?: readonly unknown[];
-  /** Later: declared host/peer requirements. */
-  readonly requires?: readonly unknown[];
+  /** Declaration-only consumed-resource needs, structurally validated at admission. */
+  readonly requires?: readonly ToolResourceRequirement[];
 
   // ── Reserved for community / catalog (ecosystem vision) ─────────────
   // These are additive reservations (currently unused) so manifests

@@ -19,6 +19,7 @@ import { pathToFileURL } from 'node:url';
 
 import { logger } from '../lib/logger.js';
 
+import { readOneExport } from './capability-export-reader.js';
 import {
   discoverPackagesByDeclaredKind,
   readDeclaredCapabilityPackageMetadata,
@@ -28,77 +29,22 @@ import { discoverScopedPackages, resolvePackageDir } from './node-modules-walk.j
 import { resolvePackageEntryPoint } from './package-entry.js';
 import { filterSameCorePackages, selfCore } from './single-core-guard.js';
 
+import type {
+  CapabilityDiscoveryDiagnostic,
+  DiscoverCapabilityContributionsOptions,
+  RawCapabilityContribution,
+  SelectedCapabilityPackage,
+} from './capability-discovery-types.js';
 import type { CapabilityDiscoveryDescriptor } from '../tools/capability.js';
 
-/**
- * Resolved discovery preferences for one domain. The host resolves these from
- * project config (Phase 3) against the descriptor's `configKeys`; the substrate
- * just applies them. Absent `packages` means "auto-discover"; `autoDiscover:
- * false` disables it; an explicit `packages` list always wins over auto-discovery.
- */
-export interface CapabilityDiscoveryPreferences {
-  /** Explicit package-name list. When present (even empty), auto-discovery is skipped. */
-  readonly packages?: readonly string[];
-  /** Disable auto-discovery (name-pattern/marker walk). Default: true (enabled). */
-  readonly autoDiscover?: boolean;
-  /** name-pattern mode only: scopes to scan, overriding the descriptor's `defaultScopes`. */
-  readonly scopes?: readonly string[];
-}
-
-/** A raw contribution yielded by discovery, tagged with the package it came from. */
-export interface RawCapabilityContribution {
-  /** The contribution value read from the package's declared export (unvalidated). */
-  readonly contribution: unknown;
-  /** npm package name the contribution came from, for diagnostics + provenance. */
-  readonly sourcePackage: string;
-  /**
-   * The domain this contribution routes to, when it is NOT the primary domain
-   * being discovered — i.e. a co-contribution (§5.3): a `recipes` export read from
-   * a fit-pack package, routed to the `fit-recipe` domain. `undefined` means the
-   * primary domain (`descriptor`'s own domain).
-   */
-  readonly targetDomainId?: string;
-  /** Package-declared target domain from `opensipTools.targetDomain`. */
-  readonly packageTargetDomain?: string;
-  /** Package-declared target epoch from `opensipTools.targetDomainApiVersion`. */
-  readonly packageTargetDomainApiVersion?: number;
-}
-
-/** A structured non-fatal discovery diagnostic (missing package, bad export, import throw). */
-export interface CapabilityDiscoveryDiagnostic {
-  /** Stable event id, e.g. `capability.discovery.package_not_resolved`. */
-  readonly evt: string;
-  /** The package the diagnostic concerns, when known. */
-  readonly packageName?: string;
-  /** Human-readable message. */
-  readonly message: string;
-}
-
-/** Options for {@link discoverCapabilityContributions}. */
-export interface DiscoverCapabilityContributionsOptions {
-  /** The domain's manifest-declared discovery descriptor. */
-  readonly descriptor: CapabilityDiscoveryDescriptor;
-  /** Discovery anchor for consumer-owned packages (the project root). */
-  readonly projectDir: string;
-  /**
-   * Discovery anchor for BUILT-IN packages (those under `descriptor.builtinScope`).
-   * When the descriptor declares a `builtinScope`, packages under that scope are
-   * resolved from here (the CLI's own install tree) instead of `projectDir`, so a
-   * project pinning an older copy cannot shadow the bundled built-in. Ignored when
-   * the descriptor declares no `builtinScope`.
-   */
-  readonly cliDir?: string;
-  /** Resolved preferences (explicit list / opt-out / scopes). */
-  readonly preferences?: CapabilityDiscoveryPreferences;
-  /** Sink for non-fatal per-package diagnostics. */
-  readonly onDiagnostic?: (diagnostic: CapabilityDiscoveryDiagnostic) => void;
-}
-
-/** A package selected for loading: its name + on-disk directory. */
-interface SelectedPackage {
-  readonly name: string;
-  readonly packageDir: string;
-}
+export type {
+  CapabilityDiscoveryDiagnostic,
+  CapabilityDiscoveryPreferences,
+  CapabilityPackageAdmission,
+  DiscoverCapabilityContributionsOptions,
+  RawCapabilityContribution,
+  SelectedCapabilityPackage,
+} from './capability-discovery-types.js';
 
 /**
  * Max packages imported concurrently. Per-package loads are independent, so we
@@ -139,7 +85,9 @@ export async function discoverCapabilityContributions(
  * Finally, the single-core guard drops any pack resolving a foreign
  * `@opensip-cli/core` (a split run scope → false positives).
  */
-function selectPackages(options: DiscoverCapabilityContributionsOptions): SelectedPackage[] {
+function selectPackages(
+  options: DiscoverCapabilityContributionsOptions,
+): SelectedCapabilityPackage[] {
   const { descriptor, preferences = {}, onDiagnostic } = options;
   const explicitMode = descriptor.explicitListMode ?? 'replace';
   const hasExplicit = preferences.packages !== undefined;
@@ -157,7 +105,9 @@ function selectPackages(options: DiscoverCapabilityContributionsOptions): Select
 }
 
 /** Auto-discover packages by the descriptor's mode (marker | name-pattern). */
-function autoDiscover(options: DiscoverCapabilityContributionsOptions): SelectedPackage[] {
+function autoDiscover(
+  options: DiscoverCapabilityContributionsOptions,
+): SelectedCapabilityPackage[] {
   const { descriptor, projectDir, cliDir, preferences = {} } = options;
   return descriptor.discovery.mode === 'marker'
     ? autoDiscoverByMarker(descriptor, projectDir, cliDir)
@@ -172,10 +122,10 @@ function autoDiscover(options: DiscoverCapabilityContributionsOptions): Selected
 function resolveExplicit(
   names: readonly string[],
   options: DiscoverCapabilityContributionsOptions,
-): SelectedPackage[] {
+): SelectedCapabilityPackage[] {
   const { descriptor, projectDir, cliDir, onDiagnostic } = options;
   const scope = descriptor.builtinScope;
-  const out: SelectedPackage[] = [];
+  const out: SelectedCapabilityPackage[] = [];
   for (const name of names) {
     const anchor =
       scope !== undefined && cliDir !== undefined && isUnderScope(name, scope)
@@ -205,7 +155,7 @@ function autoDiscoverByMarker(
   descriptor: CapabilityDiscoveryDescriptor,
   projectDir: string,
   cliDir: string | undefined,
-): SelectedPackage[] {
+): SelectedCapabilityPackage[] {
   if (descriptor.discovery.mode !== 'marker') return [];
   const { markerKind } = descriptor.discovery;
   const scope = descriptor.builtinScope;
@@ -227,7 +177,7 @@ function autoDiscoverByNamePattern(
   descriptor: CapabilityDiscoveryDescriptor,
   projectDir: string,
   scopeOverride: readonly string[] | undefined,
-): SelectedPackage[] {
+): SelectedCapabilityPackage[] {
   if (descriptor.discovery.mode !== 'name-pattern') return [];
   const { prefix, defaultScopes } = descriptor.discovery;
   const scopes = scopeOverride ?? defaultScopes;
@@ -243,9 +193,9 @@ function isUnderScope(name: string, scope: string): boolean {
 }
 
 /** Dedupe discovered packages by name (first occurrence wins) and drop the kind tag. */
-function dedupe(packages: readonly DiscoveredDeclaredPackage[]): SelectedPackage[] {
+function dedupe(packages: readonly DiscoveredDeclaredPackage[]): SelectedCapabilityPackage[] {
   const seen = new Set<string>();
-  const out: SelectedPackage[] = [];
+  const out: SelectedCapabilityPackage[] = [];
   for (const p of packages) {
     if (seen.has(p.name)) continue;
     seen.add(p.name);
@@ -255,9 +205,11 @@ function dedupe(packages: readonly DiscoveredDeclaredPackage[]): SelectedPackage
 }
 
 /** Dedupe selected packages by name (first occurrence wins). */
-function dedupeSelected(packages: readonly SelectedPackage[]): SelectedPackage[] {
+function dedupeSelected(
+  packages: readonly SelectedCapabilityPackage[],
+): SelectedCapabilityPackage[] {
   const seen = new Set<string>();
-  const out: SelectedPackage[] = [];
+  const out: SelectedCapabilityPackage[] = [];
   for (const p of packages) {
     if (seen.has(p.name)) continue;
     seen.add(p.name);
@@ -273,9 +225,9 @@ function dedupeSelected(packages: readonly SelectedPackage[]): SelectedPackage[]
  * Generic: every domain's packs get the guard, not just fit's.
  */
 function applySingleCoreGuard(
-  packages: readonly SelectedPackage[],
+  packages: readonly SelectedCapabilityPackage[],
   onDiagnostic?: (d: CapabilityDiscoveryDiagnostic) => void,
-): SelectedPackage[] {
+): SelectedCapabilityPackage[] {
   return filterSameCorePackages(packages, (pkg, foreignCore) => {
     onDiagnostic?.({
       evt: 'capability.discovery.foreign_core',
@@ -294,10 +246,19 @@ function applySingleCoreGuard(
  * throws all skip the package with a diagnostic — never propagate.
  */
 async function loadPackageContributions(
-  pkg: SelectedPackage,
+  pkg: SelectedCapabilityPackage,
   options: DiscoverCapabilityContributionsOptions,
 ): Promise<RawCapabilityContribution[]> {
-  const { descriptor, onDiagnostic } = options;
+  const { descriptor, onDiagnostic, shouldLoadPackage } = options;
+  const admission = shouldLoadPackage?.(pkg) ?? { admit: true };
+  if (!admission.admit) {
+    onDiagnostic?.({
+      evt: 'capability.discovery.package_denied',
+      packageName: pkg.name,
+      message: `package ${pkg.name} denied by capability-pack trust policy: ${admission.reason}`,
+    });
+    return [];
+  }
   const resolved = resolvePackageEntryPoint(pkg.packageDir, pkg.name);
   if (!resolved) {
     onDiagnostic?.({
@@ -316,7 +277,9 @@ async function loadPackageContributions(
         : { packageTargetDomain: packageMetadata.targetDomain }),
       ...(packageMetadata?.targetDomainApiVersion === undefined
         ? {}
-        : { packageTargetDomainApiVersion: packageMetadata.targetDomainApiVersion }),
+        : {
+            packageTargetDomainApiVersion: packageMetadata.targetDomainApiVersion,
+          }),
     };
     // Primary export (required — a missing/wrong-shape primary is diagnosed).
     const out = readOneExport(mod, pkg.name, onDiagnostic, {
@@ -358,68 +321,4 @@ async function loadPackageContributions(
     });
     return [];
   }
-}
-
-/** Which export to read from a package module, and how. */
-interface ExportSpec {
-  readonly exportName: string;
-  readonly exportShape: 'array' | 'single';
-  /** The domain co-contributions route to; undefined = the primary domain. */
-  readonly targetDomainId?: string;
-  /** When true, a missing/wrong-shape export is diagnosed; when false, silent (optional co-export). */
-  readonly required: boolean;
-  /** Package-level target metadata attached to every yielded contribution. */
-  readonly metadataTag: {
-    readonly packageTargetDomain?: string;
-    readonly packageTargetDomainApiVersion?: number;
-  };
-}
-
-/**
- * Read one export (`mod[spec.exportName]`) per `spec.exportShape`, tagging each
- * contribution with `spec.targetDomainId` (undefined = the primary domain).
- * `spec.required` governs the missing-export behavior: a missing PRIMARY export
- * is diagnosed + skipped; a missing co-contribution export is silent.
- */
-function readOneExport(
-  mod: Record<string, unknown>,
-  sourcePackage: string,
-  onDiagnostic: ((d: CapabilityDiscoveryDiagnostic) => void) | undefined,
-  spec: ExportSpec,
-): RawCapabilityContribution[] {
-  const { exportName, exportShape, targetDomainId, required, metadataTag } = spec;
-  const tag = {
-    ...metadataTag,
-    ...(targetDomainId === undefined ? {} : { targetDomainId }),
-  };
-  const value = mod[exportName];
-  if (exportShape === 'array') {
-    if (value === undefined && !required) return [];
-    if (!Array.isArray(value)) {
-      if (required) {
-        onDiagnostic?.({
-          evt: 'capability.discovery.bad_export',
-          packageName: sourcePackage,
-          message: `package ${sourcePackage} does not export a "${exportName}" array — skipping`,
-        });
-      }
-      return [];
-    }
-    return (value as readonly unknown[]).map((contribution) => ({
-      contribution,
-      sourcePackage,
-      ...tag,
-    }));
-  }
-  if (value === undefined) {
-    if (required) {
-      onDiagnostic?.({
-        evt: 'capability.discovery.bad_export',
-        packageName: sourcePackage,
-        message: `package ${sourcePackage} does not export "${exportName}" — skipping`,
-      });
-    }
-    return [];
-  }
-  return [{ contribution: value, sourcePackage, ...tag }];
 }

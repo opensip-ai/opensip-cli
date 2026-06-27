@@ -54,12 +54,14 @@
  */
 import { defineCheck, stripStringsAndCommentsPreservingPositions } from '@opensip-cli/fitness';
 
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
+
 /**
  * Resolved-path fragment that identifies a tool-engine source file. The check
  * only applies inside the three tool engines; everything else (CLI root, output,
  * dashboard, core) and adopter repos are inert.
  */
-const TOOL_ENGINE_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\//;
+const TOOL_ENGINE_PATH = toolEnginePathRe();
 
 /**
  * Path fragments EXCLUDED from the guard even inside a tool engine: the

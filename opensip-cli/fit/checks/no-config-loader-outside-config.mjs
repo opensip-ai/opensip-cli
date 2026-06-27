@@ -44,8 +44,11 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
+
 /** First-party paths that read the opensip-cli config document (config pkg excluded). */
-const CONFIG_READER_PATH = /packages\/(?:cli|fitness|graph|simulation)\/(?:engine\/)?src\//;
+const CONFIG_READER_PATH = /packages\/cli\/src\//;
+const TOOL_ENGINE_PATH = toolEnginePathRe();
 
 /** The tool-agnostic, document-level blocks owned by @opensip-cli/config. */
 const DOCUMENT_LEVEL_KEYS = [
@@ -104,7 +107,7 @@ function documentBlockBindings(content) {
  * WITHOUT a Zod parse. Exported for unit tests.
  */
 export function analyzeNoConfigLoaderOutsideConfig(content, filePath) {
-  if (!CONFIG_READER_PATH.test(filePath)) return [];
+  if (!CONFIG_READER_PATH.test(filePath) && !TOOL_ENGINE_PATH.test(filePath)) return [];
   const bindings = documentBlockBindings(content);
   if (bindings.size === 0) return [];
 

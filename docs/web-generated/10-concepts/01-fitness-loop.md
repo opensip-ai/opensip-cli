@@ -138,7 +138,7 @@ Source: [`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/
 Three sources of checks get loaded, in order:
 
 1. **Language adapters.** Registered inside `bootstrapCli()` before any tool is mounted — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` each contribute one `LanguageAdapter` to the per-invocation `LanguageRegistry`. Without this, the framework would treat every file as raw text and a regex check looking for `console.log` would also match the literal string in a comment.
-2. **npm-package check packs.** The plugin loader walks `node_modules` for packages declaring `opensipTools.kind: "fit-pack"` (the canonical marker form), plus any exact packages listed in `plugins.checkPackages:`. Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-cli/checks-universal`, `@opensip-cli/checks-typescript`, `@opensip-cli/checks-python`, etc.
+2. **npm-package check packs.** The plugin loader walks `node_modules` for packages declaring the `fit-pack` marker plus target-domain epoch, plus any exact packages listed in `plugins.checkPackages:`. Each one exports a list of `defineCheck()` results. Bundled packs include `@opensip-cli/checks-universal`, `@opensip-cli/checks-typescript`, `@opensip-cli/checks-python`, etc.
 3. **Project-local checks.** `.mjs` files under `<project>/opensip-cli/fit/checks/` are loaded via dynamic `import()`. Each module either exports a single `Check` (the value returned by `defineCheck()`) or an array of them.
 
 `plugins.checkPackages:` is an exact-name supplement for non-marker packages; marker-based fit-pack discovery still runs.

@@ -99,6 +99,7 @@ describe('hostEnv reads (CLI infra)', () => {
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_SKIP_INSTALLED',
       'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
+      'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
       'OPENSIP_STATE_LOCK_WAIT_MS',
       'OPENSIP_STATE_LOCK_STALE_MS',
@@ -190,6 +191,18 @@ describe('hostEnv reads (CLI infra)', () => {
     process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS = '*';
     expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS')).toEqual(['*']);
     delete process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS;
+  });
+
+  it('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS coerces on whitespace AND comma and preserves wildcard as a plain token', () => {
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toEqual([]);
+    process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS = '@acme/fit-rules, @acme/graph-go';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toEqual([
+      '@acme/fit-rules',
+      '@acme/graph-go',
+    ]);
+    process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS = '*';
+    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toEqual(['*']);
+    delete process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS;
   });
 
   it('OPENSIP_CLI_ALLOW_PROJECT_TOOLS coerces on whitespace AND comma (default empty), agreeing with parseAllowlist', () => {

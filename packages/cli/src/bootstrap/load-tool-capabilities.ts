@@ -26,11 +26,15 @@ import {
   currentCapabilityRegistry,
   currentScope,
   loadCapabilityDomain,
+  logger,
   type CapabilityDiscoveryDescriptor,
+  type CapabilityPackageAdmission,
+  type SelectedCapabilityPackage,
   type Tool,
 } from '@opensip-cli/core';
 
 import { BUNDLED_CAPABILITY_PACKS } from './bundled-manifest.js';
+import { CAPABILITY_PACK_ALLOWLIST_ENV, isCapabilityPackTrusted } from './tool-trust.js';
 
 /**
  * Resolve the directory the CLI was installed into. BUILT-IN capability packs
@@ -84,10 +88,11 @@ export async function loadOwningToolCapabilities(
 
   let driven = 0;
   for (const domain of ownedDomains) {
-    if (domain.discovery === undefined) continue;
+    const descriptor = domain.discovery;
+    if (descriptor === undefined) continue;
     const preferences = augmentBundledCapabilityPreferences(
-      domain.discovery,
-      resolveCapabilityPreferences(domain.discovery, pluginsConfig),
+      descriptor,
+      resolveCapabilityPreferences(descriptor, pluginsConfig),
     );
     await loadCapabilityDomain({
       registry,
@@ -95,6 +100,7 @@ export async function loadOwningToolCapabilities(
       projectDir,
       cliDir,
       preferences,
+      shouldLoadPackage: (pkg) => admitCapabilityPackage(descriptor, pkg),
       onDiagnostic: (diagnostic) => {
         currentScope()?.bootstrapDiagnostics.record(
           capabilityDiscoveryToCliDiagnostic(diagnostic, domain.id, {
@@ -107,6 +113,45 @@ export async function loadOwningToolCapabilities(
     driven++;
   }
   return driven;
+}
+
+function admitCapabilityPackage(
+  descriptor: CapabilityDiscoveryDescriptor,
+  pkg: SelectedCapabilityPackage,
+): CapabilityPackageAdmission {
+  if (isBundledCapabilityPack(descriptor, pkg.name)) {
+    return capabilityPackProvenancePassthrough(pkg, { admit: true });
+  }
+  if (isCapabilityPackTrusted(pkg.name)) {
+    return capabilityPackProvenancePassthrough(pkg, { admit: true });
+  }
+  const reason = `set ${CAPABILITY_PACK_ALLOWLIST_ENV} to '${pkg.name}'`;
+  logger.warn({
+    evt: 'cli.capability.trust_denied',
+    module: 'cli:capability',
+    packageName: pkg.name,
+    packageDir: pkg.packageDir,
+    envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
+    message: `capability pack ${pkg.name} denied by trust policy`,
+  });
+  return capabilityPackProvenancePassthrough(pkg, { admit: false, reason });
+}
+
+function capabilityPackProvenancePassthrough(
+  _pkg: SelectedCapabilityPackage,
+  admission: CapabilityPackageAdmission,
+): CapabilityPackageAdmission {
+  // ADR-0081: `requires` is declaration-only until consumption-side provenance
+  // and capability enforcement graduate from trust metadata to policy.
+  return admission;
+}
+
+function isBundledCapabilityPack(
+  descriptor: CapabilityDiscoveryDescriptor,
+  packageName: string,
+): boolean {
+  if (descriptor.discovery.mode !== 'marker') return false;
+  return BUNDLED_CAPABILITY_PACKS[descriptor.discovery.markerKind]?.includes(packageName) ?? false;
 }
 
 /**

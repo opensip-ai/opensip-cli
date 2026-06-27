@@ -15,9 +15,9 @@
  * through.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
   enterScope,
@@ -106,6 +106,11 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
+    writeArtifact: vi.fn((path: string, bytes: string) => {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes, 'utf8');
+      return Promise.resolve();
+    }),
     datastore,
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     reportFailure: makeReportFailureMock(setExitCode, render),

@@ -25,8 +25,10 @@ import { currentScope } from '../lib/run-scope.js';
 import { checkCapabilityContributionCompatibility } from './capability-compatibility.js';
 import {
   discoverCapabilityContributions,
+  type CapabilityPackageAdmission,
   type CapabilityDiscoveryDiagnostic,
   type CapabilityDiscoveryPreferences,
+  type SelectedCapabilityPackage,
 } from './capability-discovery.js';
 
 import type { CapabilityRegistry } from './capability-registry.js';
@@ -43,6 +45,8 @@ export interface LoadCapabilityDomainOptions {
   readonly cliDir?: string;
   /** Resolved discovery preferences for this domain (Phase 3 resolves these from config). */
   readonly preferences?: CapabilityDiscoveryPreferences;
+  /** Optional pre-import package admission gate. Core stays policy-free. */
+  readonly shouldLoadPackage?: (pkg: SelectedCapabilityPackage) => CapabilityPackageAdmission;
   /** Optional sink for the substrate's per-package discovery diagnostics. */
   readonly onDiagnostic?: (diagnostic: CapabilityDiscoveryDiagnostic) => void;
 }
@@ -61,7 +65,8 @@ export interface LoadCapabilityDomainOptions {
 export async function loadCapabilityDomain(
   options: LoadCapabilityDomainOptions,
 ): Promise<readonly string[]> {
-  const { registry, domainId, projectDir, cliDir, preferences, onDiagnostic } = options;
+  const { registry, domainId, projectDir, cliDir, preferences, shouldLoadPackage, onDiagnostic } =
+    options;
   const projectKey = projectDir ?? '';
 
   if (registry.isDomainLoaded(domainId, projectKey)) {
@@ -81,6 +86,7 @@ export async function loadCapabilityDomain(
     projectDir: projectKey,
     ...(cliDir === undefined ? {} : { cliDir }),
     ...(preferences === undefined ? {} : { preferences }),
+    ...(shouldLoadPackage === undefined ? {} : { shouldLoadPackage }),
     onDiagnostic: (diagnostic) => {
       errors.push(diagnostic.message);
       onDiagnostic?.(diagnostic);

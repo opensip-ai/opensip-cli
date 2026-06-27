@@ -287,6 +287,40 @@ describe('discoverCapabilityContributions — preferences', () => {
     expect(diags[0]?.evt).toBe('capability.discovery.package_not_resolved');
     expect(diags[0]?.packageName).toBe('@acme/missing');
   });
+
+  it('denies a selected package before resolving or importing its entry', async () => {
+    const dir = join(testDir, 'node_modules/@acme/denied');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/denied',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: { kind: 'items-pack' },
+      }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), "throw new Error('must not import');\n");
+    const diags: CapabilityDiscoveryDiagnostic[] = [];
+
+    const out = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+      preferences: { packages: ['@acme/denied'] },
+      shouldLoadPackage: (pkg) =>
+        pkg.name === '@acme/denied' ? { admit: false, reason: 'not trusted' } : { admit: true },
+      onDiagnostic: (d) => diags.push(d),
+    });
+
+    expect(out).toEqual([]);
+    expect(diags).toEqual([
+      {
+        evt: 'capability.discovery.package_denied',
+        packageName: '@acme/denied',
+        message: 'package @acme/denied denied by capability-pack trust policy: not trusted',
+      },
+    ]);
+  });
 });
 
 describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {

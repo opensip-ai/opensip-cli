@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import {
   CapabilityRegistry,
   RunScope,
+  logger,
   runWithScope,
   type CapabilityDomainSpec,
   type Tool,
@@ -20,6 +21,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadOwningToolCapabilities } from '../bootstrap/load-tool-capabilities.js';
+import { CAPABILITY_PACK_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
 let testDir: string;
 
@@ -68,6 +70,25 @@ function writeExplicitAdapterPackage(
   writeFileSync(join(dir, 'index.mjs'), `export const adapter = ${exportSource};\n`);
 }
 
+/** Write an explicit capability package whose module would throw if imported. */
+function writeThrowingExplicitAdapterPackage(name: string, targetDomain = 'mine'): void {
+  const dir = join(testDir, 'node_modules', name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({
+      name,
+      type: 'module',
+      main: './index.mjs',
+      opensipTools: {
+        targetDomain,
+        targetDomainApiVersion: 1,
+      },
+    }),
+  );
+  writeFileSync(join(dir, 'index.mjs'), "throw new Error('must not import denied pack');\n");
+}
+
 /** Run `fn` inside a scope carrying `registry` as scope.capabilities. */
 async function withCapabilities(
   registry: CapabilityRegistry,
@@ -83,6 +104,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
+  delete process.env[CAPABILITY_PACK_ALLOWLIST_ENV];
+  vi.restoreAllMocks();
 });
 
 describe('loadOwningToolCapabilities', () => {
@@ -111,6 +134,7 @@ describe('loadOwningToolCapabilities', () => {
     const registrar = vi.fn();
     registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
     writeExplicitAdapterPackage('@acme/configured-adapter', "{ id: 'from-config' }");
+    process.env[CAPABILITY_PACK_ALLOWLIST_ENV] = '@acme/configured-adapter';
 
     await withCapabilities(registry, async () => {
       const driven = await loadOwningToolCapabilities({
@@ -122,6 +146,32 @@ describe('loadOwningToolCapabilities', () => {
       expect(driven).toBe(1);
       expect(registrar).toHaveBeenCalledTimes(1);
       expect(registrar).toHaveBeenCalledWith({ id: 'from-config' });
+    });
+  });
+
+  it('denies a non-bundled capability pack before import unless exact-name allowlisted', async () => {
+    const registry = new CapabilityRegistry();
+    const registrar = vi.fn();
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
+    writeThrowingExplicitAdapterPackage('@acme/denied-adapter');
+
+    await withCapabilities(registry, async () => {
+      const driven = await loadOwningToolCapabilities({
+        owningTool: makeTool('mytool'),
+        projectDir: testDir,
+        pluginsConfig: { pkgs: ['@acme/denied-adapter'] },
+      });
+
+      expect(driven).toBe(1);
+      expect(registrar).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'cli.capability.trust_denied',
+          packageName: '@acme/denied-adapter',
+          envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
+        }),
+      );
     });
   });
 

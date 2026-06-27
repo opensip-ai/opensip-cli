@@ -15,7 +15,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
 import {
+  CAPABILITY_PACK_ALLOWLIST_ENV,
   INSTALLED_TOOL_ALLOWLIST_ENV,
+  isCapabilityPackTrusted,
   isInstalledToolTrusted,
   isProjectLocalToolTrusted,
   PROJECT_TOOL_ALLOWLIST_ENV,
@@ -107,6 +109,33 @@ describe('wildcard allowlist broadening guard', () => {
     expect(isProjectLocalToolTrusted('denied', projectEnv)).toBe(false);
     expect(isInstalledToolTrusted('allowed-only', installedEnv)).toBe(true);
     expect(isInstalledToolTrusted('denied', installedEnv)).toBe(false);
+  });
+});
+
+describe('isCapabilityPackTrusted (exact-name allowlist)', () => {
+  it('denies by default and admits only exact package-name matches', () => {
+    const env = { [CAPABILITY_PACK_ALLOWLIST_ENV]: '@acme/fit-rules, @acme/graph-go' };
+    expect(isCapabilityPackTrusted('@acme/fit-rules', env)).toBe(true);
+    expect(isCapabilityPackTrusted('@acme/graph-go', env)).toBe(true);
+    expect(isCapabilityPackTrusted('@acme/other', env)).toBe(false);
+    expect(isCapabilityPackTrusted('@acme/fit-rules-extra', env)).toBe(false);
+    expect(isCapabilityPackTrusted('@acme/fit-rules', {})).toBe(false);
+  });
+
+  it('does not honor wildcard and emits the capability-specific warning', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    expect(
+      isCapabilityPackTrusted('@acme/fit-rules', { [CAPABILITY_PACK_ALLOWLIST_ENV]: '*' }),
+    ).toBe(false);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.trust.capability_wildcard_ignored',
+        envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
+      }),
+    );
+    warnSpy.mockRestore();
   });
 });
 

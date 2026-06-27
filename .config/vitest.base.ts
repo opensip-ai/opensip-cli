@@ -62,6 +62,10 @@ export const vitestBase = defineConfig({
         replacement: join(repoRoot, 'packages/test-support/src'),
       },
       {
+        find: /^@opensip-cli\/tool-test-kit/,
+        replacement: join(repoRoot, 'packages/tool-test-kit/src'),
+      },
+      {
         find: /^@opensip-cli\/datastore/,
         replacement: join(repoRoot, 'packages/datastore/src'),
       },

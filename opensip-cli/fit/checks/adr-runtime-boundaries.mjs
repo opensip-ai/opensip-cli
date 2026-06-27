@@ -9,7 +9,10 @@ import path from 'node:path';
 
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
+
 const ROOT = process.cwd();
+const TOOL_ENGINE_PATH = toolEnginePathRe();
 
 function relPath(filePath) {
   const raw = path.isAbsolute(filePath) ? path.relative(ROOT, filePath) : filePath;
@@ -182,9 +185,7 @@ const HOST_VERDICT_BRIDGE_FILES = new Set([
 function analyzeHostOwnedVerdictRatchet(content, filePath) {
   const rel = relPath(filePath);
   if (isTestOrFixture(rel) || HOST_VERDICT_BRIDGE_FILES.has(rel)) return [];
-  if (
-    !/^packages\/(?:contracts|fitness\/engine|graph\/engine|simulation\/engine)\/src\//.test(rel)
-  ) {
+  if (!/^packages\/contracts\/src\//.test(rel) && !TOOL_ENGINE_PATH.test(rel)) {
     return [];
   }
   const violations = [];
@@ -219,7 +220,7 @@ const DIRECT_JSON_STDOUT_ALLOWLIST = new Set([
 function analyzeOneOutcomeShape(content, filePath) {
   const rel = relPath(filePath);
   if (isTestOrFixture(rel) || DIRECT_JSON_STDOUT_ALLOWLIST.has(rel)) return [];
-  if (!/^packages\/(?:cli|fitness\/engine|graph\/engine|simulation\/engine)\/src\//.test(rel)) {
+  if (!/^packages\/cli\/src\//.test(rel) && !TOOL_ENGINE_PATH.test(rel)) {
     return [];
   }
   const violations = [];

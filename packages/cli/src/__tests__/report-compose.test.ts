@@ -58,6 +58,7 @@ function makeScope(
   tools: Tool[],
   datastore?: DataStore,
   toolProvenance: readonly ToolProvenance[] = [],
+  logger?: RunScope['logger'],
 ): RunScope {
   const registry = new ToolRegistry();
   for (const t of tools) registry.register(t);
@@ -75,6 +76,7 @@ function makeScope(
     projectContext,
     runId: 'test-run',
     toolProvenance,
+    ...(logger === undefined ? {} : { logger }),
     ...(datastore ? { datastore: () => datastore } : {}),
   });
 }
@@ -183,5 +185,39 @@ describe('composeAndWriteReport', () => {
 
     expect(html).not.toContain('forged');
     expect(html).toContain('legit');
+  });
+
+  it('warns and keeps the first value when two tools contribute the same report key', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const warn = vi.fn();
+    const logger = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn,
+      error: vi.fn(),
+    };
+    const scope = makeScope(
+      [
+        makeTool('first-tool', { checkCatalog: [{ slug: 'first-writer' }] }),
+        makeTool('second-tool', { checkCatalog: [{ slug: 'second-writer' }] }),
+      ],
+      undefined,
+      [],
+      logger,
+    );
+
+    const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+    const html = readFileSync(result.path, 'utf8');
+
+    expect(html).toContain('first-writer');
+    expect(html).not.toContain('second-writer');
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.report.compose.collision',
+        tool: 'second-tool',
+        otherTool: 'first-tool',
+        key: 'checkCatalog',
+      }),
+    );
   });
 });

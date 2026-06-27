@@ -16,6 +16,7 @@
       "@opensip-cli/config": ["packages/config/src/index.ts"],
       "@opensip-cli/targeting": ["packages/targeting/src/index.ts"],
       "@opensip-cli/test-support": ["packages/test-support/src/index.ts"],
+      "@opensip-cli/tool-test-kit": ["packages/tool-test-kit/src/index.ts"],
       "@opensip-cli/cli-ui": ["packages/cli-ui/src/index.ts"],
       "@opensip-cli/cli-live": ["packages/cli-live/src/index.ts"],
       "opensip-cli": ["packages/cli/src/index.ts"],

@@ -251,7 +251,7 @@ async function runGraphCatalogExport(
       language: opts.language,
       datastore: cli.scope.datastore() as DataStore | undefined,
     });
-    runCatalogJsonMode(
+    await runCatalogJsonMode(
       {
         cwd: opts.cwd,
         catalogOutput: opts.catalogOutput,

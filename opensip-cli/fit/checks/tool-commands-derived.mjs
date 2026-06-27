@@ -5,7 +5,9 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
-const TOOL_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
+import { toolDescriptorPathRe } from './tool-engine-paths.mjs';
+
+const TOOL_PATH = toolDescriptorPathRe();
 
 /** Hand-maintained command descriptor constants (pre-defineTool pattern). */
 const HAND_COMMAND_DESCRIPTOR = /:\s*ToolCommandDescriptor\s*=/;

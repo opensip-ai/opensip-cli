@@ -5,13 +5,75 @@
  * coverage-invisible.
  */
 
+import { ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
 import { buildAgentCatalog, executeAgentCatalog } from '../commands/agent-catalog.js';
 
+import type { Tool } from '@opensip-cli/core';
+
+/**
+ * @throws Error when a public tool command is missing from the agent catalog.
+ */
+function assertCatalogCoversTools(
+  catalog: ReturnType<typeof buildAgentCatalog>,
+  tools: ToolRegistry,
+): void {
+  const commands = new Set(catalog.entryPoints.map((entry) => entry.command));
+  const missing = tools
+    .list()
+    .flatMap((tool) =>
+      (tool.commandSpecs ?? [])
+        .filter(
+          (spec) =>
+            spec.parent === undefined &&
+            spec.visibility !== 'internal' &&
+            !/(?:-run-worker|-shard-worker|-equivalence-check)\b/.test(spec.name),
+        )
+        .map((spec) => spec.name),
+    )
+    .filter((name) => !commands.has(name));
+  if (missing.length > 0) {
+    throw new Error(`agent-catalog missing public tool entry point(s): ${missing.join(', ')}`);
+  }
+}
+
+async function makeRegistry(): Promise<ToolRegistry> {
+  const tools = new ToolRegistry();
+  await registerFirstPartyTools(tools);
+  tools.register({
+    identity: { name: 'third-party-tool' },
+    metadata: {
+      id: 'third-party-tool',
+      name: 'third-party-tool',
+      version: '0.0.0',
+      description: 'fixture third-party tool',
+    },
+    commandSpecs: [
+      {
+        name: 'third-party-tool',
+        description: 'run the third-party tool',
+        output: 'command-result',
+        handler: () => ({ type: 'text-lines', lines: ['ok'] }),
+      },
+      {
+        name: 'third-party-tool-worker',
+        description: '[internal] worker',
+        output: 'raw-stream',
+        rawStreamReason: 'worker-ipc',
+        visibility: 'internal',
+        handler: () => undefined,
+      },
+    ],
+  } satisfies Tool);
+  return tools;
+}
+
 describe('buildAgentCatalog', () => {
-  it('returns a stable, fully-populated catalog', () => {
-    const c = buildAgentCatalog();
+  it('returns a stable, fully-populated catalog from the live registry', async () => {
+    const tools = await makeRegistry();
+    const c = buildAgentCatalog({ tools });
     expect(c.version).toBe('1.0.0');
     expect(c.description).toMatch(/AI agents/i);
     // Every documented entry point carries at least one example.
@@ -25,12 +87,15 @@ describe('buildAgentCatalog', () => {
       expect.arrayContaining([
         'fitness',
         'graph',
+        'simulation',
         'yagni',
+        'third-party-tool',
         'sessions list',
         'sessions show',
         'agent-catalog',
       ]),
     );
+    assertCatalogCoversTools(c, tools);
   });
 
   // tool-command-surface-taxonomy Task 4.5 — the catalog is grouped by tier and
@@ -39,8 +104,8 @@ describe('buildAgentCatalog', () => {
     /** The Tier-3 internal command-name shapes that must never be catalogued. */
     const INTERNAL_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
 
-    it('annotates every entry point with a non-internal taxonomy tier', () => {
-      const c = buildAgentCatalog();
+    it('annotates every entry point with a non-internal taxonomy tier', async () => {
+      const c = buildAgentCatalog({ tools: await makeRegistry() });
       for (const e of c.entryPoints) {
         // Task 1.4 grouped the surface by tier; each entry carries the predictable
         // Tier-1 (platform) / Tier-2 (tool) shape — and NEVER 'internal'.
@@ -54,8 +119,8 @@ describe('buildAgentCatalog', () => {
       expect(tiers.has('tool')).toBe(true);
     });
 
-    it('fit/graph are tool-tier; the host commands are platform-tier', () => {
-      const c = buildAgentCatalog();
+    it('fit/graph are tool-tier; the host commands are platform-tier', async () => {
+      const c = buildAgentCatalog({ tools: await makeRegistry() });
       const tierOf = (command: string) => c.entryPoints.find((e) => e.command === command)?.tier;
       expect(tierOf('fitness')).toBe('tool');
       expect(tierOf('graph')).toBe('tool');
@@ -65,7 +130,7 @@ describe('buildAgentCatalog', () => {
     });
 
     it('no entry point or common pattern references an internal command name', () => {
-      const c = buildAgentCatalog();
+      const c = buildAgentCatalog({ tools: new ToolRegistry() });
       for (const e of c.entryPoints) {
         expect(INTERNAL_RE.test(e.command), `entry '${e.command}' must not be internal`).toBe(
           false,
@@ -84,7 +149,7 @@ describe('buildAgentCatalog', () => {
     });
 
     it('does not advertise the removed flat export verbs as entry points', () => {
-      const c = buildAgentCatalog();
+      const c = buildAgentCatalog({ tools: new ToolRegistry() });
       const commands = c.entryPoints.map((e) => e.command);
       for (const removed of [
         'sarif-export',
@@ -98,7 +163,7 @@ describe('buildAgentCatalog', () => {
   });
 
   it('describes the common agent patterns and output shapes', () => {
-    const c = buildAgentCatalog();
+    const c = buildAgentCatalog({ tools: new ToolRegistry() });
     expect(c.commonPatterns.length).toBeGreaterThan(0);
     for (const p of c.commonPatterns) {
       expect(p.name).toBeTruthy();
@@ -112,16 +177,19 @@ describe('buildAgentCatalog', () => {
 });
 
 describe('executeAgentCatalog', () => {
-  it('wraps the full catalog in a machine result under --json', () => {
-    const out = executeAgentCatalog({ json: true });
+  it('wraps the full catalog in a machine result under --json', async () => {
+    const tools = await makeRegistry();
+    const out = executeAgentCatalog({ json: true, tools });
     expect(out.type).toBe('agent-catalog');
     expect(out).toHaveProperty('catalog');
-    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
-    expect(catalog).toEqual(buildAgentCatalog());
+    const { catalog } = out as {
+      catalog: ReturnType<typeof buildAgentCatalog>;
+    };
+    expect(catalog).toEqual(buildAgentCatalog({ tools }));
   });
 
-  it('returns a concise text summary in human mode (no --json)', () => {
-    const out = executeAgentCatalog();
+  it('returns a concise text summary in human mode (no --json)', async () => {
+    const out = executeAgentCatalog({ tools: await makeRegistry() });
     expect(out.type).toBe('text-lines');
     const lines = (out as { lines: string[] }).lines;
     expect(lines[0]).toMatch(/Agent Catalog/);

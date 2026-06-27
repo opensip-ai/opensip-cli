@@ -29,11 +29,13 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-cli/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — datastore, contracts, tree-sitter, clone-detection, and cli-ui
+## Layer 2 — datastore, contracts, authoring helpers, tree-sitter, clone-detection, and cli-ui
 
 `@opensip-cli/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
 `@opensip-cli/contracts` defines the contract layer between Tools and the runner — the `SignalEnvelope` output shape every tool returns, exit codes, the cross-tool `StoredSession` type, the `GraphCatalog` surface, and small tool-facing helpers such as `defineCommand`. It is not a host runtime package: no persistence, rendering, config I/O, or tool execution lives here. Imports `core` only.
+
+`@opensip-cli/tool-test-kit` is the public author-testing package. It provides a `ToolCliContext` test double, scope helpers, and command-spec assertion helpers without importing the CLI composition root.
 
 `@opensip-cli/tree-sitter` is the grammar-agnostic tree-sitter substrate (ADR-0010): the `web-tree-sitter` lifecycle (parser init/load) plus grammar-agnostic node accessors. Like `datastore` it imports `core` only (plus `web-tree-sitter`) and sits below the adapters that consume it — the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (via `graph-adapter-common`) share it so the WASM lifecycle and node-walking helpers live in exactly one place. A dependency-cruiser rule (`tree-sitter-imports-core-only`) pins it to that substrate position.
 
@@ -45,6 +47,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-cli/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/`, `user_version` schema-stamp guard | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError`, `DataStoreVersionError` |
 | `@opensip-cli/contracts` | `packages/contracts/` | Shared contract facade — the `SignalEnvelope`/`CommandResult` shapes, exit codes, the cross-tool `StoredSession` type, `GraphCatalog` surface, and small tool-facing helpers | `SignalEnvelope`, `RunVerdict`, `UnitResult`, `buildSignalEnvelope`, `CommandResult`, `EXIT_CODES`, `getErrorSuggestion`, `StoredSession`, `ToolSessionRecord`, `GraphCatalog`, `defineCommand` |
+| `@opensip-cli/tool-test-kit` | `packages/tool-test-kit/` | Public tool-author test helpers — in-memory `ToolCliContext` double, scope helpers, and command-spec output assertions. Depends on `core` + `contracts`, not the CLI composition root. | `createToolCliContextDouble`, `runCommandSpec`, `assertSignalEnvelope`, `assertCommandResult`, `makeTestScope` |
 | `@opensip-cli/tree-sitter` | `packages/tree-sitter/` | Grammar-agnostic `web-tree-sitter` substrate (ADR-0010) — WASM parser lifecycle + node accessors, shared by the fitness `lang-*` and graph tree-sitter adapters. Depends on `web-tree-sitter` (and `core`) only | `createParser`, `parseToTree`, `walkNodes`, `findEnclosing`, `nameOf`, `childrenOf`, `namedChildrenOf`, `nodeText` |
 | `@opensip-cli/clone-detection` | `packages/clone-detection/` | Shared function-body clone-detection substrate (ADR-0064) — body digest, MinHash/LSH signatures, tool-neutral clone candidate shape, exact and near-duplicate curation policy. Leaf package; no workspace imports. | `digestCanonicalBody`, `normalizeWhitespace`, `bodySignature`, `findDuplicateBodies`, `findNearDuplicates`, `isTestFilePath`, `CloneCandidate` |
 | `@opensip-cli/cli-ui` | `packages/cli-ui/` | Shared Ink/React presentational primitives — Banner, Spinner, RunHeader, theme. Extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher. | `Banner`, `Spinner`, `RunHeader`, `theme` |
@@ -91,7 +94,7 @@ Tool engines implement the `Tool` contract. They are peer domains: none imports 
 
 ### Graph language adapters (five languages + shared scaffolding)
 
-Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"`; the CLI discovers them per command through the generic capability loader, which routes each `adapter` export to graph's registrar.
+Distinct from the fitness language adapters above — these implement the graph engine's `GraphLanguageAdapter` contract (catalog inventory, edge extraction). Each is a publishable npm package marked with `opensipTools.kind: "graph-adapter"` plus the graph-adapter target-domain epoch; the CLI discovers them per command through the generic capability loader, which routes each `adapter` export to graph's registrar.
 
 The four tree-sitter adapters (Python, Rust, Go, Java) are backed by **`web-tree-sitter`** (the WASM build — no native tree-sitter binding) and share `@opensip-cli/graph-adapter-common`, the tree-sitter scaffolding package (discover/parse/walk/cache-key factories). It sits downstream of the engine and upstream of the four tree-sitter adapters. The TypeScript adapter is the exception — it resolves its call graph through the TS compiler API, not tree-sitter.
 
@@ -106,7 +109,7 @@ The four tree-sitter adapters (Python, Rust, Go, Java) are backed by **`web-tree
 
 ### Fitness check packs
 
-Each pack implements the `FitPluginExports` contract: a required `checks: Check[]` (each carrying its own display) plus optional `recipes` (there is no `metadata` export — name and version come from the pack's `package.json`). Discovered via the scope-independent `opensipTools.kind: "fit-pack"` marker, or by exact package name in `plugins.checkPackages:`. See [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md) for the resolution rules.
+Each pack implements the `FitPluginExports` contract: a required `checks: Check[]` (each carrying its own display) plus optional `recipes` (there is no `metadata` export — name and version come from the pack's `package.json`). Discovered via the scope-independent `opensipTools.kind: "fit-pack"` marker with `targetDomain: "fit-pack"` / `targetDomainApiVersion`, or by exact package name in `plugins.checkPackages:`. See [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md) for the resolution rules.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
@@ -152,11 +155,11 @@ Imports every layer below. The published binary.
 Last verified at v0.1.13 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **36 publishable packages** total (all at `0.1.13`), plus one workspace-private
+- **37 publishable packages** total (all at `0.1.13`), plus one workspace-private
   `@opensip-cli/test-support` package and the private root `@opensip-cli/root`:
   - Layer 1 (kernel): 1 — `core`
-  - Layer 2 (datastore + contracts + tree-sitter + clone-detection + cli-ui): 5 —
-    `datastore`, `contracts`, `tree-sitter`, `clone-detection`, `cli-ui`
+  - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + cli-ui): 6 —
+    `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `cli-ui`
   - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 —
     `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`,
     `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`

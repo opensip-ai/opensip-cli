@@ -256,6 +256,11 @@ export type HostRpcCall =
       readonly path: string;
     }
   | {
+      readonly seam: 'writeArtifact';
+      readonly path: string;
+      readonly bytes: string;
+    }
+  | {
       readonly seam: 'saveBaseline';
       readonly tool: string;
       readonly envelope: unknown;

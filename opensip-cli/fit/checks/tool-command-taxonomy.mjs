@@ -51,8 +51,10 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolDescriptorPathRe, toolPackageSegmentForPath } from './tool-engine-paths.mjs';
+
 /** Resolved-path fragment identifying a first-party TOOL registration file. */
-const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
+const TOOL_REGISTRATION_PATH = toolDescriptorPathRe();
 
 /**
  * The expected bare command verb per first-party tool file (Q1: the SHORT verb
@@ -63,6 +65,7 @@ const TOOL_VERB = {
   fitness: 'fit',
   graph: 'graph',
   simulation: 'sim',
+  yagni: 'yagni',
 };
 
 /** Internal worker/equivalence command-name shapes (Tier-3). */
@@ -71,12 +74,6 @@ const GRAPH_EQUIVALENCE = 'graph-equivalence-check';
 
 /** Bare masquerading export verbs (no tool prefix) — the T-2 target. */
 const MASQUERADING_EXPORT_RE = /^(?:sarif|catalog)-export$/;
-
-/** Which package segment (fitness|graph|simulation) does this path belong to? */
-function packageSegment(filePath) {
-  const m = /packages\/(fitness|graph|simulation)\/engine\/src\/tool\.ts$/.exec(filePath);
-  return m ? m[1] : undefined;
-}
 
 /**
  * Extract every `ToolCommandDescriptor` object literal from the file text. Each
@@ -128,7 +125,7 @@ function extractDescriptors(content) {
 export function analyzeToolCommandTaxonomy(content, filePath) {
   if (!TOOL_REGISTRATION_PATH.test(filePath)) return [];
 
-  const segment = packageSegment(filePath);
+  const segment = toolPackageSegmentForPath(filePath);
   const verb = segment ? TOOL_VERB[segment] : undefined;
   const descriptors = extractDescriptors(content);
   const violations = [];

@@ -20,6 +20,7 @@ import { addToolPlugin } from '../plugin-host-ops.js';
 import { runToolValidation } from './validate.js';
 
 import type { ToolsInstallResult } from '@opensip-cli/contracts';
+import type { ToolPluginManifest } from '@opensip-cli/core';
 
 /** Options for {@link toolsInstall}. */
 export interface ToolsInstallOptions {
@@ -38,6 +39,15 @@ function packStagedDir(stagedPkgDir: string): string {
   });
   const name = out.trim().split('\n').at(-1)?.trim() ?? '';
   return `${stagedPkgDir}/${name}`;
+}
+
+function installNextSteps(manifest: ToolPluginManifest | undefined): readonly string[] | undefined {
+  if (manifest === undefined) return undefined;
+  const commandName = manifest.commands[0]?.name;
+  return [
+    `export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='${manifest.id}'`,
+    ...(commandName === undefined ? [] : [`opensip ${commandName}`]),
+  ];
 }
 
 /** Stage, validate, and (on a `passed` verdict only) activate one tool package. */
@@ -94,7 +104,11 @@ export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInst
       validation: result,
       ...(report.manifest === undefined
         ? {}
-        : { toolId: report.manifest.id, version: report.manifest.version }),
+        : {
+            toolId: report.manifest.id,
+            version: report.manifest.version,
+            nextSteps: installNextSteps(report.manifest),
+          }),
     };
   } finally {
     cleanup();

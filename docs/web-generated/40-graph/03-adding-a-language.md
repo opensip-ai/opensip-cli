@@ -39,7 +39,7 @@ The four tree-sitter adapters are backed by **vendored `web-tree-sitter` WASM gr
 
 ### Discovery and Registration
 
-Auto-discovery is **marker-based**: a package declares `opensipTools.kind: "graph-adapter"` and exports `adapter`. First-party adapters use the `@opensip-cli/graph-*` namespace, but the marker is the discovery contract; third-party adapters can use any npm name. You can also pin an exact list in `plugins.graphAdapters` in `opensip-cli.config.yml`.
+Auto-discovery is **marker-based**: a package declares `opensipTools.kind: "graph-adapter"`, `targetDomain: "graph-adapter"`, `targetDomainApiVersion: 1`, and exports `adapter`. First-party adapters use the `@opensip-cli/graph-*` namespace, but the marker is the discovery contract; third-party adapters can use any npm name. You can also pin an exact list in `plugins.graphAdapters` in `opensip-cli.config.yml`.
 
 Any first-party or third-party adapter slots in by implementing the contract and shipping the marker/export pair (or via the explicit-pin form).
 
@@ -97,7 +97,9 @@ packages/graph/graph-<id>/
                         (the `@opensip-cli/graph-*` name prefix is
                         the first-party naming convention; default
                         discovery consults only the
-                        `opensipTools: { kind: "graph-adapter" }` marker)
+                        `opensipTools: { kind: "graph-adapter",
+                          targetDomain: "graph-adapter",
+                          targetDomainApiVersion: 1 }` marker)
   tsconfig.json
   src/
     discover.ts      — discoverFiles implementation (reads pyproject.toml / Cargo.toml / go.mod / etc.)
@@ -123,7 +125,7 @@ packages/graph/graph-<id>/
 
 This mirrors `graph-python/`, `graph-rust/`, `graph-go/`, and `graph-java/` — the recommended template for tree-sitter adapters. The four tree-sitter adapters keep most of their `discover` / `parse` / `walk` / `cache-key` scaffolding in [`@opensip-cli/graph-adapter-common`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/graph/graph-adapter-common/src/parse.ts) (e.g. `createTreeSitterParseProject`, `createDiscover`, `hashConfig`) and each `src/` file is a thin per-language binding plus the vendored `wasm/<grammar>.wasm` (shipped in the package's `files`). The TypeScript adapter has a deeper subdir layout (`inventory-visitors/`, `edge-resolvers/`, `inventory-helpers/`) because its symbol-resolved walk is genuinely more complex; for a tree-sitter adapter the flat layout is plenty. Adapters that prefer one big file or a different breakdown are fine — the contract doesn't care, only the public `index.ts` export matters.
 
-**Third-party graph adapters** are supported via the same discovery path the first-party packages use: any package installed in `node_modules` that declares `opensipTools.kind: "graph-adapter"` is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-cli.config.yml` — that list replaces the auto-scan entirely. `plugins.autoDiscoverGraphAdapters: false` disables the scan. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-cli/graph`.
+**Third-party graph adapters** are supported via the same discovery path the first-party packages use: any package installed in `node_modules` that declares `opensipTools.kind: "graph-adapter"` plus the graph-adapter target-domain epoch is loaded and its `adapter` export registered. For deployments that need pinned discovery, list the exact package names under `plugins.graphAdapters:` in `opensip-cli.config.yml` — that list replaces the auto-scan entirely. `plugins.autoDiscoverGraphAdapters: false` disables the scan. The adapter contract types (`GraphLanguageAdapter`, `registerAdapter`, `pickAdapter`) are exported from `@opensip-cli/graph`.
 
 ---
 
@@ -176,14 +178,18 @@ When you ship a new adapter, add a row to this table in your PR.
 
 ## 6. Registration
 
-First-party and third-party adapters use the same registration path: ship a package that declares `opensipTools.kind: "graph-adapter"` and whose main entry exports `adapter` (or list the package name under `plugins.graphAdapters:` in the project config).
+First-party and third-party adapters use the same registration path: ship a package that declares `opensipTools.kind: "graph-adapter"` plus `targetDomain: "graph-adapter"` / `targetDomainApiVersion: 1`, and whose main entry exports `adapter` (or list the package name under `plugins.graphAdapters:` in the project config).
 
 ```json
 {
   "name": "@opensip-cli/graph-cpp",
   "main": "dist/index.js",
   "files": ["dist", "wasm"],
-  "opensipTools": { "kind": "graph-adapter" },
+  "opensipTools": {
+    "kind": "graph-adapter",
+    "targetDomain": "graph-adapter",
+    "targetDomainApiVersion": 1
+  },
   "dependencies": {
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
@@ -193,7 +199,7 @@ First-party and third-party adapters use the same registration path: ship a pack
 }
 ```
 
-The `opensipTools.kind` marker is what default graph-adapter discovery consults. An explicit `plugins.graphAdapters:` list can pin the adapter set instead.
+The `opensipTools.kind` marker is what default graph-adapter discovery consults; the target-domain epoch declares the graph-adapter API version your package targets. An explicit `plugins.graphAdapters:` list can pin the adapter set instead.
 
 ```ts
 // packages/graph/graph-cpp/src/index.ts

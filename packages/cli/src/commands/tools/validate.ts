@@ -22,7 +22,11 @@ import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
-import { PROJECT_LOCAL_MANIFEST_FILE, type ToolSource } from '@opensip-cli/core';
+import {
+  PROJECT_LOCAL_MANIFEST_FILE,
+  type RawToolPluginManifest,
+  type ToolSource,
+} from '@opensip-cli/core';
 
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
 import { ensureHostDir } from '../plugin/host-dir.js';
@@ -146,6 +150,23 @@ function storageSections(findings: readonly StorageFinding[]): ToolsValidateSect
       boundaries.map(fmt),
     ),
   ];
+}
+
+function externalOutputModeSection(
+  manifest: RawToolPluginManifest | undefined,
+): ToolsValidateSection | undefined {
+  if (manifest === undefined) return undefined;
+  const liveViewCommands = manifest.commands
+    .filter((cmd) => cmd.output === 'live-view')
+    .map((cmd) => cmd.name);
+  if (liveViewCommands.length === 0) {
+    return section('external-output-modes', 'passed');
+  }
+  const names = liveViewCommands.map((name) => `'${name}'`).join(', ');
+  return section('external-output-modes', 'failed', [
+    `external command(s) ${names} declare output 'live-view', which is bundled/in-process only; ` +
+      "use 'command-result', 'signal-envelope', or 'raw-stream'.",
+  ]);
 }
 
 /** Map one admission section result to a report section. */
@@ -280,10 +301,12 @@ export async function runToolValidation(
       staticOnly: true,
     });
     const sections: ToolsValidateSection[] = staticReport.sections.map((s) => fromAdmission(s));
+    const externalOutputModes = externalOutputModeSection(staticReport.rawManifest);
+    if (externalOutputModes !== undefined) sections.push(externalOutputModes);
 
     let toolId: string | undefined = staticReport.manifest?.id;
     let incomplete = false;
-    if (staticReport.ok) {
+    if (staticReport.ok && externalOutputModes?.status !== 'failed') {
       // Runtime sections — child-process probe (untrusted code executes there).
       const runtime = runtimeSectionsFor(
         staged,

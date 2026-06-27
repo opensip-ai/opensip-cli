@@ -84,6 +84,7 @@ will load), plus the storage and config contracts. Sections:
 | `runtime-load` | The module imports (child-process probe). |
 | `tool-shape` | The module exports a valid `tool`. |
 | `manifest-runtime-coherence` | Manifest id + command surface match the runtime. |
+| `external-output-modes` | External manifest command shells do not request host-only output modes such as `live-view`. |
 | `config-contract` | A manifest that declares config has a runtime `Tool.config`; its namespace equals the tool id. |
 | `storage-contract` | No DDL strings, no schema-mutation pragmas, no direct datastore-file paths (ADR-0042 Tier A). |
 | `import-boundaries` | No datastore-private schema/migration imports, no migration runners. |
@@ -137,6 +138,15 @@ Atomic stage → validate → activate:
 A failed install leaves no discoverable tool behind. Default scope is
 **global** (available in every project for this user); `--project` installs
 into this project's runtime tool host instead.
+
+Installed npm tools are deny-by-default. A successful install returns structured
+`nextSteps` (and renders them in text mode), including the exact allowlist export
+and first command to try, for example:
+
+```bash
+export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='audit-sec'
+opensip audit-sec
+```
 
 ## `tools uninstall <name-or-id>`
 

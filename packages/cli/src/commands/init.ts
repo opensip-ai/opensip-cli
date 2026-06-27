@@ -29,10 +29,11 @@
  * Promotion path: when a customer's pack outgrows a handful of .mjs
  * files (shared helpers, tests, more than a dozen checks/scenarios),
  * `opensip-cli/<domain>/` can graduate to a real workspace npm
- * package — `package.json` with `opensipTools.kind: "fit-pack"` or
- * `"sim-pack"`, `tsconfig.json`, `index.ts` re-exporting checks/recipes.
- * Marker-based discovery picks up the workspace package automatically
- * regardless of npm scope. The init scaffold stays loose-`.mjs` to
+ * package — fit packs declare the `fit-pack` marker plus target-domain epoch;
+ * sim packs use the `scenarios-*` package-name pattern. Add `tsconfig.json` and
+ * an `index.ts` re-exporting checks/recipes or scenarios/recipes. Marker-based
+ * discovery picks up a fit workspace package automatically regardless of npm
+ * scope. The init scaffold stays loose-`.mjs` to
  * preserve the fast first-touch experience; graduation is a manual
  * step the customer takes when their coverage becomes substantial.
  * See docs/public/50-extend/01-plugin-authoring.md.

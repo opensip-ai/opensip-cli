@@ -11,7 +11,7 @@
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { ConfigurationError, createSignal, enterScope, LanguageRegistry } from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
@@ -146,6 +146,11 @@ function mockCli(datastore: DataStore | undefined, languages?: LanguageRegistry)
       compareBaseline: compareBaselineSeam,
       exportBaselineSarif: vi.fn(() => Promise.resolve()),
       exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
+      writeArtifact: vi.fn((path: string, bytes: string) => {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, bytes, 'utf8');
+        return Promise.resolve();
+      }),
       scope: { datastore: () => datastore, languages: resolvedLanguages },
       reportFailure: makeReportFailureMock(setExitCode, render),
     } as unknown as ToolCliContext,

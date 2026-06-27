@@ -4,7 +4,7 @@
  * commands without importing its runtime.
  */
 
-import { SystemError, type ToolPluginManifest } from '@opensip-cli/core';
+import { PluginIncompatibleError, SystemError, type ToolPluginManifest } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { synthesizeExternalTool } from '../bootstrap/synthesize-external-tool.js';
@@ -91,5 +91,34 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
     expect(spec?.commonFlags).toEqual([]);
     expect(spec?.scope).toBe('project');
     expect(spec?.output).toBe('command-result');
+  });
+
+  it('rejects external live-view commands at synthesis', () => {
+    expect(() =>
+      synthesizeExternalTool(
+        manifest({
+          commands: [
+            {
+              name: 'ext-tool',
+              description: 'run ext',
+              output: 'live-view',
+            },
+          ],
+        }),
+      ),
+    ).toThrow(PluginIncompatibleError);
+    expect(() =>
+      synthesizeExternalTool(
+        manifest({
+          commands: [
+            {
+              name: 'ext-tool',
+              description: 'run ext',
+              output: 'live-view',
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/live-view.*bundled\/in-process only/);
   });
 });

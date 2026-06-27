@@ -11,7 +11,9 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
-const TOOL_DESCRIPTOR_RE = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
+import { toolDescriptorPathRe } from './tool-engine-paths.mjs';
+
+const TOOL_DESCRIPTOR_RE = toolDescriptorPathRe();
 const CONTRIBUTE_SCOPE_RE = /\bcontributeScope\b/;
 const SCOPE_AUGMENTATION_IMPORT_RE = /import\s+['"]\.\/scope-augmentation\.js['"];?/;
 

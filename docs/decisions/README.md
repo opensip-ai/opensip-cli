@@ -37,6 +37,12 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0083](ADR-0083-tool-lifecycle-hooks-self-initialize.md) — Tool lifecycle hooks self-initialize (hook call-site ordering only; report/replay/capability hooks call their own idempotent setup when needed).
+- [ADR-0082](ADR-0082-external-tools-cannot-declare-live-view.md) — External Tool manifests cannot declare `output: "live-view"`; validation rejects that host-only output mode before runtime load.
+- [ADR-0081](ADR-0081-capability-pack-trust-and-resource-declarations.md) — Capability packs are deny-by-default unless bundled; exact-name `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS`; manifest `requires` is declaration-only.
+- [ADR-0080](ADR-0080-host-owned-artifact-write-seam.md) — Durable tool artifacts write through the host-owned `cli.writeArtifact` seam.
+- [ADR-0079](ADR-0079-config-validate-namespace-parity.md) — `config validate` uses the same unclaimed-namespace policy as command dispatch.
+- [ADR-0078](ADR-0078-report-failure-accepts-unknown.md) — `reportFailure` accepts `unknown` errors and the host normalizes arbitrary throwables.
 - [ADR-0077](ADR-0077-unified-tool-logging-and-error-reporting.md) — Unified tool logging and command-failure reporting (`cli.logger` scope-backed; `reportFailure` host fan-out; `createToolLogger`; worker `reportedFailure` replay).
 - [ADR-0076](ADR-0076-tool-authoring-template-and-helper-boundary.md) — Tool authoring template and helper boundary (`createTool()` wraps `defineTool()`; `minimal-js` + `ts-local` scaffolds; no implicit extension hooks; publishable npm template deferred).
 - [ADR-0075](ADR-0075-state-locking-and-baseline-identity-versioning.md) — State locking and baseline identity versioning (datastore-file write lock plus per-artifact locks; `baselineIdentity` on envelopes; fingerprint strategy `{id, version}` persisted in baseline meta; ADR-0050 remains generic payload authority).

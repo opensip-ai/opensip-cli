@@ -57,8 +57,9 @@ const HOT_IMPORTS = [
   /from ['"]@opensip-cli\/fitness['"]/,
   /from ['"]@opensip-cli\/graph(-adapter-common)?['"]/,
   /from ['"]@opensip-cli\/simulation['"]/,
+  /from ['"]@opensip-cli\/yagni['"]/,
   /from ['"]@opensip-cli\/lang-(typescript|rust|python|go|java|cpp)['"]/,
-  /from ['"].*\/(fitness|graph|simulation)\/engine['"]/,
+  /from ['"].*\/(fitness|graph|simulation|yagni)\/engine['"]/,
 ];
 
 const HAS_SPAN = /withSpan(Async)?\s*\(/;

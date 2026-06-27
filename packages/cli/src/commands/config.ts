@@ -8,6 +8,7 @@ import { dirname, resolve } from 'node:path';
 import {
   analyzeNamespaceClaims,
   composeConfigSchema,
+  partitionUnclaimedNamespaces,
   toJsonSchema,
   validateConfigDocument,
   type ToolConfigDeclaration,
@@ -66,9 +67,19 @@ function namespaceNames(declarations: readonly ToolConfigDeclaration[]): readonl
 function collectWarnings(
   declarations: readonly ToolConfigDeclaration[],
   document: unknown,
+  loadedToolNames: ReadonlySet<string>,
 ): readonly string[] {
   const report = analyzeNamespaceClaims(declarations, document);
-  return report.unclaimed.map((u) => {
+  const { toolBugs, benign } = partitionUnclaimedNamespaces(report, loadedToolNames);
+  if (toolBugs.length > 0) {
+    const names = toolBugs.map((u) => `'${u.namespace}'`).join(', ');
+    throw new ConfigurationError(
+      `Config declares ${names} but the loaded tool(s) of the same id contribute no Tool.config — ` +
+        `the block can never apply. Remove the block or fix the tool's config contribution. (ADR-0043)`,
+      { code: 'CONFIGURATION_ERROR' },
+    );
+  }
+  return benign.map((u) => {
     const didYouMean = u.suggestion === undefined ? '' : ` — did you mean '${u.suggestion}:'?`;
     return `Config namespace '${u.namespace}:' is not claimed by any loaded tool${didYouMean}`;
   });
@@ -86,7 +97,10 @@ export function executeConfigValidate(input: ConfigValidateInput): ConfigValidat
     const schema = composeConfigSchema(declarations);
     const document = readConfigDocument(input.configPath);
     validateConfigDocument(schema, document);
-    const warnings = collectWarnings(declarations, document);
+    const loadedToolNames = new Set(
+      input.tools.list().map((t) => t.metadata.name ?? t.metadata.id),
+    );
+    const warnings = collectWarnings(declarations, document, loadedToolNames);
     const configPath = input.configPath ?? resolve(input.cwd, 'opensip-cli.config.yml');
     const result: ConfigValidateResult = {
       type: 'config-validate',

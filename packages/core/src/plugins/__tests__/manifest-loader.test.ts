@@ -380,6 +380,56 @@ describe('loadToolManifest', () => {
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
 
+  it('preserves typed resource requirements and rejects malformed requires blocks', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        apiVersion: 1,
+        requires: [
+          { resource: 'filesystem', scope: 'repo', reason: 'read project files' },
+          { resource: 'network' },
+        ],
+        commands: [{ name: 'x', description: 'x' }],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)?.requires).toEqual([
+      { resource: 'filesystem', scope: 'repo', reason: 'read project files' },
+      { resource: 'network' },
+    ]);
+
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        apiVersion: 1,
+        requires: [{ resource: 'gpu' }],
+        commands: [{ name: 'x', description: 'x' }],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        apiVersion: 1,
+        requires: [{ resource: 'env', scope: ['OPENSIP_API_KEY'] }],
+        commands: [{ name: 'x', description: 'x' }],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+  });
+
   it('READ-BEFORE-IMPORT: loads a throw-on-import tool WITHOUT importing its module', async () => {
     // The fixture's main module throws synchronously on import. If
     // loadToolManifest imported it, this test would throw. Reaching the

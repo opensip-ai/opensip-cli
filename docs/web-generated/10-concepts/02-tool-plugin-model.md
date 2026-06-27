@@ -44,16 +44,18 @@ A Tool is a TypeScript object. The whole interface lives at [`packages/core/src/
 
 ```ts
 interface Tool {
+  identity: { name: string; aliases?: readonly string[] };
   metadata: { id: string; version: string; description: string };
   commands: ReadonlyArray<{ name: string; description: string; aliases?: readonly string[] }>;
   commandSpecs?: ReadonlyArray<CommandSpec<unknown, ToolCliContext>>;
-  initialize?: () => Promise<void>;
-  // Optional contribution slots (most tools use none):
-  contributeScope?: () => ScopeContribution;          // per-run subscope (registries, etc.)
-  collectReportData?: (scope: ToolScope) => Record<string, unknown>;
-  config?: ToolConfigDeclaration;                      // a namespaced Zod schema block
-  capabilityRegistrars?: Record<string, CapabilityRegistrar>;
-  sessionReplay?: { tool: string; replaySession: (stored) => unknown };
+  extensionPoints?: {
+    initialize?: () => Promise<void>;
+    contributeScope?: () => ScopeContribution;          // per-run subscope (registries, etc.)
+    collectReportData?: (scope: ToolScope) => Record<string, unknown>;
+    config?: ToolConfigDeclaration;                      // a namespaced Zod schema block
+    capabilityRegistrars?: Record<string, CapabilityRegistrar>;
+    sessionReplay?: { tool: string; replaySession: (stored) => unknown };
+  };
 }
 ```
 
@@ -66,9 +68,32 @@ The contract has been deliberately kept narrow. Each core member exists for a sp
 - **`metadata.id`** is the registry key. `ToolRegistry.register(t)` writes `tools[t.metadata.id] = t` (first-writer-wins) — see [`packages/core/src/tools/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/core/src/tools/registry.ts). The bootstrap's discovery loop deliberately skips packages whose `id` matches a bundled tool, so a non-customized third-party install can't accidentally clobber `fit`/`sim`/`graph`.
 - **`commands[]`** carries metadata only — no handlers. The CLI uses this list for `--help` listings and conflict detection (two tools can't both claim the `fit` subcommand), and its name **set** must equal the manifest's `commands` (asserted at load — see below). Keeping it metadata-only means `--help` is cheap: the CLI doesn't import a tool's runtime to enumerate its commands.
 - **`commandSpecs`** is the tool's **declarative command surface** — typed `CommandSpec`s (name, description, aliases, common-flag selection, per-command options/args, scope, output mode, and the handler). The host's `mountCommandSpec` ([`packages/cli/src/commands/mount-command-spec.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/mount-command-spec.ts)) reads them and owns the Commander wiring, the shared flags (`--cwd`/`--json`/…), parsing, help, completion, the `--json` `CommandOutcome` wrapping, and the exit-code pipeline. A handler returns its domain result; it never touches Commander and never writes to stdout. `commandSpecs` is the one command surface — §8 "one command surface" invariant.
-- **`initialize()`** is optional async setup, called once per process — lazily, by the CLI's preAction hook, when a subcommand owned by this tool is about to run (not eagerly for every tool at startup, so an uninvoked tool and the `--help`/welcome paths pay nothing). Most tools don't need it (`fit` doesn't — its setup is lazy inside handlers). A throwing `initialize()` is fatal — the command does not run.
+- **`extensionPoints.initialize()`** is optional async setup, called once per process — lazily, by the CLI's preAction hook, when a subcommand owned by this tool is about to run (not eagerly for every tool at startup, so an uninvoked tool and the `--help`/welcome paths pay nothing). Most tools don't need it (`fit` doesn't — its setup is lazy inside handlers). A throwing `initialize()` is fatal — the command does not run.
 
-The optional contribution slots (`contributeScope`, `collectReportData`, `config`, `capabilityRegistrars`, `sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool HTML report, the composed config document, a capability domain it owns, and `sessions show` replay — each only if the tool declares it. The `sessions show` surface (and the new `agent-catalog` discovery command) now include agent ergonomics such as `--filter` and `--raw` for focused historical inspection.
+The optional contribution slots under `extensionPoints`
+(`contributeScope`, `collectReportData`, `config`, `capabilityRegistrars`,
+`sessionReplay`) let a tool plug into the host's per-run scope, the cross-tool
+HTML report, the composed config document, a capability domain it owns, and
+`sessions show` replay — each only if the tool declares it. The `sessions show`
+surface (and the new `agent-catalog` discovery command) now include agent
+ergonomics such as `--filter` and `--raw` for focused historical inspection.
+
+### Lifecycle hook ordering
+
+Hooks are self-initializing. The host guarantees only the call site that owns
+the hook:
+
+| Hook | Host call site | Ordering guarantee |
+|---|---|---|
+| `initialize` | pre-action for the invoked command | runs once before that command handler |
+| `contributeScope` | run-scope construction | runs when the scope is built |
+| `capabilityRegistrars` | capability-domain loading | runs when the owning command loads that domain |
+| `collectReportData` | report composition | runs when a report is generated |
+| `sessionReplay` | `sessions show` / `--show` | runs only for replay projection |
+
+If a report, replay, or capability hook depends on setup, put an idempotent
+`ensureInitialized()` in the tool package and call it from that hook. Do not rely
+on a normal command having run first.
 
 When a TypeScript tool contributes a typed subscope, keep the module
 augmentation in a leaf file and import it for side effects from the tool entry:
@@ -130,9 +155,17 @@ interface ToolCliContext {
   renderLive: (key: string, args: unknown) => Promise<void>;
   maybeOpenReport: (opts: { openRequested: boolean; jsonOutput: boolean }) => Promise<void>;
   emitJson: (value: unknown) => void;            // the sanctioned --json stdout seam
+  emitEnvelope: (envelope: SignalEnvelope) => void;
+  emitError: (error: unknown) => void;
+  reportFailure: (detail: ReportFailureDetail) => Promise<void>;
+  writeArtifact: (path: string, bytes: string) => Promise<void>;
+  writeSarif: (envelope: SignalEnvelope, path: string) => Promise<void>;
+  deliverSignals: (envelope: SignalEnvelope, opts?: unknown) => Promise<unknown>;
   setExitCode: (code: number) => void;           // the only writer of the final exit code
   logger: Logger;
-  // …plus emitEnvelope / deliverSignals / writeSarif / emitError — the other governed output seams.
+  toolState: ToolState;
+  runSession: ToolRunSessions;
+  hostPlanes?: { governance?: unknown; audit?: unknown; entitlements?: unknown };
 }
 ```
 
@@ -140,7 +173,7 @@ This context carries no Commander `program`. A handler has no raw-Commander
 handle to reach, so "one command surface" is structural, not merely guarded —
 the host owns the program internally and mounts each `commandSpec` itself.
 
-`registerLiveView(key, renderer)` / `renderLive(key, args)` are the stateful UI seam. A tool that wants a streaming spinner-to-results experience registers its own renderer under a key (lazily, from a setup hook on first live render) and invokes it by key. The live-view registry is owned by the tool, not the CLI — `fit`, `sim`, and `graph` each ship one. Adding a new live view is a tool-side change, not a contract change.
+`registerLiveView(key, renderer)` / `renderLive(key, args)` are the stateful UI seam. A tool that wants a streaming spinner-to-results experience registers its own renderer under a key (lazily, from a setup hook on first live render) and invokes it by key. The live-view registry is owned by bundled in-process tools, not by external manifest-only command shells. External tool manifests cannot declare `output: "live-view"`; validation rejects that shape before runtime load because the host cannot execute an external renderer in-process. Adding a bundled live view is a tool-side change, not a contract change.
 
 ---
 
@@ -183,7 +216,8 @@ The flow lives in [`packages/cli/src/bootstrap/register-tools.ts`](https://githu
    program; tools never see it.
 
 6. Parse argv, then (lazy) initialize: when a subcommand is about to run, the
-   CLI resolves the owning tool and calls its initialize() once per process,
+   CLI resolves the owning tool and calls its `extensionPoints.initialize()`
+   once per process,
    after the run scope is entered. Uninvoked tools pay nothing.
 ```
 
@@ -316,7 +350,7 @@ What you *don't* need:
 - A code change in `@opensip-cli/core`.
 - A schema migration for the project config (unless your tool has its own config — which goes in a tool-namespaced section under `opensip-cli.config.yml`, declared via the Tool's `config` slot).
 
-If your tool also wants to ship checks (the way `@opensip-cli/checks-typescript` does for `fit`), that's a separate, lighter contract — a check pack declaring `opensipTools.kind: "fit-pack"`. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/).
+If your tool also wants to ship checks (the way `@opensip-cli/checks-typescript` does for `fit`), that's a separate, lighter contract — a check pack declaring the `fit-pack` marker plus target-domain epoch. See [`50-extend/01-plugin-authoring.md`](/docs/opensip-cli/50-extend/01-plugin-authoring/).
 
 ---
 

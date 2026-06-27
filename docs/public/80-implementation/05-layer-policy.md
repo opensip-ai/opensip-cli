@@ -202,7 +202,7 @@ A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typesc
 
 - **`raw-stream-output-guarded`** ([`opensip-cli/fit/checks/raw-stream-output-guarded.mjs`](../../../opensip-cli/fit/checks/raw-stream-output-guarded.mjs), ADR-0065) — `output: 'raw-stream'` command specs must document their reason category in-file.
 
-  The complementary positive contract is the `CommandResult` return type: a tool returns its envelope/result and routes output through the `ToolCliContext` seam (`cli.render` / `cli.emitJson` / `cli.emitEnvelope` / `cli.emitError` / `cli.deliverSignals` / `cli.writeSarif`).
+  The complementary positive contract is the `CommandResult` return type: a tool returns its envelope/result and routes output through the `ToolCliContext` seam (`cli.render` / `cli.emitJson` / `cli.emitEnvelope` / `cli.emitError` / `cli.deliverSignals` / `cli.writeArtifact` / `cli.writeSarif`).
 
 ---
 

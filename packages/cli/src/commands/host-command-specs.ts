@@ -283,7 +283,7 @@ function buildUninstallSpec(): HostSpec {
 // agent-catalog (agent-first discovery surface)
 // ---------------------------------------------------------------------------
 
-function buildAgentCatalogSpec(): HostSpec {
+function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'agent-catalog',
     description:
@@ -294,7 +294,11 @@ function buildAgentCatalogSpec(): HostSpec {
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
       const opts = rawOpts as { json?: boolean };
-      return executeAgentCatalog({ json: opts.json });
+      return executeAgentCatalog({
+        json: opts.json,
+        tools: ctx.tools,
+        internalCommands: ctx.toolInternalCommands,
+      });
     },
   });
 }
@@ -327,7 +331,7 @@ function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec
     buildInitSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
-    buildAgentCatalogSpec(),
+    buildAgentCatalogSpec(ctx),
     buildUninstallSpec(),
   ];
 }
@@ -369,7 +373,7 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
     buildInitSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
-    buildAgentCatalogSpec(),
+    buildAgentCatalogSpec(ctx),
     buildCompletionSpec(ctx),
     buildUninstallSpec(),
     // ADR-0054 M4-E internal worker subcommand the dispatch supervisor forks

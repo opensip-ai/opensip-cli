@@ -216,14 +216,14 @@ export function viewToolsInstall(result: ToolsInstallResult): ViewNode {
   if (result.error !== undefined) {
     children.push(line([{ text: `  ${result.error}`, tone: 'error' }]));
   }
-  if (result.success && result.toolId !== undefined) {
+  // Single source: the host renders the allowlist breadcrumb from `nextSteps`
+  // (the same data `--json` consumers read). `install` always populates
+  // `nextSteps` alongside `toolId` on success, so there is no separate hint path.
+  if (result.success && result.nextSteps !== undefined && result.nextSteps.length > 0) {
     children.push(
-      line([
-        {
-          text: `  Allow on next run: OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='${result.toolId}'`,
-          dim: true,
-        },
-      ]),
+      SPACER,
+      line([{ text: 'Next steps:', bold: true }]),
+      ...result.nextSteps.map((step) => line([{ text: `  ${step}`, dim: true }])),
     );
   }
   children.push(SPACER, validationView(result.validation, 'Validation'));

@@ -80,6 +80,7 @@ export interface ToolsInstallResult {
   readonly validation: ToolsValidateResult;
   readonly toolId?: string;
   readonly version?: string;
+  readonly nextSteps?: readonly string[];
   /** Activation-step failure detail (validation failures live in `validation`). */
   readonly error?: string;
 }

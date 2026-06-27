@@ -7,6 +7,7 @@
 import {
   assertCommandSpec,
   defineTool,
+  PluginIncompatibleError,
   SystemError,
   type CommandSpec,
   type ManifestOptionDescriptor,
@@ -33,7 +34,20 @@ function manifestOptionToSpec(option: ManifestOptionDescriptor): OptionSpec {
   return { ...option };
 }
 
+/**
+ * @throws {PluginIncompatibleError} When an external manifest declares an in-process-only output mode.
+ */
 function manifestCommandToSpec(cmd: ToolCommandManifest): CommandSpec<unknown, ToolCliContext> {
+  if (cmd.output === 'live-view') {
+    throw new PluginIncompatibleError(
+      `external tool command '${cmd.name}' declares output 'live-view', which is bundled/in-process only; ` +
+        "external commands must use 'command-result', 'signal-envelope', or 'raw-stream'.",
+      {
+        code: 'PLUGIN_INCOMPATIBLE',
+        diagnostic: "external command output 'live-view' is not supported",
+      },
+    );
+  }
   const spec: CommandSpec<unknown, ToolCliContext> = {
     name: cmd.name,
     description: cmd.description,

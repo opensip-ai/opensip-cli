@@ -76,7 +76,7 @@ export interface PluginsConfig {
    * (e.g. ['@opensip-cli/checks-python', '@my-org/checks-internal']).
    *
    * Marker-based discovery still runs alongside this list; use this for
-   * packages that do not declare `opensipTools.kind: "fit-pack"` yet, or
+   * packages that do not declare the full fit-pack marker/epoch block yet, or
    * when you want to name a package explicitly in config.
    */
   readonly checkPackages?: readonly string[];

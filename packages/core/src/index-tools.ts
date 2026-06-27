@@ -65,6 +65,8 @@ export type {
   ToolCommandManifest,
   ManifestOptionDescriptor,
   ToolProvenance,
+  ToolResourceClass,
+  ToolResourceRequirement,
   ToolSource,
 } from './tools/index.js';
 // ADR-0054 M4-E: the serializable config descriptor a tool declares in its

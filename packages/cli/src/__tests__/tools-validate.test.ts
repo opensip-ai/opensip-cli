@@ -49,6 +49,30 @@ function fixtureWith(body: string): string {
   return dir;
 }
 
+function liveViewCommandFixture(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'ost-live-view-fixture-'));
+  tempDirs.push(dir);
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({
+      name: '@opensip-cli-fixture/live-view-case',
+      version: '0.0.0',
+      private: true,
+      type: 'module',
+      main: './index.js',
+      opensipTools: {
+        kind: 'tool',
+        id: 'live-view-case',
+        identity: { name: 'live-view-case' },
+        apiVersion: 1,
+        commands: [{ name: 'live-view-case', description: 'noop', output: 'live-view' }],
+      },
+    }),
+  );
+  writeFileSync(join(dir, 'index.js'), 'throw new Error("runtime should not load");\n');
+  return dir;
+}
+
 describe('Tier A storage-contract scan (ADR-0042)', () => {
   it('flags every documented pattern family', () => {
     const cases: readonly { body: string; clauseIncludes: string }[] = [
@@ -109,6 +133,23 @@ describe('validate verdicts over the storage fixtures', () => {
     expect(result.verdict).toBe('failed');
     const storage = result.sections.find((s) => s.name === 'storage-contract');
     expect(storage?.status).toBe('failed');
+  });
+});
+
+describe('validate — external output modes', () => {
+  it('fails live-view before running runtime probe sections', async () => {
+    const { result } = await runToolValidation({
+      spec: liveViewCommandFixture(),
+      cwd: process.cwd(),
+    });
+
+    expect(result.verdict).toBe('failed');
+    const externalModes = result.sections.find((s) => s.name === 'external-output-modes');
+    expect(externalModes).toMatchObject({
+      status: 'failed',
+      diagnostics: [expect.stringContaining("output 'live-view'")],
+    });
+    expect(result.sections.find((s) => s.name === 'runtime-load')).toBeUndefined();
   });
 });
 

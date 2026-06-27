@@ -18,9 +18,40 @@ describe('resolveReportFailure', () => {
   });
 
   it('maps untyped Error to runtime error', () => {
-    const resolved = resolveReportFailure({ error: new Error('boom') as never });
+    const resolved = resolveReportFailure({ error: new Error('boom') });
     expect(resolved.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
     expect(resolved.message).toBe('boom');
+  });
+
+  it('normalizes bare non-Error throwables to runtime error failures', () => {
+    expect(resolveReportFailure({ error: 'string boom' })).toMatchObject({
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+      message: 'string boom',
+    });
+    expect(resolveReportFailure({ error: 42 })).toMatchObject({
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+      message: '42',
+    });
+    expect(resolveReportFailure({ error: { reason: 'plain' } })).toMatchObject({
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+      message: '[object Object]',
+    });
+  });
+
+  it('truncates derived throwable messages before surfacing them', () => {
+    const resolved = resolveReportFailure({ error: new Error('x'.repeat(2000)) });
+    expect(resolved.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+    expect(resolved.message).toHaveLength(1000);
+    expect(resolved.message.endsWith('...')).toBe(true);
+  });
+
+  it('preserves ToolError code and canonical mapped exit code', () => {
+    const resolved = resolveReportFailure({ error: new NotFoundError('missing') });
+    expect(resolved).toMatchObject({
+      exitCode: EXIT_CODES.CHECK_NOT_FOUND,
+      message: 'missing',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('throws SystemError when message and exitCode are missing', () => {

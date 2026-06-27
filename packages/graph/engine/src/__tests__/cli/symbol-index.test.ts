@@ -4,9 +4,9 @@
  * a name→{file,line,…} + file→names lookup table.
  */
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -52,6 +52,11 @@ function mockCli(datastore: DataStore | undefined): MockCli {
       datastore,
       setExitCode,
       scope: { datastore: () => datastore },
+      writeArtifact: vi.fn((path: string, bytes: string) => {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, bytes, 'utf8');
+        return Promise.resolve();
+      }),
       reportFailure: makeReportFailureMock(setExitCode),
     } as unknown as ToolCliContext,
     setExitCode,

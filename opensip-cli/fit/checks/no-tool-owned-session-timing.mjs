@@ -44,8 +44,10 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { bundledToolPackageSegments } from './tool-engine-paths.mjs';
+
 /** Path prefixes of first-party TOOL packages this check governs. */
-const TOOL_PACKAGE_MARKERS = ['packages/fitness/', 'packages/simulation/', 'packages/graph/'];
+const TOOL_PACKAGE_MARKERS = bundledToolPackageSegments.map((segment) => `packages/${segment}/`);
 
 /**
  * Generic-session PERSISTENCE symbols only the HOST may reference. Exact

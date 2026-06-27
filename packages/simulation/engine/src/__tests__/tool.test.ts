@@ -115,6 +115,7 @@ function makeFakeContext(): {
       return Promise.resolve({ cloudAccepted: 0 });
     },
     writeSarif: () => Promise.resolve(),
+    writeArtifact: () => Promise.resolve(),
     saveBaseline: () => Promise.resolve(),
     compareBaseline: () =>
       Promise.resolve({

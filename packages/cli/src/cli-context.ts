@@ -26,6 +26,7 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
+import { createWriteArtifactSeam } from './bootstrap/artifact-seams.js';
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
 import { createIoPlane, type LiveViewRegistry } from './bootstrap/io-plane.js';
@@ -96,6 +97,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   //  - effectful egress (cloud sync + `--report-to` + SARIF file sink).
   const projectDatastore = createDatastoreResolver('project-seam', log);
   const baselineSeams = buildBaselineSeams({ getDatastore: projectDatastore, logger: log });
+  const writeArtifact = createWriteArtifactSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
   const hostPlanes = buildHostPlanes({ getDatastore: projectDatastore, logger: log });
 
@@ -154,6 +156,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     ...outputPlane.emits, // emitJson / emitEnvelope / emitError / emitRaw
     deliverSignals: ioPlane.deliverSignals,
     writeSarif: ioPlane.writeSarif,
+    writeArtifact,
     // Host baseline/ratchet plane seams (ADR-0036) — persistence + diff + exports.
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,
@@ -194,6 +197,7 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
   const log = logger ?? defaultLogger;
   const projectDatastore = createDatastoreResolver('project-seam', log);
   const baselineSeams = buildBaselineSeams({ getDatastore: projectDatastore, logger: log });
+  const writeArtifact = createWriteArtifactSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
   const hostPlanes = buildHostPlanes({ getDatastore: projectDatastore, logger: log });
   const outputPlane = createOutputPlane({ render: deniedHookSeam('render'), logger: log });
@@ -215,6 +219,7 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
     runSession: { timing: createRunTimer() },
     deliverSignals: deniedHookSeam('deliverSignals'),
     writeSarif: deniedHookSeam('writeSarif'),
+    writeArtifact,
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,
     exportBaselineSarif: baselineSeams.exportBaselineSarif,

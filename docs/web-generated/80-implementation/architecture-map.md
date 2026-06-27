@@ -30,7 +30,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |
 
-## Workspace packages (37)
+## Workspace packages (38)
 
 - `@opensip-cli/checks-cpp`
 - `@opensip-cli/checks-go`
@@ -66,6 +66,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/simulation`
 - `@opensip-cli/targeting`
 - `@opensip-cli/test-support`
+- `@opensip-cli/tool-test-kit`
 - `@opensip-cli/tree-sitter`
 - `@opensip-cli/yagni`
 - `opensip-cli`
@@ -94,6 +95,7 @@ per-run `ToolCliContext` (ADR-0051). See
 - `deliverSignals`
 - `cwd`
 - `writeSarif`
+- `writeArtifact`
 - `saveBaseline`
 - `compareBaseline`
 - `exportBaselineSarif`

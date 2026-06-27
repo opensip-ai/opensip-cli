@@ -24,8 +24,7 @@
  * with kind/visibility/bodyHash since we already have that data.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { createToolLogger, ConfigurationError, ToolError } from '@opensip-cli/core';
@@ -92,11 +91,7 @@ export async function executeSymbolIndex(
     }
     const artifact = buildArtifact(catalog);
     const outPath = resolve(opts.cwd, opts.out);
-    // Create the parent dir before writing so a nested --out
-    // (e.g. reports/symbolindex.json) doesn't throw ENOENT — matches
-    // the sibling writers (sarif-export, baseline-export, catalog-json).
-    mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    await cli.writeArtifact(outPath, `${JSON.stringify(artifact, null, 2)}\n`);
     const symbolCount = Object.values(artifact.symbols).reduce((n, arr) => n + arr.length, 0);
     const fileCount = Object.keys(artifact.fileSymbols).length;
     process.stdout.write(

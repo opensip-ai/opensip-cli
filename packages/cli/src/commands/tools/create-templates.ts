@@ -71,7 +71,10 @@ function minimalJsRuntime(ctx: TemplateRenderContext): string {
             lines: ['Your project-local tool is ready — allowlist it, then run opensip ${ctx.commandName}.'],
           };
         } catch (error) {
+          // The host normalizes any caught value; return after reporting so this
+          // command-result handler does not fall through to an undefined result.
           await cli.reportFailure({ error, jsonRequested: opts.json === true });
+          return;
         }
       },
     },
@@ -96,6 +99,10 @@ function tsLocalIndexTs(ctx: TemplateRenderContext): string {
 
 const log = createToolLogger('${ctx.toolId}:cli');
 
+function isJsonRequested(opts: unknown): boolean {
+  return typeof opts === 'object' && opts !== null && 'json' in opts && opts.json === true;
+}
+
 export const tool = createTool({
   identity: { name: '${ctx.toolId}' },
   metadata: {
@@ -117,7 +124,10 @@ export const tool = createTool({
           lines: ['Your typed project-local tool is ready — build, validate, allowlist, then run.'],
         };
       } catch (error) {
-        await cli.reportFailure({ error, jsonRequested: opts.json === true });
+        // The host normalizes any caught value; return after reporting so this
+        // command-result handler does not fall through to an undefined result.
+        await cli.reportFailure({ error, jsonRequested: isJsonRequested(opts) });
+        return;
       }
     },
   },

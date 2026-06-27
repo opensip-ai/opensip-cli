@@ -26,29 +26,11 @@
  * for a scope with fresh empty registries.
  */
 
-import {
-  applyToolContributeScope,
-  LanguageRegistry,
-  RunScope,
-  ToolRegistry,
-  runWithScope,
-  runWithScopeSync,
-} from '@opensip-cli/core';
+import { applyToolContributeScope, type RunScope, type RunScopeOptions } from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
+import { makeTestScope as createBaseTestScope } from '@opensip-cli/tool-test-kit';
 
-import type { RunScopeOptions } from '@opensip-cli/core';
-
-/**
- * Construct a fresh `RunScope` with empty `LanguageRegistry` /
- * `ToolRegistry` instances. Override any field via `opts`.
- */
-export function makeTestScope(opts: RunScopeOptions = {}): RunScope {
-  return new RunScope({
-    languages: opts.languages ?? new LanguageRegistry(),
-    tools: opts.tools ?? new ToolRegistry(),
-    ...opts,
-  });
-}
+export { makeTestScope, withScope, withScopeSync } from '@opensip-cli/tool-test-kit';
 
 /**
  * Construct a test `RunScope` carrying fitness's contributed subscope (incl. its
@@ -59,17 +41,7 @@ export function makeTestScope(opts: RunScopeOptions = {}): RunScope {
  * carries it. Override base fields via `opts` (e.g. a populated `languages`).
  */
 export function makeFitnessTestScope(opts: RunScopeOptions = {}): RunScope {
-  const scope = makeTestScope(opts);
+  const scope = createBaseTestScope(opts);
   applyToolContributeScope(scope, fitnessTool);
   return scope;
-}
-
-/** Run `fn` inside `scope` and return its result. Thin alias for `runWithScope`. */
-export function withScope<T>(scope: RunScope, fn: () => Promise<T>): Promise<T> {
-  return runWithScope(scope, fn);
-}
-
-/** Synchronous variant of `withScope`. */
-export function withScopeSync<T>(scope: RunScope, fn: () => T): T {
-  return runWithScopeSync(scope, fn);
 }

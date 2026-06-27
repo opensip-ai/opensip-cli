@@ -6,8 +6,9 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { isSeamExempt } from '../../../scripts/load-seam-exemptions.mjs';
+import { toolEngineCliPathRe } from './tool-engine-paths.mjs';
 
-const ENFORCED_PATH = /packages\/(fitness|graph|simulation|yagni)\/engine\/src\/cli\//;
+const ENFORCED_PATH = toolEngineCliPathRe();
 
 const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
 

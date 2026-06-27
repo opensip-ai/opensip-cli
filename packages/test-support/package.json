@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@opensip-cli/core": "workspace:*",
-    "@opensip-cli/fitness": "workspace:*"
+    "@opensip-cli/fitness": "workspace:*",
+    "@opensip-cli/tool-test-kit": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

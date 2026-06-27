@@ -56,8 +56,10 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolEnginePathRe, toolPackageSegmentForPath } from './tool-engine-paths.mjs';
+
 /** Resolved-path fragment identifying a first-party tool-engine source file. */
-const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//;
+const TOOL_ENGINE_PATH = toolEnginePathRe();
 
 /** Maps an engine namespace directory to its config-document top-level key. */
 const NAMESPACE_BY_DIR = {
@@ -130,9 +132,9 @@ function bindingsForNamespace(content, namespace) {
  * Exported for unit tests so the detector runs without the Check framework.
  */
 export function analyzeOneConfigDocument(content, filePath) {
-  const dirMatch = TOOL_ENGINE_PATH.exec(filePath);
-  if (!dirMatch) return [];
-  const namespace = NAMESPACE_BY_DIR[dirMatch[1]];
+  if (!TOOL_ENGINE_PATH.test(filePath)) return [];
+  const segment = toolPackageSegmentForPath(filePath);
+  const namespace = segment === undefined ? undefined : NAMESPACE_BY_DIR[segment];
   if (namespace === undefined) return [];
 
   const bindings = bindingsForNamespace(content, namespace);

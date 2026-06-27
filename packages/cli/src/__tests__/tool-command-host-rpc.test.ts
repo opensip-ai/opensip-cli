@@ -134,7 +134,7 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(got.value).toEqual({ v: 1 });
   });
 
-  it('performs saveBaseline / deliverSignals / writeSarif / compareBaseline / list', async () => {
+  it('performs saveBaseline / deliverSignals / writeSarif / writeArtifact / compareBaseline / list', async () => {
     const cap = makeDispatchHostCtx();
     await handleHostRpc({ rpcId: 1, seam: 'saveBaseline', tool: 't', envelope: { a: 1 } }, cap.ctx);
     expect(cap.baselines[0]).toEqual({ tool: 't', envelope: { a: 1 } });
@@ -147,6 +147,11 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(cap.delivered[0]).toEqual({ e: 1 });
 
     await handleHostRpc({ rpcId: 3, seam: 'writeSarif', envelope: {}, path: '/o.sarif' }, cap.ctx);
+    await handleHostRpc(
+      { rpcId: 30, seam: 'writeArtifact', path: '/artifact.json', bytes: '{"ok":true}\n' },
+      cap.ctx,
+    );
+    expect(cap.artifacts).toEqual([{ path: '/artifact.json', bytes: '{"ok":true}\n' }]);
     const compare = (await handleHostRpc(
       { rpcId: 4, seam: 'compareBaseline', tool: 't', envelope: {} },
       cap.ctx,

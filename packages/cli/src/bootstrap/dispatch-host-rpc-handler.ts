@@ -38,6 +38,7 @@ type HostPlaneImpl = Record<string, ((...args: unknown[]) => Promise<unknown>) |
 const RECOGNIZED_SEAMS = new Set<HostRpcCall['seam']>([
   'deliverSignals',
   'writeSarif',
+  'writeArtifact',
   'saveBaseline',
   'compareBaseline',
   'exportBaselineSarif',
@@ -127,6 +128,9 @@ async function performHostRpc(request: HostRpcRequest, ctx: ToolCliContext): Pro
     }
     case 'writeSarif': {
       return ctx.writeSarif(request.envelope, request.path);
+    }
+    case 'writeArtifact': {
+      return ctx.writeArtifact(request.path, request.bytes);
     }
     case 'saveBaseline': {
       return ctx.saveBaseline(request.tool, request.envelope);

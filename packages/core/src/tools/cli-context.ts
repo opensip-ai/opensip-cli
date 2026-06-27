@@ -290,6 +290,13 @@ export interface ToolCliContext {
    */
   readonly writeSarif: (envelope: WireSignalEnvelope, path: string) => Promise<void>;
   /**
+   * Write durable tool-owned artifact bytes through the host's atomic file
+   * writer. The host resolves the target path, writes via temp-file + rename
+   * under a per-target lock, creates parent directories, and emits the standard
+   * state artifact diagnostics. Use specialized seams for SARIF and baselines.
+   */
+  readonly writeArtifact: (path: string, bytes: string) => Promise<void>;
+  /**
    * Host baseline/ratchet plane seams (ADR-0036). The host owns persistence
    * (`BaselineRepo`), the diff, and exit derivation; a tool inherits a CI ratchet
    * by emitting fingerprint-stamped signals. The seams are **read-only** of

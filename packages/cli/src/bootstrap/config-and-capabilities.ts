@@ -30,6 +30,7 @@
 import {
   analyzeNamespaceClaims,
   composeConfigSchema,
+  partitionUnclaimedNamespaces,
   resolveConfig,
   validateConfigDocument,
   type ToolConfigDeclaration,
@@ -177,7 +178,7 @@ function reportUnclaimedNamespaces(args: {
   if (report.unclaimed.length === 0) return;
 
   const loadedToolNames = new Set(args.tools.list().map((t) => t.metadata.name ?? t.metadata.id));
-  const toolBugs = report.unclaimed.filter((u) => loadedToolNames.has(u.namespace));
+  const { toolBugs, benign } = partitionUnclaimedNamespaces(report, loadedToolNames);
   if (toolBugs.length > 0) {
     const names = toolBugs.map((u) => `'${u.namespace}'`).join(', ');
     throw new ConfigurationError(
@@ -187,7 +188,7 @@ function reportUnclaimedNamespaces(args: {
     );
   }
 
-  for (const u of report.unclaimed) {
+  for (const u of benign) {
     const didYouMean = u.suggestion === undefined ? '' : ` — did you mean '${u.suggestion}:'?`;
     logger.warn({
       evt: 'cli.config.unclaimed_namespace',

@@ -51,8 +51,10 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolDescriptorPathRe } from './tool-engine-paths.mjs';
+
 /** Resolved-path fragment identifying a first-party TOOL registration file. */
-const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
+const TOOL_REGISTRATION_PATH = toolDescriptorPathRe();
 
 /**
  * The documented host-command exceptions — the action-less Commander subcommand

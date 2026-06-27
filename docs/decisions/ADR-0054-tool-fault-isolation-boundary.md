@@ -495,3 +495,7 @@ the only external import path. The named `adr0054Transition` exception is gone
 (replaced by the bundled-only host policy + the worker-plane `inDispatchWorker`
 policy); the boundary is now the final fault-isolation boundary, mechanized by the
 fitness check + bootstrap test.
+
+**Extended by:** [ADR-0082](ADR-0082-external-tools-cannot-declare-live-view.md)
+closes the external manifest output-mode gap by rejecting `live-view` command
+shells before runtime import.

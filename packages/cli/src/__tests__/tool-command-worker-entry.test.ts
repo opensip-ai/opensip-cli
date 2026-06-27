@@ -252,6 +252,33 @@ describe('runToolCommandWorker', () => {
     expect(r.extDispatchReport?.ran).toBe(true);
   });
 
+  it('M4-F hook mode: does not run initialize before collectReportData', async () => {
+    let initialized = false;
+    const tool = {
+      identity: fixtureTool.identity,
+      metadata: { ...fixtureTool.metadata },
+      commandSpecs: fixtureTool.commandSpecs,
+      extensionPoints: {
+        initialize: () => {
+          initialized = true;
+        },
+        collectReportData: () => ({
+          initSkip: { initialized },
+        }),
+      },
+    } as Tool;
+
+    const msg = await runInScope(
+      writeSpec(specFor({ commandName: undefined, hook: 'collectReportData' })),
+      { tool },
+    );
+
+    expect(msg.kind).toBe('result');
+    if (msg.kind !== 'result') throw new Error('expected result');
+    const r = msg.value.hookResult as { initSkip?: { initialized: boolean } };
+    expect(r.initSkip?.initialized).toBe(false);
+  });
+
   it('M4-F hook mode: runs sessionReplay against the stored row and returns the replay as hookResult', async () => {
     const stored = {
       id: 'sess-42',

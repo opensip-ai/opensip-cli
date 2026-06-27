@@ -5,9 +5,6 @@
  * This is intentionally a small, self-contained surface so agents can
  * bootstrap their usage without parsing --help text or source.
  *
- * Future: can be made more dynamic by introspecting live CommandSpecs
- * (see completion.ts for precedent).
- *
  * Command taxonomy (tool-command-surface-taxonomy):
  * - Entry points are keyed by the PUBLIC command path. A `parent`-nested tool
  *   verb (the `<tool> <verb>` grammar enabled by `CommandSpec.parent` — e.g.
@@ -17,9 +14,9 @@
  *   `*-equivalence-check`) are NEVER catalogued here — the agent-catalog
  *   primary surface excludes internal workers (the host-owned tiering pass
  *   formalized in Phase 1 filters them when this surface becomes spec-derived).
- * In Phase 0 no tool declares `parent`/`visibility`, so the static catalog below
- * already satisfies both rules (no nested verb, no internal worker is listed).
  */
+
+import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
 /**
  * The command-taxonomy tier an entry point belongs to
  * (tool-command-surface-taxonomy). `'platform'` = host-owned Tier-1 commands
@@ -59,6 +56,8 @@ export interface AgentCatalog {
   readonly notes: readonly string[];
 }
 
+type EntryPoint = AgentCatalog['entryPoints'][number];
+
 /**
  * Internal (Tier-3) command-name shapes the agent-catalog must NEVER surface:
  * the IPC/CI workers and the equivalence gate. The guard checks both the name
@@ -66,6 +65,12 @@ export interface AgentCatalog {
  * either route. This is the by-construction complement to the Phase 4 test.
  */
 const INTERNAL_COMMAND_NAME_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
+
+function compareCodePoint(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
 
 /**
  * Throw if any entry point is a Tier-3 internal command (by name shape or by an
@@ -91,65 +96,106 @@ function assertNoInternalEntryPoints(
   }
 }
 
-export function buildAgentCatalog(): AgentCatalog {
-  // tool-command-surface-taxonomy Task 1.4: every entry point is annotated with
-  // its taxonomy `tier` so an agent sees the predictable Tier-1/Tier-2 shape, and
-  // NO Tier-3 internal worker is catalogued. The static list below is the
-  // primary surface; `assertNoInternalEntryPoints` guards (by construction)
-  // against a future edit pasting an internal command in (the Phase 4 test
-  // also asserts this).
+const TOOL_ENTRY_OVERLAYS: Readonly<Record<string, Partial<EntryPoint>>> = {
+  fitness: {
+    description: 'Run fitness checks. Use --json for machine output (SignalEnvelope). Alias: fit.',
+    examples: ['opensip fitness --recipe default --json', 'opensip fit --check some-check --json'],
+  },
+  graph: {
+    description: 'Build static call graph + rules. --json yields SignalEnvelope.',
+    examples: ['opensip graph --json', 'opensip graph --sarif out.sarif'],
+  },
+  sim: {
+    description: 'Run simulation scenarios. Use --json for machine output (SignalEnvelope).',
+    examples: ['opensip sim --json', 'opensip sim --scenario default --json'],
+  },
+  yagni: {
+    description:
+      'Run YAGNI reduction audit detectors. Advisory findings; --json yields SignalEnvelope.',
+    examples: ['opensip yagni --json', 'opensip yagni --json packages/yagni/engine'],
+  },
+};
+
+const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
+  {
+    command: 'sessions list',
+    description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
+    examples: [
+      'opensip sessions list --json --summary-only',
+      'opensip sessions list --json --tool fitness --limit 5',
+    ],
+    tier: 'platform' as const,
+  },
+  {
+    command: 'sessions show',
+    description:
+      'Retrieve a prior run as SessionReplayResult (includes projected SignalEnvelope). ' +
+      'Supports latest + --tool and rich filtering.',
+    examples: [
+      'opensip sessions show latest --tool fitness --json',
+      'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
+      'opensip sessions show GRAPH_01... --json --raw',
+      'opensip sessions show previous --tool graph --json',
+    ],
+    tier: 'platform' as const,
+  },
+  {
+    command: 'agent-catalog',
+    description: 'This command. Self-describing catalog for agents (JSON preferred).',
+    examples: ['opensip agent-catalog --json'],
+    tier: 'platform' as const,
+  },
+];
+
+function publicPrimaryCommand(
+  tool: Tool,
+  internalCommands: ReadonlySet<string>,
+): CommandSpec<unknown, unknown> | undefined {
+  return (tool.commandSpecs ?? []).find(
+    (spec) =>
+      spec.parent === undefined &&
+      spec.visibility !== 'internal' &&
+      !internalCommands.has(spec.name) &&
+      !INTERNAL_COMMAND_NAME_RE.test(spec.name),
+  ) as CommandSpec<unknown, unknown> | undefined;
+}
+
+function entryPointForTool(
+  tool: Tool,
+  internalCommands: ReadonlySet<string>,
+): EntryPoint | undefined {
+  const primary = publicPrimaryCommand(tool, internalCommands);
+  if (primary === undefined) return undefined;
+  const overlay = TOOL_ENTRY_OVERLAYS[primary.name] ?? TOOL_ENTRY_OVERLAYS[tool.metadata.name];
+  return {
+    command: primary.name,
+    description:
+      overlay?.description ??
+      `${primary.description} Use --json when available for machine output.`,
+    examples: overlay?.examples ?? [`opensip ${primary.name} --json`],
+    tier: 'tool',
+  };
+}
+
+function deriveToolEntryPoints(
+  tools: ToolRegistry | undefined,
+  internalCommands: ReadonlySet<string>,
+): readonly EntryPoint[] {
+  return (tools?.list() ?? [])
+    .map((tool) => entryPointForTool(tool, internalCommands))
+    .filter((entry): entry is EntryPoint => entry !== undefined)
+    .sort((a, b) => compareCodePoint(a.command, b.command));
+}
+
+export function buildAgentCatalog(
+  input: {
+    readonly tools?: ToolRegistry;
+    readonly internalCommands?: ReadonlySet<string>;
+  } = {},
+): AgentCatalog {
   const entryPoints = [
-    {
-      command: 'fitness',
-      description:
-        'Run fitness checks. Use --json for machine output (SignalEnvelope). Alias: fit.',
-      examples: [
-        'opensip fitness --recipe default --json',
-        'opensip fit --check some-check --json',
-      ],
-      tier: 'tool' as const,
-    },
-    {
-      command: 'graph',
-      description: 'Build static call graph + rules. --json yields SignalEnvelope.',
-      examples: ['opensip graph --json', 'opensip graph --sarif out.sarif'],
-      tier: 'tool' as const,
-    },
-    {
-      command: 'yagni',
-      description:
-        'Run YAGNI reduction audit detectors. Advisory findings; --json yields SignalEnvelope.',
-      examples: ['opensip yagni --json', 'opensip yagni --json packages/yagni/engine'],
-      tier: 'tool' as const,
-    },
-    {
-      command: 'sessions list',
-      description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
-      examples: [
-        'opensip sessions list --json --summary-only',
-        'opensip sessions list --json --tool fitness --limit 5',
-      ],
-      tier: 'platform' as const,
-    },
-    {
-      command: 'sessions show',
-      description:
-        'Retrieve a prior run as SessionReplayResult (includes projected SignalEnvelope). ' +
-        'Supports latest + --tool and rich filtering.',
-      examples: [
-        'opensip sessions show latest --tool fitness --json',
-        'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
-        'opensip sessions show GRAPH_01... --json --raw',
-        'opensip sessions show previous --tool graph --json',
-      ],
-      tier: 'platform' as const,
-    },
-    {
-      command: 'agent-catalog',
-      description: 'This command. Self-describing catalog for agents (JSON preferred).',
-      examples: ['opensip agent-catalog --json'],
-      tier: 'platform' as const,
-    },
+    ...deriveToolEntryPoints(input.tools, input.internalCommands ?? new Set()),
+    ...PLATFORM_ENTRY_POINTS,
   ];
   assertNoInternalEntryPoints(entryPoints);
   return {
@@ -199,23 +245,33 @@ export function buildAgentCatalog(): AgentCatalog {
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',
       'Human-readable output (no --json) uses the same tables/banners as before — unchanged.',
       // Uniform tool-primary surface (host-guaranteed; decorateToolPrimary).
-      'Every tool primary (fit/graph/sim and any third-party tool) accepts `<tool> --version` ' +
+      'Every tool primary (fit/graph/sim/yagni and any third-party tool) accepts `<tool> --version` ' +
         '(prints the TOOL version, e.g. `fit 0.1.6`; distinct from `opensip --version`, the CLI), ' +
         'plus the guaranteed baseline flags --cwd, --json, --config, --quiet, --verbose.',
       'Dogfood gate requires 0 errors + 0 warnings on fit:ci and graph:ci after any change.',
       // Hygiene invariant (host-planes-scope-seams-hygiene Phases 2-4): everything runs inside an
       // entered RunScope; the only sanctioned seams for output, delivery, baselines, toolState,
       // and hostPlanes (governance/audit/entitlements) are the documented methods on ToolCliContext
-      // (render, emitJson, emitEnvelope, deliverSignals, writeSarif, + the baseline/toolState/hostPlanes
-      // accessors). Direct stdout, the old pre-scope holder, or raw datastore from handlers is
-      // forbidden and caught by ESLint + fitness check + runtime guards. Bootstrap root is exempted.
+      // (render, emitJson, emitEnvelope, deliverSignals, writeArtifact, writeSarif, + the
+      // baseline/toolState/hostPlanes accessors). Direct stdout, the old pre-scope holder, or
+      // raw datastore from handlers is forbidden and caught by ESLint + fitness check + runtime
+      // guards. Bootstrap root is exempted.
       'Only the methods on the ToolCliContext you receive are allowed for emission/state/planes.',
     ],
   };
 }
 
-export function executeAgentCatalog(opts: { json?: boolean } = {}) {
-  const catalog = buildAgentCatalog();
+export function executeAgentCatalog(
+  opts: {
+    readonly json?: boolean;
+    readonly tools?: ToolRegistry;
+    readonly internalCommands?: ReadonlySet<string>;
+  } = {},
+) {
+  const catalog = buildAgentCatalog({
+    tools: opts.tools,
+    internalCommands: opts.internalCommands,
+  });
 
   if (opts.json) {
     // Return a result shape that the host can emit cleanly.

@@ -102,6 +102,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'buildMinimalTextTree',
   'buildSignalBatch',
   'buildToolIdentityIndex',
+  'checkCapabilityContributionCompatibility',
   'checkCompatibility',
   'checkSchemaCompat',
   'classifyIntegrityFailure',

@@ -27,7 +27,7 @@ OpenSIP CLI is extensible across five shapes, listed in increasing order of effo
 | 1 | **Project-local check** — a `.mjs` file under `opensip-cli/fit/checks/` | Add one rule to one repo. No publishing. | ~10 lines | [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/) |
 | 2 | **Project-local recipe** — a `.mjs` file under `opensip-cli/fit/recipes/` | Define a named lineup of checks for CI ("`quick-smoke` for pre-commit"). | ~10 lines | [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/) |
 | 3 | **Project-local sim scenario** — a `.mjs` file under `opensip-cli/sim/scenarios/` | Run load / chaos simulations against your service. | ~30 lines | [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/) |
-| 4 | **Publishable pack** — a fit package declaring `opensipTools.kind: "fit-pack"` or a sim package using the `scenarios-*` name pattern | Ship the same checks/scenarios across multiple projects, or organize a large in-repo set. | ~100-500 lines + tooling | [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) |
+| 4 | **Publishable pack** — a fit package declaring the `fit-pack` marker plus target-domain epoch, or a sim package using the `scenarios-*` name pattern | Ship the same checks/scenarios across multiple projects, or organize a large in-repo set. | ~100-500 lines + tooling | [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) |
 | 5 | **Full Tool plugin** — an npm package declaring `opensipTools.kind: "tool"` | Your own subcommand. Fundamentally different from `fit`/`sim`/`graph` (e.g. `audit-sec`, `bench`). | ~50-150 lines per Tool | [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) |
 
 ## Pick by question

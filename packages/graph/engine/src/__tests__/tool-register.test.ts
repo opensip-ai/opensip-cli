@@ -191,6 +191,11 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, formatSignalSarif(envelope as Parameters<typeof formatSignalSarif>[0]));
     }),
+    writeArtifact: vi.fn((path: string, bytes: string) => {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes, 'utf8');
+      return Promise.resolve();
+    }),
     // ADR-0036 host baseline/ratchet seams. The fingerprint export mirrors the
     // real host seam against the test datastore (write JSON / throw on missing).
     saveBaseline: vi.fn().mockResolvedValue(undefined),

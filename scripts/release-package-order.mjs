@@ -76,6 +76,13 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/contracts',
     publishReason: 'Tool↔runner contract facade; breaks cycles between core and tools',
   },
+  {
+    unscoped: 'tool-test-kit',
+    name: '@opensip-cli/tool-test-kit',
+    dir: 'packages/tool-test-kit',
+    filter: '@opensip-cli/tool-test-kit',
+    publishReason: 'Public ToolCliContext test double and command-spec helpers for tool authors',
+  },
   // Layer 2 — shared clone-detection substrate (node:crypto only; ADR-0064)
   {
     unscoped: 'clone-detection',

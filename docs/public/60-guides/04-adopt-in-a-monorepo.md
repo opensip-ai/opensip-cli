@@ -99,7 +99,11 @@ cd opensip-cli/fit
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
-  "opensipTools": { "kind": "fit-pack" },
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -156,7 +160,7 @@ packages:
 
 Then `pnpm i`. The workspace symlinks `@your-scope/fit` into `node_modules/`. opensip-cli's marker-based discovery finds it via the `opensipTools.kind` field and loads it on the next `fit` run.
 
-The `kind` marker is what makes fit-pack discovery work — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`). The kind tells opensip-cli "this is a fit-pack"; the rest is your naming. Sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin instead.
+The `kind` marker is what makes fit-pack discovery work — your pack can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`). The kind tells opensip-cli "this is a fit-pack"; `targetDomain: "fit-pack"` plus `targetDomainApiVersion: 1` tells the loader which fit-pack epoch your package targets. Sim scenario packs use the `<scope>/scenarios-*` package-name pattern or an explicit `plugins.scenarioPackages:` pin instead.
 
 For TS-based packs you also need to build (`pnpm -F @your-scope/fit build`) so the `main` field resolves to real JS. The runtime doesn't load TypeScript directly — it loads what your `package.json#main` points at.
 

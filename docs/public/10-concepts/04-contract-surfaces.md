@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-06-26
 release: v0.1.13
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -35,7 +35,7 @@ A contract is a promise to a consumer outside your control. Break it, and the co
 |---|---|---|---|---|
 | 1 | CLI argv (commands and flags) | humans, CI, shells | **stable** (semver-major) | `packages/*/src/*tool.ts` |
 | 2 | Exit codes | CI, scripts | **stable** (semver-major) | `packages/contracts/src/exit-codes.ts` |
-| 3 | JSON output (`SignalEnvelope`) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/signal-envelope.ts` |
+| 3 | JSON output (`CommandOutcome`, with `SignalEnvelope` under `.envelope` for tool runs) | CI, dashboards, the gate, OpenSIP Cloud | **stable** (semver-major) | `packages/contracts/src/command-outcome.ts`, `packages/contracts/src/signal-envelope.ts` |
 | 4 | SARIF output | GitHub Code Scanning, IDEs | **stable** (versioned by SARIF spec) | `packages/output/src/format/signal-sarif.ts` |
 | 5 | Tool plugin contract (`Tool`) | third-party tools | **stable** (semver-major) | `packages/core/src/tools/types.ts` |
 | 6 | Plugin discovery (`opensipTools.kind` markers; exact check-package pins; sim `scenarios-*` scope scan) | third-party tools, check packs, sim packs | **stable** (semver-major) | `packages/core/src/plugins/tool-package-discovery.ts`, `packages/core/src/plugins/capability-discovery.ts`, `packages/config/src/capability-preferences.ts` |
@@ -129,9 +129,16 @@ CI integrations are the primary consumer. `opensip fit && deploy` is an idiom; s
 
 ---
 
-## 3. JSON output (`SignalEnvelope`)
+## 3. JSON output (`CommandOutcome`)
 
-The structured stdout when `--json` is set — the **same envelope for every tool** (`fit`, `sim`, `graph`), per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md). Shape lives at [`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts):
+The structured stdout when `--json` is set is a host-stamped outer
+`CommandOutcome`. For signal-producing tool runs (`fit`, `sim`, `graph`, `yagni`)
+the unchanged `SignalEnvelope` sits under `.envelope`; command-result data sits
+under `.data`; setup and command failures use `.errors`. This is the
+one-machine-output shape from [ADR-0065](../../decisions/ADR-0065-public-json-output-and-raw-stream-policy.md), layered on top of the signal currency from
+[ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md).
+Shapes live at [`packages/contracts/src/command-outcome.ts`](../../../packages/contracts/src/command-outcome.ts) and
+[`packages/contracts/src/signal-envelope.ts`](../../../packages/contracts/src/signal-envelope.ts):
 
 ```mermaid
 flowchart LR
@@ -152,7 +159,8 @@ flowchart LR
   Graph --> Envelope
   Sim --> Envelope
   Envelope --> Root
-  Root --> Json
+  Root --> Outcome["CommandOutcome<br/>.envelope"]
+  Outcome --> Json
   Root --> Sarif
   Root --> Table
   Root --> Session
@@ -163,6 +171,15 @@ flowchart LR
 ```
 
 ```ts
+interface CommandOutcome<TData = unknown> {
+  readonly status: 'ok' | 'error';
+  readonly command: string;
+  readonly tool?: string;
+  readonly envelope?: SignalEnvelope;
+  readonly data?: TData;
+  readonly errors?: readonly CommandOutcomeError[];
+}
+
 interface SignalEnvelope {
   readonly schemaVersion: 2;
   readonly tool: 'fit' | 'sim' | 'graph';
@@ -180,7 +197,7 @@ interface SignalEnvelope {
 }
 ```
 
-`Signal` is the single output currency (`packages/core/src/types/signal.ts`):
+`Signal` remains the single finding currency (`packages/core/src/types/signal.ts`):
 4-level severity (`critical|high|medium|low`), `category`, `provider`,
 `fingerprint`, fix hint. The `schemaVersion: 2` discriminator is part of the
 contract. A future minor can add fields; a major can change `schemaVersion` and
@@ -189,7 +206,11 @@ break old consumers.
 The full per-field reference (when each field is present, what each value can
 be) is in [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
 
-**Stability rule.** Adding optional fields is a minor change. Adding required fields, removing fields, or changing types is a major change. Reordering keys within objects is *not* part of the contract — consumers must parse, not pattern-match — but in practice the renderer emits keys in declared order.
+**Stability rule.** Adding optional fields to `CommandOutcome` or the nested
+`SignalEnvelope` is a minor change. Adding required fields, removing fields, or
+changing types is a major change. Reordering keys within objects is *not* part of
+the contract — consumers must parse, not pattern-match — but in practice the
+renderer emits keys in declared order.
 
 ---
 
@@ -224,7 +245,9 @@ interface Tool {
 
 Plus the `ToolCliContext` injected into each command handler the host mounts
 from `commandSpecs`. A tool declares `commandSpecs` and the host mounts them;
-see [ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md).
+artifact exports go through `cli.writeArtifact(path, bytes)` or a narrower
+host-owned seam such as `cli.writeSarif`. See
+[ADR-0027](../../decisions/ADR-0027-ga-parity-cutover.md).
 
 **Stability rule.** Adding optional fields to `Tool` (like `initialize?`) is a minor change. Adding required fields is a major. Adding methods to `ToolCliContext` is a minor (existing tools won't call them); removing or renaming methods is a major.
 
@@ -269,7 +292,7 @@ The kernel's [`discoverToolPackages`](../../../packages/core/src/plugins/tool-pa
 ```
 
 Graph adapters use `targetDomain: "graph-adapter"` with the same epoch fields.
-The canonical contract is the `opensipTools.kind: "fit-pack"` marker ([ADR-0007](../../decisions/ADR-0007-marker-canonical-plugin-discovery.md)). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. All first-party `@opensip-cli/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
+The canonical contract is the `opensipTools.kind: "fit-pack"` marker plus target-domain epoch ([ADR-0007](../../decisions/ADR-0007-marker-canonical-plugin-discovery.md), ADR-0074). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. All first-party `@opensip-cli/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
 
 For packs published under your own scope, declare the marker or pin the package explicitly in the project config:
 
@@ -288,7 +311,7 @@ Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any in
 ### Stability rules
 
 - **Adding a new auto-discovery shape is a minor change.** Existing packs don't break.
-- **Changing what an existing shape requires is a major change.** A pack declaring `opensipTools.kind: "fit-pack"` that exports `checks: Check[]` should keep working across minors.
+- **Changing what an existing shape requires is a major change.** A pack declaring the current `fit-pack` marker/epoch shape that exports `checks: Check[]` should keep working across minors.
 - **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
 
 A tool's project-local plugin layout is described by a `PluginLayout` descriptor (`{ domain, userSubdirs }` — [`packages/core/src/plugins/types.ts`](../../../packages/core/src/plugins/types.ts)) that the tool declares on its `Tool.pluginLayout` and the kernel consumes. The `domain` is a plain string segment used for path resolution (`<project>/opensip-cli/<domain>/<kind>/` and `.runtime/plugins/<domain>/`), not a `package.json` `kind` value. The kernel deliberately does **not** enumerate the first-party domains — there is no `'fit' | 'sim' | 'lang'` union in core (ADR-0009 corollary 1).

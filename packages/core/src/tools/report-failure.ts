@@ -8,7 +8,6 @@
  */
 
 import type { CliDiagnostic } from '../lib/cli-diagnostic.js';
-import type { ToolError } from '../lib/errors.js';
 
 /** Structured log metadata optionally supplied with a command failure report. */
 export interface ReportFailureLogDetail {
@@ -19,8 +18,10 @@ export interface ReportFailureLogDetail {
 
 /**
  * Passed to {@link ToolCliContext.reportFailure}. The host resolves message,
- * exit code, and code from {@link ToolError} when omitted, then performs
- * effectful fan-out (log, render / emitError / diagnostic stderr, exit code).
+ * exit code, and code from ToolError-compatible errors when omitted, then
+ * performs effectful fan-out (log, render / emitError / diagnostic stderr,
+ * exit code). Do not throw values that contain secrets; the derived
+ * customer-facing message is bounded but still visible.
  */
 export interface ReportFailureDetail {
   /** Customer-facing headline (required unless `error` supplies message). */
@@ -31,8 +32,8 @@ export interface ReportFailureDetail {
   readonly code?: string;
   /** Explicit exit code; omitted when `error` is a ToolError (host maps). */
   readonly exitCode?: number;
-  /** Typed error — host derives message/exitCode/code when omitted. */
-  readonly error?: ToolError;
+  /** Caught throwable — host derives message/exitCode/code when omitted. */
+  readonly error?: unknown;
   /** ADR-0060 structured diagnostic for setup-class failures surfaced mid-handler. */
   readonly diagnostic?: CliDiagnostic;
   /** Whether this command invocation requested JSON output. */

@@ -11,8 +11,9 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
-const TOOL_COMMAND_SPEC =
-  /packages\/(fitness|graph|simulation)\/engine\/src\/cli\/.*command-spec.*\.ts$/;
+import { toolEngineCliPathRe } from './tool-engine-paths.mjs';
+
+const TOOL_COMMAND_SPEC = toolEngineCliPathRe('.*command-spec.*\\.ts$');
 
 const RAW_STREAM = /output:\s*['"]raw-stream['"]/;
 

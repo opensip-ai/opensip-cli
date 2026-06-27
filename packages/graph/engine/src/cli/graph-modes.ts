@@ -13,8 +13,6 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
@@ -118,11 +116,12 @@ export async function runGateMode(
  * `--catalog-output <path>` file. Phase 6's `EngineSubprocessPort`
  * invokes this mode per commit-sync run.
  *
- * Synchronous file write — catalog payloads are bounded (per-package
- * fan-out limits per-run scope) and we want backpressure if disk is
- * full rather than a deferred-write surprise.
+ * Backpressured atomic write through the host `cli.writeArtifact` seam —
+ * catalog payloads are bounded (per-package fan-out limits per-run scope)
+ * and the await holds the run until the locked temp+rename completes,
+ * surfacing a full disk rather than a deferred-write surprise.
  */
-export function runCatalogJsonMode(
+export async function runCatalogJsonMode(
   opts: GraphCommandOptions,
   result: {
     readonly catalog: Catalog | null;
@@ -132,7 +131,7 @@ export function runCatalogJsonMode(
   },
   cli: ToolCliContext,
   startedAt: string,
-): void {
+): Promise<void> {
   if (typeof opts.tenantId !== 'string' || opts.tenantId.length === 0) {
     throw new ConfigurationError('--catalog-output requires --tenant-id <id>.');
   }
@@ -183,13 +182,7 @@ export function runCatalogJsonMode(
     repoId: opts.repoId,
     gitSha: opts.gitSha,
   });
-  // Defensively create the parent dir before writing — the sibling
-  // `runSarifExportMode` does the same. The
-  // opensip `EngineSubprocessPort.runCatalogExport` may point
-  // `--catalog-output` at a run-scoped temp dir that doesn't exist yet,
-  // so a bare writeFileSync would throw ENOENT.
-  mkdirSync(dirname(catalogOutput), { recursive: true });
-  writeFileSync(catalogOutput, json);
+  await cli.writeArtifact(catalogOutput, json);
   log.info({
     evt: 'graph.render.catalog_json.complete',
     module: MODULE_GRAPH_RENDER,

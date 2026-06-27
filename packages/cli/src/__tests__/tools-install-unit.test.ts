@@ -70,13 +70,23 @@ describe('toolsInstall — activation', () => {
   it('packs the staged dir, activates, and reports the admitted manifest on success', async () => {
     stageValidation('passed', '/staged/demo');
     addToolPlugin.mockReturnValue({ type: 'plugin-add', success: true });
-    admitToolPackage.mockResolvedValue({ manifest: { id: 'demo', version: '1.0.0' } });
+    admitToolPackage.mockResolvedValue({
+      manifest: {
+        id: 'demo',
+        version: '1.0.0',
+        commands: [{ name: 'demo-run', description: 'run demo' }],
+      },
+    });
 
     const result = await toolsInstall({ spec: '@x/demo', cwd: '/proj', project: true });
     expect(result.success).toBe(true);
     expect(result.scope).toBe('project');
     expect(result.toolId).toBe('demo');
     expect(result.version).toBe('1.0.0');
+    expect(result.nextSteps).toEqual([
+      "export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo'",
+      'opensip demo-run',
+    ]);
     // npm pack runs FROM the staged dir, into the staged dir.
     expect(execFileSync).toHaveBeenCalledWith(
       'npm',

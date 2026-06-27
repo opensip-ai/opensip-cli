@@ -147,6 +147,8 @@ export type {
   ToolPluginManifest,
   ToolCommandManifest,
   ToolProvenance,
+  ToolResourceClass,
+  ToolResourceRequirement,
   ToolSource,
   CompatibilityVerdict,
   // ADR-0054 M4-E: the serializable config descriptor a tool declares in its

@@ -24,7 +24,8 @@
  *   tool-owned state, and the host governance/audit/entitlements planes is the
  *   ToolCliContext passed to every tool action body and host command handler.
  *   Canonical methods: render, emitJson, emitEnvelope, deliverSignals,
- *   writeSarif, plus the baseline seams, toolState, and hostPlanes (when present).
+ *   writeArtifact, writeSarif, plus the baseline seams, toolState, and
+ *   hostPlanes (when present).
  *
  * Direct process.stdout (run output), console.* for run data, the old
  * pre-scope CliRuntimeContext holder (getCurrentRegistriesForScope /
@@ -59,10 +60,11 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { isSeamExempt } from '../../../scripts/load-seam-exemptions.mjs';
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
 
 /** Paths that are tool engines or host command handlers (the code that must go through seams). */
-const ENFORCED_PATH =
-  /packages\/(fitness|graph|simulation)\/engine\/src\/|packages\/cli\/src\/commands\//;
+const TOOL_ENGINE_PATH = toolEnginePathRe();
+const HOST_COMMAND_PATH = /packages\/cli\/src\/commands\//;
 
 /** Bootstrap / composition root that are allowed to touch the low-level seams or build contexts. */
 const BOOTSTRAP_EXEMPT =
@@ -124,7 +126,7 @@ const RAW_DS_PATTERNS = [/\bnew DataStoreFactory\b/, /\bDataStoreFactory\.open\b
 const STDOUT_RULE = {
   patterns: STDOUT_PATTERNS,
   message:
-    'Host command handlers and tool engines must emit via ToolCliContext seams only (render, emitJson, emitEnvelope, emitError, deliverSignals, writeSarif, baseline seams, toolState, hostPlanes). Direct stdout bypasses the output contract and entered-scope invariant.',
+    'Host command handlers and tool engines must emit via ToolCliContext seams only (render, emitJson, emitEnvelope, emitError, deliverSignals, writeArtifact, writeSarif, baseline seams, toolState, hostPlanes). Direct stdout bypasses the output contract and entered-scope invariant.',
   suggestion:
     'Route through the ToolCliContext you received (including cli.emitError for --json failures), or add `@fitness-ignore-file only-documented-toolcli-seams` with justification if this is deliberate bootstrap/subprocess IPC.',
 };
@@ -149,7 +151,7 @@ const matchesAny = (patterns, line) => patterns.some((p) => p.test(line));
 
 /** Pure analysis. Exported for direct exercise if this check grows a test harness. */
 export function analyzeOnlyDocumentedSeams(content, filePath) {
-  if (!ENFORCED_PATH.test(filePath)) return [];
+  if (!TOOL_ENGINE_PATH.test(filePath) && !HOST_COMMAND_PATH.test(filePath)) return [];
   if (BOOTSTRAP_EXEMPT.test(filePath)) return [];
   if (isSeamExempt(filePath, 'only-documented-toolcli-seams')) return [];
   // Tests legitimately exercise these shapes (fixtures / scenario setup).
@@ -183,7 +185,7 @@ export const checks = [
     id: '1ea47b8c-18be-402b-ae19-8ac66a88d050',
     slug: 'only-documented-toolcli-seams',
     description:
-      'Host command handlers and tool engines must only use the documented methods on ToolCliContext (render, emit*, deliverSignals, writeSarif, toolState, hostPlanes, baseline seams). No direct stdout, pre-scope holder, or raw datastore (host-planes hygiene).',
+      'Host command handlers and tool engines must only use the documented methods on ToolCliContext (render, emit*, deliverSignals, writeArtifact, writeSarif, toolState, hostPlanes, baseline seams). No direct stdout, pre-scope holder, or raw datastore (host-planes hygiene).',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture', 'quality'],
     fileTypes: ['ts', 'tsx'],

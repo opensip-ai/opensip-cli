@@ -90,6 +90,7 @@ async function composeReportInput(): Promise<HtmlReportInput> {
   const sessions = repo ? [...repo.list({ limit: 20 })] : [];
 
   const input: HtmlReportInput = { sessions };
+  const claimedKeys = new Map<string, string>();
 
   const provenance = scope.toolProvenance;
   // Built lazily ONLY when an external tool is encountered (so a bundled-only run
@@ -106,7 +107,7 @@ async function composeReportInput(): Promise<HtmlReportInput> {
       hostCtx ??= buildHostDispatchCtx(log);
       contribution = await collectExternalReportData(tool, provenance, hostCtx, log);
     }
-    mergeContribution(input, contribution, tool, log);
+    mergeContribution(input, contribution, tool, log, claimedKeys);
   }
 
   return input;
@@ -170,8 +171,10 @@ function mergeContribution(
   contribution: Record<string, unknown> | undefined,
   tool: Tool,
   log: typeof defaultLogger,
+  claimedKeys: Map<string, string>,
 ): void {
   if (!contribution) return;
+  const toolId = tool.metadata.name ?? tool.metadata.id;
   // Guardrail (spec §8): tools must never clobber the host-owned `sessions` run
   // history. Ignore with a warning (best-effort) — the host owns the history.
   const reserved = Object.keys(contribution).filter((k) => RESERVED_DASHBOARD_KEYS.has(k));
@@ -179,11 +182,27 @@ function mergeContribution(
     void log.warn({
       evt: 'cli.report.compose.reserved_key_ignored',
       module: 'cli:report',
-      tool: tool.metadata.id,
+      tool: toolId,
       keys: reserved,
       msg: 'Tool collectReportData returned a reserved host key; it was ignored.',
     });
     for (const k of reserved) delete contribution[k];
+  }
+  for (const key of Object.keys(contribution)) {
+    const otherTool = claimedKeys.get(key);
+    if (otherTool !== undefined && otherTool !== toolId) {
+      void log.warn({
+        evt: 'cli.report.compose.collision',
+        module: 'cli:report',
+        tool: toolId,
+        otherTool,
+        key,
+        msg: 'Tool collectReportData returned a key already contributed by another tool; first writer wins.',
+      });
+      delete contribution[key];
+      continue;
+    }
+    claimedKeys.set(key, toolId);
   }
   Object.assign(input, contribution);
 }

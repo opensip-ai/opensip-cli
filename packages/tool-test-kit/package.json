@@ -1,0 +1,51 @@
+{
+  "name": "@opensip-cli/tool-test-kit",
+  "version": "0.1.13",
+  "license": "Apache-2.0",
+  "description": "Public test helpers for OpenSIP CLI tool authors — ToolCliContext double, scope helpers, and command-spec assertions",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "testing",
+    "tooling"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-test-kit"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

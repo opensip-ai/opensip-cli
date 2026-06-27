@@ -69,6 +69,18 @@ packages). Static admission uses `loadToolManifest` + `validateManifest`; runtim
 coherence uses `assertManifestMatchesTool`; execution uses the child-process
 runtime probe.
 
+## Public author test kit
+
+`@opensip-cli/tool-test-kit` is a publishable support package for third-party
+Tool authors. It exposes in-memory `RunScope` helpers, a `ToolCliContext` double
+including `reportFailure` and `writeArtifact`, and assertion helpers for command
+results / signal envelopes. It depends only on `@opensip-cli/core` and
+`@opensip-cli/contracts`; it must not import the CLI composition root.
+
+Workspace-private `@opensip-cli/test-support` delegates generic scope/context
+helpers to the public kit and keeps only repository-specific fixtures such as
+fitness-check harnesses.
+
 ## Recipe listing differences
 
 Shared result shape: `ListRecipesResult` (`list-history-results.ts`). Neutral

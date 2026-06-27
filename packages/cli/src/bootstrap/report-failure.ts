@@ -19,6 +19,47 @@ import type { CommandResult } from '@opensip-cli/contracts';
 
 const DEFAULT_FAILURE_EVT = 'tool.command.failed';
 const MODULE_TAG = 'cli:report-failure';
+const MAX_DERIVED_ERROR_MESSAGE_LENGTH = 1000;
+
+function truncateDerivedMessage(message: string): string {
+  if (message.length <= MAX_DERIVED_ERROR_MESSAGE_LENGTH) return message;
+  return `${message.slice(0, MAX_DERIVED_ERROR_MESSAGE_LENGTH - 3)}...`;
+}
+
+function stringFromUnknown(error: unknown): string {
+  try {
+    return String(error);
+  } catch {
+    return '<unstringifiable thrown value>';
+  }
+}
+
+function deriveErrorDefaults(error: unknown): {
+  readonly message?: string;
+  readonly exitCode: number;
+  readonly code?: string;
+} {
+  if (error instanceof ToolError) {
+    return {
+      message: truncateDerivedMessage(error.message),
+      exitCode: mapToolErrorToExitCode(error),
+      code: error.code,
+    };
+  }
+  if (error instanceof Error) {
+    return {
+      message: truncateDerivedMessage(error.message),
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+    };
+  }
+  if (error === undefined) {
+    return { exitCode: EXIT_CODES.RUNTIME_ERROR };
+  }
+  return {
+    message: truncateDerivedMessage(stringFromUnknown(error)),
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+  };
+}
 
 /** Resolve a {@link ReportFailureDetail} into a plain, effect-ready payload. */
 function applyErrorDefaults(
@@ -26,13 +67,11 @@ function applyErrorDefaults(
   fields: { message?: string; exitCode?: number; code?: string },
 ): { message?: string; exitCode?: number; code?: string } {
   if (detail.error === undefined) return fields;
-  const error = detail.error;
+  const derived = deriveErrorDefaults(detail.error);
   return {
-    message: fields.message ?? error.message,
-    code: fields.code ?? error.code,
-    exitCode:
-      fields.exitCode ??
-      (error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR),
+    message: fields.message ?? derived.message,
+    code: fields.code ?? derived.code,
+    exitCode: fields.exitCode ?? derived.exitCode,
   };
 }
 

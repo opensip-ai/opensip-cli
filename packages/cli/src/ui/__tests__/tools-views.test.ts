@@ -113,6 +113,9 @@ describe('viewToolsInstall', () => {
       scope: 'global',
       toolId: 'demo-tool',
       version: '1.2.3',
+      // The host renders the allowlist breadcrumb from `nextSteps` (the same
+      // data `--json` consumers read); `install` always populates it on success.
+      nextSteps: ["export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo-tool'", 'opensip demo-tool'],
       validation: validation(),
     };
     const out = renderToText(viewToolsInstall(result));
@@ -120,6 +123,7 @@ describe('viewToolsInstall', () => {
     expect(out).toContain('demo-tool');
     expect(out).toContain('global');
     expect(out).toContain('Validation');
+    expect(out).toContain('Next steps:');
     expect(out).toContain("OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo-tool'");
   });
 

@@ -80,7 +80,7 @@ describe('buildWorkerContext — FRR seams', () => {
 });
 
 describe('buildWorkerContext — RPC seams upcall the client', () => {
-  it('toolState.* / saveBaseline / deliverSignals / writeSarif / baseline exports / report build typed requests', async () => {
+  it('toolState.* / saveBaseline / deliverSignals / artifact seams / baseline exports / report build typed requests', async () => {
     const { ctx, calls } = build();
     await ctx.toolState.put('t', 'k', { v: 1 });
     await ctx.toolState.get('t', 'k');
@@ -91,6 +91,7 @@ describe('buildWorkerContext — RPC seams upcall the client', () => {
     await ctx.exportBaselineSarif('t', '/a.sarif');
     await ctx.exportBaselineFingerprints('t', '/a.json');
     await ctx.writeSarif({ env: 1 }, '/b.sarif');
+    await ctx.writeArtifact('/artifact.json', '{"ok":true}\n');
     await ctx.deliverSignals(
       { env: 1 },
       { cwd: '/x', reportTo: 'https://h', apiKey: 'secret', runFailed: true },
@@ -108,12 +109,18 @@ describe('buildWorkerContext — RPC seams upcall the client', () => {
       'exportBaselineSarif',
       'exportBaselineFingerprints',
       'writeSarif',
+      'writeArtifact',
       'deliverSignals',
       'maybeOpenReport',
     ]);
     const deliver = calls.find((c) => c.seam === 'deliverSignals');
     expect(deliver).toMatchObject({
       opts: { cwd: '/x', reportTo: 'https://h', apiKey: 'secret', runFailed: true },
+    });
+    expect(calls.find((c) => c.seam === 'writeArtifact')).toEqual({
+      seam: 'writeArtifact',
+      path: '/artifact.json',
+      bytes: '{"ok":true}\n',
     });
   });
 

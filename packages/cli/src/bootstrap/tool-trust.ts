@@ -37,6 +37,13 @@ export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS';
 export const INSTALLED_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS';
 
 /**
+ * Environment variable carrying the capability-pack allowlist. Unlike the older
+ * tool allowlists, this launch surface is exact-name only: wildcard `*` is not
+ * honored.
+ */
+export const CAPABILITY_PACK_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS';
+
+/**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
  * unset ⇒ empty set (deny-by-default). The wildcard `'*'` admits all
  * (surfaced via {@link isProjectLocalToolTrusted}).
@@ -60,6 +67,16 @@ function warnWildcardAllowlist(envVar: string, allow: ReadonlySet<string>): void
     detail:
       'DEPRECATED: trust allowlist contains wildcard * — every matching tool runs at full user privilege; ' +
       'this is fault-isolation only, not a sandbox',
+  });
+}
+
+function warnIgnoredCapabilityWildcard(allow: ReadonlySet<string>): void {
+  if (!allow.has('*')) return;
+  logger.warn({
+    evt: 'cli.trust.capability_wildcard_ignored',
+    envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
+    detail:
+      'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS requires exact package names; wildcard * is ignored',
   });
 }
 
@@ -109,4 +126,18 @@ export function isInstalledToolTrusted(id: string, env: NodeJS.ProcessEnv = proc
   const allow = parseAllowlist(env[INSTALLED_TOOL_ALLOWLIST_ENV]);
   warnWildcardAllowlist(INSTALLED_TOOL_ALLOWLIST_ENV, allow);
   return allow.has('*') || allow.has(id);
+}
+
+/**
+ * Decide whether a third-party capability pack may be imported into the host
+ * process. First-party bundled packs are handled by the caller; this predicate
+ * is exact-name allowlist only and intentionally does not honor `*`.
+ */
+export function isCapabilityPackTrusted(
+  packageName: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const allow = parseAllowlist(env[CAPABILITY_PACK_ALLOWLIST_ENV]);
+  warnIgnoredCapabilityWildcard(allow);
+  return allow.has(packageName);
 }

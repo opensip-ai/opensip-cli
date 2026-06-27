@@ -62,7 +62,7 @@ function emptyRegistryDiagnostic(): CliDiagnostic {
     message: 'No fitness checks were loaded for this project.',
     impact: 'The run cannot produce credible findings because the check registry is empty.',
     action:
-      'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
+      'Install at least one package declaring the fit-pack marker plus target-domain epoch, ' +
       'or declare plugins.checkPackages in opensip-cli.config.yml.',
     provenance: { toolId: 'fit', capabilityDomain: 'fit-pack' },
   });

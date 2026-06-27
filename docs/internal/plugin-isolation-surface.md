@@ -64,7 +64,7 @@ policy-defined but **not implemented** in the loader yet (spec 03 owns enforceme
 | Project-local authored Tools | Sidecar path + manifest | Deny-by-default (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`) | No (authored source) | Admission (`tools validate`) + load |
 | User-global authored Tools | Sidecar path under `~/.opensip-cli/tools/` | Trusted-by-location | No | Load (explicit policy TBD) |
 | Project-pinned fit/sim packs | npm pin in `plugins.*` | Config-listed | Yes | Sync/install + capability load |
-| Marker-discovered fit packs | `opensipTools.kind: fit-pack` | Trusted when bundled; external = config/markers | Yes for external npm | Capability load |
+| Marker-discovered fit packs | `opensipTools.kind: fit-pack` + target epoch | Trusted when bundled; non-bundled requires exact `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` | Yes for external npm | Capability load |
 | Graph adapters | `plugins.graphAdapters` or marker | Trusted when bundled; external = explicit | Yes for external npm | Per-run capability load |
 
 ### Strict-mode target policy (not enforced yet)

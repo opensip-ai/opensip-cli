@@ -65,6 +65,9 @@ Once a Tool exists as a package, the customer-facing management surface is the [
 	    "id": "audit-sec",
 	    "identity": { "name": "audit-sec" },
 	    "apiVersion": 1,
+	    "requires": [
+	      { "resource": "filesystem", "access": "read", "scope": "project" }
+	    ],
 	    "commands": [
 	      { "name": "audit-sec", "description": "Run the security audit" },
 	      { "name": "list", "parent": "audit-sec", "description": "List audit rules" },
@@ -88,6 +91,10 @@ The `opensipTools` block is your tool's **static manifest** — read before your
   when `MIN_SUPPORTED_PLUGIN_API_VERSION <= apiVersion <= PLUGIN_API_VERSION`
   (currently `1..1`). A tool that declares no `apiVersion` is not admitted (it
   fail-closes when run explicitly, or is skipped with a diagnostic when discovered).
+- **`requires`** — optional, declaration-only resource requirements. The host
+  normalizes and hashes them for manifest provenance/trust UX, but they are not
+  a sandbox. An admitted external tool still runs with the current user's OS
+  privileges.
 - **`commands`** — the command **names** (with descriptions) your tool mounts. The host asserts this set equals your runtime `tool.commands` at load (`assertManifestMatchesTool`) and throws on drift — the manifest is the cheap, no-import way to enumerate your surface for `--help`/completion, so it must stay in sync with the tool.
 
 Peer-dep on `@opensip-cli/contracts` and `@opensip-cli/core` at `^0.1.0`; the
@@ -103,6 +110,12 @@ dispatch, and exit policy. You write a handler and a declaration; everything els
 arrives for free, identically to a bundled tool. You never touch Commander, never
 add `--json` yourself, and never write to stdout — the host renders your result and
 wraps `--json` in a `CommandOutcome`.
+
+| `CommandSpec.output` | Use for | External Tool support |
+|---|---|---|
+| `command-result` | Normal commands that return a renderable result | Supported |
+| `raw-stream` | File export or worker/transport commands that own their stream | Supported, with `rawStreamReason` |
+| `live-view` | Bundled in-process tools that register a renderer | Not supported for external manifests; validation fails fast |
 
 ```ts
 import {
@@ -176,6 +189,26 @@ export const tool = defineTool({
 });
 ```
 
+## Output modes
+
+A command declares one `output` mode on its `CommandSpec`; that mode determines
+the single path your handler uses to produce output. You never write to stdout or
+add `--json` yourself — the host renders your result and wraps `--json` in a
+`CommandOutcome`.
+
+| `output` mode | What your handler does | Host behavior |
+|---|---|---|
+| `command-result` (default) | `return` a `CommandResult` (e.g. `{ type: 'text-lines', … }`) | Renders for humans; wraps the result under `CommandOutcome` for `--json` |
+| `signal-envelope` | `return` a `SignalEnvelope` (or `cli.emitEnvelope(env)`) | Wraps the envelope under `CommandOutcome.envelope`; routes baseline/SARIF/cloud seams |
+| `raw-stream` | `cli.emitRaw(...)` (requires a `rawStreamReason`) | Writes your bytes verbatim — for human status lines / file-export confirmations, not machine JSON |
+| `live-view` | `cli.renderLive(key, args)` | Renders an Ink/TTY live view. **Bundled/in-process tools only** — external manifest tools may not declare it (see [External tool trust boundary](#external-tool-trust-boundary-adr-0054-adr-0061)) |
+
+**Error path (any mode).** To fail a command, either `throw` a typed `ToolError`
+(the host maps it to an exit code) or call `cli.reportFailure({ error, … })` — the
+host accepts any caught value, derives the message/exit code, logs, renders the
+customer surface, and sets the exit code. Do not `process.exit` or format errors
+yourself. See [Command failures vs findings](#command-failures-vs-findings).
+
 ## Logging and operational telemetry
 
 During a normal command run, `cli.logger` resolves to the **per-run scope logger**
@@ -205,6 +238,7 @@ customer-facing command output.
 | Scan/analysis results (signals, score, verdict) | Build a `SignalEnvelope` and return it (or call `cli.deliverSignals` after render) |
 | Command cannot run (missing file, bad config, not found) | `await cli.reportFailure({ … })` |
 | Uncaught `ToolError` in a handler | Host catches and calls `reportFailure` for you |
+| Durable artifact export | `await cli.writeArtifact(path, bytes)` (or a narrower host seam such as `cli.writeSarif`) |
 
 `reportFailure` fans out to structured log, human Ink / `--json` error `CommandOutcome`,
 exit code, and diagnostics — the host owns routing. Example:
@@ -238,6 +272,18 @@ That's the whole tool. Install it either way and `opensip audit-sec` works on th
 
 - **`opensip tools install @my-co/audit-sec`** — validates the package against the Tool contract, then installs it **user-global** into `~/.opensip-cli/plugins/tool/` by default, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-cli/.runtime/plugins/tool/` instead (that copy is **gitignored and not shared** with teammates, and keeps provenance `installed` — it is still an npm install, not authored content). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its `opensipTools.kind: "tool"` marker. (Whole Tool plugins are managed ONLY by `opensip tools …`; the per-tool `plugin` group manages a pack-supporting tool's extension packs, not whole tools.)
 - **`npm install @my-co/audit-sec`** in your project — discovery walks the project tree's `node_modules`, so a plain install is picked up too. A global `npm i -g @my-co/audit-sec` next to a global `opensip-cli` is found via the CLI's own install tree.
+
+Installed npm tools are deny-by-default even after a successful install. The
+`tools install` result includes `nextSteps`; the important one is to admit the
+tool id explicitly before running it:
+
+```bash
+export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='audit-sec'
+opensip audit-sec
+```
+
+Use exact ids for CI. The `*` wildcard is still accepted for local incident
+response/testing but warns because it admits every discovered installed Tool.
 
 ## Authored Tool sidecars (tracked, no npm install)
 
@@ -399,10 +445,19 @@ What is enforced at admission:
 
 - Manifest compatibility, `apiVersion`, and manifest⇔runtime drift checks
   (`admit-tool-package.ts`).
+- External manifest command shells may declare `output: "command-result"` or
+  `output: "raw-stream"`; `output: "live-view"` is rejected by admission and by
+  `tools validate`. A live-view renderer is executable UI code and cannot be
+  mounted from a manifest-only external tool shell.
 - Deny-by-default allowlists for project-local and installed tools
   (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`).
   The `*` wildcard admits all and emits a per-invocation `cli.trust.wildcard_allowlist`
   deprecation warning (DEPRECATED — every matching tool runs at full user privilege).
+- Deny-by-default capability packs for marker-discovered in-process extensions
+  (`OPENSIP_CLI_ALLOW_CAPABILITY_PACKS`). Bundled first-party packs are trusted;
+  non-bundled fit packs and graph adapters must be allowlisted by exact package
+  name before their module is imported. Wildcard allowlisting is ignored for
+  capability packs.
 - **Mount isolation** — a broken external `commandSpecs` declaration warns and
   continues; bundled mount failures abort startup (exit 5).
 - **`tools validate`** — probes a not-yet-trusted package in a child process

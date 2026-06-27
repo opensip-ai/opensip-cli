@@ -25,7 +25,7 @@ related-docs:
 ---
 # Check pack architecture
 
-A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `opensip fit plugin add`, by declaring `opensipTools.kind: "fit-pack"` in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md)) takes care of the rest.
+A check pack is an npm package that contributes one or more `Check` objects. Seven pack packages ship today; an arbitrary number of third-party packs can be added by `opensip fit plugin add`, by declaring the `fit-pack` marker plus target-domain epoch in `package.json`, or by exact name in `plugins.checkPackages`. The pack contract is simple, the marketplace shape is intentional, and the discovery layer (covered in [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md)) takes care of the rest.
 
 > **What you'll understand after this:**
 > - The `FitPluginExports` shape every pack implements.
@@ -59,14 +59,18 @@ Plus a discoverable package.json shape:
 ```json
 {
   "name": "@opensip-cli/checks-universal",
-  "opensipTools": { "kind": "fit-pack" },
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
+  },
   "main": "dist/index.js"
 }
 ```
 
 Discovery uses **two paths**, both run on every fit invocation; results are merged and deduplicated by package name:
 
-- **Marker** — any package whose `package.json` declares `opensipTools.kind: "fit-pack"` is discovered regardless of npm scope or name pattern. This is the canonical path for first-party and third-party packs.
+- **Marker** — any package whose `package.json` declares `opensipTools.kind: "fit-pack"`, `targetDomain: "fit-pack"`, and a numeric `targetDomainApiVersion` is discovered regardless of npm scope or name pattern. This is the canonical path for first-party and third-party packs.
 - **Explicit list** — `plugins.checkPackages:` in `opensip-cli.config.yml` names packages by exact name. Use for packages that do not declare the marker yet. Marker discovery still runs alongside it.
 
 See [`80-implementation/02-plugin-loader.md`](../80-implementation/02-plugin-loader.md) for the resolution rules.
@@ -218,7 +222,7 @@ Minimum viable pack:
 
 ```
 @my-co/checks-internal/
-├── package.json                # opensipTools.kind: 'fit-pack' (or pinned in config)
+├── package.json                # opensipTools.kind: 'fit-pack' + targetDomain epoch (or pinned in config)
 ├── dist/index.js               # exports: checks (each carrying display) (+ optional recipes)
 └── README.md                   # author affordance
 ```

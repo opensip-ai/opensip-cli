@@ -30,7 +30,7 @@ opensip-cli reads two config files:
 | `<project>/opensip-cli.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
 
-Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](../../../packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated (the catchall seam), so a key no tool owns passes through.
+Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](../../../packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated only when no loaded tool owns that namespace; a block named after a loaded tool that did not declare a config schema is rejected as a tool/config contract bug.
 
 ## Validate and export schema
 

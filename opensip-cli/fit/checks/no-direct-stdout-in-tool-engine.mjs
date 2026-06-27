@@ -47,13 +47,14 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { isSeamExempt } from '../../../scripts/load-seam-exemptions.mjs';
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
 
 /**
  * Resolved-path fragment that identifies a tool-engine source file. The
  * check only applies inside the three tool engines; everything else (CLI
  * root, output package, dashboard, core) may own stdout.
  */
-const TOOL_ENGINE_PATH = /packages\/(fitness|graph|simulation)\/engine\/src\//;
+const TOOL_ENGINE_PATH = toolEnginePathRe();
 
 /**
  * stdout run-output call shapes. `process.stdout.write(` is the explicit
@@ -96,6 +97,12 @@ export function analyzeDirectStdout(content) {
   return violations;
 }
 
+export function analyzeDirectStdoutInToolEngine(content, filePath) {
+  if (!TOOL_ENGINE_PATH.test(filePath)) return [];
+  if (isSeamExempt(filePath, 'no-direct-stdout-in-tool-engine')) return [];
+  return analyzeDirectStdout(content);
+}
+
 export const checks = [
   defineCheck({
     id: '9968cdec-1541-4522-ac02-e9eff56a5c2a',
@@ -112,9 +119,7 @@ export const checks = [
     analyze: (content, filePath) => {
       // The contract is tool-engine-scoped. The dogfood `backend` target spans
       // every package's src; narrow to the three tool engines here.
-      if (!TOOL_ENGINE_PATH.test(filePath)) return [];
-      if (isSeamExempt(filePath, 'no-direct-stdout-in-tool-engine')) return [];
-      return analyzeDirectStdout(content);
+      return analyzeDirectStdoutInToolEngine(content, filePath);
     },
   }),
 ];

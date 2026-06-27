@@ -38,21 +38,26 @@ Tag your pack's `package.json` with `opensipTools.kind`:
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
-  "opensipTools": { "kind": "fit-pack" }
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
+  }
 }
 ```
 
 For a **fit pack** the `fit-pack` marker is name-pattern-independent — your pack
 can use any npm scope you own (`@acme/fit`, `@my-internal-org/checks-platform`,
-anything); the marker is what makes the platform find it. A **sim pack** is
-discovered by a name pattern instead — name it `<scope>/scenarios-*` (see
-below).
+anything); the marker is what makes the platform find it. The `targetDomain`
+and `targetDomainApiVersion` fields declare the domain epoch your pack targets.
+A **sim pack** is discovered by a name pattern instead — name it
+`<scope>/scenarios-*` (see below).
 
 ### Discovery paths
 
 Listed in recommendation order:
 
-- **fit: the `fit-pack` marker (recommended)** — declare `opensipTools.kind: "fit-pack"` in your pack's `package.json`. Free choice of scope and name. No config entry.
+- **fit: the `fit-pack` marker (recommended)** — declare `opensipTools.kind: "fit-pack"`, `targetDomain: "fit-pack"`, and `targetDomainApiVersion: 1` in your pack's `package.json`. Free choice of scope and name. No config entry.
 - **sim: the `scenarios-*` name pattern (recommended)** — name your pack
   `<scope>/scenarios-*` (e.g. `@acme/scenarios-load`). `plugins.packageScopes`
   extends the scopes scanned beyond `@opensip-cli`.
@@ -75,7 +80,7 @@ If none of those apply, stay with loose `.mjs`. The graduation is worthwhile onl
 
 ```
 @my-co/checks-internal/
-├── package.json                # declares opensipTools.kind: "fit-pack"
+├── package.json                # declares fit-pack marker + targetDomain epoch
 ├── tsconfig.json
 ├── src/
 │   ├── index.ts                # exports: checks (display folded on), recipes
@@ -121,7 +126,11 @@ and `defineLoadScenario(...)` / `defineChaosScenario(...)` exports.
   "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
-  "opensipTools": { "kind": "fit-pack" },
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
+  },
   "peerDependencies": {
     "@opensip-cli/fitness": "^0.1.13",
     "@opensip-cli/core": "^0.1.13"
@@ -217,7 +226,7 @@ A step-by-step you can follow when you've decided to graduate:
 
 1. **Pick the pack name and location.** For a workspace-only pack, `@your-scope/fit` works. For a publishable pack, use your own scope and pick one of the [discovery paths](#discovery-paths) above.
 2. **Add the directory as a workspace member.** Append `opensip-cli/*` to your `pnpm-workspace.yaml` (or yarn/npm equivalent).
-3. **Write `package.json`** with `opensipTools.kind: "fit-pack"`, `main: "./dist/index.js"`, peer-dep on `@opensip-cli/fitness` and `@opensip-cli/core`.
+3. **Write `package.json`** with `opensipTools.kind: "fit-pack"`, `targetDomain: "fit-pack"`, `targetDomainApiVersion: 1`, `main: "./dist/index.js"`, peer-dep on `@opensip-cli/fitness` and `@opensip-cli/core`.
 4. **Convert each `.mjs` to a TypeScript module.** One `<slug>.ts` per check under `src/checks/`, each exporting a `defineCheck(...)` object. **Keep the same slug values** as the loose files used — recipes select by tag/slug, and `--check <slug>` invocations keep working across the move.
 5. **Create `src/register-checks.ts`** that imports every check and exports `allChecks` as a `readonly Check[]`.
 6. **Create `src/index.ts`** that folds the per-pack display map onto `allChecks` via `applyCheckDisplay` and exports the result as `checks`.

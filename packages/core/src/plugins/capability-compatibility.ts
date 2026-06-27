@@ -8,6 +8,7 @@
 
 import type { CapabilityDomainSpec } from '../tools/capability.js';
 
+/** Compatibility decision for a package contribution against the selected capability domain. */
 export type CapabilityCompatibilityVerdict =
   | { readonly kind: 'compatible' }
   | {
@@ -19,6 +20,7 @@ export type CapabilityCompatibilityVerdict =
       readonly currentApiVersion: number;
     };
 
+/** Inputs for checking package-declared target-domain metadata against a domain spec. */
 export interface CheckCapabilityContributionCompatibilityArgs {
   readonly targetDomainId: string;
   readonly packageTargetDomain?: string;

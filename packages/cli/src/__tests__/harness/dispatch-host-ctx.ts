@@ -37,6 +37,8 @@ export interface CapturedHostCtx {
   readonly baselines: { tool: string; envelope: unknown }[];
   /** Envelopes delivered host-side via the RPC `deliverSignals` upcall. */
   readonly delivered: unknown[];
+  /** General artifacts written host-side via RPC. */
+  readonly artifacts: { path: string; bytes: string }[];
 }
 
 const noop = (): void => {
@@ -59,6 +61,7 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
   const toolStateStore = new Map<string, unknown>();
   const baselines: { tool: string; envelope: unknown }[] = [];
   const delivered: unknown[] = [];
+  const artifacts: { path: string; bytes: string }[] = [];
 
   const logger = {
     debug: noop,
@@ -135,6 +138,11 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
       calls.push('writeSarif');
       return Promise.resolve();
     }) as ToolCliContext['writeSarif'],
+    writeArtifact: ((path: string, bytes: string) => {
+      artifacts.push({ path, bytes });
+      calls.push(`writeArtifact:${path}`);
+      return Promise.resolve();
+    }) as ToolCliContext['writeArtifact'],
     saveBaseline: ((tool: string, envelope: unknown) => {
       baselines.push({ tool, envelope });
       calls.push(`saveBaseline:${tool}`);
@@ -193,5 +201,6 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
     toolStateStore,
     baselines,
     delivered,
+    artifacts,
   };
 }

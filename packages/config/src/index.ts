@@ -24,6 +24,8 @@ export { decorateToolConfigDeclarationsWithGateKeys } from './gate-keys.js';
 // warning / applies the loaded-tool rejection).
 export { analyzeNamespaceClaims } from './namespace-claims.js';
 export type { NamespaceClaimReport, UnclaimedNamespace } from './namespace-claims.js';
+export { partitionUnclaimedNamespaces } from './namespace-policy.js';
+export type { UnclaimedNamespacePartition } from './namespace-policy.js';
 export type {
   EnvBindingDeclaration,
   EnvBindingType,

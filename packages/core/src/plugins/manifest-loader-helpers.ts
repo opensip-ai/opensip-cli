@@ -11,7 +11,13 @@ import { normalizeDiscovery } from './manifest-discovery.js';
 import type { PluginLayout } from './types.js';
 import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
 import type { ToolConfigManifestDescriptor } from '../tools/manifest-config.js';
-import type { RawToolPluginManifest, ToolCommandManifest, ToolSource } from '../tools/manifest.js';
+import type {
+  RawToolPluginManifest,
+  ToolCommandManifest,
+  ToolResourceClass,
+  ToolResourceRequirement,
+  ToolSource,
+} from '../tools/manifest.js';
 
 /**
  * Filename of the project-local manifest sidecar. A project-local tool is
@@ -93,6 +99,13 @@ function validateOptionalCapabilities(
   return normalizeCapabilities(raw) ?? 'invalid';
 }
 
+function validateOptionalRequirements(
+  raw: unknown,
+): readonly ToolResourceRequirement[] | undefined | 'invalid' {
+  const requirements = normalizeRequirements(raw);
+  return raw !== undefined && requirements === undefined ? 'invalid' : requirements;
+}
+
 function normalizeManifestIdentity(block: Record<string, unknown>):
   | {
       readonly identity: ToolIdentity;
@@ -116,11 +129,35 @@ type ConfigParseResult =
   | { readonly ok: true; readonly config?: ToolConfigManifestDescriptor }
   | { readonly ok: false };
 
+type OptionalParseResult<T> = { readonly ok: true; readonly value?: T } | { readonly ok: false };
+
 function configMatchesIdentity(
   config: ToolConfigManifestDescriptor | undefined,
   identity: ReturnType<typeof validateToolIdentity>,
 ): boolean {
   return config === undefined || config.namespace === identity.name;
+}
+
+function validateOptionalPluginLayout(
+  raw: unknown,
+  identity: ReturnType<typeof validateToolIdentity>,
+): OptionalParseResult<PluginLayout> {
+  const pluginLayout = normalizePluginLayout(raw);
+  if (raw !== undefined && pluginLayout === undefined) return { ok: false };
+  return layoutMatchesIdentity(pluginLayout, identity)
+    ? { ok: true, value: pluginLayout }
+    : { ok: false };
+}
+
+function validateOptionalConfig(
+  raw: unknown,
+  identity: ReturnType<typeof validateToolIdentity>,
+): OptionalParseResult<ToolConfigManifestDescriptor> {
+  const configResult = normalizeConfig(raw);
+  if (!configResult.ok) return { ok: false };
+  return configMatchesIdentity(configResult.config, identity)
+    ? { ok: true, value: configResult.config }
+    : { ok: false };
 }
 
 /** Validate and normalize a raw `opensipTools` or sidecar manifest block. */
@@ -150,14 +187,16 @@ export function validateManifest(
   const capabilities = validateOptionalCapabilities(block.capabilities);
   if (capabilities === 'invalid') return undefined;
 
-  const pluginLayout = normalizePluginLayout(block.pluginLayout);
-  if (block.pluginLayout !== undefined && pluginLayout === undefined) return undefined;
-  if (!layoutMatchesIdentity(pluginLayout, normalizedIdentity)) return undefined;
+  const requires = validateOptionalRequirements(block.requires);
+  if (requires === 'invalid') return undefined;
 
-  const configResult = normalizeConfig(block.config);
+  const pluginLayoutResult = validateOptionalPluginLayout(block.pluginLayout, normalizedIdentity);
+  if (!pluginLayoutResult.ok) return undefined;
+  const pluginLayout = pluginLayoutResult.value;
+
+  const configResult = validateOptionalConfig(block.config, normalizedIdentity);
   if (!configResult.ok) return undefined;
-  const { config } = configResult;
-  if (!configMatchesIdentity(config, normalizedIdentity)) return undefined;
+  const config = configResult.value;
 
   return {
     kind: 'tool',
@@ -169,6 +208,7 @@ export function validateManifest(
     ...opt('apiVersion', apiVersion),
     commands,
     ...opt('capabilities', capabilities),
+    ...opt('requires', requires),
     ...opt('config', config),
     ...opt('pluginLayout', pluginLayout),
     ...opt('compatibility', block.compatibility),
@@ -188,6 +228,13 @@ const CONTRIBUTION_KINDS: readonly CapabilityContributionKind[] = [
   'module-export',
   'manifest-entry',
   'file',
+];
+
+const REQUIREMENT_RESOURCES: readonly ToolResourceClass[] = [
+  'filesystem',
+  'network',
+  'env',
+  'subprocess',
 ];
 
 function parseCapabilityEntry(entry: unknown): ToolCapabilityDeclaration | undefined {
@@ -231,6 +278,35 @@ function normalizeCapabilities(value: unknown): readonly ToolCapabilityDeclarati
 
 function isContributionKind(value: unknown): value is CapabilityContributionKind {
   return typeof value === 'string' && (CONTRIBUTION_KINDS as readonly string[]).includes(value);
+}
+
+function isRequirementResource(value: unknown): value is ToolResourceClass {
+  return typeof value === 'string' && (REQUIREMENT_RESOURCES as readonly string[]).includes(value);
+}
+
+function normalizeRequirement(value: unknown): ToolResourceRequirement | undefined {
+  if (!isRecord(value)) return undefined;
+  const { resource, scope, reason } = value;
+  if (!isRequirementResource(resource)) return undefined;
+  if (scope !== undefined && typeof scope !== 'string') return undefined;
+  if (reason !== undefined && typeof reason !== 'string') return undefined;
+  return {
+    resource,
+    ...(scope === undefined ? {} : { scope }),
+    ...(reason === undefined ? {} : { reason }),
+  };
+}
+
+function normalizeRequirements(value: unknown): readonly ToolResourceRequirement[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return undefined;
+  const out: ToolResourceRequirement[] = [];
+  for (const entry of value) {
+    const parsed = normalizeRequirement(entry);
+    if (parsed === undefined) return undefined;
+    out.push(parsed);
+  }
+  return out;
 }
 
 const COMMAND_OUTPUT_MODES = new Set([
@@ -319,6 +395,7 @@ export function hashManifest(manifest: RawToolPluginManifest): string {
     version: manifest.version,
     apiVersion: manifest.apiVersion ?? null,
     config: manifest.config ?? null,
+    requires: manifest.requires ?? null,
     pluginLayout: manifest.pluginLayout ?? null,
     commands: manifest.commands.map((c) => ({
       name: c.name,

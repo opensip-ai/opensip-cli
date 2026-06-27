@@ -1,18 +1,134 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   assertManifestMatchesTool,
   loadToolManifest,
   PROJECT_LOCAL_MANIFEST_FILE,
 } from '@opensip-cli/core';
+import ts from 'typescript';
 import { describe, expect, it, afterEach } from 'vitest';
 
 import { writeTemplateFiles } from '../create-template-writer.js';
 import { TOOLS_CREATE_TEMPLATE_RENDERERS } from '../create-templates.js';
 import { toolsCreate } from '../create.js';
 import { runToolValidation } from '../validate.js';
+
+interface TemplateTypecheckResult {
+  readonly ok: boolean;
+  readonly diagnostics: readonly string[];
+}
+
+/**
+ * @throws Error when no workspace root can be found above `start`.
+ */
+function findRepoRoot(start: string): string {
+  let dir = start;
+  while (dir !== dirname(dir)) {
+    const workspacePath = join(dir, 'pnpm-workspace.yaml');
+    if (existsSync(workspacePath)) return dir;
+    dir = dirname(dir);
+  }
+  throw new Error(`Could not find repository root from ${start}`);
+}
+
+const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
+const requireFromHere = createRequire(import.meta.url);
+const vitestTypesPath = join(
+  dirname(requireFromHere.resolve('vitest/package.json')),
+  'dist/index.d.ts',
+);
+
+/**
+ * @throws Error when template typechecking prerequisites have not been built or installed.
+ */
+function assertWorkspacePrerequisites(): void {
+  const coreDist = join(repoRoot, 'packages/core/dist/index.d.ts');
+  if (!existsSync(coreDist)) {
+    throw new Error(
+      `Template typecheck requires built @opensip-cli/core at ${coreDist}. Run pnpm build first.`,
+    );
+  }
+  const contractsDist = join(repoRoot, 'packages/contracts/dist/index.d.ts');
+  if (!existsSync(contractsDist)) {
+    throw new Error(
+      `Template typecheck requires built @opensip-cli/contracts at ${contractsDist}. Run pnpm build first.`,
+    );
+  }
+  try {
+    requireFromHere.resolve('vitest');
+  } catch {
+    throw new Error('Template typecheck requires workspace dev dependency vitest to be installed.');
+  }
+}
+
+function writeRenderedTemplateFiles(root: string, files: Record<string, string>): void {
+  for (const [rel, content] of Object.entries(files)) {
+    const target = join(root, rel);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content, 'utf8');
+  }
+}
+
+function compilerConfig(root: string): Record<string, unknown> {
+  return {
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      noEmit: true,
+      ignoreDeprecations: '6.0',
+      baseUrl: root,
+      types: ['node'],
+      paths: {
+        '@opensip-cli/core': [join(repoRoot, 'packages/core/dist/index.d.ts')],
+        '@opensip-cli/core/*': [join(repoRoot, 'packages/core/dist/*')],
+        '@opensip-cli/contracts': [join(repoRoot, 'packages/contracts/dist/index.d.ts')],
+        '@opensip-cli/contracts/*': [join(repoRoot, 'packages/contracts/dist/*')],
+        vitest: [vitestTypesPath],
+      },
+    },
+    include: ['src/**/*.ts', 'src/**/*.tsx'],
+  };
+}
+
+/**
+ * @throws Error when workspace prerequisites needed for template typechecking are unavailable.
+ */
+function typecheckRenderedTemplate(files: Record<string, string>): TemplateTypecheckResult {
+  assertWorkspacePrerequisites();
+  const root = mkdtempSync(join(tmpdir(), 'opensip-template-typecheck-'));
+  try {
+    writeRenderedTemplateFiles(root, files);
+    const config = compilerConfig(root);
+    const parsed = ts.parseJsonConfigFileContent(config, ts.sys, root);
+    const program = ts.createProgram({
+      rootNames: parsed.fileNames,
+      options: parsed.options,
+    });
+    const diagnostics = ts.getPreEmitDiagnostics(program);
+    const host: ts.FormatDiagnosticsHost = {
+      getCanonicalFileName: (fileName) => fileName,
+      getCurrentDirectory: () => root,
+      getNewLine: () => '\n',
+    };
+    return {
+      ok: diagnostics.length === 0,
+      diagnostics:
+        diagnostics.length === 0
+          ? []
+          : [ts.formatDiagnosticsWithColorAndContext(diagnostics, host)],
+    };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
 
 let tmp: string;
 
@@ -106,7 +222,10 @@ describe('toolsCreate', () => {
         const id = template === 'minimal-js' ? 'hello-tools' : 'typed-tool';
         expect(toolsCreate({ toolId: id, projectRoot: root, template }).success).toBe(true);
         const toolDir = join(root, 'opensip-cli', 'tools', id);
-        const { result, cleanup } = await runToolValidation({ spec: toolDir, cwd: root });
+        const { result, cleanup } = await runToolValidation({
+          spec: toolDir,
+          cwd: root,
+        });
         cleanup();
         const sectionStatus = (name: string): string | undefined =>
           result.sections.find((s) => s.name === name)?.status;
@@ -160,6 +279,47 @@ describe('toolsCreate', () => {
       tool: Parameters<typeof assertManifestMatchesTool>[1];
     };
     assertManifestMatchesTool(manifest!, mod.tool);
+  });
+
+  it('typechecks the rendered ts-local template under strict settings', () => {
+    const rendered = TOOLS_CREATE_TEMPLATE_RENDERERS['ts-local']({
+      toolId: 'typed-tool',
+      stableId: '00000000-0000-4000-8000-000000000099',
+      commandName: 'typed-tool',
+    });
+    const result = typecheckRenderedTemplate(
+      Object.fromEntries(rendered.files.map((file) => [file.relativePath, file.content])),
+    );
+
+    expect(result.diagnostics.join('\n')).toBe('');
+    expect(result.ok).toBe(true);
+  });
+
+  it('template typecheck harness rejects the pre-fix unknown opts access', () => {
+    const result = typecheckRenderedTemplate({
+      'src/index.ts': `import { createTool } from '@opensip-cli/core';
+
+export const tool = createTool({
+  identity: { name: 'bad-template' },
+  metadata: { id: 'bad-template', version: '0.1.0', description: 'bad' },
+  primaryCommand: {
+    description: 'bad',
+    output: 'command-result',
+    handler: async (opts, cli) => {
+      try {
+        return { type: 'text-lines', lines: ['done'] };
+      } catch (error) {
+        await cli.reportFailure({ error, jsonRequested: opts.json === true });
+        return;
+      }
+    },
+  },
+});
+`,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics.join('\n')).toContain("'opts' is of type 'unknown'");
   });
 });
 

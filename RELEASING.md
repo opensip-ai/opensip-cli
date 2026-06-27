@@ -21,7 +21,7 @@ packages) is a separate trust gate — see
 [ADR-0068](../docs/decisions/ADR-0068-consumption-side-verification-policy.md)
 and [ADR-0061](../docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
-## The 36 packages
+## The 37 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -32,6 +32,7 @@ contract tests derive from or verify against that source.
 | Kernel         | `@opensip-cli/core`                 | `packages/core`                       |
 | Persistence    | `@opensip-cli/datastore`            | `packages/datastore`                  |
 | Shared CLI     | `@opensip-cli/contracts`            | `packages/contracts`                  |
+| Authoring      | `@opensip-cli/tool-test-kit`        | `packages/tool-test-kit`              |
 | Substrate      | `@opensip-cli/clone-detection`      | `packages/clone-detection`            |
 | Persistence    | `@opensip-cli/session-store`        | `packages/session-store`              |
 | Output         | `@opensip-cli/output`               | `packages/output`                     |
@@ -79,8 +80,8 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 
 ### 1. Version fields (hand-set, lockstep)
 
-All 36 publishable packages **plus** the private root (`@opensip-cli/root`) and
-the private `@opensip-cli/test-support` carry one shared version — 38
+All 37 publishable packages **plus** the private root (`@opensip-cli/root`) and
+the private `@opensip-cli/test-support` carry one shared version — 39
 `package.json` files. The bump script matches `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
@@ -97,7 +98,7 @@ Each reads `packages/core/package.json#version`:
 | Surface                                   | Regenerate with                                                               | Pins                                                  |
 | ----------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
 | CLI `--version`                           | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version                                 |
-| Per-package `README.md` (×35 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
+| Per-package `README.md` (×36 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
 | `docs/web-generated/**` + `manifest.json` | `pnpm docs:build`                                                             | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
 
 CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
@@ -133,7 +134,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    derived ones (see "Version Surfaces" above):
 
    ```bash
-   node scripts/bump-version.mjs <new-version>   # 38 package.json + docs + SECURITY + prose
+   node scripts/bump-version.mjs <new-version>   # 39 package.json + docs + SECURITY + prose
    pnpm install --lockfile-only                  # refresh the lockfile
    pnpm docs:readmes && pnpm docs:build          # regenerate version-pinned READMEs + web docs
    node scripts/bump-version.mjs --check         # assert no surface drifted
@@ -178,7 +179,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    Or inspect manually:
 
    ```bash
-   for p in core datastore contracts clone-detection session-store output config targeting cli-ui cli-live tree-sitter \
+  for p in core datastore contracts tool-test-kit clone-detection session-store output config targeting cli-ui cli-live tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard fitness simulation graph yagni graph-adapter-common graph-typescript \
             graph-python graph-rust graph-go graph-java checks-universal checks-typescript \
@@ -263,7 +264,7 @@ in `release.yml` or `bootstrap-publish.sh`.
    and `filter`.
 3. **Update this file (`RELEASING.md`)** — CI's release-package-order contract
    test enforces the prose:
-   - Add a row to [The 36 packages](#the-36-packages) (update the section title
+   - Add a row to [The 37 packages](#the-37-packages) (update the section title
      count when the set size changes).
    - Add the unscoped name to the [npm verify loop](#cutting-a-release) `for p in …`
      block (scoped packages only; `opensip-cli` stays on its own line).

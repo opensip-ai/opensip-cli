@@ -82,6 +82,7 @@ function makeContext(datastore: DataStore | undefined): {
     reportFailure: vi.fn(() => Promise.resolve()),
     deliverSignals: () => Promise.resolve({ cloudAccepted: 0 }),
     writeSarif: () => Promise.resolve(),
+    writeArtifact: () => Promise.resolve(),
     saveBaseline: () => Promise.resolve(),
     compareBaseline: () =>
       Promise.resolve({

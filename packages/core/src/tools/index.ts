@@ -74,6 +74,8 @@ export type {
   ToolCommandManifest,
   ManifestOptionDescriptor,
   ToolProvenance,
+  ToolResourceClass,
+  ToolResourceRequirement,
   ToolSource,
 } from './manifest.js';
 // ADR-0054 M4-E: the serializable, JSON-Schema-shaped config descriptor a tool

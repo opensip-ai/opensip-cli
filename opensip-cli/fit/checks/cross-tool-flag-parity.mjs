@@ -32,8 +32,10 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolDescriptorPathRe } from './tool-engine-paths.mjs';
+
 /** Resolved-path fragment identifying a first-party tool registration file. */
-const TOOL_REGISTRATION_PATH = /packages\/(?:fitness|graph|simulation)\/engine\/src\/tool\.ts$/;
+const TOOL_REGISTRATION_PATH = toolDescriptorPathRe();
 
 /** Long flags owned by the ADR-0021 registry — a raw `.option(...)` for any of
  *  these bypasses `applyCommonFlags`. */

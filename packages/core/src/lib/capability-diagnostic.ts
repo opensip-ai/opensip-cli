@@ -17,6 +17,23 @@ export function capabilityDiscoveryToCliDiagnostic(
   domainId: string,
   provenance?: CliDiagnosticProvenance,
 ): CliDiagnostic {
+  if (diagnostic.evt === 'capability.discovery.package_denied') {
+    return {
+      severity: 'warning',
+      code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_PACK_UNTRUSTED,
+      category: 'discovery',
+      message: diagnostic.message,
+      impact: `Capability domain '${domainId}' skipped an untrusted package contribution.`,
+      action: 'Allowlist the package in the host capability-pack trust configuration.',
+      provenance: {
+        packageName: diagnostic.packageName,
+        capabilityDomain: domainId,
+        ...provenance,
+      },
+      logRef: diagnostic.evt,
+    };
+  }
+
   return {
     severity: 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_DOMAIN_LOAD_FAILED,
@@ -41,7 +58,7 @@ export function fitnessEmptyCheckRegistryDiagnostic(): CliDiagnostic {
     message: 'No check packages were loaded.',
     impact: 'A fitness run cannot scan anything until at least one check pack is available.',
     action:
-      'Install at least one package declaring opensipTools.kind: "fit-pack", ' +
+      'Install at least one package declaring the fit-pack marker plus target-domain epoch, ' +
       'or declare plugins.checkPackages in opensip-cli.config.yml.',
     provenance: { toolId: 'fitness', capabilityDomain: 'fit-pack' },
   };

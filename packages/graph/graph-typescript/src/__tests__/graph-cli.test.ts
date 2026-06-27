@@ -28,12 +28,22 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { Signal, ToolCliContext, ToolError } from '@opensip-cli/core';
+import type { ReportFailureDetail, Signal, ToolCliContext } from '@opensip-cli/core';
 
-function exitFromToolError(error: ToolError): number {
+function exitFromToolError(error: unknown): number {
   if (error instanceof NotFoundError) return 3;
   if (error instanceof ConfigurationError || error instanceof ValidationError) return 2;
   return 1;
+}
+
+function messageFromError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error === undefined || error === null) return '';
+  if (typeof error === 'string') return error;
+  if (typeof error === 'number' || typeof error === 'boolean' || typeof error === 'bigint') {
+    return String(error);
+  }
+  return 'Unknown error';
 }
 
 /** Minimal structural view of RunPresentation — avoids a contracts dep in this adapter test. */
@@ -140,21 +150,20 @@ function makeCli(): CapturedCli {
     // Mirror the composition root's `emitEnvelope` seam: write the envelope as
     // JSON to stdout so the `--json` integration test can parse it.
     emitError: vi.fn(),
-    reportFailure: vi.fn(
-      async (detail: { exitCode?: number; error?: ToolError; message?: string }) => {
-        let code = detail.exitCode;
-        if (code === undefined && detail.error !== undefined) {
-          code = exitFromToolError(detail.error);
-        }
-        if (code !== undefined) {
-          exitCodes.push(code);
-        }
-        const message = detail.message ?? detail.error?.message ?? '';
-        if (message) {
-          await render({ type: 'error', message, exitCode: code ?? 1 });
-        }
-      },
-    ),
+    reportFailure: vi.fn(async (detail: ReportFailureDetail) => {
+      let code = detail.exitCode;
+      if (code === undefined && detail.error !== undefined) {
+        code = exitFromToolError(detail.error);
+      }
+      if (code !== undefined) {
+        exitCodes.push(code);
+      }
+      const message = detail.message ?? messageFromError(detail.error);
+      if (message) {
+        await render({ type: 'error', message, exitCode: code ?? 1 });
+      }
+    }),
+    writeArtifact: vi.fn(() => Promise.resolve()),
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);

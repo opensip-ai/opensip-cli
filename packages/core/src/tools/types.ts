@@ -88,9 +88,10 @@ export * from './tool-results.js';
  * - The primary evolution mechanism remains `extensionPoints` (see below and
  *   the `Tool` interface JSDoc). `contractVersion` is a marker only.
  *
- * The host can use the declared value for diagnostics, logging
- * ("tool X was written against contract vY"), future compatibility warnings,
- * or ratcheting in the plugin loader / compatibility gate.
+ * The host surfaces the declared value for diagnostics/display only (for
+ * example, the tool's `--version` output can append "tool contract vY"). The
+ * plugin compatibility gate does NOT consume this scalar; admission is governed
+ * by the manifest's integer `apiVersion` epoch.
  *
  * See ADR-0046 for the full policy, alternatives considered, and enforcement.
  */
@@ -212,6 +213,12 @@ export interface ToolCommandDescriptor {
  * - Optional lifecycle hooks (initialize, contributeScope, etc.)
  * - Future capabilities, community distribution metadata, etc.
  * - Host-plane participation declarations (governance / audit / entitlements)
+ *
+ * Hooks are self-initializing: a report, replay, scope, or capability hook that
+ * needs setup must call the tool's own idempotent setup helper. The host only
+ * guarantees the local call-site ordering for each hook (for example,
+ * `initialize` before the invoked command handler), not that an unrelated
+ * command path has initialized the tool before a report or replay hook runs.
  *
  * See the JSDoc on the `Tool` interface for the recommended grouping and
  * the "Evolution Path" guidance. Also see ADR-0027 and ADR-0038.

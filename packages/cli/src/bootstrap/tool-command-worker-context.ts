@@ -10,7 +10,7 @@
  *     ResultAccumulator} drained into a `ToolCommandResult` after the handler
  *     resolves; the host replays them through the real seams.
  *   - host-RPC (RPC): `deliverSignals` / `writeSarif` / the four baseline seams
- *     / `toolState.*` / `hostPlanes.*` / `maybeOpenReport` / `getExitCode` issue
+ *     / `writeArtifact` / `toolState.*` / `hostPlanes.*` / `maybeOpenReport` / `getExitCode` issue
  *     a typed {@link HostRpcRequest} via the {@link WorkerRpcClient} and await
  *     the host's reply — the HOST performs the privileged effect (datastore /
  *     egress / FS / process exit) and returns the result.
@@ -218,6 +218,7 @@ export function buildWorkerContext(
         },
       }),
     writeSarif: (envelope, path) => rpc<void>(rpcClient, { seam: 'writeSarif', envelope, path }),
+    writeArtifact: (path, bytes) => rpc<void>(rpcClient, { seam: 'writeArtifact', path, bytes }),
     saveBaseline: (tool, envelope) =>
       rpc<void>(rpcClient, { seam: 'saveBaseline', tool, envelope }),
     compareBaseline: (tool, envelope) =>

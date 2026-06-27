@@ -44,9 +44,11 @@ export type { DiscoveredDeclaredPackage } from './marker-discovery.js';
 export { discoverCapabilityContributions } from './capability-discovery.js';
 export type {
   CapabilityDiscoveryPreferences,
+  CapabilityPackageAdmission,
   RawCapabilityContribution,
   CapabilityDiscoveryDiagnostic,
   DiscoverCapabilityContributionsOptions,
+  SelectedCapabilityPackage,
 } from './capability-discovery.js';
 export { discoverScopedPackages, hasPackageJson, resolvePackageDir } from './node-modules-walk.js';
 export type {
@@ -81,6 +83,11 @@ export type { CapabilityRegistrar } from './capability-registry.js';
 // `routeContribution` — the live conduit. Memoized per scope (fixes F1).
 export { loadCapabilityDomain } from './capability-loader.js';
 export type { LoadCapabilityDomainOptions } from './capability-loader.js';
+export { checkCapabilityContributionCompatibility } from './capability-compatibility.js';
+export type {
+  CapabilityCompatibilityVerdict,
+  CheckCapabilityContributionCompatibilityArgs,
+} from './capability-compatibility.js';
 export { registerRecipesFromMod } from './recipe-loader.js';
 export type { RegisterRecipesOptions, RegisterRecipesResult } from './recipe-loader.js';
 export type {

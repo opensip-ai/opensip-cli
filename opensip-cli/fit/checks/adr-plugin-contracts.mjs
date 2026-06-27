@@ -8,7 +8,17 @@ import path from 'node:path';
 
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { bundledToolPackageSegments, toolEnginePathRe } from './tool-engine-paths.mjs';
+
 const ROOT = process.cwd();
+const BUNDLED_TOOL_PACKAGE_NAMES = new Set(
+  bundledToolPackageSegments.map((segment) => `@opensip-cli/${segment}`),
+);
+const TOOL_ENGINE_PATH = toolEnginePathRe();
+
+function escapeRe(value) {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
 
 function relPath(filePath) {
   const raw = path.isAbsolute(filePath) ? path.relative(ROOT, filePath) : filePath;
@@ -54,8 +64,12 @@ function stringSet(values) {
 // ADR-0009 / ADR-0013 / ADR-0027 / ADR-0029: bundled tools load by manifest.
 // ---------------------------------------------------------------------------
 
-const HOST_STATIC_TOOL_IMPORT_RE =
-  /^\s*import\s+(?!type\b)[^;]+?\bfrom\s*['"]@opensip-cli\/(?:fitness|graph|simulation|checks-[^'"]+)['"]/gm;
+const HOST_STATIC_TOOL_IMPORT_RE = new RegExp(
+  String.raw`^\s*import\s+(?!type\b)[^;]+?\bfrom\s*['"]@opensip-cli/(?:${bundledToolPackageSegments
+    .map(escapeRe)
+    .join('|')}|checks-[^'"]+)['"]`,
+  'gm',
+);
 
 function analyzeNoBootstrapToolImport(content, filePath) {
   const rel = relPath(filePath);
@@ -91,11 +105,7 @@ function expectedPackageKind(pkgName) {
   ) {
     return 'graph-adapter';
   }
-  if (
-    pkgName === '@opensip-cli/fitness' ||
-    pkgName === '@opensip-cli/graph' ||
-    pkgName === '@opensip-cli/simulation'
-  ) {
+  if (BUNDLED_TOOL_PACKAGE_NAMES.has(pkgName)) {
     return 'tool';
   }
   return undefined;
@@ -305,20 +315,15 @@ function analyzeCapabilityByManifest(content, filePath) {
 // ADR-0021 / command plane: tools expose CommandSpec, not raw Commander hooks.
 // ---------------------------------------------------------------------------
 
-const TOOL_DESCRIPTOR_FILES = new Set([
-  'packages/fitness/engine/src/tool.ts',
-  'packages/graph/engine/src/tool.ts',
-  'packages/simulation/engine/src/tool.ts',
-]);
+const TOOL_DESCRIPTOR_FILES = new Set(
+  bundledToolPackageSegments.map((segment) => `packages/${segment}/engine/src/tool.ts`),
+);
 
 function analyzeCommandSurfaceParity(content, filePath) {
   const rel = relPath(filePath);
   if (isTestOrFixture(rel)) return [];
   const violations = [];
-  if (
-    /^packages\/(?:fitness|graph|simulation)\/engine\/src\//.test(rel) &&
-    /\bprogram\.command\s*\(/.test(content)
-  ) {
+  if (TOOL_ENGINE_PATH.test(rel) && /\bprogram\.command\s*\(/.test(content)) {
     violations.push(
       violation(
         filePath,

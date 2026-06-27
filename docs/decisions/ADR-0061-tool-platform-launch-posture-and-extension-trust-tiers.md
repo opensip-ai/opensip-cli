@@ -211,3 +211,7 @@ resource-control gaps named here), ADR-0028 (off-main-process live runs; its
 enforcement text is stale, see spec 01), ADR-0058 (shared live-run shell that
 superseded ADR-0028's guard), ADR-0036 (host-owned baseline plane), ADR-0051
 (host-owned run timing), and ADR-0056 (architecture audit remediation).
+
+**Extended by:** [ADR-0081](ADR-0081-capability-pack-trust-and-resource-declarations.md)
+adds exact-name admission for non-bundled in-process capability packs and records
+`opensipTools.requires` as declaration-only trust metadata.
