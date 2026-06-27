@@ -53,6 +53,14 @@ describe('isRelevantDiagnostic', () => {
     expect(isRelevantDiagnostic(diag, undefined, 'fit-pack')).toBe(true);
     expect(isRelevantDiagnostic(diag, 'graph', 'fit-pack')).toBe(true);
   });
+
+  it('returns true for global diagnostics with no provenance', () => {
+    expect(isRelevantDiagnostic({ ...fitnessDiag, provenance: undefined }, 'graph')).toBe(true);
+  });
+
+  it('matches diagnostics by package name', () => {
+    expect(isRelevantDiagnostic(fitnessDiag, '@opensip-cli/fitness')).toBe(true);
+  });
 });
 
 describe('BootstrapDiagnosticsCollector', () => {
@@ -62,6 +70,13 @@ describe('BootstrapDiagnosticsCollector', () => {
     collector.record(graphDiag);
     expect(collector.filterForCommand('graph')).toEqual([graphDiag]);
     expect(collector.list()).toHaveLength(2);
+  });
+
+  it('returns every buffered diagnostic when no command filter is supplied', () => {
+    const collector = new BootstrapDiagnosticsCollector();
+    collector.record(fitnessDiag);
+    collector.record(graphDiag);
+    expect(collector.filterForCommand()).toEqual([fitnessDiag, graphDiag]);
   });
 });
 

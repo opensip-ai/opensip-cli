@@ -47,6 +47,16 @@ export default mergeConfig(
           'cli-ui/src/**',
           '**/packages/cli-live/src/**',
           '**/packages/cli-ui/src/**',
+          // Pure type-definition modules — no executable code.
+          'src/bootstrap/pre-action-runtime.ts',
+          'src/bootstrap/tool-admission-types.ts',
+          'src/bootstrap/tool-command-dispatch-types.ts',
+          'src/commands/shared.ts',
+          // Spawn-error / timeout arms of the probe parent are not mockable under
+          // ESM (node:child_process.spawnSync is not configurable). The happy,
+          // stderr-only, and empty-dir paths are covered here; full validate
+          // integration is exercised by the tools e2e lane.
+          'src/commands/tools/runtime-probe.ts',
         ],
         thresholds: {
           statements: 90,

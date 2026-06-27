@@ -28,6 +28,7 @@ import {
 import { type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as dispatchHookMod from '../bootstrap/dispatch-external-tool-hook.js';
 import * as openReportMod from '../open-report.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
@@ -107,6 +108,31 @@ describe('composeAndWriteReport', () => {
     expect(html).toContain('id="panel-simulation"');
     // Fitness's catalog contribution made it into the inlined data.
     expect(html).toContain('demo-check');
+  });
+
+  it('omits an external contribution when the forked hook rejects', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    vi.spyOn(dispatchHookMod, 'dispatchExternalToolHook').mockRejectedValue(
+      new Error('worker blew up'),
+    );
+
+    const external: Tool = {
+      metadata: { id: 'ext-tool', name: 'ext-tool', version: '0.0.0', description: 'ext' },
+      commandSpecs: [],
+      extensionPoints: {
+        collectReportData: () => ({ externalOnly: true }),
+      },
+    };
+    const bundled = makeTool('fitness', { checkCatalog: [{ slug: 'legit' }] });
+    const provenance: ToolProvenance[] = [
+      { source: 'installed', id: 'ext-tool', version: '0.0.0', manifestHash: 'h' },
+    ];
+
+    const scope = makeScope([external, bundled], undefined, provenance);
+    const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+    const html = readFileSync(result.path, 'utf8');
+    expect(html).toContain('legit');
+    expect(html).not.toContain('externalOnly');
   });
 
   it('launches the browser only when open is true', async () => {

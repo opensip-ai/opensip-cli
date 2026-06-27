@@ -1,13 +1,13 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, RunScope, runWithScope } from '@opensip-cli/core';
+import { ConfigurationError, RunScope, SystemError, runWithScope } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createWriteArtifactSeam } from '../artifact-seams.js';
 
-import type { Logger } from '@opensip-cli/core';
+import type { Logger, ProjectContext } from '@opensip-cli/core';
 
 function makeLogger(): Logger {
   return {
@@ -54,6 +54,38 @@ describe('createWriteArtifactSeam', () => {
 
     await expect(createWriteArtifactSeam(makeLogger())(target, 'nope')).rejects.toBeInstanceOf(
       ConfigurationError,
+    );
+  });
+
+  it('derives cwdBasename from the scope projectContext when present', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'artifact-seam-'));
+    const target = join(dir, 'catalog.json');
+    const projectContext: ProjectContext = {
+      cwd: dir,
+      cwdExplicit: false,
+      projectRoot: dir,
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'project',
+    };
+    const scope = new RunScope({ logger: makeLogger(), runId: 'r-pc', projectContext });
+    const writeArtifact = createWriteArtifactSeam(makeLogger());
+
+    await runWithScope(scope, () => writeArtifact(target, 'scoped\n'));
+
+    expect(readFileSync(target, 'utf8')).toBe('scoped\n');
+  });
+
+  it('wraps a non-ToolError write failure as a SystemError', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'artifact-seam-'));
+    const regularFile = join(dir, 'a-file');
+    writeFileSync(regularFile, 'x');
+    // The parent path component is a regular file, so stat throws ENOTDIR
+    // (not ENOENT) — a non-ToolError that surfaces as a wrapped SystemError.
+    const target = join(regularFile, 'sub', 'catalog.json');
+
+    await expect(createWriteArtifactSeam(makeLogger())(target, 'nope')).rejects.toBeInstanceOf(
+      SystemError,
     );
   });
 });

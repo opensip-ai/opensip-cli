@@ -40,6 +40,20 @@ describe('createToolLogger', () => {
     });
   });
 
+  it('routes debug and error entries through the same module merge path', () => {
+    const base = { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() };
+    const log = createToolLogger('yagni:cli', base);
+    log.debug({ evt: 'yagni.debug' });
+    log.error('failed', { evt: 'yagni.error', code: 'E1' });
+    expect(base.debug).toHaveBeenCalledWith({ module: 'yagni:cli', evt: 'yagni.debug' });
+    expect(base.error).toHaveBeenCalledWith({
+      module: 'yagni:cli',
+      msg: 'failed',
+      evt: 'yagni.error',
+      code: 'E1',
+    });
+  });
+
   it('uses scope logger under ALS when no base is supplied', () => {
     const scopeLogger = new LoggerImpl({ level: 'debug' });
     const scope = new RunScope({ logger: scopeLogger });

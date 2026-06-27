@@ -42,6 +42,17 @@ export default mergeConfig(
           // `equivalence-check.ts` and IS covered directly by
           // `equivalence-check.test.ts`. Same rationale as graph-runner.tsx.
           'src/cli/equivalence-check-command.ts',
+          // Re-export shims — executable code lives in @opensip-cli/clone-detection.
+          'src/lang-adapter/body-digest.ts',
+          'src/lang-adapter/near-duplicate-signature.ts',
+          // Re-export / type surface for adapter test suites (ADR-0009).
+          'src/internal.ts',
+          // Pure type-definition modules — no executable code.
+          'src/cli/graph-options.ts',
+          'src/cli/graph-run-outcome.ts',
+          'src/cli/orchestrate/shard-model.ts',
+          'src/cli/orchestrate/resolution-trace.ts',
+          'src/render/catalog-json-types.ts',
         ],
         thresholds: {
           statements: 90,

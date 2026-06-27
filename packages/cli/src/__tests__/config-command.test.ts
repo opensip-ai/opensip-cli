@@ -166,6 +166,36 @@ describe('executeConfigValidate', () => {
     expect(result.namespaces).toEqual(expect.arrayContaining(['fitness', 'graph', 'cli']));
   });
 
+  it('validates an empty document when no config path is provided', async () => {
+    const { tools, manifests, provenance } = await makeRegistry();
+    const result = executeConfigValidate({
+      tools,
+      manifests,
+      provenance,
+      configPath: undefined,
+      cwd: dir,
+    });
+    expect(result.valid).toBe(true);
+    expect(result.configPath).toBe(join(dir, 'opensip-cli.config.yml'));
+  });
+
+  it('suggests a nearby namespace for a near-miss unclaimed key', async () => {
+    writeFileSync(
+      join(dir, 'opensip-cli.config.yml'),
+      'fitness:\n  failOnErrors: 1\nfitnes:\n  enabled: true\n',
+      'utf8',
+    );
+    const { tools, manifests, provenance } = await makeRegistry();
+    const result = executeConfigValidate({
+      tools,
+      manifests,
+      provenance,
+      configPath: join(dir, 'opensip-cli.config.yml'),
+      cwd: dir,
+    });
+    expect(result.warnings?.join('\n')).toMatch(/did you mean 'fitness:'/);
+  });
+
   it('throws ConfigurationError for a typo inside a claimed namespace', async () => {
     writeFileSync(
       join(dir, 'opensip-cli.config.yml'),

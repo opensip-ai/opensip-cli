@@ -39,4 +39,14 @@ describe('resolveRecipeToRules', () => {
       expect(() => resolveRecipeToRules('bogus')).toThrow(/Unknown graph recipe 'bogus'/);
     });
   });
+
+  it('tolerant mode falls back to default when a configured recipe name is unknown', () => {
+    runWithScopeSync(makeGraphTestScope(), () => {
+      const allSlugs = currentRules().map((r) => r.slug);
+      const slugs = resolveRecipeToRules('copied-from-fit-config', { tolerant: true }).map(
+        (r) => r.slug,
+      );
+      expect(slugs).toEqual(allSlugs);
+    });
+  });
 });

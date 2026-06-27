@@ -4,9 +4,10 @@
  * registered in the test process), which is the standalone-run contract.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import { DiagnosticsBus } from '../diagnostics-bus.js';
+import * as telemetry from '../telemetry.js';
 
 describe('DiagnosticsBus', () => {
   it('collects events in order and stamps an ISO timestamp when none is given', () => {
@@ -25,6 +26,18 @@ describe('DiagnosticsBus', () => {
     const bus = new DiagnosticsBus('run_2');
     bus.emit({ phase: 'validate', level: 'warn', message: 'x', at: '2026-06-07T00:00:00.000Z' });
     expect(bus.snapshot().events[0].at).toBe('2026-06-07T00:00:00.000Z');
+  });
+
+  it('bridges the active traceparent into snapshot().trace when telemetry is on', () => {
+    const spy = vi
+      .spyOn(telemetry, 'currentTraceparent')
+      .mockReturnValue('00-abc123def456789012345678901234-9876543210abcdef-01');
+    const snap = new DiagnosticsBus('run_trace').snapshot();
+    expect(snap.trace).toEqual({
+      traceId: 'abc123def456789012345678901234',
+      spanId: '9876543210abcdef',
+    });
+    spy.mockRestore();
   });
 
   it('accumulates counters and only includes metrics when non-empty', () => {

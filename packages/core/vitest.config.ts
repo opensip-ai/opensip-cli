@@ -22,6 +22,21 @@ export default mergeConfig(
           'src/languages/index.ts',
           'src/languages/adapter.ts',
           'src/languages/generic-types.ts',
+          'src/languages/workspace-unit.ts',
+          // Contract hub modules split from types.ts (M6) — interfaces only.
+          'src/tools/cli-context.ts',
+          'src/tools/host-planes.ts',
+          'src/tools/scaffold.ts',
+          'src/tools/tool-results.ts',
+          'src/tools/tool-sessions.ts',
+          'src/tools/report-failure.ts',
+          'src/tools/manifest-config.ts',
+          'src/lib/ui-context.ts',
+          'src/lib/execution/options.ts',
+          // Re-export shim — executable code lives in lib/json-guards.ts.
+          'src/plugins/json-guards.ts',
+          // Progress transport contract — interfaces and type aliases only.
+          'src/runtime/progress-transport.ts',
         ],
         thresholds: {
           statements: 95,

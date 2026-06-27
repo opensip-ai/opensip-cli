@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -62,5 +62,29 @@ describe('writeArtifactAtomically', () => {
       .events.find((e) => e.message === 'state.artifact.write.complete');
     expect(persist).toBeDefined();
     expect(persist?.phase).toBe('persist');
+  });
+
+  it('emits an error diagnostic when the atomic rename fails', () => {
+    dir = mkdtempSync(join(tmpdir(), 'artifact-write-'));
+    const target = join(dir, 'out.sarif');
+    mkdirSync(target);
+    const scope = new RunScope({ logger: makeLogger(), runId: 'r-artifact-err' });
+
+    runWithScopeSync(scope, () => {
+      expect(() =>
+        writeArtifactAtomically(target, '{"ok":true}\n', {
+          policy: POLICY,
+          logger: makeLogger(),
+          command: 'test',
+          cwdBasename: 'repo',
+        }),
+      ).toThrow();
+    });
+
+    const errorEvent = scope.diagnostics
+      .snapshot()
+      .events.find((e) => e.message === 'state.artifact.write.error');
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent?.phase).toBe('persist');
   });
 });
