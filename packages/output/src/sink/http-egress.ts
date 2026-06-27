@@ -56,6 +56,12 @@ export interface PostChunkedArgs {
   readonly policy: RetryPolicy;
   /** Log event prefix, e.g. `cli.report` or `cli.signal-sync`. */
   readonly evtPrefix: string;
+  /**
+   * Extra request headers merged into every chunk POST (e.g.
+   * `x-opensip-repo`). The transport-owned `Content-Type` and `Authorization`
+   * headers always win — a caller cannot override auth via this bag.
+   */
+  readonly extraHeaders?: Readonly<Record<string, string>>;
   readonly fetchImpl?: typeof fetch;
   /** Injectable clock/sleep for deterministic tests. */
   readonly now?: () => number;
@@ -116,7 +122,12 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     };
   }
 
-  const headersBase: Record<string, string> = { 'Content-Type': 'application/json' };
+  // Caller-supplied headers go in first so the transport-owned `Content-Type`
+  // and `Authorization` below always win (auth is never caller-overridable).
+  const headersBase: Record<string, string> = {
+    ...args.extraHeaders,
+    'Content-Type': 'application/json',
+  };
   // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
   // token only (the api-key strategy matches `Bearer osk_`); the historical
   // `X-API-Key` header never reached a route and is removed outright — no
