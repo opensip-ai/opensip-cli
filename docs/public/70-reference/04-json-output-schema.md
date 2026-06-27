@@ -177,6 +177,20 @@ fix hint with confidence.
 | `strength` | number | no | Optional signal-strength weight. |
 | `fingerprint` | string | no | Stable de-dup fingerprint when the producer computes one. |
 | `createdAt` | string (ISO 8601) | yes | When the signal was created. |
+| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](../../decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. Not exported to SARIF. |
+
+#### `SignalRepair` (optional)
+
+```jsonc
+{
+  "repairKind": "split-function",  // e.g. add-test | split-function | manual | unknown
+  "autofixable": false,
+  "suggestedCommand": "opensip fit --check large-function",
+  "docsRef": "../60-guides/use-opensip-with-ai-agents.md",
+  "confidence": 0.7,
+  "patchHint": { "kind": "text", "summary": "Extract helper from lines 40-120" }
+}
+```
 
 The line and column are **1-based** to match SARIF and most editor conventions. A signal without a location omits `line` / `column` and carries an empty `filePath`.
 
@@ -251,6 +265,44 @@ opensip fit --json | jq -e '.envelope.verdict.score >= 90'
 ```
 
 For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-cli' — see [`10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
+
+### Agent-filtered live/replay output
+
+When `fit`/`graph`/`sim` run with `--json` and any `--filter` token (or
+`sessions show` with filters), the payload includes filter metadata
+([ADR-0085](../../decisions/ADR-0085-change-detection-substrate.md)):
+
+```jsonc
+{
+  "filtersApplied": ["errors-only", "top:20"],
+  "originalSignalCount": 142,
+  "returnedSignalCount": 20,
+  "envelope": { /* filtered SignalEnvelope */ }
+}
+```
+
+With `--raw`, the outer `CommandOutcome` wrapper is omitted and only the
+filtered result object is emitted.
+
+### `graph impact --json`
+
+```jsonc
+{
+  "kind": "graph-impact",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "graph-impact",
+    "basis": { "type": "changed", "ref": "main" },
+    "changedFiles": ["src/foo.ts"],
+    "changedFunctions": [ /* ImpactFunction[] */ ],
+    "impactedFunctions": [ /* ImpactFunction[] */ ],
+    "impactedPackages": [ /* ImpactPackage[] */ ],
+    "recommendedCommands": ["opensip fit --changed --include-impacted --json"],
+    "truncated": false
+  }
+}
+```
 
 ### `graph lookup --json`
 

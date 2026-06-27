@@ -48,6 +48,15 @@ opensip graph --language python --list-files
 opensip graph
 ```
 
+For agent edit loops, analyze change blast radius without a full rule run:
+
+```bash
+opensip graph impact --changed --json --top 20
+opensip graph --recipe agent-risk --json --filter high-impact
+```
+
+See [Use OpenSIP with AI agents](./use-opensip-with-ai-agents.md).
+
 The default output is compact. Use verbose mode when you want details in the terminal:
 
 ```bash

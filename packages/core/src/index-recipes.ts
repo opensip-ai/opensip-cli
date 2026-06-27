@@ -73,6 +73,7 @@ export type { RunScopeOptions } from './lib/run-scope.js';
 export type {
   RecipeUnitConfigSlot,
   DataStoreThunk,
+  GraphCatalogThunk,
   ToolScope,
   ScopeContribution,
   ScopeContributionWithDisposer,
