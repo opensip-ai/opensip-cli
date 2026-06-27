@@ -47,7 +47,10 @@ describe('load executor', () => {
 
   it('fails when the target fails', async () => {
     const r = await createLoadScenarioRunner(
-      base({ target: failingTarget, assertions: [ASSERTIONS.lowErrorRate(0.1)] }),
+      base({
+        target: failingTarget,
+        assertions: [ASSERTIONS.lowErrorRate(0.1)],
+      }),
     ).run(new AbortController().signal);
     if (r.kind !== 'load') throw new Error('expected load result');
     expect(r.passed).toBe(false);

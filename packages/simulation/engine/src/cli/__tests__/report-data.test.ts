@@ -42,10 +42,21 @@ describe('collectSimulationReportData', () => {
     };
 
     expect(out.simScenarioCatalog).toEqual([
-      { id: 's1', name: 'Load Test', kind: 'load', description: 'a load scenario', tags: ['perf'] },
+      {
+        id: 's1',
+        name: 'Load Test',
+        kind: 'load',
+        description: 'a load scenario',
+        tags: ['perf'],
+      },
     ]);
     expect(out.simRecipeCatalog).toEqual([
-      { name: 'default', displayName: 'Default', description: 'the default recipe', tags: ['ci'] },
+      {
+        name: 'default',
+        displayName: 'Default',
+        description: 'the default recipe',
+        tags: ['ci'],
+      },
     ]);
   });
 

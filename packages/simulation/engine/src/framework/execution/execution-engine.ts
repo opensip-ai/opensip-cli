@@ -39,7 +39,10 @@ import type { SimulationMetrics, ScenarioAssertion } from '../../types/base-type
 export function validateAssertions(
   metrics: SimulationMetrics,
   assertions: ScenarioAssertion[],
-): { passed: boolean; failed: { assertion: ScenarioAssertion; actual: number }[] } {
+): {
+  passed: boolean;
+  failed: { assertion: ScenarioAssertion; actual: number }[];
+} {
   if (!Array.isArray(assertions)) {
     return { passed: false, failed: [] };
   }

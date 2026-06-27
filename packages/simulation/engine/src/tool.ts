@@ -11,7 +11,15 @@
  * old `register()` action body did (byte-identical behaviour).
  */
 
-import { EXIT_CODES, type StoredSession, type ToolOptions } from '@opensip-cli/contracts';
+import {
+  agentRunFlagSpecs,
+  buildAgentFilteredResult,
+  EXIT_CODES,
+  normalizeAgentRunFilters,
+  type SignalEnvelope,
+  type StoredSession,
+  type ToolOptions,
+} from '@opensip-cli/contracts';
 import {
   createToolScope,
   definePrimaryCommand,
@@ -59,6 +67,9 @@ type SimOptions = ToolOptions & {
   quiet?: boolean;
   open?: boolean;
   verbose?: boolean;
+  filter?: string[];
+  top?: string;
+  raw?: boolean;
 };
 
 /**
@@ -74,6 +85,25 @@ type SimOptions = ToolOptions & {
  * doing this once per run — only on the interactive path that needs it — is
  * equivalent to the old mount-time registration.
  */
+/** Emit sim JSON — unfiltered envelope or agent-filtered result (ADR-0085). */
+function emitSimJsonOutput(
+  cli: ToolCliContext,
+  envelope: SignalEnvelope,
+  opts: Pick<SimOptions, 'filter' | 'top' | 'raw'>,
+): void {
+  const tokens = normalizeAgentRunFilters(opts.filter, opts.top);
+  if (tokens.length === 0 && opts.raw !== true) {
+    cli.emitEnvelope(envelope);
+    return;
+  }
+  const filtered = buildAgentFilteredResult(envelope, tokens);
+  if (opts.raw === true) {
+    cli.emitRaw(filtered);
+  } else {
+    cli.emitJson(filtered);
+  }
+}
+
 function setUpSimLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(SIMULATION_LIVE_VIEW_KEY, async (args, liveContext) => {
     const simArgs = args as ToolOptions;
@@ -139,7 +169,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
   // through the shared formatSignalJson; default renders the envelope-
   // derived per-scenario table.
   if (opts.json) {
-    cli.emitEnvelope(result.envelope);
+    emitSimJsonOutput(cli, result.envelope, opts);
   } else {
     await cli.render(result);
   }
@@ -310,6 +340,7 @@ const simCommand = definePrimaryCommand<unknown, ToolCliContext>({
       value: '<session>',
       description: 'Replay a stored sim session by id, or latest for the latest sim session',
     },
+    ...agentRunFlagSpecs,
   ],
   scope: 'project',
   output: 'raw-stream',

@@ -30,7 +30,10 @@ import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
 const fakeEnvelope = {
   schemaVersion: 2,
   tool: 'sim',
-  verdict: { passed: false, summary: { passed: 0, failed: 1, errors: 0, warnings: 0 } },
+  verdict: {
+    passed: false,
+    summary: { passed: 0, failed: 1, errors: 0, warnings: 0 },
+  },
 } as unknown as SignalEnvelope;
 
 // host-owned-run-timing Phase 2: renderSimLive resolves a ToolRunCompletion
@@ -100,7 +103,14 @@ function makeCtx(): Captured {
     }),
     writeSarif: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
-  return { ctx, liveViews, delivered, renderLiveCalls, dashboardCalls, exitCodes };
+  return {
+    ctx,
+    liveViews,
+    delivered,
+    renderLiveCalls,
+    dashboardCalls,
+    exitCodes,
+  };
 }
 
 describe('simulationTool live-view callback (ADR-0016)', () => {
@@ -121,7 +131,11 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     expect(callback).toBeDefined();
 
     // Invoke the live-view callback the dispatcher would call.
-    await callback?.({ cwd: '/proj', reportTo: 'https://cloud.example', apiKey: 'k' });
+    await callback?.({
+      cwd: '/proj',
+      reportTo: 'https://cloud.example',
+      apiKey: 'k',
+    });
 
     // The Ink renderer ran with setExitCode wired through (once per run via the
     // handler's renderLive, once here via the direct callback invocation).
@@ -147,7 +161,9 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     // only the directly-invoked callback below does, returning a completion with
     // no envelope (host-owned-run-timing Phase 2).
     (
-      renderSimLive as unknown as { mockResolvedValueOnce: (v: unknown) => void }
+      renderSimLive as unknown as {
+        mockResolvedValueOnce: (v: unknown) => void;
+      }
     ).mockResolvedValueOnce({ envelope: undefined });
     const cap = makeCtx();
     await simHandler()({ cwd: '/proj' }, cap.ctx);
@@ -176,6 +192,9 @@ describe('simulationTool action — interactive TTY branch', () => {
     expect(cap.renderLiveCalls).toHaveLength(1);
     expect(cap.renderLiveCalls[0]?.[0]).toBe('simulation');
     expect(cap.dashboardCalls).toHaveLength(1);
-    expect(cap.dashboardCalls[0]).toMatchObject({ openRequested: true, jsonOutput: false });
+    expect(cap.dashboardCalls[0]).toMatchObject({
+      openRequested: true,
+      jsonOutput: false,
+    });
   });
 });

@@ -141,19 +141,28 @@ describe('validateChaosScenarioConfig', () => {
   it('rejects an unknown fault kind', () => {
     expect(() =>
       validateChaosScenarioConfig(
-        base({ fault: { faults: [{ kind: 'meltdown' as never }], probability: 0.5 } }),
+        base({
+          fault: { faults: [{ kind: 'meltdown' as never }], probability: 0.5 },
+        }),
       ),
     ).toThrow(/fault kind must be one of/);
   });
   it('rejects a latency fault with a missing or negative ms', () => {
     expect(() =>
       validateChaosScenarioConfig(
-        base({ fault: { faults: [{ kind: 'latency' } as never], probability: 0.5 } }),
+        base({
+          fault: { faults: [{ kind: 'latency' } as never], probability: 0.5 },
+        }),
       ),
     ).toThrow(/latency fault requires a non-negative ms/);
     expect(() =>
       validateChaosScenarioConfig(
-        base({ fault: { faults: [{ kind: 'latency', ms: -5 } as never], probability: 0.5 } }),
+        base({
+          fault: {
+            faults: [{ kind: 'latency', ms: -5 } as never],
+            probability: 0.5,
+          },
+        }),
       ),
     ).toThrow(/latency fault requires a non-negative ms/);
   });

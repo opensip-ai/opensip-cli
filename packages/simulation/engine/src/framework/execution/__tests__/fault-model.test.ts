@@ -11,7 +11,10 @@ import { createFaultModel } from '../fault-model.js';
 
 import type { TargetContext } from '../target.js';
 
-const ctx: TargetContext = { signal: new AbortController().signal, correlationId: 'c' };
+const ctx: TargetContext = {
+  signal: new AbortController().signal,
+  correlationId: 'c',
+};
 
 /** RNG that walks a fixed sequence (wraps). */
 const seq = (vals: readonly number[]) => {
@@ -52,7 +55,9 @@ describe('createFaultModel', () => {
   });
 
   it('abort fault fails even when the target ignores the signal', async () => {
-    const fm = createFaultModel(fault.of([fault.abort()], { probability: 1 }), { rng: () => 0 });
+    const fm = createFaultModel(fault.of([fault.abort()], { probability: 1 }), {
+      rng: () => 0,
+    });
     await expect(fm.wrap(noopTarget)(ctx)).rejects.toThrow();
     expect(fm.drained()).toHaveLength(1);
     expect(fm.drained()[0]?.kind).toBe('abort');
@@ -60,7 +65,9 @@ describe('createFaultModel', () => {
 
   it('does not perturb when probability is 0', async () => {
     const ct = countingTarget();
-    const fm = createFaultModel(fault.of([fault.drop()], { probability: 0 }), { rng: () => 0 });
+    const fm = createFaultModel(fault.of([fault.drop()], { probability: 0 }), {
+      rng: () => 0,
+    });
     await fm.wrap(ct.target)(ctx);
     expect(ct.calls()).toBe(1);
     expect(fm.drained()).toHaveLength(0);

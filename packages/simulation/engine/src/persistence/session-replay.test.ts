@@ -115,7 +115,11 @@ describe('simReplayFromSession', () => {
   describe('payload validation', () => {
     const cases: { name: string; payload: unknown; message: RegExp }[] = [
       { name: 'null payload', payload: null, message: /no replay payload/ },
-      { name: 'missing summary', payload: { checks: [] }, message: /summary is missing/ },
+      {
+        name: 'missing summary',
+        payload: { checks: [] },
+        message: /summary is missing/,
+      },
       {
         name: 'non-number summary field',
         payload: {
@@ -126,7 +130,9 @@ describe('simReplayFromSession', () => {
       },
       {
         name: 'missing checks[]',
-        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+        payload: {
+          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+        },
         message: /missing checks\[\]/,
       },
       {
@@ -150,7 +156,13 @@ describe('simReplayFromSession', () => {
         payload: {
           summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
           checks: [
-            { checkSlug: 'a', passed: true, violationCount: 1, durationMs: 1, findings: [42] },
+            {
+              checkSlug: 'a',
+              passed: true,
+              violationCount: 1,
+              durationMs: 1,
+              findings: [42],
+            },
           ],
         },
         message: /finding is invalid/,
