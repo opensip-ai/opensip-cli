@@ -6,6 +6,23 @@ import { forkAndSettle } from '../fork-and-settle.js';
 
 const FIXTURE = fileURLToPath(new URL('fixtures/limit-worker.mjs', import.meta.url));
 
+async function waitFor<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error(message));
+        }, timeoutMs);
+        timeout.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
 describe('forkAndSettle', () => {
   afterEach(() => {
     delete process.env.OPENSIP_CLI_WORKER_TIMEOUT_MS;
@@ -149,23 +166,28 @@ describe('forkAndSettle', () => {
   });
 
   it('resets the idle RPC timer on inbound worker messages and fails when it expires', async () => {
-    let failureClass: string | undefined;
-    let detail: string | undefined;
-    const handle = forkAndSettle({
-      command: FIXTURE,
-      argv: ['message-then-idle'],
-      limits: { idleRpcMs: 50 },
-      onMessage: () => undefined,
-      onLimitFailure: (fc, d) => {
-        failureClass = fc;
-        detail = d;
-      },
+    let handle: ReturnType<typeof forkAndSettle> | undefined;
+    const failure = new Promise<{ failureClass: string; detail?: string }>((resolve) => {
+      handle = forkAndSettle({
+        command: FIXTURE,
+        argv: ['message-then-idle'],
+        limits: { idleRpcMs: 50 },
+        onMessage: () => undefined,
+        onLimitFailure: (failureClass, detail) => {
+          resolve({ failureClass, detail });
+        },
+      });
     });
 
-    await new Promise((r) => setTimeout(r, 250));
-    expect(failureClass).toBe('timeout');
-    expect(detail).toContain('host-RPC idle timer exceeded 50ms');
-    handle.dispose();
+    try {
+      const result = await waitFor(failure, 2000, 'timed out waiting for idle RPC limit failure');
+      expect(result.failureClass).toBe('timeout');
+      expect(result.detail).toContain('host-RPC idle timer exceeded 50ms');
+    } finally {
+      if (handle !== undefined) {
+        handle.dispose();
+      }
+    }
   });
 
   it('kills when RSS exceeds the configured ceiling', async () => {
