@@ -43,7 +43,11 @@ const ROOT_FILES: readonly string[] = [join(FIXTURE_ROOT, 'root-script.ts')];
 const ALL_FILES: readonly string[] = [...Object.values(PKG_FILES).flat(), ...ROOT_FILES];
 const SHARDS: readonly Shard[] = [
   ...Object.entries(PKG_FILES).map(
-    ([name, files]): Shard => ({ id: `pkg:${name}`, rootDir: PKG(name), files: [...files] }),
+    ([name, files]): Shard => ({
+      id: `pkg:${name}`,
+      rootDir: PKG(name),
+      files: [...files],
+    }),
   ),
   { id: ':root', rootDir: FIXTURE_ROOT, files: [...ROOT_FILES] },
 ];

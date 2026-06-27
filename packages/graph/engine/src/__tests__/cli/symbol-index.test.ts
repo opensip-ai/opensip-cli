@@ -100,8 +100,16 @@ describe('graph symbol-index', () => {
     });
 
     it('dedupes the per-file name list when the same name has multiple occurrences', () => {
-      const o1 = occ({ bodyHash: 'h1', simpleName: 'fn', filePath: 'src/a.ts' });
-      const o2 = occ({ bodyHash: 'h2', simpleName: 'fn', filePath: 'src/a.ts' });
+      const o1 = occ({
+        bodyHash: 'h1',
+        simpleName: 'fn',
+        filePath: 'src/a.ts',
+      });
+      const o2 = occ({
+        bodyHash: 'h2',
+        simpleName: 'fn',
+        filePath: 'src/a.ts',
+      });
       const artifact = buildArtifact(makeCatalog([o1, o2]));
       expect(artifact.symbols.fn).toHaveLength(2);
       expect(artifact.fileSymbols['src/a.ts']).toEqual(['fn']);
@@ -154,7 +162,11 @@ describe('graph symbol-index', () => {
 
     it('with --build runs the graph pipeline before emitting the artifact', async () => {
       const catalog = makeCatalog([
-        occ({ bodyHash: 'h1', simpleName: 'builtFn', filePath: 'src/built.ts' }),
+        occ({
+          bodyHash: 'h1',
+          simpleName: 'builtFn',
+          filePath: 'src/built.ts',
+        }),
       ]);
       const runGraph = vi.spyOn(orchestrate, 'runGraph').mockResolvedValue({
         catalog,

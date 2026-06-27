@@ -5,7 +5,11 @@ import { packageOf, resolveCallee, callerImportedPackages } from '../resolve-cal
 import type { FunctionOccurrence, Indexes } from '../types.js';
 
 function occ(
-  over: Partial<FunctionOccurrence> & { bodyHash: string; filePath: string; qualifiedName: string },
+  over: Partial<FunctionOccurrence> & {
+    bodyHash: string;
+    filePath: string;
+    qualifiedName: string;
+  },
 ): FunctionOccurrence {
   return {
     bodySize: 50,

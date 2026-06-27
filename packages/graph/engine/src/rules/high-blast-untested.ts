@@ -69,6 +69,7 @@ export const highBlastUntestedRule = defineRule({
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Add a test that exercises this high-reach function.',
           metadata: {
+            highImpact: true,
             blast: score,
             blastDirect: blast.direct,
             blastTransitive: blast.transitive,

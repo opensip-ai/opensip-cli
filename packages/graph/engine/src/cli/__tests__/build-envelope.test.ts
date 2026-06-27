@@ -56,12 +56,18 @@ describe('buildGraphEnvelope', () => {
   });
 
   it('computes the verdict (errors = critical|high; passed ⇔ errors === 0)', () => {
-    const clean = buildGraphEnvelope({ ...BASE, signals: [signal({ severity: 'low' })] });
+    const clean = buildGraphEnvelope({
+      ...BASE,
+      signals: [signal({ severity: 'low' })],
+    });
     expect(clean.verdict.passed).toBe(true);
     expect(clean.verdict.summary.errors).toBe(0);
     expect(clean.verdict.summary.warnings).toBe(1);
 
-    const failing = buildGraphEnvelope({ ...BASE, signals: [signal({ severity: 'critical' })] });
+    const failing = buildGraphEnvelope({
+      ...BASE,
+      signals: [signal({ severity: 'critical' })],
+    });
     expect(failing.verdict.passed).toBe(false);
     expect(failing.verdict.summary.errors).toBe(1);
   });

@@ -57,7 +57,9 @@ describe('createGraphSignal', () => {
   });
 
   it('applies a configured severity override', () => {
-    const config = { severityOverrides: { 'graph:cycle': 'error' } } as unknown as GraphConfig;
+    const config = {
+      severityOverrides: { 'graph:cycle': 'error' },
+    } as unknown as GraphConfig;
     expect(createGraphSignal('graph:cycle', config, BODY).severity).toBe('high');
   });
 });

@@ -37,7 +37,11 @@ export const nearDuplicateFunctionBodyRule = defineRule({
         severity: 'low',
         category: 'quality',
         message: `${String(c.nearMembers.length)} near-duplicate function bodies cluster around ${c.anchor.qualifiedName} (estimated Jaccard ≥ ${c.estimatedSimilarity.toFixed(2)}).`,
-        code: { file: c.anchor.filePath, line: c.anchor.line, column: c.anchor.column },
+        code: {
+          file: c.anchor.filePath,
+          line: c.anchor.line,
+          column: c.anchor.column,
+        },
         suggestion:
           'Extract the shared logic into one function and replace the near-clone copies with calls to it.',
         metadata: {

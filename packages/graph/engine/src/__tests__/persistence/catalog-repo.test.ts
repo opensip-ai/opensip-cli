@@ -128,7 +128,14 @@ function featuresPayload(): PersistedFeatures {
         simpleName: 'a',
         endLine: 12,
         calls: [
-          { to: ['b'], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'b()' },
+          {
+            to: ['b'],
+            line: 1,
+            column: 0,
+            resolution: 'static',
+            confidence: 'high',
+            text: 'b()',
+          },
         ],
       }),
     ],

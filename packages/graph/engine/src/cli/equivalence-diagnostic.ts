@@ -114,8 +114,15 @@ export function buildEquivalenceDiagnostic(
   const decline = input.report.productionDecline.map(describe);
   const phantom = input.report.productionPhantom.map(describe);
   return {
-    counts: { productionDecline: decline.length, productionPhantom: phantom.length },
-    shards: input.shards.map((s) => ({ id: s.id, rootDir: s.rootDir, fileCount: s.files.length })),
+    counts: {
+      productionDecline: decline.length,
+      productionPhantom: phantom.length,
+    },
+    shards: input.shards.map((s) => ({
+      id: s.id,
+      rootDir: s.rootDir,
+      fileCount: s.files.length,
+    })),
     declineByExactResolution: countBy(decline, (d) => edgeResolutionKey(d.exactEdge)),
     phantomByShardedResolution: countBy(phantom, (d) => edgeResolutionKey(d.shardedEdge)),
     decline,
@@ -226,7 +233,10 @@ function summarizeTargets(
   hash: string,
   targets: ReadonlyMap<string, readonly FunctionOccurrence[]>,
 ): TargetSummary {
-  return { hash, occurrences: (targets.get(hash) ?? []).map(summarizeOccurrence) };
+  return {
+    hash,
+    occurrences: (targets.get(hash) ?? []).map(summarizeOccurrence),
+  };
 }
 
 function summarizeOccurrence(occ: FunctionOccurrence): OccurrenceSummary {

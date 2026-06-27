@@ -58,7 +58,10 @@ function fakeAdapter(input: FakeAdapterInput): GraphLanguageAdapter {
       configPathAbs: input.configPathAbs,
       compilerOptions: input.compilerOptions,
     }),
-    parseProject: (): ParseOutput => ({ project: { token: 'parsed' }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { token: 'parsed' },
+      parseErrors: [],
+    }),
     walkProject: (): WalkOutput => ({
       occurrences,
       callSites: [],
@@ -134,7 +137,11 @@ describe('runGraph orchestrator', () => {
           },
         }),
       );
-      const result = await runGraph({ cwd: projectDir, noCache: true, rules: [] });
+      const result = await runGraph({
+        cwd: projectDir,
+        noCache: true,
+        rules: [],
+      });
       expect(result.catalog).not.toBeNull();
       expect(result.catalog?.language).toBe('fake');
       expect(result.indexes).not.toBeNull();
@@ -238,8 +245,16 @@ describe('runGraph orchestrator', () => {
         }),
       );
       const evaluate = vi.fn().mockReturnValue([]);
-      const rule: Rule = { slug: 'graph:test', defaultSeverity: 'warning', evaluate };
-      const result = await runGraph({ cwd: projectDir, noCache: true, rules: [rule] });
+      const rule: Rule = {
+        slug: 'graph:test',
+        defaultSeverity: 'warning',
+        evaluate,
+      };
+      const result = await runGraph({
+        cwd: projectDir,
+        noCache: true,
+        rules: [rule],
+      });
       expect(evaluate).toHaveBeenCalledTimes(1);
       expect(result.signals).toEqual([]);
     });
@@ -251,7 +266,10 @@ describe('runGraph orchestrator', () => {
       const a = fakeAdapter({ projectDir });
       const spy = vi.spyOn(a, 'discoverFiles').mockImplementation((inp) => {
         seen.push(inp.configPathOverride ?? 'absent');
-        return { projectDirAbs: projectDir, files: [join(projectDir, 'src', 'a.ts')] };
+        return {
+          projectDirAbs: projectDir,
+          files: [join(projectDir, 'src', 'a.ts')],
+        };
       });
       currentAdapterRegistry().register(a);
       await runGraph({
@@ -341,8 +359,20 @@ describe('runGraph — incremental rebuild path', () => {
           cacheKey: 'k1',
           files: [fileA, fileB],
           occurrences: {
-            fa: [occurrence({ bodyHash: 'hA', simpleName: 'fa', filePath: 'src/a.ts' })],
-            fb: [occurrence({ bodyHash: 'hB', simpleName: 'fb', filePath: 'src/b.ts' })],
+            fa: [
+              occurrence({
+                bodyHash: 'hA',
+                simpleName: 'fa',
+                filePath: 'src/a.ts',
+              }),
+            ],
+            fb: [
+              occurrence({
+                bodyHash: 'hB',
+                simpleName: 'fb',
+                filePath: 'src/b.ts',
+              }),
+            ],
           },
         }),
       );
@@ -358,8 +388,20 @@ describe('runGraph — incremental rebuild path', () => {
           cacheKey: 'k1',
           files: [fileA, fileB],
           occurrences: {
-            fa: [occurrence({ bodyHash: 'hA', simpleName: 'fa', filePath: 'src/a.ts' })],
-            fb: [occurrence({ bodyHash: 'hB-new', simpleName: 'fb', filePath: 'src/b.ts' })],
+            fa: [
+              occurrence({
+                bodyHash: 'hA',
+                simpleName: 'fa',
+                filePath: 'src/a.ts',
+              }),
+            ],
+            fb: [
+              occurrence({
+                bodyHash: 'hB-new',
+                simpleName: 'fb',
+                filePath: 'src/b.ts',
+              }),
+            ],
           },
         }),
       );

@@ -52,6 +52,7 @@ describe('graphTool contract conformance (AC-2)', () => {
       'lookup',
       'index',
       'list',
+      'impact',
       'graph-equivalence-check',
     ]);
     // The legacy flat-root aliases are gone.
@@ -82,6 +83,7 @@ describe('graphTool contract conformance (AC-2)', () => {
       'lookup',
       'index',
       'list',
+      'impact',
       'graph-equivalence-check',
     ]);
   });

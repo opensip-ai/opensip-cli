@@ -31,7 +31,12 @@ describe('duplicated-function-body aggregate cross-package path', () => {
   const substantial = { bodySize: 500, line: 1, endLine: 10 };
 
   it('fires exactly one aggregate signal for a substantial body in 3 packages', () => {
-    const a = occ({ bodyHash: 'h', simpleName: 'stripStrings', package: 'pkg-c', ...substantial });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'stripStrings',
+      package: 'pkg-c',
+      ...substantial,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'stripStrings',
@@ -73,7 +78,12 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     // thin delegator — is below the size floor, so the aggregate path skips it
     // even though it spans 3 packages (and the per-instance path is floored too).
     const trivial = { bodySize: 50, line: 1, endLine: 2 };
-    const a = occ({ bodyHash: 'h', simpleName: 'get', package: 'pkg-a', ...trivial });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'get',
+      package: 'pkg-a',
+      ...trivial,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'get',
@@ -100,7 +110,12 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     // aggregate path catches it — its whole purpose (small shared utility
     // copied across packages).
     const smallReal = { bodySize: 120, line: 1, endLine: 2 };
-    const a = occ({ bodyHash: 'h', simpleName: 'parseRange', package: 'pkg-a', ...smallReal });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'parseRange',
+      package: 'pkg-a',
+      ...smallReal,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'parseRange',
@@ -125,7 +140,12 @@ describe('duplicated-function-body aggregate cross-package path', () => {
 
   it('honors a custom minCrossPackageDuplicateBodySize override', () => {
     const body90 = { bodySize: 90, line: 1, endLine: 2 };
-    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...body90 });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'a',
+      package: 'pkg-a',
+      ...body90,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',
@@ -147,22 +167,39 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     expect(aggregates(evaluate(catalog, buildIndexes(catalog), {}))).toHaveLength(1);
     // Raised to 100: 90 < 100 → suppressed.
     expect(
-      evaluate(catalog, buildIndexes(catalog), { minCrossPackageDuplicateBodySize: 100 }),
+      evaluate(catalog, buildIndexes(catalog), {
+        minCrossPackageDuplicateBodySize: 100,
+      }),
     ).toHaveLength(0);
   });
 
   it('does NOT fire for a within-package small dup (1 package)', () => {
     const small = { bodySize: 50, line: 1, endLine: 2, package: 'pkg-a' };
     const a = occ({ bodyHash: 'h', simpleName: 'a', ...small });
-    const b = occ({ bodyHash: 'h', simpleName: 'b', filePath: 'src/b.ts', ...small });
-    const c = occ({ bodyHash: 'h', simpleName: 'c', filePath: 'src/c.ts', ...small });
+    const b = occ({
+      bodyHash: 'h',
+      simpleName: 'b',
+      filePath: 'src/b.ts',
+      ...small,
+    });
+    const c = occ({
+      bodyHash: 'h',
+      simpleName: 'c',
+      filePath: 'src/c.ts',
+      ...small,
+    });
     const catalog = makeCatalog([a, b, c]);
     const signals = evaluate(catalog, buildIndexes(catalog), {});
     expect(signals).toHaveLength(0);
   });
 
   it('honors the minCrossPackageDuplicatePackages threshold', () => {
-    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...substantial });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'a',
+      package: 'pkg-a',
+      ...substantial,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',
@@ -193,7 +230,12 @@ describe('duplicated-function-body aggregate cross-package path', () => {
     // Large body (clears default size + line floor) so the per-instance path
     // WOULD fire (2 signals) absent suppression.
     const large = { bodySize: 500, line: 1, endLine: 10 };
-    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...large });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'a',
+      package: 'pkg-a',
+      ...large,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',
@@ -219,7 +261,12 @@ describe('duplicated-function-body aggregate cross-package path', () => {
 
   it('excludes inTestFile occurrences from the aggregate path', () => {
     const small = { bodySize: 50, line: 1, endLine: 2, inTestFile: true };
-    const a = occ({ bodyHash: 'h', simpleName: 'a', package: 'pkg-a', ...small });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'a',
+      package: 'pkg-a',
+      ...small,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',
@@ -240,7 +287,13 @@ describe('duplicated-function-body aggregate cross-package path', () => {
 
   it('excludes arrow / function-expression / module-init kinds from the aggregate path', () => {
     const small = { bodySize: 50, line: 1, endLine: 2 };
-    const a = occ({ bodyHash: 'h', simpleName: 'a', kind: 'arrow', package: 'pkg-a', ...small });
+    const a = occ({
+      bodyHash: 'h',
+      simpleName: 'a',
+      kind: 'arrow',
+      package: 'pkg-a',
+      ...small,
+    });
     const b = occ({
       bodyHash: 'h',
       simpleName: 'b',

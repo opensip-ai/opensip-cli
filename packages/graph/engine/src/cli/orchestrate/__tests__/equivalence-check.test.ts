@@ -59,7 +59,16 @@ function occ(
     kind: 'function',
     visibility: 'exported',
     params: [],
-    calls: [{ to, line, column, resolution: 'semantic', confidence: 'high', text: 'call()' }],
+    calls: [
+      {
+        to,
+        line,
+        column,
+        resolution: 'semantic',
+        confidence: 'high',
+        text: 'call()',
+      },
+    ],
   } as unknown as FunctionOccurrence;
 }
 
@@ -207,7 +216,12 @@ describe('judgeEquivalence directional ratchet', () => {
         conflict: [conflict('p/b.ts')],
         scc: ['s'],
       }),
-      { ...FLOOR, phantomDivergences: 1, conflictDivergences: 1, sccDivergences: 1 },
+      {
+        ...FLOOR,
+        phantomDivergences: 1,
+        conflictDivergences: 1,
+        sccDivergences: 1,
+      },
     );
     expect(v.failed).toBe(false);
     expect(v.phantomCount).toBe(1);
@@ -231,7 +245,12 @@ describe('judgeEquivalence directional ratchet', () => {
         decline: [decline('p/b.ts'), decline('p/c.ts')],
         conflict: [conflict('p/d.ts')],
       }),
-      { ...FLOOR, phantomDivergences: 1, declineDivergences: 2, conflictDivergences: 1 },
+      {
+        ...FLOOR,
+        phantomDivergences: 1,
+        declineDivergences: 2,
+        conflictDivergences: 1,
+      },
     );
     expect(v.failed).toBe(false);
     expect(v.phantomCount).toBe(1);

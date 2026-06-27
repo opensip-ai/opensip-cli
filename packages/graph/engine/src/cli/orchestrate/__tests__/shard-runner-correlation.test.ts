@@ -214,7 +214,9 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     // A 200ms injected kill-timeout: the fixture sleeps 60s, so the parent must
     // SIGKILL it and settle as `timeout` — the test itself completes far under
     // the 10-minute production default (proving no indefinite hang).
-    const out = await runWithCorrelation([shard('sleep:hang')], { hardKillTimeoutMs: 200 });
+    const out = await runWithCorrelation([shard('sleep:hang')], {
+      hardKillTimeoutMs: 200,
+    });
 
     expect(out.fragments).toHaveLength(0);
     expect(out.failures).toHaveLength(1);

@@ -56,13 +56,26 @@ describe('contributionFromSignals', () => {
     expect(payload.checks).toHaveLength(evaluated.length);
     expect(payload.checks.every((c) => c.passed && c.violationCount === 0)).toBe(true);
     expect(payload.checks.map((c) => c.checkSlug).sort()).toEqual([...evaluated].sort());
-    expect(payload.summary).toEqual({ total: 3, passed: 3, failed: 0, errors: 0, warnings: 0 });
+    expect(payload.summary).toEqual({
+      total: 3,
+      passed: 3,
+      failed: 0,
+      errors: 0,
+      warnings: 0,
+    });
   });
 
   it('marks the rule that fired as failed while keeping the clean ones as PASS rows', () => {
     const contribution = contributionFromSignals(
       { cwd: '/repo', recipe: 'default' },
-      [sig({ ruleId: 'graph:cycle', severity: 'high', filePath: 'a.ts', line: 1 })],
+      [
+        sig({
+          ruleId: 'graph:cycle',
+          severity: 'high',
+          filePath: 'a.ts',
+          line: 1,
+        }),
+      ],
       ['graph:cycle', 'graph:large-function'],
     );
     const payload = contribution.payload as GraphSessionPayload;

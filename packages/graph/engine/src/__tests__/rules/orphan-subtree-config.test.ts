@@ -14,7 +14,10 @@ import { makeCatalog, occ, staticCall } from './_helpers.js';
 
 describe('orphan-subtree config behavior', () => {
   it('respects config.entryPointHashes — orphan becomes reachable when added as entry', () => {
-    const reachableViaOrphan = occ({ bodyHash: 'r', simpleName: 'reachableViaOrphan' });
+    const reachableViaOrphan = occ({
+      bodyHash: 'r',
+      simpleName: 'reachableViaOrphan',
+    });
     const opaque = occ({
       bodyHash: 'o',
       simpleName: 'opaque',
@@ -32,7 +35,9 @@ describe('orphan-subtree config behavior', () => {
 
     // With opaque as a manual entry point: opaque is no longer orphan
     // and reachableViaOrphan is reached transitively.
-    const withCfg = orphanSubtreeRule.evaluate(catalog, indexes, { entryPointHashes: ['o'] });
+    const withCfg = orphanSubtreeRule.evaluate(catalog, indexes, {
+      entryPointHashes: ['o'],
+    });
     const names = withCfg.map((s) => s.metadata.simpleName);
     expect(names).not.toContain('opaque');
     expect(names).not.toContain('reachableViaOrphan');
@@ -62,8 +67,16 @@ describe('orphan-subtree config behavior', () => {
       filePath: 'src/b.ts',
       calls: [staticCall('privB')],
     });
-    const privA = occ({ bodyHash: 'privA', simpleName: 'privA', filePath: 'src/a.ts' });
-    const privB = occ({ bodyHash: 'privB', simpleName: 'privB', filePath: 'src/b.ts' });
+    const privA = occ({
+      bodyHash: 'privA',
+      simpleName: 'privA',
+      filePath: 'src/a.ts',
+    });
+    const privB = occ({
+      bodyHash: 'privB',
+      simpleName: 'privB',
+      filePath: 'src/b.ts',
+    });
     const mi = occ({
       bodyHash: 'mi',
       simpleName: '<module-init:a.ts>',
@@ -80,7 +93,11 @@ describe('orphan-subtree config behavior', () => {
   });
 
   it('flags a genuinely-dead module-local, zero-caller, non-test, non-decorated function (D3 guard)', () => {
-    const dead = occ({ bodyHash: 'd', simpleName: 'deadHelper', visibility: 'module-local' });
+    const dead = occ({
+      bodyHash: 'd',
+      simpleName: 'deadHelper',
+      visibility: 'module-local',
+    });
     const catalog = makeCatalog([dead]);
     const orphans = orphanSubtreeRule
       .evaluate(catalog, buildIndexes(catalog), {})
@@ -100,7 +117,11 @@ describe('orphan-subtree config behavior', () => {
       visibility: 'module-local',
       calls: [staticCall('pub')],
     });
-    const pub = occ({ bodyHash: 'pub', simpleName: 'publicSurface', visibility: 'exported' });
+    const pub = occ({
+      bodyHash: 'pub',
+      simpleName: 'publicSurface',
+      visibility: 'exported',
+    });
     const catalog = makeCatalog([deadCaller, pub]);
     const indexes = buildIndexes(catalog);
 

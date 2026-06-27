@@ -41,7 +41,10 @@ export async function writeWorkspaceReport(
   durationMs: number,
   cli: ToolCliContext,
 ): Promise<void> {
-  await cli.render({ type: 'graph-status', lines: workspaceReportLines(perUnit, durationMs) });
+  await cli.render({
+    type: 'graph-status',
+    lines: workspaceReportLines(perUnit, durationMs),
+  });
 }
 
 /**

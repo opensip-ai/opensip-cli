@@ -22,7 +22,10 @@ const MODULE_GRAPH_CLI = 'graph:cli';
  * Marker-file → canonical adapter id. Order matters only for
  * documentation; detection returns ALL matches (polyglot).
  */
-const MARKER_MAP: readonly { readonly marker: string; readonly adapterId: string }[] = [
+const MARKER_MAP: readonly {
+  readonly marker: string;
+  readonly adapterId: string;
+}[] = [
   { marker: 'tsconfig.json', adapterId: 'typescript' },
   { marker: 'package.json', adapterId: 'typescript' },
   { marker: 'Cargo.toml', adapterId: 'rust' },
@@ -63,7 +66,11 @@ export interface DetectionResult {
  * `adapterIds` (defensive against partial CLI bootstrap configurations).
  */
 export function detectLanguages(rootDir: string, registry: LanguageRegistry): DetectionResult {
-  log.info({ evt: 'graph.cli.detect.start', module: MODULE_GRAPH_CLI, rootDir });
+  log.info({
+    evt: 'graph.cli.detect.start',
+    module: MODULE_GRAPH_CLI,
+    rootDir,
+  });
   const matchedMarkers: DetectionMatch[] = [];
   const adapterIdSet = new Set<string>();
   for (const { marker, adapterId } of MARKER_MAP) {

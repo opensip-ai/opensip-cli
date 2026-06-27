@@ -22,7 +22,10 @@ import { graphTool } from '../../tool.js';
  *  `@opensip-cli/test-support`, which this package's tests cannot use
  *  without coupling its test graph to the fitness engine). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 
 /** Build a fresh RunScope with `scope.graph` populated. */
 export function makeGraphTestScope(): RunScope {

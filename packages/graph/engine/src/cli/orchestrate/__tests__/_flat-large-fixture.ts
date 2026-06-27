@@ -102,7 +102,13 @@ export function generateFlatLargeFixture(
       mkdirSync(dirAbs, { recursive: true });
       madeDirs.add(dirAbs);
     }
-    const content = renderFile({ index: i, fileCount, clusterCount, blockSize, rng });
+    const content = renderFile({
+      index: i,
+      fileCount,
+      clusterCount,
+      blockSize,
+      rng,
+    });
     writeFileSync(join(targetDir, rel), content, 'utf8');
   }
   return { fileCount, clusterCount, skipped: false };
@@ -145,7 +151,11 @@ function fixturePackageJson(): string {
 function fixtureTsconfig(): string {
   return JSON.stringify(
     {
-      compilerOptions: { module: 'nodenext', moduleResolution: 'nodenext', noEmit: true },
+      compilerOptions: {
+        module: 'nodenext',
+        moduleResolution: 'nodenext',
+        noEmit: true,
+      },
       include: ['src'],
     },
     null,

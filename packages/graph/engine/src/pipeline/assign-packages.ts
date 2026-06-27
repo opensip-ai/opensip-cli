@@ -38,7 +38,10 @@ export function assignPackages(catalog: Catalog, projectRoot: string): Catalog {
 
       const functions: Record<string, FunctionOccurrence[]> = {};
       for (const [name, occs] of Object.entries(catalog.functions)) {
-        functions[name] = occs.map((occ) => ({ ...occ, package: labelOf(occ.filePath) }));
+        functions[name] = occs.map((occ) => ({
+          ...occ,
+          package: labelOf(occ.filePath),
+        }));
       }
       return { ...catalog, functions };
     },
@@ -86,7 +89,9 @@ function readManifestName(pkgJsonPath: string): string | null {
   // is noteworthy.
   if (!existsSync(pkgJsonPath)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as { name?: unknown };
+    const parsed = JSON.parse(readFileSync(pkgJsonPath, 'utf8')) as {
+      name?: unknown;
+    };
     return typeof parsed.name === 'string' && parsed.name.length > 0 ? parsed.name : null;
   } catch (error) {
     logger.debug({

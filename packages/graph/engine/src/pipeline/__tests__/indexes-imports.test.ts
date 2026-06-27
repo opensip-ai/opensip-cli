@@ -38,7 +38,14 @@ function catalogOf(functions: Record<string, FunctionOccurrence[]>): Catalog {
 }
 
 function call(to: string): NonNullable<FunctionOccurrence['calls']>[number] {
-  return { to: [to], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'f()' };
+  return {
+    to: [to],
+    line: 1,
+    column: 0,
+    resolution: 'static',
+    confidence: 'high',
+    text: 'f()',
+  };
 }
 
 describe('buildIndexes — occurrencesByHash + importedPackagesByFile', () => {
@@ -87,8 +94,16 @@ describe('buildIndexes — occurrencesByHash + importedPackagesByFile', () => {
       simpleName: 'twin',
       calls: [call('TB')],
     });
-    const ta = occ({ bodyHash: 'TA', filePath: 'packages/a/src/y.ts', simpleName: 'ta' });
-    const tb = occ({ bodyHash: 'TB', filePath: 'packages/b/src/y.ts', simpleName: 'tb' });
+    const ta = occ({
+      bodyHash: 'TA',
+      filePath: 'packages/a/src/y.ts',
+      simpleName: 'ta',
+    });
+    const tb = occ({
+      bodyHash: 'TB',
+      filePath: 'packages/b/src/y.ts',
+      simpleName: 'tb',
+    });
     const idx = buildIndexes(catalogOf({ twin: [twinA, twinB], ta: [ta], tb: [tb] }));
     // callees['H'] is the UNION of both twins' out-edges, not the byBodyHash winner's only.
     expect([...(idx.callees.get('H') ?? [])].sort()).toEqual(['TA', 'TB']);

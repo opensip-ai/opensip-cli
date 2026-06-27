@@ -43,6 +43,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'buildPackageManifestIndex',
   'buildPackageManifestIndexFromRoots',
   'createAdapterRegistry',
+  'createGraphCatalogThunk',
   'createMutableStats',
   'createRecipeRegistry',
   'currentAdapterRegistry',

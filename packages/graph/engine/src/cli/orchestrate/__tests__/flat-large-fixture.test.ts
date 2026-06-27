@@ -48,7 +48,11 @@ describe('generateFlatLargeFixture', () => {
     const b = join(work, 'gen-b');
     const resultA = generateFlatLargeFixture(a, SMALL_SPEC);
     const resultB = generateFlatLargeFixture(b, SMALL_SPEC);
-    expect(resultA).toEqual({ fileCount: 60, clusterCount: 30, skipped: false });
+    expect(resultA).toEqual({
+      fileCount: 60,
+      clusterCount: 30,
+      skipped: false,
+    });
     expect(resultB.skipped).toBe(false);
 
     const filesA = listFiles(a);

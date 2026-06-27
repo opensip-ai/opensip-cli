@@ -312,7 +312,10 @@ export async function buildAndResolveCatalogIncremental(
         finalFunctions,
         result.dependenciesByOwner,
       );
-      const catalog: Catalog = { ...initialCatalog, functions: stitchedFunctions };
+      const catalog: Catalog = {
+        ...initialCatalog,
+        functions: stitchedFunctions,
+      };
       return { ...result, catalog };
     },
     detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,

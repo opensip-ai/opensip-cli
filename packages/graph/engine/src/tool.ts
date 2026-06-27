@@ -31,6 +31,7 @@ import { graphFingerprintStrategy } from './baseline-strategy.js';
 import {
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
+  graphImpactCommandSpec,
   graphIndexGroupedCommandSpec,
   graphListCommandSpec,
   graphLookupGroupedCommandSpec,
@@ -81,6 +82,7 @@ const graphCommandSpecs = [
   graphLookupGroupedCommandSpec,
   graphIndexGroupedCommandSpec,
   graphListCommandSpec,
+  graphImpactCommandSpec,
   graphEquivalenceCheckCommandSpec,
 ];
 

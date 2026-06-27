@@ -89,7 +89,11 @@ describe('resolution-mode contract', () => {
   });
 
   describe('buildGraphEnvelope', () => {
-    const RUN = { signals: [], runId: 'run-1', createdAt: '2026-06-04T00:00:00.000Z' };
+    const RUN = {
+      signals: [],
+      runId: 'run-1',
+      createdAt: '2026-06-04T00:00:00.000Z',
+    };
 
     it('omits resolutionMode for exact / undefined', () => {
       expect(buildGraphEnvelope(RUN).resolutionMode).toBeUndefined();

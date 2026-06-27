@@ -76,7 +76,11 @@ describe('graph baseline plane', () => {
     expect(graphFingerprintStrategy.fingerprint(gsig('graph:cycle', 'src/a.ts', 5, 2))).toBe(
       'graph:cycle|src/a.ts|5|2',
     );
-    const noLoc = { ...gsig('r', 'f', 1), line: undefined, column: undefined } as Signal;
+    const noLoc = {
+      ...gsig('r', 'f', 1),
+      line: undefined,
+      column: undefined,
+    } as Signal;
     expect(graphFingerprintStrategy.fingerprint(noLoc)).toBe('r|f|0|0');
   });
 });

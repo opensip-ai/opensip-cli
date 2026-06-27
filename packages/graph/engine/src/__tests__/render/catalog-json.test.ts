@@ -183,7 +183,9 @@ describe('renderCatalogJson — symbol rows', () => {
       repoId: REPO_ID,
       gitSha: GIT_SHA,
     });
-    const parsed = JSON.parse(json) as { symbols: { modulePath: string; filePath: string }[] };
+    const parsed = JSON.parse(json) as {
+      symbols: { modulePath: string; filePath: string }[];
+    };
     for (const sym of parsed.symbols) {
       expect(sym.modulePath).toBe(deriveOpenSipModulePath(sym.filePath));
       expect(sym.modulePath.endsWith('.ts')).toBe(false);

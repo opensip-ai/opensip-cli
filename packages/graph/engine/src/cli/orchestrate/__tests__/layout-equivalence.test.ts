@@ -80,7 +80,11 @@ function pkgShard(
   relFiles: readonly string[],
 ): Shard {
   const rootDir = join(fixtureRoot, relRoot);
-  return { id, rootDir, files: relFiles.map((f) => join(fixtureRoot, relRoot, f)) };
+  return {
+    id,
+    rootDir,
+    files: relFiles.map((f) => join(fixtureRoot, relRoot, f)),
+  };
 }
 
 /** flat — `packages/<name>/`. */

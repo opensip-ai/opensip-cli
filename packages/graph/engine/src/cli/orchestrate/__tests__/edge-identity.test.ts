@@ -13,7 +13,14 @@ import { bucketEdgesByOwner, ownerEdgeKey, stitchEdgesByOwner } from '../edge-id
 import type { CallEdge, FunctionOccurrence } from '../../../types.js';
 
 function edge(to: readonly string[], line: number, column = 0): CallEdge {
-  return { to, line, column, resolution: 'semantic', confidence: 'high', text: 'x()' };
+  return {
+    to,
+    line,
+    column,
+    resolution: 'semantic',
+    confidence: 'high',
+    text: 'x()',
+  };
 }
 
 function occ(

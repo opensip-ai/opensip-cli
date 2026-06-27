@@ -21,6 +21,8 @@ export { GRAPH_CONTRACT_VERSION } from './tool.js';
 // Graph-engine environment-variable specs (launch, §5.12) — the CLI
 // composition root imports these to aggregate the env-surface reference doc.
 export { GRAPH_ENV_SPECS } from './cli/pressure-monitor.js';
+// ADR-0085: host-wired RunScope.graphCatalog thunk — CLI bootstrap only.
+export { createGraphCatalogThunk, type GraphCatalogThunk } from './graph-catalog-thunk.js';
 // Orchestration / CLI-handler / heap-preflight / shard-model / report
 // helpers (runGraph, executeGraph, GRAPH_STAGES, the heap-preflight
 // surface, MemoryPressureError, Shard*, buildUnifiedReportLines, and

@@ -79,12 +79,17 @@ export async function buildLiveGraphOutput(
   buildRoot: string,
 ): Promise<LiveGraphOutput> {
   const finalized = await finalizeGraphSignals(input.signals, buildRoot);
-  const waivedInput: UnifiedReportInput = { ...input, signals: finalized.signals };
+  const waivedInput: UnifiedReportInput = {
+    ...input,
+    signals: finalized.signals,
+  };
   const resolutionMode = input.catalog?.resolutionMode;
   return {
     signals: finalized.signals,
     suppressedCount: finalized.suppressedCount,
-    reportLines: buildUnifiedReportLines(waivedInput, { includeSummary: false }),
+    reportLines: buildUnifiedReportLines(waivedInput, {
+      includeSummary: false,
+    }),
     ...(resolutionMode === undefined ? {} : { resolutionMode }),
   };
 }

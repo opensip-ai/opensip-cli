@@ -134,7 +134,14 @@ describe('cross-shard merge determinism (characterization)', () => {
       'key-a',
       occ('caller', 'packages/pkg-a/index.ts', 'A', [
         // Unresolved placeholder the local pass left at the boundary site.
-        { to: [], line: 2, column: 9, resolution: 'unknown', confidence: 'low', text: 'helperB()' },
+        {
+          to: [],
+          line: 2,
+          column: 9,
+          resolution: 'unknown',
+          confidence: 'low',
+          text: 'helperB()',
+        },
       ]),
     ),
     [

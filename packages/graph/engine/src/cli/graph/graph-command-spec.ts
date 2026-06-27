@@ -24,7 +24,12 @@
  * before the handler runs), so the handler trusts the parsed value.
  */
 
-import { EXIT_CODES, type SignalEnvelope, type StoredSession } from '@opensip-cli/contracts';
+import {
+  agentRunFlagSpecs,
+  EXIT_CODES,
+  type SignalEnvelope,
+  type StoredSession,
+} from '@opensip-cli/contracts';
 import { definePrimaryCommand } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
@@ -76,6 +81,9 @@ interface GraphCommandOptions {
   listFiles?: boolean;
   sarif?: string;
   show?: string;
+  filter?: string[];
+  top?: string;
+  raw?: boolean;
 }
 
 /**
@@ -304,6 +312,9 @@ async function runGraphCommand(
       language: opts.language,
       verbose: opts.verbose,
       cliScript: process.argv[1],
+      filter: opts.filter,
+      top: opts.top,
+      raw: opts.raw,
     },
     cli,
   );
@@ -566,6 +577,7 @@ export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
         'List the source files graph would discover for this scope and exit (no build; honors [paths...], --workspace, --language, --json)',
       default: false,
     },
+    ...agentRunFlagSpecs,
     {
       flag: '--sarif',
       value: '<path>',

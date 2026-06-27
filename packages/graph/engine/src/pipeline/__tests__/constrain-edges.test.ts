@@ -5,7 +5,11 @@ import { constrainCrossPackageEdges } from '../constrain-edges.js';
 import type { CallEdge, Catalog, FunctionOccurrence, ResolutionMode } from '../../types.js';
 
 function occ(
-  over: Partial<FunctionOccurrence> & { bodyHash: string; filePath: string; package: string },
+  over: Partial<FunctionOccurrence> & {
+    bodyHash: string;
+    filePath: string;
+    package: string;
+  },
 ): FunctionOccurrence {
   return {
     simpleName: 'f',
@@ -27,15 +31,32 @@ function occ(
 }
 
 function edge(over: Partial<CallEdge> & { to: string[] }): CallEdge {
-  return { line: 1, column: 0, resolution: 'unknown', confidence: 'medium', text: 'f()', ...over };
+  return {
+    line: 1,
+    column: 0,
+    resolution: 'unknown',
+    confidence: 'medium',
+    text: 'f()',
+    ...over,
+  };
 }
 
 /** module-init occurrence in `filePath` (package `pkg`) importing each specifier. */
 function moduleInit(filePath: string, pkg: string, specifiers: string[]): FunctionOccurrence {
   return {
-    ...occ({ bodyHash: `MI:${filePath}`, filePath, package: pkg, simpleName: '<module-init>' }),
+    ...occ({
+      bodyHash: `MI:${filePath}`,
+      filePath,
+      package: pkg,
+      simpleName: '<module-init>',
+    }),
     kind: 'module-init',
-    dependencies: specifiers.map((specifier) => ({ to: [], specifier, line: 1, column: 0 })),
+    dependencies: specifiers.map((specifier) => ({
+      to: [],
+      specifier,
+      line: 1,
+      column: 0,
+    })),
   };
 }
 
@@ -61,7 +82,11 @@ const PKGC = '@scope/pkgc';
 
 describe('constrainCrossPackageEdges', () => {
   it('drops a name-guessed edge into a package the caller does not import', () => {
-    const target = occ({ bodyHash: 'H', filePath: 'packages/pkg-b/src/f.ts', package: PKGB });
+    const target = occ({
+      bodyHash: 'H',
+      filePath: 'packages/pkg-b/src/f.ts',
+      package: PKGB,
+    });
     const caller = occ({
       bodyHash: 'C',
       filePath: A,
@@ -74,7 +99,11 @@ describe('constrainCrossPackageEdges', () => {
   });
 
   it('keeps a name-guessed edge into a package the caller imports (by specifier)', () => {
-    const target = occ({ bodyHash: 'H', filePath: 'packages/pkg-b/src/f.ts', package: PKGB });
+    const target = occ({
+      bodyHash: 'H',
+      filePath: 'packages/pkg-b/src/f.ts',
+      package: PKGB,
+    });
     const caller = occ({
       bodyHash: 'C',
       filePath: A,
@@ -90,7 +119,11 @@ describe('constrainCrossPackageEdges', () => {
   });
 
   it('keeps a same-package name-guessed edge', () => {
-    const target = occ({ bodyHash: 'H', filePath: 'packages/pkg-a/src/f.ts', package: PKGA });
+    const target = occ({
+      bodyHash: 'H',
+      filePath: 'packages/pkg-a/src/f.ts',
+      package: PKGA,
+    });
     const caller = occ({
       bodyHash: 'C',
       filePath: A,
@@ -103,7 +136,11 @@ describe('constrainCrossPackageEdges', () => {
   });
 
   it('never drops a type-checker-backed (static) edge, even cross-package', () => {
-    const target = occ({ bodyHash: 'H', filePath: 'packages/pkg-b/src/f.ts', package: PKGB });
+    const target = occ({
+      bodyHash: 'H',
+      filePath: 'packages/pkg-b/src/f.ts',
+      package: PKGB,
+    });
     const caller = occ({
       bodyHash: 'C',
       filePath: A,
@@ -237,14 +274,23 @@ describe('constrainCrossPackageEdges', () => {
     });
     const mi = moduleInit(A, PKGA, ['./local', 'lodash/fp', PKGB, PKGC]);
     const out = constrainCrossPackageEdges(
-      catalogOf({ f: [bF, cF], callB: [callB], callC: [callC], '<module-init>': [mi] }),
+      catalogOf({
+        f: [bF, cF],
+        callB: [callB],
+        callC: [callC],
+        '<module-init>': [mi],
+      }),
     );
     expect(out.functions.callB[0].calls[0].to).toEqual(['Hb']);
     expect(out.functions.callC[0].calls[0].to).toEqual(['Hc']);
   });
 
   it('returns the catalog untouched in fast mode (no import set)', () => {
-    const target = occ({ bodyHash: 'H', filePath: 'packages/pkg-b/src/f.ts', package: PKGB });
+    const target = occ({
+      bodyHash: 'H',
+      filePath: 'packages/pkg-b/src/f.ts',
+      package: PKGB,
+    });
     const caller = occ({
       bodyHash: 'C',
       filePath: A,

@@ -95,7 +95,10 @@ export function partitionFilesIntoShards(input: PartitionInput): Shard[] {
   const { canonicalFiles, units, projectRoot, rootConfigPathAbs } = input;
 
   // Pre-normalize unit rootDirs once; index by id to accumulate file buckets.
-  const normUnits: NormUnit[] = units.map((u) => ({ unit: u, rootPosix: toPosixPath(u.rootDir) }));
+  const normUnits: NormUnit[] = units.map((u) => ({
+    unit: u,
+    rootPosix: toPosixPath(u.rootDir),
+  }));
   const buckets = new Map<string, string[]>();
   for (const u of units) buckets.set(u.id, []);
   const rootBucket: string[] = [];

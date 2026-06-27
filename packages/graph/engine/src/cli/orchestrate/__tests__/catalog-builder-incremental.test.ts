@@ -81,7 +81,10 @@ function incrementalAdapter(opts: {
   return {
     id: 'typescript',
     displayName: 'Fake',
-    parseProject: (): ParseOutput => ({ project: { token: 'p' }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { token: 'p' },
+      parseErrors: [],
+    }),
     walkProject: ({ files }: { files: readonly string[] }): WalkOutput => {
       const occurrences: Record<string, FunctionOccurrence[]> = {};
       for (const abs of files) {
@@ -140,7 +143,10 @@ describe('buildAndResolveCatalogIncremental', () => {
     const { catalog, resolutionStats } = await buildAndResolveCatalogIncremental({
       runStage,
       adapter,
-      discovery: { projectDirAbs: root, files: [join(root, 'a.ts'), join(root, 'b.ts')] },
+      discovery: {
+        projectDirAbs: root,
+        files: [join(root, 'a.ts'), join(root, 'b.ts')],
+      },
       cachedCatalog: cached,
       changedFilesAbs: [join(root, 'a.ts')],
       resolutionMode: 'exact',
@@ -155,7 +161,12 @@ describe('buildAndResolveCatalogIncremental', () => {
 
   it('attaches module-level dependency edges via the incremental post-pass', async () => {
     const cached = catalogOf(occ('mod', 'a.ts', 'M1'));
-    const dep: DependencyEdge = { to: ['lodash'], specifier: 'lodash', line: 1, column: 0 };
+    const dep: DependencyEdge = {
+      to: ['lodash'],
+      specifier: 'lodash',
+      line: 1,
+      column: 0,
+    };
     const adapter = incrementalAdapter({
       walked: { 'a.ts': [occ('mod', 'a.ts', 'M1')] },
       edges: new Map(),

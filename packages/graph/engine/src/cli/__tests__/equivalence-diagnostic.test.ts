@@ -81,8 +81,16 @@ const SHARDS = [{ id: 'pkg:a', rootDir: '/repo/packages/a', files: ['f1.ts', 'f2
 
 describe('buildEquivalenceDiagnostic', () => {
   it('describes a decline (exact resolved, sharded declined) symmetrically', () => {
-    const exactEdge = edge({ to: ['TGT'], resolution: 'semantic', crossShard: true });
-    const shardedEdge = edge({ to: [], resolution: 'unknown', confidence: 'low' });
+    const exactEdge = edge({
+      to: ['TGT'],
+      resolution: 'semantic',
+      crossShard: true,
+    });
+    const shardedEdge = edge({
+      to: [],
+      resolution: 'unknown',
+      confidence: 'low',
+    });
     const exact = fragment(
       occ('caller', 'packages/a/src/caller.ts', 'OWNER', [exactEdge]),
       occ('target', 'packages/b/src/target.ts', 'TGT'),
@@ -93,7 +101,10 @@ describe('buildEquivalenceDiagnostic', () => {
     );
 
     const out = buildEquivalenceDiagnostic({
-      report: { productionDecline: [diff({ toA: 'TGT', toB: '' })], productionPhantom: [] },
+      report: {
+        productionDecline: [diff({ toA: 'TGT', toB: '' })],
+        productionPhantom: [],
+      },
       exact,
       sharded,
       shards: SHARDS,
@@ -112,7 +123,10 @@ describe('buildEquivalenceDiagnostic', () => {
     expect(d.shardedEdge?.to).toEqual([]);
     expect(d.shardedEdge?.resolution).toBe('unknown');
     expect(d.exactTo).toEqual([
-      { hash: 'TGT', occurrences: [expect.objectContaining({ simpleName: 'target' })] },
+      {
+        hash: 'TGT',
+        occurrences: [expect.objectContaining({ simpleName: 'target' })],
+      },
     ]);
     expect(d.shardedTo).toEqual([]);
     // Histogram keys on `<resolution>:<crossShard>` of the exact edge.
@@ -129,7 +143,10 @@ describe('buildEquivalenceDiagnostic', () => {
     );
 
     const out = buildEquivalenceDiagnostic({
-      report: { productionDecline: [], productionPhantom: [diff({ toA: '', toB: 'TGT' })] },
+      report: {
+        productionDecline: [],
+        productionPhantom: [diff({ toA: '', toB: 'TGT' })],
+      },
       exact,
       sharded,
       shards: SHARDS,
@@ -139,7 +156,10 @@ describe('buildEquivalenceDiagnostic', () => {
     const p = out.phantom[0];
     expect(p.shardedEdge?.to).toEqual(['TGT']);
     expect(p.shardedTo).toEqual([
-      { hash: 'TGT', occurrences: [expect.objectContaining({ simpleName: 'target' })] },
+      {
+        hash: 'TGT',
+        occurrences: [expect.objectContaining({ simpleName: 'target' })],
+      },
     ]);
     expect(p.exactTo).toEqual([]);
     expect(out.phantomByShardedResolution).toEqual({ 'semantic:true': 1 });
@@ -154,7 +174,10 @@ describe('buildEquivalenceDiagnostic', () => {
     const sharded = fragment(occ('unrelated', 'packages/c/src/x.ts', 'OTHER'));
 
     const out = buildEquivalenceDiagnostic({
-      report: { productionDecline: [diff({ toA: 'TGT', toB: '' })], productionPhantom: [] },
+      report: {
+        productionDecline: [diff({ toA: 'TGT', toB: '' })],
+        productionPhantom: [],
+      },
       exact,
       sharded,
       shards: SHARDS,

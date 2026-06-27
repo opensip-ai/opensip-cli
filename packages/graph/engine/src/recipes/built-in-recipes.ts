@@ -29,14 +29,45 @@ export const deadCodeGraphRecipe: GraphRecipe = defineGraphRecipe({
   name: 'dead-code',
   displayName: 'Dead Code',
   description: 'Reachability rules: orphan subtrees and test-only-reachable functions',
-  rules: { type: 'explicit', ids: ['graph:orphan-subtree', 'graph:test-only-reachable'] },
+  rules: {
+    type: 'explicit',
+    ids: ['graph:orphan-subtree', 'graph:test-only-reachable'],
+  },
   tags: ['dead-code'],
+});
+
+/** Agent-risk: high-impact graph rules for agent risk passes. */
+export const agentRiskGraphRecipe: GraphRecipe = defineGraphRecipe({
+  name: 'agent-risk',
+  displayName: 'Agent Risk',
+  description: 'High-impact graph rules: blast, cycles, large/wide functions',
+  rules: {
+    type: 'explicit',
+    ids: [
+      'graph:high-blast-untested',
+      'graph:cycle',
+      'graph:large-function',
+      'graph:wide-function',
+    ],
+  },
+  tags: ['agent', 'risk'],
+});
+
+/** Agent-final: all rules — handoff gate convention. */
+export const agentFinalGraphRecipe: GraphRecipe = defineGraphRecipe({
+  name: 'agent-final',
+  displayName: 'Agent Final',
+  description: 'All graph rules — agent handoff / gate-compare convention',
+  rules: { type: 'all' },
+  tags: ['agent', 'final'],
 });
 
 /** All built-in graph recipes, frozen, `default` first. */
 export const builtInGraphRecipes: readonly GraphRecipe[] = Object.freeze([
   defaultGraphRecipe,
   deadCodeGraphRecipe,
+  agentRiskGraphRecipe,
+  agentFinalGraphRecipe,
 ]);
 
 /** By-name lookup for the built-in recipes. */

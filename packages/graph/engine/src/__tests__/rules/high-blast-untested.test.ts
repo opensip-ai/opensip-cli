@@ -21,7 +21,10 @@ import type { BlastScore, FeatureTable, FunctionFeatures, GraphConfig } from '..
 
 const EMPTY: GraphConfig = {};
 /** Explicit thresholds so the banding logic is tested independent of the defaults. */
-const BANDS: GraphConfig = { highBlastWarnThreshold: 8, highBlastErrorThreshold: 20 };
+const BANDS: GraphConfig = {
+  highBlastWarnThreshold: 8,
+  highBlastErrorThreshold: 20,
+};
 
 function blast(score: number): BlastScore {
   return { direct: score, transitive: 0, score };
@@ -48,7 +51,11 @@ function run(row: FunctionFeatures, config: GraphConfig = BANDS) {
 
 describe('graph:high-blast-untested predicate (explicit thresholds 8/20)', () => {
   it('emits high for a high-blast untested function', () => {
-    const signals = run({ bodyLines: 5, blast: blast(25), testReachable: false });
+    const signals = run({
+      bodyLines: 5,
+      blast: blast(25),
+      testReachable: false,
+    });
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('high');
     expect(signals[0]?.metadata.testReachable).toBe(false);
@@ -56,7 +63,11 @@ describe('graph:high-blast-untested predicate (explicit thresholds 8/20)', () =>
   });
 
   it('emits medium for a moderate-blast untested function', () => {
-    const signals = run({ bodyLines: 5, blast: blast(12), testReachable: false });
+    const signals = run({
+      bodyLines: 5,
+      blast: blast(12),
+      testReachable: false,
+    });
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('medium');
   });
@@ -105,7 +116,12 @@ describe('graph:high-blast-untested predicate (explicit thresholds 8/20)', () =>
   });
 
   it('returns [] for an empty catalog', () => {
-    const empty: FeatureTable = { function: new Map(), package: new Map(), scc: [], edge: [] };
+    const empty: FeatureTable = {
+      function: new Map(),
+      package: new Map(),
+      scc: [],
+      edge: [],
+    };
     expect(
       highBlastUntestedRule.evaluate(
         makeCatalog([]),

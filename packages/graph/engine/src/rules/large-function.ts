@@ -57,7 +57,13 @@ export const largeFunctionRule = defineRule({
           message: `${occ.simpleName} is ${String(bodyLines)} lines long.`,
           code: { file: occ.filePath, line: occ.line, column: occ.column },
           suggestion: 'Split this function into smaller units.',
+          repair: {
+            repairKind: 'split-function',
+            autofixable: false,
+            confidence: 0.7,
+          },
           metadata: {
+            highImpact: base === 'high',
             bodyLines,
             qualifiedName: occ.qualifiedName,
           },

@@ -89,7 +89,11 @@ const ALL_FILES: readonly string[] = [...Object.values(PKG_FILES).flat(), ...ROO
 /** Five package shards + the synthetic `:root` shard (root shard last). */
 const SHARDS: readonly Shard[] = [
   ...Object.entries(PKG_FILES).map(
-    ([name, files]): Shard => ({ id: `pkg:${name}`, rootDir: PKG(name), files: [...files] }),
+    ([name, files]): Shard => ({
+      id: `pkg:${name}`,
+      rootDir: PKG(name),
+      files: [...files],
+    }),
   ),
   { id: ':root', rootDir: FIXTURE_ROOT, files: [...ROOT_FILES] },
 ];

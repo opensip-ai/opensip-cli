@@ -78,8 +78,16 @@ function pureCatalog(): Catalog {
     endLine: 20,
     calls: [edge('LEAF1'), edge('LEAF2')],
   });
-  const leaf1 = occ({ bodyHash: 'LEAF1', simpleName: 'leaf1', visibility: 'module-local' });
-  const leaf2 = occ({ bodyHash: 'LEAF2', simpleName: 'leaf2', visibility: 'module-local' });
+  const leaf1 = occ({
+    bodyHash: 'LEAF1',
+    simpleName: 'leaf1',
+    visibility: 'module-local',
+  });
+  const leaf2 = occ({
+    bodyHash: 'LEAF2',
+    simpleName: 'leaf2',
+    visibility: 'module-local',
+  });
   const caller = occ({
     bodyHash: 'CALLER',
     simpleName: 'driver',
@@ -118,7 +126,11 @@ describe('noSideEffectPathRule', () => {
         visibility: 'module-local',
         calls: [edge('X', { text: 'print(x)' })],
       }),
-      occ({ bodyHash: 'LEAF2', simpleName: 'leaf2', visibility: 'module-local' }),
+      occ({
+        bodyHash: 'LEAF2',
+        simpleName: 'leaf2',
+        visibility: 'module-local',
+      }),
       occ({
         bodyHash: 'CALLER',
         simpleName: 'driver',
@@ -144,8 +156,16 @@ describe('noSideEffectPathRule', () => {
         endLine: 20,
         calls: [edge('LEAF1'), edge('LEAF2')],
       }),
-      occ({ bodyHash: 'LEAF1', simpleName: 'leaf1', visibility: 'module-local' }),
-      occ({ bodyHash: 'LEAF2', simpleName: 'leaf2', visibility: 'module-local' }),
+      occ({
+        bodyHash: 'LEAF1',
+        simpleName: 'leaf1',
+        visibility: 'module-local',
+      }),
+      occ({
+        bodyHash: 'LEAF2',
+        simpleName: 'leaf2',
+        visibility: 'module-local',
+      }),
       occ({
         bodyHash: 'CALLER',
         simpleName: 'driver',
@@ -167,7 +187,11 @@ describe('orphanSubtreeRule', () => {
   it('flags a module-local function unreachable from any entry point', () => {
     // entry (exported, uncalled) → reachable; orphan (module-local, uncalled) → orphan.
     const entry = occ({ bodyHash: 'ENTRY', simpleName: 'run', calls: [] });
-    const orphan = occ({ bodyHash: 'ORPHAN', simpleName: 'dead', visibility: 'module-local' });
+    const orphan = occ({
+      bodyHash: 'ORPHAN',
+      simpleName: 'dead',
+      visibility: 'module-local',
+    });
     const catalog = catalogOf([entry, orphan]);
     const signals = orphanSubtreeRule.evaluate(
       catalog,
@@ -197,7 +221,11 @@ describe('testOnlyReachableRule', () => {
   it('flags a module-local function whose only caller is a test file', () => {
     // A production entry that reaches `prodReached` keeps it off the list;
     // `testFixture` is module-local and reached only from a test-file caller.
-    const entry = occ({ bodyHash: 'ENTRY', simpleName: 'run', calls: [edge('PRODREACHED')] });
+    const entry = occ({
+      bodyHash: 'ENTRY',
+      simpleName: 'run',
+      calls: [edge('PRODREACHED')],
+    });
     const prodReached = occ({
       bodyHash: 'PRODREACHED',
       simpleName: 'prodReached',
@@ -236,7 +264,11 @@ describe('testOnlyReachableRule', () => {
       visibility: 'module-local',
       calls: [edge('API')],
     });
-    const exportedApi = occ({ bodyHash: 'API', simpleName: 'publicApi', visibility: 'exported' });
+    const exportedApi = occ({
+      bodyHash: 'API',
+      simpleName: 'publicApi',
+      visibility: 'exported',
+    });
     const catalog = catalogOf([exportedApi, testCaller]);
     const signals = testOnlyReachableRule.evaluate(
       catalog,

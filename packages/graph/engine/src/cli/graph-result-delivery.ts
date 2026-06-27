@@ -1,4 +1,8 @@
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import {
+  buildAgentFilteredResult,
+  EXIT_CODES,
+  normalizeAgentRunFilters,
+} from '@opensip-cli/contracts';
 import { createToolLogger, currentScope } from '@opensip-cli/core';
 
 import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
@@ -15,6 +19,25 @@ import type { RunPresentation, SignalEnvelope, VerboseDetail } from '@opensip-cl
 import type { ToolCliContext } from '@opensip-cli/core';
 
 const log = createToolLogger('graph:cli');
+
+/** Emit graph JSON — unfiltered envelope or agent-filtered result (ADR-0085). */
+function emitGraphJsonOutput(
+  cli: ToolCliContext,
+  envelope: SignalEnvelope,
+  opts: Pick<GraphCommandOptions, 'filter' | 'top' | 'raw'>,
+): void {
+  const tokens = normalizeAgentRunFilters(opts.filter, opts.top);
+  if (tokens.length === 0 && opts.raw !== true) {
+    cli.emitEnvelope(envelope);
+    return;
+  }
+  const result = buildAgentFilteredResult(envelope, tokens);
+  if (opts.raw === true) {
+    cli.emitRaw(result);
+  } else {
+    cli.emitJson(result);
+  }
+}
 
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
@@ -229,14 +252,17 @@ async function renderGraphResult(
       evt: 'graph.render.json.start',
       module: MODULE_GRAPH_RENDER,
     });
-    cli.emitEnvelope(envelope);
+    emitGraphJsonOutput(cli, envelope, opts);
     log.info({
       evt: 'graph.render.json.complete',
       module: MODULE_GRAPH_RENDER,
     });
     return envelope;
   }
-  log.info({ evt: 'graph.render.presentation.start', module: MODULE_GRAPH_RENDER });
+  log.info({
+    evt: 'graph.render.presentation.start',
+    module: MODULE_GRAPH_RENDER,
+  });
   const verbose = opts.verbose === true;
   // ADR-0021: graph's verbose body is carried as VerboseDetail{kind:'lines'} and
   // rendered through the shared resultToView seam — the same path the live runner

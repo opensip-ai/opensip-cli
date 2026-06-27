@@ -58,7 +58,11 @@ function aggregateSignal(
     severity: 'low',
     category: 'quality',
     message: `This body is duplicated across ${String(agg.packages.length)} packages (${agg.packages.join(', ')}) in ${String(agg.occurrenceCount)} occurrences — hoist it into a shared package.`,
-    code: { file: agg.anchor.filePath, line: agg.anchor.line, column: agg.anchor.column },
+    code: {
+      file: agg.anchor.filePath,
+      line: agg.anchor.line,
+      column: agg.anchor.column,
+    },
     suggestion: 'Hoist the shared body into a single shared package and have every copy import it.',
     metadata: {
       packages: agg.packages,

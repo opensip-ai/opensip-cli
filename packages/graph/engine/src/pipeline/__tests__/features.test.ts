@@ -14,7 +14,11 @@ import { buildIndexes } from '../indexes.js';
 import type { Catalog, FunctionOccurrence, GraphConfig, Indexes } from '../../types.js';
 
 function occ(
-  over: Partial<FunctionOccurrence> & { bodyHash: string; simpleName: string; package: string },
+  over: Partial<FunctionOccurrence> & {
+    bodyHash: string;
+    simpleName: string;
+    package: string;
+  },
 ): FunctionOccurrence {
   return {
     qualifiedName: `${over.package}.${over.simpleName}`,
@@ -36,7 +40,14 @@ function occ(
 }
 
 function call(to: string): NonNullable<FunctionOccurrence['calls']>[number] {
-  return { to: [to], line: 1, column: 0, resolution: 'static', confidence: 'high', text: 'f()' };
+  return {
+    to: [to],
+    line: 1,
+    column: 0,
+    resolution: 'static',
+    confidence: 'high',
+    text: 'f()',
+  };
 }
 
 function catalogOf(functions: Record<string, FunctionOccurrence[]>): Catalog {
@@ -72,19 +83,74 @@ function makeFixture(): { catalog: Catalog; indexes: Indexes } {
     visibility: 'exported',
     calls: [call('hub')],
   });
-  const hub = occ({ bodyHash: 'hub', simpleName: 'hub', package: 'core', endLine: 20 }); // bodyLines 20
-  const d1 = occ({ bodyHash: 'd1', simpleName: 'd1', package: 'core', calls: [call('hub')] });
-  const d2 = occ({ bodyHash: 'd2', simpleName: 'd2', package: 'core', calls: [call('hub')] });
-  const d3 = occ({ bodyHash: 'd3', simpleName: 'd3', package: 'core', calls: [call('hub')] });
-  const t1 = occ({ bodyHash: 't1', simpleName: 't1', package: 'core', calls: [call('d1')] });
-  const t2 = occ({ bodyHash: 't2', simpleName: 't2', package: 'core', calls: [call('d2')] });
+  const hub = occ({
+    bodyHash: 'hub',
+    simpleName: 'hub',
+    package: 'core',
+    endLine: 20,
+  }); // bodyLines 20
+  const d1 = occ({
+    bodyHash: 'd1',
+    simpleName: 'd1',
+    package: 'core',
+    calls: [call('hub')],
+  });
+  const d2 = occ({
+    bodyHash: 'd2',
+    simpleName: 'd2',
+    package: 'core',
+    calls: [call('hub')],
+  });
+  const d3 = occ({
+    bodyHash: 'd3',
+    simpleName: 'd3',
+    package: 'core',
+    calls: [call('hub')],
+  });
+  const t1 = occ({
+    bodyHash: 't1',
+    simpleName: 't1',
+    package: 'core',
+    calls: [call('d1')],
+  });
+  const t2 = occ({
+    bodyHash: 't2',
+    simpleName: 't2',
+    package: 'core',
+    calls: [call('d2')],
+  });
 
-  const c2a = occ({ bodyHash: 'c2a', simpleName: 'c2a', package: 'core', calls: [call('c2b')] });
-  const c2b = occ({ bodyHash: 'c2b', simpleName: 'c2b', package: 'core', calls: [call('c2a')] });
+  const c2a = occ({
+    bodyHash: 'c2a',
+    simpleName: 'c2a',
+    package: 'core',
+    calls: [call('c2b')],
+  });
+  const c2b = occ({
+    bodyHash: 'c2b',
+    simpleName: 'c2b',
+    package: 'core',
+    calls: [call('c2a')],
+  });
 
-  const c3a = occ({ bodyHash: 'c3a', simpleName: 'c3a', package: 'core', calls: [call('c3b')] });
-  const c3b = occ({ bodyHash: 'c3b', simpleName: 'c3b', package: 'core', calls: [call('c3c')] });
-  const c3c = occ({ bodyHash: 'c3c', simpleName: 'c3c', package: 'cli', calls: [call('c3a')] });
+  const c3a = occ({
+    bodyHash: 'c3a',
+    simpleName: 'c3a',
+    package: 'core',
+    calls: [call('c3b')],
+  });
+  const c3b = occ({
+    bodyHash: 'c3b',
+    simpleName: 'c3b',
+    package: 'core',
+    calls: [call('c3c')],
+  });
+  const c3c = occ({
+    bodyHash: 'c3c',
+    simpleName: 'c3c',
+    package: 'cli',
+    calls: [call('c3a')],
+  });
 
   const orphan = occ({
     bodyHash: 'orphan',

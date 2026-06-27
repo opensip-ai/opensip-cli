@@ -40,13 +40,33 @@ describe('discoverPolyglotUnits', () => {
 
   it('aggregates units across multiple adapters', async () => {
     const tsUnits: WorkspaceUnit[] = [
-      { id: 'ts-a', rootDir: '/root/ts/a', configPath: '/root/ts/a/tsconfig.json' },
-      { id: 'ts-b', rootDir: '/root/ts/b', configPath: '/root/ts/b/tsconfig.json' },
-      { id: 'ts-c', rootDir: '/root/ts/c', configPath: '/root/ts/c/tsconfig.json' },
+      {
+        id: 'ts-a',
+        rootDir: '/root/ts/a',
+        configPath: '/root/ts/a/tsconfig.json',
+      },
+      {
+        id: 'ts-b',
+        rootDir: '/root/ts/b',
+        configPath: '/root/ts/b/tsconfig.json',
+      },
+      {
+        id: 'ts-c',
+        rootDir: '/root/ts/c',
+        configPath: '/root/ts/c/tsconfig.json',
+      },
     ];
     const rustUnits: WorkspaceUnit[] = [
-      { id: 'crate-x', rootDir: '/root/crates/x', configPath: '/root/crates/x/Cargo.toml' },
-      { id: 'crate-y', rootDir: '/root/crates/y', configPath: '/root/crates/y/Cargo.toml' },
+      {
+        id: 'crate-x',
+        rootDir: '/root/crates/x',
+        configPath: '/root/crates/x/Cargo.toml',
+      },
+      {
+        id: 'crate-y',
+        rootDir: '/root/crates/y',
+        configPath: '/root/crates/y/Cargo.toml',
+      },
     ];
     const ts = mockAdapter('typescript', tsUnits);
     const rust = mockAdapter('rust', rustUnits);
