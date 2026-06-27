@@ -16,7 +16,10 @@ import { createSubprocessProgressRun, runOffThreadOrInProcess } from '../subproc
 
 const FIXTURE = fileURLToPath(new URL('fixtures/progress-worker.mjs', import.meta.url));
 
-function descriptorFor(mode: string): { command: string; argv: readonly string[] } {
+function descriptorFor(mode: string): {
+  command: string;
+  argv: readonly string[];
+} {
   return { command: FIXTURE, argv: [mode] };
 }
 

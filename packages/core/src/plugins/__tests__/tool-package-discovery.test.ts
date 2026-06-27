@@ -50,7 +50,9 @@ describe('discoverToolPackages', () => {
   });
 
   it('skips packages that are not marked as tools', () => {
-    writePkg(join(testDir, 'node_modules', 'random-pkg'), { name: 'random-pkg' });
+    writePkg(join(testDir, 'node_modules', 'random-pkg'), {
+      name: 'random-pkg',
+    });
     expect(discoverToolPackages({ projectDir: testDir })).toEqual([]);
   });
 
@@ -135,7 +137,10 @@ describe('discoverToolPackagesFromAnchors', () => {
     });
 
     const out = discoverToolPackagesFromAnchors([
-      { dir: join(testDir, 'proj', '.runtime', 'plugins', 'tool'), mode: 'scanDir' },
+      {
+        dir: join(testDir, 'proj', '.runtime', 'plugins', 'tool'),
+        mode: 'scanDir',
+      },
       { dir: join(testDir, 'cwd'), mode: 'walkUp' },
     ]);
     expect(out.map((t) => t.name).sort()).toEqual(['audit', 'other']);
@@ -210,7 +215,9 @@ describe('readToolPackageMetadata', () => {
       join(pkgDir, 'package.json'),
       JSON.stringify({
         name: 'pkg',
-        exports: { '.': { import: './dist/import.js', default: './dist/default.js' } },
+        exports: {
+          '.': { import: './dist/import.js', default: './dist/default.js' },
+        },
       }),
     );
     expect(readToolPackageMetadata(pkgDir)?.mainEntry).toBe(join(pkgDir, './dist/import.js'));
@@ -249,7 +256,12 @@ describe('readToolPackageMetadata', () => {
   it('defaults an authored sidecar entry to ./index.js when `main` is absent, naming from id', () => {
     writeFileSync(
       join(pkgDir, 'opensip-tool.manifest.json'),
-      JSON.stringify({ kind: 'tool', id: 'bench', version: '1.0.0', commands: [] }),
+      JSON.stringify({
+        kind: 'tool',
+        id: 'bench',
+        version: '1.0.0',
+        commands: [],
+      }),
     );
     expect(readToolPackageMetadata(pkgDir)).toEqual({
       name: 'bench',
@@ -264,7 +276,12 @@ describe('readToolPackageMetadata', () => {
     );
     writeFileSync(
       join(pkgDir, 'opensip-tool.manifest.json'),
-      JSON.stringify({ kind: 'tool', id: 'audit', main: './dist/sidecar.js', commands: [] }),
+      JSON.stringify({
+        kind: 'tool',
+        id: 'audit',
+        main: './dist/sidecar.js',
+        commands: [],
+      }),
     );
     expect(readToolPackageMetadata(pkgDir)?.mainEntry).toBe(join(pkgDir, './dist/pkg.js'));
   });

@@ -35,7 +35,11 @@ function plantForeignCore(dir: string): void {
   mkdirSync(coreDir, { recursive: true });
   writeFileSync(
     join(coreDir, 'package.json'),
-    JSON.stringify({ name: '@opensip-cli/core', version: '0.0.0-foreign', main: 'index.js' }),
+    JSON.stringify({
+      name: '@opensip-cli/core',
+      version: '0.0.0-foreign',
+      main: 'index.js',
+    }),
   );
   writeFileSync(join(coreDir, 'index.js'), 'module.exports = {};');
 }

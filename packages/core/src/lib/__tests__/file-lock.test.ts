@@ -149,7 +149,10 @@ describe('withFileLock', () => {
     expect(() =>
       withFileLock(
         lockPath,
-        { policy: { waitMs: 50, staleMs: 600_000, heartbeatMs: 20 }, resource: 'datastore' },
+        {
+          policy: { waitMs: 50, staleMs: 600_000, heartbeatMs: 20 },
+          resource: 'datastore',
+        },
         () => 'x',
       ),
     ).toThrow(SystemError);

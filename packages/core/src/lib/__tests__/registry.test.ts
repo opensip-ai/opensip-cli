@@ -144,7 +144,9 @@ describe('Registry<T> — duplicatePolicy: throw', () => {
     reg.register(make('id-1', 'foo'));
     // Without internal, the second item (same id) would throw.
     expect(() =>
-      reg.registerAll([make('id-1', 'foo'), make('id-2', 'bar')], { internal: true }),
+      reg.registerAll([make('id-1', 'foo'), make('id-2', 'bar')], {
+        internal: true,
+      }),
     ).not.toThrow();
     expect(reg.size).toBe(2);
   });

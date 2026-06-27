@@ -47,12 +47,16 @@ export function validateToolIdentity(identity: ToolIdentity): {
   readonly layoutKey: string;
 } {
   if (identity === undefined || identity === null || typeof identity !== 'object') {
-    throw new ValidationError('Tool identity is required.', { code: 'TOOL.IDENTITY.REQUIRED' });
+    throw new ValidationError('Tool identity is required.', {
+      code: 'TOOL.IDENTITY.REQUIRED',
+    });
   }
 
   const name = identity.name;
   if (typeof name !== 'string') {
-    throw new ValidationError('Tool identity is required.', { code: 'TOOL.IDENTITY.REQUIRED' });
+    throw new ValidationError('Tool identity is required.', {
+      code: 'TOOL.IDENTITY.REQUIRED',
+    });
   }
   validateIdentityName(name, 'name');
 

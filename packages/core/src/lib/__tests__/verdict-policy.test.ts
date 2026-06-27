@@ -25,7 +25,10 @@ import type { ResolvedToolConfig } from '../scope-types.js';
  *  `@opensip-cli/test-support`, which core cannot dev-depend on — that
  *  package depends on core, so the edge would make the package graph cyclic). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 
 describe('policyPasses', () => {
   // [errors, warnings, failOnErrors, failOnWarnings, expectedPasses]

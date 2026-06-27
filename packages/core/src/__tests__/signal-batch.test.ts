@@ -5,7 +5,12 @@ import { buildSignalBatch, createSignal, MAX_SIGNALS_PER_BATCH } from '../index.
 import type { Signal, SignalSeverity } from '../index.js';
 
 function sig(severity: SignalSeverity, i = 0): Signal {
-  return createSignal({ source: 'test', severity, ruleId: `rule-${i}`, message: `m${i}` });
+  return createSignal({
+    source: 'test',
+    severity,
+    ruleId: `rule-${i}`,
+    message: `m${i}`,
+  });
 }
 
 describe('buildSignalBatch', () => {
@@ -32,7 +37,12 @@ describe('buildSignalBatch', () => {
       ...Array.from({ length: 3 }, (_, i) => sig('low', i)),
       ...Array.from({ length: 2 }, (_, i) => sig('critical', i)),
     ];
-    const batch = buildSignalBatch({ tool: 'fit', repo: {}, signals, maxSignals: 2 });
+    const batch = buildSignalBatch({
+      tool: 'fit',
+      repo: {},
+      signals,
+      maxSignals: 2,
+    });
     expect(batch.signals).toHaveLength(2);
     expect(batch.truncated).toEqual({ dropped: 3 });
     // Highest severity kept: both criticals survive, lows dropped.

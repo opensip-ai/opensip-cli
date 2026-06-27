@@ -19,8 +19,16 @@ function makeTool(
 ): Tool {
   return {
     identity: { name: humanName },
-    metadata: { id: stableId, name: humanName, version: '0.0.0', description: 'test tool' },
-    commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
+    metadata: {
+      id: stableId,
+      name: humanName,
+      version: '0.0.0',
+      description: 'test tool',
+    },
+    commands: commandNames.map((name) => ({
+      name,
+      description: `${name} desc`,
+    })),
   };
 }
 
@@ -37,7 +45,10 @@ function makeManifest(
     name: '@scope/test',
     version: '0.0.0',
     apiVersion: 1,
-    commands: commandNames.map((name) => ({ name, description: `${name} desc` })),
+    commands: commandNames.map((name) => ({
+      name,
+      description: `${name} desc`,
+    })),
   };
 }
 
@@ -105,7 +116,10 @@ describe('assertManifestMatchesTool', () => {
   });
 
   it('throws when manifest identity fields drift from runtime identity', () => {
-    const tool = { ...makeTool('fitness', ['fitness']), identity: { name: 'fitness' } };
+    const tool = {
+      ...makeTool('fitness', ['fitness']),
+      identity: { name: 'fitness' },
+    };
     expect(() =>
       assertManifestMatchesTool(
         { ...makeManifest('fitness', ['fitness']), identity: { name: 'fit' } },
@@ -123,7 +137,10 @@ describe('assertManifestMatchesTool', () => {
     ).toThrow(/must equal identity\.name/);
     expect(() =>
       assertManifestMatchesTool(
-        { ...makeManifest('fitness', ['fitness']), identity: { name: 'fitness', aliases: ['f'] } },
+        {
+          ...makeManifest('fitness', ['fitness']),
+          identity: { name: 'fitness', aliases: ['f'] },
+        },
         { ...tool, identity: { name: 'fitness', aliases: ['fit'] } },
       ),
     ).toThrow(/identity\.aliases/);
@@ -139,7 +156,10 @@ describe('assertManifestMatchesTool', () => {
   });
 
   it('throws when manifest or runtime layout/config derived fields drift', () => {
-    const tool = { ...makeTool('fitness', ['fitness']), identity: { name: 'fitness' } };
+    const tool = {
+      ...makeTool('fitness', ['fitness']),
+      identity: { name: 'fitness' },
+    };
 
     expect(() =>
       assertManifestMatchesTool(

@@ -98,6 +98,10 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
       attempts.map((a) => `  - ${a}`).join('\n') +
       `\n\nRun 'opensip init' to scaffold one, or pass --config <path> ` +
       `to point at an existing config.`,
-    { operation: 'resolve', loader: 'project-config', code: 'ERRORS.CONFIG.NOT_FOUND' },
+    {
+      operation: 'resolve',
+      loader: 'project-config',
+      code: 'ERRORS.CONFIG.NOT_FOUND',
+    },
   );
 }

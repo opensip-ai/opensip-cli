@@ -74,7 +74,11 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const registry = new CapabilityRegistry();
     registry.registerDomain(itemsDomain(), registrar);
 
-    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    const errors = await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
 
     expect(errors).toEqual([]);
     expect(registrar).toHaveBeenCalledTimes(2);
@@ -89,12 +93,20 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const registry = new CapabilityRegistry();
     registry.registerDomain(itemsDomain(), registrar);
 
-    await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
     expect(registrar).toHaveBeenCalledTimes(1);
 
     // A new package appears, but the memoized domain is not re-walked.
     writeItemsPackage('@acme/items-b', "[{ id: 'b' }]");
-    await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
     expect(registrar).toHaveBeenCalledTimes(1);
   });
 
@@ -104,14 +116,22 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const first = vi.fn();
     const reg1 = new CapabilityRegistry();
     reg1.registerDomain(itemsDomain(), first);
-    await loadCapabilityDomain({ registry: reg1, domainId: 'items', projectDir: testDir });
+    await loadCapabilityDomain({
+      registry: reg1,
+      domainId: 'items',
+      projectDir: testDir,
+    });
     expect(first).toHaveBeenCalledTimes(1);
 
     // A second scope's registry has its own load-state and re-discovers.
     const second = vi.fn();
     const reg2 = new CapabilityRegistry();
     reg2.registerDomain(itemsDomain(), second);
-    await loadCapabilityDomain({ registry: reg2, domainId: 'items', projectDir: testDir });
+    await loadCapabilityDomain({
+      registry: reg2,
+      domainId: 'items',
+      projectDir: testDir,
+    });
     expect(second).toHaveBeenCalledTimes(1);
   });
 
@@ -125,7 +145,11 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registrar,
     );
 
-    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    const errors = await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
 
     expect(registrar).toHaveBeenCalledTimes(1);
     expect(registrar).toHaveBeenCalledWith({ id: 'ok' });
@@ -140,7 +164,11 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const registry = new CapabilityRegistry();
     registry.registerDomain(itemsDomain({ discovery: undefined }), registrar);
 
-    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    const errors = await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
 
     expect(errors).toEqual([]);
     expect(registrar).not.toHaveBeenCalled();
@@ -153,7 +181,11 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const registry = new CapabilityRegistry();
     registry.registerDomain(itemsDomain(), registrar);
 
-    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    const errors = await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
 
     expect(registrar).not.toHaveBeenCalled();
     expect(errors).toHaveLength(1);
@@ -178,7 +210,11 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     const registry = new CapabilityRegistry();
     registry.registerDomain(itemsDomain(), registrar);
 
-    const errors = await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+    const errors = await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+    });
 
     expect(registrar).not.toHaveBeenCalled();
     expect(errors).toHaveLength(1);
@@ -192,7 +228,11 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
 
     const scope = new RunScope();
     await runWithScope(scope, async () => {
-      await loadCapabilityDomain({ registry, domainId: 'items', projectDir: testDir });
+      await loadCapabilityDomain({
+        registry,
+        domainId: 'items',
+        projectDir: testDir,
+      });
     });
 
     const loaded = scope.diagnostics

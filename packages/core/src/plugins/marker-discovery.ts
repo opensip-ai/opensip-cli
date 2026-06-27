@@ -104,7 +104,11 @@ export function discoverPackagesInNodeModules(
   if (existsSync(nodeModulesDir)) {
     collectByDeclaredKind(nodeModulesDir, kind, new Set<string>(), out);
   }
-  return out.map((p) => ({ name: p.name, packageDir: p.packageDir, kind: p.kind as MarkerKind }));
+  return out.map((p) => ({
+    name: p.name,
+    packageDir: p.packageDir,
+    kind: p.kind as MarkerKind,
+  }));
 }
 
 /**

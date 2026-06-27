@@ -16,7 +16,12 @@ import { describe, expect, it } from 'vitest';
 import { buildSignalEnvelope, type UnitResult } from './signal-envelope.js';
 
 function sig(severity: SignalSeverity): Signal {
-  return createSignal({ source: 'u', severity, ruleId: `r-${severity}`, message: 'x' });
+  return createSignal({
+    source: 'u',
+    severity,
+    ruleId: `r-${severity}`,
+    message: 'x',
+  });
 }
 
 const FALLBACK: VerdictPolicy = { failOnErrors: 1, failOnWarnings: 0 };
@@ -53,8 +58,10 @@ describe('buildSignalEnvelope · verdict.passed (ADR-0035)', () => {
 
   it('fails a warning-only run when failOnWarnings is active', () => {
     expect(
-      verdictOf({ signals: [sig('medium')], policy: { failOnErrors: 1, failOnWarnings: 1 } })
-        .passed,
+      verdictOf({
+        signals: [sig('medium')],
+        policy: { failOnErrors: 1, failOnWarnings: 1 },
+      }).passed,
     ).toBe(false);
   });
 
@@ -72,7 +79,12 @@ describe('buildSignalEnvelope · verdict.passed (ADR-0035)', () => {
   });
 
   it('FAILS when a unit carries an error, even with zero signals', () => {
-    const errored: UnitResult = { slug: 'boom', passed: false, durationMs: 1, error: 'exploded' };
+    const errored: UnitResult = {
+      slug: 'boom',
+      passed: false,
+      durationMs: 1,
+      error: 'exploded',
+    };
     expect(verdictOf({ units: [errored], signals: [] }).passed).toBe(false);
   });
 

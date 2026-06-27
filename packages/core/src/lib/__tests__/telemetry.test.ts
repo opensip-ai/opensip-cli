@@ -59,8 +59,14 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
       startActiveSpan: ((_name: string, fn: (s: unknown) => unknown) => fn(span)) as never,
     } as never);
     try {
-      withSpan('test-scope', 'unit', () => 'ok', { 'k.count': 3, 'k.flag': true });
-      expect(setAttributes).toHaveBeenCalledWith({ 'k.count': 3, 'k.flag': true });
+      withSpan('test-scope', 'unit', () => 'ok', {
+        'k.count': 3,
+        'k.flag': true,
+      });
+      expect(setAttributes).toHaveBeenCalledWith({
+        'k.count': 3,
+        'k.flag': true,
+      });
       expect(span.end).toHaveBeenCalledTimes(1);
     } finally {
       spy.mockRestore();

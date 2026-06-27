@@ -165,7 +165,10 @@ describe('loadToolManifest', () => {
     });
 
     const manifest = loadToolManifest('installed', testDir);
-    expect(manifest?.pluginLayout).toEqual({ domain: 'ext', userSubdirs: ['checks', 'recipes'] });
+    expect(manifest?.pluginLayout).toEqual({
+      domain: 'ext',
+      userSubdirs: ['checks', 'recipes'],
+    });
     expect(manifest?.commands[0]).toEqual({
       name: 'ext',
       description: 'run ext',
@@ -248,7 +251,12 @@ describe('loadToolManifest', () => {
   it('returns undefined when name/version cannot be derived', () => {
     writePackageManifest(testDir, {
       // no name/version
-      opensipTools: { kind: 'tool', id: 'x', identity: { name: 'x' }, commands: [] },
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        commands: [],
+      },
     });
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
@@ -257,7 +265,12 @@ describe('loadToolManifest', () => {
     writePackageManifest(testDir, {
       name: 'x',
       version: '1.0.0',
-      opensipTools: { kind: 'tool', id: 'x', identity: { name: 'x' }, commands: 'nope' },
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        commands: 'nope',
+      },
     });
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
@@ -390,7 +403,11 @@ describe('loadToolManifest', () => {
         identity: { name: 'x' },
         apiVersion: 1,
         requires: [
-          { resource: 'filesystem', scope: 'repo', reason: 'read project files' },
+          {
+            resource: 'filesystem',
+            scope: 'repo',
+            reason: 'read project files',
+          },
           { resource: 'network' },
         ],
         commands: [{ name: 'x', description: 'x' }],
@@ -511,7 +528,11 @@ describe('capability discovery descriptor (§5.3)', () => {
 
   it('preserves a name-pattern-mode descriptor', () => {
     withCapability({
-      discovery: { mode: 'name-pattern', prefix: 'items-', defaultScopes: ['@opensip-cli'] },
+      discovery: {
+        mode: 'name-pattern',
+        prefix: 'items-',
+        defaultScopes: ['@opensip-cli'],
+      },
       exportName: 'items',
       exportShape: 'array',
       configKeys: { packages: 'p', autoDiscover: 'a', scopes: 's' },

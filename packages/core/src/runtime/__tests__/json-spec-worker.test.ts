@@ -68,7 +68,9 @@ describe('runJsonSpecWorker', () => {
     dir = mkdtempSync(join(tmpdir(), 'json-spec-worker-'));
     const specPath = writeSpec(dir, { value: 1 });
     const messages = captureWorkerMessages();
-    const error = new Error('worker timed out') as Error & { failureClass: string };
+    const error = new Error('worker timed out') as Error & {
+      failureClass: string;
+    };
     error.failureClass = 'timeout';
 
     await runJsonSpecWorker<{ value: number }, never, never>({

@@ -18,7 +18,10 @@ import {
 /** Core-internal stand-ins for the retired `test-utils/with-scope` sugar
  *  (ADR-0040 — see verdict-policy.test.ts for the cycle rationale). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 const withScopeSync = runWithScopeSync;
 
 interface MyUnitConfig extends Record<string, unknown> {

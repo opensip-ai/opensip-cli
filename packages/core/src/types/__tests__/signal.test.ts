@@ -128,10 +128,24 @@ describe('isErrorSeverity', () => {
 describe('isErrorSignal', () => {
   it('delegates to the signal severity', () => {
     expect(
-      isErrorSignal(createSignal({ source: 's', severity: 'high', ruleId: 'r', message: 'm' })),
+      isErrorSignal(
+        createSignal({
+          source: 's',
+          severity: 'high',
+          ruleId: 'r',
+          message: 'm',
+        }),
+      ),
     ).toBe(true);
     expect(
-      isErrorSignal(createSignal({ source: 's', severity: 'low', ruleId: 'r', message: 'm' })),
+      isErrorSignal(
+        createSignal({
+          source: 's',
+          severity: 'low',
+          ruleId: 'r',
+          message: 'm',
+        }),
+      ),
     ).toBe(false);
   });
 });

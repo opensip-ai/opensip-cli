@@ -113,7 +113,9 @@ describe('defineTool', () => {
     expect(() =>
       defineTool({
         ...base,
-        extensionPoints: { config: { schema: {}, namespace: 'manual' } as never },
+        extensionPoints: {
+          config: { schema: {}, namespace: 'manual' } as never,
+        },
       }),
     ).toThrow(/config\.namespace/);
     expect(() =>

@@ -166,7 +166,11 @@ describe('secret hygiene (M1) — the API key is NEVER in the correlation env', 
   it('ignores an OPENSIP_API_KEY present in the env on the READ side too', () => {
     // The reader's spec table has no OPENSIP_API_KEY entry, so an ambient API key
     // never surfaces as a RunCorrelation field.
-    loadEnv({ OPENSIP_RUN_ID: 'run_k', OPENSIP_TOOL: 'graph', OPENSIP_PARENT_COMMAND: 'graph' });
+    loadEnv({
+      OPENSIP_RUN_ID: 'run_k',
+      OPENSIP_TOOL: 'graph',
+      OPENSIP_PARENT_COMMAND: 'graph',
+    });
     process.env.OPENSIP_API_KEY = 'secret-xyz';
     const c = correlationFromEnv();
     expect(JSON.stringify(c)).not.toContain('secret-xyz');

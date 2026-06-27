@@ -213,7 +213,9 @@ describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding 
   it('PluginIncompatibleError → PLUGIN_INCOMPATIBLE (release 2.8.0 fail-closed)', () => {
     expect(
       mapToolErrorToExitCode(
-        new PluginIncompatibleError('tool x is incompatible', { diagnostic: 'epoch mismatch' }),
+        new PluginIncompatibleError('tool x is incompatible', {
+          diagnostic: 'epoch mismatch',
+        }),
       ),
     ).toBe(EXIT_CODES.PLUGIN_INCOMPATIBLE);
   });

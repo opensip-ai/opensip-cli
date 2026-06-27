@@ -16,7 +16,10 @@ import {
 
 // A fake language scanner: chars 0-2 are a "string", chars 4-6 a "comment".
 function fakeScan(_src: string): ScanResult {
-  return { stringRegions: [{ start: 0, end: 3 }], commentRegions: [{ start: 4, end: 7 }] };
+  return {
+    stringRegions: [{ start: 0, end: 3 }],
+    commentRegions: [{ start: 4, end: 7 }],
+  };
 }
 
 describe('isIdentChar', () => {

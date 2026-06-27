@@ -9,15 +9,21 @@ import { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from '../manifes
 
 describe('checkCompatibility', () => {
   it('admits a tool declaring the current epoch', () => {
-    expect(checkCompatibility(PLUGIN_API_VERSION)).toEqual({ kind: 'compatible' });
+    expect(checkCompatibility(PLUGIN_API_VERSION)).toEqual({
+      kind: 'compatible',
+    });
   });
 
   it('admits a tool declaring the minimum supported epoch', () => {
-    expect(checkCompatibility(MIN_SUPPORTED_PLUGIN_API_VERSION)).toEqual({ kind: 'compatible' });
+    expect(checkCompatibility(MIN_SUPPORTED_PLUGIN_API_VERSION)).toEqual({
+      kind: 'compatible',
+    });
   });
 
   it('admits a middle epoch when the supported range spans multiple epochs', () => {
-    expect(checkCompatibility(2, { minSupported: 1, current: 3 })).toEqual({ kind: 'compatible' });
+    expect(checkCompatibility(2, { minSupported: 1, current: 3 })).toEqual({
+      kind: 'compatible',
+    });
   });
 
   it('rejects a tool with no declared apiVersion (3.0.0 — grace window ended)', () => {
@@ -62,7 +68,9 @@ describe('checkCompatibility', () => {
   });
 
   it('honours an explicit range override', () => {
-    expect(checkCompatibility(2, { minSupported: 2, current: 2 })).toEqual({ kind: 'compatible' });
+    expect(checkCompatibility(2, { minSupported: 2, current: 2 })).toEqual({
+      kind: 'compatible',
+    });
     expect(checkCompatibility(1, { minSupported: 2, current: 2 }).kind).toBe('incompatible');
   });
 });

@@ -354,7 +354,12 @@ export async function filterSignalsBySuppressions(
     if (match === null) {
       kept.push(signal);
     } else {
-      suppressed.push({ signal, ruleId: id, file: match.file, line: match.line });
+      suppressed.push({
+        signal,
+        ruleId: id,
+        file: match.file,
+        line: match.line,
+      });
     }
   }
 

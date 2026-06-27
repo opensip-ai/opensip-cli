@@ -30,7 +30,9 @@ export function readChildRssBytes(pid: number): number | undefined {
   }
 
   try {
-    const out = execFileSync('ps', ['-o', 'rss=', '-p', String(pid)], { encoding: 'utf8' }).trim();
+    const out = execFileSync('ps', ['-o', 'rss=', '-p', String(pid)], {
+      encoding: 'utf8',
+    }).trim();
     const kb = Number.parseInt(out, 10);
     if (!Number.isFinite(kb) || kb <= 0) return undefined;
     return kb * 1024;

@@ -20,12 +20,17 @@ describe('contracts manifest re-export', () => {
     expect(PLUGIN_API_VERSION).toBe(1);
     // 3.0.0: a missing apiVersion is incompatible (the grace window ended).
     expect(checkCompatibility(undefined).kind).toBe('incompatible');
-    expect(checkCompatibility(PLUGIN_API_VERSION)).toEqual({ kind: 'compatible' });
+    expect(checkCompatibility(PLUGIN_API_VERSION)).toEqual({
+      kind: 'compatible',
+    });
     expect(checkCompatibility(PLUGIN_API_VERSION + 1).kind).toBe('incompatible');
   });
 
   it('re-exports the manifest/provenance types (compile-time shape check)', () => {
-    const command: ToolCommandManifest = { name: 'fit', description: 'Run fitness checks' };
+    const command: ToolCommandManifest = {
+      name: 'fit',
+      description: 'Run fitness checks',
+    };
     const manifest: ToolPluginManifest = {
       kind: 'tool',
       id: 'fitness',

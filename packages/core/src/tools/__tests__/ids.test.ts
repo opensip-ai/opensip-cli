@@ -167,7 +167,13 @@ describe('tool-id registry', () => {
   describe('buildToolIdentityIndex conflicts', () => {
     it('allows one tool to use the same alias and layoutKey', () => {
       const reg = new ToolRegistry();
-      reg.register(indexedTool('fitness', { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' }));
+      reg.register(
+        indexedTool('fitness', {
+          name: 'fitness',
+          aliases: ['fit'],
+          layoutKey: 'fit',
+        }),
+      );
       const index = buildToolIdentityIndex(reg);
       expect(index.resolveInput('fit')?.canonicalName).toBe('fitness');
       expect(index.canonicalForStoredTool('fit')).toBe('fitness');

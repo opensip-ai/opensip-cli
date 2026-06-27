@@ -26,7 +26,10 @@ import type {
 export type DiscoveryParse =
   | { readonly status: 'absent' }
   | { readonly status: 'invalid' }
-  | { readonly status: 'ok'; readonly descriptor: CapabilityDiscoveryDescriptor };
+  | {
+      readonly status: 'ok';
+      readonly descriptor: CapabilityDiscoveryDescriptor;
+    };
 
 /** Parse + validate a capability's `discovery` field into a {@link DiscoveryParse}. */
 export function normalizeDiscovery(value: unknown): DiscoveryParse {
@@ -67,7 +70,10 @@ export function normalizeDiscovery(value: unknown): DiscoveryParse {
 type CoContributionsParse =
   | { readonly status: 'absent' }
   | { readonly status: 'invalid' }
-  | { readonly status: 'ok'; readonly value: readonly CapabilityCoContribution[] };
+  | {
+      readonly status: 'ok';
+      readonly value: readonly CapabilityCoContribution[];
+    };
 
 /** Validate the optional `coContributions` array (each: exportName + exportShape + domainId). */
 function normalizeCoContributions(value: unknown): CoContributionsParse {
@@ -116,7 +122,11 @@ function normalizeDiscoveryMode(value: unknown): CapabilityDiscoveryMode | undef
   if (value.mode === 'name-pattern') {
     if (typeof value.prefix !== 'string' || value.prefix === '') return undefined;
     if (!isStringArray(value.defaultScopes)) return undefined;
-    return { mode: 'name-pattern', prefix: value.prefix, defaultScopes: value.defaultScopes };
+    return {
+      mode: 'name-pattern',
+      prefix: value.prefix,
+      defaultScopes: value.defaultScopes,
+    };
   }
   return undefined;
 }
