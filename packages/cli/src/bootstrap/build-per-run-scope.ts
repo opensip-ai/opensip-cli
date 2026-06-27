@@ -227,7 +227,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // Lazy datastore thunk; its `dispose` (registered on the scope below) closes
   // the cached SQLite connection on teardown — checkpointing/truncating the WAL
   // and freeing the handle, which otherwise leaked for the process lifetime.
-  const datastoreThunk = buildDatastoreThunk(project, logger);
+  const datastoreThunk = buildDatastoreThunk(project, logger, input.parentCommand);
   const scope = new RunScope({
     logger,
     projectContext: project,

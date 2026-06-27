@@ -7,7 +7,13 @@
 import { closeSync, mkdirSync, openSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { generateUUID, withFileLock, type Logger, type StateLockPolicy } from '@opensip-cli/core';
+import {
+  currentScope,
+  generateUUID,
+  withFileLock,
+  type Logger,
+  type StateLockPolicy,
+} from '@opensip-cli/core';
 
 import { createStateLockEventBridge } from './state-lock-policy.js';
 
@@ -58,16 +64,25 @@ export function writeArtifactAtomically(
           module: 'cli:atomic-artifact-write',
           operation: 'artifact.write',
         });
+        // Mirror the lock/baseline bridges: surface the state-plane event on the
+        // run diagnostics `persist` phase too (the contract doc lists it there).
+        currentScope()?.diagnostics?.event('persist', 'info', 'state.artifact.write.complete', {
+          operation: 'artifact.write',
+        });
       } catch (error) {
         try {
           unlinkSync(tempPath);
         } catch {
           /* best-effort */
         }
+        const message = error instanceof Error ? error.message : String(error);
         ctx.logger.error({
           evt: 'state.artifact.write.error',
           module: 'cli:atomic-artifact-write',
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
+        });
+        currentScope()?.diagnostics?.event('persist', 'error', 'state.artifact.write.error', {
+          operation: 'artifact.write',
         });
         throw error;
       }

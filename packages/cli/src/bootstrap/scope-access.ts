@@ -96,6 +96,7 @@ export interface DatastoreThunk {
 export function buildDatastoreThunk(
   project: ProjectContext,
   log: Logger = defaultLogger,
+  commandName?: string,
 ): DatastoreThunk {
   let cached: DataStore | undefined;
   const thunk = (() => {
@@ -111,7 +112,7 @@ export function buildDatastoreThunk(
     cached = DataStoreFactory.open({
       backend: 'sqlite',
       path,
-      lock: buildDatastoreLockContext(log, { cwd: project.projectRoot }),
+      lock: buildDatastoreLockContext(log, { cwd: project.projectRoot, commandName }),
     });
     log.info({
       evt: 'cli.datastore.opened',
