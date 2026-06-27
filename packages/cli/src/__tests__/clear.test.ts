@@ -41,7 +41,10 @@ function makeStoredSession(id: string, timestamp: number): StoredSession {
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), 'cli-clear-'));
-  ds = DataStoreFactory.open({ backend: 'sqlite', path: join(tmp, 'd.sqlite') });
+  ds = DataStoreFactory.open({
+    backend: 'sqlite',
+    path: join(tmp, 'd.sqlite'),
+  });
   nextAnswer = 'y';
   vi.resetModules();
 });
@@ -82,7 +85,11 @@ describe('executeClear', () => {
     repo.save(makeStoredSession('old', oldTs));
     repo.save(makeStoredSession('recent', recentTs));
     const { executeClear } = await loadModule();
-    const result = await executeClear({ yes: true, olderThan: 5, datastore: ds });
+    const result = await executeClear({
+      yes: true,
+      olderThan: 5,
+      datastore: ds,
+    });
     expect(result.action).toBe('done');
     expect(result.deletedCount).toBe(1);
     expect(repo.count()).toBe(1);
@@ -110,7 +117,11 @@ describe('executeClear', () => {
     const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     try {
       const { executeClear } = await loadModule();
-      const result = await executeClear({ yes: false, olderThan: 1, datastore: ds });
+      const result = await executeClear({
+        yes: false,
+        olderThan: 1,
+        datastore: ds,
+      });
       // Session is recent (now); olderThan=1 means it stays.
       expect(result.action).toBe('done');
       expect(result.deletedCount).toBe(0);

@@ -20,7 +20,10 @@ import { buildEffectiveSuffixes } from './throws-documentation-constants.js';
 export const throwsDocumentation = defineCheck({
   id: 'f4fb7ff5-5927-4b0b-a9cf-d919cd37c931',
   slug: 'throws-documentation',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'high',

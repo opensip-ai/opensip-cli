@@ -25,7 +25,10 @@ afterEach(() => {
 });
 
 function planes(logger?: Logger) {
-  return buildHostPlanes({ getDatastore: () => ds, ...(logger ? { logger } : {}) });
+  return buildHostPlanes({
+    getDatastore: () => ds,
+    ...(logger ? { logger } : {}),
+  });
 }
 
 describe('host-planes — governance', () => {
@@ -51,8 +54,13 @@ describe('host-planes — governance', () => {
   it('appends approval decisions cumulatively', async () => {
     const { governance } = planes();
     await governance.recordApprovalDecision('fit', { by: 'a', approved: true });
-    await governance.recordApprovalDecision('fit', { by: 'b', approved: false });
-    const state = (await governance.getGovernanceState('fit')) as { approvals: unknown[] };
+    await governance.recordApprovalDecision('fit', {
+      by: 'b',
+      approved: false,
+    });
+    const state = (await governance.getGovernanceState('fit')) as {
+      approvals: unknown[];
+    };
     expect(state.approvals).toHaveLength(2);
   });
 
@@ -70,7 +78,10 @@ describe('host-planes — governance', () => {
     const debug = vi.fn();
     await planes({ debug } as unknown as Logger).governance.recordInstallation('fit', {});
     expect(debug).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.governance.install-recorded', tool: 'fit' }),
+      expect.objectContaining({
+        evt: 'cli.governance.install-recorded',
+        tool: 'fit',
+      }),
     );
   });
 });
@@ -90,7 +101,9 @@ describe('host-planes — audit', () => {
   it('exportForCloud returns the current log for the given tool, empty for an unknown arg', async () => {
     const { audit } = planes();
     await audit.append('fit', { action: 'run' });
-    const exported = (await audit.exportForCloud('fit')) as { entries: unknown[] };
+    const exported = (await audit.exportForCloud('fit')) as {
+      entries: unknown[];
+    };
     expect(exported).toEqual({ entries: expect.any(Array) });
     expect(exported.entries).toHaveLength(1);
     // No/empty tool arg → empty export, no throw.
@@ -99,7 +112,9 @@ describe('host-planes — audit', () => {
 
   it('emits a debug log on append when a logger is supplied', async () => {
     const debug = vi.fn();
-    await planes({ debug } as unknown as Logger).audit.append('fit', { action: 'run' });
+    await planes({ debug } as unknown as Logger).audit.append('fit', {
+      action: 'run',
+    });
     expect(debug).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'cli.audit.append', tool: 'fit' }),
     );
@@ -108,7 +123,10 @@ describe('host-planes — audit', () => {
 
 describe('host-planes — entitlements', () => {
   it('defaults to entitled for a tool with no recorded entitlements', async () => {
-    expect(await planes().entitlements.check('fit')).toEqual({ entitled: true, source: 'default' });
+    expect(await planes().entitlements.check('fit')).toEqual({
+      entitled: true,
+      source: 'default',
+    });
   });
 
   it('records usage and returns the recorded state on a subsequent check', async () => {

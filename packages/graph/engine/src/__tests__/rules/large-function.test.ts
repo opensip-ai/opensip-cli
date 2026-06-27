@@ -19,7 +19,10 @@ import type { FeatureTable, GraphConfig } from '../../types.js';
 
 const EMPTY: GraphConfig = {};
 /** Explicit thresholds so the banding logic is tested independent of the defaults. */
-const BANDS: GraphConfig = { largeFunctionWarnLines: 80, largeFunctionErrorLines: 150 };
+const BANDS: GraphConfig = {
+  largeFunctionWarnLines: 80,
+  largeFunctionErrorLines: 150,
+};
 
 /** Single occurrence whose span (endLine − line + 1) is `lines`. */
 function withLines(lines: number) {

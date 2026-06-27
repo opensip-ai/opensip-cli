@@ -51,7 +51,10 @@ export const heavyImportDetection = defineCheck({
   id: 'ebd495d1-ae48-478d-a1cc-4823a18cada6',
   slug: 'heavy-import-detection',
   contentFilter: 'strip-strings',
-  scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  scope: {
+    languages: ['typescript', 'javascript'],
+    concerns: ['backend', 'frontend'],
+  },
   confidence: 'high',
   description:
     'Detects heavy/deprecated library imports and excessive named imports that bloat bundle size',

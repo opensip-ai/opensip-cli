@@ -103,14 +103,23 @@ describe('buildUnifiedReportLines', () => {
     const catalog = catalogOf([occ()], 'fast');
     const indexes = buildIndexes(catalog);
     const lines = runWithScopeSync(makeGraphTestScope(), () =>
-      buildUnifiedReportLines({ catalog, indexes, signals: [], cacheHit: false }),
+      buildUnifiedReportLines({
+        catalog,
+        indexes,
+        signals: [],
+        cacheHit: false,
+      }),
     );
     expect(lines.join('\n')).toContain('Resolution: fast (syntactic)');
   });
 
   it('reports "(none inferred)" when there are no entry points', () => {
     // A non-exported, module-local function with a caller is not an entry point.
-    const callee = occ({ bodyHash: 'h2', simpleName: 'helper', visibility: 'module-local' });
+    const callee = occ({
+      bodyHash: 'h2',
+      simpleName: 'helper',
+      visibility: 'module-local',
+    });
     const caller = occ({
       bodyHash: 'h1',
       simpleName: 'driver',
@@ -130,7 +139,12 @@ describe('buildUnifiedReportLines', () => {
     const catalog = catalogOf([caller, callee]);
     const indexes = buildIndexes(catalog);
     const lines = runWithScopeSync(makeGraphTestScope(), () =>
-      buildUnifiedReportLines({ catalog, indexes, signals: [], cacheHit: false }),
+      buildUnifiedReportLines({
+        catalog,
+        indexes,
+        signals: [],
+        cacheHit: false,
+      }),
     );
     expect(lines.join('\n')).toContain('(none inferred)');
   });

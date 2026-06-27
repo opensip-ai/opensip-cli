@@ -17,7 +17,10 @@ import type { GraphConfig, Param } from '../../types.js';
 
 const EMPTY: GraphConfig = {};
 /** Explicit thresholds so the banding logic is tested independent of the defaults. */
-const BANDS: GraphConfig = { wideFunctionWarnParams: 4, wideFunctionErrorParams: 7 };
+const BANDS: GraphConfig = {
+  wideFunctionWarnParams: 4,
+  wideFunctionErrorParams: 7,
+};
 
 function params(n: number): Param[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -66,7 +69,12 @@ describe('graph:wide-function bands (explicit thresholds 4/7)', () => {
   });
 
   it('does not flag a wide function defined in a test file', () => {
-    const o = occ({ bodyHash: 'h', simpleName: 'wideHelper', params: params(9), inTestFile: true });
+    const o = occ({
+      bodyHash: 'h',
+      simpleName: 'wideHelper',
+      params: params(9),
+      inTestFile: true,
+    });
     expect(
       wideFunctionRule.evaluate(makeCatalog([]), buildIndexes(makeCatalog([o])), EMPTY),
     ).toEqual([]);

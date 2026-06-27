@@ -203,7 +203,10 @@ describe('pickAdapter — multi-adapter dominance', () => {
         // is the "Go/Java repo but no Go/Java adapter installed" smell.
         expect(pickAdapter(dir)).toBe(ts);
         expect(warnSpy).toHaveBeenCalledTimes(1);
-        const payload = warnSpy.mock.calls[0]?.[0] as { evt: string; registered: string[] };
+        const payload = warnSpy.mock.calls[0]?.[0] as {
+          evt: string;
+          registered: string[];
+        };
         expect(payload.evt).toBe('graph.lang_adapter.no_match');
         expect(payload.registered).toEqual(expect.arrayContaining(['typescript', 'python']));
       } finally {

@@ -134,13 +134,21 @@ export class EnvRegistry {
 
     const canonicalRaw = process.env[spec.canonical];
     if (canonicalRaw !== undefined) {
-      return { value: coerce(canonicalRaw), source: 'canonical', deprecated: spec.deprecated };
+      return {
+        value: coerce(canonicalRaw),
+        source: 'canonical',
+        deprecated: spec.deprecated,
+      };
     }
 
     for (const alias of spec.aliases ?? []) {
       const aliasRaw = process.env[alias];
       if (aliasRaw !== undefined) {
-        return { value: coerce(aliasRaw), source: 'alias', deprecated: spec.deprecated };
+        return {
+          value: coerce(aliasRaw),
+          source: 'alias',
+          deprecated: spec.deprecated,
+        };
       }
     }
 

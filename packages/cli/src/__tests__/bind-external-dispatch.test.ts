@@ -148,7 +148,13 @@ describe('buildMaybeDispatchExternal', () => {
       name: 'external-dispatch-tool',
       version: '0.0.0',
       apiVersion: 1,
-      commands: [{ name: 'external-dispatch-tool', aliases: ['ext-run'], description: 'fixture' }],
+      commands: [
+        {
+          name: 'external-dispatch-tool',
+          aliases: ['ext-run'],
+          description: 'fixture',
+        },
+      ],
       config: {
         namespace: 'external-dispatch-tool',
         schema: { type: 'object', properties: {} },

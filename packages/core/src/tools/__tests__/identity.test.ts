@@ -49,7 +49,13 @@ describe('validateToolIdentity', () => {
 describe('tool identity index', () => {
   it('resolves canonical names, aliases, and layout keys', () => {
     const registry = new ToolRegistry();
-    registry.register(makeTool('fitness', { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' }));
+    registry.register(
+      makeTool('fitness', {
+        name: 'fitness',
+        aliases: ['fit'],
+        layoutKey: 'fit',
+      }),
+    );
 
     const index = buildToolIdentityIndex(registry);
     expect(index.resolveInput('fitness')?.layoutKey).toBe('fit');

@@ -58,7 +58,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
  *  `@opensip-cli/test-support`, which this package's tests cannot use
  *  without coupling its test graph to the fitness engine). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 
 const GRAPH_TRACER_PREFIX = 'opensip_cli.graph.';
 
@@ -113,7 +116,9 @@ describe('graph stage spans — in-process capture (in-memory exporter)', () => 
 
   beforeEach(() => {
     exporter = new InMemorySpanExporter();
-    provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+    provider = new NodeTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    });
     provider.register();
   });
 

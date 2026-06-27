@@ -153,9 +153,15 @@ export class UnknownCapabilityDomainError extends NotFoundError {
 
   constructor(
     message: string,
-    options: ToolErrorOptions & { domainId: string; knownDomains: readonly string[] },
+    options: ToolErrorOptions & {
+      domainId: string;
+      knownDomains: readonly string[];
+    },
   ) {
-    super(message, { ...options, code: options.code ?? 'CAPABILITY.DOMAIN.UNKNOWN' });
+    super(message, {
+      ...options,
+      code: options.code ?? 'CAPABILITY.DOMAIN.UNKNOWN',
+    });
     this.name = 'UnknownCapabilityDomainError';
     this.domainId = options.domainId;
     this.knownDomains = options.knownDomains;
@@ -180,7 +186,11 @@ export class CapabilitySchemaMismatchError extends ValidationError {
 
   constructor(
     message: string,
-    options: ToolErrorOptions & { domainId: string; ownerToolId: string; diagnostic: string },
+    options: ToolErrorOptions & {
+      domainId: string;
+      ownerToolId: string;
+      diagnostic: string;
+    },
   ) {
     super(message, {
       ...options,

@@ -240,6 +240,9 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // (post-action handlers, error printers) that read via
     // `getOrOpenDatastore()` find the same instance.
     datastore: datastoreThunk,
+    // `graphCatalog` is NOT wired here — the graph tool installs it via its
+    // `contributeScope()` hook (ADR-0085), so the host never statically imports
+    // `@opensip-cli/graph` (install-source independence, ADR-0009/0027/0029).
     // Presentation settings the render paths read via currentScope()?.ui.
     // bannerSize stays an untyped string at the kernel boundary; the
     // cli-ui render sites narrow it with normalizeBannerSize.

@@ -403,7 +403,10 @@ function checkLineForPlaceholder(line: string, lineNum: number): CheckViolation 
 export const stubbedImplementationDetection = defineCheck({
   id: '12218d58-5dea-4aba-ba7b-fc1822d03ec4',
   slug: 'stubbed-implementation-detection',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   confidence: 'high',
   description: 'Detects incomplete/placeholder implementations',

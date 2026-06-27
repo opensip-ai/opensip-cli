@@ -25,7 +25,11 @@ afterEach(() => {
 
 describe('PathMatcher.match', () => {
   it('expands include globs and returns absolute, sorted paths', async () => {
-    const m = PathMatcher.create({ cwd: testDir, include: ['src/*.ts'], exclude: [] });
+    const m = PathMatcher.create({
+      cwd: testDir,
+      include: ['src/*.ts'],
+      exclude: [],
+    });
     const result = await m.match();
     expect(result.files.every((f) => f.startsWith(testDir))).toBe(true);
     const sorted = [...result.files].sort();
@@ -54,7 +58,11 @@ describe('PathMatcher.match', () => {
   });
 
   it('returns durationMs', async () => {
-    const m = PathMatcher.create({ cwd: testDir, include: ['src/*.ts'], exclude: [] });
+    const m = PathMatcher.create({
+      cwd: testDir,
+      include: ['src/*.ts'],
+      exclude: [],
+    });
     const result = await m.match();
     expect(typeof result.durationMs).toBe('number');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
@@ -63,12 +71,20 @@ describe('PathMatcher.match', () => {
 
 describe('PathMatcher.matches', () => {
   it('returns true for files that match include and not exclude', () => {
-    const m = PathMatcher.create({ cwd: testDir, include: ['src/**/*.ts'], exclude: [] });
+    const m = PathMatcher.create({
+      cwd: testDir,
+      include: ['src/**/*.ts'],
+      exclude: [],
+    });
     expect(m.matches(join(testDir, 'src', 'a.ts'))).toBe(true);
   });
 
   it('returns false for files outside the include patterns', () => {
-    const m = PathMatcher.create({ cwd: testDir, include: ['lib/**/*.ts'], exclude: [] });
+    const m = PathMatcher.create({
+      cwd: testDir,
+      include: ['lib/**/*.ts'],
+      exclude: [],
+    });
     expect(m.matches(join(testDir, 'src', 'a.ts'))).toBe(false);
   });
 
@@ -94,7 +110,11 @@ describe('PathMatcher.matches', () => {
 
 describe('PathMatcher composition', () => {
   it('withExcludes returns a new matcher with the union of excludes', () => {
-    const base = PathMatcher.create({ cwd: testDir, include: ['src/**/*.ts'], exclude: [] });
+    const base = PathMatcher.create({
+      cwd: testDir,
+      include: ['src/**/*.ts'],
+      exclude: [],
+    });
     const extended = base.withExcludes(['**/*.test.ts']);
     expect(extended.excludePatterns).toContain('**/*.test.ts');
     // Original is unchanged
@@ -102,7 +122,11 @@ describe('PathMatcher composition', () => {
   });
 
   it('noTests excludes the standard test patterns', () => {
-    const base = PathMatcher.create({ cwd: testDir, include: ['src/**/*.ts'], exclude: [] });
+    const base = PathMatcher.create({
+      cwd: testDir,
+      include: ['src/**/*.ts'],
+      exclude: [],
+    });
     const noTests = base.noTests();
     expect(noTests.matches(join(testDir, 'src', 'a.test.ts'))).toBe(false);
     expect(noTests.matches(join(testDir, 'src', '__tests__', 'd.ts'))).toBe(false);
@@ -110,7 +134,11 @@ describe('PathMatcher composition', () => {
   });
 
   it('typescriptOnly narrows include to **/*.{ts,tsx}', () => {
-    const base = PathMatcher.create({ cwd: testDir, include: ['src/*'], exclude: [] });
+    const base = PathMatcher.create({
+      cwd: testDir,
+      include: ['src/*'],
+      exclude: [],
+    });
     const ts = base.typescriptOnly();
     // Ensure the include patterns now end in .{ts,tsx}
     expect(ts.includePatterns.every((p) => p.includes('.ts') || p.includes('tsx'))).toBe(true);

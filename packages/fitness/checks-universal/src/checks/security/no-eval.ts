@@ -20,7 +20,10 @@ import { defineRegexListCheck } from '@opensip-cli/fitness';
 export const noEval = defineRegexListCheck({
   id: '9f6d299f-8155-4719-b605-897e9dcb1fdb',
   slug: 'no-eval',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
   confidence: 'medium',
   description: 'Detect dangerous eval and dynamic code execution',

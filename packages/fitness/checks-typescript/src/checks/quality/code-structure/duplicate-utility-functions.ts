@@ -32,7 +32,10 @@ export {
 export const duplicateUtilityFunctions = defineCheck({
   id: 'aa303a1e-f3f8-4a11-ade2-9e29af89c299',
   slug: 'duplicate-utility-functions',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'high',

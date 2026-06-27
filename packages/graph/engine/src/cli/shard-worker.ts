@@ -103,7 +103,9 @@ function resolveWorkerCorrelation(spec: ShardWorkerSpec): RunCorrelation {
  * no span carries an empty attribute.
  */
 function shardSpanAttrs(corr: RunCorrelation): Attributes {
-  const attrs: Attributes = { 'opensip_cli.graph.shard_id': corr.shardId ?? '' };
+  const attrs: Attributes = {
+    'opensip_cli.graph.shard_id': corr.shardId ?? '',
+  };
   if (corr.runId) attrs['opensip.run_id'] = corr.runId;
   if (corr.parentCommand) attrs['opensip.parent_command'] = corr.parentCommand;
   if (corr.repo !== undefined) attrs[REPO_OTEL_ATTR] = corr.repo;

@@ -163,7 +163,9 @@ describe('Tool.initialize() wiring (preAction)', () => {
     const events: string[] = [];
     const program = buildProgram(makeFixtureTool('order-tool', 'order-cmd', events));
 
-    await program.parseAsync(['node', 'cli', 'order-cmd', '--cwd', FIXTURE], { from: 'node' });
+    await program.parseAsync(['node', 'cli', 'order-cmd', '--cwd', FIXTURE], {
+      from: 'node',
+    });
 
     expect(events).toEqual(['initialize:order-tool', 'action:order-cmd']);
   });
@@ -172,7 +174,9 @@ describe('Tool.initialize() wiring (preAction)', () => {
     const events: string[] = [];
     const program = buildProgram(makeFixtureTool('memo-tool', 'memo-cmd', events));
 
-    await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], { from: 'node' });
+    await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], {
+      from: 'node',
+    });
     // Production runs one command per process, so each invocation's pre-action
     // hook enters a fresh ALS slot from a clean state. This test drives Commander
     // twice in ONE process to exercise the once-per-process initialize() guard, so
@@ -180,7 +184,9 @@ describe('Tool.initialize() wiring (preAction)', () => {
     // boundary — otherwise the second enterScope would (correctly) trip the
     // always-on SYSTEM.SCOPE.REENTRANT guard against the first run's leaked scope.
     exitScope();
-    await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], { from: 'node' });
+    await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], {
+      from: 'node',
+    });
 
     // initialize once total; action twice.
     expect(events).toEqual(['initialize:memo-tool', 'action:memo-cmd', 'action:memo-cmd']);
@@ -197,7 +203,9 @@ describe('Tool.initialize() wiring (preAction)', () => {
     // itself. The throw propagates out of parseAsync here (this bare test program
     // installs no catch boundary).
     await expect(
-      program.parseAsync(['node', 'cli', 'boom-cmd', '--cwd', FIXTURE], { from: 'node' }),
+      program.parseAsync(['node', 'cli', 'boom-cmd', '--cwd', FIXTURE], {
+        from: 'node',
+      }),
     ).rejects.toMatchObject({
       name: 'BootstrapError',
       exitCode: 1,

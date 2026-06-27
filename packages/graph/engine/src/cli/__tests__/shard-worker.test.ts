@@ -41,7 +41,10 @@ function fakeAdapter(id = 'typescript', fileExtension = '.ts'): GraphLanguageAda
       configPathAbs: undefined,
       compilerOptions: undefined,
     }),
-    parseProject: (): ParseOutput => ({ project: { dummy: true }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { dummy: true },
+      parseErrors: [],
+    }),
     walkProject: (): WalkOutput => ({
       occurrences: {
         fn: [

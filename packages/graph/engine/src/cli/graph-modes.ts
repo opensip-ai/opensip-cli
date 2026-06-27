@@ -59,7 +59,11 @@ export async function runGateMode(
   // ADR-0035): graph hands the already-fingerprint-stamped envelope to the seams
   // and feeds its gate verdict to the host's `deliverSignals` runFailed override.
   // No tool `setExitCode` on the gate path — the host derives RUNTIME_ERROR.
-  const deliverOpts = { cwd: opts.cwd, reportTo: opts.reportTo, apiKey: opts.apiKey };
+  const deliverOpts = {
+    cwd: opts.cwd,
+    reportTo: opts.reportTo,
+    apiKey: opts.apiKey,
+  };
   if (opts.gateSave === true) {
     // ADR-0020: gate-save records the baseline AND hard-fails the step when the
     // current (already suppression-filtered, ADR-0014) signal set contains any

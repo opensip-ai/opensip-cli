@@ -271,7 +271,9 @@ async function runScenarios(
       const result = await runScenarioUnit(scenario, timeoutMs, abortSignal);
       results[index] = result;
       onComplete?.();
-      return { shouldStop: !result.passed && recipe.execution.stopOnFirstFailure === true };
+      return {
+        shouldStop: !result.passed && recipe.execution.stopOnFirstFailure === true,
+      };
     },
   });
 

@@ -166,7 +166,11 @@ function readWorkflows(rootDir: string): WorkflowFile[] {
     const filePath = path.join(workflowsDir, entry.name);
     const content = readIfExists(filePath);
     if (content === null) continue;
-    workflows.push({ filePath, relPath: normalizeRel(filePath, rootDir), content });
+    workflows.push({
+      filePath,
+      relPath: normalizeRel(filePath, rootDir),
+      content,
+    });
   }
   return workflows;
 }

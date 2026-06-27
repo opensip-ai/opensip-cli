@@ -42,7 +42,11 @@ const INDEXES: Indexes = {
 };
 
 function sig(slug: string, message: string): Signal {
-  return createGraphSignal(slug, CONFIG, { severity: 'low', category: 'quality', message });
+  return createGraphSignal(slug, CONFIG, {
+    severity: 'low',
+    category: 'quality',
+    message,
+  });
 }
 
 /** A rule whose `evaluate` returns a fixed signal list (ignores its inputs). */
@@ -75,7 +79,11 @@ describe('evaluateRules', () => {
       fakeRule('graph:c', [c]),
     ];
 
-    const out = evaluateRules(rules, { catalog: CATALOG, indexes: INDEXES, config: CONFIG });
+    const out = evaluateRules(rules, {
+      catalog: CATALOG,
+      indexes: INDEXES,
+      config: CONFIG,
+    });
 
     expect(out).toEqual([a, b1, b2, c]);
   });

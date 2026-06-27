@@ -30,7 +30,9 @@ const text = (r: InitResult): string => renderToText(viewInit(r));
 describe('viewInit — refusals', () => {
   it('renders the inside-existing-project message verbatim (one node per line)', () => {
     const out = text(
-      result({ insideExistingProject: { message: 'line one\nline two' } } as Partial<InitResult>),
+      result({
+        insideExistingProject: { message: 'line one\nline two' },
+      } as Partial<InitResult>),
     );
     expect(out).toContain('line one');
     expect(out).toContain('line two');
@@ -38,7 +40,9 @@ describe('viewInit — refusals', () => {
 
   it('renders the ambiguous-language refusal', () => {
     const out = text(
-      result({ ambiguousLanguageError: { message: 'pass --language' } } as Partial<InitResult>),
+      result({
+        ambiguousLanguageError: { message: 'pass --language' },
+      } as Partial<InitResult>),
     );
     expect(out).toContain('language ambiguous');
     expect(out).toContain('pass --language');
@@ -54,7 +58,10 @@ describe('viewInit — partial-state report', () => {
     ];
     const dirOnly = text(
       result({
-        partialStateError: { state: 'partial-dir-only', preExistingFiles: files },
+        partialStateError: {
+          state: 'partial-dir-only',
+          preExistingFiles: files,
+        },
       } as Partial<InitResult>),
     );
     expect(dirOnly).toContain('opensip-cli/ present but');
@@ -65,7 +72,10 @@ describe('viewInit — partial-state report', () => {
 
     const cfgOnly = text(
       result({
-        partialStateError: { state: 'partial-config-only', preExistingFiles: [] },
+        partialStateError: {
+          state: 'partial-config-only',
+          preExistingFiles: [],
+        },
       } as Partial<InitResult>),
     );
     expect(cfgOnly).toContain('present but opensip-cli/ missing');

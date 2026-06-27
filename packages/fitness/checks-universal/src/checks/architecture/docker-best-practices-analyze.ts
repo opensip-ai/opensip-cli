@@ -382,7 +382,16 @@ function processDockerfileLine(options: ProcessDockerfileLineOptions): void {
   }
 
   if (upperLine.startsWith('COPY ')) {
-    processCopyLine({ trimmedLine, lineNum, index, lines, file, filePath, state, violations });
+    processCopyLine({
+      trimmedLine,
+      lineNum,
+      index,
+      lines,
+      file,
+      filePath,
+      state,
+      violations,
+    });
   }
 }
 

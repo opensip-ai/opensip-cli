@@ -108,7 +108,12 @@ describe('planShardWork', () => {
   function shard(id: string): Shard {
     const file = join(dir, `${id}.ts`);
     writeFileSync(file, 'export const x = 1;\n', 'utf8');
-    return { id, rootDir: dir, files: [file], configPathAbs: join(dir, `${id}.tsconfig`) };
+    return {
+      id,
+      rootDir: dir,
+      files: [file],
+      configPathAbs: join(dir, `${id}.tsconfig`),
+    };
   }
 
   it('rebuilds every shard when the cache is empty', () => {

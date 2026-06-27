@@ -16,16 +16,31 @@ import { edge, makeCatalog, occ } from './_helpers.js';
 
 import type { CallEdge, FunctionOccurrence } from '../../types.js';
 
-const exportedDefaults: Partial<FunctionOccurrence> = { visibility: 'exported', endLine: 20 };
+const exportedDefaults: Partial<FunctionOccurrence> = {
+  visibility: 'exported',
+  endLine: 20,
+};
 
 function ed(text: string, to: readonly string[], discarded?: boolean): CallEdge {
-  return { ...edge(text, to, discarded), resolution: 'static', confidence: 'high' };
+  return {
+    ...edge(text, to, discarded),
+    resolution: 'static',
+    confidence: 'high',
+  };
 }
 
 describe('no-side-effect-path rule', () => {
   it('flags an exported pure function whose caller discards its return value', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'pureCalc',
@@ -45,8 +60,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag when caller consumes the return value (discarded=false)', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'pureCalc',
@@ -91,8 +114,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag a non-exported function (ineligible candidate)', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'localPure',
@@ -113,8 +144,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag when source span is < 10 lines', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'tinyPure',
@@ -136,7 +175,11 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag when there are unresolved edges', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'partial',
@@ -156,8 +199,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('falls back to legacy behavior on catalogs without `discarded` field', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'oldCatalog',
@@ -187,8 +238,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag a module-init occurrence even when otherwise eligible', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const init = occ({
       bodyHash: 'mi',
       simpleName: '<module-init:a.ts>',
@@ -203,8 +262,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag occurrences in test files', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const inTest = occ({
       bodyHash: 'p',
       simpleName: 'inTestPure',
@@ -228,8 +295,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag when there is no caller at all', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'unused',
@@ -250,8 +325,16 @@ describe('no-side-effect-path rule', () => {
   it.each(['void', 'Promise<void>'])(
     'does not flag a void-like (%s) effect-only function whose caller discards the call',
     (returnType) => {
-      const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-      const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+      const helperA = occ({
+        bodyHash: 'ha',
+        simpleName: 'helperA',
+        ...exportedDefaults,
+      });
+      const helperB = occ({
+        bodyHash: 'hb',
+        simpleName: 'helperB',
+        ...exportedDefaults,
+      });
       const effectOnly = occ({
         bodyHash: 'p',
         simpleName: 'rebuildLookups',
@@ -275,8 +358,16 @@ describe('no-side-effect-path rule', () => {
   // True positive preserved: a value-returning pure function whose result
   // is thrown away is still dead computation and must still flag.
   it('still flags a value-returning (number) pure function whose caller discards its return', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'computeTotal',
@@ -300,8 +391,16 @@ describe('no-side-effect-path rule', () => {
   // over-rejected: a genuinely-pure un-annotated function whose result is
   // dropped is still a real finding. Rejecting null would be a false negative.
   it('still flags a pure function with a null (unknown) return type whose caller discards it', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'inferredPure',
@@ -338,8 +437,16 @@ describe('no-side-effect-path rule', () => {
   // thing that can suppress the flag is the side-effect classification of
   // the edge TEXT. The `helperA`/`helperB` callee bodies stay pure.
   it('does not flag a function that calls a telemetry/observability helper (recordX)', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const effecting = occ({
       bodyHash: 'p',
       simpleName: 'classifyComplexity',
@@ -360,8 +467,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag a function that calls a withSpan-style tracing helper', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const effecting = occ({
       bodyHash: 'p',
       simpleName: 'runQuery',
@@ -382,8 +497,16 @@ describe('no-side-effect-path rule', () => {
   });
 
   it('does not flag a function that mutates module-level state (Map.set / array.push)', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const effecting = occ({
       bodyHash: 'p',
       simpleName: 'cacheResult',
@@ -412,8 +535,16 @@ describe('no-side-effect-path rule', () => {
   // flag even if another caller happens to discard the same function.
 
   it('does not flag when one caller consumes the return via .map even though another discards', () => {
-    const helperA = occ({ bodyHash: 'ha', simpleName: 'helperA', ...exportedDefaults });
-    const helperB = occ({ bodyHash: 'hb', simpleName: 'helperB', ...exportedDefaults });
+    const helperA = occ({
+      bodyHash: 'ha',
+      simpleName: 'helperA',
+      ...exportedDefaults,
+    });
+    const helperB = occ({
+      bodyHash: 'hb',
+      simpleName: 'helperB',
+      ...exportedDefaults,
+    });
     const pure = occ({
       bodyHash: 'p',
       simpleName: 'transformItem',

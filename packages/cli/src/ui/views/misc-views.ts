@@ -140,7 +140,14 @@ const HISTORY_COLUMNS: readonly (string | TableColumnSpec)[] = [
 export function viewHistory(result: HistoryResult): ViewNode {
   if (result.sessions.length === 0) {
     return group(
-      [line([{ text: 'No sessions recorded yet. Run opensip fit to generate data.', dim: true }])],
+      [
+        line([
+          {
+            text: 'No sessions recorded yet. Run opensip fit to generate data.',
+            dim: true,
+          },
+        ]),
+      ],
       2,
     );
   }
@@ -163,7 +170,12 @@ export function viewSimNotice(_result: SimNoticeResult): ViewNode {
       [
         line([{ text: SIMULATION_TOOL_TITLE, tone: 'brand', bold: true }]),
         SPACER,
-        line([{ text: 'Run scenario-based tests against your codebase.', dim: true }]),
+        line([
+          {
+            text: 'Run scenario-based tests against your codebase.',
+            dim: true,
+          },
+        ]),
         SPACER,
         SEPARATOR,
       ],
@@ -175,7 +187,12 @@ export function viewSimNotice(_result: SimNoticeResult): ViewNode {
         line([{ text: 'Status:', tone: 'success' }, { text: ' Available in OpenSIP CLI 1.0.0.' }]),
         line([{ text: '  Use opensip sim --recipes to list registered recipes.' }]),
         SPACER,
-        line([{ text: '  → https://github.com/opensip-ai/opensip-cli/issues', dim: true }]),
+        line([
+          {
+            text: '  → https://github.com/opensip-ai/opensip-cli/issues',
+            dim: true,
+          },
+        ]),
       ],
       2,
     ),
@@ -333,7 +350,10 @@ export function viewConfigureDone(result: ConfigureDoneResult): ViewNode {
         { text: result.configPath, bold: true },
       ]),
       line([
-        { text: '  You can now use --report-to to send results to OpenSIP Cloud.', dim: true },
+        {
+          text: '  You can now use --report-to to send results to OpenSIP Cloud.',
+          dim: true,
+        },
       ]),
     ],
     2,

@@ -86,7 +86,10 @@ export const graphIgnoreHygiene = defineCheck({
   slug: 'graph-ignore-hygiene',
   // Broad TS source scope: @graph-ignore can appear in any production source
   // the graph tool analyzes, so this is NOT scoped to `concerns: ['fitness']`.
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   description:
     'Validates that @graph-ignore directives have valid graph rule ids and reason comments',

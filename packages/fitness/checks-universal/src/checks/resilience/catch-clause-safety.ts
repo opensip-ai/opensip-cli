@@ -102,7 +102,10 @@ function analyzeCatchSafety(content: string, filePath: string): CheckViolation[]
 export const catchClauseSafety = defineCheck({
   id: 'b0bae498-e01a-4eeb-ab5e-ab18776e3111',
   slug: 'catch-clause-safety',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   description:
     'Detects unsafe catch clause patterns: as Error casts without instanceof, catch(e: any)',
   longDescription: `**Purpose:** Detects unsafe catch clause patterns that can cause runtime errors when the caught value is not actually an Error instance.

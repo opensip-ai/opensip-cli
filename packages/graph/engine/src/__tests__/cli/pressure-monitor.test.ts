@@ -51,7 +51,10 @@ describe('createPressureMonitor', () => {
     const prev = process.env.OPENSIP_HEAP_NO_MONITOR;
     process.env.OPENSIP_HEAP_NO_MONITOR = '1';
     try {
-      const monitor = createPressureMonitor({ threshold: 0, pollIntervalMs: 0 });
+      const monitor = createPressureMonitor({
+        threshold: 0,
+        pollIntervalMs: 0,
+      });
       expect(() => monitor.check()).not.toThrow();
       monitor.dispose();
     } finally {

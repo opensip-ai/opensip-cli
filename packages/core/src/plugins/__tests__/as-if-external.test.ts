@@ -75,6 +75,7 @@ const BUNDLED_TOOLS: readonly BundledTool[] = [
       'lookup',
       'index',
       'list',
+      'impact',
     ],
   },
 ];

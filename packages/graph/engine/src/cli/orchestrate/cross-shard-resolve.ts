@@ -409,7 +409,11 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
       // set, so an unreachable target drops in BOTH engines (no sharded-only phantom).
       const reTarget = followReExport(bc, ctx);
       if (reTarget !== undefined) {
-        const edge: CallEdge = { ...base, resolution: 'unknown', to: [reTarget] };
+        const edge: CallEdge = {
+          ...base,
+          resolution: 'unknown',
+          to: [reTarget],
+        };
         traceResolveOne(bc, 'relative-pin', edge.to);
         return edge;
       }

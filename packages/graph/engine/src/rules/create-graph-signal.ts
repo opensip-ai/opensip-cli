@@ -18,6 +18,7 @@ import {
   createSignal,
   type Signal,
   type SignalCategory,
+  type SignalRepair,
   type SignalSeverity,
 } from '@opensip-cli/core';
 
@@ -35,6 +36,7 @@ export interface GraphSignalBody {
   readonly code?: { file?: string; line?: number; column?: number };
   readonly suggestion?: string;
   readonly metadata?: Record<string, unknown>;
+  readonly repair?: SignalRepair;
 }
 
 /**
@@ -56,5 +58,6 @@ export function createGraphSignal(
     code: body.code,
     suggestion: body.suggestion,
     metadata: body.metadata,
+    repair: body.repair,
   });
 }

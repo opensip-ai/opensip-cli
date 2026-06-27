@@ -20,7 +20,9 @@ function signalToTaskkillForce(signal: NodeJS.Signals | number): boolean {
 function descendantPids(pid: number): readonly number[] {
   if (isWindows()) return [];
   try {
-    const out = execFileSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' });
+    const out = execFileSync('pgrep', ['-P', String(pid)], {
+      encoding: 'utf8',
+    });
     const children = out
       .split(/\s+/)
       .map((raw) => Number.parseInt(raw, 10))
@@ -63,7 +65,9 @@ export function killTree(child: ChildProcess, signal: NodeJS.Signals | number = 
   if (isWindows()) {
     try {
       const force = signalToTaskkillForce(signal) ? ['/F'] : [];
-      execFileSync('taskkill', ['/PID', String(pid), '/T', ...force], { stdio: 'ignore' });
+      execFileSync('taskkill', ['/PID', String(pid), '/T', ...force], {
+        stdio: 'ignore',
+      });
     } catch {
       try {
         child.kill(signal);

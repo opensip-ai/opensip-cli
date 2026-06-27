@@ -39,7 +39,10 @@ function emptyAdapter(projectDir: string): GraphLanguageAdapter {
       projectDirAbs: projectDir,
       files: [],
     }),
-    parseProject: (): ParseOutput => ({ project: { dummy: true }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { dummy: true },
+      parseErrors: [],
+    }),
     walkProject: (): WalkOutput => ({
       occurrences: {},
       callSites: [],
@@ -68,7 +71,10 @@ function populatedAdapter(projectDir: string): GraphLanguageAdapter {
       projectDirAbs: projectDir,
       files: [join(projectDir, 'src', 'a.ts')],
     }),
-    parseProject: (): ParseOutput => ({ project: { dummy: true }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { dummy: true },
+      parseErrors: [],
+    }),
     walkProject: (): WalkOutput => ({
       occurrences: {
         fn: [

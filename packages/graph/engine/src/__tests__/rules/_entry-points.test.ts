@@ -14,7 +14,11 @@ import { makeCatalog, occ, staticCall } from './_helpers.js';
 
 describe('inferEntryPoints', () => {
   it('classifies module-init occurrences as entry points', () => {
-    const init = occ({ bodyHash: 'mi', simpleName: '<module-init:a.ts>', kind: 'module-init' });
+    const init = occ({
+      bodyHash: 'mi',
+      simpleName: '<module-init:a.ts>',
+      kind: 'module-init',
+    });
     const catalog = makeCatalog([init]);
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 'mi')?.reason).toBe('module-init');
@@ -31,15 +35,27 @@ describe('inferEntryPoints', () => {
   });
 
   it('classifies an exported, never-called function as no-callers-exported', () => {
-    const ep = occ({ bodyHash: 'e', simpleName: 'externalApi', visibility: 'exported' });
+    const ep = occ({
+      bodyHash: 'e',
+      simpleName: 'externalApi',
+      visibility: 'exported',
+    });
     const catalog = makeCatalog([ep]);
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 'e')?.reason).toBe('no-callers-exported');
   });
 
   it('does not classify an exported function with callers', () => {
-    const target = occ({ bodyHash: 't', simpleName: 'target', visibility: 'exported' });
-    const caller = occ({ bodyHash: 'c', simpleName: 'caller', calls: [staticCall('t')] });
+    const target = occ({
+      bodyHash: 't',
+      simpleName: 'target',
+      visibility: 'exported',
+    });
+    const caller = occ({
+      bodyHash: 'c',
+      simpleName: 'caller',
+      calls: [staticCall('t')],
+    });
     const catalog = makeCatalog([target, caller]);
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 't')).toBeUndefined();
@@ -68,14 +84,22 @@ describe('inferEntryPoints', () => {
       visibility: 'exported',
       calls: [staticCall('r2')],
     });
-    const caller = occ({ bodyHash: 'u', simpleName: 'user', calls: [staticCall('r2')] });
+    const caller = occ({
+      bodyHash: 'u',
+      simpleName: 'user',
+      calls: [staticCall('r2')],
+    });
     const catalog = makeCatalog([recursive, caller]);
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 'r2')).toBeUndefined();
   });
 
   it('does not classify a module-local function with no callers', () => {
-    const helper = occ({ bodyHash: 'h', simpleName: 'helper', visibility: 'module-local' });
+    const helper = occ({
+      bodyHash: 'h',
+      simpleName: 'helper',
+      visibility: 'module-local',
+    });
     const catalog = makeCatalog([helper]);
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 'h')).toBeUndefined();

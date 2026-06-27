@@ -24,7 +24,12 @@ describe('DiagnosticsBus', () => {
 
   it('preserves a caller-supplied timestamp', () => {
     const bus = new DiagnosticsBus('run_2');
-    bus.emit({ phase: 'validate', level: 'warn', message: 'x', at: '2026-06-07T00:00:00.000Z' });
+    bus.emit({
+      phase: 'validate',
+      level: 'warn',
+      message: 'x',
+      at: '2026-06-07T00:00:00.000Z',
+    });
     expect(bus.snapshot().events[0].at).toBe('2026-06-07T00:00:00.000Z');
   });
 

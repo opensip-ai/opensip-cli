@@ -35,8 +35,18 @@ const baseMetrics = (overrides: Partial<SimulationMetrics> = {}): SimulationMetr
 describe('validateAssertions', () => {
   it('returns passed=true when every assertion holds', () => {
     const assertions: ScenarioAssertion[] = [
-      { metric: 'error_rate', operator: 'lt', value: 0.5, message: 'low error rate' },
-      { metric: 'success_rate', operator: 'gt', value: 0.5, message: 'high success rate' },
+      {
+        metric: 'error_rate',
+        operator: 'lt',
+        value: 0.5,
+        message: 'low error rate',
+      },
+      {
+        metric: 'success_rate',
+        operator: 'gt',
+        value: 0.5,
+        message: 'high success rate',
+      },
     ];
     const out = validateAssertions(baseMetrics(), assertions);
     expect(out.passed).toBe(true);
@@ -45,7 +55,12 @@ describe('validateAssertions', () => {
 
   it('returns failed entries with the actual value', () => {
     const assertions: ScenarioAssertion[] = [
-      { metric: 'error_rate', operator: 'lt', value: 0.001, message: 'extreme low error' },
+      {
+        metric: 'error_rate',
+        operator: 'lt',
+        value: 0.001,
+        message: 'extreme low error',
+      },
     ];
     const out = validateAssertions(baseMetrics(), assertions);
     expect(out.passed).toBe(false);
@@ -96,7 +111,11 @@ describe('updateLatencyMetrics', () => {
   });
 
   it('updates the running average on subsequent samples', () => {
-    const m: SimulationMetrics = { ...createEmptyMetrics(), totalRequests: 1, avgLatencyMs: 100 };
+    const m: SimulationMetrics = {
+      ...createEmptyMetrics(),
+      totalRequests: 1,
+      avgLatencyMs: 100,
+    };
     // After: n=1, avg becomes (100*0 + sample)/1 — but the function expects
     // `metrics.totalRequests` to be the count BEFORE incrementing.
     updateLatencyMetrics(m, 200);
@@ -104,7 +123,11 @@ describe('updateLatencyMetrics', () => {
   });
 
   it('approximates percentiles as multiples of the average for n>=1', () => {
-    const m: SimulationMetrics = { ...createEmptyMetrics(), totalRequests: 2, avgLatencyMs: 100 };
+    const m: SimulationMetrics = {
+      ...createEmptyMetrics(),
+      totalRequests: 2,
+      avgLatencyMs: 100,
+    };
     updateLatencyMetrics(m, 200);
     expect(m.p50LatencyMs).toBeCloseTo(m.avgLatencyMs * 0.9);
     expect(m.p95LatencyMs).toBeCloseTo(m.avgLatencyMs * 1.5);

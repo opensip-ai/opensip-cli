@@ -69,7 +69,9 @@ describe('FileAccessor contentFilter dispatch', () => {
         const filePath = await writeTempFile(
           `const a = 1\n// @swallow-ok intentional fallthrough\nconst b = 2`,
         );
-        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' });
+        const accessor = createFileAccessor([filePath], {
+          contentFilter: 'strip-strings',
+        });
         const content = await accessor.read(filePath);
 
         expect(content).toContain('@swallow-ok');
@@ -83,7 +85,9 @@ describe('FileAccessor contentFilter dispatch', () => {
         const filePath = await writeTempFile(
           `/** @deprecated use Y instead */\nexport function legacy() {}`,
         );
-        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' });
+        const accessor = createFileAccessor([filePath], {
+          contentFilter: 'strip-strings',
+        });
         const content = await accessor.read(filePath);
 
         expect(content).toContain('@deprecated');
@@ -94,7 +98,9 @@ describe('FileAccessor contentFilter dispatch', () => {
     it('blanks string-literal contents', async () => {
       await inScope(async () => {
         const filePath = await writeTempFile(`const url = 'phrase_in_string'`);
-        const accessor = createFileAccessor([filePath], { contentFilter: 'strip-strings' });
+        const accessor = createFileAccessor([filePath], {
+          contentFilter: 'strip-strings',
+        });
         const content = await accessor.read(filePath);
 
         expect(content).not.toContain('phrase_in_string');

@@ -56,21 +56,49 @@ const JS_IDIOMS: readonly SkipIdiom[] = [
     label: '.skip skipped test',
     focused: false,
   },
-  { pattern: /\b(?:it|test)\.todo\b/g, label: '.todo placeholder test', focused: false },
+  {
+    pattern: /\b(?:it|test)\.todo\b/g,
+    label: '.todo placeholder test',
+    focused: false,
+  },
   { pattern: /\bfit\s*\(/g, label: 'fit() focused test', focused: true },
-  { pattern: /\bfdescribe\s*\(/g, label: 'fdescribe() focused suite', focused: true },
+  {
+    pattern: /\bfdescribe\s*\(/g,
+    label: 'fdescribe() focused suite',
+    focused: true,
+  },
   { pattern: /\bxit\s*\(/g, label: 'xit() skipped test', focused: false },
   { pattern: /\bxtest\s*\(/g, label: 'xtest() skipped test', focused: false },
-  { pattern: /\bxdescribe\s*\(/g, label: 'xdescribe() skipped suite', focused: false },
+  {
+    pattern: /\bxdescribe\s*\(/g,
+    label: 'xdescribe() skipped suite',
+    focused: false,
+  },
 ];
 
 // Python — pytest / unittest.
 const PY_IDIOMS: readonly SkipIdiom[] = [
-  { pattern: /@pytest\.mark\.skipif\b/g, label: '@pytest.mark.skipif', focused: false },
-  { pattern: /@pytest\.mark\.skip\b/g, label: '@pytest.mark.skip', focused: false },
-  { pattern: /@unittest\.expectedFailure\b/g, label: '@unittest.expectedFailure', focused: false },
+  {
+    pattern: /@pytest\.mark\.skipif\b/g,
+    label: '@pytest.mark.skipif',
+    focused: false,
+  },
+  {
+    pattern: /@pytest\.mark\.skip\b/g,
+    label: '@pytest.mark.skip',
+    focused: false,
+  },
+  {
+    pattern: /@unittest\.expectedFailure\b/g,
+    label: '@unittest.expectedFailure',
+    focused: false,
+  },
   { pattern: /@unittest\.skip\b/g, label: '@unittest.skip', focused: false },
-  { pattern: /\bself\.skipTest\s*\(/g, label: 'self.skipTest()', focused: false },
+  {
+    pattern: /\bself\.skipTest\s*\(/g,
+    label: 'self.skipTest()',
+    focused: false,
+  },
   { pattern: /\bpytest\.skip\s*\(/g, label: 'pytest.skip()', focused: false },
 ];
 
@@ -83,7 +111,11 @@ const GO_IDIOMS: readonly SkipIdiom[] = [
 
 // Rust — the #[ignore] test attribute.
 const RUST_IDIOMS: readonly SkipIdiom[] = [
-  { pattern: /#\[\s*ignore\b/g, label: '#[ignore] test attribute', focused: false },
+  {
+    pattern: /#\[\s*ignore\b/g,
+    label: '#[ignore] test attribute',
+    focused: false,
+  },
 ];
 
 // Java — JUnit 5 (@Disabled) / JUnit 4 (@Ignore).

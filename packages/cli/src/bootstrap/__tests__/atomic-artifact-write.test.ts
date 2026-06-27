@@ -68,7 +68,10 @@ describe('writeArtifactAtomically', () => {
     dir = mkdtempSync(join(tmpdir(), 'artifact-write-'));
     const target = join(dir, 'out.sarif');
     mkdirSync(target);
-    const scope = new RunScope({ logger: makeLogger(), runId: 'r-artifact-err' });
+    const scope = new RunScope({
+      logger: makeLogger(),
+      runId: 'r-artifact-err',
+    });
 
     runWithScopeSync(scope, () => {
       expect(() =>

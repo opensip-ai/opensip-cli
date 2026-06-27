@@ -957,7 +957,10 @@ describe('missing-type-exports — branch coverage', () => {
           version: '1.0.0',
           exports: {
             '.': './dist/index.js',
-            './errors': { import: './dist/errors.js', default: './dist/errors.cjs' },
+            './errors': {
+              import: './dist/errors.js',
+              default: './dist/errors.cjs',
+            },
             './plugins/*': './dist/plugins/*.js',
           },
         },

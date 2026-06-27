@@ -29,7 +29,10 @@ function fitRowsToLiveRunTable(rows: ReturnType<typeof envelopeToFitRows>): Live
 }
 
 function makeFitnessScope(): RunScope {
-  const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  const scope = new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
   applyToolContributeScope(scope, fitnessTool);
   return scope;
 }

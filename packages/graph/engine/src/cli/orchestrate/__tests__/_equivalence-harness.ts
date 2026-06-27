@@ -128,7 +128,12 @@ export function createEquivalenceHarness(config: HarnessConfig): EquivalenceHarn
     return sep === '/' ? rel : rel.split(sep).join('/');
   };
 
-  const adapter = makeFixtureAdapter({ fixtureRoot, shards, toProjectRel, bodyHashFor });
+  const adapter = makeFixtureAdapter({
+    fixtureRoot,
+    shards,
+    toProjectRel,
+    bodyHashFor,
+  });
 
   const buildSingleProgram = async (): Promise<Catalog> => {
     const built = await buildAndResolveCatalog({
@@ -345,7 +350,10 @@ function resolveFixtureEdges(
   let totalCallSites = 0;
 
   for (const site of input.callSites) {
-    const { file, call } = site.nodeRef as { file: ParsedFile; call: ParsedCall };
+    const { file, call } = site.nodeRef as {
+      file: ParsedFile;
+      call: ParsedCall;
+    };
     totalCallSites++;
     // The engine stitches BOTH local AND boundary edges back by
     // ownerEdgeKey(bodyHash, filePath) — so a body-twin's edges never union
@@ -395,7 +403,13 @@ function resolveFixtureEdges(
   return {
     edgesByOwner,
     boundaryCalls,
-    stats: { totalCallSites, resolvedHigh, resolvedMedium: 0, resolvedLow: 0, unresolved },
+    stats: {
+      totalCallSites,
+      resolvedHigh,
+      resolvedMedium: 0,
+      resolvedLow: 0,
+      unresolved,
+    },
   };
 }
 
@@ -418,14 +432,20 @@ function resolveOne(
 ): Resolution {
   // (1) Same-file definition (e.g. canonicalize calling itself).
   if (file.exports.has(call.calleeName)) {
-    return { boundary: false, to: [ctx.bodyHashFor(file.projectRel, call.calleeName)] };
+    return {
+      boundary: false,
+      to: [ctx.bodyHashFor(file.projectRel, call.calleeName)],
+    };
   }
   // (2) Relative import → path-pin to the resolved file (intra-package).
   if (spec?.startsWith('.')) {
     const targetRel = resolveRelative(file.projectRel, spec);
     const targetFile = ctx.fileByRel.get(targetRel);
     if (targetFile?.exports.has(call.calleeName)) {
-      return { boundary: false, to: [ctx.bodyHashFor(targetRel, call.calleeName)] };
+      return {
+        boundary: false,
+        to: [ctx.bodyHashFor(targetRel, call.calleeName)],
+      };
     }
     return { boundary: false, to: [] };
   }

@@ -14,7 +14,11 @@ import { partitionFilesIntoShards, ROOT_SHARD_ID } from '../partition-files.js';
 import type { ShardBoundary } from '../partition-files.js';
 
 const UNITS: ShardBoundary[] = [
-  { id: 'pkg:core', rootDir: 'packages/core', configPathAbs: 'packages/core/tsconfig.json' },
+  {
+    id: 'pkg:core',
+    rootDir: 'packages/core',
+    configPathAbs: 'packages/core/tsconfig.json',
+  },
   {
     id: 'pkg:core-extra',
     rootDir: 'packages/core/extra',
@@ -78,7 +82,11 @@ describe('partitionFilesIntoShards', () => {
       'packages/core/extra/src/b.ts',
       'scripts/root.ts',
     ];
-    const shards = partitionFilesIntoShards({ canonicalFiles, units: UNITS, projectRoot: '' });
+    const shards = partitionFilesIntoShards({
+      canonicalFiles,
+      units: UNITS,
+      projectRoot: '',
+    });
     const flat = shards.flatMap((s) => s.files).sort();
     expect(flat).toEqual([...canonicalFiles].sort());
     expect(new Set(flat).size).toBe(flat.length);

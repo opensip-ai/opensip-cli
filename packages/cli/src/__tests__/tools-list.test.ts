@@ -76,7 +76,10 @@ interface Row {
   version: string;
 }
 
-function listRows(extra: readonly string[] = []): { rows: Row[]; exitCode: number } {
+function listRows(extra: readonly string[] = []): {
+  rows: Row[];
+  exitCode: number;
+} {
   const r = distRunner().run(['tools', 'list', '--json', ...extra], {
     cwd: projectDir,
     env: { ...process.env, HOME: fakeHome },

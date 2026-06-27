@@ -112,7 +112,10 @@ export function buildDatastoreThunk(
     cached = DataStoreFactory.open({
       backend: 'sqlite',
       path,
-      lock: buildDatastoreLockContext(log, { cwd: project.projectRoot, commandName }),
+      lock: buildDatastoreLockContext(log, {
+        cwd: project.projectRoot,
+        commandName,
+      }),
     });
     log.info({
       evt: 'cli.datastore.opened',

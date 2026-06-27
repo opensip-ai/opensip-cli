@@ -118,7 +118,12 @@ describe('plugin wiring', () => {
       },
       {
         identity: { name: 'simulation', layoutKey: 'sim' },
-        metadata: { id: 's', name: 'simulation', version: '0', description: '' },
+        metadata: {
+          id: 's',
+          name: 'simulation',
+          version: '0',
+          description: '',
+        },
         commandSpecs: [],
         pluginLayout: { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
       },

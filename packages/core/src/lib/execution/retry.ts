@@ -55,10 +55,20 @@ export async function runWithRetry<T>(
     return { result, lastError: undefined, retryCount: 0, wasRetried: false };
   } catch (firstError) {
     if (options.shouldNotRetry?.(firstError) === true) {
-      return { result: undefined, lastError: firstError, retryCount: 0, wasRetried: false };
+      return {
+        result: undefined,
+        lastError: firstError,
+        retryCount: 0,
+        wasRetried: false,
+      };
     }
     if (!options.enabled || options.maxRetries <= 0) {
-      return { result: undefined, lastError: firstError, retryCount: 0, wasRetried: false };
+      return {
+        result: undefined,
+        lastError: firstError,
+        retryCount: 0,
+        wasRetried: false,
+      };
     }
 
     let lastError: unknown = firstError;
@@ -66,11 +76,21 @@ export async function runWithRetry<T>(
       await backoff(attempt, delays);
       try {
         const result = await fn();
-        return { result, lastError: undefined, retryCount: attempt + 1, wasRetried: true };
+        return {
+          result,
+          lastError: undefined,
+          retryCount: attempt + 1,
+          wasRetried: true,
+        };
       } catch (retryError) {
         lastError = retryError;
       }
     }
-    return { result: undefined, lastError, retryCount: options.maxRetries, wasRetried: true };
+    return {
+      result: undefined,
+      lastError,
+      retryCount: options.maxRetries,
+      wasRetried: true,
+    };
   }
 }

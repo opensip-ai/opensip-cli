@@ -5,6 +5,7 @@ export type {
   SignalCategory,
   CreateSignalInput,
   FixHint,
+  SignalRepair,
 } from './types/signal.js';
 export { createSignal, isErrorSeverity, isErrorSignal } from './types/signal.js';
 

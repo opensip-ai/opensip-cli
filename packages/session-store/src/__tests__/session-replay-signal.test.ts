@@ -86,6 +86,41 @@ describe('buildReplaySignal', () => {
     expect(signal.metadata).toEqual({});
   });
 
+  it('carries a decoded repair contract onto the replayed signal (ADR-0086 round-trip)', () => {
+    const signal = buildReplaySignal({
+      stored: makeSession(),
+      source: 'graph:large-function',
+      finding: finding({
+        severity: 'error',
+        repair: { repairKind: 'split-function', autofixable: false, confidence: 0.7 },
+      }),
+      checkIndex: 0,
+      findingIndex: 0,
+      toolPrefix: 'graph',
+      category: 'architecture',
+    });
+
+    expect(signal.repair).toEqual({
+      repairKind: 'split-function',
+      autofixable: false,
+      confidence: 0.7,
+    });
+  });
+
+  it('omits repair when the finding carries none', () => {
+    const signal = buildReplaySignal({
+      stored: makeSession(),
+      source: 'check-x',
+      finding: finding(),
+      checkIndex: 0,
+      findingIndex: 0,
+      toolPrefix: 'fit',
+      category: 'quality',
+    });
+
+    expect(signal).not.toHaveProperty('repair');
+  });
+
   it('forces code with the fallback filePath when alwaysIncludeCode is set on a location-less finding', () => {
     const signal = buildReplaySignal({
       stored: makeSession(),

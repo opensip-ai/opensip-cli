@@ -65,7 +65,11 @@ describe('discoverScopedPackages', () => {
 
   it('returns [] when no scope directory exists', () => {
     expect(
-      discoverScopedPackages({ projectDir: root, scopes: ['@scope'], prefix: 'scenarios-' }),
+      discoverScopedPackages({
+        projectDir: root,
+        scopes: ['@scope'],
+        prefix: 'scenarios-',
+      }),
     ).toEqual([]);
   });
 });

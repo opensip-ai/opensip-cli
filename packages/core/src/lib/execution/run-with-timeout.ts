@@ -18,8 +18,16 @@ import { runWithRetry, type PipelineRetryOptions } from './retry.js';
 /** Result of one unit run. `timeout` and `error` are distinct so callers can map each. */
 export type UnitRunOutcome<R> =
   | { readonly status: 'ok'; readonly result: R; readonly durationMs: number }
-  | { readonly status: 'timeout'; readonly durationMs: number; readonly timeoutMs: number }
-  | { readonly status: 'error'; readonly error: unknown; readonly durationMs: number };
+  | {
+      readonly status: 'timeout';
+      readonly durationMs: number;
+      readonly timeoutMs: number;
+    }
+  | {
+      readonly status: 'error';
+      readonly error: unknown;
+      readonly durationMs: number;
+    };
 
 export interface RunWithTimeoutOptions<R> {
   /** The domain run — receives the abort signal the timeout fires on. */

@@ -46,7 +46,9 @@ function deriveValidMarkerKinds(packageJsonPaths: readonly string[]): Set<string
   for (const p of packageJsonPaths) {
     const json = JSON.parse(readFileSync(p, 'utf8')) as {
       opensipTools?: {
-        capabilities?: { discovery?: { discovery?: { mode?: string; markerKind?: string } } }[];
+        capabilities?: {
+          discovery?: { discovery?: { mode?: string; markerKind?: string } };
+        }[];
       };
     };
     for (const cap of json.opensipTools?.capabilities ?? []) {

@@ -32,7 +32,9 @@ function write(rel: string, content: string): string {
 /** A scope carrying the fitness fileCache + a fresh shared-Program cell. */
 function scopeWithFitness(): RunScope {
   const scope = new RunScope();
-  Object.assign(scope, { fitness: { fileCache, tsProgram: { value: undefined } } });
+  Object.assign(scope, {
+    fitness: { fileCache, tsProgram: { value: undefined } },
+  });
   return scope;
 }
 
@@ -60,7 +62,9 @@ const FIXTURE = [
 describe('analyzeNullSafetyTyped (type-aware detector)', () => {
   it('flags only receivers whose actual type includes null/undefined', () => {
     const file = write('src/sample.ts', FIXTURE);
-    const { checker, getSourceFile } = createTypeCheckedProgram([file], { projectRoot: dir });
+    const { checker, getSourceFile } = createTypeCheckedProgram([file], {
+      projectRoot: dir,
+    });
     const found = analyzeNullSafetyTyped(getSourceFile(file)!, checker, file).map((v) => v.match);
 
     expect(found).toEqual(expect.arrayContaining(['getNullable().x', 'getMaybe().y', 'arr[0].a']));
@@ -73,7 +77,9 @@ describe('analyzeNullSafetyTyped (type-aware detector)', () => {
 
   it('skips safe-by-construction paths (schema/DI) entirely', () => {
     const file = write('src/sample.ts', FIXTURE);
-    const { checker, getSourceFile } = createTypeCheckedProgram([file], { projectRoot: dir });
+    const { checker, getSourceFile } = createTypeCheckedProgram([file], {
+      projectRoot: dir,
+    });
     // The filePath drives the path skip independently of the SourceFile content.
     expect(analyzeNullSafetyTyped(getSourceFile(file)!, checker, '/proj/src/schema/x.ts')).toEqual(
       [],
@@ -82,7 +88,9 @@ describe('analyzeNullSafetyTyped (type-aware detector)', () => {
 
   it('honors additionalSafeBuilders as a manual escape hatch for unresolved symbols', async () => {
     const file = write('src/sample.ts', FIXTURE);
-    const { checker, getSourceFile } = createTypeCheckedProgram([file], { projectRoot: dir });
+    const { checker, getSourceFile } = createTypeCheckedProgram([file], {
+      projectRoot: dir,
+    });
     const sf = getSourceFile(file)!;
     const scope = new RunScope();
     await runWithScope(scope, () => {
@@ -116,7 +124,9 @@ describe('null-safety check — analyzeAll mode selection', () => {
     const file = write('src/svc.ts', FIXTURE);
     const scope = scopeWithFitness();
     await runWithScope(scope, async () => {
-      setCurrentRecipeCheckConfig(scope, { 'null-safety': { typeAware: false } });
+      setCurrentRecipeCheckConfig(scope, {
+        'null-safety': { typeAware: false },
+      });
       await fileCache.prewarm(dir, ['**/*']);
       const result = await nullSafety.run(dir, { targetFiles: [file] });
       // Convention trusts `get*` calls as non-null (its false-negative), so the

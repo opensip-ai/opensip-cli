@@ -28,7 +28,12 @@ function sig(source: string, severity: SignalSeverity, ruleId = `fit:${source}`)
 }
 
 function envelope(
-  units: { slug: string; passed: boolean; violationCount?: number; durationMs?: number }[],
+  units: {
+    slug: string;
+    passed: boolean;
+    violationCount?: number;
+    durationMs?: number;
+  }[],
   signals: ReturnType<typeof sig>[],
 ) {
   return buildSignalEnvelope({
@@ -91,7 +96,13 @@ describe('buildFitnessSessionPayload', () => {
       [sig('a', 'critical')],
     );
     const payload = buildFitnessSessionPayload(env);
-    expect(payload.summary).toEqual({ total: 2, passed: 1, failed: 1, errors: 1, warnings: 0 });
+    expect(payload.summary).toEqual({
+      total: 2,
+      passed: 1,
+      failed: 1,
+      errors: 1,
+      warnings: 0,
+    });
     const finding = payload.checks.find((c) => c.checkSlug === 'a')?.findings[0];
     expect(finding?.filePath).toBe('src/x.ts');
     expect(finding?.line).toBe(3);

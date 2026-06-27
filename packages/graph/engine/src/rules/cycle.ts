@@ -68,9 +68,14 @@ export const cycleRule = defineRule({
           severity: base,
           category: 'architecture',
           message: `${anchor.simpleName} is part of a ${String(scc.sccSize)}-function call cycle${scc.crossesPackages ? ' spanning multiple packages' : ''}.`,
-          code: { file: anchor.filePath, line: anchor.line, column: anchor.column },
+          code: {
+            file: anchor.filePath,
+            line: anchor.line,
+            column: anchor.column,
+          },
           suggestion: 'Break the cycle: invert one dependency or extract the shared piece.',
           metadata: {
+            highImpact: scc.crossesPackages || scc.sccSize >= minSize,
             sccId: scc.id,
             sccSize: scc.sccSize,
             crossesPackages: scc.crossesPackages,

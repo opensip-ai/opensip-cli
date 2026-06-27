@@ -69,7 +69,11 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
       compilerOptions: undefined,
     }),
     parseProject: (): ParseOutput => ({ project: { x: 1 }, parseErrors: [] }),
-    walkProject: (): WalkOutput => ({ occurrences: {}, callSites: [], parseErrors: [] }),
+    walkProject: (): WalkOutput => ({
+      occurrences: {},
+      callSites: [],
+      parseErrors: [],
+    }),
     resolveCallSites: (): ResolveOutput => ({
       edgesByOwner: new Map(),
       stats: {
@@ -125,7 +129,10 @@ async function withTTY(value: boolean | undefined, fn: () => Promise<unknown>): 
   try {
     await fn();
   } finally {
-    Object.defineProperty(process.stdout, 'isTTY', { value: prev, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: prev,
+      configurable: true,
+    });
   }
 }
 
@@ -265,7 +272,11 @@ describe('graph-shard-worker handler', () => {
     currentAdapterRegistry().register(fakeAdapter(workDir));
     const specPath = join(workDir, 'spec.json');
     const spec: ShardWorkerSpec = {
-      shard: { id: 'pkg:a', rootDir: workDir, files: [join(workDir, 'src', 'a.ts')] },
+      shard: {
+        id: 'pkg:a',
+        rootDir: workDir,
+        files: [join(workDir, 'src', 'a.ts')],
+      },
       projectRoot: workDir,
       resolutionMode: 'exact',
     };

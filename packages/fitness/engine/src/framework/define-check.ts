@@ -297,7 +297,10 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
       fileTypes: config.fileTypes ? [...config.fileTypes] : undefined,
       checkScope:
         config.scope && canonicalLanguages
-          ? { languages: canonicalLanguages, concerns: [...config.scope.concerns] }
+          ? {
+              languages: canonicalLanguages,
+              concerns: [...config.scope.concerns],
+            }
           : undefined,
       // Display metadata travels WITH the check (§5.3 fold) — no separate
       // per-process display sidecar/singleton. Authors set these inline, or a

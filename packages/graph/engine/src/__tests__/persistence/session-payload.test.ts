@@ -37,8 +37,20 @@ describe('buildGraphSessionPayload', () => {
         filePath: 'a.ts',
         line: 1,
       }),
-      sig({ ruleId: 'graph:dup-body', message: 'dup', severity: 'low', filePath: 'b.ts', line: 2 }),
-      sig({ ruleId: 'graph:dup-body', message: 'dup', severity: 'low', filePath: 'c.ts', line: 3 }),
+      sig({
+        ruleId: 'graph:dup-body',
+        message: 'dup',
+        severity: 'low',
+        filePath: 'b.ts',
+        line: 2,
+      }),
+      sig({
+        ruleId: 'graph:dup-body',
+        message: 'dup',
+        severity: 'low',
+        filePath: 'c.ts',
+        line: 3,
+      }),
     ]);
 
     // One check per rule; every finding is kept (3 signals → 3 findings total).
@@ -58,7 +70,13 @@ describe('buildGraphSessionPayload', () => {
     expect(dup?.passed).toBe(true);
     expect(dup?.findings[0]?.severity).toBe('warning');
     // Summary aggregates by severity bucket.
-    expect(payload.summary).toEqual({ total: 2, passed: 1, failed: 1, errors: 1, warnings: 2 });
+    expect(payload.summary).toEqual({
+      total: 2,
+      passed: 1,
+      failed: 1,
+      errors: 1,
+      warnings: 2,
+    });
   });
 
   it('returns an empty checks list for a run with no signals (no evaluated-rule list)', () => {
@@ -81,12 +99,26 @@ describe('buildGraphSessionPayload', () => {
       'graph:dup-body',
       'graph:large-function',
     ]);
-    expect(payload.summary).toEqual({ total: 3, passed: 3, failed: 0, errors: 0, warnings: 0 });
+    expect(payload.summary).toEqual({
+      total: 3,
+      passed: 3,
+      failed: 0,
+      errors: 0,
+      warnings: 0,
+    });
   });
 
   it('unions evaluated rules with rules that fired (a fired rule keeps its findings)', () => {
     const payload = buildGraphSessionPayload(
-      [sig({ ruleId: 'graph:cycle', message: 'cyc', severity: 'high', filePath: 'a.ts', line: 1 })],
+      [
+        sig({
+          ruleId: 'graph:cycle',
+          message: 'cyc',
+          severity: 'high',
+          filePath: 'a.ts',
+          line: 1,
+        }),
+      ],
       ['graph:large-function', 'graph:cycle'],
     );
     expect(payload.checks).toHaveLength(2);
@@ -96,6 +128,12 @@ describe('buildGraphSessionPayload', () => {
     expect(cycle?.findings).toHaveLength(1);
     expect(large?.passed).toBe(true);
     expect(large?.findings).toHaveLength(0);
-    expect(payload.summary).toEqual({ total: 2, passed: 1, failed: 1, errors: 1, warnings: 0 });
+    expect(payload.summary).toEqual({
+      total: 2,
+      passed: 1,
+      failed: 1,
+      errors: 1,
+      warnings: 0,
+    });
   });
 });

@@ -99,7 +99,10 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 export const noAnyTypes = defineCheck({
   id: '3d456769-bbcb-461f-8efd-e7b340dcb1b8',
   slug: 'no-any-types',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   description: 'Detect usage of any type - use unknown with type narrowing instead',
   longDescription: `**Purpose:** Detects usage of the \`any\` type in TypeScript code, which bypasses type checking and should be replaced with \`unknown\` plus proper type narrowing.
 

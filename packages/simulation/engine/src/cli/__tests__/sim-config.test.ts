@@ -88,10 +88,15 @@ describe('resolveSimRecipeSelection (ADR-0022)', () => {
       // says `from-scope` — sim must return the SCOPE value.
       write('simulation:\n  recipe: from-file\n');
       const scope = makeSimTestScope();
-      Object.assign(scope, { toolConfig: { simulation: { recipe: 'from-scope' } } });
+      Object.assign(scope, {
+        toolConfig: { simulation: { recipe: 'from-scope' } },
+      });
 
       const resolved = runWithScopeSync(scope, () => resolveSimRecipeSelection(dir, undefined));
-      expect(resolved).toMatchObject({ name: 'from-scope', source: 'tool-config' });
+      expect(resolved).toMatchObject({
+        name: 'from-scope',
+        source: 'tool-config',
+      });
     });
 
     it('returns builtin default when the scope simulation block has no recipe', () => {

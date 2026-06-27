@@ -372,7 +372,10 @@ function splitSpecifier(specifier: string): {
     }
     const packageName = `${parts[0]}/${parts[1]}`;
     const rest = parts.slice(2);
-    return { packageName, subpath: rest.length > 0 ? `./${rest.join('/')}` : undefined };
+    return {
+      packageName,
+      subpath: rest.length > 0 ? `./${rest.join('/')}` : undefined,
+    };
   }
   // Unscoped: pkg[/...rest]
   const packageName = parts[0];
@@ -380,7 +383,10 @@ function splitSpecifier(specifier: string): {
     return { packageName: undefined, subpath: undefined };
   }
   const rest = parts.slice(1);
-  return { packageName, subpath: rest.length > 0 ? `./${rest.join('/')}` : undefined };
+  return {
+    packageName,
+    subpath: rest.length > 0 ? `./${rest.join('/')}` : undefined,
+  };
 }
 
 /** True when `exports` literally declares `subpath` as a key (v1 — no globs). */

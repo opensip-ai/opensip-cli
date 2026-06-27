@@ -129,7 +129,14 @@ describe('mountCommandSpec — wiring', () => {
           choices: ['exact', 'fast'],
         },
       ],
-      args: [{ name: 'paths', variadic: true, optional: true, description: 'subtrees' }],
+      args: [
+        {
+          name: 'paths',
+          variadic: true,
+          optional: true,
+          description: 'subtrees',
+        },
+      ],
       scope: 'project',
       output: 'command-result',
       handler,
@@ -150,7 +157,9 @@ describe('mountCommandSpec — wiring', () => {
     expect(optionFlags).toContain('--no-cache');
     expect(optionFlags).toContain('--resolution <mode>');
 
-    await program.parseAsync(['demo', '--recipe', 'r1', 'src', 'lib'], { from: 'user' });
+    await program.parseAsync(['demo', '--recipe', 'r1', 'src', 'lib'], {
+      from: 'user',
+    });
 
     expect(handler).toHaveBeenCalledOnce();
     const opts = handler.mock.calls[0]?.[0] as Record<string, unknown>;
@@ -181,7 +190,13 @@ describe('mountCommandSpec — wiring', () => {
       description: 'pick a mode',
       commonFlags: [],
       options: [
-        { flag: '--mode', value: '<m>', description: 'mode', default: 'a', choices: ['a', 'b'] },
+        {
+          flag: '--mode',
+          value: '<m>',
+          description: 'mode',
+          default: 'a',
+          choices: ['a', 'b'],
+        },
       ],
       scope: 'none',
       output: 'command-result',
@@ -221,7 +236,9 @@ describe('mountCommandSpec — wiring', () => {
     });
     mountCommandSpec(program, spec, ctx);
 
-    await program.parseAsync(['acc', '--exclude', 'x', '--exclude', 'y'], { from: 'user' });
+    await program.parseAsync(['acc', '--exclude', 'x', '--exclude', 'y'], {
+      from: 'user',
+    });
     expect((handler.mock.calls[0]?.[0] as Record<string, unknown>).exclude).toEqual(['x', 'y']);
   });
 
@@ -233,7 +250,14 @@ describe('mountCommandSpec — wiring', () => {
       name: 'needs',
       description: 'needs out',
       commonFlags: [],
-      options: [{ flag: '--out', value: '<path>', description: 'output path', required: true }],
+      options: [
+        {
+          flag: '--out',
+          value: '<path>',
+          description: 'output path',
+          required: true,
+        },
+      ],
       scope: 'none',
       output: 'raw-stream',
       rawStreamReason: 'file-export',
@@ -690,7 +714,9 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
     // cwd is seeded by applyCommonFlags when the flag is declared
     expect(received[0].opts.cwd).toBeTruthy();
 
-    await program.parseAsync(['onepos', 'src/bar', '--cwd', 'some/tmp/x'], { from: 'user' });
+    await program.parseAsync(['onepos', 'src/bar', '--cwd', 'some/tmp/x'], {
+      from: 'user',
+    });
     expect(received[1].positionals).toEqual(['src/bar']);
     expect(received[1].opts.cwd).toBe('some/tmp/x');
   });
@@ -703,7 +729,14 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
       name: 'multipos',
       description: 'variadic positionals',
       commonFlags: ['json'],
-      args: [{ name: 'paths', variadic: true, optional: true, description: 'paths...' }],
+      args: [
+        {
+          name: 'paths',
+          variadic: true,
+          optional: true,
+          description: 'paths...',
+        },
+      ],
       scope: 'none',
       output: 'command-result',
       handler: (opts) => {
@@ -717,7 +750,9 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
     // Variadic positionals surface via _args as an array containing the variadic list
     expect(received[0].positionals).toEqual([['a', 'b', 'c']]);
 
-    await program.parseAsync(['multipos', 'x', '--json', 'y'], { from: 'user' });
+    await program.parseAsync(['multipos', 'x', '--json', 'y'], {
+      from: 'user',
+    });
     // --json is a flag, not a positional; the two real positionals (for the variadic) survive.
     // Current _args delivery for the variadic collects them as a nested array in this handler context.
     expect(received[1].positionals).toEqual([['x', 'y']]);
@@ -733,7 +768,12 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
 // ---------------------------------------------------------------------------
 
 /** Silent logger for the integration run plane (no warn/info spam). */
-const SILENT_LOG: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const SILENT_LOG: Logger = {
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
 
 describe('mountCommandSpec — host run-lifecycle hooks', () => {
   it('calls beginRun before the handler and completeRun(result) after — exactly once each, in order', async () => {
@@ -746,7 +786,10 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
       order.push('handler');
       return result;
     });
-    const hookedCtx = Object.assign({}, ctx, { beginRun, completeRun }) as ToolCliContext;
+    const hookedCtx = Object.assign({}, ctx, {
+      beginRun,
+      completeRun,
+    }) as ToolCliContext;
     const program = new Command();
     const spec: HostCommandSpec = defineCommand({
       name: 'lc',
@@ -774,7 +817,10 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
     const handler = vi.fn(() => {
       throw new ConfigurationError('bad', { code: 'CONFIGURATION_ERROR' });
     });
-    const hookedCtx = Object.assign({}, ctx, { beginRun, completeRun }) as ToolCliContext;
+    const hookedCtx = Object.assign({}, ctx, {
+      beginRun,
+      completeRun,
+    }) as ToolCliContext;
     const program = new Command();
     const spec: HostCommandSpec = defineCommand({
       name: 'boom',
@@ -802,7 +848,10 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
 
   /** Build a ctx whose run seam + action hooks are backed by a REAL run plane. */
   function ctxWithRealRunPlane(ds: DataStore): ToolCliContext {
-    const factory = createRunPlaneFactory({ getDatastore: () => ds, logger: SILENT_LOG });
+    const factory = createRunPlaneFactory({
+      getDatastore: () => ds,
+      logger: SILENT_LOG,
+    });
     return Object.assign({}, makeCtx().ctx, {
       runSession: createRunSessionSeam(factory),
       ...createRunActionHooks(factory),

@@ -30,7 +30,10 @@ function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolati
     const intervalMatch = /(?:const|let|var)\s+(\w+)\s*=\s*setInterval\s*\(/.exec(line);
     if (intervalMatch) {
       /* v8 ignore next -- defensive: regex (\w+) capture group always yields a string */
-      intervalCreations.push({ line: i + 1, varName: intervalMatch[1] ?? null });
+      intervalCreations.push({
+        line: i + 1,
+        varName: intervalMatch[1] ?? null,
+      });
     } else if (/\bsetInterval\s*\(/.test(line) && !line.includes('clearInterval')) {
       // setInterval without variable capture
       intervalCreations.push({ line: i + 1, varName: null });
@@ -66,7 +69,10 @@ function analyzeTimerLifecycle(content: string, _filePath: string): CheckViolati
 export const timerLifecycle = defineCheck({
   id: 'f42299e1-6d22-4c4b-a236-6157a95f0949',
   slug: 'timer-lifecycle',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   description:
     'Detects setInterval() calls without corresponding clearInterval() cleanup — prevents timer leaks',
   longDescription: `**Purpose:** Detects \`setInterval()\` calls that have no corresponding \`clearInterval()\` in the same module, which causes timer leaks.

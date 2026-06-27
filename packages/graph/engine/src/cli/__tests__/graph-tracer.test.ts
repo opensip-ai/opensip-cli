@@ -41,7 +41,12 @@ describe('spanRunStage (sharded-worker stage spans)', () => {
   it('tolerates base attrs + a no-op span without throwing', async () => {
     const run = spanRunStage({ 'opensip_cli.graph.shard_id': 's2' });
     await expect(
-      run({ stage: 'resolve', onProgress: undefined, monitor: undefined, fn: () => undefined }),
+      run({
+        stage: 'resolve',
+        onProgress: undefined,
+        monitor: undefined,
+        fn: () => undefined,
+      }),
     ).resolves.toBeUndefined();
   });
 });

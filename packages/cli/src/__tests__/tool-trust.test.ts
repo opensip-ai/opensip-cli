@@ -44,7 +44,11 @@ function stageProjectLocalTool(id: string, apiVersion?: number): string {
 describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
   it('admits all on the wildcard and emits a per-invocation deprecation warning', () => {
     const warnSpy = vi.spyOn(logger, 'warn');
-    expect(isInstalledToolTrusted('anything', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    expect(
+      isInstalledToolTrusted('anything', {
+        [INSTALLED_TOOL_ALLOWLIST_ENV]: '*',
+      }),
+    ).toBe(true);
     expect(isInstalledToolTrusted('again', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
     expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledWith(
@@ -60,7 +64,11 @@ describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
 
   it('denies by default when the allowlist env is unset/empty', () => {
     expect(isInstalledToolTrusted('my-plugin', {})).toBe(false);
-    expect(isInstalledToolTrusted('my-plugin', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '' })).toBe(false);
+    expect(
+      isInstalledToolTrusted('my-plugin', {
+        [INSTALLED_TOOL_ALLOWLIST_ENV]: '',
+      }),
+    ).toBe(false);
   });
 
   it('admits an id present in the comma/space-separated allowlist', () => {
@@ -74,7 +82,11 @@ describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
 describe('isProjectLocalToolTrusted (deny-by-default allowlist)', () => {
   it('denies by default when the allowlist env is unset/empty', () => {
     expect(isProjectLocalToolTrusted('my-audit', {})).toBe(false);
-    expect(isProjectLocalToolTrusted('my-audit', { [PROJECT_TOOL_ALLOWLIST_ENV]: '' })).toBe(false);
+    expect(
+      isProjectLocalToolTrusted('my-audit', {
+        [PROJECT_TOOL_ALLOWLIST_ENV]: '',
+      }),
+    ).toBe(false);
   });
 
   it('admits an id present in the comma/space-separated allowlist', () => {
@@ -85,7 +97,11 @@ describe('isProjectLocalToolTrusted (deny-by-default allowlist)', () => {
   });
 
   it('admits all on the wildcard', () => {
-    expect(isProjectLocalToolTrusted('anything', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    expect(
+      isProjectLocalToolTrusted('anything', {
+        [PROJECT_TOOL_ALLOWLIST_ENV]: '*',
+      }),
+    ).toBe(true);
   });
 });
 
@@ -114,7 +130,9 @@ describe('wildcard allowlist broadening guard', () => {
 
 describe('isCapabilityPackTrusted (exact-name allowlist)', () => {
   it('denies by default and admits only exact package-name matches', () => {
-    const env = { [CAPABILITY_PACK_ALLOWLIST_ENV]: '@acme/fit-rules, @acme/graph-go' };
+    const env = {
+      [CAPABILITY_PACK_ALLOWLIST_ENV]: '@acme/fit-rules, @acme/graph-go',
+    };
     expect(isCapabilityPackTrusted('@acme/fit-rules', env)).toBe(true);
     expect(isCapabilityPackTrusted('@acme/graph-go', env)).toBe(true);
     expect(isCapabilityPackTrusted('@acme/other', env)).toBe(false);
@@ -126,7 +144,9 @@ describe('isCapabilityPackTrusted (exact-name allowlist)', () => {
     const warnSpy = vi.spyOn(logger, 'warn');
 
     expect(
-      isCapabilityPackTrusted('@acme/fit-rules', { [CAPABILITY_PACK_ALLOWLIST_ENV]: '*' }),
+      isCapabilityPackTrusted('@acme/fit-rules', {
+        [CAPABILITY_PACK_ALLOWLIST_ENV]: '*',
+      }),
     ).toBe(false);
 
     expect(warnSpy).toHaveBeenCalledWith(
@@ -178,7 +198,10 @@ describe('admitProjectLocalTool — trust gate precedes import', () => {
     const dir = mkdtempSync(join(tmpdir(), 'opensip-projlocal-empty-'));
     staged.push(dir);
     expect(() =>
-      admitProjectLocalTool({ dir, env: { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' } }),
+      admitProjectLocalTool({
+        dir,
+        env: { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' },
+      }),
     ).toThrow(PluginIncompatibleError);
   });
 
@@ -188,7 +211,10 @@ describe('admitProjectLocalTool — trust gate precedes import', () => {
     const dir = stageProjectLocalTool('future-tool', 999);
     staged.push(dir);
     try {
-      admitProjectLocalTool({ dir, env: { [PROJECT_TOOL_ALLOWLIST_ENV]: 'future-tool' } });
+      admitProjectLocalTool({
+        dir,
+        env: { [PROJECT_TOOL_ALLOWLIST_ENV]: 'future-tool' },
+      });
       expect.unreachable('expected a PluginIncompatibleError');
     } catch (error) {
       expect(error).toBeInstanceOf(PluginIncompatibleError);

@@ -238,7 +238,11 @@ describe('isTestFile', () => {
       // With excludeDeclarationFiles disabled, the function falls back to
       // pattern matching. A .d.ts inside __tests__ then matches the dir
       // pattern.
-      expect(isTestFile('src/__tests__/types.d.ts', { excludeDeclarationFiles: false })).toBe(true);
+      expect(
+        isTestFile('src/__tests__/types.d.ts', {
+          excludeDeclarationFiles: false,
+        }),
+      ).toBe(true);
     });
   });
 

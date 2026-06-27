@@ -43,16 +43,25 @@ function validateChaosWorkloadTiming(
   errors: ScenarioValidationError[],
 ): void {
   if (config.workload?.rampUp !== undefined && config.workload.rampUp < 0) {
-    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp must be non-negative' });
+    errors.push({
+      field: 'workload.rampUp',
+      message: 'workload.rampUp must be non-negative',
+    });
   }
   if (typeof config.duration !== 'number' || config.duration <= 0) {
-    errors.push({ field: 'duration', message: 'duration must be a positive number' });
+    errors.push({
+      field: 'duration',
+      message: 'duration must be a positive number',
+    });
   }
 }
 
 function validateFault(config: ChaosScenarioConfig, errors: ScenarioValidationError[]): void {
   if (!config.fault) {
-    errors.push({ field: 'fault', message: 'fault spec is required for chaos scenarios' });
+    errors.push({
+      field: 'fault',
+      message: 'fault spec is required for chaos scenarios',
+    });
     return;
   }
   if (
@@ -66,7 +75,10 @@ function validateFault(config: ChaosScenarioConfig, errors: ScenarioValidationEr
     });
   }
   if (config.fault.faults.length === 0) {
-    errors.push({ field: 'fault.faults', message: 'fault.faults must be a non-empty array' });
+    errors.push({
+      field: 'fault.faults',
+      message: 'fault.faults must be a non-empty array',
+    });
     return;
   }
   for (const [i, f] of config.fault.faults.entries()) {

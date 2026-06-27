@@ -10,7 +10,11 @@ function validDiscovery(): Record<string, unknown> {
     discovery: { mode: 'marker', markerKind: 'tool' },
     exportName: 'register',
     exportShape: 'array',
-    configKeys: { packages: 'plugins.tools', autoDiscover: 'auto', scopes: 'scope' },
+    configKeys: {
+      packages: 'plugins.tools',
+      autoDiscover: 'auto',
+      scopes: 'scope',
+    },
     builtinScope: 'core',
     explicitListMode: 'replace',
     coContributions: [{ exportName: 'recipes', exportShape: 'array', domainId: 'fit-recipe' }],
@@ -38,7 +42,11 @@ describe('normalizeDiscovery — happy path', () => {
       discovery: { mode: 'marker', markerKind: 'tool' },
       exportName: 'register',
       exportShape: 'array',
-      configKeys: { packages: 'plugins.tools', autoDiscover: 'auto', scopes: 'scope' },
+      configKeys: {
+        packages: 'plugins.tools',
+        autoDiscover: 'auto',
+        scopes: 'scope',
+      },
       builtinScope: 'core',
       explicitListMode: 'replace',
       coContributions: [{ exportName: 'recipes', exportShape: 'array', domainId: 'fit-recipe' }],
@@ -61,7 +69,11 @@ describe('normalizeDiscovery — happy path', () => {
 
   it('accepts a name-pattern discovery mode', () => {
     const result = normalizeDiscovery({
-      discovery: { mode: 'name-pattern', prefix: 'opensip-', defaultScopes: ['backend'] },
+      discovery: {
+        mode: 'name-pattern',
+        prefix: 'opensip-',
+        defaultScopes: ['backend'],
+      },
       exportName: 'register',
       exportShape: 'array',
       configKeys: {},

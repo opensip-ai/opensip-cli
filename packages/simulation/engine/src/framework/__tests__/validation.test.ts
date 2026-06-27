@@ -59,20 +59,30 @@ describe('validateScenarioMetadata', () => {
   it('flags a missing name when required and skips it when not', () => {
     const required: ScenarioValidationError[] = [];
     validateScenarioMetadata({ id: 'ok', description: 'd' }, required);
-    expect(required).toContainEqual({ field: 'name', message: 'name is required' });
+    expect(required).toContainEqual({
+      field: 'name',
+      message: 'name is required',
+    });
 
     const optional: ScenarioValidationError[] = [];
-    validateScenarioMetadata({ id: 'ok', description: 'd' }, optional, { requireName: false });
+    validateScenarioMetadata({ id: 'ok', description: 'd' }, optional, {
+      requireName: false,
+    });
     expect(optional).toEqual([]);
   });
 
   it('flags a missing description when required and skips it when not', () => {
     const required: ScenarioValidationError[] = [];
     validateScenarioMetadata({ id: 'ok', name: 'n' }, required);
-    expect(required).toContainEqual({ field: 'description', message: 'description is required' });
+    expect(required).toContainEqual({
+      field: 'description',
+      message: 'description is required',
+    });
 
     const optional: ScenarioValidationError[] = [];
-    validateScenarioMetadata({ id: 'ok', name: 'n' }, optional, { requireDescription: false });
+    validateScenarioMetadata({ id: 'ok', name: 'n' }, optional, {
+      requireDescription: false,
+    });
     expect(optional).toEqual([]);
   });
 });

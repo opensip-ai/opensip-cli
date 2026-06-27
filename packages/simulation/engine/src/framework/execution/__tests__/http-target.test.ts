@@ -8,7 +8,10 @@ import { httpTarget } from '../http-target.js';
 
 import type { TargetContext } from '../target.js';
 
-const ctx: TargetContext = { signal: new AbortController().signal, correlationId: 'c' };
+const ctx: TargetContext = {
+  signal: new AbortController().signal,
+  correlationId: 'c',
+};
 
 const respond = (body: string, status: number) => () =>
   Promise.resolve(new Response(body, { status }));
@@ -31,9 +34,12 @@ describe('httpTarget', () => {
   it('forwards method, headers, body, and the abort signal', async () => {
     const f = vi.fn(respond('ok', 200));
     vi.stubGlobal('fetch', f);
-    await httpTarget({ url: 'https://x.test', method: 'POST', headers: { a: 'b' }, body: 'p' })(
-      ctx,
-    );
+    await httpTarget({
+      url: 'https://x.test',
+      method: 'POST',
+      headers: { a: 'b' },
+      body: 'p',
+    })(ctx);
     expect(f).toHaveBeenCalledWith(
       'https://x.test',
       expect.objectContaining({

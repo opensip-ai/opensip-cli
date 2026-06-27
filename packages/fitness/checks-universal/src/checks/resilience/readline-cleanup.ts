@@ -35,7 +35,10 @@ const CLEANUP_PATTERNS = [
 export const readlineCleanup = defineCheck({
   id: 'd0e76036-c138-4132-99be-d2cddf9aeac1',
   slug: 'readline-cleanup',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'medium',

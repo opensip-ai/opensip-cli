@@ -15,7 +15,10 @@ describe('commonFlags registry', () => {
       description: 'Output structured JSON',
       defaultValue: false,
     });
-    expect(commonFlags.cwd).toEqual({ flags: '--cwd <path>', description: 'Target directory' });
+    expect(commonFlags.cwd).toEqual({
+      flags: '--cwd <path>',
+      description: 'Target directory',
+    });
     expect(commonFlags.verbose.flags).toBe('-v, --verbose');
     expect(commonFlags.quiet.flags).toBe('-q, --quiet');
     // The drift this registry exists to prevent: one canonical --report-to string.

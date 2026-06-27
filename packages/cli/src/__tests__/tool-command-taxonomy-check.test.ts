@@ -87,7 +87,10 @@ describe('analyzeToolCommandTaxonomy — Rule A (no masquerading export verb) (S
     // No canonical `export` in the file: Rule A is dormant. The bare
     // `sarif-export` is NOT tool-prefixed for graph (`graph-`) so Rule C warns —
     // but the masquerade rule itself does not fire.
-    const content = descriptor({ name: 'sarif-export', description: 'write SARIF' });
+    const content = descriptor({
+      name: 'sarif-export',
+      description: 'write SARIF',
+    });
     const findings = analyzeToolCommandTaxonomy(content, GRAPH_TOOL);
     expect(findings.filter((f) => /masquerade/i.test(f.message))).toEqual([]);
   });
@@ -100,7 +103,11 @@ describe('analyzeToolCommandTaxonomy — Rule B (internal marker) (Step 2)', () 
     // unmarked worker.
     const content = [
       descriptor({ name: 'fit-run-worker', description: '[internal] worker' }),
-      descriptor({ name: 'fit-shard-worker', visibility: 'internal', description: '[internal]' }),
+      descriptor({
+        name: 'fit-shard-worker',
+        visibility: 'internal',
+        description: '[internal]',
+      }),
     ].join('\n\n');
     const findings = analyzeToolCommandTaxonomy(content, FIT_TOOL);
     const ruleB = findings.filter((f) => /must declare visibility: 'internal'/.test(f.message));
@@ -122,7 +129,10 @@ describe('analyzeToolCommandTaxonomy — Rule B (internal marker) (Step 2)', () 
     // A lone unmarked worker with no marker convention anywhere in the file: Rule
     // B has not activated, so the unmarked worker is tolerated (and internal
     // names are exempt from the Rule C verb-shape check).
-    const content = descriptor({ name: 'fit-run-worker', description: '[internal] worker' });
+    const content = descriptor({
+      name: 'fit-run-worker',
+      description: '[internal] worker',
+    });
     expect(analyzeToolCommandTaxonomy(content, FIT_TOOL)).toEqual([]);
   });
 
@@ -130,8 +140,15 @@ describe('analyzeToolCommandTaxonomy — Rule B (internal marker) (Step 2)', () 
     // `graph-equivalence-check` is the non-`*-worker` internal name (the Phase 1
     // leak fix). Unmarked, with the convention in use elsewhere, Rule B fires.
     const content = [
-      descriptor({ name: 'graph-equivalence-check', description: '[internal] gate' }),
-      descriptor({ name: 'graph-run-worker', visibility: 'internal', description: '[internal]' }),
+      descriptor({
+        name: 'graph-equivalence-check',
+        description: '[internal] gate',
+      }),
+      descriptor({
+        name: 'graph-run-worker',
+        visibility: 'internal',
+        description: '[internal]',
+      }),
     ].join('\n\n');
     const ruleB = analyzeToolCommandTaxonomy(content, GRAPH_TOOL).filter((f) =>
       /must declare visibility: 'internal'/.test(f.message),
@@ -157,13 +174,20 @@ describe('analyzeToolCommandTaxonomy — Rule C (verb shape) (Step 3)', () => {
   });
 
   it('does NOT warn on a tool-prefixed grouped name', () => {
-    const content = descriptor({ name: 'graph-lookup', description: 'look up a symbol' });
+    const content = descriptor({
+      name: 'graph-lookup',
+      description: 'look up a symbol',
+    });
     expect(analyzeToolCommandTaxonomy(content, GRAPH_TOOL)).toEqual([]);
   });
 
   it('does NOT warn on a parent-nested child (the canonical <tool> <verb> grammar)', () => {
     // `parent: 'graph'` IS the grammar — a nested `graph export` / `graph list`.
-    const content = descriptor({ name: 'list', parent: 'graph', description: 'list rules' });
+    const content = descriptor({
+      name: 'list',
+      parent: 'graph',
+      description: 'list rules',
+    });
     expect(analyzeToolCommandTaxonomy(content, GRAPH_TOOL)).toEqual([]);
   });
 
@@ -171,7 +195,10 @@ describe('analyzeToolCommandTaxonomy — Rule C (verb shape) (Step 3)', () => {
     // Tool-prefixed (`fit-...`) names satisfy Rule C even though the flat
     // `fit-baseline-export` command itself was removed — the rule keys on shape,
     // not on a specific allow-list.
-    const content = descriptor({ name: 'fit-baseline-export', description: 'export baseline' });
+    const content = descriptor({
+      name: 'fit-baseline-export',
+      description: 'export baseline',
+    });
     expect(analyzeToolCommandTaxonomy(content, FIT_TOOL)).toEqual([]);
   });
 

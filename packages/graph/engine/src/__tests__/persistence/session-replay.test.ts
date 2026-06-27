@@ -16,7 +16,11 @@ import type { StoredSession } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
 
 function sig(
-  over: Partial<Signal> & { ruleId: string; severity: Signal['severity']; filePath: string },
+  over: Partial<Signal> & {
+    ruleId: string;
+    severity: Signal['severity'];
+    filePath: string;
+  },
 ): Signal {
   return {
     id: `sig_${over.ruleId}`,
@@ -69,7 +73,11 @@ describe('graphReplayFromSession', () => {
     const located = replay.envelope.signals.find((s) => s.ruleId === 'graph:god-file');
     expect(located?.code).toEqual({ file: 'a.ts', line: 1, column: 2 });
     expect(located?.suggestion).toBe('split it');
-    expect(located?.metadata).toEqual({ fanIn: 12, label: 'big', flagged: true });
+    expect(located?.metadata).toEqual({
+      fanIn: 12,
+      label: 'big',
+      flagged: true,
+    });
     // The inner replay result is the uniform render-only RunPresentation carrying
     // the projected envelope (the host renders replay via SessionReplayResult, not
     // this inner result).
@@ -132,7 +140,11 @@ describe('graphReplayFromSession', () => {
   describe('payload validation', () => {
     const cases: { name: string; payload: unknown; message: RegExp }[] = [
       { name: 'null payload', payload: null, message: /no replay payload/ },
-      { name: 'missing summary', payload: { checks: [] }, message: /summary is missing/ },
+      {
+        name: 'missing summary',
+        payload: { checks: [] },
+        message: /summary is missing/,
+      },
       {
         name: 'non-number summary field',
         payload: {
@@ -143,7 +155,9 @@ describe('graphReplayFromSession', () => {
       },
       {
         name: 'missing checks[]',
-        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+        payload: {
+          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+        },
         message: /missing checks\[\]/,
       },
       {
@@ -167,7 +181,13 @@ describe('graphReplayFromSession', () => {
         payload: {
           summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
           checks: [
-            { checkSlug: 'a', passed: true, violationCount: 1, durationMs: 0, findings: [42] },
+            {
+              checkSlug: 'a',
+              passed: true,
+              violationCount: 1,
+              durationMs: 0,
+              findings: [42],
+            },
           ],
         },
         message: /finding is invalid/,
@@ -182,7 +202,14 @@ describe('graphReplayFromSession', () => {
               passed: true,
               violationCount: 1,
               durationMs: 0,
-              findings: [{ ruleId: 'r', message: 'm', severity: 'info', filePath: 'x.ts' }],
+              findings: [
+                {
+                  ruleId: 'r',
+                  message: 'm',
+                  severity: 'info',
+                  filePath: 'x.ts',
+                },
+              ],
             },
           ],
         },

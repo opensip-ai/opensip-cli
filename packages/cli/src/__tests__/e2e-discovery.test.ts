@@ -158,7 +158,9 @@ describe('init refusal inside existing project', () => {
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), {
+      recursive: true,
+    });
     const subdir = join(testDir, 'packages', 'api');
     mkdirSync(subdir, { recursive: true });
     const { stdout, stderr, exitCode } = runCli(['init'], subdir);
@@ -179,9 +181,13 @@ describe('uninstall safe default + --purge', () => {
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), {
+      recursive: true,
+    });
     writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my.mjs'), '\n', 'utf8');
-    mkdirSync(join(testDir, 'opensip-cli', '.runtime', 'logs'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', '.runtime', 'logs'), {
+      recursive: true,
+    });
     writeFileSync(join(testDir, 'opensip-cli', '.runtime', 'logs', 'run.jsonl'), '{}\n', 'utf8');
   });
 
@@ -329,7 +335,9 @@ describe('no-side-effects', () => {
       'schemaVersion: 1\ntargets: {}\n',
       'utf8',
     );
-    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), {
+      recursive: true,
+    });
     writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my.mjs'), '\n', 'utf8');
     runCli(['uninstall', '--project', '--dry-run', '--yes'], testDir);
     // The catastrophic side effect was the SQLite file. With lazy

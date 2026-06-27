@@ -68,7 +68,10 @@ describe('resolveChecks', () => {
         makeCheck('b', ['performance']),
         makeCheck('c', ['quality']),
       );
-      const selector: CheckSelector = { type: 'tags', include: ['security', 'performance'] };
+      const selector: CheckSelector = {
+        type: 'tags',
+        include: ['security', 'performance'],
+      };
       const result = resolveChecks(selector, reg);
       expect(result).toHaveLength(2);
       expect(result).toContain('a');
@@ -91,7 +94,10 @@ describe('resolveChecks', () => {
 
     it('returns empty array when no tags match', () => {
       const reg = createRegistry(makeCheck('a', ['quality']));
-      const selector: CheckSelector = { type: 'tags', include: ['nonexistent'] };
+      const selector: CheckSelector = {
+        type: 'tags',
+        include: ['nonexistent'],
+      };
       expect(resolveChecks(selector, reg)).toEqual([]);
     });
   });
@@ -99,7 +105,10 @@ describe('resolveChecks', () => {
   describe('explicit selector', () => {
     it('resolves by bare slug', () => {
       const reg = createRegistry(makeCheck('no-eval'), makeCheck('no-console'));
-      const selector: CheckSelector = { type: 'explicit', checkIds: ['no-eval'] };
+      const selector: CheckSelector = {
+        type: 'explicit',
+        checkIds: ['no-eval'],
+      };
       expect(resolveChecks(selector, reg)).toEqual(['no-eval']);
     });
 
@@ -109,7 +118,10 @@ describe('resolveChecks', () => {
         makeCheck('no-eval'),
         makeCheck('no-console'),
       );
-      const selector: CheckSelector = { type: 'explicit', checkIds: ['no-eval'] };
+      const selector: CheckSelector = {
+        type: 'explicit',
+        checkIds: ['no-eval'],
+      };
       const result = resolveChecks(selector, reg);
       expect(result).toHaveLength(1);
       expect(result[0]).toBe('builtin:no-eval');
@@ -117,13 +129,19 @@ describe('resolveChecks', () => {
 
     it('resolves by exact namespaced slug', () => {
       const reg = createNamespacedRegistry('builtin', makeCheck('no-eval'));
-      const selector: CheckSelector = { type: 'explicit', checkIds: ['builtin:no-eval'] };
+      const selector: CheckSelector = {
+        type: 'explicit',
+        checkIds: ['builtin:no-eval'],
+      };
       expect(resolveChecks(selector, reg)).toEqual(['builtin:no-eval']);
     });
 
     it('filters out unknown slugs', () => {
       const reg = createRegistry(makeCheck('exists'));
-      const selector: CheckSelector = { type: 'explicit', checkIds: ['exists', 'nope'] };
+      const selector: CheckSelector = {
+        type: 'explicit',
+        checkIds: ['exists', 'nope'],
+      };
       expect(resolveChecks(selector, reg)).toEqual(['exists']);
     });
   });
@@ -135,7 +153,10 @@ describe('resolveChecks', () => {
         makeCheck('null-safety', ['quality']),
         makeCheck('sql-injection', ['security']),
       );
-      const selector: CheckSelector = { type: 'pattern', include: ['security/*'] };
+      const selector: CheckSelector = {
+        type: 'pattern',
+        include: ['security/*'],
+      };
       const result = resolveChecks(selector, reg);
       expect(result).toHaveLength(2);
       expect(result).toContain('no-eval');
@@ -174,7 +195,10 @@ describe('resolveChecks', () => {
         makeCheck('no-eval', ['security']),
         makeCheck('null-safety', ['quality']),
       );
-      const selector: CheckSelector = { type: 'pattern', include: ['security/*'] };
+      const selector: CheckSelector = {
+        type: 'pattern',
+        include: ['security/*'],
+      };
       const result = resolveChecks(selector, reg);
       expect(result).toHaveLength(1);
       expect(result[0]).toBe('builtin:no-eval');

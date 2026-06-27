@@ -195,7 +195,12 @@ export type { RunTimer, RunLifecycle, RunTimingSnapshot } from './lib/run-timer.
 // Lib — path resolver (project-local opensip-cli/.runtime, user-level
 // ~/.opensip-cli/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
-export { resolveProjectPaths, resolveUserPaths, isPathInside } from './lib/paths.js';
+export {
+  resolveProjectPaths,
+  resolveUserPaths,
+  isPathInside,
+  toPosixRelative,
+} from './lib/paths.js';
 export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';
 
 // Lib — project-context resolver. One-shot ancestor walk from cwd to
@@ -225,3 +230,9 @@ export type { SchemaCompat } from './lib/config-version.js';
 // subtrees left over from pre-discovery runs. Returns paths; callers
 // surface them; never auto-deletes.
 export { detectPhantomRuntimes } from './lib/phantom-detect.js';
+
+// Lib — host-owned git changed-file resolver (ADR-0085). Single source of truth
+// for `fit --changed` and `graph impact --changed`; tools must not shell out
+// independently.
+export { resolveChangedFiles } from './lib/git-changed-files.js';
+export type { ChangedFilesResult, ChangedFileBasis } from './lib/git-changed-files.js';

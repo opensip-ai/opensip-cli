@@ -30,7 +30,10 @@ function createFlagCheckPattern(flagName: string): RegExp {
 export const reentrancyGuard = defineCheck({
   id: 'd7f35c3b-af42-435f-b953-ee167060fecb',
   slug: 'reentrancy-guard',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'medium',

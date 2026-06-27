@@ -54,7 +54,12 @@ export interface FitnessRecipeServiceCallbacks {
   onComplete?: (result: FitnessRecipeResult) => void;
   /** Called before execution with all registered checks for catalog sync. */
   onCatalogSync?: (
-    entries: { id: string; slug: string; tags: readonly string[]; description: string }[],
+    entries: {
+      id: string;
+      slug: string;
+      tags: readonly string[];
+      description: string;
+    }[],
   ) => void;
 }
 

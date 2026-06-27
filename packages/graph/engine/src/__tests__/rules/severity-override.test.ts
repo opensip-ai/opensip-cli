@@ -31,7 +31,9 @@ describe('applySeverityOverride', () => {
 
   it("clamps 'error' → 'high' and 'warning' → 'medium' when set for the slug", () => {
     const errCfg: GraphConfig = { severityOverrides: { 'graph:x': 'error' } };
-    const warnCfg: GraphConfig = { severityOverrides: { 'graph:x': 'warning' } };
+    const warnCfg: GraphConfig = {
+      severityOverrides: { 'graph:x': 'warning' },
+    };
     expect(applySeverityOverride('low', 'graph:x', errCfg)).toBe('high');
     expect(applySeverityOverride('low', 'graph:x', warnCfg)).toBe('medium');
   });
@@ -45,7 +47,11 @@ describe('applySeverityOverride', () => {
 
 describe('clamp integration — baseline-neutral when unset, clamps when set', () => {
   it('orphan-subtree (base medium) is unchanged with {} and clamps when overridden', () => {
-    const orphan = occ({ bodyHash: 'o', simpleName: 'lonely', visibility: 'module-local' });
+    const orphan = occ({
+      bodyHash: 'o',
+      simpleName: 'lonely',
+      visibility: 'module-local',
+    });
     const catalog = makeCatalog([orphan]);
     const indexes = buildIndexes(catalog);
 
@@ -60,12 +66,20 @@ describe('clamp integration — baseline-neutral when unset, clamps when set', (
   });
 
   it('large-function (base high) is unchanged without an override and clamps when set', () => {
-    const big = occ({ bodyHash: 'h', simpleName: 'huge', line: 1, endLine: 200 });
+    const big = occ({
+      bodyHash: 'h',
+      simpleName: 'huge',
+      line: 1,
+      endLine: 200,
+    });
     const catalog = makeCatalog([big]);
     const indexes = buildIndexes(catalog);
     // Explicit thresholds (error 150) so the 200-line span is base `high`
     // regardless of the shipped defaults — this case tests the clamp, not the bands.
-    const bands: GraphConfig = { largeFunctionWarnLines: 80, largeFunctionErrorLines: 150 };
+    const bands: GraphConfig = {
+      largeFunctionWarnLines: 80,
+      largeFunctionErrorLines: 150,
+    };
 
     const baseSignals = largeFunctionRule.evaluate(catalog, indexes, bands);
     expect(baseSignals).toHaveLength(1);

@@ -13,7 +13,10 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cl
 export const contractsSchemaConsistency = defineCheck({
   id: '3f2fb75f-27f5-4572-aa18-1947f98ac82f',
   slug: 'contracts-schema-consistency',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'medium',

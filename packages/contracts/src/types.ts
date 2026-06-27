@@ -34,6 +34,18 @@ export interface FitOptions {
   gateSave?: boolean;
   /** Architecture-gate: compare current findings against a saved baseline; exit 1 if regressions found. Mutually exclusive with --gate-save. */
   gateCompare?: boolean;
+  /** Agent filter tokens (repeatable). See agentRunFlagSpecs / applyAgentFilters (ADR-0085). */
+  filter?: string[];
+  /** Limit returned signals (sugar for --filter top:<n>). */
+  top?: string;
+  /** Emit unwrapped agent-filtered payload (no CommandOutcome wrapper). */
+  raw?: boolean;
+  /** Run only checks whose targets intersect git-changed files (ADR-0085). */
+  changed?: boolean;
+  /** Git ref base for --changed (diff <since>...HEAD). */
+  since?: string;
+  /** Expand changed set with graph-impacted files (requires catalog on scope). */
+  includeImpacted?: boolean;
 }
 
 /** Options for the `init` subcommand. */

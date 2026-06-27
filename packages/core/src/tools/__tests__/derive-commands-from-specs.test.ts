@@ -9,7 +9,12 @@ describe('resolveToolCommands', () => {
   it('prefers commandSpecs over a stale commands[] (mount surface wins)', () => {
     const tool = {
       identity: { name: 'test-tool' },
-      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
+      metadata: {
+        id: 'demo',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
       commands: [{ name: 'legacy-cmd', description: 'stale' }],
       commandSpecs: [
         defineCommand({
@@ -30,7 +35,12 @@ describe('resolveToolCommands', () => {
   it('falls back to commands[] when commandSpecs is absent', () => {
     const tool = {
       identity: { name: 'test-tool' },
-      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
+      metadata: {
+        id: 'demo',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
       commands: [{ name: 'legacy-only', description: 'legacy' }],
     } satisfies Tool;
 

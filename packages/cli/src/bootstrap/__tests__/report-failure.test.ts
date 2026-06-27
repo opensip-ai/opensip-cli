@@ -39,14 +39,18 @@ describe('resolveReportFailure', () => {
   });
 
   it('truncates derived throwable messages before surfacing them', () => {
-    const resolved = resolveReportFailure({ error: new Error('x'.repeat(2000)) });
+    const resolved = resolveReportFailure({
+      error: new Error('x'.repeat(2000)),
+    });
     expect(resolved.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
     expect(resolved.message).toHaveLength(1000);
     expect(resolved.message.endsWith('...')).toBe(true);
   });
 
   it('preserves ToolError code and canonical mapped exit code', () => {
-    const resolved = resolveReportFailure({ error: new NotFoundError('missing') });
+    const resolved = resolveReportFailure({
+      error: new NotFoundError('missing'),
+    });
     expect(resolved).toMatchObject({
       exitCode: EXIT_CODES.CHECK_NOT_FOUND,
       message: 'missing',
@@ -65,7 +69,11 @@ describe('resolveReportFailure', () => {
       exitCode: 9,
       code: 'CUSTOM',
     });
-    expect(resolved).toMatchObject({ message: 'custom', exitCode: 9, code: 'CUSTOM' });
+    expect(resolved).toMatchObject({
+      message: 'custom',
+      exitCode: 9,
+      code: 'CUSTOM',
+    });
   });
 });
 
@@ -95,7 +103,11 @@ describe('createReportFailure', () => {
       getDiagnostics: deps.getDiagnostics,
     });
     await report({ message: 'nope', exitCode: 2 });
-    expect(deps.render).toHaveBeenCalledWith({ type: 'error', message: 'nope', exitCode: 2 });
+    expect(deps.render).toHaveBeenCalledWith({
+      type: 'error',
+      message: 'nope',
+      exitCode: 2,
+    });
     expect(deps.setExitCode).toHaveBeenCalledWith(2);
   });
 
@@ -108,7 +120,12 @@ describe('createReportFailure', () => {
       emitError: deps.emitError,
       writeStderr: deps.writeStderr,
     });
-    await report({ message: 'nope', exitCode: 3, jsonRequested: true, code: 'not-found' });
+    await report({
+      message: 'nope',
+      exitCode: 3,
+      jsonRequested: true,
+      code: 'not-found',
+    });
     expect(deps.emitError).toHaveBeenCalledWith({
       message: 'nope',
       exitCode: 3,
@@ -151,7 +168,11 @@ describe('createReportFailure', () => {
     });
     await report({ message: 'failed', exitCode: 1 });
     expect(deps.log.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'tool.command.failed', message: 'failed', exitCode: 1 }),
+      expect.objectContaining({
+        evt: 'tool.command.failed',
+        message: 'failed',
+        exitCode: 1,
+      }),
     );
   });
 });

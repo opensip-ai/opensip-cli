@@ -26,8 +26,16 @@ export const CLI_SUPPORTED_SCHEMA_VERSION = 1 as const;
 /** Outcome of `checkSchemaCompat`. */
 export type SchemaCompat =
   | { readonly kind: 'ok'; readonly configVersion: number }
-  | { readonly kind: 'older'; readonly configVersion: number; readonly cliVersion: number }
-  | { readonly kind: 'cli-too-old'; readonly configVersion: number; readonly cliVersion: number };
+  | {
+      readonly kind: 'older';
+      readonly configVersion: number;
+      readonly cliVersion: number;
+    }
+  | {
+      readonly kind: 'cli-too-old';
+      readonly configVersion: number;
+      readonly cliVersion: number;
+    };
 
 /**
  * Read the top-level `schemaVersion:` field. Returns 1 for any
@@ -57,7 +65,15 @@ export function checkSchemaCompat(configVersion: number): SchemaCompat {
     return { kind: 'ok', configVersion };
   }
   if (configVersion < CLI_SUPPORTED_SCHEMA_VERSION) {
-    return { kind: 'older', configVersion, cliVersion: CLI_SUPPORTED_SCHEMA_VERSION };
+    return {
+      kind: 'older',
+      configVersion,
+      cliVersion: CLI_SUPPORTED_SCHEMA_VERSION,
+    };
   }
-  return { kind: 'cli-too-old', configVersion, cliVersion: CLI_SUPPORTED_SCHEMA_VERSION };
+  return {
+    kind: 'cli-too-old',
+    configVersion,
+    cliVersion: CLI_SUPPORTED_SCHEMA_VERSION,
+  };
 }

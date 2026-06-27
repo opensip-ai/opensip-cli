@@ -18,7 +18,10 @@ describe('registerRecipesFromMod', () => {
   it('returns zero when mod is undefined', () => {
     const registry = new RecipeRegistry<TestRecipe>();
     const onWarn = vi.fn();
-    const result = registerRecipesFromMod(undefined, registry, { namespace: 'test', onWarn });
+    const result = registerRecipesFromMod(undefined, registry, {
+      namespace: 'test',
+      onWarn,
+    });
     expect(result.recipesRegistered).toBe(0);
     expect(onWarn).not.toHaveBeenCalled();
   });
@@ -26,7 +29,10 @@ describe('registerRecipesFromMod', () => {
   it('returns zero when mod is null', () => {
     const registry = new RecipeRegistry<TestRecipe>();
     const onWarn = vi.fn();
-    const result = registerRecipesFromMod(null, registry, { namespace: 'test', onWarn });
+    const result = registerRecipesFromMod(null, registry, {
+      namespace: 'test',
+      onWarn,
+    });
     expect(result.recipesRegistered).toBe(0);
     expect(onWarn).not.toHaveBeenCalled();
   });
@@ -34,7 +40,10 @@ describe('registerRecipesFromMod', () => {
   it('returns zero when mod has no recipes field', () => {
     const registry = new RecipeRegistry<TestRecipe>();
     const onWarn = vi.fn();
-    const result = registerRecipesFromMod({ checks: [] }, registry, { namespace: 'test', onWarn });
+    const result = registerRecipesFromMod({ checks: [] }, registry, {
+      namespace: 'test',
+      onWarn,
+    });
     expect(result.recipesRegistered).toBe(0);
     expect(onWarn).not.toHaveBeenCalled();
   });

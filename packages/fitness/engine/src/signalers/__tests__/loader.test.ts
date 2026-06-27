@@ -129,7 +129,10 @@ fitness:
  *  installed via Object.assign exactly like the CLI pre-action hook does
  *  (scope-types.ts declares it readonly for readers). */
 const makeScopeWithDocument = (configDocument: Record<string, unknown>): RunScope => {
-  const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  const scope = new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
   Object.assign(scope, { configDocument });
   return scope;
 };
@@ -155,7 +158,10 @@ describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
       join(testDir, 'opensip-cli.config.yml'),
       'targets: {}\nfitness:\n  failOnErrors: 99\n',
     );
-    const scope = makeScopeWithDocument({ targets: {}, fitness: { failOnErrors: 2 } });
+    const scope = makeScopeWithDocument({
+      targets: {},
+      fitness: { failOnErrors: 2 },
+    });
     const cfg = runWithScopeSync(scope, () => loadSignalersConfig(testDir));
     expect(cfg.fitness.failOnErrors).toBe(2);
   });
@@ -171,14 +177,19 @@ describe('loadSignalersConfig — scope-first (ADR-0023 one-reader)', () => {
     // A scope WITHOUT configDocument has already passed through bootstrap
     // without a document; the loader must fail closed rather than re-reading
     // YAML from a scoped run.
-    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+    });
     expect(() => runWithScopeSync(scope, () => loadSignalersConfig(testDir))).toThrow(
       ValidationError,
     );
   });
 
   it('still rejects an invalid scope document with the fitness error shape', () => {
-    const scope = makeScopeWithDocument({ targets: { 'Bad Name': { include: [] } } });
+    const scope = makeScopeWithDocument({
+      targets: { 'Bad Name': { include: [] } },
+    });
     expect(() => runWithScopeSync(scope, () => loadSignalersConfig(testDir))).toThrow(
       ValidationError,
     );

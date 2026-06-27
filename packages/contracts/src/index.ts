@@ -78,6 +78,8 @@ export type {
   ErrorResult,
   GraphLookupMatch,
   GraphLookupResult,
+  GraphImpactBasis,
+  GraphImpactResult,
   ConfigValidateResult,
   ConfigSchemaResult,
 } from './command-results.js';
@@ -257,34 +259,24 @@ export type {
   GraphBlastScore,
 } from './graph-catalog.js';
 
+// Agent ergonomics — shared filter engine + impact compute (ADR-0085).
+export {
+  applyAgentFilters,
+  buildAgentFilteredResult,
+  normalizeAgentRunFilters,
+  agentRunFlagSpecs,
+  AgentFilterParseError,
+} from './agent-filters.js';
+export type { AgentFilteredResult } from './agent-filters.js';
+export { computeImpact } from './graph-impact-compute.js';
+export type { ImpactComputation, ImpactFunction, ImpactPackage } from './graph-impact-compute.js';
+
 // SARIF + cloud reporting moved to @opensip-cli/output (audit
 // 2026-05-29, contracts split; package renamed reporting→output in Phase 2,
 // ADR-0011). The formatter/sink runtime + its types live there; contracts
 // no longer re-exports them.
 
-// `commander` is referenced here purely as a type — `import type` keeps
-// the runtime bundle (`dist/index.js`) free of any commander require.
-// The package declares `commander` as an OPTIONAL peer dependency
-// (see package.json `peerDependencies` + `peerDependenciesMeta`) so
-// consumers who want to use `CliProgram` get commander surfaced in
-// their dependency graph, while plugins that never touch `CliProgram`
-// pay no install cost.
-import type { Command } from 'commander';
-
-/**
- * Type alias for Commander's `Command` class — re-exported here so the
- * host's command-spec mounting (`mountCommandSpec`) and the tool lifecycle
- * can type the root `program` handle without a direct `commander` import or
- * an `as Command` cast. (Tools themselves no longer touch Commander — they
- * declare `commandSpecs`; the host owns `program`.)
- *
- * `commander` is an OPTIONAL peer dependency of
- * `@opensip-cli/contracts`. `CliProgram` is now primarily a host-side
- * type (the `Tool` contract no longer surfaces it — tools declare
- * `commandSpecs`), so any code referencing it needs `commander` resolvable
- * in its own `node_modules`; pnpm/npm will surface the peer requirement in
- * install output. Code that never touches `CliProgram` can skip commander
- * entirely. The alias erases at compile time — no runtime commander require
- * lands in `dist/index.js`.
- */
-export type CliProgram = Command;
+// `CliProgram` (the optional-commander host type) lives in its own module so
+// this barrel stays a PURE re-export surface (auto-exempt from
+// module-coupling-fan-out); see cli-program.ts for the commander peer-dep notes.
+export type { CliProgram } from './cli-program.js';

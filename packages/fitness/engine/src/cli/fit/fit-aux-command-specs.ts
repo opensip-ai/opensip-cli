@@ -159,7 +159,10 @@ export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   output: 'raw-stream',
   rawStreamReason: 'file-export',
   handler: async (rawOpts, cli): Promise<void> => {
-    const opts = rawOpts as ToolOptions & { out: string; format: FitExportFormat };
+    const opts = rawOpts as ToolOptions & {
+      out: string;
+      format: FitExportFormat;
+    };
     if (opts.format === 'baseline') {
       await runFitBaselineExport(opts, cli);
     }

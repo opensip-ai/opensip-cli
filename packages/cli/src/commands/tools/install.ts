@@ -59,7 +59,13 @@ export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInst
   );
   try {
     if (result.verdict !== 'passed') {
-      return { type: 'tools-install', spec: opts.spec, success: false, scope, validation: result };
+      return {
+        type: 'tools-install',
+        spec: opts.spec,
+        success: false,
+        scope,
+        validation: result,
+      };
     }
     /* v8 ignore next 9 -- defensive: a passed verdict from a keepStaged run always carries the staged dir */
     if (stagedPkgDir === undefined) {

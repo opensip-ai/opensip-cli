@@ -15,7 +15,11 @@ import { makeCatalog, occ, staticCall } from './_helpers.js';
 
 describe('test-only-reachable rule', () => {
   it('flags a non-exported helper called only from a test file', () => {
-    const helper = occ({ bodyHash: 'h', simpleName: 'helper', visibility: 'module-local' });
+    const helper = occ({
+      bodyHash: 'h',
+      simpleName: 'helper',
+      visibility: 'module-local',
+    });
     const testCaller = occ({
       bodyHash: 't',
       simpleName: 'spec',
@@ -30,7 +34,11 @@ describe('test-only-reachable rule', () => {
   });
 
   it('does not flag exported helpers (might be intentional test-callable API)', () => {
-    const helper = occ({ bodyHash: 'h', simpleName: 'helper', visibility: 'exported' });
+    const helper = occ({
+      bodyHash: 'h',
+      simpleName: 'helper',
+      visibility: 'exported',
+    });
     const testCaller = occ({
       bodyHash: 't',
       simpleName: 'spec',
@@ -45,7 +53,11 @@ describe('test-only-reachable rule', () => {
   });
 
   it('does not flag a function that is also called from a prod entry point', () => {
-    const helper = occ({ bodyHash: 'h', simpleName: 'helper', visibility: 'module-local' });
+    const helper = occ({
+      bodyHash: 'h',
+      simpleName: 'helper',
+      visibility: 'module-local',
+    });
     const main = occ({
       bodyHash: 'm',
       simpleName: 'main',
@@ -66,7 +78,11 @@ describe('test-only-reachable rule', () => {
   });
 
   it('does not flag orphans (callers list empty)', () => {
-    const orphan = occ({ bodyHash: 'h', simpleName: 'orphan', visibility: 'module-local' });
+    const orphan = occ({
+      bodyHash: 'h',
+      simpleName: 'orphan',
+      visibility: 'module-local',
+    });
     const catalog = makeCatalog([orphan]);
     const indexes = buildIndexes(catalog);
     const signals = testOnlyReachableRule.evaluate(catalog, indexes, {});
@@ -126,7 +142,11 @@ describe('test-only-reachable rule', () => {
   });
 
   it('flags a chain of test-only helpers (helper-of-test-helper)', () => {
-    const inner = occ({ bodyHash: 'i', simpleName: 'innerHelper', visibility: 'module-local' });
+    const inner = occ({
+      bodyHash: 'i',
+      simpleName: 'innerHelper',
+      visibility: 'module-local',
+    });
     const outer = occ({
       bodyHash: 'o',
       simpleName: 'outerHelper',

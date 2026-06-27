@@ -30,7 +30,10 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = { ...originalEnv };
-  Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: originalIsTTY,
+    configurable: true,
+  });
   vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });
@@ -47,12 +50,18 @@ describe('maybeNotify', () => {
   });
 
   it('returns null when stdout is not a TTY', () => {
-    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
     expect(maybeNotify({ name: 'test', version: '1.0.0' })).toBeNull();
   });
 
   it('returns a notifier (not null) when stdout is a TTY and not opted-out', () => {
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     const out = maybeNotify({ name: 'opensip-cli-test', version: '0.0.1' });
     // We don't assert the shape — we only care that the early-skip
     // gates aren't blocking us.
@@ -61,7 +70,10 @@ describe('maybeNotify', () => {
 
   it('writes the update line via the supplied write callback when a newer version exists', () => {
     // Mock update-notifier to force a fake "update available" reply.
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     const writes: string[] = [];
     const out = maybeNotify({
       name: 'opensip-cli',
@@ -117,12 +129,18 @@ describe('checkForUpdate', () => {
   });
 
   it('returns undefined when stdout is not a TTY', () => {
-    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
     expect(checkForUpdate({ name: 'opensip-cli', version: '0.0.1', stateFile })).toBeUndefined();
   });
 
   it('does not throw on a TTY and returns a string or undefined', () => {
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     // The cached npm result is environment-dependent, so we only assert the
     // contract: best-effort, never throws, narrows to string | undefined.
     const result = checkForUpdate({

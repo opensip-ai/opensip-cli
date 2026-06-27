@@ -28,7 +28,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { deliverEnvelope, deriveReportExitDecision } from '../bootstrap/deliver-envelope.js';
 
-const NOOP_SINK: SignalSink = { emit: () => Promise.resolve({ accepted: 0, authRejected: false }) };
+const NOOP_SINK: SignalSink = {
+  emit: () => Promise.resolve({ accepted: 0, authRejected: false }),
+};
 
 function scope(): RunScope {
   return new RunScope({
@@ -46,7 +48,14 @@ function envelope(tool: ToolShortId, failing: boolean): SignalEnvelope {
     createdAt: '2026-01-01T00:00:00.000Z',
     units: [{ slug: 'u', passed: !failing, durationMs: 1 }],
     signals: failing
-      ? [createSignal({ source: 'u', severity: 'high', ruleId: 'r', message: 'x' })]
+      ? [
+          createSignal({
+            source: 'u',
+            severity: 'high',
+            ruleId: 'r',
+            message: 'x',
+          }),
+        ]
       : [],
     policy: HOST_VERDICT_POLICY_FALLBACK,
     runFaulted: false,

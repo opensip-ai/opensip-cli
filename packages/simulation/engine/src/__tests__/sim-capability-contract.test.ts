@@ -57,14 +57,17 @@ describe('sim tool — flag-surface contract', () => {
       [
         '--cwd',
         '--debug',
+        '--filter',
         '--json',
         '--open',
         '--quiet',
+        '--raw',
         '--verbose',
         '--recipe',
         '--report-to',
         '--api-key',
         '--show',
+        '--top',
       ].sort(),
     );
   });

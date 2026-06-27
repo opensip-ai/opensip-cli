@@ -26,7 +26,10 @@ const analyze = createMissingSentryInitOptionAnalyzer({
 export const sentryEnvironmentSet = defineCheck({
   id: 'b2d8f4a1-5c3e-4f9b-a012-e4d6b8c0f3a5',
   slug: 'sentry-environment-set',
-  scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  scope: {
+    languages: ['typescript', 'javascript'],
+    concerns: ['backend', 'frontend'],
+  },
   contentFilter: 'strip-strings-and-comments',
   description: 'Detects Sentry.init() without environment — errors from all environments mixed',
   longDescription: `**Purpose:** Ensures Sentry events are tagged with the deployment environment so errors can be filtered and triaged correctly.

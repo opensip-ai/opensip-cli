@@ -120,6 +120,37 @@
             "flag": "--gate-compare",
             "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
             "default": false
+          },
+          {
+            "flag": "--filter",
+            "value": "<filter>",
+            "description": "Agent filter (repeatable): errors-only, warnings-only, category:<name>, source:<slug>, file:<path>, high-impact, top:<n>",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--top",
+            "value": "<n>",
+            "description": "Limit returned signals (sugar for --filter top:<n>)"
+          },
+          {
+            "flag": "--raw",
+            "description": "Emit unwrapped payload (no CommandOutcome wrapper)",
+            "default": false
+          },
+          {
+            "flag": "--changed",
+            "description": "Run only checks whose targets intersect git-changed files",
+            "default": false
+          },
+          {
+            "flag": "--since",
+            "value": "<ref>",
+            "description": "Git ref base for --changed (diff <ref>...HEAD)"
+          },
+          {
+            "flag": "--include-impacted",
+            "description": "Expand changed set with graph-impacted files (requires a built catalog)",
+            "default": false
           }
         ],
         "scope": "project",

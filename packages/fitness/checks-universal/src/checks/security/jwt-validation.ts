@@ -14,7 +14,11 @@ interface JwtSecurityPattern {
   message: string;
   suggestion: string;
   severity: 'error' | 'warning';
-  check: (line: string) => { matched: boolean; matchIndex: number; matchText: string };
+  check: (line: string) => {
+    matched: boolean;
+    matchIndex: number;
+    matchText: string;
+  };
 }
 
 /**
@@ -69,7 +73,11 @@ function checkJwtVerifyWithoutAlgorithm(line: string): {
   // jwt.verify(token, secret) has 1 comma, jwt.verify(token, secret, options) has 2+
   // Also check if 'algorithms' is mentioned
   if (commaCount === 1 && !callContent.toLowerCase().includes('algorithm')) {
-    return { matched: true, matchIndex: idx, matchText: 'jwt.verify' + callContent };
+    return {
+      matched: true,
+      matchIndex: idx,
+      matchText: 'jwt.verify' + callContent,
+    };
   }
 
   return { matched: false, matchIndex: -1, matchText: '' };
@@ -135,7 +143,11 @@ function checkWeakJwtSecret(line: string): {
     const assignMatch = /^\s*[:=]\s*['"`]([^'"`]{0,20})['"`]/.exec(afterKeyword);
 
     if (assignMatch?.[1] !== undefined && assignMatch[1].length <= 20) {
-      return { matched: true, matchIndex: idx, matchText: keyword + assignMatch[0] };
+      return {
+        matched: true,
+        matchIndex: idx,
+        matchText: keyword + assignMatch[0],
+      };
     }
   }
 
@@ -175,7 +187,11 @@ function checkAlgorithmNone(line: string): {
 
     if (hasNone) {
       const matchEnd = line.slice(Math.max(0, idx)).indexOf(']') + 1;
-      return { matched: true, matchIndex: idx, matchText: line.slice(idx, idx + matchEnd) };
+      return {
+        matched: true,
+        matchIndex: idx,
+        matchText: line.slice(idx, idx + matchEnd),
+      };
     }
   }
 

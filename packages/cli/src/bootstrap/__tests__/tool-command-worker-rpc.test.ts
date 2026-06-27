@@ -67,7 +67,12 @@ describe('createWorkerRpcClient — happy path', () => {
     const { rpcId } = channel.sent[0];
     expect(rpcId).toBe(1);
 
-    const reply: RpcReply = { kind: 'rpc-reply', rpcId, ok: true, value: { exitCode: 7 } };
+    const reply: RpcReply = {
+      kind: 'rpc-reply',
+      rpcId,
+      ok: true,
+      value: { exitCode: 7 },
+    };
     channel.deliver(reply);
 
     await expect(pending).resolves.toEqual({ exitCode: 7 });
@@ -81,8 +86,18 @@ describe('createWorkerRpcClient — happy path', () => {
     const second = client.call(CALL);
     expect(channel.sent.map((r) => r.rpcId)).toEqual([1, 2]);
 
-    channel.deliver({ kind: 'rpc-reply', rpcId: 2, ok: true, value: 'second' } satisfies RpcReply);
-    channel.deliver({ kind: 'rpc-reply', rpcId: 1, ok: true, value: 'first' } satisfies RpcReply);
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId: 2,
+      ok: true,
+      value: 'second',
+    } satisfies RpcReply);
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId: 1,
+      ok: true,
+      value: 'first',
+    } satisfies RpcReply);
     await expect(first).resolves.toBe('first');
     await expect(second).resolves.toBe('second');
   });
@@ -99,7 +114,11 @@ describe('createWorkerRpcClient — host fault reply', () => {
       kind: 'rpc-reply',
       rpcId,
       ok: false,
-      error: { message: 'boom', code: 'E_HOST', stack: 'Error: boom\n  at host' },
+      error: {
+        message: 'boom',
+        code: 'E_HOST',
+        stack: 'Error: boom\n  at host',
+      },
     } satisfies RpcReply);
 
     await expect(pending).rejects.toMatchObject({
@@ -145,7 +164,10 @@ describe('createWorkerRpcClient — host fault reply', () => {
       error: { message: 'coded', code: 'E_ONLY_CODE' },
     } satisfies RpcReply);
 
-    await expect(pending).rejects.toMatchObject({ message: 'coded', code: 'E_ONLY_CODE' });
+    await expect(pending).rejects.toMatchObject({
+      message: 'coded',
+      code: 'E_ONLY_CODE',
+    });
   });
 });
 
@@ -165,7 +187,12 @@ describe('createWorkerRpcClient — listener demux defenses', () => {
     channel.deliver({ kind: 'rpc-reply', rpcId: 'not-a-number' }); // bad rpcId type
 
     // Now deliver the real reply and confirm the call still resolves cleanly.
-    channel.deliver({ kind: 'rpc-reply', rpcId, ok: true, value: 'ok' } satisfies RpcReply);
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId,
+      ok: true,
+      value: 'ok',
+    } satisfies RpcReply);
     await expect(pending).resolves.toBe('ok');
   });
 
@@ -177,15 +204,30 @@ describe('createWorkerRpcClient — listener demux defenses', () => {
 
     // No pending call has rpcId 999 → defensively ignored, no throw.
     expect(() =>
-      channel.deliver({ kind: 'rpc-reply', rpcId: 999, ok: true, value: 'x' } satisfies RpcReply),
+      channel.deliver({
+        kind: 'rpc-reply',
+        rpcId: 999,
+        ok: true,
+        value: 'x',
+      } satisfies RpcReply),
     ).not.toThrow();
 
-    channel.deliver({ kind: 'rpc-reply', rpcId, ok: true, value: 'real' } satisfies RpcReply);
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId,
+      ok: true,
+      value: 'real',
+    } satisfies RpcReply);
     await expect(pending).resolves.toBe('real');
 
     // A duplicate reply for an already-settled id is also ignored (pending was deleted).
     expect(() =>
-      channel.deliver({ kind: 'rpc-reply', rpcId, ok: true, value: 'dup' } satisfies RpcReply),
+      channel.deliver({
+        kind: 'rpc-reply',
+        rpcId,
+        ok: true,
+        value: 'dup',
+      } satisfies RpcReply),
     ).not.toThrow();
   });
 

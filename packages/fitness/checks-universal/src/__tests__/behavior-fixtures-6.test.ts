@@ -416,7 +416,9 @@ describe('dependency-security-audit parseOutput', () => {
   it('returns empty for clean exit code 0 and empty stdout', async () => {
     const { dependencyVulnerabilityAudit } =
       await import('../checks/security/dependency-vulnerability-audit.js');
-    const cmd = dependencyVulnerabilityAudit as unknown as { config: { execute: unknown } };
+    const cmd = dependencyVulnerabilityAudit as unknown as {
+      config: { execute: unknown };
+    };
     // The check has command mode — get the original config
     expect(cmd).toBeDefined();
   });

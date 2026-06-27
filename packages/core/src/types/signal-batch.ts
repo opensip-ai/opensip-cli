@@ -68,7 +68,12 @@ export interface BuildSignalBatchInput {
 }
 
 // Highest severity first when we must drop signals to fit the cap.
-const SEVERITY_RANK: Record<SignalSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+const SEVERITY_RANK: Record<SignalSeverity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
 
 /**
  * Assemble a {@link SignalBatch}: generate the run id, stamp `createdAt`,
@@ -86,7 +91,12 @@ export function buildSignalBatch(input: BuildSignalBatchInput): SignalBatch {
       .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
       .slice(0, max);
     truncated = { dropped };
-    logger.warn({ evt: 'cli.signal-sync.truncated', module: 'signal-batch', kept: max, dropped });
+    logger.warn({
+      evt: 'cli.signal-sync.truncated',
+      module: 'signal-batch',
+      kept: max,
+      dropped,
+    });
   }
 
   const bySeverity: Record<string, number> = {};

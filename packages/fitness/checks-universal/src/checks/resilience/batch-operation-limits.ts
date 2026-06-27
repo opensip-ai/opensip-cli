@@ -214,7 +214,10 @@ function batchPatternViolations(content: string, filePath: string): CheckViolati
 export const batchOperationLimits = defineCheck({
   id: 'c4d9b853-147e-4c29-9702-f392b1f51056',
   slug: 'batch-operation-limits',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'medium',

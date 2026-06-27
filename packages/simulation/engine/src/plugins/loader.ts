@@ -45,7 +45,9 @@ export const SIM_PLUGIN_LAYOUT: PluginLayout = {
  *  matching the prior behavior of silently skipping duplicates. */
 function tryRegisterRecipe(recipe: SimulationRecipe): boolean {
   try {
-    currentSimulationRecipeRegistry().register(recipe, { allowOverwrite: false });
+    currentSimulationRecipeRegistry().register(recipe, {
+      allowOverwrite: false,
+    });
     return true;
   } catch {
     return false;

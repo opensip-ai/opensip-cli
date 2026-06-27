@@ -209,8 +209,13 @@ Subcommands available out of the box:
 - `opensip graph export --format sarif` — Run graph analysis and write SARIF findings
 - `opensip sim` — Run simulation scenarios [experimental]
 - `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--graph build`, `--min-confidence`)
-- `opensip init` — Generate `opensip-cli.config.yml`
+- `opensip init` — Generate `opensip-cli.config.yml` and `AGENTS.md` (write-if-absent)
 - `opensip sessions list|show|purge` — Manage stored sessions
+- `opensip agent-catalog` — Machine discovery surface for AI agents
+- `opensip graph impact` — Changed→impact analysis (`--changed`, `--since`, `--files`)
+- Agent ergonomics on live runs: `fit`/`graph`/`sim` support `--filter`/`--top`/`--raw`
+  on `--json`; `fit --changed`/`--include-impacted` for edit loops; agent recipes
+  `agent-fast`/`agent-risk`/`agent-final`; `signal.repair` on findings (ADR-0085/0086)
 - `opensip <tool> plugin list|add|remove|sync` — Manage a pack-supporting
   tool's extension packs (`opensip fit plugin …`, `opensip sim plugin …`); the
   domain is bound from the tool (no `--domain` flag). There is no top-level

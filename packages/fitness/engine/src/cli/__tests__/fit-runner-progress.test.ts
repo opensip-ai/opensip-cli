@@ -21,10 +21,19 @@ describe('fit live progress check count', () => {
 
   it('derives the header count from stage-progress totals', () => {
     expect(
-      progressTotal({ type: 'stage-start', stage: 'checks', label: 'Running checks...' }),
+      progressTotal({
+        type: 'stage-start',
+        stage: 'checks',
+        label: 'Running checks...',
+      }),
     ).toBe(null);
     expect(
-      progressTotal({ type: 'stage-progress', stage: 'checks', completed: 1, total: 187 }),
+      progressTotal({
+        type: 'stage-progress',
+        stage: 'checks',
+        completed: 1,
+        total: 187,
+      }),
     ).toBe(187);
   });
 
@@ -40,8 +49,17 @@ describe('fit live progress check count', () => {
       events.push(event),
     );
 
-    const start = { type: 'stage-start', stage: 'checks', label: 'Running checks...' } as const;
-    const progress = { type: 'stage-progress', stage: 'checks', completed: 4, total: 187 } as const;
+    const start = {
+      type: 'stage-start',
+      stage: 'checks',
+      label: 'Running checks...',
+    } as const;
+    const progress = {
+      type: 'stage-progress',
+      stage: 'checks',
+      completed: 4,
+      total: 187,
+    } as const;
 
     listener?.(start);
     listener?.(progress);

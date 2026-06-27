@@ -35,7 +35,9 @@ export interface DefineToolInput {
     readonly config?: Omit<ToolConfigContribution, 'namespace'>;
     readonly sessionReplay?: Omit<ToolSessionReplayContribution, 'tool'>;
   };
-  readonly pluginLayout?: Omit<PluginLayout, 'domain'> & { readonly domain?: never };
+  readonly pluginLayout?: Omit<PluginLayout, 'domain'> & {
+    readonly domain?: never;
+  };
   readonly contractVersion?: string;
 }
 
@@ -150,7 +152,9 @@ function assertNoDerivedExtensionInputs(input: DefineToolInput): void {
  */
 export function defineTool(input: DefineToolInput): Tool {
   if (input.identity === undefined) {
-    throw new ValidationError('Tool identity is required.', { code: 'TOOL.IDENTITY.REQUIRED' });
+    throw new ValidationError('Tool identity is required.', {
+      code: 'TOOL.IDENTITY.REQUIRED',
+    });
   }
 
   const identity = validateToolIdentity(input.identity);

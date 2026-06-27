@@ -26,7 +26,10 @@ const analyze = createMissingSentryInitOptionAnalyzer({
 export const sentryDsnConfigured = defineCheck({
   id: 'a1c7e3f0-4b2d-4e8a-9f01-d3c5a7b9e2f4',
   slug: 'sentry-dsn-configured',
-  scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  scope: {
+    languages: ['typescript', 'javascript'],
+    concerns: ['backend', 'frontend'],
+  },
   contentFilter: 'strip-strings-and-comments',
   description: 'Detects Sentry.init() without a DSN — monitoring silently disabled',
   longDescription: `**Purpose:** Ensures Sentry is actually configured to report errors by checking that a DSN is provided in the init call.

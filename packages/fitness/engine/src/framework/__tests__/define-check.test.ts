@@ -36,7 +36,12 @@ describe('defineCheck', () => {
         const lines = content.split('\n');
         for (const [i, line] of lines.entries()) {
           if (line?.includes('FOO')) {
-            out.push({ line: i + 1, message: 'FOO not allowed', severity: 'error', filePath });
+            out.push({
+              line: i + 1,
+              message: 'FOO not allowed',
+              severity: 'error',
+              filePath,
+            });
           }
         }
         return out;
@@ -250,7 +255,12 @@ describe('defineCheck', () => {
     it('throws when id is missing', () => {
       expect(() =>
         // @ts-expect-error — testing the runtime guard
-        defineCheck({ slug: 'no-id', description: 'd', tags: [], analyze: () => [] }),
+        defineCheck({
+          slug: 'no-id',
+          description: 'd',
+          tags: [],
+          analyze: () => [],
+        }),
       ).toThrow();
     });
 
@@ -333,7 +343,12 @@ describe('defineCheck — analyze mode end-to-end run', () => {
         const lines = content.split('\n');
         for (const [i, line] of lines.entries()) {
           if (line.includes('FOO')) {
-            out.push({ line: i + 1, message: 'no foo', severity: 'error', filePath });
+            out.push({
+              line: i + 1,
+              message: 'no foo',
+              severity: 'error',
+              filePath,
+            });
           }
         }
         return out;
@@ -450,7 +465,14 @@ describe('defineCheck — analyzeAll mode end-to-end run', () => {
       analyzeAll: async (accessor) => {
         const content = await accessor.read(file);
         return content.includes('DISK MUTATED')
-          ? [{ line: 1, message: 'read disk', severity: 'error' as const, filePath: file }]
+          ? [
+              {
+                line: 1,
+                message: 'read disk',
+                severity: 'error' as const,
+                filePath: file,
+              },
+            ]
           : [];
       },
     });

@@ -30,7 +30,10 @@ const TRY_FINALLY_PATTERN = /\}\s*finally\s*\{/;
 export const noProcessExitInFinally = defineCheck({
   id: '58c0aaf6-f965-4336-983f-ee1033269e54',
   slug: 'no-process-exit-in-finally',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'medium',

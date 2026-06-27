@@ -102,7 +102,12 @@ describe('TargetRegistry', () => {
 
     it('requires both dimensions to match', () => {
       const reg = new TargetRegistry();
-      reg.register(stub('ts-frontend', { languages: ['typescript'], concerns: ['frontend'] }));
+      reg.register(
+        stub('ts-frontend', {
+          languages: ['typescript'],
+          concerns: ['frontend'],
+        }),
+      );
       expect(reg.findByScope(['typescript'], ['backend'])).toEqual([]);
     });
   });

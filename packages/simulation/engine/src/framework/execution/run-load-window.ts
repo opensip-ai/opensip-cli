@@ -86,7 +86,10 @@ function dispatchRequest(state: DispatchState): void {
   metrics.totalRequests++;
   const run = (async (): Promise<void> => {
     try {
-      await target({ signal: context.abortSignal, correlationId: context.correlationId });
+      await target({
+        signal: context.abortSignal,
+        correlationId: context.correlationId,
+      });
       metrics.successfulRequests++;
     } catch {
       metrics.failedRequests++;

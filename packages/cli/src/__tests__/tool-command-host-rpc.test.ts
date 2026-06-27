@@ -79,7 +79,12 @@ describe('createWorkerRpcClient — worker-side rpc-reply round-trip', () => {
     // A second call gets a strictly greater id (monotonic).
     const p2 = client.call({ seam: 'getExitCode' });
     expect(lastRpcId(ch.sent)).toBeGreaterThan(id);
-    ch.reply({ kind: 'rpc-reply', rpcId: lastRpcId(ch.sent), ok: true, value: 7 });
+    ch.reply({
+      kind: 'rpc-reply',
+      rpcId: lastRpcId(ch.sent),
+      ok: true,
+      value: 7,
+    });
     await expect(p2).resolves.toBe(7);
   });
 
@@ -106,7 +111,12 @@ describe('createWorkerRpcClient — worker-side rpc-reply round-trip', () => {
     void p.then(() => (settled = true));
     await Promise.resolve();
     expect(settled).toBe(false);
-    ch.reply({ kind: 'rpc-reply', rpcId: lastRpcId(ch.sent), ok: true, value: 1 });
+    ch.reply({
+      kind: 'rpc-reply',
+      rpcId: lastRpcId(ch.sent),
+      ok: true,
+      value: 1,
+    });
     await expect(p).resolves.toBe(1);
   });
 
@@ -120,10 +130,21 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
   it('performs toolState.put then get through the real ctx and returns the value', async () => {
     const cap = makeDispatchHostCtx();
     const put = await handleHostRpc(
-      { rpcId: 1, seam: 'toolState.put', tool: 't', key: 'k', payload: { v: 1 } },
+      {
+        rpcId: 1,
+        seam: 'toolState.put',
+        tool: 't',
+        key: 'k',
+        payload: { v: 1 },
+      },
       cap.ctx,
     );
-    expect(put).toEqual({ kind: 'rpc-reply', rpcId: 1, ok: true, value: undefined });
+    expect(put).toEqual({
+      kind: 'rpc-reply',
+      rpcId: 1,
+      ok: true,
+      value: undefined,
+    });
     expect(cap.toolStateStore.get('t:k')).toEqual({ v: 1 });
 
     const got = (await handleHostRpc(
@@ -140,7 +161,12 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(cap.baselines[0]).toEqual({ tool: 't', envelope: { a: 1 } });
 
     const deliver = (await handleHostRpc(
-      { rpcId: 2, seam: 'deliverSignals', envelope: { e: 1 }, opts: { cwd: '/x' } },
+      {
+        rpcId: 2,
+        seam: 'deliverSignals',
+        envelope: { e: 1 },
+        opts: { cwd: '/x' },
+      },
       cap.ctx,
     )) as Extract<RpcReply, { ok: true }>;
     expect(deliver.value).toEqual({ cloudAccepted: 0 });
@@ -148,7 +174,12 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
 
     await handleHostRpc({ rpcId: 3, seam: 'writeSarif', envelope: {}, path: '/o.sarif' }, cap.ctx);
     await handleHostRpc(
-      { rpcId: 30, seam: 'writeArtifact', path: '/artifact.json', bytes: '{"ok":true}\n' },
+      {
+        rpcId: 30,
+        seam: 'writeArtifact',
+        path: '/artifact.json',
+        bytes: '{"ok":true}\n',
+      },
       cap.ctx,
     );
     expect(cap.artifacts).toEqual([{ path: '/artifact.json', bytes: '{"ok":true}\n' }]);
@@ -178,7 +209,12 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(sarif.ok).toBe(true);
 
     const fp = await handleHostRpc(
-      { rpcId: 2, seam: 'exportBaselineFingerprints', tool: 't', path: '/base.json' },
+      {
+        rpcId: 2,
+        seam: 'exportBaselineFingerprints',
+        tool: 't',
+        path: '/base.json',
+      },
       cap.ctx,
     );
     expect(fp.ok).toBe(true);
@@ -203,7 +239,12 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
         rpcId: 1,
         seam: 'deliverSignals',
         envelope: { e: 1 },
-        opts: { cwd: '/x', reportTo: 'https://h', apiKey: 'k', runFailed: true },
+        opts: {
+          cwd: '/x',
+          reportTo: 'https://h',
+          apiKey: 'k',
+          runFailed: true,
+        },
       },
       cap.ctx,
     );
@@ -235,11 +276,18 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     } as unknown as Parameters<typeof handleHostRpc>[1];
 
     const reply = (await handleHostRpc(
-      { rpcId: 1, seam: 'maybeOpenReport', opts: { openRequested: true, jsonOutput: false } },
+      {
+        rpcId: 1,
+        seam: 'maybeOpenReport',
+        opts: { openRequested: true, jsonOutput: false },
+      },
       ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error).toMatchObject({ message: 'coded host fault', code: 'E_HOST_CODE' });
+    expect(reply.error).toMatchObject({
+      message: 'coded host fault',
+      code: 'E_HOST_CODE',
+    });
     expect(reply.error.stack).toContain('coded host fault');
   });
 
@@ -274,7 +322,11 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(exit.value).toBe(3);
 
     const open = await handleHostRpc(
-      { rpcId: 2, seam: 'maybeOpenReport', opts: { openRequested: false, jsonOutput: true } },
+      {
+        rpcId: 2,
+        seam: 'maybeOpenReport',
+        opts: { openRequested: false, jsonOutput: true },
+      },
       cap.ctx,
     );
     expect(open.ok).toBe(true);
@@ -289,7 +341,13 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     } as unknown as Parameters<typeof handleHostRpc>[1];
 
     const reply = await handleHostRpc(
-      { rpcId: 1, seam: 'hostPlane', plane: 'audit', method: 'append', args: ['t', { e: 1 }] },
+      {
+        rpcId: 1,
+        seam: 'hostPlane',
+        plane: 'audit',
+        method: 'append',
+        args: ['t', { e: 1 }],
+      },
       ctx,
     );
     expect(reply.ok).toBe(true);
@@ -338,7 +396,13 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       hostPlanes: { entitlements: {} },
     } as unknown as Parameters<typeof handleHostRpc>[1];
     const reply = (await handleHostRpc(
-      { rpcId: 1, seam: 'hostPlane', plane: 'entitlements', method: 'check', args: ['t'] },
+      {
+        rpcId: 1,
+        seam: 'hostPlane',
+        plane: 'entitlements',
+        method: 'check',
+        args: ['t'],
+      },
       ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);

@@ -85,7 +85,12 @@ describe('buildScopeBasedFileMap', () => {
     ]);
 
     const out = buildScopeBasedFileMap(
-      [{ slug: 'ts-check', scope: { languages: ['typescript'], concerns: ['backend'] } }],
+      [
+        {
+          slug: 'ts-check',
+          scope: { languages: ['typescript'], concerns: ['backend'] },
+        },
+      ],
       registry,
       makeConfig(),
       testDir,
@@ -108,7 +113,12 @@ describe('buildScopeBasedFileMap', () => {
     ]);
 
     const out = buildScopeBasedFileMap(
-      [{ slug: 'cobol-check', scope: { languages: ['cobol'], concerns: ['mainframe'] } }],
+      [
+        {
+          slug: 'cobol-check',
+          scope: { languages: ['cobol'], concerns: ['mainframe'] },
+        },
+      ],
       registry,
       makeConfig(),
       testDir,
@@ -167,7 +177,12 @@ describe('buildScopeBasedFileMap', () => {
     ]);
 
     const out = buildScopeBasedFileMap(
-      [{ slug: 'check', scope: { languages: ['typescript'], concerns: ['backend'] } }],
+      [
+        {
+          slug: 'check',
+          scope: { languages: ['typescript'], concerns: ['backend'] },
+        },
+      ],
       registry,
       makeConfig({ globalExcludes: ['**/ignore-me/**'] }),
       testDir,
@@ -191,7 +206,12 @@ describe('buildScopeBasedFileMap', () => {
     ]);
 
     const out = buildScopeBasedFileMap(
-      [{ slug: 'check', scope: { languages: ['typescript'], concerns: ['backend'] } }],
+      [
+        {
+          slug: 'check',
+          scope: { languages: ['typescript'], concerns: ['backend'] },
+        },
+      ],
       registry,
       makeConfig(),
       testDir,

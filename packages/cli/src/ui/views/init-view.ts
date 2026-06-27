@@ -46,7 +46,10 @@ function preExistingLines(files: readonly PreExistingFile[], cwd: string): ViewN
   return files.map((f) =>
     line([
       { text: `    ${relativize(f.path, cwd)}`, dim: true },
-      { text: `  (${f.classification})`, tone: classificationTone(f.classification) },
+      {
+        text: `  (${f.classification})`,
+        tone: classificationTone(f.classification),
+      },
     ]),
   );
 }
@@ -84,7 +87,10 @@ function partialStateView(
     children.push(
       { kind: 'spacer' },
       line([
-        { text: `  Found ${err.preExistingFiles.length} file(s) under opensip-cli/:`, dim: true },
+        {
+          text: `  Found ${err.preExistingFiles.length} file(s) under opensip-cli/:`,
+          dim: true,
+        },
       ]),
       ...preExistingLines(err.preExistingFiles, cwd),
     );
@@ -127,6 +133,11 @@ function createdView(result: InitResult): ViewNode {
   }
   if (result.gitignoreUpdated === true) {
     children.push(line([{ text: '    .gitignore (added opensip-cli/.runtime/)', dim: true }]));
+  }
+  if (result.agentsMdCreated === true) {
+    children.push(line([{ text: '    AGENTS.md (agent playbook)', dim: true }]));
+  } else if (result.created) {
+    children.push(line([{ text: '    AGENTS.md preserved (already present)', dim: true }]));
   }
   if (result.preExistingFiles && result.preExistingFiles.length > 0) {
     children.push(

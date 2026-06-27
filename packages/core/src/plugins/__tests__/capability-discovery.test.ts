@@ -51,10 +51,18 @@ const MARKER_DESCRIPTOR: CapabilityDiscoveryDescriptor = {
 };
 
 const NAME_PATTERN_DESCRIPTOR: CapabilityDiscoveryDescriptor = {
-  discovery: { mode: 'name-pattern', prefix: 'items-', defaultScopes: ['@acme'] },
+  discovery: {
+    mode: 'name-pattern',
+    prefix: 'items-',
+    defaultScopes: ['@acme'],
+  },
   exportName: 'items',
   exportShape: 'array',
-  configKeys: { packages: 'itemPackages', autoDiscover: 'autoDiscoverItems', scopes: 'itemScopes' },
+  configKeys: {
+    packages: 'itemPackages',
+    autoDiscover: 'autoDiscoverItems',
+    scopes: 'itemScopes',
+  },
 };
 
 const SINGLE_DESCRIPTOR: CapabilityDiscoveryDescriptor = {
@@ -345,7 +353,11 @@ describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
       descriptor: {
         ...MARKER_DESCRIPTOR,
         coContributions: [
-          { exportName: 'extras', exportShape: 'array', domainId: 'extras-domain' },
+          {
+            exportName: 'extras',
+            exportShape: 'array',
+            domainId: 'extras-domain',
+          },
         ],
       },
       projectDir: testDir,

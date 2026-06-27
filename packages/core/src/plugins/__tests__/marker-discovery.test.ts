@@ -114,7 +114,9 @@ describe('discoverPackagesByDeclaredKind', () => {
   });
 
   it('skips packages with no opensipTools field', () => {
-    writePkg(join(testDir, 'node_modules', 'random-pkg'), { name: 'random-pkg' });
+    writePkg(join(testDir, 'node_modules', 'random-pkg'), {
+      name: 'random-pkg',
+    });
     expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
   });
 

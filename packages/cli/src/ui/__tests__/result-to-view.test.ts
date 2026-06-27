@@ -77,7 +77,11 @@ describe('resultToView', () => {
             filePath: 'b.ts',
             line: 4,
           }),
-          fitSignal({ source: 'naming', severity: 'medium', message: 'bad name' }),
+          fitSignal({
+            source: 'naming',
+            severity: 'medium',
+            message: 'bad name',
+          }),
         ],
         policy: HOST_VERDICT_POLICY_FALLBACK,
         runFaulted: false,
@@ -163,7 +167,12 @@ describe('resultToView', () => {
         runId: 'r',
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [
-          { slug: 'loader', passed: false, durationMs: 1, error: 'failed to load' },
+          {
+            slug: 'loader',
+            passed: false,
+            durationMs: 1,
+            error: 'failed to load',
+          },
           {
             slug: 'naming',
             passed: false,
@@ -174,7 +183,12 @@ describe('resultToView', () => {
           },
         ],
         signals: [
-          fitSignal({ source: 'naming', severity: 'medium', message: 'w0', filePath: 'b.ts' }),
+          fitSignal({
+            source: 'naming',
+            severity: 'medium',
+            message: 'w0',
+            filePath: 'b.ts',
+          }),
         ],
         policy: HOST_VERDICT_POLICY_FALLBACK,
         runFaulted: false,
@@ -280,7 +294,11 @@ describe('resultToView', () => {
   });
 
   it('renders generic text-lines command results', () => {
-    const out = textOf({ type: 'text-lines', title: 'Custom Tool', lines: ['alpha', 'beta'] });
+    const out = textOf({
+      type: 'text-lines',
+      title: 'Custom Tool',
+      lines: ['alpha', 'beta'],
+    });
 
     expect(out).toContain('Custom Tool');
     expect(out).toContain('alpha');
@@ -292,7 +310,12 @@ describe('resultToView', () => {
   });
 
   it('renders an error with the ✗ marker and indented suggestion', () => {
-    const out = textOf({ type: 'error', message: 'boom', suggestion: 'try --help', exitCode: 1 });
+    const out = textOf({
+      type: 'error',
+      message: 'boom',
+      suggestion: 'try --help',
+      exitCode: 1,
+    });
     expect(out).toBe('  ✗ boom\n      try --help');
   });
 
@@ -345,7 +368,10 @@ describe('resultToView', () => {
   });
 
   it('renders the sim verbose table from the envelope', () => {
-    const out = textOf({ ...simBase, verboseDetail: { kind: 'findings', groups: [] } });
+    const out = textOf({
+      ...simBase,
+      verboseDetail: { kind: 'findings', groups: [] },
+    });
     // One row per scenario-unit, keyed by scenarioId; b's high signal counts
     // as an error on its row and drives the FAIL status.
     expect(out).toContain('Unit');
@@ -400,7 +426,12 @@ describe('resultToView', () => {
         runId: 'r',
         createdAt: '2026-06-04T00:00:00.000Z',
         units: [
-          { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
+          {
+            slug: 'graph.architecture.cycle',
+            passed: true,
+            violationCount: 0,
+            durationMs: 0,
+          },
           {
             slug: 'graph.dead-code.orphan-subtree',
             passed: true,

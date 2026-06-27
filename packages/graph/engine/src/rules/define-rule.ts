@@ -123,7 +123,13 @@ export function defineRule(config: DefineRuleConfig): Rule {
     ): readonly Signal[] {
       // The orchestrator threads the engine-computed FeatureTable as the 5th
       // positional arg (Plan C); `features` is undefined on 3/4-arg test calls.
-      return config.evaluate({ catalog, indexes, config: ruleConfig, hints, features });
+      return config.evaluate({
+        catalog,
+        indexes,
+        config: ruleConfig,
+        hints,
+        features,
+      });
     },
   };
   return Object.freeze(rule);

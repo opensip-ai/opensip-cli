@@ -16,7 +16,12 @@ describe('toolValidationFailure', () => {
   it('rejects deprecated top-level hooks with an actionable message', () => {
     const value = {
       identity: { name: 'demo' },
-      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
+      metadata: {
+        id: 'demo',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
       commandSpecs: [minimalSpec],
       initialize: () => Promise.resolve(),
     };
@@ -28,7 +33,12 @@ describe('toolValidationFailure', () => {
   it('accepts hooks under extensionPoints', () => {
     const value = {
       identity: { name: 'demo' },
-      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
+      metadata: {
+        id: 'demo',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
       commandSpecs: [minimalSpec],
       extensionPoints: {
         initialize: () => Promise.resolve(),
@@ -39,7 +49,12 @@ describe('toolValidationFailure', () => {
 
   it('rejects tools without identity', () => {
     const value = {
-      metadata: { id: 'demo', name: 'demo', version: '0.0.0', description: 'demo' },
+      metadata: {
+        id: 'demo',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
       commandSpecs: [minimalSpec],
     };
     expect(isValidTool(value)).toBe(false);
@@ -49,7 +64,12 @@ describe('toolValidationFailure', () => {
   it('rejects metadata.name drift from identity.name', () => {
     const value = {
       identity: { name: 'demo' },
-      metadata: { id: 'demo', name: 'other', version: '0.0.0', description: 'demo' },
+      metadata: {
+        id: 'demo',
+        name: 'other',
+        version: '0.0.0',
+        description: 'demo',
+      },
       commandSpecs: [minimalSpec],
     };
     expect(isValidTool(value)).toBe(false);

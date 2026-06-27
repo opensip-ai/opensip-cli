@@ -107,7 +107,11 @@ const ALL_FILES: readonly string[] = [...Object.values(PKG_FILES).flat(), ...ROO
  */
 const FIXTURE_SHARDS: readonly Shard[] = [
   { id: 'pkg:a', rootDir: PKG_DIRS.a, files: [...PKG_FILES.a] },
-  { id: 'pkg:foundation', rootDir: PKG_DIRS.foundation, files: [...PKG_FILES.foundation] },
+  {
+    id: 'pkg:foundation',
+    rootDir: PKG_DIRS.foundation,
+    files: [...PKG_FILES.foundation],
+  },
   { id: 'pkg:b', rootDir: PKG_DIRS.b, files: [...PKG_FILES.b] },
   { id: ':root', rootDir: FIXTURE_ROOT, files: [...ROOT_FILES] },
 ];
@@ -306,7 +310,10 @@ function rewriteCrossEdgeTarget(catalog: Catalog, from: string, to: string | und
       ...o,
       calls: o.calls.map((e) =>
         e.crossShard && e.to.includes(from)
-          ? { ...e, to: to === undefined ? [] : e.to.map((t) => (t === from ? to : t)) }
+          ? {
+              ...e,
+              to: to === undefined ? [] : e.to.map((t) => (t === from ? to : t)),
+            }
           : e,
       ),
     }));

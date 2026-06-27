@@ -76,6 +76,22 @@
             "flag": "--show",
             "value": "<session>",
             "description": "Replay a stored sim session by id, or latest for the latest sim session"
+          },
+          {
+            "flag": "--filter",
+            "value": "<filter>",
+            "description": "Agent filter (repeatable): errors-only, warnings-only, category:<name>, source:<slug>, file:<path>, high-impact, top:<n>",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--top",
+            "value": "<n>",
+            "description": "Limit returned signals (sugar for --filter top:<n>)"
+          },
+          {
+            "flag": "--raw",
+            "description": "Emit unwrapped payload (no CommandOutcome wrapper)",
+            "default": false
           }
         ],
         "scope": "project",

@@ -46,7 +46,11 @@ export interface CommonFlagSpec {
  * {@link applyCommonFlags} with the relevant keys — never re-declaring a flag.
  */
 export const commonFlags: Readonly<Record<CommonFlagKey, CommonFlagSpec>> = {
-  json: { flags: '--json', description: 'Output structured JSON', defaultValue: false },
+  json: {
+    flags: '--json',
+    description: 'Output structured JSON',
+    defaultValue: false,
+  },
   cwd: { flags: '--cwd <path>', description: 'Target directory' },
   quiet: {
     flags: '-q, --quiet',
@@ -67,7 +71,10 @@ export const commonFlags: Readonly<Record<CommonFlagKey, CommonFlagSpec>> = {
     flags: '--report-to <url>',
     description: 'POST findings to OpenSIP Cloud or a compatible endpoint',
   },
-  apiKey: { flags: '--api-key <key>', description: 'API key for --report-to authentication' },
+  apiKey: {
+    flags: '--api-key <key>',
+    description: 'API key for --report-to authentication',
+  },
   open: {
     flags: '--open',
     description: 'Launch the HTML report in your browser after the run completes',

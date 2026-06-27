@@ -28,7 +28,10 @@ export function applyCheckDisplay(
   return checks.map((check) => {
     const entry = displayMap[check.config.slug];
     if (!entry) return check;
-    return { ...check, config: { ...check.config, icon: entry[0], displayName: entry[1] } };
+    return {
+      ...check,
+      config: { ...check.config, icon: entry[0], displayName: entry[1] },
+    };
   });
 }
 

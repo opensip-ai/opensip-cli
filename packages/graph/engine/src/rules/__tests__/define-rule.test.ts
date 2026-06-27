@@ -25,7 +25,11 @@ const CONFIG: GraphConfig = {};
 
 describe('defineRule', () => {
   it('returns an object satisfying the Rule interface', () => {
-    const rule = defineRule({ slug: 'graph:demo', defaultSeverity: 'warning', evaluate: () => [] });
+    const rule = defineRule({
+      slug: 'graph:demo',
+      defaultSeverity: 'warning',
+      evaluate: () => [],
+    });
     expect(rule.slug).toBe('graph:demo');
     expect(rule.defaultSeverity).toBe('warning');
     expect(typeof rule.evaluate).toBe('function');
@@ -99,7 +103,11 @@ describe('defineRule', () => {
 
   it('throws ValidationError on an invalid slug', () => {
     expect(() =>
-      defineRule({ slug: 'demo', defaultSeverity: 'warning', evaluate: () => [] }),
+      defineRule({
+        slug: 'demo',
+        defaultSeverity: 'warning',
+        evaluate: () => [],
+      }),
     ).toThrow(ValidationError);
     expect(() => defineRule({ slug: '', defaultSeverity: 'warning', evaluate: () => [] })).toThrow(
       ValidationError,
@@ -108,7 +116,11 @@ describe('defineRule', () => {
 
   it('throws ValidationError on an invalid defaultSeverity', () => {
     expect(() =>
-      defineRule({ slug: 'graph:demo', defaultSeverity: 'fatal' as 'error', evaluate: () => [] }),
+      defineRule({
+        slug: 'graph:demo',
+        defaultSeverity: 'fatal' as 'error',
+        evaluate: () => [],
+      }),
     ).toThrow(ValidationError);
   });
 

@@ -199,9 +199,12 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     // ADR-0036 host baseline/ratchet seams. The fingerprint export mirrors the
     // real host seam against the test datastore (write JSON / throw on missing).
     saveBaseline: vi.fn().mockResolvedValue(undefined),
-    compareBaseline: vi
-      .fn()
-      .mockResolvedValue({ added: [], resolved: [], unchanged: [], degraded: false }),
+    compareBaseline: vi.fn().mockResolvedValue({
+      added: [],
+      resolved: [],
+      unchanged: [],
+      degraded: false,
+    }),
     exportBaselineSarif: vi.fn().mockResolvedValue(undefined),
     // eslint-disable-next-line @typescript-eslint/require-await -- async to match the seam signature
     exportBaselineFingerprints: vi.fn(async (tool: string, path: string) =>
@@ -211,7 +214,15 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     reportFailure: makeReportFailureMock(setExitCode, render),
   } as unknown as ToolCliContext;
-  return { cli, setExitCode, emitJson, emitError, registerLiveView, renderLive, render };
+  return {
+    cli,
+    setExitCode,
+    emitJson,
+    emitError,
+    registerLiveView,
+    renderLive,
+    render,
+  };
 }
 
 /** Concatenated text of every lines-bearing result handed to cli.render(). */
@@ -249,6 +260,7 @@ describe('graphTool command surface', () => {
       'lookup',
       'index',
       'list',
+      'impact',
       'graph-equivalence-check',
     ]);
     // The legacy flat-root aliases are gone.
@@ -293,7 +305,10 @@ describe('graphTool command surface', () => {
         // The animated live view is taken only on a TTY; vitest's stdout is
         // not a TTY, so force it for this assertion.
         const prevTTY = process.stdout.isTTY;
-        Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+        Object.defineProperty(process.stdout, 'isTTY', {
+          value: true,
+          configurable: true,
+        });
         try {
           // The Ink live runner drives the EXACT single-program engine, so it is
           // eligible only under `--exact` (ADR-0032: sharded is the default and
@@ -303,7 +318,10 @@ describe('graphTool command surface', () => {
         } finally {
           if (prev === undefined) delete process.env.OPENSIP_HEAP_ELEVATED;
           else process.env.OPENSIP_HEAP_ELEVATED = prev;
-          Object.defineProperty(process.stdout, 'isTTY', { value: prevTTY, configurable: true });
+          Object.defineProperty(process.stdout, 'isTTY', {
+            value: prevTTY,
+            configurable: true,
+          });
         }
         // Spec-mounted world: the renderer is set up lazily on the interactive
         // path before the renderLive lookup.

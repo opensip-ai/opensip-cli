@@ -23,7 +23,9 @@ function check() {
 }
 
 async function findings(content: string): Promise<number> {
-  const run = await runCheckOnFixture(check(), { files: [{ path: 'a.ts', content }] });
+  const run = await runCheckOnFixture(check(), {
+    files: [{ path: 'a.ts', content }],
+  });
   return run.findings.length;
 }
 

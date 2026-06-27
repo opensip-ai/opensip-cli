@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0086](ADR-0086-signal-repair-metadata.md) — Additive nested `signal.repair` structured-repair contract for agent triage (JSON/session only; SARIF omits it).
+- [ADR-0085](ADR-0085-change-detection-substrate.md) — Host-owned change-detection substrate: core resolver, contracts filter/impact compute, `RunScope.graphCatalog` thunk for fit `--include-impacted`.
 - [ADR-0083](ADR-0083-tool-lifecycle-hooks-self-initialize.md) — Tool lifecycle hooks self-initialize (hook call-site ordering only; report/replay/capability hooks call their own idempotent setup when needed).
 - [ADR-0082](ADR-0082-external-tools-cannot-declare-live-view.md) — External Tool manifests cannot declare `output: "live-view"`; validation rejects that host-only output mode before runtime load.
 - [ADR-0081](ADR-0081-capability-pack-trust-and-resource-declarations.md) — Capability packs are deny-by-default unless bundled; exact-name `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS`; manifest `requires` is declaration-only.

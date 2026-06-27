@@ -54,7 +54,10 @@ export interface DiscoveredToolPackage {
 export function discoverToolPackages(
   options: ToolPackageDiscoveryOptions,
 ): DiscoveredToolPackage[] {
-  return discoverPackagesByMarker({ projectDir: options.projectDir, kind: 'tool' }).map((pkg) => ({
+  return discoverPackagesByMarker({
+    projectDir: options.projectDir,
+    kind: 'tool',
+  }).map((pkg) => ({
     name: pkg.name,
     packageDir: pkg.packageDir,
   }));

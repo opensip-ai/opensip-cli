@@ -41,7 +41,10 @@ function makeSignal(over: Partial<Signal> = {}): Signal {
 // through the single shared `formatSignalSarif` and writes it — exactly what
 // the CLI composition root does. Driving the real formatter here keeps the
 // subcommand's byte-output coverage end-to-end through the migrated seam.
-function makeCli(): { cli: ToolCliContext; setExitCode: ReturnType<typeof vi.fn> } {
+function makeCli(): {
+  cli: ToolCliContext;
+  setExitCode: ReturnType<typeof vi.fn>;
+} {
   const setExitCode = vi.fn();
   // eslint-disable-next-line @typescript-eslint/require-await -- async to match the seam signature
   const writeSarif = vi.fn(async (envelope: unknown, path: string) => {
@@ -76,7 +79,10 @@ describe('runSarifExportMode', () => {
     expect(existsSync(outPath)).toBe(true);
     const parsed = JSON.parse(readFileSync(outPath, 'utf8')) as {
       version: string;
-      runs: { tool: { driver: { name: string } }; results: { ruleId: string }[] }[];
+      runs: {
+        tool: { driver: { name: string } };
+        results: { ruleId: string }[];
+      }[];
     };
     expect(parsed.version).toBe('2.1.0');
     expect(parsed.runs[0]?.tool.driver.name).toBe('opensip-cli-graph');

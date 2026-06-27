@@ -36,7 +36,10 @@ const DATE_FIX = 'Remove date stamp; git history tracks this information';
 export const noProcessArtifacts = defineRegexListCheck({
   id: '3aa07a17-4bde-4f17-9296-c035809bc938',
   slug: 'no-process-artifacts',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detects process/planning artifacts (Phase X, Sprint X, version stamps) in comments',

@@ -47,13 +47,29 @@ interface KindSelector {
 type AnySelector = RecipeSelector | KindSelector;
 
 const items: readonly Item[] = [
-  { id: 'security:no-eval', name: 'security:no-eval', tags: ['security', 'architecture'] },
+  {
+    id: 'security:no-eval',
+    name: 'security:no-eval',
+    tags: ['security', 'architecture'],
+  },
   { id: 'security:no-exec', name: 'security:no-exec', tags: ['security'] },
   { id: 'backend:no-sync-fs', name: 'backend:no-sync-fs', tags: ['backend'] },
-  { id: 'frontend:no-inline-style', name: 'frontend:no-inline-style', tags: ['frontend'] },
-  { id: 'architecture:layering', name: 'architecture:layering', tags: ['architecture'] },
+  {
+    id: 'frontend:no-inline-style',
+    name: 'frontend:no-inline-style',
+    tags: ['frontend'],
+  },
+  {
+    id: 'architecture:layering',
+    name: 'architecture:layering',
+    tags: ['architecture'],
+  },
   { id: 'no-todo', name: 'no-todo', tags: [] },
-  { id: 'backend:max-params', name: 'backend:max-params', tags: ['backend', 'architecture'] },
+  {
+    id: 'backend:max-params',
+    name: 'backend:max-params',
+    tags: ['backend', 'architecture'],
+  },
   { id: 'load-test', name: 'load-test', tags: ['load'], kind: 'load' },
 ];
 
@@ -219,7 +235,11 @@ describe('resolveSelector — predicate override (simulation-style)', () => {
 
   it('tags predicate excludes on id/name, not tags', () => {
     const result = resolveSelector<Item, AnySelector>(
-      { type: 'tags', include: ['architecture'], exclude: ['security:no-eval'] },
+      {
+        type: 'tags',
+        include: ['architecture'],
+        exclude: ['security:no-eval'],
+      },
       items,
       simOpts,
     );

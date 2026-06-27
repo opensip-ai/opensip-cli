@@ -51,7 +51,10 @@ const chaosCfg = (o: Partial<ChaosScenarioConfig> = {}): ChaosScenarioConfig => 
 describe('ADR-0035 · failed scenario emits an error-severity signal', () => {
   it('load: a failing scenario emits ≥1 error signal attributed to its id', async () => {
     const r = await createLoadScenarioRunner(
-      loadCfg({ target: failingTarget, assertions: [ASSERTIONS.lowErrorRate(0.1)] }),
+      loadCfg({
+        target: failingTarget,
+        assertions: [ASSERTIONS.lowErrorRate(0.1)],
+      }),
     ).run(new AbortController().signal);
     if (r.kind !== 'load') throw new Error('expected load result');
 
@@ -91,7 +94,13 @@ describe('ADR-0035 · failed scenario emits an error-severity signal', () => {
 
   it('buildFailedScenarioSignal: high severity, scenario-attributed, summarizes assertions', () => {
     const sig = buildFailedScenarioSignal('s1', [
-      { metric: 'error_rate', operator: 'lte', value: 0.1, message: 'low errors', actual: 0.9 },
+      {
+        metric: 'error_rate',
+        operator: 'lte',
+        value: 0.1,
+        message: 'low errors',
+        actual: 0.9,
+      },
     ]);
     expect(sig.severity).toBe('high');
     expect(isErrorSignal(sig)).toBe(true);

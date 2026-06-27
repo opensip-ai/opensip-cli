@@ -52,13 +52,15 @@ const GUARANTEED_COMMON_FLAG_KEYS = ['cwd', 'json', 'quiet', 'verbose'] as const
  * ONCE at module load. Precomputing keeps the per-decoration filter a plain
  * `.long` read (no `commonFlags[key]` index access in the hot path).
  */
-const GUARANTEED_COMMON_FLAGS: readonly { readonly key: CommonFlagKey; readonly long: string }[] =
-  GUARANTEED_COMMON_FLAG_KEYS.map((key) => {
-    // Destructure the registry value into a local before reading `.flags` — the
-    // key is a static `CommonFlagKey`, so the registry entry is always present.
-    const { flags } = commonFlags[key];
-    return { key, long: longFlagOf(flags) };
-  });
+const GUARANTEED_COMMON_FLAGS: readonly {
+  readonly key: CommonFlagKey;
+  readonly long: string;
+}[] = GUARANTEED_COMMON_FLAG_KEYS.map((key) => {
+  // Destructure the registry value into a local before reading `.flags` — the
+  // key is a static `CommonFlagKey`, so the registry entry is always present.
+  const { flags } = commonFlags[key];
+  return { key, long: longFlagOf(flags) };
+});
 
 /**
  * Read the set of long-flag strings (`--foo`) a Commander command already has, so

@@ -40,7 +40,10 @@ describe('CLI e2e', () => {
   // apply cleanly against a fresh DB. Cheap; tests already round-trip
   // through the CLI's own writes.
   beforeEach(() => {
-    rmSync(join(FIXTURE, 'opensip-cli', '.runtime'), { recursive: true, force: true });
+    rmSync(join(FIXTURE, 'opensip-cli', '.runtime'), {
+      recursive: true,
+      force: true,
+    });
   });
 
   it('--help shows usage information', () => {
@@ -66,7 +69,9 @@ describe('CLI e2e', () => {
   };
 
   it.each(['fit', 'graph', 'sim'])('%s --version prints the tool version', (tool) => {
-    const { stdout, exitCode } = cli.run([tool, '--version'], { cwd: FIXTURE });
+    const { stdout, exitCode } = cli.run([tool, '--version'], {
+      cwd: FIXTURE,
+    });
     expect(exitCode).toBe(0);
     const label = VERSION_LABEL[tool] ?? tool;
     expect(stdout.trim()).toMatch(new RegExp(`^${label} \\d+\\.\\d+\\.\\d+`));
@@ -108,13 +113,17 @@ describe('CLI e2e', () => {
     });
 
     it('--recipes shows available recipes', () => {
-      const { stdout, exitCode } = cli.run(['fit', '--recipes'], { cwd: FIXTURE });
+      const { stdout, exitCode } = cli.run(['fit', '--recipes'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Available Recipes');
     });
 
     it('--list --json outputs valid JSON', () => {
-      const { stdout, exitCode } = cli.run(['fit', '--list', '--json'], { cwd: FIXTURE });
+      const { stdout, exitCode } = cli.run(['fit', '--list', '--json'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(0);
       // 2.12.0: a CommandResult rides under `.data` of the outcome wrapper.
       const output = JSON.parse(stdout).data;
@@ -124,7 +133,9 @@ describe('CLI e2e', () => {
     });
 
     it('--recipes --json outputs valid JSON', () => {
-      const { stdout, exitCode } = cli.run(['fit', '--recipes', '--json'], { cwd: FIXTURE });
+      const { stdout, exitCode } = cli.run(['fit', '--recipes', '--json'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(0);
       const output = JSON.parse(stdout).data;
       expect(output.type).toBe('list-recipes');
@@ -143,7 +154,9 @@ describe('CLI e2e', () => {
     });
 
     it('--recipe quick-smoke runs without error', () => {
-      const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], { cwd: FIXTURE });
+      const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], {
+        cwd: FIXTURE,
+      });
       const output = JSON.parse(stdout).envelope;
       expect(output.tool).toBe('fit');
       expect(output.verdict).toBeDefined();
@@ -151,7 +164,9 @@ describe('CLI e2e', () => {
     });
 
     it('--json summary fields have expected types', () => {
-      const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], { cwd: FIXTURE });
+      const { stdout } = cli.run(['fit', '--json', '--recipe', 'quick-smoke'], {
+        cwd: FIXTURE,
+      });
       const output = JSON.parse(stdout).envelope;
       expect(typeof output.createdAt).toBe('string');
       expect(typeof output.verdict.score).toBe('number');
@@ -182,7 +197,9 @@ describe('CLI e2e', () => {
       );
       mkdirSync(tempDir, { recursive: true });
       try {
-        const { stdout, exitCode } = cli.run(['fit', '--json'], { cwd: tempDir });
+        const { stdout, exitCode } = cli.run(['fit', '--json'], {
+          cwd: tempDir,
+        });
         expect(exitCode).toBe(2);
         // 2.12.0 (§4.7): no-project --json is a structured bootstrap.error outcome.
         const outcome = JSON.parse(stdout);
@@ -263,7 +280,9 @@ describe('CLI e2e', () => {
     });
 
     it('exits 2 when given an unknown recipe name', () => {
-      const { exitCode } = cli.run(['sim', '--recipe', 'nonexistent'], { cwd: FIXTURE });
+      const { exitCode } = cli.run(['sim', '--recipe', 'nonexistent'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(2);
     });
   });
@@ -278,7 +297,9 @@ describe('CLI e2e', () => {
       // invalid-argument-value to CONFIGURATION_ERROR (2), restoring 2.10.0
       // parity. Asserting `=== 2` end-to-end closes that loop. The error line
       // is Commander's (the one sanctioned surface delta).
-      const { exitCode, stderr } = cli.run(['graph', '--resolution', 'bogus'], { cwd: FIXTURE });
+      const { exitCode, stderr } = cli.run(['graph', '--resolution', 'bogus'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(2);
       expect(stderr).toContain("argument 'bogus' is invalid");
     });
@@ -304,15 +325,22 @@ describe('CLI e2e', () => {
       const proj = mkdtempSync(join(tmpdir(), 'opensip-e2e-session-'));
       try {
         cpSync(FIXTURE, proj, { recursive: true });
-        rmSync(join(proj, 'opensip-cli', '.runtime'), { recursive: true, force: true });
+        rmSync(join(proj, 'opensip-cli', '.runtime'), {
+          recursive: true,
+          force: true,
+        });
 
         // Human path (no --json) persists the session via the host run plane.
         const fit = cli.run(['fit', '--check', 'no-eval'], { cwd: proj });
         expect([0, 1]).toContain(fit.exitCode);
 
-        const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], { cwd: proj });
+        const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], {
+          cwd: proj,
+        });
         expect(exitCode).toBe(0);
-        const outcome = JSON.parse(stdout) as { data?: { sessions?: Record<string, unknown>[] } };
+        const outcome = JSON.parse(stdout) as {
+          data?: { sessions?: Record<string, unknown>[] };
+        };
         const sessions = outcome.data?.sessions ?? [];
         expect(sessions.length).toBeGreaterThanOrEqual(1);
 
@@ -340,7 +368,9 @@ describe('CLI e2e', () => {
     it('shows fit pack information (domain-bound under the fit primary)', () => {
       // The top-level `plugin` group was retired — pack ops mount under each
       // pack-supporting tool primary (`opensip fit plugin …`).
-      const { stdout, exitCode } = cli.run(['fit', 'plugin', 'list'], { cwd: FIXTURE });
+      const { stdout, exitCode } = cli.run(['fit', 'plugin', 'list'], {
+        cwd: FIXTURE,
+      });
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Installed Plugins');
     });
@@ -367,7 +397,9 @@ describe('CLI e2e', () => {
       );
       mkdirSync(tempDir, { recursive: true });
 
-      const { exitCode } = cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
+      const { exitCode } = cli.run(['init', '--language', 'typescript'], {
+        cwd: tempDir,
+      });
       expect(exitCode).toBe(0);
 
       expect(existsSync(join(tempDir, 'opensip-cli.config.yml'))).toBe(true);

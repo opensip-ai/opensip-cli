@@ -140,7 +140,10 @@ async function analyzeAllFiles(files: FileAccessor): Promise<CheckViolation[]> {
 export const directiveAudit = defineCheck({
   id: '9ffe898e-3f62-4ef1-9abd-63cf45174689',
   slug: 'directive-audit',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

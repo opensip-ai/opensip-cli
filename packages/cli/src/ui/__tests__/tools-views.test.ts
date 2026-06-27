@@ -52,7 +52,11 @@ function validation(over: Partial<ToolsValidateResult> = {}): ToolsValidateResul
 
 describe('viewToolsList', () => {
   it('renders the empty state when no tools match the scope', () => {
-    const result: ToolsListResult = { type: 'tools-list', tools: [], totalCount: 0 };
+    const result: ToolsListResult = {
+      type: 'tools-list',
+      tools: [],
+      totalCount: 0,
+    };
     expect(renderToText(viewToolsList(result))).toMatch(/No tools found/);
   });
 
@@ -148,7 +152,11 @@ describe('viewToolsUninstall', () => {
       type: 'tools-uninstall',
       success: true,
       target: 'demo-tool',
-      removed: { id: 'demo-tool', packageName: '@scope/demo-tool', scope: 'global' },
+      removed: {
+        id: 'demo-tool',
+        packageName: '@scope/demo-tool',
+        scope: 'global',
+      },
     };
     const out = renderToText(viewToolsUninstall(result));
     expect(out).toContain('Removed');

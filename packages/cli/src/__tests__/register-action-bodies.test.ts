@@ -22,13 +22,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // --- Mock the underlying handlers so we can drive the wiring deterministically. ---
 vi.mock('../commands/plugin.js', () => ({
   pluginList: vi.fn((cwd: string) =>
-    Promise.resolve({ type: 'plugin', action: 'list', cwd, plugins: [] } as never),
+    Promise.resolve({
+      type: 'plugin',
+      action: 'list',
+      cwd,
+      plugins: [],
+    } as never),
   ),
   pluginAdd: vi.fn((pkg: string, cwd: string, domain: string | undefined) =>
-    Promise.resolve({ type: 'plugin', action: 'add', pkg, cwd, domain } as never),
+    Promise.resolve({
+      type: 'plugin',
+      action: 'add',
+      pkg,
+      cwd,
+      domain,
+    } as never),
   ),
   pluginRemove: vi.fn((pkg: string, cwd: string, domain: string | undefined) =>
-    Promise.resolve({ type: 'plugin', action: 'remove', pkg, cwd, domain } as never),
+    Promise.resolve({
+      type: 'plugin',
+      action: 'remove',
+      pkg,
+      cwd,
+      domain,
+    } as never),
   ),
   pluginSync: vi.fn((cwd: string, domain: string | undefined) =>
     Promise.resolve({ type: 'plugin', action: 'sync', cwd, domain } as never),
@@ -183,7 +200,11 @@ describe('<tool> plugin spec — action bodies (domain-bound)', () => {
     expect(
       effectiveCwd({
         cwd: '/explicit/cwd',
-        projectContext: { scope: 'project', projectRoot: '/discovered/root', walkedUp: 0 },
+        projectContext: {
+          scope: 'project',
+          projectRoot: '/discovered/root',
+          walkedUp: 0,
+        },
       }),
     ).toBe('/discovered/root');
     expect(effectiveCwd({ cwd: '/explicit/cwd' })).toBe('/explicit/cwd');
@@ -305,7 +326,9 @@ describe('<tool> plugin spec — action bodies (domain-bound)', () => {
     const { ctx } = makeCtx();
     const program = mountWithToolPrimaries(ctx);
 
-    await program.parseAsync(['fit', 'plugin', 'sync', '--cwd', '/p'], { from: 'user' });
+    await program.parseAsync(['fit', 'plugin', 'sync', '--cwd', '/p'], {
+      from: 'user',
+    });
     expect(pluginSync).toHaveBeenCalledWith('/p', 'fit', FIT_BOUND_LAYOUTS);
   });
 });
@@ -348,7 +371,9 @@ describe('sessions spec — action bodies', () => {
     process.stderr.write = () => true;
     try {
       await expect(
-        program.parseAsync(['sessions', 'list', '--limit', '0'], { from: 'user' }),
+        program.parseAsync(['sessions', 'list', '--limit', '0'], {
+          from: 'user',
+        }),
       ).rejects.toThrow(/Invalid --limit/);
     } finally {
       process.stderr.write = origWrite;
@@ -396,7 +421,9 @@ describe('sessions spec — action bodies', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['sessions', 'show', 'session-1'], { from: 'user' });
+    await program.parseAsync(['sessions', 'show', 'session-1'], {
+      from: 'user',
+    });
 
     expect(executeSessionShow).toHaveBeenCalledWith(
       expect.objectContaining({ ref: 'session-1', filters: [] }),
@@ -444,7 +471,9 @@ describe('sessions spec — action bodies', () => {
       return true;
     });
     try {
-      await program.parseAsync(['sessions', 'purge', '--json'], { from: 'user' });
+      await program.parseAsync(['sessions', 'purge', '--json'], {
+        from: 'user',
+      });
     } finally {
       spy.mockRestore();
     }
@@ -545,7 +574,11 @@ describe('init spec — action body', () => {
       cwd: process.cwd(),
       configFilename: 'opensip-cli.config.yml',
       created: false,
-      partialStateError: { state: 'fully-initialized', preExistingFiles: [], message: 'm' },
+      partialStateError: {
+        state: 'fully-initialized',
+        preExistingFiles: [],
+        message: 'm',
+      },
     } as never);
 
     const { ctx, setExitCode } = makeCtx();
@@ -598,7 +631,9 @@ describe('uninstall spec — action body', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['uninstall', '--yes', '--dry-run'], { from: 'user' });
+    await program.parseAsync(['uninstall', '--yes', '--dry-run'], {
+      from: 'user',
+    });
     expect(executeUninstall).toHaveBeenCalledWith(
       expect.objectContaining({ yes: true, dryRun: true, project: undefined }),
     );
@@ -608,7 +643,9 @@ describe('uninstall spec — action body', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['uninstall', '--user', '--yes'], { from: 'user' });
+    await program.parseAsync(['uninstall', '--user', '--yes'], {
+      from: 'user',
+    });
     expect(executeUninstall).toHaveBeenCalledWith(
       expect.objectContaining({ yes: true, project: undefined }),
     );
@@ -618,7 +655,9 @@ describe('uninstall spec — action body', () => {
     const { ctx, setExitCode } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['uninstall', '--user', '--project', '--yes'], { from: 'user' });
+    await program.parseAsync(['uninstall', '--user', '--project', '--yes'], {
+      from: 'user',
+    });
     expect(executeUninstall).not.toHaveBeenCalled();
     expect(setExitCode).toHaveBeenCalledTimes(1);
   });
@@ -627,7 +666,9 @@ describe('uninstall spec — action body', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['uninstall', '--project', '--yes'], { from: 'user' });
+    await program.parseAsync(['uninstall', '--project', '--yes'], {
+      from: 'user',
+    });
     expect(executeUninstall).toHaveBeenCalledWith(expect.objectContaining({ project: true }));
   });
 
@@ -653,7 +694,9 @@ describe('uninstall spec — action body', () => {
       return true;
     });
     try {
-      await program.parseAsync(['uninstall', '--json', '--yes'], { from: 'user' });
+      await program.parseAsync(['uninstall', '--json', '--yes'], {
+        from: 'user',
+      });
     } finally {
       spy.mockRestore();
     }

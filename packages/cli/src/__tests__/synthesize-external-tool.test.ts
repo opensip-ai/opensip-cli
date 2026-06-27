@@ -71,7 +71,10 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
     const tool = synthesizeExternalTool(
       manifest({ pluginLayout: { domain: 'ext', userSubdirs: ['checks'] } }),
     );
-    expect(tool.pluginLayout).toEqual({ domain: 'ext', userSubdirs: ['checks'] });
+    expect(tool.pluginLayout).toEqual({
+      domain: 'ext',
+      userSubdirs: ['checks'],
+    });
   });
 
   it('omits pluginLayout when the manifest declares none', () => {

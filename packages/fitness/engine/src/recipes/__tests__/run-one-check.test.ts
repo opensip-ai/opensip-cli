@@ -50,7 +50,11 @@ function makeRecipe(): FitnessRecipe {
     displayName: 'Test',
     description: 'test recipe',
     checks: { type: 'all', exclude: [] },
-    execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 30_000 },
+    execution: {
+      mode: 'sequential',
+      stopOnFirstFailure: false,
+      timeout: 30_000,
+    },
     reporting: { format: 'table', verbose: false },
   };
 }

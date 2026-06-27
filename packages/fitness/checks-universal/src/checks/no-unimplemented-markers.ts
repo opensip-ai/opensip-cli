@@ -72,12 +72,18 @@ const TS_JS_PATTERNS: readonly MarkerPattern[] = [
     test: lineMatcher(/throw\s+new\s+Error\s*\(([^)]*)\)/i, isUnimplementedArg),
   },
   // `throw new NotImplementedError(...)` and a bare `NotImplementedError(` call.
-  { marker: 'NotImplementedError', test: lineMatcher(/\bNotImplementedError\s*\(/) },
+  {
+    marker: 'NotImplementedError',
+    test: lineMatcher(/\bNotImplementedError\s*\(/),
+  },
 ];
 
 const PYTHON_PATTERNS: readonly MarkerPattern[] = [
   // `raise NotImplementedError` with or without parens/message.
-  { marker: 'raise NotImplementedError', test: lineMatcher(/\braise\s+NotImplementedError\b/) },
+  {
+    marker: 'raise NotImplementedError',
+    test: lineMatcher(/\braise\s+NotImplementedError\b/),
+  },
 ];
 
 const RUST_PATTERNS: readonly MarkerPattern[] = [
@@ -86,7 +92,10 @@ const RUST_PATTERNS: readonly MarkerPattern[] = [
 ];
 
 const GO_PATTERNS: readonly MarkerPattern[] = [
-  { marker: 'panic("not implemented")', test: lineMatcher(/\bpanic\s*\(([^)]*)\)/, isGoPanicArg) },
+  {
+    marker: 'panic("not implemented")',
+    test: lineMatcher(/\bpanic\s*\(([^)]*)\)/, isGoPanicArg),
+  },
 ];
 
 const JAVA_PATTERNS: readonly MarkerPattern[] = [

@@ -58,7 +58,9 @@ describe('loadCliDefaults', () => {
       const customPath = join(customDir, 'custom.yml');
       writeFileSync(customPath, 'cli:\n  verbose: true\n');
       const { loadCliDefaults } = await loadModule();
-      expect(loadCliDefaults(projectDir, customPath)).toEqual({ verbose: true });
+      expect(loadCliDefaults(projectDir, customPath)).toEqual({
+        verbose: true,
+      });
     } finally {
       rmSync(customDir, { recursive: true, force: true });
     }

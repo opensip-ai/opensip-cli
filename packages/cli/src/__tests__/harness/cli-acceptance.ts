@@ -45,7 +45,9 @@ const DIST_CLI = fileURLToPath(new URL('../../../dist/index.js', import.meta.url
  */
 export const CLI_PKG_VERSION: string = (() => {
   const pkgUrl = new URL('../../../package.json', import.meta.url);
-  const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as { version: string };
+  const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as {
+    version: string;
+  };
   return pkg.version;
 })();
 

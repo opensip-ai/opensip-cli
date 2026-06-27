@@ -89,14 +89,22 @@ describe('rule feature-column parity — features present vs absent', () => {
   });
 
   it('orphan-subtree: identical signals with and without features', () => {
-    const orphan = occ({ bodyHash: 'o', simpleName: 'lonely', visibility: 'module-local' });
+    const orphan = occ({
+      bodyHash: 'o',
+      simpleName: 'lonely',
+      visibility: 'module-local',
+    });
     const entry = occ({
       bodyHash: 'e',
       simpleName: 'main',
       visibility: 'exported',
       calls: [staticCall('used')],
     });
-    const used = occ({ bodyHash: 'used', simpleName: 'used', visibility: 'module-local' });
+    const used = occ({
+      bodyHash: 'used',
+      simpleName: 'used',
+      visibility: 'module-local',
+    });
     const catalog = makeCatalog([orphan, entry, used]);
     const indexes = buildIndexes(catalog);
     const features = featuresFor(orphanSubtreeRule, catalog);
@@ -108,7 +116,11 @@ describe('rule feature-column parity — features present vs absent', () => {
   });
 
   it('test-only-reachable: identical signals with and without features', () => {
-    const helper = occ({ bodyHash: 'h', simpleName: 'helper', visibility: 'module-local' });
+    const helper = occ({
+      bodyHash: 'h',
+      simpleName: 'helper',
+      visibility: 'module-local',
+    });
     const testCaller = occ({
       bodyHash: 't',
       simpleName: 'spec',
@@ -151,7 +163,10 @@ describe('rule feature-column parity — the column actually drives the verdict'
     });
     const catalog = makeCatalog([a, b]);
     const indexes = buildIndexes(catalog);
-    const config: GraphConfig = { minDuplicateBodyLines: 10, minCrossPackageDuplicatePackages: 99 };
+    const config: GraphConfig = {
+      minDuplicateBodyLines: 10,
+      minCrossPackageDuplicatePackages: 99,
+    };
 
     // Sanity: without the override this is flagged (per-instance path).
     const flagged = duplicatedFunctionBodyRule.evaluate(catalog, indexes, config);
@@ -176,7 +191,11 @@ describe('rule feature-column parity — the column actually drives the verdict'
   });
 
   it('orphan-subtree honors a reachableFromEntry column that marks the orphan reachable', () => {
-    const orphan = occ({ bodyHash: 'o', simpleName: 'lonely', visibility: 'module-local' });
+    const orphan = occ({
+      bodyHash: 'o',
+      simpleName: 'lonely',
+      visibility: 'module-local',
+    });
     const catalog = makeCatalog([orphan]);
     const indexes = buildIndexes(catalog);
 

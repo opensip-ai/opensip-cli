@@ -96,10 +96,16 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   //  - governance / entitlements / audit (H1-H3);
   //  - effectful egress (cloud sync + `--report-to` + SARIF file sink).
   const projectDatastore = createDatastoreResolver('project-seam', log);
-  const baselineSeams = buildBaselineSeams({ getDatastore: projectDatastore, logger: log });
+  const baselineSeams = buildBaselineSeams({
+    getDatastore: projectDatastore,
+    logger: log,
+  });
   const writeArtifact = createWriteArtifactSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
-  const hostPlanes = buildHostPlanes({ getDatastore: projectDatastore, logger: log });
+  const hostPlanes = buildHostPlanes({
+    getDatastore: projectDatastore,
+    logger: log,
+  });
 
   // Host run-lifecycle plane (host-owned-run-timing Phase 1). The FACTORY holds
   // stable deps only — it must NOT start a lifecycle here. The lifecycle is
@@ -196,11 +202,20 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
 export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
   const log = logger ?? defaultLogger;
   const projectDatastore = createDatastoreResolver('project-seam', log);
-  const baselineSeams = buildBaselineSeams({ getDatastore: projectDatastore, logger: log });
+  const baselineSeams = buildBaselineSeams({
+    getDatastore: projectDatastore,
+    logger: log,
+  });
   const writeArtifact = createWriteArtifactSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
-  const hostPlanes = buildHostPlanes({ getDatastore: projectDatastore, logger: log });
-  const outputPlane = createOutputPlane({ render: deniedHookSeam('render'), logger: log });
+  const hostPlanes = buildHostPlanes({
+    getDatastore: projectDatastore,
+    logger: log,
+  });
+  const outputPlane = createOutputPlane({
+    render: deniedHookSeam('render'),
+    logger: log,
+  });
   const ctx: ToolCliContext = {
     get scope(): RunScope {
       return readScope();

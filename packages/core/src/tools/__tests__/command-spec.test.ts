@@ -109,18 +109,30 @@ describe('OptionSpec corpus coverage', () => {
   // Each case below is a real first-party flag shape from the Phase 0 corpus,
   // asserting the type expresses it with zero raw-Commander escape.
   it('expresses a boolean flag with default (--gate-save)', () => {
-    const opt: OptionSpec = { flag: '--gate-save', description: 'Save baseline', default: false };
+    const opt: OptionSpec = {
+      flag: '--gate-save',
+      description: 'Save baseline',
+      default: false,
+    };
     expect(opt.value).toBeUndefined();
     expect(opt.default).toBe(false);
   });
 
   it('expresses a negatable flag (--no-cache)', () => {
-    const opt: OptionSpec = { flag: '--no-cache', description: 'Skip cache', negatable: true };
+    const opt: OptionSpec = {
+      flag: '--no-cache',
+      description: 'Skip cache',
+      negatable: true,
+    };
     expect(opt.negatable).toBe(true);
   });
 
   it('expresses a value flag (--recipe <name>)', () => {
-    const opt: OptionSpec = { flag: '--recipe', value: '<name>', description: 'Run a recipe' };
+    const opt: OptionSpec = {
+      flag: '--recipe',
+      value: '<name>',
+      description: 'Run a recipe',
+    };
     expect(opt.value).toBe('<name>');
   });
 
@@ -169,7 +181,11 @@ describe('OptionSpec corpus coverage', () => {
   });
 
   it('expresses a short-aliased boolean (-y, --yes)', () => {
-    const opt: OptionSpec = { flag: '-y, --yes', description: 'Skip confirmation', default: false };
+    const opt: OptionSpec = {
+      flag: '-y, --yes',
+      description: 'Skip confirmation',
+      default: false,
+    };
     expect(opt.flag).toContain('-y');
   });
 
@@ -185,13 +201,21 @@ describe('OptionSpec corpus coverage', () => {
 
 describe('ArgSpec corpus coverage', () => {
   it('expresses a variadic optional positional ([paths...])', () => {
-    const arg: ArgSpec = { name: 'paths', description: 'Subtrees', variadic: true, optional: true };
+    const arg: ArgSpec = {
+      name: 'paths',
+      description: 'Subtrees',
+      variadic: true,
+      optional: true,
+    };
     expect(arg.variadic).toBe(true);
     expect(arg.optional).toBe(true);
   });
 
   it('expresses a required positional (<name>)', () => {
-    const arg: ArgSpec = { name: 'name', description: 'Function name to look up' };
+    const arg: ArgSpec = {
+      name: 'name',
+      description: 'Function name to look up',
+    };
     expect(arg.variadic).toBeUndefined();
     expect(arg.optional).toBeUndefined();
   });
@@ -245,7 +269,14 @@ describe('CommandSpec shape', () => {
       baseSpec({
         aliases: ['inspect'],
         options: [{ flag: '--no-cache', description: 'Skip cache', negatable: true }],
-        args: [{ name: 'paths', description: 'Subtrees', variadic: true, optional: true }],
+        args: [
+          {
+            name: 'paths',
+            description: 'Subtrees',
+            variadic: true,
+            optional: true,
+          },
+        ],
         output: 'live-view',
         scope: 'none',
       }),

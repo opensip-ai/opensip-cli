@@ -91,7 +91,11 @@ function makeSignal(fixture: RuleFixture): Signal {
     filePath: fixture.filePath,
     line: fixture.line,
     column: fixture.column,
-    code: { file: fixture.filePath, line: fixture.line, column: fixture.column },
+    code: {
+      file: fixture.filePath,
+      line: fixture.line,
+      column: fixture.column,
+    },
     metadata: {},
     createdAt: '2026-05-27T00:00:00.000Z',
   };
@@ -266,7 +270,11 @@ describe('graph SARIF — Plan D rules level mapping + multi-language', () => {
       expectedLevel: 'error',
       filePath: 'src/x.ts',
     });
-    const py = { ...ts, filePath: 'src/x.py', code: { file: 'src/x.py', line: 10, column: 0 } };
+    const py = {
+      ...ts,
+      filePath: 'src/x.py',
+      code: { file: 'src/x.py', line: 10, column: 0 },
+    };
     const rTs = firstResult(ts);
     const rPy = firstResult(py);
     // Band logic is language-agnostic: same ruleId + level regardless of path.

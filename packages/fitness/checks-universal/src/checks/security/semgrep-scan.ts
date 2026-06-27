@@ -103,7 +103,10 @@ function parseSemgrepOutput(
 export const semgrepScan = defineCheck({
   id: 'b8e2f4a1-6c3d-4e5f-9a1b-7d8c2e3f4a5b',
   slug: 'semgrep-scan',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
 
   confidence: 'high',
   description: 'Run Semgrep static analysis to detect security vulnerabilities',

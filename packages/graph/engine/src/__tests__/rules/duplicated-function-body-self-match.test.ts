@@ -27,7 +27,11 @@ import type { FunctionOccurrence } from '../../types.js';
 const evaluate = duplicatedFunctionBodyRule.evaluate.bind(duplicatedFunctionBodyRule);
 
 /** Clears the default per-instance floor (≥ 5 lines, ≥ 200 chars). */
-const substantial: Partial<FunctionOccurrence> = { line: 55, endLine: 70, bodySize: 500 };
+const substantial: Partial<FunctionOccurrence> = {
+  line: 55,
+  endLine: 70,
+  bodySize: 500,
+};
 
 describe('duplicated-function-body self-match exclusion', () => {
   it('does NOT flag a single function that appears twice in the catalog index (same file + line)', () => {

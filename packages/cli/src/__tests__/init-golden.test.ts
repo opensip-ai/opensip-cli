@@ -45,7 +45,10 @@ function firstPartyScaffolds(): ToolScaffold[] {
  * contains it verifies the id-embedding contract end to end.
  */
 function pinnedCheckId(language: string): string {
-  const files = resolveToolHooks(fitnessTool).scaffoldExamples?.({ languages: [language] }) ?? [];
+  const files =
+    resolveToolHooks(fitnessTool).scaffoldExamples?.({
+      languages: [language],
+    }) ?? [];
   const check = files.find((f) => f.filename.startsWith('example-check'));
   if (!check) throw new Error(`no example-check contribution for ${language}`);
   return check.stableId;

@@ -29,7 +29,11 @@ function collectRawStreamSpecs(toolName: string, specs: readonly CommandSpec[]):
     if (spec.rawStreamReason === undefined) {
       throw new Error(`${toolName}:${spec.name} missing rawStreamReason`);
     }
-    entries.push({ tool: toolName, command: spec.name, reason: spec.rawStreamReason });
+    entries.push({
+      tool: toolName,
+      command: spec.name,
+      reason: spec.rawStreamReason,
+    });
   }
   return entries;
 }
@@ -75,6 +79,7 @@ describe('raw-stream inventory (bundled tools)', () => {
     expect(byReason['runtime-render-dispatch']?.map((e) => e.command).sort()).toEqual([
       'fitness',
       'graph',
+      'impact',
       'simulation',
     ]);
     expect(byReason['worker-ipc']?.length).toBeGreaterThanOrEqual(3);

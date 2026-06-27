@@ -471,6 +471,17 @@
       "purpose": "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-cli subcommand."
     },
     {
+      "file": "docs/web-generated/60-guides/use-opensip-with-ai-agents.md",
+      "path": "/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/",
+      "section": "60-guides",
+      "title": "Use OpenSIP with AI agents",
+      "audience": [
+        "getting-started",
+        "ci-integrators"
+      ],
+      "purpose": "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
+    },
+    {
       "file": "docs/web-generated/70-reference/01-cli-commands.md",
       "path": "/docs/opensip-cli/70-reference/01-cli-commands/",
       "section": "70-reference",
@@ -745,7 +756,8 @@
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
         "/docs/opensip-cli/60-guides/05-migrate-from-eslint/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
-        "/docs/opensip-cli/60-guides/07-create-your-first-tool/"
+        "/docs/opensip-cli/60-guides/07-create-your-first-tool/",
+        "/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/"
       ]
     },
     {
@@ -798,6 +810,7 @@
         "/docs/opensip-cli/60-guides/03-wire-into-ci/",
         "/docs/opensip-cli/60-guides/05-migrate-from-eslint/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
+        "/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/",
         "/docs/opensip-cli/70-reference/03-configuration/",
         "/docs/opensip-cli/70-reference/05-checks-index/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/"
@@ -867,6 +880,7 @@
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
         "/docs/opensip-cli/60-guides/05-migrate-from-eslint/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
+        "/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/",
         "/docs/opensip-cli/70-reference/01-cli-commands/",
         "/docs/opensip-cli/70-reference/03-configuration/",
         "/docs/opensip-cli/70-reference/04-json-output-schema/",

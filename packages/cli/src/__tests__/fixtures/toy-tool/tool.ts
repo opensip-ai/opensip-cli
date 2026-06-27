@@ -89,7 +89,11 @@ export function toyNetNewSignal(): Signal {
  * "free ratchet" surface a new tool must author.
  */
 export const toyTool: Tool = {
-  metadata: { id: TOY_TOOL_ID, version: '0.0.0', description: 'Toy tool (ratchet proof)' },
+  metadata: {
+    id: TOY_TOOL_ID,
+    version: '0.0.0',
+    description: 'Toy tool (ratchet proof)',
+  },
   commandSpecs: [
     defineCommand<unknown, ToolCliContext>({
       name: 'toy',
@@ -100,10 +104,17 @@ export const toyTool: Tool = {
       commonFlags: ['cwd'],
       options: [
         { flag: '--gate-save', description: 'Save the toy baseline' },
-        { flag: '--gate-compare', description: 'Compare against the toy baseline' },
+        {
+          flag: '--gate-compare',
+          description: 'Compare against the toy baseline',
+        },
       ],
       handler: async (rawOpts, cli): Promise<void> => {
-        const opts = rawOpts as { gateSave?: boolean; gateCompare?: boolean; cwd?: string };
+        const opts = rawOpts as {
+          gateSave?: boolean;
+          gateCompare?: boolean;
+          cwd?: string;
+        };
         const envelope = buildToyEnvelope();
         if (opts.gateSave === true) {
           await cli.saveBaseline(TOY_TOOL_ID, envelope);
@@ -113,7 +124,10 @@ export const toyTool: Tool = {
         // ADR-0035: the HOST derives the gate exit — the tool passes the ratchet
         // verdict as the deliverSignals runFailed override; it NEVER calls
         // setExitCode for the gate path.
-        await cli.deliverSignals(envelope, { cwd: opts.cwd ?? '.', runFailed: result.degraded });
+        await cli.deliverSignals(envelope, {
+          cwd: opts.cwd ?? '.',
+          runFailed: result.degraded,
+        });
       },
     }),
   ],

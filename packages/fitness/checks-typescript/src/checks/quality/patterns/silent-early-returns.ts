@@ -187,7 +187,9 @@ function extractReturnStatement(node: ts.IfStatement): ts.ReturnStatement | null
   return null;
 }
 
-type SentinelReturnStatement = ts.ReturnStatement & { expression: ts.Expression };
+type SentinelReturnStatement = ts.ReturnStatement & {
+  expression: ts.Expression;
+};
 
 function isSentinelReturn(
   returnStatement: ts.ReturnStatement | null,

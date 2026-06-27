@@ -51,7 +51,9 @@ describe('loadGraphConfig', () => {
     expect(config.minCrossPackageDuplicatePackages).toBe(2);
     expect(config.minCrossPackageDuplicateBodySize).toBe(150);
     expect(config.entryPointHashes).toEqual(['abc', 'def']);
-    expect(config.severityOverrides).toEqual({ 'graph:orphan-subtree': 'error' });
+    expect(config.severityOverrides).toEqual({
+      'graph:orphan-subtree': 'error',
+    });
   });
 
   it('returns {} when there is no graph: block', () => {
@@ -107,7 +109,9 @@ describe('loadGraphConfig reads scope.toolConfig.graph when a scope is present',
     // surface this. The scope says 99; loadGraphConfig must return the SCOPE value.
     writeConfig('graph:\n  minDuplicateBodyLines: 8\n');
     const scope = makeGraphTestScope();
-    Object.assign(scope, { toolConfig: { graph: { minDuplicateBodyLines: 99 } } });
+    Object.assign(scope, {
+      toolConfig: { graph: { minDuplicateBodyLines: 99 } },
+    });
 
     const config = runWithScopeSync(scope, () => loadGraphConfig(workDir));
     expect(config.minDuplicateBodyLines).toBe(99);

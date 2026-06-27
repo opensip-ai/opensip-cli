@@ -67,7 +67,11 @@ describe('tool-identity-single-source', () => {
       accessor({
         'a/package.json': JSON.stringify({ name: 'a' }),
         'b/package.json': JSON.stringify({
-          opensipTools: { kind: 'tool', id: 'x', commands: [{ name: 'x', description: 'd' }] },
+          opensipTools: {
+            kind: 'tool',
+            id: 'x',
+            commands: [{ name: 'x', description: 'd' }],
+          },
         }),
       }),
     );

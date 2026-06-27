@@ -23,6 +23,10 @@ export type {
   GraphLookupResult,
 } from './command-results-variants/graph-results.js';
 export type {
+  GraphImpactBasis,
+  GraphImpactResult,
+} from './command-results-variants/graph-impact-result.js';
+export type {
   ConfigValidateResult,
   ConfigSchemaResult,
 } from './command-results-variants/config-results.js';
@@ -72,6 +76,7 @@ import type {
   GraphStatusResult,
   TextLinesResult,
 } from './command-results-variants/done-results.js';
+import type { GraphImpactResult } from './command-results-variants/graph-impact-result.js';
 import type { GraphLookupResult } from './command-results-variants/graph-results.js';
 import type { InitResult, SimNoticeResult } from './command-results-variants/init-results.js';
 import type {
@@ -108,6 +113,7 @@ export type CommandResult =
   | GateDoneResult
   | GraphStatusResult
   | GraphLookupResult
+  | GraphImpactResult
   | ConfigValidateResult
   | ConfigSchemaResult
   | ListChecksResult

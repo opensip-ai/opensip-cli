@@ -10,7 +10,10 @@ import { loadPlugin, loadAllPlugins } from '../loader.js';
 import type { DiscoveredPlugin, PluginLayout } from '../types.js';
 
 /** Fit-shaped layout used by the loadAllPlugins discovery tests. */
-const FIT_LAYOUT: PluginLayout = { domain: 'fit', userSubdirs: ['checks', 'recipes'] };
+const FIT_LAYOUT: PluginLayout = {
+  domain: 'fit',
+  userSubdirs: ['checks', 'recipes'],
+};
 
 let testDir: string;
 let infoSpy: ReturnType<typeof vi.spyOn>;
@@ -145,7 +148,10 @@ describe('loadPlugin', () => {
   it('passes warn/debug helpers to the callback', async () => {
     const entry = writePluginFile('plugin-ctx.mjs', 'export const x = 1;');
     let captured:
-      | { warn: typeof globalThis.console.warn; debug: typeof globalThis.console.debug }
+      | {
+          warn: typeof globalThis.console.warn;
+          debug: typeof globalThis.console.debug;
+        }
       | undefined;
     await loadPlugin(makeDiscovered(entry), (_mod, ctx) => {
       ctx.warn('my.evt', 'my message', { extra: 'field' });

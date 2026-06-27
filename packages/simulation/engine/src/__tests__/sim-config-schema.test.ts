@@ -11,7 +11,9 @@ import {
 
 describe('SimulationNamespaceSchema', () => {
   it('accepts a block with a recipe', () => {
-    expect(SimulationNamespaceSchema.parse({ recipe: 'example' })).toEqual({ recipe: 'example' });
+    expect(SimulationNamespaceSchema.parse({ recipe: 'example' })).toEqual({
+      recipe: 'example',
+    });
   });
 
   it('accepts an empty block', () => {

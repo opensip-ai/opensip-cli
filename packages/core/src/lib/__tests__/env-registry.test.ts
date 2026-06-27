@@ -62,15 +62,25 @@ describe('EnvRegistry', () => {
 
   it('returns undefined with source=unset when neither set nor defaulted', () => {
     const reg = new EnvRegistry([{ canonical: 'OST_TEST_VALUE', docs: 'x' }]);
-    expect(reg.read('OST_TEST_VALUE')).toEqual({ value: undefined, source: 'unset' });
+    expect(reg.read('OST_TEST_VALUE')).toEqual({
+      value: undefined,
+      source: 'unset',
+    });
   });
 
   it('surfaces the deprecation note on a hit so the caller can warn', () => {
     process.env.OST_TEST_CANON = 'v';
     const reg = new EnvRegistry([
-      { canonical: 'OST_TEST_CANON', docs: 'x', deprecated: { since: '2.12.0', use: 'OST_NEW' } },
+      {
+        canonical: 'OST_TEST_CANON',
+        docs: 'x',
+        deprecated: { since: '2.12.0', use: 'OST_NEW' },
+      },
     ]);
-    expect(reg.read('OST_TEST_CANON').deprecated).toEqual({ since: '2.12.0', use: 'OST_NEW' });
+    expect(reg.read('OST_TEST_CANON').deprecated).toEqual({
+      since: '2.12.0',
+      use: 'OST_NEW',
+    });
   });
 
   it('describe() returns every registered spec for the generated doc', () => {

@@ -14,6 +14,7 @@
  * the handler stays authoritative — byte-identical to the former action body.
  */
 
+import { agentRunFlagSpecs } from '@opensip-cli/contracts';
 import { definePrimaryCommand } from '@opensip-cli/core';
 
 import { FITNESS_LIVE_VIEW_KEY } from '../../identity.js';
@@ -97,7 +98,11 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
         value: '<name>',
         description: 'Use a named recipe (default, quick-smoke, backend, etc.)',
       },
-      { flag: '--check', value: '<slug>', description: 'Run a single check by slug' },
+      {
+        flag: '--check',
+        value: '<slug>',
+        description: 'Run a single check by slug',
+      },
       {
         flag: '--tags',
         value: '<tags>',
@@ -106,7 +111,11 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
         parse: (val, prev) => [...(prev as string[]), val],
       },
       { flag: '--list', description: 'List available checks', default: false },
-      { flag: '--recipes', description: 'List available recipes', default: false },
+      {
+        flag: '--recipes',
+        description: 'List available recipes',
+        default: false,
+      },
       {
         flag: '--exclude',
         value: '<slug>',
@@ -134,6 +143,22 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
         flag: '--gate-compare',
         description:
           'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
+        default: false,
+      },
+      ...agentRunFlagSpecs,
+      {
+        flag: '--changed',
+        description: 'Run only checks whose targets intersect git-changed files',
+        default: false,
+      },
+      {
+        flag: '--since',
+        value: '<ref>',
+        description: 'Git ref base for --changed (diff <ref>...HEAD)',
+      },
+      {
+        flag: '--include-impacted',
+        description: 'Expand changed set with graph-impacted files (requires a built catalog)',
         default: false,
       },
     ],

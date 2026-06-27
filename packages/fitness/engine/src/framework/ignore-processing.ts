@@ -108,7 +108,11 @@ export async function filterSignalsByDirectives(
 function toDirectiveEntry(
   filePath: string,
   lineNumber: number,
-  parsed: { type: 'file' | 'next-line'; checkId: string; reason: string | null },
+  parsed: {
+    type: 'file' | 'next-line';
+    checkId: string;
+    reason: string | null;
+  },
 ): DirectiveEntry {
   return {
     filePath,

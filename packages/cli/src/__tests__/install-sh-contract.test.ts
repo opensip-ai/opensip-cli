@@ -111,7 +111,9 @@ describe('install.sh ⇄ CLI surface contract', () => {
       const init = cli.run(['init', '--cwd', dir, '--language', 'typescript', '--json']);
       expect(init.exitCode).toBe(0);
       // Mirrors install.sh: `cd "$SMOKE_DIR" && opensip sessions list --json`.
-      const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], { cwd: dir });
+      const { stdout, exitCode } = cli.run(['sessions', 'list', '--json'], {
+        cwd: dir,
+      });
       expect(exitCode).toBe(0);
       expectOkEnvelope(stdout);
     });

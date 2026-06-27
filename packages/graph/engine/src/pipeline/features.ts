@@ -74,7 +74,12 @@ export function buildFeatures(
 ): FeatureTable {
   const set = new Set<FeatureColumn>(requested);
   if (set.size === 0) {
-    return { function: EMPTY_FUNCTION, package: EMPTY_PACKAGE, scc: EMPTY_SCC, edge: EMPTY_EDGE };
+    return {
+      function: EMPTY_FUNCTION,
+      package: EMPTY_PACKAGE,
+      scc: EMPTY_SCC,
+      edge: EMPTY_EDGE,
+    };
   }
 
   const fn = wantsFunctionGrain(set)
@@ -127,7 +132,9 @@ function buildFunctionFeatures(
 
   const out = new Map<string, FunctionFeatures>();
   for (const [hash, occ] of indexes.byBodyHash) {
-    const row: { -readonly [K in keyof FunctionFeatures]?: FunctionFeatures[K] } = {
+    const row: {
+      -readonly [K in keyof FunctionFeatures]?: FunctionFeatures[K];
+    } = {
       bodyLines: occ.endLine - occ.line + 1,
     };
     if (blast) row.blast = blast.get(hash);

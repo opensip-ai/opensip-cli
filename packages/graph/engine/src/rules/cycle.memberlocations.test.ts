@@ -79,9 +79,24 @@ const EMPTY_CONFIG: GraphConfig = {};
 describe('cycleRule memberLocations', () => {
   it('attaches a non-empty memberLocations array covering the SCC members', () => {
     // A 3-member intra-package cycle (size ≥ default cycleMinSize → medium band).
-    const a = occ({ bodyHash: 'A', simpleName: 'a', filePath: 'src/a.ts', line: 3 });
-    const b = occ({ bodyHash: 'B', simpleName: 'b', filePath: 'src/b.ts', line: 7 });
-    const c = occ({ bodyHash: 'C', simpleName: 'c', filePath: 'src/c.ts', line: 11 });
+    const a = occ({
+      bodyHash: 'A',
+      simpleName: 'a',
+      filePath: 'src/a.ts',
+      line: 3,
+    });
+    const b = occ({
+      bodyHash: 'B',
+      simpleName: 'b',
+      filePath: 'src/b.ts',
+      line: 7,
+    });
+    const c = occ({
+      bodyHash: 'C',
+      simpleName: 'c',
+      filePath: 'src/c.ts',
+      line: 11,
+    });
     const catalog = catalogOf([a, b, c]);
     // Members are occIds (`${filePath}:${line}:${column}`), resolved via byOccId.
     const scc: SccFeatures = {

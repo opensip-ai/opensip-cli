@@ -62,6 +62,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'isBaselineIdentityCompatible',
   'stampFingerprints',
   'toBaselineIdentityMetadata',
+  'toPosixRelative',
   'DEFAULT_FAIL_ON_DEGRADED',
   'resolveFailOnDegraded',
   // Subprocess-correlation telemetry: the pure correlation primitive (type +
@@ -209,6 +210,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'registerCapabilityDomainsFromManifest',
   'registerRecipesFromMod',
   'registeredToolShortIds',
+  'resolveChangedFiles',
   'resolvePackageDir',
   'resolvePackageEntryPoint',
   'resolveProjectConfigPath',

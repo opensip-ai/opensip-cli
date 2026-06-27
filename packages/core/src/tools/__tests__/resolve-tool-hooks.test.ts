@@ -15,7 +15,10 @@ describe('resolveToolHooks', () => {
       identity: { name: 'test-tool' },
       metadata: { id: 'x', name: 'x', version: '0', description: 'x' },
       commands: [{ name: 'x', description: 'x' }],
-      extensionPoints: { initialize: bagInit, config: { namespace: 'x', schema: {} } },
+      extensionPoints: {
+        initialize: bagInit,
+        config: { namespace: 'x', schema: {} },
+      },
     } as Tool;
 
     const hooks = resolveToolHooks(tool);
@@ -71,7 +74,9 @@ describe('applyToolContributeScope', () => {
 
     applyToolContributeScope(scope, tool);
 
-    expect((scope as RunScope & { x?: { ready: boolean } }).x).toEqual({ ready: true });
+    expect((scope as RunScope & { x?: { ready: boolean } }).x).toEqual({
+      ready: true,
+    });
   });
 
   it('installs a wrapped contribution and registers its disposer', () => {
@@ -95,7 +100,9 @@ describe('applyToolContributeScope', () => {
     scope.dispose();
     scope.dispose();
 
-    expect((scope as RunScope & { x?: { ready: boolean } }).x).toEqual({ ready: true });
+    expect((scope as RunScope & { x?: { ready: boolean } }).x).toEqual({
+      ready: true,
+    });
     expect(disposeCount).toBe(1);
   });
 });

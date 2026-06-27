@@ -22,14 +22,27 @@ describe('createToolLogger', () => {
   });
 
   it('does not let caller module override the helper module', () => {
-    const base = { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() };
+    const base = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+      error: vi.fn(),
+    };
     const log = createToolLogger('fixed:module', base);
     log.info({ evt: 'x', module: 'other' });
-    expect(base.info).toHaveBeenCalledWith({ module: 'fixed:module', evt: 'x' });
+    expect(base.info).toHaveBeenCalledWith({
+      module: 'fixed:module',
+      evt: 'x',
+    });
   });
 
   it('supports string message entries', () => {
-    const base = { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() };
+    const base = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+      error: vi.fn(),
+    };
     const log = createToolLogger('simulation:scenario', base);
     log.warn('hello', { evt: 'simulation.scenario.warn', scenarioId: 's1' });
     expect(base.warn).toHaveBeenCalledWith({
@@ -41,11 +54,19 @@ describe('createToolLogger', () => {
   });
 
   it('routes debug and error entries through the same module merge path', () => {
-    const base = { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() };
+    const base = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+      error: vi.fn(),
+    };
     const log = createToolLogger('yagni:cli', base);
     log.debug({ evt: 'yagni.debug' });
     log.error('failed', { evt: 'yagni.error', code: 'E1' });
-    expect(base.debug).toHaveBeenCalledWith({ module: 'yagni:cli', evt: 'yagni.debug' });
+    expect(base.debug).toHaveBeenCalledWith({
+      module: 'yagni:cli',
+      evt: 'yagni.debug',
+    });
     expect(base.error).toHaveBeenCalledWith({
       module: 'yagni:cli',
       msg: 'failed',
@@ -64,7 +85,10 @@ describe('createToolLogger', () => {
     runWithScopeSync(scope, () => {
       createToolLogger('fitness:cli').info({ evt: 'fit.run.start' });
     });
-    expect(writes[0]).toMatchObject({ module: 'fitness:cli', evt: 'fit.run.start' });
+    expect(writes[0]).toMatchObject({
+      module: 'fitness:cli',
+      evt: 'fit.run.start',
+    });
     spy.mockRestore();
   });
 
@@ -86,7 +110,10 @@ describe('createToolLogger', () => {
       log.info({ evt: 'graph.cli.lookup.start' });
     });
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(writes[0]).toMatchObject({ module: 'graph:cli', evt: 'graph.cli.lookup.start' });
+    expect(writes[0]).toMatchObject({
+      module: 'graph:cli',
+      evt: 'graph.cli.lookup.start',
+    });
     spy.mockRestore();
   });
 });

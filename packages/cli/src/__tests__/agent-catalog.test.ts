@@ -174,6 +174,14 @@ describe('buildAgentCatalog', () => {
     expect(c.outputShapes.history).toMatch(/history/);
     expect(c.notes.length).toBeGreaterThan(0);
   });
+
+  it('surfaces agent recipes and the read-latest-result workflow', async () => {
+    const c = buildAgentCatalog({ tools: await makeRegistry() });
+    expect(c.commonPatterns.some((p) => p.name.toLowerCase().includes('read-latest'))).toBe(true);
+    expect(c.commonPatterns.some((p) => p.example.includes('agent-fast'))).toBe(true);
+    expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
+    expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
+  });
 });
 
 describe('executeAgentCatalog', () => {

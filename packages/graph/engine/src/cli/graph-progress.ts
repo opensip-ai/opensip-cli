@@ -47,7 +47,11 @@ export const SHARDED_STAGE_LABELS: Readonly<Record<GraphStage, string>> = {
 export function toProgressEvent(event: GraphProgressEvent, sharded = false): ProgressEvent {
   const labels = sharded ? SHARDED_STAGE_LABELS : STAGE_LABELS;
   if (event.type === 'stage-start') {
-    return { type: 'stage-start', stage: event.stage, label: labels[event.stage] };
+    return {
+      type: 'stage-start',
+      stage: event.stage,
+      label: labels[event.stage],
+    };
   }
   if (event.type === 'stage-done') {
     return {

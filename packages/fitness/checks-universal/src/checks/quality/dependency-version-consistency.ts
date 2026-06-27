@@ -130,7 +130,10 @@ function analyzeDependencyVersions(
     const pkgName = pkg.name ?? path.basename(path.dirname(pkgPath));
 
     // Check both dependencies and devDependencies
-    const depSources: { deps: Record<string, string> | undefined; isDev: boolean }[] = [
+    const depSources: {
+      deps: Record<string, string> | undefined;
+      isDev: boolean;
+    }[] = [
       { deps: pkg.dependencies, isDev: false },
       { deps: pkg.devDependencies, isDev: true },
     ];
@@ -178,7 +181,12 @@ function findNonWorkspaceProtocolDeps(
   packageJsonFiles: string[],
   projectRoot: string,
 ): { pkgName: string; pkgPath: string; dep: string; version: string }[] {
-  const violations: { pkgName: string; pkgPath: string; dep: string; version: string }[] = [];
+  const violations: {
+    pkgName: string;
+    pkgPath: string;
+    dep: string;
+    version: string;
+  }[] = [];
 
   for (const pkgPath of packageJsonFiles) {
     const pkg = parsePackageJson(pkgPath);

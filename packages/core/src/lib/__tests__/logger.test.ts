@@ -191,7 +191,10 @@ describe('logger', () => {
       const expectedPath = join(tempDir, `${today}.jsonl`);
       expect(existsSync(expectedPath)).toBe(true);
       const content = readFileSync(expectedPath, 'utf8').trim().split('\n');
-      const entry = JSON.parse(content.at(-1) ?? '{}') as { msg: string; level: string };
+      const entry = JSON.parse(content.at(-1) ?? '{}') as {
+        msg: string;
+        level: string;
+      };
       expect(entry.msg).toBe('hello');
       expect(entry.level).toBe('info');
     });

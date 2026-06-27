@@ -120,7 +120,11 @@ describe('authored-tool end-to-end load', () => {
     await expect(
       discoverAndRegisterAuthoredTools(
         registry,
-        { projectAuthoredDir: projectRoot, globalAuthoredDir: globalRoot, env: {} },
+        {
+          projectAuthoredDir: projectRoot,
+          globalAuthoredDir: globalRoot,
+          env: {},
+        },
         new Set(),
       ),
     ).rejects.toBeInstanceOf(PluginIncompatibleError);
@@ -136,7 +140,11 @@ describe('authored-tool end-to-end load', () => {
     try {
       await discoverAndRegisterAuthoredTools(
         registry,
-        { projectAuthoredDir: projectRoot, globalAuthoredDir: globalRoot, env: {} },
+        {
+          projectAuthoredDir: projectRoot,
+          globalAuthoredDir: globalRoot,
+          env: {},
+        },
         new Set(),
       );
       expect.unreachable('expected a PluginIncompatibleError');
@@ -193,7 +201,10 @@ describe('authored-tool end-to-end load', () => {
     await expect(
       discoverAndRegisterAuthoredTools(
         registry,
-        { globalAuthoredDir: join(tmpdir(), 'opensip-missing-global-root-xyz'), env: {} },
+        {
+          globalAuthoredDir: join(tmpdir(), 'opensip-missing-global-root-xyz'),
+          env: {},
+        },
         new Set(),
       ),
     ).resolves.toBeUndefined();

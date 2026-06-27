@@ -225,14 +225,24 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
   printPreambleForRun(write, { mode, purge, toDelete, toKeep, rootPath });
 
   if (opts.dryRun) {
-    return buildResult({ action: 'dry-run', mode, targets: toDelete, rootPath });
+    return buildResult({
+      action: 'dry-run',
+      mode,
+      targets: toDelete,
+      rootPath,
+    });
   }
 
   if (opts.yes !== true) {
     const prompt = opts.prompt ?? defaultPrompt;
     const ok = await confirm(prompt, `Proceed? [y/N] `);
     if (!ok) {
-      return buildResult({ action: 'cancelled', mode, targets: toDelete, rootPath });
+      return buildResult({
+        action: 'cancelled',
+        mode,
+        targets: toDelete,
+        rootPath,
+      });
     }
   }
 

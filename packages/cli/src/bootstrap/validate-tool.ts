@@ -81,10 +81,17 @@ function commandSpecEntryValidation(
   identity: NormalizedIdentity,
 ): { readonly failure?: string; readonly primary: boolean } {
   if (!validateCommandSpec(spec)) {
-    return { failure: 'tool.commandSpecs contains an invalid CommandSpec', primary: false };
+    return {
+      failure: 'tool.commandSpecs contains an invalid CommandSpec',
+      primary: false,
+    };
   }
 
-  const command = spec as { name?: unknown; parent?: unknown; aliases?: unknown };
+  const command = spec as {
+    name?: unknown;
+    parent?: unknown;
+    aliases?: unknown;
+  };
   if (command.parent !== undefined && command.parent !== identity.name) {
     return {
       failure: `tool.commandSpecs parent '${diagnosticString(command.parent)}' must equal identity.name '${identity.name}'`,

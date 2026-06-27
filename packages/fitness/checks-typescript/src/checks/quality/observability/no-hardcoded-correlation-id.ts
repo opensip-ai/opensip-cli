@@ -56,7 +56,10 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
 export const noHardcodedCorrelationId = defineCheck({
   id: 'de7e8777-2979-4ea5-97b7-8fbcc37bdfef',
   slug: 'no-hardcoded-correlation-id',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

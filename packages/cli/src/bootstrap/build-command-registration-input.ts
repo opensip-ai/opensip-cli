@@ -68,7 +68,10 @@ export function buildCommandRegistrationInput(
    * in-host. Defaulted so the registry stays buildable without them (replay then
    * treats every tool as bundled — the pre-M4-F behavior).
    */
-  opts?: { readonly provenance?: readonly ToolProvenance[]; readonly cwd?: string },
+  opts?: {
+    readonly provenance?: readonly ToolProvenance[];
+    readonly cwd?: string;
+  },
 ): CommandRegistrationInput {
   // Source the plugin-supporting domains from the registered tools'
   // declared layouts — the kernel never enumerates them (ADR-0009).

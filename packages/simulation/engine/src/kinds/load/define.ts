@@ -38,7 +38,10 @@ function validateRampUp(config: LoadScenarioConfig, errors: ScenarioValidationEr
     return;
   }
   if (rampUp > config.duration) {
-    errors.push({ field: 'workload.rampUp', message: 'workload.rampUp cannot exceed duration' });
+    errors.push({
+      field: 'workload.rampUp',
+      message: 'workload.rampUp cannot exceed duration',
+    });
   }
 }
 
@@ -59,13 +62,19 @@ export function validateLoadScenarioConfig(config: LoadScenarioConfig): void {
   validateTargetAndWorkload(config, errors);
 
   if (typeof config.duration !== 'number' || config.duration <= 0) {
-    errors.push({ field: 'duration', message: 'duration must be a positive number' });
+    errors.push({
+      field: 'duration',
+      message: 'duration must be a positive number',
+    });
   }
 
   validateRampUp(config, errors);
 
   if (config.assertions.length === 0) {
-    errors.push({ field: 'assertions', message: 'at least one assertion is required' });
+    errors.push({
+      field: 'assertions',
+      message: 'at least one assertion is required',
+    });
   }
 
   throwValidationErrors(errors, 'load');

@@ -96,7 +96,11 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as { tool?: ToolShortId; limit?: number; summaryOnly?: boolean };
+      const opts = rawOpts as {
+        tool?: ToolShortId;
+        limit?: number;
+        summaryOnly?: boolean;
+      };
       const invalid = validateToolFilter(opts.tool);
       if (invalid) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
@@ -216,7 +220,11 @@ function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
         description: 'Only delete sessions older than N days',
         parse: parseOlderThanDays,
       },
-      { flag: '-y, --yes', description: 'Skip confirmation prompt', default: false },
+      {
+        flag: '-y, --yes',
+        description: 'Skip confirmation prompt',
+        default: false,
+      },
     ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,

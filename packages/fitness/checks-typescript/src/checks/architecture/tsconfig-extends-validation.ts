@@ -15,7 +15,10 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cl
 export const tsconfigExtendsValidation = defineCheck({
   id: '842e7d00-c8e8-4a57-873a-c03caec7e603',
   slug: 'tsconfig-extends-validation',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   confidence: 'high',
   description: 'Ensures all tsconfig.json files extend a shared base and the base file exists',
   tags: ['architecture', 'typescript', 'monorepo'],

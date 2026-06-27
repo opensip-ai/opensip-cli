@@ -53,7 +53,9 @@ describe('exit-code-correctness — numeric setExitCode FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('exit-code-correctness').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('exit-code-correctness').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals).toHaveLength(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -73,7 +75,9 @@ describe('exit-code-correctness — numeric setExitCode FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('exit-code-correctness').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('exit-code-correctness').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals.length).toBeGreaterThan(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -93,7 +97,9 @@ describe('unbounded-memory — bounded-read FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('unbounded-memory').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('unbounded-memory').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals).toHaveLength(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -114,7 +120,9 @@ describe('unbounded-memory — bounded-read FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('unbounded-memory').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('unbounded-memory').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals).toHaveLength(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -134,7 +142,9 @@ describe('unbounded-memory — bounded-read FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('batch-operation-limits').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('batch-operation-limits').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals).toHaveLength(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -154,7 +164,9 @@ describe('unbounded-memory — bounded-read FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('batch-operation-limits').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('batch-operation-limits').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals).toHaveLength(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -171,7 +183,9 @@ describe('unbounded-memory — bounded-read FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('unbounded-memory').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('unbounded-memory').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals).toHaveLength(0);
     rmSync(cwd, { recursive: true, force: true });
   });
@@ -189,7 +203,9 @@ describe('unbounded-memory — bounded-read FP regression', () => {
         '}',
       ].join('\n'),
     );
-    const result = await findCheck('unbounded-memory').run(cwd, { targetFiles: [file] });
+    const result = await findCheck('unbounded-memory').run(cwd, {
+      targetFiles: [file],
+    });
     expect(result.signals.length).toBeGreaterThan(0);
     rmSync(cwd, { recursive: true, force: true });
   });

@@ -197,7 +197,12 @@ describe('near-duplicate-function-body', () => {
       BASE_BODY,
     );
     const b = withSignature(
-      { bodyHash: 'hash-b', simpleName: 'pB', filePath: 'src/b.ts', qualifiedName: 'src/b.pB' },
+      {
+        bodyHash: 'hash-b',
+        simpleName: 'pB',
+        filePath: 'src/b.ts',
+        qualifiedName: 'src/b.pB',
+      },
       NEAR_BODY,
     );
     expect(evaluateNear(makeCatalog([a, b]), { nearDuplicateLshBands: 7 })).toHaveLength(0);

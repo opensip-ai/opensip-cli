@@ -21,7 +21,10 @@ import type { GraphRecipe } from './types.js';
 /** Per-RunScope recipe registry, seeded with the built-in graph recipes. */
 export class GraphRecipeRegistry extends RecipeRegistry<GraphRecipe> {
   constructor() {
-    super({ module: 'graph:recipes', validationCode: 'VALIDATION.GRAPH.RECIPE.DUPLICATE' });
+    super({
+      module: 'graph:recipes',
+      validationCode: 'VALIDATION.GRAPH.RECIPE.DUPLICATE',
+    });
     this.registerAll(builtInGraphRecipes, { internal: true });
   }
 }

@@ -161,6 +161,14 @@ opensip fit --gate-compare
 | `--config <path>` | path | discovered | Override the `opensip-cli.config.yml` location (defaults to the project's config or the package.json pointer). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
+| `--filter <token>` | repeatable | `[]` | Agent filter (repeatable). Values: `errors-only`, `warnings-only`, `category:<name>`, `source:<tool>`, `file:<prefix>`, `high-impact`, `top:<n>`. Composable with `--top`. See [Agent run filters](#agent-run-filters-fit-graph-sim). |
+| `--top <n>` | string | — | Shorthand for `--filter top:<n>`. |
+| `--raw` | bool | `false` | Emit the filtered payload without the `CommandOutcome` wrapper (with `--json`). |
+| `--changed` | bool | `false` | Restrict the run to git-changed files (intersects scope targets). |
+| `--since <ref>` | string | — | Git ref base for changed-file detection (implies changed semantics). |
+| `--include-impacted` | bool | `false` | Expand `--changed` targets with graph impact callers (requires a built catalog; degrades to changed-only with a warning). |
+
+**Agent recipes:** `agent-fast`, `agent-risk`, `agent-final` — see [Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md).
 
 **Mutual exclusion:** `--gate-save` and `--gate-compare` cannot be combined.
 
@@ -191,6 +199,9 @@ opensip sim --recipe <name>
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
+| `--filter <token>` | repeatable | `[]` | Agent filter — same tokens as fit (except `high-impact` / `file:` are N/A). See [Agent run filters](#agent-run-filters-fit-graph-sim). |
+| `--top <n>` | string | — | Shorthand for `--filter top:<n>`. |
+| `--raw` | bool | `false` | Emit the filtered payload without the `CommandOutcome` wrapper (with `--json`). |
 
 **Exit codes:** 0 (all scenarios passed), 1 (any scenario failed), 2 (config/runtime error, **including a run that selected zero scenarios** — an empty run fails closed rather than reporting a false pass: no scenario packages installed, or the recipe selector matched none). Exit 0 therefore always means at least one scenario ran and passed.
 
@@ -266,6 +277,11 @@ opensip graph --list-files --workspace  # the per-unit fan-out set
 | `-q, --quiet` | bool | `false` | Suppress banner / boxes; print only the pass-fail summary line. |
 | `--list-files` | bool | `false` | Discovery-only: resolve and print the source-file set this scope would analyze (whole project, positional subtrees, or `--workspace` fan-out) and exit — no catalog build. Reuses the adapter's stage-0 discovery, so the list is faithful to a real run (`.d.ts` excluded, TypeScript extension-priority collisions collapsed, per-tsconfig `include`/`exclude` honored). Composes with `[paths...]`, `--workspace`, and `--language`; `--json` emits `{ count, files }`. |
 | `--debug` | bool | `false` | Enable debug-mode structured log output. |
+| `--filter <token>` | repeatable | `[]` | Agent filter — includes `high-impact` (blast/coupling markers). See [Agent run filters](#agent-run-filters-fit-graph-sim). |
+| `--top <n>` | string | — | Shorthand for `--filter top:<n>`. |
+| `--raw` | bool | `false` | Emit the filtered payload without the `CommandOutcome` wrapper (with `--json`). |
+
+**Agent recipes:** `agent-risk`, `agent-final`.
 
 **Inspecting discovery (`--list-files`).** `graph` does not enumerate files the way a filesystem walk would — it asks the language adapter, which for TypeScript means the set the `tsconfig` resolves (so `.d.ts` is excluded, an extension-priority collision like a `foo.tsx` shadowed by a sibling `foo.ts` is collapsed to the `.ts`, and each package's `include`/`exclude` is honored). `--list-files` prints exactly that set for the chosen scope and exits before any catalog build, which makes it the cheap, authoritative answer to "what does graph actually see?" The whole-project list and the `--workspace` list can legitimately differ — the latter is the union of per-package `tsconfig`s, which may exclude paths (e.g. `__fixtures__`, root scripts, out-of-`src` files) the root tree includes. To diff graph's view against the VCS:
 
@@ -362,6 +378,31 @@ opensip graph lookup <name> --json
 | `--json` | bool | `false` | Emit a host-stamped `CommandOutcome` with `data.type: "graph-lookup"` (see [JSON output schema](./04-json-output-schema.md)). |
 
 The command reads from the catalog stored in `<project>/opensip-cli/.runtime/datastore.sqlite`. Run `opensip graph` at least once first to populate the catalog. JSON mode routes through the host `command-result` seam — not a bare per-command JSON document.
+
+---
+
+## `graph impact` — changed→impact analysis
+
+Tool-owned (graph Tool). Read-only analysis of what changed and what depends on it — combining git change detection (or explicit files) with the persisted graph catalog. Rebuilds the catalog when missing ([ADR-0085](../../decisions/ADR-0085-change-detection-substrate.md)).
+
+```
+opensip graph impact --changed --json
+opensip graph impact --since main --json --top 20
+opensip graph impact --files packages/core/src/index.ts --json
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--changed` | bool | `false` | Use git working-tree / branch diff for changed files. |
+| `--since <ref>` | string | — | Git ref base (`<ref>...HEAD`). |
+| `--files <path>` | repeatable | `[]` | Explicit changed file (git-free; works outside a repo). |
+| `--top <n>` | string | — | Cap impacted function rows; sets `truncated` when capped. |
+| `--raw` | bool | `false` | Emit `GraphImpactResult` without the `CommandOutcome` wrapper. |
+| `--json` | bool | `false` | Emit structured `GraphImpactResult` (see [JSON output schema](./04-json-output-schema.md)). |
+
+**Exit codes:** 0 (success), 2 (configuration error — not a git repo, missing basis, invalid `--top`).
+
+**Agent recipes:** `agent-risk`, `agent-final` on `graph --recipe`.
 
 ---
 
@@ -562,7 +603,9 @@ simulation tools, a project gets:
 <cwd>/opensip-cli/sim/recipes/example-recipe.mjs          # TRACKED
 ```
 
-Plus appends `opensip-cli/.runtime/` to `<cwd>/.gitignore`.
+Plus appends `opensip-cli/.runtime/` to `<cwd>/.gitignore`, and writes
+`<cwd>/AGENTS.md` (write-if-absent) — a short agent playbook referencing
+`agent-catalog`, session replay, agent recipes, and `graph impact`.
 
 The scaffolded set equals the **registered** set: a tool that declares no project
 layout (e.g. `graph`) writes no directory, and a tool installed *after* `init`
@@ -657,6 +700,30 @@ Prompts:
 5. Test the key against the cloud entitlement endpoint. Verification is best-effort; the key stays saved if the endpoint is unreachable so offline setup still works.
 
 The user-level config is shared across every project on the machine. `opensip fit --report-to <url>` uses the configured key by default unless `--api-key` overrides it.
+
+---
+
+## Agent run filters (fit, graph, sim)
+
+`fit`, `graph`, and `sim` primary runs support the same agent filter flags on
+`--json` (and `sessions show` replay uses the same engine). Filters are a
+**presentation concern only** — gate, egress, and session persistence use the
+unfiltered envelope ([ADR-0085](../../decisions/ADR-0085-change-detection-substrate.md)).
+
+| Token | Effect |
+|---|---|
+| `errors-only` | Keep `critical` + `high` severity signals |
+| `warnings-only` | Keep `medium` + `low` severity signals |
+| `category:<name>` | Match `signal.category` |
+| `source:<tool>` | Match signal source namespace |
+| `file:<prefix>` | Match `filePath` prefix |
+| `high-impact` | Graph-only: signals with `metadata.highImpact` |
+| `top:<n>` | Cap count after other predicates |
+
+When any filter is active (or `--raw` is set), the emitted JSON includes
+`filtersApplied`, `originalSignalCount`, and `returnedSignalCount` alongside a
+filtered `envelope`. Unfiltered `--json` remains byte-compatible with prior
+releases.
 
 ---
 

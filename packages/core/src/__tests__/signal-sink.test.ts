@@ -18,12 +18,17 @@ describe('noopSignalSink', () => {
 
 describe('RunScope.signalSink', () => {
   it('defaults to the no-op sink', () => {
-    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+    });
     expect(scope.signalSink).toBe(noopSignalSink);
   });
 
   it('carries an explicitly provided sink', () => {
-    const custom = { emit: () => Promise.resolve({ accepted: 7, authRejected: false }) };
+    const custom = {
+      emit: () => Promise.resolve({ accepted: 7, authRejected: false }),
+    };
     const scope = new RunScope({
       languages: new LanguageRegistry(),
       tools: new ToolRegistry(),

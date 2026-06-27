@@ -147,7 +147,12 @@ export function buildScopeBasedFileMap(
   // Pre-resolve all targets once — deduplicated glob pass across all targets.
   // GlobalExcludes are applied during pre-resolution so per-check lookups are pure in-memory.
   const resolvedTargets = preResolveAllTargets(registry, config.globalExcludes, rootDir);
-  const ctx: CheckFileResolutionContext = { registry, config, rootDir, resolvedTargets };
+  const ctx: CheckFileResolutionContext = {
+    registry,
+    config,
+    rootDir,
+    resolvedTargets,
+  };
 
   const result = new Map<string, readonly string[]>();
 

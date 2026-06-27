@@ -89,7 +89,10 @@ describe('fork-path correlation (createSubprocessProgressRun)', () => {
   });
 
   it('preserves PATH/HOME — correlation env is MERGED over the base env, not a replacement (M2)', async () => {
-    const scope = new RunScope({ runId: 'run_parent_fork', correlation: PARENT_CORRELATION });
+    const scope = new RunScope({
+      runId: 'run_parent_fork',
+      correlation: PARENT_CORRELATION,
+    });
     const full = await runWithScope(scope, () => {
       const run = createSubprocessProgressRun<
         number,
@@ -133,7 +136,10 @@ describe('fork-path missing-correlation degradation (M2)', () => {
   });
 
   it('a child WITH an inherited runId does NOT degrade — it adopts the parent run', async () => {
-    const scope = new RunScope({ runId: 'run_parent_fork', correlation: PARENT_CORRELATION });
+    const scope = new RunScope({
+      runId: 'run_parent_fork',
+      correlation: PARENT_CORRELATION,
+    });
     const result = await runWithScope(scope, () => {
       const run = createSubprocessProgressRun<number, CorrelationCheckResult>({
         command: FIXTURE,
@@ -172,7 +178,10 @@ describe('fork-path no duplicate complete under one runId (GAP b)', () => {
     // line is captured (the SAME gate the run-id-log-isolation test uses).
     configureLogger({ debugMode: true, silent: false, runId: '' });
 
-    const scope = new RunScope({ runId: 'run_parent_fork', correlation: PARENT_CORRELATION });
+    const scope = new RunScope({
+      runId: 'run_parent_fork',
+      correlation: PARENT_CORRELATION,
+    });
     await runWithScope(scope, () => {
       const run = createSubprocessProgressRun<number, string>({
         command: FIXTURE,

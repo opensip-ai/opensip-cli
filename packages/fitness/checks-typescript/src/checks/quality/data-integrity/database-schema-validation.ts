@@ -240,7 +240,13 @@ function processPropertyMember(
     }
 
     updateStateFromDecorator(decoratorName, state);
-    checkColumnDecorator({ decorator, decoratorName, propName, line, violations });
+    checkColumnDecorator({
+      decorator,
+      decoratorName,
+      propName,
+      line,
+      violations,
+    });
   }
 }
 

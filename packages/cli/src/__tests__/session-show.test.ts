@@ -27,7 +27,10 @@ let ds: DataStore;
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), 'cli-session-show-'));
-  ds = DataStoreFactory.open({ backend: 'sqlite', path: join(tmp, 'd.sqlite') });
+  ds = DataStoreFactory.open({
+    backend: 'sqlite',
+    path: join(tmp, 'd.sqlite'),
+  });
 });
 
 afterEach(() => {
@@ -84,7 +87,12 @@ function replayFitSession(stored: ToolSessionRecord): ToolSessionReplay<CommandR
 
 /** A signal of a given severity for the agent-filter tests. */
 function signal(id: string, severity: 'high' | 'medium' | 'low'): Signal {
-  return createSignal({ source: 'test', ruleId: `rule-${id}`, severity, message: `signal ${id}` });
+  return createSignal({
+    source: 'test',
+    ruleId: `rule-${id}`,
+    severity,
+    message: `signal ${id}`,
+  });
 }
 
 /** Build a replay function whose envelope carries the given signals. */
@@ -282,7 +290,10 @@ describe('executeSessionShow', () => {
       }),
     );
 
-    expect(s.rendered[0]).toMatchObject({ type: 'session-replay', session: { recipe: 'example' } });
+    expect(s.rendered[0]).toMatchObject({
+      type: 'session-replay',
+      session: { recipe: 'example' },
+    });
   });
 
   it('renders a structured error result when the session cannot be found (non-JSON)', async () => {
@@ -343,7 +354,11 @@ describe('executeSessionShow', () => {
       }),
     );
 
-    expect(s.errors[0]).toEqual({ message: 'corrupt payload', exitCode: 2, code: 'decode-error' });
+    expect(s.errors[0]).toEqual({
+      message: 'corrupt payload',
+      exitCode: 2,
+      code: 'decode-error',
+    });
   });
 
   it('reports replay-unavailable through emitError when no tool contributes a replay', async () => {
@@ -428,7 +443,11 @@ describe('executeSessionShow', () => {
       }),
     );
 
-    expect(s.errors[0]).toEqual({ message: 'boom-string', exitCode: 2, code: 'decode-error' });
+    expect(s.errors[0]).toEqual({
+      message: 'boom-string',
+      exitCode: 2,
+      code: 'decode-error',
+    });
   });
 });
 
@@ -500,9 +519,13 @@ describe('executeSessionShow — agent filters', () => {
     expect(payload.returnedSignalCount).toBe(2);
   });
 
-  it('warnings-only keeps only medium-severity signals', async () => {
+  it('warnings-only keeps medium and low severity signals', async () => {
     const { payload } = await showWithFilters(mixedSignals(), ['warnings-only']);
-    expect(payload.envelope.signals.map((x: Signal) => x.severity)).toEqual(['medium', 'medium']);
+    expect(payload.envelope.signals.map((x: Signal) => x.severity).sort()).toEqual([
+      'low',
+      'medium',
+      'medium',
+    ]);
   });
 
   it('top:N severity-ranks (high → medium → low) and truncates, stable within a rank', async () => {
@@ -517,16 +540,15 @@ describe('executeSessionShow — agent filters', () => {
     expect(payload.envelope.signals.map((x: Signal) => x.ruleId)).toEqual(['rule-h1']);
   });
 
-  it('treats errors-only AND warnings-only together as no severity filter', async () => {
+  it('AND-composes errors-only with warnings-only to an empty set', async () => {
     const { payload } = await showWithFilters(mixedSignals(), ['errors-only', 'warnings-only']);
-    expect(payload.envelope.signals).toHaveLength(5);
+    expect(payload.envelope.signals).toHaveLength(0);
   });
 
-  it('ignores a non-positive / non-numeric top:N', async () => {
+  it('rejects invalid top:N and honors top:0 as an empty cap', async () => {
     const { payload } = await showWithFilters(mixedSignals(), ['top:0']);
-    expect(payload.envelope.signals).toHaveLength(5);
-    const bad = await showWithFilters(mixedSignals(), ['top:abc']);
-    expect(bad.payload.envelope.signals).toHaveLength(5);
+    expect(payload.envelope.signals).toHaveLength(0);
+    await expect(showWithFilters(mixedSignals(), ['top:abc'])).rejects.toThrow(/Invalid top value/);
   });
 
   it('emits the filtered payload through emitRaw under --raw and sets exit 0', async () => {

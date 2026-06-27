@@ -20,7 +20,9 @@ describe('GraphConfigSchema', () => {
     });
     expect(parsed.minCrossPackageDuplicatePackages).toBe(2);
     expect(parsed.cycleSize2Severity).toBe('low');
-    expect(parsed.severityOverrides).toEqual({ 'graph:orphan-subtree': 'error' });
+    expect(parsed.severityOverrides).toEqual({
+      'graph:orphan-subtree': 'error',
+    });
   });
 
   it('accepts an empty block (every knob optional → in-rule default)', () => {
@@ -33,7 +35,9 @@ describe('GraphConfigSchema', () => {
 
   it('rejects an out-of-enum severityOverrides value', () => {
     expect(
-      GraphConfigSchema.safeParse({ severityOverrides: { 'graph:x': 'nonsense' } }).success,
+      GraphConfigSchema.safeParse({
+        severityOverrides: { 'graph:x': 'nonsense' },
+      }).success,
     ).toBe(false);
   });
 
@@ -60,7 +64,9 @@ describe('GraphConfigSchema', () => {
   it('rejects an unknown key once strict (composer behaviour)', () => {
     // The historical typo the strict schema now catches instead of dropping.
     expect(
-      GraphConfigSchema.strict().safeParse({ minCrossPackageDuplicatePackges: 2 }).success,
+      GraphConfigSchema.strict().safeParse({
+        minCrossPackageDuplicatePackges: 2,
+      }).success,
     ).toBe(false);
   });
 

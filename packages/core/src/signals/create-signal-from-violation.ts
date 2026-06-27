@@ -39,6 +39,10 @@ export function createSignalFromViolation(
     severity: SeverityPolicy.liftAuthorSeverity(violation.severity),
     message: violation.message,
     suggestion: violation.suggestion,
-    code: { file: violation.file, line: violation.line, column: violation.column },
+    code: {
+      file: violation.file,
+      line: violation.line,
+      column: violation.column,
+    },
   });
 }

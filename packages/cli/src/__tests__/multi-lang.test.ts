@@ -23,8 +23,14 @@ const cli = distRunner();
 
 describe('CLI multi-language', () => {
   beforeEach(() => {
-    rmSync(join(FIXTURE, 'opensip-cli', '.runtime'), { recursive: true, force: true });
-    rmSync(join(UNKNOWN_FIXTURE, 'opensip-cli', '.runtime'), { recursive: true, force: true });
+    rmSync(join(FIXTURE, 'opensip-cli', '.runtime'), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(join(UNKNOWN_FIXTURE, 'opensip-cli', '.runtime'), {
+      recursive: true,
+      force: true,
+    });
   });
 
   it('lists language adapters for all six bundled languages', () => {
@@ -33,7 +39,9 @@ describe('CLI multi-language', () => {
     const result = cli.run(['fit', '--json'], { cwd: FIXTURE });
     expect([0, 1]).toContain(result.exitCode); // 0 if all pass, 1 if some fail (acceptable in fixture)
     // 2.12.0: --json wraps the envelope in a CommandOutcome (`.envelope`).
-    const outcome = JSON.parse(result.stdout) as { envelope: { schemaVersion: number } };
+    const outcome = JSON.parse(result.stdout) as {
+      envelope: { schemaVersion: number };
+    };
     expect(typeof outcome).toBe('object');
     expect(outcome.envelope.schemaVersion).toBe(2);
   });

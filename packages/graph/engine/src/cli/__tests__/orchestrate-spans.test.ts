@@ -45,8 +45,15 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
       configPathAbs: undefined,
       compilerOptions: undefined,
     }),
-    parseProject: (): ParseOutput => ({ project: { token: 'parsed' }, parseErrors: [] }),
-    walkProject: (): WalkOutput => ({ occurrences: {}, callSites: [], parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { token: 'parsed' },
+      parseErrors: [],
+    }),
+    walkProject: (): WalkOutput => ({
+      occurrences: {},
+      callSites: [],
+      parseErrors: [],
+    }),
     resolveCallSites: (): ResolveOutput => ({
       edgesByOwner: new Map(),
       stats: {

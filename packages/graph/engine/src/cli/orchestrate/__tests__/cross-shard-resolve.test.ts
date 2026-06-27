@@ -503,7 +503,11 @@ describe('diffCatalogsByEdge', () => {
 });
 
 // Keep the shard type referenced so the import documents the merge inputs.
-const _exampleShard: Shard = { id: 'pkg:a', rootDir: '/abs/pkgA', files: ['/abs/pkgA/index.ts'] };
+const _exampleShard: Shard = {
+  id: 'pkg:a',
+  rootDir: '/abs/pkgA',
+  files: ['/abs/pkgA/index.ts'],
+};
 void _exampleShard;
 
 describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths)', () => {

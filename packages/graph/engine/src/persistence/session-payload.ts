@@ -24,7 +24,7 @@
  * envelope's Option-A remap).
  */
 
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, SignalRepair } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
 export type GraphFindingSeverity = 'error' | 'warning';
@@ -42,6 +42,8 @@ export interface GraphSessionFinding {
   readonly column?: number;
   readonly suggestion?: string;
   readonly metadata?: Readonly<Record<string, JsonScalar>>;
+  /** Structured repair guidance (ADR-0086) — round-trips through replay. */
+  readonly repair?: SignalRepair;
 }
 
 /** A persisted per-rule detail row — the structural subset the dashboard renders. */
@@ -135,6 +137,7 @@ export function buildGraphSessionPayload(
       column: s.column,
       suggestion: s.suggestion,
       ...(metadata ? { metadata } : {}),
+      ...(s.repair === undefined ? {} : { repair: s.repair }),
     };
     let arr = byRule.get(s.ruleId);
     if (!arr) {

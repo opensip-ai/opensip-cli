@@ -38,7 +38,10 @@ export { ownerEdgeKey } from '../../owner-key.js';
  */
 export function bucketEdgesByOwner<T>(
   items: Iterable<T>,
-  keyParts: (item: T) => { readonly bodyHash: string; readonly filePath: string },
+  keyParts: (item: T) => {
+    readonly bodyHash: string;
+    readonly filePath: string;
+  },
   edgeOf: (item: T) => CallEdge,
 ): Map<string, CallEdge[]> {
   const byOwner = new Map<string, CallEdge[]>();

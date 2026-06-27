@@ -22,7 +22,10 @@ describe('deriveRecipeId', () => {
 
 describe('runWithTimeout', () => {
   it('classifies a fast run as ok', async () => {
-    const out = await runWithTimeout({ run: () => Promise.resolve(42), timeoutMs: 1000 });
+    const out = await runWithTimeout({
+      run: () => Promise.resolve(42),
+      timeoutMs: 1000,
+    });
     expect(out.status).toBe('ok');
     expect(out.status === 'ok' && out.result).toBe(42);
   });
@@ -30,7 +33,10 @@ describe('runWithTimeout', () => {
   it('clears the hard-timeout timer when the unit finishes first', async () => {
     vi.useFakeTimers();
     try {
-      const out = await runWithTimeout({ run: () => Promise.resolve(42), timeoutMs: 1000 });
+      const out = await runWithTimeout({
+        run: () => Promise.resolve(42),
+        timeoutMs: 1000,
+      });
       expect(out.status).toBe('ok');
       expect(vi.getTimerCount()).toBe(0);
     } finally {
@@ -112,7 +118,11 @@ describe('runWithRetry', () => {
       maxRetries: 2,
       backoffMs: [0, 0],
     });
-    expect(out).toMatchObject({ result: 'ok', wasRetried: false, retryCount: 0 });
+    expect(out).toMatchObject({
+      result: 'ok',
+      wasRetried: false,
+      retryCount: 0,
+    });
   });
 
   it('retries on throw up to maxRetries then returns lastError', async () => {

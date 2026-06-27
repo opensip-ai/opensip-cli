@@ -17,7 +17,10 @@ interface SafeParseable {
   readonly safeParse: (value: unknown) => {
     readonly success: boolean;
     readonly error?: {
-      readonly issues?: readonly { path?: readonly unknown[]; message: string }[];
+      readonly issues?: readonly {
+        path?: readonly unknown[];
+        message: string;
+      }[];
     };
   };
 }

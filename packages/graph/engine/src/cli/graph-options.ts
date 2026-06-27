@@ -142,4 +142,10 @@ export interface GraphCommandOptions {
    * `--json` for machine-readable output.
    */
   readonly listFiles?: boolean;
+  /** Agent filter tokens (repeatable). See agentRunFlagSpecs (ADR-0085). */
+  readonly filter?: readonly string[];
+  /** Limit returned signals (sugar for --filter top:<n>). */
+  readonly top?: string;
+  /** Emit unwrapped agent-filtered payload (no CommandOutcome wrapper). */
+  readonly raw?: boolean;
 }

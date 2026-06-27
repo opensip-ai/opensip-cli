@@ -261,7 +261,10 @@ describe('executeGraph — render dispatch', () => {
       const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
       await executeGraph({ cwd: projectDir, noCache: true, json: true }, cli);
       expect(setExitCode).toHaveBeenCalledWith(0);
-      const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string; schemaVersion: number };
+      const envelope = emitEnvelope.mock.calls[0]?.[0] as {
+        tool: string;
+        schemaVersion: number;
+      };
       expect(envelope.tool).toBe('graph');
       expect(envelope.schemaVersion).toBe(2);
     } finally {
@@ -334,7 +337,10 @@ describe('executeGraph — render dispatch', () => {
       expect(profile.runs[0]?.mode).toBe('sharded');
       expect(profile.runs[0]?.stages).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ name: 'sharded-build', detail: '2 shard(s)' }),
+          expect.objectContaining({
+            name: 'sharded-build',
+            detail: '2 shard(s)',
+          }),
         ]),
       );
     } finally {
@@ -408,7 +414,10 @@ describe('executeGraph — render dispatch', () => {
     registerLargeFlatAdapter(projectDir);
     const fakeCliPath = writeFakeShardCli(projectDir);
     const original = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     const profilePath = join(projectDir, 'profile-tty.json');
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
@@ -430,7 +439,10 @@ describe('executeGraph — render dispatch', () => {
       // Sharded regardless of isTTY — the engine is TTY-independent.
       expect(profile.runs[0]?.mode).toBe('sharded');
     } finally {
-      Object.defineProperty(process.stdout, 'isTTY', { value: original, configurable: true });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: original,
+        configurable: true,
+      });
       datastore.close();
     }
   });
@@ -446,7 +458,12 @@ describe('executeGraph — multiple positional paths', () => {
     try {
       const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
       await executeGraph(
-        { cwd: projectDir, noCache: true, json: true, paths: [projectDir, other] },
+        {
+          cwd: projectDir,
+          noCache: true,
+          json: true,
+          paths: [projectDir, other],
+        },
         cli,
       );
       expect(setExitCode).toHaveBeenCalledWith(0);
@@ -520,7 +537,13 @@ describe('executeGraph — --workspace guards', () => {
     // resolveAdaptersForRun reads cli.scope.languages (empty here) → the
     // language name isn't registered → ConfigurationError.
     await executeGraph(
-      { cwd: projectDir, noCache: true, workspace: true, cliScript: 'cli.js', language: 'klingon' },
+      {
+        cwd: projectDir,
+        noCache: true,
+        workspace: true,
+        cliScript: 'cli.js',
+        language: 'klingon',
+      },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);

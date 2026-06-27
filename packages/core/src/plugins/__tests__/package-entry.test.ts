@@ -111,7 +111,11 @@ describe('resolvePackageEntryPoint', () => {
   });
 
   it('falls back to pkg.main when exports `.` is a non-string, non-object value', () => {
-    const dir = writePkg({ name: 'p', main: './main.js', exports: { '.': 123 } });
+    const dir = writePkg({
+      name: 'p',
+      main: './main.js',
+      exports: { '.': 123 },
+    });
     const r = resolvePackageEntryPoint(dir);
     expect(r?.entry).toBe(join(dir, './main.js'));
   });
@@ -130,7 +134,11 @@ describe('resolvePackageEntryPoint', () => {
   });
 
   it('falls back to pkg.main when exports has no `.` key', () => {
-    const dir = writePkg({ name: 'p', main: './main.js', exports: { './sub': './sub.js' } });
+    const dir = writePkg({
+      name: 'p',
+      main: './main.js',
+      exports: { './sub': './sub.js' },
+    });
     const r = resolvePackageEntryPoint(dir);
     expect(r?.entry).toBe(join(dir, './main.js'));
   });

@@ -425,7 +425,11 @@ describe('package-supply-chain-policy', () => {
         cwd,
         'package.json',
         JSON.stringify(
-          { name: 'deps-app', private: true, packageManager: 'pnpm@11.5.1+sha512.abc123' },
+          {
+            name: 'deps-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
           null,
           2,
         ),
@@ -471,7 +475,11 @@ describe('package-supply-chain-policy', () => {
         cwd,
         'package.json',
         JSON.stringify(
-          { name: 'deps-app', private: true, packageManager: 'pnpm@11.5.1+sha512.abc123' },
+          {
+            name: 'deps-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
           null,
           2,
         ),

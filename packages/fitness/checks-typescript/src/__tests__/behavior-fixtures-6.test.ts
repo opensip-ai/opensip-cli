@@ -226,7 +226,10 @@ describe('package-json-exports-field — analyzeAll branches', () => {
   it('does NOT flag a packages/* package with an exports field', async () => {
     fx(
       'packages/bar/package.json',
-      JSON.stringify({ name: '@scope/bar', exports: { '.': './dist/index.js' } }),
+      JSON.stringify({
+        name: '@scope/bar',
+        exports: { '.': './dist/index.js' },
+      }),
     );
     process.chdir(root);
     const result = await runRelative('package-json-exports-field', ['packages/bar/package.json']);
@@ -287,7 +290,10 @@ describe('missing-type-exports — analyzeAll branches', () => {
   it('flags a deep import of a subpath not declared in the package exports map', async () => {
     fx(
       'packages/foo/package.json',
-      JSON.stringify({ name: '@scope/foo', exports: { '.': './dist/index.js' } }),
+      JSON.stringify({
+        name: '@scope/foo',
+        exports: { '.': './dist/index.js' },
+      }),
     );
     fx(
       'packages/consumer/src/uses.ts',
@@ -370,7 +376,10 @@ describe('missing-type-exports — analyzeAll branches', () => {
   it('ignores root imports, relative imports, test files, and dist paths', async () => {
     fx(
       'packages/foo/package.json',
-      JSON.stringify({ name: '@scope/foo', exports: { '.': './dist/index.js' } }),
+      JSON.stringify({
+        name: '@scope/foo',
+        exports: { '.': './dist/index.js' },
+      }),
     );
     fx('packages/consumer/src/root.ts', 'import { a } from "@scope/foo"\nexport const r = a');
     fx('packages/consumer/src/rel.ts', 'import { b } from "./local"\nexport const s = b');

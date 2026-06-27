@@ -133,7 +133,9 @@ describe('resolveProjectContext', () => {
       writeFileSync(pointedConfig, 'targets: {}\n');
       writeFileSync(
         join(testDir, 'package.json'),
-        JSON.stringify({ 'opensip-cli': { configPath: 'config/opensip-cli.config.yml' } }),
+        JSON.stringify({
+          'opensip-cli': { configPath: 'config/opensip-cli.config.yml' },
+        }),
       );
       const sub = join(testDir, 'sub');
       mkdirSync(sub);

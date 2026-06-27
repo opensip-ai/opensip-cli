@@ -190,7 +190,11 @@ async function reportSarif(
     chunks: [JSON.parse(sarif) as unknown],
     idempotencyKeyFor: (i) => `${envelope.runId}:report:${i}`,
     timeoutFor: () => Math.min(300_000, 60_000 + envelope.signals.length * 100),
-    policy: { maxAttempts: 3, overallDeadlineMs: 300_000, honorRetryAfter: true },
+    policy: {
+      maxAttempts: 3,
+      overallDeadlineMs: 300_000,
+      honorRetryAfter: true,
+    },
     evtPrefix: 'cli.report',
     fetchImpl,
   });

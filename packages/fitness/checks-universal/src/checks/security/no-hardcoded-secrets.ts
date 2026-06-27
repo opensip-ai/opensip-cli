@@ -113,7 +113,10 @@ const SECRET_PATTERNS = [
 export const noHardcodedSecrets = defineCheck({
   id: '68ba1265-9e9b-4a1c-9adc-73c68f470242',
   slug: 'no-hardcoded-secrets',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
   confidence: 'medium',
   description: 'Detect hardcoded secrets, API keys, and credentials in source code',

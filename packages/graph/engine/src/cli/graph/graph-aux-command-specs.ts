@@ -40,6 +40,7 @@ import { listGraphRules } from '../graph-list.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
 import { listGraphRecipes } from '../graph-recipes.js';
 import { handleGraphError } from '../graph.js';
+import { executeImpact } from '../impact.js';
 import { executeLookup } from '../lookup.js';
 import { runGraph } from '../orchestrate.js';
 import { runSarifExportMode } from '../sarif-export.js';
@@ -534,7 +535,11 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
         await runGraphExportGuarded({
           format: 'baseline',
           requiredFlags: BASELINE_EXPORT_REQUIRED_FLAGS,
-          opts: opts as unknown as { cwd: string; out: string; json?: boolean },
+          opts: opts as unknown as {
+            cwd: string;
+            out: string;
+            json?: boolean;
+          },
           present: opts,
           cli,
           run: runGraphBaselineExport,
@@ -652,4 +657,76 @@ export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   scope: 'project',
   output: 'command-result',
   handler: async () => listGraphRules(),
+});
+
+/** `graph impact` — changed→impact analysis over the persisted catalog (ADR-0085). */
+export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defineNestedCommand<
+  unknown,
+  ToolCliContext
+>({
+  name: 'impact',
+  description:
+    'Analyze what changed and what depends on it (git --changed/--since or explicit --files)',
+  commonFlags: ['cwd', 'json'],
+  options: [
+    {
+      flag: '--changed',
+      description: 'Use git working-tree / branch diff for changed files',
+      default: false,
+    },
+    {
+      flag: '--since',
+      value: '<ref>',
+      description: 'Git ref base (diff <ref>...HEAD); implies changed semantics',
+    },
+    {
+      flag: '--files',
+      value: '<path>',
+      description: 'Explicit changed file (repeatable; git-free)',
+      arrayDefault: [] as readonly string[],
+      parse: (val: string, prev: unknown) => [...(prev as string[]), val],
+    },
+    {
+      flag: '--top',
+      value: '<n>',
+      description: 'Cap impacted function count',
+    },
+    {
+      flag: '--raw',
+      description: 'Emit unwrapped payload (no CommandOutcome wrapper)',
+      default: false,
+    },
+    {
+      flag: '--no-cache',
+      description: 'Force catalog rebuild before impact analysis',
+      default: false,
+    },
+  ],
+  scope: 'project',
+  output: RAW_STREAM,
+  rawStreamReason: 'runtime-render-dispatch',
+  handler: async (rawOpts, cli): Promise<void> => {
+    const opts = rawOpts as {
+      cwd: string;
+      json?: boolean;
+      raw?: boolean;
+      changed?: boolean;
+      since?: string;
+      top?: string;
+      noCache?: boolean;
+    };
+    await executeImpact(
+      {
+        cwd: opts.cwd,
+        json: opts.json,
+        raw: opts.raw,
+        changed: opts.changed,
+        since: opts.since,
+        files: (opts as { files?: string[] }).files,
+        top: opts.top,
+        noCache: opts.noCache,
+      },
+      cli,
+    );
+  },
 });

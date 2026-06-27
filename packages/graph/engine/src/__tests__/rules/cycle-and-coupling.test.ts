@@ -29,21 +29,50 @@ function fingerprint(s: Signal): string {
 }
 
 function featureTable(over: Partial<FeatureTable>): FeatureTable {
-  return { function: new Map(), package: new Map(), scc: [], edge: [], ...over };
+  return {
+    function: new Map(),
+    package: new Map(),
+    scc: [],
+    edge: [],
+    ...over,
+  };
 }
 
 /** A single SCC fixture over `members`. */
 function sccFixture(members: readonly string[], crossesPackages: boolean): SccFeatures {
-  return { id: `scc:${members[0] ?? ''}`, members, sccSize: members.length, crossesPackages };
+  return {
+    id: `scc:${members[0] ?? ''}`,
+    members,
+    sccSize: members.length,
+    crossesPackages,
+  };
 }
 
 describe('graph:cycle bands', () => {
   // One occurrence per member, each at a distinct source location so its occId
   // (`${filePath}:${line}:${column}`) is unique. SCC members are occIds.
   const catalog = makeCatalog([
-    occ({ bodyHash: 'm1', simpleName: 'a', qualifiedName: 'a', filePath: 'src/a.ts', line: 1 }),
-    occ({ bodyHash: 'm2', simpleName: 'b', qualifiedName: 'b', filePath: 'src/b.ts', line: 1 }),
-    occ({ bodyHash: 'm3', simpleName: 'c', qualifiedName: 'c', filePath: 'src/c.ts', line: 1 }),
+    occ({
+      bodyHash: 'm1',
+      simpleName: 'a',
+      qualifiedName: 'a',
+      filePath: 'src/a.ts',
+      line: 1,
+    }),
+    occ({
+      bodyHash: 'm2',
+      simpleName: 'b',
+      qualifiedName: 'b',
+      filePath: 'src/b.ts',
+      line: 1,
+    }),
+    occ({
+      bodyHash: 'm3',
+      simpleName: 'c',
+      qualifiedName: 'c',
+      filePath: 'src/c.ts',
+      line: 1,
+    }),
   ]);
   const indexes = buildIndexes(catalog);
   const m1 = 'src/a.ts:1:0';
@@ -63,7 +92,9 @@ describe('graph:cycle bands', () => {
   });
 
   it('emits low for sccSize === 2 when cycleSize2Severity is low', () => {
-    const signals = run(sccFixture([m1, m2], false), { cycleSize2Severity: 'low' });
+    const signals = run(sccFixture([m1, m2], false), {
+      cycleSize2Severity: 'low',
+    });
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('low');
   });
@@ -180,6 +211,9 @@ describe('graph:unexpected-coupling package cycles', () => {
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('high');
     expect(signals[0]?.metadata.packages).toEqual(['pkg-a', 'pkg-b']);
+    // Phase 2 Task 2.3: package-coupling rules carry highImpact so
+    // `--filter high-impact` selects them alongside the other high-impact rules.
+    expect(signals[0]?.metadata.highImpact).toBe(true);
   });
 
   it('emits nothing when there is no reverse edge (no cycle)', () => {

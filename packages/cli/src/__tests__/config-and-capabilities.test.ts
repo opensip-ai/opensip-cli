@@ -35,7 +35,12 @@ function makeTool(opts: {
   };
   return {
     identity: { name: opts.id },
-    metadata: { id: opts.id, name: opts.id, version: '0.0.0', description: opts.id },
+    metadata: {
+      id: opts.id,
+      name: opts.id,
+      version: '0.0.0',
+      description: opts.id,
+    },
     commandSpecs: [],
     ...(Object.keys(extensionPoints).length > 0 ? { extensionPoints } : {}),
   };
@@ -49,7 +54,10 @@ function registryWith(tools: readonly Tool[]): ToolRegistry {
 
 const graphTool = makeTool({
   id: 'graph',
-  config: { namespace: 'graph', schema: z.object({ minPackages: z.number().int().optional() }) },
+  config: {
+    namespace: 'graph',
+    schema: z.object({ minPackages: z.number().int().optional() }),
+  },
 });
 const fitnessTool = makeTool({
   id: 'fitness',
@@ -370,8 +378,16 @@ describe('composeAndValidateToolConfig', () => {
       }),
       defaults: { failOnErrors: 1, failOnWarnings: 0 },
       env: [
-        { envVar: 'OPENSIP_FIT_FAIL_ON_ERRORS', key: 'failOnErrors', type: 'number' },
-        { envVar: 'OPENSIP_FIT_FAIL_ON_WARNINGS', key: 'failOnWarnings', type: 'number' },
+        {
+          envVar: 'OPENSIP_FIT_FAIL_ON_ERRORS',
+          key: 'failOnErrors',
+          type: 'number',
+        },
+        {
+          envVar: 'OPENSIP_FIT_FAIL_ON_WARNINGS',
+          key: 'failOnWarnings',
+          type: 'number',
+        },
       ],
     },
   });
@@ -385,7 +401,10 @@ describe('composeAndValidateToolConfig', () => {
     });
     // env (0) beats the file (5) — this is exactly what makes the gate "never
     // fail on errors" without editing opensip-cli.config.yml.
-    expect(result.config?.fitness).toMatchObject({ failOnErrors: 0, failOnWarnings: 0 });
+    expect(result.config?.fitness).toMatchObject({
+      failOnErrors: 0,
+      failOnWarnings: 0,
+    });
   });
 
   it('OPENSIP_FIT_FAIL_ON_WARNINGS env overrides the default (env > defaults)', () => {
@@ -395,7 +414,10 @@ describe('composeAndValidateToolConfig', () => {
       env: { OPENSIP_FIT_FAIL_ON_WARNINGS: '1' },
     });
     // defaults say 0; env (1) wins — fail on any warning.
-    expect(result.config?.fitness).toMatchObject({ failOnErrors: 1, failOnWarnings: 1 });
+    expect(result.config?.fitness).toMatchObject({
+      failOnErrors: 1,
+      failOnWarnings: 1,
+    });
   });
 });
 
@@ -422,7 +444,10 @@ function manifest(id: string, domainId: string): ToolPluginManifest {
 describe('wireCapabilityRegistry', () => {
   it('registers manifest domains then replaces the placeholder with the tool real registrar', () => {
     const real = vi.fn();
-    const tool = makeTool({ id: 'graph', capabilityRegistrars: { 'graph-adapter': real } });
+    const tool = makeTool({
+      id: 'graph',
+      capabilityRegistrars: { 'graph-adapter': real },
+    });
     const registry = wireCapabilityRegistry({
       tools: registryWith([tool]),
       manifests: [manifest('graph', 'graph-adapter')],
@@ -451,7 +476,10 @@ describe('wireCapabilityRegistry', () => {
 
   it('skips a registrar whose domain was not declared in any manifest', () => {
     const real = vi.fn();
-    const tool = makeTool({ id: 'graph', capabilityRegistrars: { 'undeclared-domain': real } });
+    const tool = makeTool({
+      id: 'graph',
+      capabilityRegistrars: { 'undeclared-domain': real },
+    });
     const registry = wireCapabilityRegistry({
       tools: registryWith([tool]),
       manifests: [],
@@ -465,7 +493,10 @@ describe('wireCapabilityRegistry', () => {
   // is external runtime code). The domain keeps its deferred placeholder host-side.
   it('M4-F: does NOT install an EXTERNAL tool real registrar in-host (placeholder kept)', () => {
     const real = vi.fn();
-    const tool = makeTool({ id: 'ext', capabilityRegistrars: { 'ext-domain': real } });
+    const tool = makeTool({
+      id: 'ext',
+      capabilityRegistrars: { 'ext-domain': real },
+    });
     const registry = wireCapabilityRegistry({
       tools: registryWith([tool]),
       manifests: [manifest('ext', 'ext-domain')],
@@ -481,7 +512,10 @@ describe('wireCapabilityRegistry', () => {
 
   it('M4-F: STILL installs a BUNDLED tool real registrar in-host (regression)', () => {
     const real = vi.fn();
-    const tool = makeTool({ id: 'graph', capabilityRegistrars: { 'graph-adapter': real } });
+    const tool = makeTool({
+      id: 'graph',
+      capabilityRegistrars: { 'graph-adapter': real },
+    });
     const registry = wireCapabilityRegistry({
       tools: registryWith([tool]),
       manifests: [manifest('graph', 'graph-adapter')],

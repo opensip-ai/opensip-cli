@@ -43,7 +43,10 @@ function fakeAdapter(projectDir: string): GraphLanguageAdapter {
       projectDirAbs: projectDir,
       files: [join(projectDir, 'src', 'a.ts')],
     }),
-    parseProject: (): ParseOutput => ({ project: { dummy: true }, parseErrors: [] }),
+    parseProject: (): ParseOutput => ({
+      project: { dummy: true },
+      parseErrors: [],
+    }),
     walkProject: (): WalkOutput => ({
       occurrences: {
         fn: [
@@ -320,7 +323,10 @@ describe('executeGraph — human / JSON modes', () => {
     const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
     await executeGraph({ cwd: projectDir, noCache: true, json: true }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string; schemaVersion: number };
+    const envelope = emitEnvelope.mock.calls[0]?.[0] as {
+      tool: string;
+      schemaVersion: number;
+    };
     expect(envelope.tool).toBe('graph');
     expect(envelope.schemaVersion).toBe(2);
   });
@@ -343,7 +349,13 @@ describe('executeGraph — human / JSON modes', () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     const outPath = join(projectDir, 'catalog.json');
     await executeGraph(
-      { cwd: projectDir, noCache: true, catalogOutput: outPath, repoId: 'r', gitSha: 'sha' },
+      {
+        cwd: projectDir,
+        noCache: true,
+        catalogOutput: outPath,
+        repoId: 'r',
+        gitSha: 'sha',
+      },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -354,7 +366,13 @@ describe('executeGraph — human / JSON modes', () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     const outPath = join(projectDir, 'catalog.json');
     await executeGraph(
-      { cwd: projectDir, noCache: true, catalogOutput: outPath, tenantId: 't', gitSha: 'sha' },
+      {
+        cwd: projectDir,
+        noCache: true,
+        catalogOutput: outPath,
+        tenantId: 't',
+        gitSha: 'sha',
+      },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -365,7 +383,13 @@ describe('executeGraph — human / JSON modes', () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     const outPath = join(projectDir, 'catalog.json');
     await executeGraph(
-      { cwd: projectDir, noCache: true, catalogOutput: outPath, tenantId: 't', repoId: 'r' },
+      {
+        cwd: projectDir,
+        noCache: true,
+        catalogOutput: outPath,
+        tenantId: 't',
+        repoId: 'r',
+      },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -423,7 +447,9 @@ describe('executeGraph — human / JSON modes', () => {
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const written = JSON.parse(readFileSync(outPath, 'utf8')) as { version: string };
+    const written = JSON.parse(readFileSync(outPath, 'utf8')) as {
+      version: string;
+    };
     expect(written.version).toBe('1.0');
   });
 });
@@ -501,7 +527,11 @@ describe('executeGraph — positional paths', () => {
   it('errors when a positional path does not exist', async () => {
     const { cli, setExitCode, render } = mockCli(datastore);
     await executeGraph(
-      { cwd: projectDir, noCache: true, paths: [join(projectDir, 'missing-pkg')] },
+      {
+        cwd: projectDir,
+        noCache: true,
+        paths: [join(projectDir, 'missing-pkg')],
+      },
       cli,
     );
     expect(setExitCode).toHaveBeenCalledWith(2);
@@ -634,7 +664,10 @@ process.exit(1);
     // ADR-0011: --workspace --json now emits the JSON document object through
     // the CLI seam (cli.emitJson), not process.stdout directly.
     expect(emitJson).toHaveBeenCalledTimes(1);
-    const parsed = emitJson.mock.calls[0]?.[0] as { mode: string; totalFindings: number };
+    const parsed = emitJson.mock.calls[0]?.[0] as {
+      mode: string;
+      totalFindings: number;
+    };
     expect(parsed.mode).toBe('workspace');
     expect(parsed.totalFindings).toBe(0);
   });
@@ -701,8 +734,18 @@ describe('buildUnifiedReportLines', () => {
 
   it('groups findings under their rule headers', () => {
     const findings = [
-      sig({ ruleId: 'graph:orphan-subtree', message: 'foo', filePath: 'src/a.ts', line: 1 }),
-      sig({ ruleId: 'graph:orphan-subtree', message: 'bar', filePath: 'src/b.ts', line: 2 }),
+      sig({
+        ruleId: 'graph:orphan-subtree',
+        message: 'foo',
+        filePath: 'src/a.ts',
+        line: 1,
+      }),
+      sig({
+        ruleId: 'graph:orphan-subtree',
+        message: 'bar',
+        filePath: 'src/b.ts',
+        line: 2,
+      }),
       sig({
         ruleId: 'graph:duplicated-function-body',
         message: 'dup',

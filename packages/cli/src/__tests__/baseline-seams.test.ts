@@ -67,7 +67,12 @@ afterEach(() => {
 
 describe('saveBaseline / compareBaseline guards', () => {
   it('saveBaseline rejects an unstamped signal (the plane never fingerprints)', () => {
-    const unstamped = createSignal({ source: 's', severity: 'high', ruleId: 'r', message: 'm' });
+    const unstamped = createSignal({
+      source: 's',
+      severity: 'high',
+      ruleId: 'r',
+      message: 'm',
+    });
     // saveBaseline is sync-bodied (SQLite is synchronous), so the stamp guard
     // throws synchronously — an awaiting caller still catches it.
     expect(() => seams.saveBaseline('graph', envelopeOf([unstamped]))).toThrow(
@@ -99,7 +104,12 @@ describe('saveBaseline / compareBaseline guards', () => {
 
   it('compareBaseline rejects unstamped current signals with a typed error', async () => {
     await seams.saveBaseline('graph', envelopeOf([stampedSignal('a|x|1|0')]));
-    const unstamped = createSignal({ source: 's', severity: 'high', ruleId: 'r', message: 'm' });
+    const unstamped = createSignal({
+      source: 's',
+      severity: 'high',
+      ruleId: 'r',
+      message: 'm',
+    });
 
     expect(() => seams.compareBaseline('graph', envelopeOf([unstamped]))).toThrow(
       ConfigurationError,
@@ -140,7 +150,9 @@ describe('exportBaselineSarif (reconstruct from payloads)', () => {
     await seams.saveBaseline('graph', envelopeOf([stampedSignal('a|x|1|0', 'graph:cycle')]));
     const out = join(dir, 'b.sarif');
     await seams.exportBaselineSarif('graph', out);
-    const sarif = JSON.parse(readFileSync(out, 'utf8')) as { runs?: { tool?: unknown }[] };
+    const sarif = JSON.parse(readFileSync(out, 'utf8')) as {
+      runs?: { tool?: unknown }[];
+    };
     expect(sarif.runs).toHaveLength(1);
     expect(readFileSync(out, 'utf8')).toContain('opensip-cli-graph');
   });

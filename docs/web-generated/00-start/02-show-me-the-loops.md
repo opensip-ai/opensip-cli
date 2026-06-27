@@ -30,6 +30,8 @@ opensip-cli ships four first-party tools. Each answers a different question shap
 
 One concrete sample of each, below. After you've seen them, [quick start](/docs/opensip-cli/00-start/00-quick-start/) shows you how to run them.
 
+**AI agents:** see [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) for the Discover → Edit → Final loops (`agent-catalog`, session replay, `agent-fast`, `graph impact`, `agent-final`).
+
 ---
 
 ## `fit` — a check

@@ -216,7 +216,10 @@ export const vitestConfigRequiredWithTests = defineCheck({
   id: 'b7363db9-c3f7-47bc-8c25-1ddeebf53904',
   slug: 'vitest-config-required-with-tests',
   itemType: 'packages',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
 
   confidence: 'high',
   description: 'Ensures packages with tests have a vitest.config at the package root',

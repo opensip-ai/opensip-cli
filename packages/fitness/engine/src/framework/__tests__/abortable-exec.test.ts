@@ -79,7 +79,9 @@ describe('execAbortable — abort signal', () => {
   it('returns aborted=true immediately when signal is already aborted', async () => {
     const ctrl = new AbortController();
     ctrl.abort();
-    const result = await execAbortable(['echo', 'never-runs'], { signal: ctrl.signal });
+    const result = await execAbortable(['echo', 'never-runs'], {
+      signal: ctrl.signal,
+    });
     expect(result.aborted).toBe(true);
     expect(result.stdout).toBe('');
   });
@@ -87,14 +89,18 @@ describe('execAbortable — abort signal', () => {
   it('aborts a running process when the signal fires mid-execution', async () => {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 30);
-    const result = await execAbortable(['sh', '-c', 'sleep 5'], { signal: ctrl.signal });
+    const result = await execAbortable(['sh', '-c', 'sleep 5'], {
+      signal: ctrl.signal,
+    });
     expect(result.aborted).toBe(true);
   });
 });
 
 describe('execAbortable — timeout', () => {
   it('aborts a running process when timeout elapses', async () => {
-    const result = await execAbortable(['sh', '-c', 'sleep 5'], { timeout: 50 });
+    const result = await execAbortable(['sh', '-c', 'sleep 5'], {
+      timeout: 50,
+    });
     expect(result.aborted).toBe(true);
   });
 
@@ -109,7 +115,9 @@ describe('execAbortable — buffering', () => {
   it('caps stdout buffer at maxBuffer', async () => {
     // Generate 200 KB of stdout and cap buffer at 1 KB. The spawned
     // process succeeds; buffer cap just truncates what we capture.
-    const result = await execAbortable(['sh', '-c', 'yes x | head -c 200000'], { maxBuffer: 1024 });
+    const result = await execAbortable(['sh', '-c', 'yes x | head -c 200000'], {
+      maxBuffer: 1024,
+    });
     expect(result.stdout.length).toBeLessThanOrEqual(1024);
     expect(result.exitCode).toBeDefined();
   });

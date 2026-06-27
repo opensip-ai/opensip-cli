@@ -33,7 +33,10 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
   private readonly _overriddenBuiltIns = new Set<string>();
 
   constructor() {
-    super({ module: 'fitness:recipes', validationCode: 'VALIDATION.FITNESS.DUPLICATE_RECIPE' });
+    super({
+      module: 'fitness:recipes',
+      validationCode: 'VALIDATION.FITNESS.DUPLICATE_RECIPE',
+    });
     this.registerBuiltInRecipes();
   }
 

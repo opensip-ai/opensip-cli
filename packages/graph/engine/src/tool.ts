@@ -31,6 +31,7 @@ import { graphFingerprintStrategy } from './baseline-strategy.js';
 import {
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
+  graphImpactCommandSpec,
   graphIndexGroupedCommandSpec,
   graphListCommandSpec,
   graphLookupGroupedCommandSpec,
@@ -41,6 +42,7 @@ import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
+import { createGraphCatalogThunk } from './graph-catalog-thunk.js';
 import { GRAPH_IDENTITY } from './identity.js';
 import { createAdapterRegistry, currentAdapterRegistry } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
@@ -81,6 +83,7 @@ const graphCommandSpecs = [
   graphLookupGroupedCommandSpec,
   graphIndexGroupedCommandSpec,
   graphListCommandSpec,
+  graphImpactCommandSpec,
   graphEquivalenceCheckCommandSpec,
 ];
 
@@ -170,7 +173,14 @@ export const graphTool: Tool = defineTool({
     contractVersions: {
       graph: GRAPH_CONTRACT_VERSION,
     },
-    contributeScope: graphScope.contributeScope,
+    // Contribute the `graph` subscope slot AND the generic `graphCatalog`
+    // thunk (ADR-0085) through the same IoC seam — the host installs both via
+    // Object.assign with no static `@opensip-cli/graph` import (install-source
+    // independence). The thunk reads the datastore lazily from `currentScope()`.
+    contributeScope: () => ({
+      ...graphScope.contributeScope(),
+      graphCatalog: createGraphCatalogThunk(),
+    }),
     collectReportData,
     sessionReplay: {
       replaySession: graphReplayFromSession,
