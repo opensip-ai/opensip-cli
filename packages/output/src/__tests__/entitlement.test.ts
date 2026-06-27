@@ -35,6 +35,26 @@ describe('checkEntitlement', () => {
     expect(net2).not.toHaveBeenCalled();
   });
 
+  it('authenticates the probe with Authorization: Bearer (never X-API-Key)', async () => {
+    const cacheDir = await dir();
+    const net = vi.fn(() => Promise.resolve(ok(true))) as unknown as typeof fetch;
+    await checkEntitlement({
+      apiKey: 'osk_secret',
+      endpoint: ENDPOINT,
+      now: 1000,
+      cacheDir,
+      fetchImpl: net,
+    });
+    expect(net).toHaveBeenCalledOnce();
+    const [, init] = (net as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const headers = init.headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer osk_secret');
+    expect(headers['X-API-Key']).toBeUndefined();
+  });
+
   it('re-checks over the network once the positive TTL elapses', async () => {
     const cacheDir = await dir();
     await checkEntitlement({

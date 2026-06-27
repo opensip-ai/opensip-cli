@@ -99,7 +99,11 @@ export async function checkEntitlement(input: CheckEntitlementInput): Promise<En
     const url = endpoint.endsWith('/entitlements') ? endpoint : `${endpoint}/entitlements`;
     const res = await fetchImpl(url, {
       method: 'GET',
-      headers: { 'X-API-Key': apiKey },
+      // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
+      // token only (the api-key strategy matches `Bearer osk_`); the historical
+      // `X-API-Key` header never reached a route (DEC-587). Keep this probe
+      // consistent with the SARIF egress in http-egress.ts.
+      headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
