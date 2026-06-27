@@ -138,14 +138,23 @@ function tryAcquireLock(lockPath: string, metadata: FileLockMetadata): boolean {
   }
 }
 
-function recoverStaleLock(
-  lockPath: string,
-  metadata: FileLockMetadata | undefined,
-  staleMs: number,
-  onEvent?: (event: FileLockEvent) => void,
-  resource: 'datastore' | 'artifact' = 'datastore',
-  operation?: string,
-): boolean {
+interface StaleLockRecoveryContext {
+  readonly lockPath: string;
+  readonly metadata: FileLockMetadata | undefined;
+  readonly staleMs: number;
+  readonly onEvent?: (event: FileLockEvent) => void;
+  readonly resource: 'datastore' | 'artifact';
+  readonly operation?: string;
+}
+
+function recoverStaleLock({
+  lockPath,
+  metadata,
+  staleMs,
+  onEvent,
+  resource,
+  operation,
+}: StaleLockRecoveryContext): boolean {
   if (!metadata || !isStale(metadata, staleMs)) return false;
   try {
     unlinkSync(lockPath);
@@ -182,14 +191,14 @@ function evaluateLockContention(
   if (!existing) return Date.now() >= deadline ? 'timeout' : 'retry';
 
   if (
-    recoverStaleLock(
+    recoverStaleLock({
       lockPath,
-      existing,
-      options.policy.staleMs,
-      options.onEvent,
-      options.resource,
-      options.operation,
-    )
+      metadata: existing,
+      staleMs: options.policy.staleMs,
+      onEvent: options.onEvent,
+      resource: options.resource,
+      operation: options.operation,
+    })
   ) {
     return 'retry';
   }

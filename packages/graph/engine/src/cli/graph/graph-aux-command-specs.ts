@@ -435,14 +435,23 @@ const CATALOG_EXPORT_REQUIRED_FLAGS = [
 ] as const;
 const BASELINE_EXPORT_REQUIRED_FLAGS = ['--out'] as const;
 
-function runGraphExportGuarded<TOpts>(
-  format: GraphExportFormat,
-  requiredFlags: readonly string[],
-  opts: TOpts,
-  present: Record<string, unknown>,
-  cli: ToolCliContext,
-  run: (opts: TOpts, cli: ToolCliContext) => Promise<void>,
-): Promise<void> {
+interface GraphExportGuard<TOpts> {
+  readonly format: GraphExportFormat;
+  readonly requiredFlags: readonly string[];
+  readonly opts: TOpts;
+  readonly present: Record<string, unknown>;
+  readonly cli: ToolCliContext;
+  readonly run: (opts: TOpts, cli: ToolCliContext) => Promise<void>;
+}
+
+function runGraphExportGuarded<TOpts>({
+  format,
+  requiredFlags,
+  opts,
+  present,
+  cli,
+  run,
+}: GraphExportGuard<TOpts>): Promise<void> {
   const missing = missingExportFlags(present, requiredFlags);
   if (missing.length > 0) return reportMissingExportFlags(format, present, missing, cli);
   return run(opts, cli);
@@ -500,36 +509,36 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
     };
     switch (opts.format) {
       case 'sarif': {
-        await runGraphExportGuarded(
-          'sarif',
-          SARIF_EXPORT_REQUIRED_FLAGS,
-          opts as unknown as GraphSarifExportOpts,
-          opts,
+        await runGraphExportGuarded({
+          format: 'sarif',
+          requiredFlags: SARIF_EXPORT_REQUIRED_FLAGS,
+          opts: opts as unknown as GraphSarifExportOpts,
+          present: opts,
           cli,
-          runGraphSarifExport,
-        );
+          run: runGraphSarifExport,
+        });
         return;
       }
       case 'catalog': {
-        await runGraphExportGuarded(
-          'catalog',
-          CATALOG_EXPORT_REQUIRED_FLAGS,
-          opts as unknown as GraphCatalogExportOpts,
-          opts,
+        await runGraphExportGuarded({
+          format: 'catalog',
+          requiredFlags: CATALOG_EXPORT_REQUIRED_FLAGS,
+          opts: opts as unknown as GraphCatalogExportOpts,
+          present: opts,
           cli,
-          runGraphCatalogExport,
-        );
+          run: runGraphCatalogExport,
+        });
         return;
       }
       case 'baseline': {
-        await runGraphExportGuarded(
-          'baseline',
-          BASELINE_EXPORT_REQUIRED_FLAGS,
-          opts as unknown as { cwd: string; out: string; json?: boolean },
-          opts,
+        await runGraphExportGuarded({
+          format: 'baseline',
+          requiredFlags: BASELINE_EXPORT_REQUIRED_FLAGS,
+          opts: opts as unknown as { cwd: string; out: string; json?: boolean },
+          present: opts,
           cli,
-          runGraphBaselineExport,
-        );
+          run: runGraphBaselineExport,
+        });
         return;
       }
     }

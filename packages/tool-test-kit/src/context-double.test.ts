@@ -59,8 +59,10 @@ describe('createToolCliContextDouble', () => {
 
   it('captures reportFailure details with unknown throwables', async () => {
     const double = createToolCliContextDouble();
-    const detail = { error: { thrown: 'plain object' }, jsonRequested: true };
-    assertReportFailureDetail(detail);
+    const detail = assertReportFailureDetail({
+      error: { thrown: 'plain object' },
+      jsonRequested: true,
+    });
 
     await double.ctx.reportFailure(detail);
     expect(double.captured.reportFailures).toEqual([detail]);

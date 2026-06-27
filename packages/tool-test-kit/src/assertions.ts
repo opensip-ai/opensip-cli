@@ -31,7 +31,7 @@ export function assertSignalEnvelope(value: unknown): asserts value is SignalEnv
   if (!Array.isArray(value.signals)) fail('Expected SignalEnvelope.signals array.');
 }
 
-export function assertReportFailureDetail(value: unknown): asserts value is ReportFailureDetail {
+export function assertReportFailureDetail(value: unknown): ReportFailureDetail {
   if (!isRecord(value)) fail('Expected ReportFailureDetail object.');
   if (value.message !== undefined && typeof value.message !== 'string') {
     fail('Expected ReportFailureDetail.message to be a string when present.');
@@ -42,4 +42,5 @@ export function assertReportFailureDetail(value: unknown): asserts value is Repo
   if (value.jsonRequested !== undefined && typeof value.jsonRequested !== 'boolean') {
     fail('Expected ReportFailureDetail.jsonRequested to be a boolean when present.');
   }
+  return value;
 }
