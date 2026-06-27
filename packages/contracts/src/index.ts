@@ -78,6 +78,8 @@ export type {
   ErrorResult,
   GraphLookupMatch,
   GraphLookupResult,
+  GraphImpactBasis,
+  GraphImpactResult,
   ConfigValidateResult,
   ConfigSchemaResult,
 } from './command-results.js';
@@ -256,6 +258,18 @@ export type {
   GraphPackageEdgeFeature,
   GraphBlastScore,
 } from './graph-catalog.js';
+
+// Agent ergonomics — shared filter engine + impact compute (ADR-0085).
+export {
+  applyAgentFilters,
+  buildAgentFilteredResult,
+  normalizeAgentRunFilters,
+  agentRunFlagSpecs,
+  AgentFilterParseError,
+} from './agent-filters.js';
+export type { AgentFilteredResult } from './agent-filters.js';
+export { computeImpact } from './graph-impact-compute.js';
+export type { ImpactComputation, ImpactFunction, ImpactPackage } from './graph-impact-compute.js';
 
 // SARIF + cloud reporting moved to @opensip-cli/output (audit
 // 2026-05-29, contracts split; package renamed reporting→output in Phase 2,
