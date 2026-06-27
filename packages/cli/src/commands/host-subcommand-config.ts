@@ -32,7 +32,14 @@ function buildConfigValidateSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'validate',
     description: 'Validate the effective project config against the composed schema',
-    commonFlags: ['json'],
+    commonFlags: ['json', 'cwd'],
+    options: [
+      {
+        flag: '--config',
+        value: '<path>',
+        description: 'Validate the config at this path instead of the discovered project config',
+      },
+    ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
@@ -53,8 +60,14 @@ function buildConfigSchemaSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name: 'schema',
     description: 'Export the composed project config JSON Schema',
-    commonFlags: ['json'],
+    commonFlags: ['json', 'cwd'],
     options: [
+      {
+        flag: '--config',
+        value: '<path>',
+        description:
+          'Resolve the project from the config at this path instead of the discovered one',
+      },
       {
         flag: '--out',
         value: '<path>',

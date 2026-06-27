@@ -563,7 +563,7 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
   defineNestedCommand<unknown, ToolCliContext>({
     name: 'lookup',
     description: 'Look up function occurrences by simple name from the persisted catalog',
-    commonFlags: ['json'],
+    commonFlags: ['json', 'cwd'],
     args: [
       {
         name: 'name',

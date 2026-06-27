@@ -102,6 +102,26 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "options": [
             {
               "choices": undefined,
+              "defaultValue": undefined,
+              "description": "Resolve the project from the config at this path instead of the discovered one",
+              "flags": "--config <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": "<cwd>",
+              "description": "Target directory",
+              "flags": "--cwd <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
               "defaultValue": false,
               "description": "Output structured JSON",
               "flags": "--json",
@@ -130,6 +150,26 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "args": [],
           "name": "validate",
           "options": [
+            {
+              "choices": undefined,
+              "defaultValue": undefined,
+              "description": "Validate the config at this path instead of the discovered project config",
+              "flags": "--config <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": "<cwd>",
+              "description": "Target directory",
+              "flags": "--cwd <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
             {
               "choices": undefined,
               "defaultValue": false,
@@ -1125,6 +1165,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           ],
           "name": "lookup",
           "options": [
+            {
+              "choices": undefined,
+              "defaultValue": "<cwd>",
+              "description": "Target directory",
+              "flags": "--cwd <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
             {
               "choices": undefined,
               "defaultValue": false,

@@ -277,7 +277,8 @@
         "description": "Look up function occurrences by simple name from the persisted catalog",
         "parent": "graph",
         "commonFlags": [
-          "json"
+          "json",
+          "cwd"
         ],
         "args": [
           {
