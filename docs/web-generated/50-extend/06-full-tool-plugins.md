@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Full Tool plugins"
 audience: [plugin-authors]
-purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
+purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph/yagni aren't the right shape and you want something fundamentally different."
 source-files:
   - packages/core/src/tools/types.ts
   - packages/cli/src/index.ts
@@ -20,7 +20,7 @@ related-docs:
 ---
 # Full Tool plugins
 
-A Tool plugin contributes its own subcommand. Use this when you want something fundamentally different from `fit`, `sim`, or `graph` — an `audit-sec`, a `bench`, a custom `report`. Anything that has its own argv shape, its own logic, and its own result type.
+A Tool plugin contributes its own subcommand. Use this when you want something fundamentally different from `fit`, `sim`, `graph`, or `yagni` — an `audit-sec`, a `bench`, a custom `report`. Anything that has its own argv shape, its own logic, and its own result type.
 
 This is the heaviest extension shape. Most teams never need it. If you just want to ship rules, [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) is the right path.
 

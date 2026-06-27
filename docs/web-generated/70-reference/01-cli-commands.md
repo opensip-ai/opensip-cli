@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-06-27
 release: v0.1.13
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -26,7 +26,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
 
 ---
 
@@ -62,10 +62,10 @@ carries `--cwd`, `--json`, `--config`, `--quiet`, `--verbose`, and its own
 - `--config <path>` (the explicit `opensip-cli.config.yml` override) is now on
   every tool primary, not just `fit`.
 
-The only `program`-level (root) options are `--version` (the CLI version) and
-`--no-cloud`. The root `--version` is host-owned and must precede any
-subcommand (`opensip --version`); a `--version` **after** a subcommand is that
-tool's own:
+The `program`-level (root) options are `--version` (the CLI version),
+`--no-cloud`, and `--no-plugins`. The root `--version` is host-owned and must
+precede any subcommand (`opensip --version`); a `--version` **after** a
+subcommand is that tool's own:
 
 | Flag | Effect |
 |---|---|
@@ -76,6 +76,7 @@ tool's own:
 | `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, `yagni`, and the `<tool> plugin <subcmd>` commands. |
 | `--json` | Emit structured JSON on stdout instead of the table renderer. (Per-command — `init`, `fit`, `sim`, `graph`, `yagni`.) |
 | `--no-cloud` | Disable OpenSIP Cloud signal sync for this run (program-level). See below. |
+| `--no-plugins` | Skip discovery/loading of installed npm Tool packages for this run (program-level, equivalent to `OPENSIP_CLI_SKIP_INSTALLED=1`). Bundled first-party tools and project-authored checks/scenarios still load through their normal lanes. |
 
 Global startup/admission failures can occur before any subcommand body runs.
 Most configuration failures exit 2; a project-authored Tool sidecar rejected by
@@ -89,20 +90,20 @@ OpenSIP Cloud sync is optional. This repo ships the CLI client and the
 compatible endpoint are configured. Without a key, the CLI remains fully local.
 
 When configured (an OpenSIP API key via `opensip configure` or
-`OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each `fit`
-and `graph` run additionally emits its **signals** (the findings it already
-produces) to OpenSIP Cloud for storage. This is **additive and best-effort**:
-results are always written to the local SQLite store first, and a cloud failure
-never blocks, slows, or fails a run. On a successful sync you'll see
-`✓ Sent N signals to OpenSIP Cloud`.
+`OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each deliverable
+`fit`, `sim`, `graph`, and `yagni` run additionally emits its **signals** (the
+findings it already produces) to OpenSIP Cloud for storage. This is **additive
+and best-effort**: results are always written to the local SQLite store first,
+and a cloud failure never blocks, slows, or fails a run. On a successful sync
+you'll see `✓ Sent N signals to OpenSIP Cloud`.
 
-For `graph`, every human-facing mode emits — the default render, `--gate-save`/
-`--gate-compare`, and `--report-to`. Two modes do not emit: plain `--json`
-(a machine-artifact stream, also the carrier each `--workspace` child runs under)
-and `--workspace` itself (the parent aggregates per-unit findings for the
-dashboard, not signals). The separate `graph export --format catalog` command is a catalog dump
-for the parent ingestor, not a signal-emitting run. Run a whole-project `graph`
-to sync.
+`fit`, `sim`, and `yagni` deliver after normal run modes that produce a
+`SignalEnvelope`. `graph` has extra carrier/export modes: the default render,
+`--gate-save`/`--gate-compare`, and `--report-to` deliver; plain `--json` (a
+machine-artifact stream, also the carrier each `--workspace` child runs under)
+and `--workspace` itself do not. The separate `graph export --format catalog`
+command is a catalog dump for the parent ingestor, not a signal-emitting run.
+Run a whole-project `graph` to sync.
 
 What is sent: each signal's file path, message, suggestion, code-location
 hints, and rule metadata. Nothing is sent for users without an API key or
@@ -333,7 +334,6 @@ opensip yagni packages/cli/src
 | `--detector <slug>` | string | — | Run only named detectors (repeatable). Bundled: `unused-config-surface`, `duplicate-body-candidate`. |
 | `--category <name>` | string | — | Filter by `metadata.yagni.reductionCategory` (repeatable). |
 | `--include-tests` | bool | `false` | Include test and fixture files in analysis. |
-| `--show <session>` | string | — | Replay a stored yagni session (by id, or `latest`) instead of running — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--open` | bool | `false` | Launch the HTML report after run. |
 | `-v, --verbose` | bool | `false` | Show evidence, validation steps, and low-confidence findings. |
@@ -671,7 +671,7 @@ opensip agent-catalog --json
 
 The `--json` output is designed to be consumed directly by agents. It contains:
 
-- Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim|yagni> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
+- Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
 - Common composable agent workflows.
 - Notes on the core output shapes (`SignalEnvelope`, `SessionReplayResult` with `fidelity: "projection"`, etc.).
 - Explicit call-out that human-readable renderers (tables, banners) are unchanged.
@@ -703,7 +703,7 @@ opensip sessions purge -y
 | `list` | (none) | List every stored session, newest first. |
 | `list` | `--summary-only` | Omit heavy per-session tool payloads (agent-friendly "menu" mode). The lightweight summary and `showCommand` hints remain. |
 | `show` | `<ref>` (positional) | Replay a stored session by id, or `latest` (requires `--tool`). Supports relative refs such as `previous` / `latest-N`. |
-| `show` | `--tool <fit\|graph\|sim\|yagni>` | Required for `latest`; an optional sanity check for an explicit id. |
+| `show` | `--tool <name>` | Required for `latest`; an optional sanity check for an explicit id. Accepts any registered tool id, but replay output requires that the tool contributed a `sessionReplay` hook. |
 | `show` | `--json` | Emit the replayed session (projected `SignalEnvelope` under the result). |
 | `show` | `--filter <type>` | Filter the replayed signals (repeatable). Supported values: `errors-only` (high severity), `warnings-only` (medium), `top:<n>`. Composable, e.g. `--filter errors-only --filter top:20`. Adds `filtersApplied`, `originalSignalCount`, and `returnedSignalCount` to the machine output. |
 | `show` | `--raw` | With `--json`: emit only the inner payload (`session` + `envelope` + metadata) without the outer `CommandOutcome` wrapper. Ideal for token-sensitive agents. |
@@ -711,12 +711,13 @@ opensip sessions purge -y
 | `purge` | `-y, --yes` | Skip the confirmation prompt. |
 
 **Session replay.** `sessions show` reconstructs a past run's output from the
-stored payload: each tool contributes a `sessionReplay` projection
-(`fit`/`graph`/`sim`/`yagni`) that decodes the opaque payload back into a
-`SignalEnvelope`. The replay `fidelity` is always `projection` — it is rebuilt from
-persisted findings, not a re-execution. Each run command also accepts an inline
-`--show <session>` flag (`fit --show latest`, `graph --show <id>`,
-`sim --show latest`) as a shorthand for the same replay scoped to that tool. A
+stored payload when that tool contributes a `sessionReplay` projection. The
+replay-capable first-party tools are `fit`, `graph`, and `sim` today; they
+decode the opaque payload back into a `SignalEnvelope`. The replay `fidelity` is
+always `projection` — it is rebuilt from persisted findings, not a re-execution.
+Each replay-capable run command also accepts an inline `--show <session>` flag
+(`fit --show latest`, `graph --show <id>`, `sim --show latest`) as a shorthand
+for the same replay scoped to that tool. A
 missing session, wrong tool, or undecodable payload returns a structured error
 (`reason`/`code`: `not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`)
 and exit 2.

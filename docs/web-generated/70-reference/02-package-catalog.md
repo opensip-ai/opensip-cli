@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Package catalog"
 audience: [contributors, plugin-authors]
@@ -64,7 +64,7 @@ Packages above the substrate, below tool engines. These are shared libraries con
 | `@opensip-cli/targeting` | `packages/targeting/` | Host file-targeting runtime substrate (ADR-0037) — `TargetRegistry`, uniform glob expansion with `globalExcludes`, built once per run by the CLI bootstrap and exposed as `scope.targets`. Depends on `config` + `core` only (`targeting-imports-config-core-only`) | `TargetRegistry`, `resolveTargets`, `preResolveAllTargets`, `applyGlobalExcludes` |
 | `@opensip-cli/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_tool_payload` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-cli/output` | `packages/output/` | Machine output layer (renamed from `@opensip-cli/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
-| `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders the fit/sim/graph report from session data + graph catalogs. Consumed by the CLI-owned `report` command and each tool's auto-open hook. | `generateDashboardHtml` |
+| `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders fit/sim/graph/yagni sessions plus tool catalog data. Consumed by the CLI-owned `report` command and each tool's auto-open hook. | `generateDashboardHtml` |
 
 ### Language adapters (fitness — six languages)
 

@@ -47,5 +47,4 @@ describe('runRuntimeProbe', () => {
     expect(report.ok).toBe(false);
     expect(Array.isArray(report.sections)).toBe(true);
   });
-
 });

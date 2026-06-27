@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-09
+last_verified: 2026-06-27
 release: v0.1.13
 title: "The tool-plugin model"
 audience: [contributors, plugin-authors]
-purpose: "How the CLI doesn't know what `fit` does. The Tool contract, the manifest, the unified loader, and what it takes to add a third tool."
+purpose: "How the CLI doesn't know what a tool does. The Tool contract, the manifest, the unified loader, and what it takes to add a Tool."
 source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/tools/registry.ts
@@ -13,6 +13,9 @@ source-files:
   - packages/cli/src/bootstrap/register-tools.ts
   - packages/cli/src/commands/mount-command-spec.ts
   - packages/fitness/engine/src/tool.ts
+  - packages/simulation/engine/src/tool.ts
+  - packages/graph/engine/src/tool.ts
+  - packages/yagni/engine/src/tool.ts
 related-docs:
   - ./01-fitness-loop.md
   - ./03-modular-monolith.md
@@ -25,7 +28,7 @@ related-docs:
 
 The CLI is a generic dispatcher. It cannot tell `fit` from `sim` from `graph` from any future Tool. This isn't a stylistic choice — it's an architectural commitment that the layer policy enforces and that buys you the only thing that makes the platform shape-consistent over time: the freedom to add a tool without touching the kernel.
 
-Bundled tools (`fit`/`sim`/`graph`) and installed or project-local tools load
+Bundled tools (`fit`/`sim`/`graph`/`yagni`) and installed or project-local tools load
 through the same path ([ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0027-ga-parity-cutover.md)).
 The only thing distinguishing them is their **source of installation, never
 their lifecycle**.
@@ -34,7 +37,7 @@ their lifecycle**.
 > - What the `Tool` contract looks like and why it has the shape it does.
 > - How a tool declares its commands as data (`commandSpecs`) that the host mounts.
 > - How tools get discovered and admitted (manifest + `apiVersion`), bundled and third-party alike.
-> - What you write to add a third tool.
+> - What you write to add another tool.
 
 ---
 
@@ -277,7 +280,7 @@ A few alternatives were considered. Worth knowing why they're not what's here.
 
 ---
 
-## What you write to add a third tool
+## What you write to add another tool
 
 The minimum viable tool, end-to-end:
 
@@ -360,7 +363,7 @@ Three things, in order of importance:
 
 1. **A stable kernel.** `@opensip-cli/core` does not import any tool. The layer policy ([dependency-cruiser config](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
 2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to compatible first-party tool releases, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec` release while staying on `opensip-cli@0.1.13`.
-3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in by shipping a manifest + `commandSpecs`, inheriting every host-owned plane (output, progress, config, sessions, dashboard). Today there are three (`fit`, `sim`, `graph`); the CLI grows by zero lines for the fourth.
+3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in by shipping a manifest + `commandSpecs`, inheriting every host-owned plane (output, progress, config, sessions, dashboard). Today there are four first-party tools (`fit`, `sim`, `graph`, `yagni`); the CLI grows by zero lines for the next one.
 
 ---
 

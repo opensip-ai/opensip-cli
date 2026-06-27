@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Cloud signal sync"
 audience: [getting-started, ci-integrators, contributors]
@@ -21,7 +21,7 @@ related-docs:
 ---
 # Cloud signal sync
 
-Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and a compatible endpoint, each `fit`/`graph` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0008-opensip-cloud-signal-sync.md).
+Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and a compatible endpoint, each deliverable `fit`, `sim`, `graph`, or `yagni` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0008-opensip-cloud-signal-sync.md).
 
 If you don't have a key, none of this runs — no network, no check, no cost. The keyless OSS majority can ignore this page.
 
@@ -83,7 +83,7 @@ The unit of egress is a **`SignalBatch`** ([`packages/core/src/types/signal-batc
 ```ts
 interface SignalBatch {
   schemaVersion: 1;
-  tool: string;                 // 'fit' | 'graph'
+  tool: string;                 // e.g. 'fit' | 'sim' | 'graph' | 'yagni'
   recipe?: string;              // the recipe name, if any
   repo: RepoIdentity;           // { id?, remoteUrl?, commit? } — git HEAD sha + origin remote
   runId: string;
@@ -120,7 +120,7 @@ cloud:
 
 See [`70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/) for the config shape and [`70-reference/01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/#opensip-cloud-signal-sync) for the flag.
 
-This is distinct from `fit --report-to <url>`, which explicitly POSTs **SARIF** to **any** receiver (and can fail a CI build via exit 4). Cloud sync emits **native signals** to **OpenSIP Cloud** automatically and best-effort.
+This is distinct from `--report-to <url>`, which explicitly POSTs **SARIF** to **any** receiver (and can fail a CI build via exit 4). Cloud sync emits **native signals** to **OpenSIP Cloud** automatically and best-effort.
 
 ---
 
@@ -129,7 +129,8 @@ This is distinct from `fit --report-to <url>`, which explicitly POSTs **SARIF** 
 Sync happens at the composition root after a tool returns its envelope (`cli.deliverSignals`), on the modes that produce a deliverable envelope:
 
 - **`fit`** — delivers after a run completes.
-- **`sim`** — delivers after a run completes. Since ADR-0011 sim emits the envelope, so it gains cloud sync (and `--report-to`) "for free".
+- **`sim`** — delivers after a run completes. Since ADR-0011 sim returns the shared envelope, it gains cloud sync (and `--report-to`) through the host delivery path.
+- **`yagni`** — delivers after an advisory audit completes; findings remain advisory unless the `yagni.failOnErrors` / `yagni.failOnWarnings` thresholds are configured.
 - **`graph`** — delivers on the default render and in `--gate-save`/`--gate-compare` and `--report-to` modes. It does **not** deliver for plain `--json` (a machine-artifact stream, and the carrier each `--workspace` child runs under) or for `--workspace` itself (the parent aggregates per-unit findings for the dashboard, not signals) — `executeGraph` returns `undefined` for those paths, so the root skips delivery. The separate `graph export --format catalog` command is a catalog dump for the parent ingestor, not a signal-emitting run. Run a whole-project `graph` to sync.
 
 ---

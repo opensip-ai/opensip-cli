@@ -63,7 +63,7 @@ Every output path starts from the same shape — a `SignalEnvelope` produced aft
 ```ts
 interface SignalEnvelope {
   readonly schemaVersion: 2;
-  readonly tool: 'fit' | 'sim' | 'graph';
+  readonly tool: string;                 // ToolShortId; first-party examples: fit/sim/graph/yagni
   readonly recipe?: string;
   readonly runId: string;
   readonly createdAt: string;            // ISO 8601

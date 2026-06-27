@@ -149,9 +149,11 @@ function analyzeLiveRunnerOffThread(content, filePath) {
       );
     }
   }
-  const sendsWorkerIpc =
-    /process\.send(?:\?\.)?\s*\(/.test(content) || /\bsendWorkerIpcMessage\s*\(/.test(content);
-  if (LIVE_WORKER_FILES.has(rel) && !sendsWorkerIpc) {
+  const usesWorkerIpcTransport =
+    /process\.send(?:\?\.)?\s*\(/.test(content) ||
+    /\bsendWorkerIpcMessage\s*\(/.test(content) ||
+    /\brunJsonSpecWorker\s*(?:<|\()/.test(content);
+  if (LIVE_WORKER_FILES.has(rel) && !usesWorkerIpcTransport) {
     violations.push(
       violation(
         filePath,

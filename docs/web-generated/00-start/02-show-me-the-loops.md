@@ -125,7 +125,7 @@ dashboard exactly like fitness checks. The difference is the *input*: where a
 check sees `(content, filePath)`, a rule sees the engine **dataset** (the
 catalog, the indexes, and a derived feature layer). The engine builds your
 project's static call graph in a staged pipeline (discover → walk → resolve →
-index → derive features → render); ten built-in rules consume that dataset and
+index → derive features → render); eleven built-in rules consume that dataset and
 emit findings.
 
 ```text
@@ -145,10 +145,11 @@ emit findings.
   ... | Duration 2.5s   (incremental rebuild)
 ```
 
-The ten rules, in two groups. Reachability and duplication:
+The eleven rules, in two groups. Reachability and duplication:
 
 - **`orphan-subtree`** — functions reachable from nothing (no entry point, no test).
 - **`duplicated-function-body`** — distinct functions whose bodies hash the same (refactor candidates).
+- **`near-duplicate-function-body`** — functions whose normalized bodies are almost the same (copy-paste-with-edits candidates).
 - **`no-side-effect-path`** — code paths that should have side effects but don't (e.g. a logged-out branch that doesn't log).
 - **`test-only-reachable`** — code only reached from test files (likely dead in production).
 - **`always-throws-branch`** — branches that always throw, suggesting an unreachable code path.

@@ -267,4 +267,4 @@ These are drawn from real bugs caught while shipping the tree-sitter adapters.
 ## What's next
 
 - **[`01-stages-and-catalog.md`](./01-stages-and-catalog.md)** — the engine pipeline your adapter feeds into.
-- **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the ten rules that consume the catalog and the gate workflow.
+- **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the eleven rules that consume the catalog and the gate workflow.

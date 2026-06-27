@@ -6,9 +6,7 @@
   "keywords": [
     "opensip-cli",
     "static-analysis",
-    "code-quality",
-    "testing",
-    "tooling"
+    "code-quality"
   ],
   "repository": {
     "type": "git",

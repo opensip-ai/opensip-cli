@@ -57,11 +57,11 @@ interface Rule {
 
 A rule receives frozen inputs (the catalog from stages 1+2, the indexes from stage 3) and returns a list of typed `Signal`s. It cannot import the parser, cannot import another rule, cannot read files. That isolation makes rules unit-testable in ten lines and lets us replace any one of them without touching the rest.
 
-The ten rules below are registered in [`rules/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/graph/engine/src/rules/registry.ts) and run on every `graph` invocation (the default recipe is "run all rules") unless a `--recipe` narrows the set.
+The eleven rules below are registered in [`rules/registry.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/graph/engine/src/rules/registry.ts) and run on every `graph` invocation (the default recipe is "run all rules") unless a `--recipe` narrows the set.
 
 ---
 
-## The five core rules
+## The six core rules
 
 ### `graph:orphan-subtree`
 

@@ -8,7 +8,7 @@
 
 This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.
 
-Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), and simulation (`sim`).
+Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), simulation (`sim`), and advisory reduction audits (`yagni`).
 
 **Distribution model:** the published `opensip-cli` npm package is a full-stack bundle of first-party tools, check packs, and language adapters. Third-party tools install separately via the `opensipTools` manifest and host allowlist; a slim install without bundled tools is not a current goal.
 

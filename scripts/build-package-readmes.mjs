@@ -97,8 +97,8 @@ function renderReadme(pkg, releaseRef) {
     `> ${description}\n\n` +
     `${roleSentence(pkg.opensipTools?.kind)}\n\n` +
     `Part of [**opensip-cli**](${repoRootUrl}) — an open-source codebase intelligence ` +
-    `CLI: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), and ` +
-    `simulation (\`sim\`).\n\n` +
+    `CLI: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), ` +
+    `simulation (\`sim\`), and advisory reduction audits (\`yagni\`).\n\n` +
     `**Distribution model:** the published \`opensip-cli\` npm package is a full-stack ` +
     `bundle of first-party tools, check packs, and language adapters. Third-party tools ` +
     `install separately via the \`opensipTools\` manifest and host allowlist; a slim ` +

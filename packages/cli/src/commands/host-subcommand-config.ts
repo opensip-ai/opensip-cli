@@ -2,7 +2,7 @@
  * `config` subcommand group leaf specs (`validate`, `schema`).
  */
 
-import { currentScope, type ProjectContext } from '@opensip-cli/core';
+import { currentScope, type OptionSpec, type ProjectContext } from '@opensip-cli/core';
 
 import { executeConfigSchema, executeConfigValidate } from './config.js';
 import {
@@ -14,7 +14,6 @@ import {
 } from './host-subcommand-shared.js';
 
 import type { CliCommandsContext } from './shared.js';
-import type { OptionSpec } from '@opensip-cli/core';
 
 /** @throws {Error} When the tool registry is missing from context and scope. */
 function requireTools(ctx: CliCommandsContext) {

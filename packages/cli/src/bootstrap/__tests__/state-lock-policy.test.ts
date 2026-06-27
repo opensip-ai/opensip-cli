@@ -95,7 +95,7 @@ describe('createStateLockEventBridge', () => {
     runWithScopeSync(scope, () => {
       bridge({
         kind: 'acquire.timeout',
-        lockPath: '/tmp/demo.lock',
+        lockPath: 'demo.lock',
         resource: 'datastore',
         operation: 'datastore.open',
         waitMs: 5000,
@@ -123,7 +123,7 @@ describe('createStateLockEventBridge', () => {
     const bridge = createStateLockEventBridge(logger);
     bridge({
       kind: 'acquire.start',
-      lockPath: '/tmp/demo.lock',
+      lockPath: 'demo.lock',
       resource: 'artifact',
       operation: 'artifact.write',
     });

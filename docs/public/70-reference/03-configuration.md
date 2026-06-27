@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-11
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -245,6 +245,14 @@ Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed na
 | `minDuplicateBodySize` | number | `200` | Minimum normalized body size (chars) for a per-instance match. Filters trivial pass-through wrappers. |
 | `minCrossPackageDuplicatePackages` | number | `3` | Minimum DISTINCT packages a body hash must appear in to trigger the aggregate cross-package duplication signal (suppressing the per-instance signals for that hash). |
 | `minCrossPackageDuplicateBodySize` | number | `80` | Normalized-body-size floor (chars) for the aggregate cross-package path. Deliberately lighter than `minDuplicateBodySize`; no line floor. |
+
+### Near-duplicate-function-body (`graph:near-duplicate-function-body`)
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `minNearDuplicateSimilarity` | number | `0.85` | Minimum estimated Jaccard similarity for a near-clone edge. |
+| `minNearDuplicateBodySize` | number | `200` | Minimum normalized body size (chars) for a near-duplicate candidate. |
+| `nearDuplicateLshBands` | number | `8` | LSH band count for the 128-component MinHash signature. Must divide 128 evenly. |
 
 ### Orphan detection (`graph:orphan-subtree`)
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Report"
 audience: [users, contributors]
@@ -22,11 +22,11 @@ related-docs:
 ---
 # Report
 
-The report is a self-contained HTML view of every fit, sim, and graph run on the local machine. No server, no database, no asset hosting — a single file you can email or commit, fully functional offline.
+The report is a self-contained HTML view of every fit, sim, graph, and yagni run on the local machine. No server, no database, no asset hosting — a single file you can email or commit, fully functional offline.
 
 > **What you'll understand after this:**
 > - When the report opens automatically vs. manually.
-> - What the HTML report contains (the four top-level tabs and their subtabs).
+> - What the HTML report contains (the top-level tabs and their subtabs).
 > - How the static HTML is generated and how data flows in.
 > - Where the report renderer's source lives.
 
@@ -53,7 +53,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Four top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Paths`). The Fitness and Simulation tabs each carry three subtabs (`Overview`, `Catalog`, `Recipes`) — the per-tool `Overview` subtab shows that tool's session list. The Code Paths (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). Browser panel modules live under [`packages/dashboard/src/client/`](../../../packages/dashboard/src/client/); the top-of-page tool-tab switcher is wired by [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts).
+Five top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`). The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](../../../packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](../../../packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts).
 
 ### Overview
 
@@ -132,7 +132,7 @@ Source: [`packages/dashboard/src/code-paths.ts`](../../../packages/dashboard/src
 
 ### Tool tabs
 
-The report supports fit, sim, and graph runs. The top-of-page tab switcher (Overview / Fitness / Simulation / Code Paths) filters the panels by tool. Sim runs are sparser today; the panel shapes are the same. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts).
+The report supports fit, sim, graph, and yagni runs. The top-of-page tab switcher filters the panels by tool. Fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](../../../packages/dashboard/src/tool-tabs-registrations.ts).
 
 ---
 
@@ -170,7 +170,8 @@ sprinkling globals.
 `generateDashboardHtml({ … })` accepts a single options object; the
 shape is the `DashboardInput` interface re-exported from
 `@opensip-cli/dashboard`. Today it carries `sessions`,
-`checkCatalog`, `recipeCatalog`, `graphCatalog`, and
+`checkCatalog`, `recipeCatalog`, graph catalog/rule/recipe data,
+simulation scenario/recipe data, YAGNI detector data, and
 `editorProtocol`. Future tool-shaped data — alarm history,
 dependency graphs, simulation traces — extends the interface as new
 optional fields. Don't grow positional parameters; add a new

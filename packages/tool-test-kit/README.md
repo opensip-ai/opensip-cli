@@ -2,11 +2,11 @@
      Change the package's "description" (or the generator template) and run
      `pnpm docs:readmes`. CI enforces sync via `pnpm docs:readmes:check`. -->
 
-# @opensip-cli/simulation
+# @opensip-cli/tool-test-kit
 
-> Simulation scenarios for OpenSIP CLI
+> Public test helpers for OpenSIP CLI tool authors — ToolCliContext double, scope helpers, and command-spec assertions
 
-This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.
+This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
 Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), simulation (`sim`), and advisory reduction audits (`yagni`).
 
@@ -20,13 +20,13 @@ Most users install the CLI, which bundles the first-party tools:
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 ```
 
-This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-cli/simulation` directly.
+This package is published for the CLI and advanced plugin authors; most users should not install `@opensip-cli/tool-test-kit` directly.
 
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
 - 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.13/packages/simulation/engine
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.1.13/packages/tool-test-kit
 
 ## License
 

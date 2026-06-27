@@ -126,7 +126,7 @@
         "contributors",
         "plugin-authors"
       ],
-      "purpose": "How the CLI doesn't know what `fit` does. The Tool contract, the manifest, the unified loader, and what it takes to add a third tool."
+      "purpose": "How the CLI doesn't know what a tool does. The Tool contract, the manifest, the unified loader, and what it takes to add a Tool."
     },
     {
       "file": "docs/web-generated/10-concepts/03-modular-monolith.md",
@@ -136,7 +136,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The 33-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+      "purpose": "The 38-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
     },
     {
       "file": "docs/web-generated/10-concepts/04-contract-surfaces.md",
@@ -356,7 +356,7 @@
       "audience": [
         "plugin-authors"
       ],
-      "purpose": "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph aren't the right shape and you want something fundamentally different."
+      "purpose": "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph/yagni aren't the right shape and you want something fundamentally different."
     },
     {
       "file": "docs/web-generated/50-extend/07-command-taxonomy.md",

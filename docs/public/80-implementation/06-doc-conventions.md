@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Doc conventions"
 audience: [contributors]
@@ -156,7 +156,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 
 Last verified at v0.1.13 against:
 
-- `packages/` directory listing (34 publishable packages plus workspace-private support packages ...).
+- `packages/` directory listing (37 publishable packages plus workspace-private support packages ...).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```
@@ -171,7 +171,7 @@ Most contributions don't need a new doc. The existing numbered docs (00–80) co
 
 You probably need a new doc if:
 
-- You're adding a new subsystem (a third tool, a new layer, a deeply opt-in feature).
+- You're adding a new subsystem (another tool, a new layer, a deeply opt-in feature).
 - An existing doc would balloon by 50%+ with the new content.
 - The new content has its own coherent narrative arc.
 

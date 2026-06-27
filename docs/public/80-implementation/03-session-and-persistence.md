@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-06-27
 release: v0.1.13
 title: "Session and persistence"
 audience: [contributors]
@@ -107,12 +107,12 @@ SQLite + Drizzle were chosen because the runtime store is local, project-scoped,
 
 ## Sessions
 
-A session is one record per `fit`, `sim`, or `graph` run. The persistence layer holds **zero tool-specific vocabulary** (audit 2026-05-29, session split): the `sessions` table carries only the columns every tool shares, and per-session detail lives in a separate `session_tool_payload` row as an **opaque JSON blob** whose shape is owned and validated by the writing tool. The `StoredSession` interface in [`packages/contracts/src/session-types.ts`](../../../packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
+A session is one record per `fit`, `sim`, `graph`, or `yagni` run. The persistence layer holds **zero tool-specific vocabulary** (audit 2026-05-29, session split): the `sessions` table carries only the columns every tool shares, and per-session detail lives in a separate `session_tool_payload` row as an **opaque JSON blob** whose shape is owned and validated by the writing tool. The `StoredSession` interface in [`packages/contracts/src/session-types.ts`](../../../packages/contracts/src/session-types.ts) is what `SessionRepo` round-trips:
 
 ```ts
 interface StoredSession {
   readonly id: string;
-  readonly tool: 'fit' | 'sim' | 'graph';   // ToolShortId
+  readonly tool: string;                    // ToolShortId; first-party rows include fit/sim/graph/yagni
   readonly startedAt: string;                // host-stamped: wall-clock run start
   readonly completedAt: string;              // host-stamped: when the tool returned to the host
   readonly cwd: string;
@@ -138,7 +138,7 @@ The session is written via [`SessionRepo.save()`](../../../packages/session-stor
 ```bash
 opensip sessions list                       # SELECT * FROM sessions ORDER BY timestamp DESC
 opensip sessions list --json --summary-only # lean listing for agents (omits heavy payloads)
-opensip sessions show <id>                  # replay a stored session (or `latest --tool <fit|graph|sim|yagni>`)
+opensip sessions show <id>                  # replay a stored session (or `latest --tool <name>`)
 opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
 opensip sessions purge                      # DELETE FROM sessions (prompts for confirm)
 opensip sessions purge --older-than 7       # DELETE FROM sessions WHERE timestamp < cutoff
@@ -151,11 +151,12 @@ The dashboard reads the same store to populate its run-history view. For program
 
 **Session replay.** `sessions show` (and the per-run `--show <session>`
 shorthand on `fit`/`graph`/`sim`) reconstructs a past run's output from its
-stored payload. The opaque payload is decoded back into its structural shape by
-the shared `decodeSessionPayload` in [`@opensip-cli/session-store`](../../../packages/session-store/src/session-payload-decode.ts)
+stored payload when that tool contributes a `sessionReplay` hook. The opaque
+payload is decoded back into its structural shape by the shared
+`decodeSessionPayload` in [`@opensip-cli/session-store`](../../../packages/session-store/src/session-payload-decode.ts)
 — persistence owns the structural decode but still holds **zero tool
-vocabulary**. Each tool then projects that structure into a `SignalEnvelope` via
-its `sessionReplay` contribution (`fit`/`graph`/`sim`), tagging the result
+vocabulary**. The replay-capable first-party tools then project that structure
+into a `SignalEnvelope` (`fit`/`graph`/`sim` today), tagging the result
 `fidelity: 'projection'` (rebuilt from persisted findings, not re-executed).
 Failures (`not-found`, `wrong-tool`, `ambiguous-latest`, `decode-error`) surface
 as a structured `CommandOutcome` error with exit 2.

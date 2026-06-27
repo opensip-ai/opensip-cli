@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-06-27
 release: v0.1.13
 owner: opensip-cli
 indexable: true
@@ -20,7 +20,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 |---|---|
 | Enforce project-specific quality, security, and architecture rules | `opensip fit` with 151 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
-| Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and ten built-in graph rules |
+| Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and eleven built-in graph rules |
 | Review evidence-backed code-reduction opportunities (advisory) | `opensip yagni` with bundled detectors and optional graph evidence |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
@@ -182,10 +182,10 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ## Factual Baseline
 
-This v0.1.13 doc set was rechecked against the source on 2026-06-15:
+This v0.1.13 doc set was rechecked against the source on 2026-06-27:
 
 - 151 built-in fitness checks across seven packs.
-- 34 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- 37 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
 - Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.

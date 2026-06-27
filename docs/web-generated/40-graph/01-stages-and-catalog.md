@@ -339,6 +339,6 @@ These shapes trade cross-subtree edge fidelity for speed and memory. Use `--no-c
 
 ## What's next
 
-- **[`02-rules-and-gating.md`](/docs/opensip-cli/40-graph/02-rules-and-gating/)** — the ten rules that consume the catalog, the gate workflow, and the SARIF integration.
+- **[`02-rules-and-gating.md`](/docs/opensip-cli/40-graph/02-rules-and-gating/)** — the eleven rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-reference/01-cli-commands.md#graph`](/docs/opensip-cli/70-reference/01-cli-commands/)** — the CLI flag reference.
 - **`git -P log -- packages/graph`** — the perf-plan history landed in waves: heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild. The original perf plan documents were removed once each wave shipped; the commit history is the source of truth.

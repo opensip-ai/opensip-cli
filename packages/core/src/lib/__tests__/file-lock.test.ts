@@ -124,7 +124,7 @@ describe('withFileLock', () => {
           resource: 'datastore',
           onEvent: (e) => events.push(e.kind),
         },
-        async () => 'never',
+        () => Promise.resolve('never'),
       ),
     ).rejects.toThrow(TimeoutError);
 
@@ -173,7 +173,7 @@ describe('withFileLockAsync', () => {
         resource: 'artifact',
         operation: 'artifact.write',
       },
-      async () => 'ok',
+      () => Promise.resolve('ok'),
     );
     expect(out).toBe('ok');
     expect(() => readFileSync(lockPath, 'utf8')).toThrow();
@@ -201,7 +201,7 @@ describe('withFileLockAsync', () => {
           policy: { waitMs: 50, staleMs: 600_000, heartbeatMs: 20 },
           resource: 'datastore',
         },
-        async () => 'x',
+        () => Promise.resolve('x'),
       ),
     ).rejects.toThrow(SystemError);
   });

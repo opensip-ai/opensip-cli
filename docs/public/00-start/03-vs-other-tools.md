@@ -21,7 +21,7 @@ OpenSIP CLI is not a replacement for ESLint, Semgrep, or Sonarqube — it comple
 |---|---|---|---|---|---|
 | **Polyglot in one run** | ✓ TS, Python, Rust, Go, Java, C/C++ | ✗ (one per language) | ✓ | ✓ | ✓ (security focus) |
 | **User-authored architectural rules** | ✓ (`defineCheck` in 15 lines) | partial (custom rules per linter) | ✓ (Semgrep YAML) | partial (XPath-ish) | ✗ |
-| **Static call-graph rules** (orphan code, dead paths, structural) | ✓ (10 built-in, `defineRule`) | ✗ | partial | ✓ | ✗ |
+| **Static call-graph rules** (orphan code, dead paths, structural) | ✓ (11 built-in, `defineRule`) | ✗ | partial | ✓ | ✗ |
 | **Load / chaos simulation** | ✓ (`sim`) | ✗ | ✗ | ✗ | ✗ |
 | **CI gate with baselines** | ✓ (`--gate-save` / `--gate-compare`) | partial (snapshot files) | ✓ | ✓ | ✓ |
 | **SARIF output for PR annotations** | ✓ | partial | ✓ | ✓ | ✓ |
