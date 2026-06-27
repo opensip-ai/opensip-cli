@@ -471,6 +471,17 @@
       "purpose": "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-cli subcommand."
     },
     {
+      "file": "docs/web-generated/60-guides/cloud-handoff.md",
+      "path": "/docs/opensip-cli/60-guides/cloud-handoff/",
+      "section": "60-guides",
+      "title": "Send CLI findings to OpenSIP Cloud",
+      "audience": [
+        "ci-integrators",
+        "cloud-adopters"
+      ],
+      "purpose": "Task-led: hand opensip fit findings to OpenSIP Cloud over --report-to (or the published GitHub Action) so they become tickets — with no manual ingest step."
+    },
+    {
       "file": "docs/web-generated/70-reference/01-cli-commands.md",
       "path": "/docs/opensip-cli/70-reference/01-cli-commands/",
       "section": "70-reference",
@@ -745,7 +756,8 @@
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
         "/docs/opensip-cli/60-guides/05-migrate-from-eslint/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
-        "/docs/opensip-cli/60-guides/07-create-your-first-tool/"
+        "/docs/opensip-cli/60-guides/07-create-your-first-tool/",
+        "/docs/opensip-cli/60-guides/cloud-handoff/"
       ]
     },
     {
@@ -867,6 +879,7 @@
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",
         "/docs/opensip-cli/60-guides/05-migrate-from-eslint/",
         "/docs/opensip-cli/60-guides/06-use-graph/",
+        "/docs/opensip-cli/60-guides/cloud-handoff/",
         "/docs/opensip-cli/70-reference/01-cli-commands/",
         "/docs/opensip-cli/70-reference/03-configuration/",
         "/docs/opensip-cli/70-reference/04-json-output-schema/",
