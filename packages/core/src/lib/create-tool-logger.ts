@@ -23,13 +23,20 @@ function mergeEntry(
 /**
  * Returns a {@link Logger} that stamps `module` on every entry. Reads the current
  * run scope logger via {@link currentLogger} unless a `base` logger is supplied.
+ *
+ * Resolution is LAZY (per call), not captured at construction: tool CLI modules
+ * create their logger as a module-level `const` at import time — before any
+ * `RunScope` is entered — so an eager `currentLogger()` would bind the bare
+ * compatibility singleton forever and the per-run JSONL log file (on
+ * `scope.logger`) would never receive these entries. Resolving on each call
+ * routes module-level loggers to the active run's logger during a command.
  */
 export function createToolLogger(module: string, base?: Logger): Logger {
-  const delegate = base ?? currentLogger();
+  const delegate = (): Logger => base ?? currentLogger();
   return {
-    debug: (msgOrObj, data) => delegate.debug(mergeEntry(module, msgOrObj, data)),
-    info: (msgOrObj, data) => delegate.info(mergeEntry(module, msgOrObj, data)),
-    warn: (msgOrObj, data) => delegate.warn(mergeEntry(module, msgOrObj, data)),
-    error: (msgOrObj, data) => delegate.error(mergeEntry(module, msgOrObj, data)),
+    debug: (msgOrObj, data) => delegate().debug(mergeEntry(module, msgOrObj, data)),
+    info: (msgOrObj, data) => delegate().info(mergeEntry(module, msgOrObj, data)),
+    warn: (msgOrObj, data) => delegate().warn(mergeEntry(module, msgOrObj, data)),
+    error: (msgOrObj, data) => delegate().error(mergeEntry(module, msgOrObj, data)),
   };
 }

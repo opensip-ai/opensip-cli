@@ -53,4 +53,26 @@ describe('createToolLogger', () => {
     expect(writes[0]).toMatchObject({ module: 'fitness:cli', evt: 'fit.run.start' });
     spy.mockRestore();
   });
+
+  it('resolves the scope logger LAZILY: a logger built OUTSIDE a scope still routes to the run scope when it logs INSIDE one', () => {
+    // The real import order for first-party CLI handlers: the module-level
+    // `const log = createToolLogger('graph:cli')` runs at registration time,
+    // BEFORE any RunScope is entered. An eager `base ?? currentLogger()`
+    // capture would bind the singleton forever and never reach the per-run
+    // JSONL log file. Build the logger with NO scope active, then log inside.
+    const log = createToolLogger('graph:cli');
+
+    const scopeLogger = new LoggerImpl({ level: 'debug' });
+    const scope = new RunScope({ logger: scopeLogger });
+    const writes: Record<string, unknown>[] = [];
+    const spy = vi.spyOn(scopeLogger, 'info').mockImplementation((entry) => {
+      writes.push(typeof entry === 'string' ? { msg: entry } : entry);
+    });
+    runWithScopeSync(scope, () => {
+      log.info({ evt: 'graph.cli.lookup.start' });
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(writes[0]).toMatchObject({ module: 'graph:cli', evt: 'graph.cli.lookup.start' });
+    spy.mockRestore();
+  });
 });
