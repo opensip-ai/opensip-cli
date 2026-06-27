@@ -44,6 +44,8 @@ export interface Signal {
    * Optional: a freshly-`createSignal`'d signal has none until stamped.
    */
   readonly fingerprint?: string;
+  /** Optional structured repair guidance (ADR-0086). */
+  readonly repair?: SignalRepair;
   readonly createdAt: string;
 }
 
@@ -60,6 +62,7 @@ export interface CreateSignalInput {
   code?: { file?: string; line?: number; column?: number };
   fix?: FixHint;
   metadata?: Record<string, unknown>;
+  repair?: SignalRepair;
 }
 
 /** Optional remediation hint attached to a Signal — action label and confidence. */
@@ -67,6 +70,26 @@ export interface FixHint {
   readonly action?: string;
   readonly confidence?: number;
   readonly description?: string;
+}
+
+/** Structured repair contract for AI agents (ADR-0086, spec §5.5). */
+export interface SignalRepair {
+  readonly repairKind?:
+    | 'add-test'
+    | 'split-function'
+    | 'extract-module'
+    | 'fix-import'
+    | 'manual'
+    | 'unknown';
+  readonly autofixable?: boolean;
+  readonly suggestedCommand?: string;
+  readonly docsRef?: string;
+  readonly confidence?: number;
+  readonly patchHint?: {
+    readonly kind: 'text' | 'structured';
+    readonly summary: string;
+    readonly target?: string;
+  };
 }
 
 /**
@@ -106,6 +129,7 @@ export function createSignal(input: CreateSignalInput): Signal {
     fixAction: input.fix?.action,
     fixConfidence: input.fix?.confidence,
     metadata: input.metadata ?? {},
+    ...(input.repair === undefined ? {} : { repair: input.repair }),
     createdAt: new Date().toISOString(),
   };
 }

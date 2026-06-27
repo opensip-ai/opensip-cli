@@ -209,6 +209,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'registerCapabilityDomainsFromManifest',
   'registerRecipesFromMod',
   'registeredToolShortIds',
+  'resolveChangedFiles',
   'resolvePackageDir',
   'resolvePackageEntryPoint',
   'resolveProjectConfigPath',

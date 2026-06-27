@@ -113,6 +113,12 @@ export interface TargetResolver {
 export type DataStoreThunk = () => unknown;
 
 /**
+ * Opaque accessor for the persisted graph catalog contract (ADR-0085).
+ * Populated by the CLI bootstrap; fitness reads via `currentScope()?.graphCatalog`.
+ */
+export type GraphCatalogThunk = () => unknown;
+
+/**
  * Per-tool subscope contribution. Each tool augments this interface from
  * its own package (`declare module '@opensip-cli/core' { interface
  * ScopeContribution { graph?: … } }`) and returns the matching object
@@ -220,4 +226,9 @@ export interface ToolScope extends ScopeContribution {
    * names no targeting concrete, so the kernel carries no targeting dependency.
    */
   readonly targets?: TargetResolver;
+  /**
+   * Lazy graph catalog reader (ADR-0085). Populated by the CLI bootstrap from
+   * graph's `CatalogRepo.loadCatalogContract()`; fitness casts at the boundary.
+   */
+  readonly graphCatalog?: GraphCatalogThunk;
 }

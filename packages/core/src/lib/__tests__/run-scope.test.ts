@@ -53,6 +53,12 @@ describe('RunScope — construction', () => {
     scope.dispose();
   });
 
+  it('default graphCatalog thunk is undefined (ADR-0085)', () => {
+    const scope = new RunScope();
+    expect(scope.graphCatalog).toBeUndefined();
+    scope.dispose();
+  });
+
   it('default runId is the empty string (matches prior singleton reset semantics)', () => {
     const scope = new RunScope();
     expect(scope.runId).toBe('');
@@ -100,8 +106,14 @@ describe('runWithScope / currentScope', () => {
   });
 
   it('currentLogger returns the scoped logger and falls back to the singleton outside scope', () => {
-    const scopedLogger = createRunLogger({ runId: 'RUN_scoped_logger', silent: true });
-    const scope = new RunScope({ runId: 'RUN_scoped_logger', logger: scopedLogger });
+    const scopedLogger = createRunLogger({
+      runId: 'RUN_scoped_logger',
+      silent: true,
+    });
+    const scope = new RunScope({
+      runId: 'RUN_scoped_logger',
+      logger: scopedLogger,
+    });
 
     expect(currentLogger()).toBe(defaultLogger);
     expect(runWithScopeSync(scope, () => currentLogger())).toBe(scopedLogger);
@@ -300,8 +312,16 @@ describe('runId — scope-bound propagation to logger event-stamping', () => {
 
 describe('RunScope — per-run logger isolation (ADR-0053)', () => {
   it('concurrent scopes use independent loggers', async () => {
-    const a = createRunLogger({ runId: 'RUN_a', silent: true, debugMode: true });
-    const b = createRunLogger({ runId: 'RUN_b', silent: true, debugMode: false });
+    const a = createRunLogger({
+      runId: 'RUN_a',
+      silent: true,
+      debugMode: true,
+    });
+    const b = createRunLogger({
+      runId: 'RUN_b',
+      silent: true,
+      debugMode: false,
+    });
 
     const scopeA = new RunScope({ runId: 'RUN_a', logger: a });
     const scopeB = new RunScope({ runId: 'RUN_b', logger: b });

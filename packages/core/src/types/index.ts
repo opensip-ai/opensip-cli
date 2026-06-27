@@ -4,6 +4,7 @@ export type {
   SignalCategory,
   CreateSignalInput,
   FixHint,
+  SignalRepair,
 } from './signal.js';
 export { createSignal } from './signal.js';
 export type { SignalBatch, RepoIdentity, BuildSignalBatchInput } from './signal-batch.js';

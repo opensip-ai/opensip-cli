@@ -225,3 +225,9 @@ export type { SchemaCompat } from './lib/config-version.js';
 // subtrees left over from pre-discovery runs. Returns paths; callers
 // surface them; never auto-deletes.
 export { detectPhantomRuntimes } from './lib/phantom-detect.js';
+
+// Lib — host-owned git changed-file resolver (ADR-0085). Single source of truth
+// for `fit --changed` and `graph impact --changed`; tools must not shell out
+// independently.
+export { resolveChangedFiles } from './lib/git-changed-files.js';
+export type { ChangedFilesResult, ChangedFileBasis } from './lib/git-changed-files.js';
