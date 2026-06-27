@@ -12,6 +12,7 @@ import { describe, expect, it, afterEach } from 'vitest';
 import { writeTemplateFiles } from '../create-template-writer.js';
 import { TOOLS_CREATE_TEMPLATE_RENDERERS } from '../create-templates.js';
 import { toolsCreate } from '../create.js';
+import { runToolValidation } from '../validate.js';
 
 let tmp: string;
 
@@ -92,6 +93,30 @@ describe('toolsCreate', () => {
     expect(source).toContain('createToolLogger');
     expect(source).toContain('reportFailure');
     expect(result.nextSteps?.some((step) => step.includes('pnpm install'))).toBe(true);
+  });
+
+  it('a scaffolded tool passes `tools validate` static sections (create→validate loop)', async () => {
+    // Regression: `tools validate` admitted candidates as source 'installed'
+    // (reading package.json#opensipTools), but `tools create` writes only the
+    // project-local sidecar — so a freshly scaffolded tool failed admission with
+    // "manifest missing or malformed". Both templates must validate.
+    for (const template of ['minimal-js', 'ts-local'] as const) {
+      const root = mkdtempSync(join(tmpdir(), 'ost-tools-validate-'));
+      try {
+        const id = template === 'minimal-js' ? 'hello-tools' : 'typed-tool';
+        expect(toolsCreate({ toolId: id, projectRoot: root, template }).success).toBe(true);
+        const toolDir = join(root, 'opensip-cli', 'tools', id);
+        const { result, cleanup } = await runToolValidation({ spec: toolDir, cwd: root });
+        cleanup();
+        const sectionStatus = (name: string): string | undefined =>
+          result.sections.find((s) => s.name === name)?.status;
+        // The sidecar is read as 'project-local' — NOT "manifest missing or malformed".
+        expect(sectionStatus('manifest')).toBe('passed');
+        expect(sectionStatus('compatibility')).toBe('passed');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
   });
 
   it('rejects invalid ids and unknown templates', () => {

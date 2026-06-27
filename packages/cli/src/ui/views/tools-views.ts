@@ -135,6 +135,13 @@ export function viewToolsCreate(result: ToolsCreateResult): ViewNode {
     line([{ text: result.dir, dim: true }]),
     ...result.files.map((file) => line([{ text: `  ${file}`, dim: true }])),
   ];
+  if (result.nextSteps !== undefined && result.nextSteps.length > 0) {
+    children.push(
+      SPACER,
+      line([{ text: 'Next steps:', bold: true }]),
+      ...result.nextSteps.map((step) => line([{ text: `  ${step}`, dim: true }])),
+    );
+  }
   if (result.hint !== undefined) {
     children.push(SPACER, line([{ text: result.hint, tone: 'warning' }]));
   }

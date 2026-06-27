@@ -22,6 +22,8 @@ import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
+import { PROJECT_LOCAL_MANIFEST_FILE, type ToolSource } from '@opensip-cli/core';
+
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
 import { ensureHostDir } from '../plugin/host-dir.js';
 import { npmInstallIntoHost } from '../plugin-host-ops.js';
@@ -51,8 +53,26 @@ interface StagedCandidate {
   readonly pkgDir: string;
   readonly cleanup: () => void;
   readonly stagedByInstall: boolean;
+  /**
+   * The manifest source to admit under — `project-local` for an authored tool
+   * carrying the `opensip-tool.manifest.json` sidecar (what `tools create`
+   * scaffolds), `installed` for an npm package whose identity lives in
+   * `package.json#opensipTools`. Selecting the wrong source reads the wrong
+   * manifest location and reports "manifest missing or malformed".
+   */
+  readonly source: ToolSource;
   /** Present when staging itself failed (no pkgDir to validate). */
   readonly stagingError?: string;
+}
+
+/**
+ * A package carrying the project-local sidecar manifest is an authored tool
+ * (source `project-local`); otherwise its identity is in `package.json`
+ * (source `installed`). Survives an npm install because the sidecar is packed
+ * by default (no `files` allowlist excludes it).
+ */
+function manifestSourceFor(pkgDir: string): ToolSource {
+  return existsSync(join(pkgDir, PROJECT_LOCAL_MANIFEST_FILE)) ? 'project-local' : 'installed';
 }
 
 const NOOP_CLEANUP = (): void => {
@@ -74,7 +94,12 @@ function stageCandidate(opts: ToolValidationOptions): StagedCandidate {
   const localDir = isLocalDirSpec(opts.spec, opts.cwd);
   if (localDir && opts.installDeps !== true) {
     const pkgDir = isAbsolute(opts.spec) ? opts.spec : resolve(opts.cwd, opts.spec);
-    return { pkgDir, cleanup: NOOP_CLEANUP, stagedByInstall: false };
+    return {
+      pkgDir,
+      cleanup: NOOP_CLEANUP,
+      stagedByInstall: false,
+      source: manifestSourceFor(pkgDir),
+    };
   }
   const tempHost = mkdtempSync(join(tmpdir(), 'ost-tools-validate-'));
   const cleanup = (): void => rmSync(tempHost, { recursive: true, force: true });
@@ -82,12 +107,20 @@ function stageCandidate(opts: ToolValidationOptions): StagedCandidate {
   const spec = localDir && !isAbsolute(opts.spec) ? resolve(opts.cwd, opts.spec) : opts.spec;
   const outcome = npmInstallIntoHost(tempHost, spec);
   if (!outcome.ok) {
-    return { pkgDir: '', cleanup, stagedByInstall: true, stagingError: outcome.error };
+    return {
+      pkgDir: '',
+      cleanup,
+      stagedByInstall: true,
+      source: 'installed',
+      stagingError: outcome.error,
+    };
   }
+  const pkgDir = join(tempHost, 'node_modules', outcome.installedName);
   return {
-    pkgDir: join(tempHost, 'node_modules', outcome.installedName),
+    pkgDir,
     cleanup,
     stagedByInstall: true,
+    source: manifestSourceFor(pkgDir),
   };
 }
 
@@ -242,7 +275,7 @@ export async function runToolValidation(
     // candidate code runs.
     const staticReport = await admitToolPackage({
       dir: staged.pkgDir,
-      source: 'installed',
+      source: staged.source,
       explicitlyRequested: true,
       staticOnly: true,
     });
