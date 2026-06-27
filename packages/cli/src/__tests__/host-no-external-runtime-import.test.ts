@@ -42,7 +42,10 @@ import { discoverAndRegisterToolPackages } from '../bootstrap/register-tools.js'
 import { INSTALLED_TOOL_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 
 const FIXTURE_ID = 'm4g-sentinel-tool';
-const STABLE_ID = '00000000-0000-4000-8000-0000000m4g01';
+// A real (hex-only) UUID — manifest admission rejects non-UUID stableIds
+// (`validateManifest` → `isAbsentOrUuidString`); a mnemonic placeholder with
+// non-hex characters would be silently dropped before registration.
+const STABLE_ID = '00000000-0000-4000-8000-000000004601';
 
 let fixtureRoot = '';
 let fixtureDir = '';

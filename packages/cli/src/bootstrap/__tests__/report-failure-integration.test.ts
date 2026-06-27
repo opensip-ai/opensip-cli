@@ -13,11 +13,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildToolCliContext, createLiveViewRegistry } from '../../cli-context.js';
 
 function todayLogName(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}.jsonl`;
+  // LoggerImpl.initLogFile partitions the daily file by the UTC calendar date
+  // (`new Date().toISOString().slice(0, 10)`). Mirror that exactly — building
+  // the name from the LOCAL date makes this test fail whenever the local and
+  // UTC dates differ (e.g. afternoon/evening in the Americas).
+  return `${new Date().toISOString().slice(0, 10)}.jsonl`;
 }
 
 describe('reportFailure integration', () => {
