@@ -193,8 +193,15 @@ const CONTRIBUTION_KINDS: readonly CapabilityContributionKind[] = [
 function parseCapabilityEntry(entry: unknown): ToolCapabilityDeclaration | undefined {
   if (!isRecord(entry)) return undefined;
   if (typeof entry.id !== 'string' || entry.id === '') return undefined;
-  if (typeof entry.apiVersion !== 'number') return undefined;
-  if (typeof entry.minSupportedApiVersion !== 'number') return undefined;
+  // Capability epochs are bounded INTEGERS (ADR-0074): reject non-integers like
+  // 1.5 and semver-shaped numbers, not just non-numbers.
+  if (typeof entry.apiVersion !== 'number' || !Number.isInteger(entry.apiVersion)) return undefined;
+  if (
+    typeof entry.minSupportedApiVersion !== 'number' ||
+    !Number.isInteger(entry.minSupportedApiVersion)
+  ) {
+    return undefined;
+  }
   if (entry.minSupportedApiVersion > entry.apiVersion) return undefined;
   const kind = entry.contributionKind;
   if (!isContributionKind(kind)) return undefined;

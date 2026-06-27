@@ -156,6 +156,26 @@ describe('loadToolManifest — capabilities slot', () => {
     );
     expect(loadToolManifest('installed', testDir)).toBeUndefined();
   });
+
+  it('rejects non-integer capability epochs (epochs are bounded integers, ADR-0074)', () => {
+    for (const entry of [
+      { apiVersion: 1.5, minSupportedApiVersion: 1 },
+      { apiVersion: 2, minSupportedApiVersion: 1.5 },
+    ]) {
+      writePackageManifest(
+        testDir,
+        fixturePackageJson([
+          {
+            id: 'audit-rule',
+            ...entry,
+            contributionSchema: {},
+            contributionKind: 'module-export',
+          },
+        ]),
+      );
+      expect(loadToolManifest('installed', testDir)).toBeUndefined();
+    }
+  });
 });
 
 describe('registerCapabilityDomainsFromManifest — MARKER_KINDS stays a bootstrap default', () => {
