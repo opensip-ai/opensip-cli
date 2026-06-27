@@ -36,6 +36,14 @@ export interface EgressResult {
   readonly outcome: 'ok' | 'partial' | 'failed';
   /** Saw a 401/403 — caller should bust any auth/entitlement cache. */
   readonly authRejected: boolean;
+  /**
+   * The auth-rejection status when `authRejected` is true, so callers branch on
+   * a typed value rather than string-sniffing `errors[]`: `401` = the key was
+   * not authenticated (unknown/bad key); `403` = authenticated but lacking the
+   * required permission (e.g. `ingest:write`). Undefined when no auth rejection
+   * occurred.
+   */
+  readonly authStatus?: 401 | 403;
   /** Saw a 429. */
   readonly throttled: boolean;
   /** Stopped early because the overall deadline elapsed. */
@@ -140,6 +148,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   const errors: string[] = [];
   let acceptedChunks = 0;
   let authRejected = false;
+  let authStatus: 401 | 403 | undefined;
   let throttled = false;
   let deadlineExceeded = false;
 
@@ -177,6 +186,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
         if (res.status === 401 || res.status === 403) {
           authRejected = true;
+          authStatus = res.status;
           logger.warn({
             evt: `${evtPrefix}.auth-rejected`,
             module: MODULE_TAG,
@@ -242,6 +252,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     chunkResults,
     outcome,
     authRejected,
+    ...(authStatus === undefined ? {} : { authStatus }),
     throttled,
     deadlineExceeded,
     errors,

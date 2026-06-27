@@ -263,8 +263,18 @@ export async function deliverEnvelope(
   const result = await reportSarif(envelope, opts.reportTo, opts.apiKey, opts.fetchImpl, repoSlug);
   const reportSuccess = result.outcome === 'ok';
   if (!reportSuccess) {
+    // Branch on the typed auth-status discriminator (never string-sniff
+    // `errors[]`): 401 = the key was rejected; 403 = authenticated but missing
+    // the `ingest:write` permission. The hint tells the user whether to fix the
+    // key or upgrade its role — the funnel's incentive to grant ingest:write.
+    let hint = '';
+    if (result.authStatus === 401) {
+      hint = ` — the API key was rejected; check --api-key / your config`;
+    } else if (result.authStatus === 403) {
+      hint = ` — the API key lacks the \`ingest:write\` permission; use an operator/admin key`;
+    }
     process.stderr.write(
-      `opensip: --report-to failed (${opts.reportTo}): ` +
+      `opensip: --report-to failed (${opts.reportTo})${hint}: ` +
         `${result.errors.length > 0 ? result.errors.join('; ') : 'unknown error'}\n`,
     );
   }
