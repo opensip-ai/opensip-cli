@@ -21,6 +21,7 @@ import {
   type CommandResult,
 } from '@opensip-cli/contracts';
 import {
+  SystemError,
   ToolError,
   currentScope,
   type LiveViewContext,
@@ -169,6 +170,16 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
   cmd.action(async (...actionArgs: unknown[]) => {
     const { opts, positionals } = splitActionArgs(actionArgs);
     const optsWithArgs = { ...opts, _args: positionals };
+    let failureReported = false;
+    const actionCtx =
+      ctx.reportFailure === undefined
+        ? ctx
+        : (Object.assign(Object.create(ctx), {
+            reportFailure: async (detail: ReportFailureDetail) => {
+              failureReported = true;
+              await ctx.reportFailure?.(detail);
+            },
+          }) as TCtx);
     // Lifecycle diagnostics (§5.10): bracket the handler with `execute` events so
     // every CommandOutcome carries a record that this command ran. Scope-bound via
     // the pre-action hook's enterScope; a no-op when no scope is present (tests).
@@ -192,13 +203,16 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
         diagnostics?.event('execute', 'debug', `command '${spec.name}' dispatched out-of-process`);
         return;
       }
-      const result = await spec.handler(optsWithArgs, ctx);
+      const result = await spec.handler(optsWithArgs, actionCtx);
       diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
       // Static-path completion: if the handler returned a ToolRunCompletion with
       // a session contribution, the host freezes the lifecycle and persists it.
       // A plain CommandResult (no session) is a no-op — there is no tool-side
       // generic-session writer. The live-view path persists after renderLive.
       ctx.completeRun?.(result);
+      if (failureReported && result === undefined) {
+        return;
+      }
       await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
     } catch (error) {
       if (error instanceof ToolError) {
@@ -254,6 +268,12 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
   const jsonRequested = opts.json === true;
   switch (spec.output) {
     case 'command-result': {
+      if (result === undefined) {
+        throw new SystemError(
+          `mountCommandSpec: command '${spec.name}' declares output 'command-result' but its handler returned undefined. Return a CommandResult, throw a ToolError, or call reportFailure and return.`,
+          { code: 'SYSTEM.COMMAND_RESULT.UNDEFINED' },
+        );
+      }
       await emitCommandResult(result as CommandResult, {
         render: (r) => ctx.render(r),
         jsonRequested,

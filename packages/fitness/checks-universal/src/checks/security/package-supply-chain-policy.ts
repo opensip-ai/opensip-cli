@@ -519,12 +519,15 @@ function isMutableInstallLine(line: string): boolean {
   );
 }
 
+const WORKFLOW_STEP_START_RE =
+  /^\s*-\s+(?:name|run|uses|id|if|env|with|shell|working-directory|continue-on-error|timeout-minutes):/;
+
 function splitWorkflowSteps(content: string): string[] {
   const lines = content.split('\n');
   const steps: string[] = [];
   let current: string[] = [];
   for (const line of lines) {
-    if (/^\s*-\s+name:/.test(line) && current.length > 0) {
+    if (WORKFLOW_STEP_START_RE.test(line) && current.length > 0) {
       steps.push(current.join('\n'));
       current = [line];
       continue;

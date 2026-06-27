@@ -32,6 +32,7 @@ export function writeArtifactAtomically(
   const lockPath = `${targetPath}.artifact.lock`;
   const tempPath = join(dir, `.${generateUUID()}.tmp`);
 
+  mkdirSync(dir, { recursive: true });
   withFileLock(
     lockPath,
     {
@@ -44,7 +45,6 @@ export function writeArtifactAtomically(
       onEvent: createStateLockEventBridge(ctx.logger),
     },
     () => {
-      mkdirSync(dir, { recursive: true });
       try {
         const fd = openSync(tempPath, 'w');
         try {

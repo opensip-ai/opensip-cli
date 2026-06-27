@@ -216,7 +216,7 @@ async function registerDiscoveredInstalledPackage(
     readonly registry: ToolRegistry;
     readonly builtInIds: ReadonlySet<string>;
     readonly env: NodeJS.ProcessEnv;
-    readonly registeredStableIds: ReadonlySet<string>;
+    readonly registeredStableIds: Set<string>;
     readonly provenance: ToolProvenance[];
     readonly manifests: ToolPluginManifest[];
     readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
@@ -264,6 +264,7 @@ async function registerDiscoveredInstalledPackage(
   assertManifestMatchesTool(admission.manifest, load.tool);
 
   args.registry.register(load.tool, { sourcePackage: pkg.name });
+  args.registeredStableIds.add(load.tool.metadata.id);
   args.provenance.push(admission.provenance);
   args.manifests.push(admission.manifest);
 }
@@ -278,7 +279,7 @@ function registerSyntheticExternalTool(
   args: {
     readonly registry: ToolRegistry;
     readonly builtInIds: ReadonlySet<string>;
-    readonly registeredStableIds: ReadonlySet<string>;
+    readonly registeredStableIds: Set<string>;
     readonly provenance: ToolProvenance[];
     readonly manifests: ToolPluginManifest[];
   },
@@ -289,6 +290,7 @@ function registerSyntheticExternalTool(
   if (args.builtInIds.has(tool.metadata.name ?? tool.metadata.id)) return;
   if (args.registeredStableIds.has(tool.metadata.id)) return;
   args.registry.register(tool, opts?.sourcePackage === undefined ? undefined : opts);
+  args.registeredStableIds.add(tool.metadata.id);
   args.provenance.push(admission.provenance);
   args.manifests.push(admission.manifest);
 }

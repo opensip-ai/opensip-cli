@@ -206,6 +206,14 @@ export const tool = {
           });
           return;
         }
+        if (mode === 'report-failure-large') {
+          await cli.reportFailure({
+            message: 'x'.repeat(1024 * 1024 + 1),
+            exitCode: 3,
+            code: 'FIXTURE.FAIL',
+          });
+          return;
+        }
         if (mode === 'fp') {
           // ADR-0054 M4-F: apply the tool's OWN fingerprintStrategy to the signal
           // (exactly what buildSignalEnvelope does at construction time) — this

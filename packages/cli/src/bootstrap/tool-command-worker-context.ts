@@ -196,7 +196,9 @@ export function buildWorkerContext(
     },
     reportFailure: (detail: ReportFailureDetail) => {
       const resolved = resolveReportFailure(detail);
-      acc.reportedFailure = toReportedFailureWire(resolved);
+      const wire = toReportedFailureWire(resolved);
+      cap('reportedFailure', wire);
+      acc.reportedFailure = wire;
       return Promise.resolve();
     },
     setExitCode: (code: number) => {

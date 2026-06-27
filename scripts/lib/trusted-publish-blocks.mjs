@@ -3,12 +3,15 @@
  * reusable package-supply-chain-policy fitness check.
  */
 
+const STEP_START_RE =
+  /^\s*-\s+(?:name|run|uses|id|if|env|with|shell|working-directory|continue-on-error|timeout-minutes):/;
+
 export function splitWorkflowSteps(content) {
   const lines = content.split('\n');
   const steps = [];
   let current = [];
   for (const line of lines) {
-    if (/^\s*-\s+name:/.test(line) && current.length > 0) {
+    if (STEP_START_RE.test(line) && current.length > 0) {
       steps.push(current.join('\n'));
       current = [line];
       continue;

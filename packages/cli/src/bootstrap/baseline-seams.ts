@@ -58,11 +58,12 @@ function missingBaseline(tool: string): ConfigurationError {
 function requireStampedEntries(
   tool: string,
   signals: readonly Signal[],
+  operation: 'saveBaseline' | 'compareBaseline',
 ): { fingerprint: string; payload: Signal }[] {
   return signals.map((s) => {
     if (!s.fingerprint) {
       throw new ConfigurationError(
-        `saveBaseline(${tool}): signal ${s.ruleId} is not fingerprint-stamped. The tool must ` +
+        `${operation}(${tool}): signal ${s.ruleId} is not fingerprint-stamped. The tool must ` +
           `stamp its signals (stampFingerprints) before the seam — the plane never fingerprints.`,
         { code: 'CONFIGURATION.GATE.UNSTAMPED_SIGNAL' },
       );
@@ -71,12 +72,16 @@ function requireStampedEntries(
   });
 }
 
-function requireEnvelopeBaselineIdentity(tool: string, envelope: SignalEnvelope) {
+function requireEnvelopeBaselineIdentity(
+  tool: string,
+  envelope: SignalEnvelope,
+  operation: 'saveBaseline' | 'compareBaseline',
+) {
   const id = envelope.baselineIdentity?.fingerprintStrategyId;
   const version = envelope.baselineIdentity?.fingerprintStrategyVersion;
   if (!id || !Number.isInteger(version) || version < 1) {
     throw new ConfigurationError(
-      `saveBaseline(${tool}): envelope is missing baseline identity metadata. ` +
+      `${operation}(${tool}): envelope is missing baseline identity metadata. ` +
         `Build the envelope with buildSignalEnvelope so strategy id/version are stamped.`,
       { code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISSING' },
     );
@@ -124,8 +129,8 @@ export function buildBaselineSeams(deps: {
     // contract; a sync throw still rejects for an `await`ing caller.
     saveBaseline: (tool, envelope) => {
       const env = envelope as SignalEnvelope;
-      const identity = requireEnvelopeBaselineIdentity(tool, env);
-      const entries = requireStampedEntries(tool, env.signals);
+      const identity = requireEnvelopeBaselineIdentity(tool, env, 'saveBaseline');
+      const entries = requireStampedEntries(tool, env.signals, 'saveBaseline');
       const metadata = toBaselineIdentityMetadata(identity);
       repoFor().save(tool, entries, metadata);
       logger.info({
@@ -153,25 +158,24 @@ export function buildBaselineSeams(deps: {
       const repo = repoFor();
       if (!repo.exists(tool)) return Promise.reject(missingBaseline(tool));
       const env = envelope as SignalEnvelope;
+      const identity = requireEnvelopeBaselineIdentity(tool, env, 'compareBaseline');
+      requireStampedEntries(tool, env.signals, 'compareBaseline');
       const stored = repo.loadMeta(tool);
-      if (!isBaselineIdentityCompatible(env.baselineIdentity, stored)) {
+      if (!isBaselineIdentityCompatible(identity, stored)) {
         logger.warn({
           evt: 'state.baseline.identity.mismatch',
           module: 'cli:baseline-seams',
           tool,
           storedStrategyId: stored?.fingerprintStrategyId,
           storedStrategyVersion: stored?.fingerprintStrategyVersion,
-          currentStrategyId: env.baselineIdentity.fingerprintStrategyId,
-          currentStrategyVersion: env.baselineIdentity.fingerprintStrategyVersion,
+          currentStrategyId: identity.fingerprintStrategyId,
+          currentStrategyVersion: identity.fingerprintStrategyVersion,
         });
         emitIdentityMismatchDiagnostic(tool, env, stored);
         return Promise.reject(
-          new ConfigurationError(
-            formatBaselineIdentityMismatch(tool, env.baselineIdentity, stored),
-            {
-              code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISMATCH',
-            },
-          ),
+          new ConfigurationError(formatBaselineIdentityMismatch(tool, identity, stored), {
+            code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISMATCH',
+          }),
         );
       }
       return Promise.resolve(diffBaseline(env.signals, repo.load(tool)));

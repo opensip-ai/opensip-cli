@@ -214,6 +214,32 @@ function toResult(
   };
 }
 
+function hasExplicitFinalResult(acc: ResultAccumulator): boolean {
+  return (
+    acc.render !== undefined ||
+    acc.envelope !== undefined ||
+    acc.json !== undefined ||
+    acc.raw !== undefined ||
+    acc.error !== undefined ||
+    acc.reportedFailure !== undefined ||
+    acc.exitCode !== undefined
+  );
+}
+
+function assertReturnValuedHandlerResult(
+  commandSpec: CommandSpec<unknown, ToolCliContext>,
+  acc: ResultAccumulator,
+  returned: unknown,
+): void {
+  if (!isReturnValuedOutput(commandSpec.output) || returned !== undefined) return;
+  if (hasExplicitFinalResult(acc)) return;
+  const err = new Error(
+    `tool command worker: command '${commandSpec.name}' declares output '${commandSpec.output}' but its handler returned undefined. Return a value, throw, or call reportFailure.`,
+  );
+  (err as Error & { failureClass: ToolCommandFailureClass }).failureClass = 'tool-handler-throw';
+  throw err;
+}
+
 /** Map a thrown error to its structured failure class for the IPC `error` message. */
 function classifyThrow(error: unknown): ToolCommandFailureClass {
   if (error instanceof UnsupportedSeamError) return error.failureClass;
@@ -296,6 +322,7 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
       { ...spec.opts, _args: spec.positionals },
       ctx,
     )) as MaybeCompletion | void;
+    assertReturnValuedHandlerResult(commandSpec, acc, returned);
     return {
       kind: 'result',
       value: toResult(commandSpec.output, acc, returned?.session, returned),

@@ -80,9 +80,10 @@ function normalizeIdentity(raw: unknown): ToolIdentity | undefined {
   }
 }
 
-/** Narrow to an optional non-empty string: absent, or a non-empty string. */
-function isAbsentOrNonEmptyString(value: unknown): value is string | undefined {
-  return value === undefined || isNonEmptyString(value);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isAbsentOrUuidString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === 'string' && UUID_RE.test(value));
 }
 
 function validateOptionalCapabilities(
@@ -143,7 +144,7 @@ export function validateManifest(
   const apiVersion = block.apiVersion;
   if (apiVersion !== undefined && typeof apiVersion !== 'number') return undefined;
 
-  if (!isAbsentOrNonEmptyString(block.stableId)) return undefined;
+  if (!isAbsentOrUuidString(block.stableId)) return undefined;
   const stableId = block.stableId;
 
   const capabilities = validateOptionalCapabilities(block.capabilities);

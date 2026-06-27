@@ -524,6 +524,45 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
     expect(registry.get('fixture-valid')).toBeDefined();
   });
 
+  it('deduplicates discovered tools by stable UUID across the same discovery pass', async () => {
+    const stableId = '00000000-0000-4000-8000-00000000d00d';
+    for (const id of ['fixture-dup-a', 'fixture-dup-b']) {
+      staged.push(
+        stageFixture(id, {
+          packageJson: {
+            name: `@opensip-cli-fixture/${id}`,
+            version: '0.0.0',
+            type: 'module',
+            main: './index.js',
+            opensipTools: {
+              kind: 'tool',
+              id,
+              stableId,
+              apiVersion: 1,
+              commands: [{ name: id, description: `${id} command` }],
+            },
+          },
+          indexJs: "throw new Error('host discovery must synthesize from manifest');",
+        }),
+      );
+    }
+
+    const registry = new ToolRegistryClass();
+    const provenance: ToolProvenance[] = [];
+    const manifests: ToolPluginManifest[] = [];
+    await discoverAndRegisterToolPackages(
+      registry,
+      WALK_UP_SOURCES,
+      BUILTIN_IDS,
+      provenance,
+      manifests,
+    );
+
+    expect(registry.list().filter((tool) => tool.metadata.id === stableId)).toHaveLength(1);
+    expect(provenance.filter((record) => record.stableId === stableId)).toHaveLength(1);
+    expect(manifests.filter((manifest) => manifest.stableId === stableId)).toHaveLength(1);
+  });
+
   it('skips a stale bundled installed copy without user-facing stderr (ADR-0060 Phase 1)', async () => {
     staged.push(
       stageFixture('stale-bundled-fitness', {

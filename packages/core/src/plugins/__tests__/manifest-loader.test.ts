@@ -291,6 +291,22 @@ describe('loadToolManifest', () => {
     expect(loadToolManifest('bundled', testDir)).toBeUndefined();
   });
 
+  it('returns undefined when stableId is not a UUID', () => {
+    writePackageManifest(testDir, {
+      name: 'x',
+      version: '1.0.0',
+      opensipTools: {
+        kind: 'tool',
+        id: 'x',
+        identity: { name: 'x' },
+        stableId: 'x',
+        apiVersion: 1,
+        commands: [],
+      },
+    });
+    expect(loadToolManifest('bundled', testDir)).toBeUndefined();
+  });
+
   it('returns undefined when identity is missing', () => {
     writePackageManifest(testDir, {
       name: 'x',

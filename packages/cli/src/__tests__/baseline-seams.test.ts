@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal, type Signal } from '@opensip-cli/core';
+import { ConfigurationError, createSignal, type Signal } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -86,6 +86,27 @@ describe('saveBaseline / compareBaseline guards', () => {
       mismatched as { baselineIdentity: { fingerprintStrategyVersion: number } }
     ).baselineIdentity.fingerprintStrategyVersion = 99;
     await expect(seams.compareBaseline('graph', mismatched)).rejects.toThrow(/--gate-save/i);
+  });
+
+  it('compareBaseline rejects envelopes missing baseline identity with a typed error', async () => {
+    await seams.saveBaseline('graph', envelopeOf([stampedSignal('a|x|1|0')]));
+    const current = envelopeOf([stampedSignal('a|x|1|0')]) as Partial<SignalEnvelope>;
+    delete current.baselineIdentity;
+
+    expect(() => seams.compareBaseline('graph', current)).toThrow(ConfigurationError);
+    expect(() => seams.compareBaseline('graph', current)).toThrow(/compareBaseline\(graph\)/);
+  });
+
+  it('compareBaseline rejects unstamped current signals with a typed error', async () => {
+    await seams.saveBaseline('graph', envelopeOf([stampedSignal('a|x|1|0')]));
+    const unstamped = createSignal({ source: 's', severity: 'high', ruleId: 'r', message: 'm' });
+
+    expect(() => seams.compareBaseline('graph', envelopeOf([unstamped]))).toThrow(
+      ConfigurationError,
+    );
+    expect(() => seams.compareBaseline('graph', envelopeOf([unstamped]))).toThrow(
+      /compareBaseline\(graph\).*not fingerprint-stamped/,
+    );
   });
 });
 

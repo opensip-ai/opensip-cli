@@ -34,16 +34,19 @@ export function writeTemplateFiles(input: WriteTemplateFilesInput): WriteTemplat
     };
   }
 
-  const written: string[] = [];
-
   for (const file of input.files) {
     if (!isSafeRelativePath(input.toolDir, file.relativePath)) {
       return {
         success: false,
-        files: written,
+        files: [],
         error: `unsafe template path rejected: ${file.relativePath}`,
       };
     }
+  }
+
+  const written: string[] = [];
+
+  for (const file of input.files) {
     const absolutePath = join(input.toolDir, file.relativePath);
     mkdirSync(join(absolutePath, '..'), { recursive: true });
     writeFileSync(absolutePath, file.content, 'utf8');

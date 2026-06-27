@@ -169,4 +169,21 @@ describe('writeTemplateFiles', () => {
     expect(existsSync(join(toolDir, 'src', 'index.ts'))).toBe(false);
     expect(existsSync(join(toolDir, 'index.mjs'))).toBe(true);
   });
+
+  it('validates every rendered path before writing any scaffold file', () => {
+    tmp = mkdtempSync(join(tmpdir(), 'ost-tools-write-'));
+    const toolDir = join(tmp, 'tool-dir');
+
+    const result = writeTemplateFiles({
+      toolDir,
+      files: [
+        { relativePath: 'safe.txt', content: 'safe' },
+        { relativePath: '../escape.txt', content: 'nope' },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.files).toEqual([]);
+    expect(existsSync(join(toolDir, 'safe.txt'))).toBe(false);
+  });
 });

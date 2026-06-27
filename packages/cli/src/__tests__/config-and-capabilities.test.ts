@@ -293,6 +293,17 @@ describe('composeAndValidateToolConfig', () => {
     ).toThrow(ConfigurationError);
   });
 
+  it('throws ConfigurationError when a config file has a non-object root', () => {
+    const configPath = writeConfig('- fitness\n- graph\n');
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: registryWith([graphTool, fitnessTool]),
+        configPath,
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
   it('accepts reserved gate keys on any tool namespace and resolves them into tool config', () => {
     const configPath = writeConfig(
       [

@@ -78,6 +78,20 @@ describe('executeConfigValidate', () => {
     ).toThrow(ConfigurationError);
   });
 
+  it('throws ConfigurationError for a non-object config document root', async () => {
+    writeFileSync(join(dir, 'opensip-cli.config.yml'), '- fitness\n- graph\n', 'utf8');
+    const { tools, manifests, provenance } = await makeRegistry();
+    expect(() =>
+      executeConfigValidate({
+        tools,
+        manifests,
+        provenance,
+        configPath: join(dir, 'opensip-cli.config.yml'),
+        cwd: dir,
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
   it('passes through an unclaimed top-level namespace with a warning', async () => {
     writeFileSync(
       join(dir, 'opensip-cli.config.yml'),

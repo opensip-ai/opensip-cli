@@ -126,12 +126,11 @@ export function composeAndValidateToolConfig(args: {
   // paths elsewhere still use the non-throwing reader).
   const raw: unknown =
     configPath === undefined ? {} : readYamlFileOrThrow(configPath, { loader: 'project-config' });
-  const document = isPlainRecord(raw) ? raw : {};
 
   const schema = composeConfigSchema(declarations);
   // STRICT gate: a typo in any tool namespace throws ConfigurationError here,
   // before dispatch. The CLI error boundary maps it to CONFIGURATION_ERROR.
-  const validated = validateConfigDocument(schema, document);
+  const validated = validateConfigDocument(schema, raw);
 
   // ADR-0043: the composer TOLERATES unclaimed top-level namespaces (the
   // uninstalled-tool forward-compat contract) — but never silently. Two cases:

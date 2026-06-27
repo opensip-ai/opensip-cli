@@ -79,7 +79,11 @@ function runInScope(
 ): ReturnType<typeof runToolCommandWorker> {
   const tools = new ToolRegistry();
   if (registerTool) tools.register(tool);
-  const scope = new RunScope({ tools, languages: new LanguageRegistry(), runId: 'unit-run' });
+  const scope = new RunScope({
+    tools,
+    languages: new LanguageRegistry(),
+    runId: 'unit-run',
+  });
   return runWithScope(scope, () => runToolCommandWorker(specPath));
 }
 
@@ -102,10 +106,35 @@ describe('runToolCommandWorker', () => {
     expect(msg.kind).toBe('result');
     if (msg.kind !== 'result') throw new Error('expected result');
     expect(msg.value.output).toBe('signal-envelope');
-    const env = msg.value.envelope as { tool: string; signals: { echoedOpt: string }[] };
+    const env = msg.value.envelope as {
+      tool: string;
+      signals: { echoedOpt: string }[];
+    };
     expect(env.tool).toBe('external-dispatch-tool');
     expect(env.signals[0]?.echoedOpt).toBe('x');
     expect(msg.value.exitCode).toBe(0);
+  });
+
+  it('fails loud when a return-valued command returns undefined without an explicit seam', async () => {
+    const tool = {
+      metadata: { ...fixtureTool.metadata },
+      commandSpecs: [
+        {
+          name: 'void-result',
+          description: 'invalid command-result handler',
+          commonFlags: [],
+          scope: 'project',
+          output: 'command-result',
+          handler: () => undefined,
+        },
+      ],
+    } as Tool;
+
+    const msg = await runInScope(writeSpec(specFor({ commandName: 'void-result' })), { tool });
+    expect(msg.kind).toBe('error');
+    if (msg.kind !== 'error') throw new Error('expected error');
+    expect(msg.failureClass).toBe('tool-handler-throw');
+    expect(msg.message).toContain('handler returned undefined');
   });
 
   it('returns a bad-spec error for an unreadable spec file', async () => {
@@ -224,13 +253,27 @@ describe('runToolCommandWorker', () => {
   });
 
   it('M4-F hook mode: runs sessionReplay against the stored row and returns the replay as hookResult', async () => {
-    const stored = { id: 'sess-42', tool: 'external-dispatch-tool', score: 7, passed: true };
+    const stored = {
+      id: 'sess-42',
+      tool: 'external-dispatch-tool',
+      score: 7,
+      passed: true,
+    };
     const msg = await runInScope(
-      writeSpec(specFor({ commandName: undefined, hook: 'sessionReplay', hookArg: stored })),
+      writeSpec(
+        specFor({
+          commandName: undefined,
+          hook: 'sessionReplay',
+          hookArg: stored,
+        }),
+      ),
     );
     expect(msg.kind).toBe('result');
     if (msg.kind !== 'result') throw new Error('expected result');
-    const r = msg.value.hookResult as { fidelity: string; envelope: { runId: string } };
+    const r = msg.value.hookResult as {
+      fidelity: string;
+      envelope: { runId: string };
+    };
     expect(r.fidelity).toBe('projection');
     expect(r.envelope.runId).toBe('sess-42');
   });
@@ -249,5 +292,23 @@ describe('runToolCommandWorker', () => {
     const env = msg.value.envelope as { signals: { initialized?: boolean }[] };
     // initialize ran (worker-side) before this handler, setting the sentinel.
     expect(env.signals[0]?.initialized).toBe(true);
+  });
+
+  it('caps reportFailure payloads like other worker final-result seams', async () => {
+    const previous = process.env.OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES;
+    process.env.OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES = '128';
+    try {
+      const msg = await runInScope(writeSpec(specFor({ opts: { mode: 'report-failure-large' } })));
+      expect(msg.kind).toBe('error');
+      if (msg.kind !== 'error') throw new Error('expected error');
+      expect(msg.failureClass).toBe('payload_too_large');
+      expect(msg.message).toContain('reportedFailure output exceeds cap');
+    } finally {
+      if (previous === undefined) {
+        delete process.env.OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES;
+      } else {
+        process.env.OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES = previous;
+      }
+    }
   });
 });

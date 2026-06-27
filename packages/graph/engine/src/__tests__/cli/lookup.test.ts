@@ -4,7 +4,7 @@
  * granularity.
  */
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { ConfigurationError } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
@@ -78,21 +78,21 @@ afterEach(() => {
 });
 
 describe('graph lookup', () => {
-  it('renders occurrences for a name found in the catalog through the seam', async () => {
+  it('renders occurrences for a name found in the catalog through the seam', () => {
     new CatalogRepo(datastore).replaceAll(
       makeCatalog([occ({ bodyHash: 'a1', simpleName: 'saveBaseline' })]),
     );
     const cli = mockCli(datastore);
-    const result = await executeLookup({ name: 'saveBaseline' }, cli.cli);
+    const result = executeLookup({ name: 'saveBaseline' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
     expect(result).toMatchObject({ type: 'graph-status' });
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
-  it('returns a graph-lookup result when --json is set (no direct stdout)', async () => {
+  it('returns a graph-lookup result when --json is set (no direct stdout)', () => {
     new CatalogRepo(datastore).replaceAll(makeCatalog([occ({ bodyHash: 'a1', simpleName: 'fn' })]));
     const cli = mockCli(datastore);
-    const result = await executeLookup({ name: 'fn', json: true }, cli.cli);
+    const result = executeLookup({ name: 'fn', json: true }, cli.cli);
     expect(result).toMatchObject({
       type: 'graph-lookup',
       name: 'fn',
@@ -103,10 +103,10 @@ describe('graph lookup', () => {
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
-  it('exits SUCCESS with a "not found" message when the name has no occurrences', async () => {
+  it('exits SUCCESS with a "not found" message when the name has no occurrences', () => {
     new CatalogRepo(datastore).replaceAll(makeCatalog([]));
     const cli = mockCli(datastore);
-    const result = await executeLookup({ name: 'missing' }, cli.cli);
+    const result = executeLookup({ name: 'missing' }, cli.cli);
     expect(cli.setExitCode).toHaveBeenCalledWith(0);
     expect(result).toMatchObject({ type: 'graph-status' });
     expect((result as { lines: readonly string[] }).lines.join('\n')).toContain(
@@ -114,20 +114,18 @@ describe('graph lookup', () => {
     );
   });
 
-  it('routes missing catalog through reportFailure with CONFIGURATION_ERROR', async () => {
+  it('throws a typed configuration error when the catalog is missing', () => {
     const cli = mockCli(datastore);
-    const result = await executeLookup({ name: 'anything' }, cli.cli);
-    expect(result).toBeUndefined();
-    expect(cli.reportFailure).toHaveBeenCalled();
-    expect(cli.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(() => executeLookup({ name: 'anything' }, cli.cli)).toThrow(ConfigurationError);
+    expect(cli.reportFailure).not.toHaveBeenCalled();
+    expect(cli.setExitCode).not.toHaveBeenCalled();
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('routes missing DataStore through reportFailure with CONFIGURATION_ERROR', async () => {
+  it('throws a typed configuration error when the DataStore is missing', () => {
     const cli = mockCli(undefined);
-    const result = await executeLookup({ name: 'fn' }, cli.cli);
-    expect(result).toBeUndefined();
-    expect(cli.reportFailure).toHaveBeenCalled();
-    expect(cli.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(() => executeLookup({ name: 'fn' }, cli.cli)).toThrow(ConfigurationError);
+    expect(cli.reportFailure).not.toHaveBeenCalled();
+    expect(cli.setExitCode).not.toHaveBeenCalled();
   });
 });

@@ -12,11 +12,10 @@
  */
 
 import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
-import { ConfigurationError, createToolLogger } from '@opensip-cli/core';
+import { ConfigurationError, SystemError, ToolError, createToolLogger } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
-import { handleGraphError } from './graph.js';
 import { buildLookupResult } from './lookup-result.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
@@ -30,33 +29,18 @@ export interface LookupCommandOptions {
   readonly json?: boolean;
 }
 
-export async function executeLookup(
-  opts: LookupCommandOptions,
-  cli: ToolCliContext,
-): Promise<CommandResult | undefined> {
+export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): CommandResult {
   log.info({ evt: 'graph.cli.lookup.start', name: opts.name });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
     if (!datastore) {
-      await handleGraphError(
-        'lookup',
-        new ConfigurationError('graph lookup requires a DataStore on ToolCliContext.'),
-        cli,
-        opts.json === true,
-      );
-      return undefined;
+      throw new ConfigurationError('lookup: graph lookup requires a DataStore on ToolCliContext.');
     }
     const catalog = new CatalogRepo(datastore).loadFullCatalog();
     if (!catalog) {
-      await handleGraphError(
-        'lookup',
-        new ConfigurationError(
-          'No graph catalog found. Run `opensip graph` first to build the catalog.',
-        ),
-        cli,
-        opts.json === true,
+      throw new ConfigurationError(
+        'lookup: No graph catalog found. Run `opensip graph` first to build the catalog.',
       );
-      return undefined;
     }
     const matches = collectMatches(catalog, opts.name);
     const resolutionMode = catalog.resolutionMode ?? 'exact';
@@ -77,8 +61,10 @@ export async function executeLookup(
       evt: 'graph.cli.lookup.error',
       err: error instanceof Error ? error.message : String(error),
     });
-    await handleGraphError('lookup', error, cli, opts.json === true);
-    return undefined;
+    if (error instanceof ToolError) throw error;
+    throw new SystemError(`lookup: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
   }
 }
 

@@ -20,6 +20,7 @@ function writeFixture(cwd: string, relPath: string, content: string): string {
 
 async function runPolicy(cwd: string) {
   return packageSupplyChainPolicy.run(cwd, {
+    fileCache,
     targetFiles: [join(cwd, 'package.json')],
   });
 }
@@ -295,6 +296,61 @@ describe('package-supply-chain-policy', () => {
           '      id-token: write',
           '    steps:',
           '      - run: pnpm install --frozen-lockfile',
+          '      - run: npm publish dist/app-1.0.0.tgz --access public',
+          '        env:',
+          '          NPM_CONFIG_PROVENANCE: true',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).not.toContain('publish-provenance-missing');
+      expect(types).not.toContain('publish-token-exposure');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let provenance env on a previous step bless a publish step', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'env-provenance-wrong-step-app',
+            private: true,
+            packageManager: 'pnpm@11.5.1+sha512.abc123',
+          },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      writeFixture(
+        cwd,
+        '.github/workflows/release.yml',
+        [
+          'name: Release',
+          'jobs:',
+          '  publish:',
+          '    permissions:',
+          '      id-token: write',
+          '    steps:',
+          '      - run: pnpm install --frozen-lockfile',
           '        env:',
           '          NPM_CONFIG_PROVENANCE: true',
           '      - run: npm publish dist/app-1.0.0.tgz --access public',
@@ -303,8 +359,7 @@ describe('package-supply-chain-policy', () => {
 
       const result = await runPolicy(cwd);
       const types = result.signals.map((signal) => signal.metadata.type);
-      expect(types).not.toContain('publish-provenance-missing');
-      expect(types).not.toContain('publish-token-exposure');
+      expect(types).toContain('publish-provenance-missing');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

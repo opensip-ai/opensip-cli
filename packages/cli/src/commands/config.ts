@@ -15,7 +15,6 @@ import {
 import {
   ConfigurationError,
   currentScope,
-  isPlainRecord,
   readYamlFileOrThrow,
   type ToolPluginManifest,
   type ToolProvenance,
@@ -57,8 +56,7 @@ function configLogger(): {
 
 function readConfigDocument(configPath: string | undefined): unknown {
   if (configPath === undefined) return {};
-  const raw = readYamlFileOrThrow(configPath, { loader: 'project-config' });
-  return isPlainRecord(raw) ? raw : {};
+  return readYamlFileOrThrow(configPath, { loader: 'project-config' });
 }
 
 function namespaceNames(declarations: readonly ToolConfigDeclaration[]): readonly string[] {

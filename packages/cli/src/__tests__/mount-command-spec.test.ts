@@ -458,6 +458,55 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     });
   });
 
+  it('treats reportFailure plus an undefined return as terminal output', async () => {
+    const { ctx, rendered, exitCodes } = makeCtx();
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'handled-failure',
+      description: 'reports and returns',
+      commonFlags: ['json'],
+      scope: 'none',
+      output: 'command-result',
+      handler: async (_opts, cli) => {
+        await cli.reportFailure({
+          message: 'handled failure',
+          exitCode: 3,
+          jsonRequested: false,
+        });
+      },
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['handled-failure'], { from: 'user' });
+    expect(ctx.reportFailure).toHaveBeenCalledTimes(1);
+    expect(exitCodes).toEqual([3]);
+    expect(rendered).toEqual([]);
+  });
+
+  it('reports command-result handlers that return undefined without an explicit failure', async () => {
+    const { ctx, rendered, exitCodes } = makeCtx();
+    const program = new Command();
+    const spec: HostCommandSpec = defineCommand({
+      name: 'undefined-result',
+      description: 'returns undefined',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => undefined as never,
+    });
+    mountCommandSpec(program, spec, ctx);
+
+    await program.parseAsync(['undefined-result'], { from: 'user' });
+    expect(ctx.reportFailure).toHaveBeenCalledWith({
+      error: expect.objectContaining({
+        code: 'SYSTEM.COMMAND_RESULT.UNDEFINED',
+      }),
+      jsonRequested: false,
+    });
+    expect(exitCodes).toEqual([1]);
+    expect(rendered).toEqual([]);
+  });
+
   it('re-throws a non-ToolError so the top-level boundary handles it', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
