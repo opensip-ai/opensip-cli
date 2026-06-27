@@ -27,15 +27,15 @@ plugins.
 
 ## Extension taxonomy (author view)
 
-| Extension | Discovery | Trust | Validation |
-|-----------|-----------|-------|------------|
-| Bundled whole tools | Shipped manifests | Trusted | Startup admission |
-| Installed whole tools | `node_modules` marker | Allowlist opt-in | `tools validate` / install |
-| Project-local tools | `opensip-cli/tools/<id>/` sidecar | Deny-by-default | `tools validate` + allowlist |
-| User-global tools | `~/.opensip-cli/tools/` | Trusted-by-default | `tools validate` |
-| Fit / sim packs & recipes | `plugins.<domain>` | In-process; epoch metadata | Domain registrars |
-| Graph adapters & recipes | `plugins.graph` | In-process; epoch metadata | Domain registrars |
-| Loose project files | Plugin dirs | Executable when loaded | Domain-specific |
+| Extension | Discovery | Trust | Load boundary | Validation |
+|-----------|-----------|-------|---------------|------------|
+| Bundled whole tools | Shipped manifests | Trusted | In-process (host) | Startup admission |
+| Installed whole tools | `node_modules` marker | Allowlist opt-in | Forked dispatch worker (ADR-0054) | `tools validate` / install |
+| Project-local tools | `opensip-cli/tools/<id>/` sidecar | Deny-by-default | Forked dispatch worker (ADR-0054) | `tools validate` + allowlist |
+| User-global tools | `~/.opensip-cli/tools/` | Trusted-by-default | Forked dispatch worker (ADR-0054) | `tools validate` |
+| Fit / sim packs & recipes | `plugins.<domain>` | In-process; epoch metadata | In-process (host) | Domain registrars |
+| Graph adapters & recipes | `plugins.graph` | In-process; epoch metadata | In-process (host) | Domain registrars |
+| Loose project files | Plugin dirs | Executable when loaded | In-process (host) | Domain-specific |
 
 Authoring on-ramps: `opensip tools create` (`minimal-js`, `ts-local`). See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/),

@@ -146,6 +146,8 @@ export const EXIT_CODES = {
 
 Tools call `cli.setExitCode(code)` instead of mutating `process.exitCode` directly. The CLI mediates the final exit so it can run dashboard launching / cleanup after the Tool is done.
 
+Exit-code classification is owned by typed errors: only `ToolError` subclasses (and Commander/bootstrap errors) choose a non-runtime exit code; an untyped error defaults to `RUNTIME_ERROR` even when a suggestion is attached. See [ADR-0066](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0066-typed-errors-own-exit-codes.md).
+
 Adding a new exit code is a major-version change — see [`10-concepts/04-contract-surfaces.md`](/docs/opensip-cli/10-concepts/04-contract-surfaces/).
 
 ---

@@ -133,6 +133,10 @@ export const scenarios = [defineLoadScenario({
 
 Same shape for `defineChaosScenario` — each pinned to its own kind. See [scenarios and recipes](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/).
 
+## Loose source is current-epoch source, not a portable artifact
+
+Loose project-local `.mjs` files (and authored project-local tools) are **source authored against the CLI and domain epoch you have installed right now** — they are not portable, package-compatible artifacts. They carry no `apiVersion` / `minSupportedApiVersion` / target-domain epoch and so do **not** participate in the bounded-epoch compatibility negotiation that published packs and whole-tool manifests use ([ADR-0074](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md)). The contract is simply: they run against the current CLI. If you upgrade the CLI across a domain epoch and a loose file stops loading, re-author it against the new epoch (or graduate it to a versioned pack). Do not copy a loose file between projects on different CLI versions and expect epoch checks to protect you — there are none.
+
 ## When to graduate
 
 The `.mjs` shape works fine through ~10-15 checks. Past that you'll want types, shared helpers, colocated tests, and a way to publish. That's when you graduate to a publishable workspace pack — see [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/).
