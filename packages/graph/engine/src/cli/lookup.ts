@@ -29,6 +29,16 @@ export interface LookupCommandOptions {
   readonly json?: boolean;
 }
 
+/**
+ * Run `graph lookup <name>` and return a {@link CommandResult}: a
+ * `command-result` lookup payload when `opts.json` is set, otherwise a
+ * `graph-status` human view. The host stamps the outcome and exit code.
+ *
+ * @throws {ConfigurationError} when no DataStore is bound to the context, or no
+ *   graph catalog has been built yet (run `opensip graph` first).
+ * @throws {SystemError} when an unexpected (non-`ToolError`) failure occurs
+ *   while loading or querying the catalog.
+ */
 export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): CommandResult {
   log.info({ evt: 'graph.cli.lookup.start', name: opts.name });
   try {

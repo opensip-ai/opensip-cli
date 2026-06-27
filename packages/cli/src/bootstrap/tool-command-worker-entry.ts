@@ -44,7 +44,6 @@ import {
   type CommandSpec,
   type ToolCliContext,
   type Tool,
-  type ToolSessionContribution,
   type ToolSessionRecord,
   type WorkerMessage,
 } from '@opensip-cli/core';
@@ -57,6 +56,11 @@ import {
   UnsupportedSeamError,
   type ResultAccumulator,
 } from './tool-command-worker-context.js';
+import {
+  assertReturnValuedHandlerResult,
+  toResult,
+  type MaybeCompletion,
+} from './tool-command-worker-result.js';
 import { createWorkerRpcClient } from './tool-command-worker-rpc.js';
 
 import type {
@@ -173,71 +177,6 @@ function readSpec(specPath: string): ToolCommandWorkerSpec | DispatchWorkerMessa
       'bad-spec',
     );
   }
-}
-
-/** The completion shape a run-producing handler returns (the session leg the host persists). */
-interface MaybeCompletion {
-  readonly session?: ToolSessionContribution;
-}
-
-/**
- * The output modes whose PAYLOAD is the handler's RETURN value (routed by the
- * in-process `dispatchOutput`): `command-result` (a `CommandResult`) and
- * `signal-envelope` (a `SignalEnvelope`). For these, the worker must carry the
- * return back UNROUTED in `returned` so the supervisor replays it through the SAME
- * `dispatchOutput`. `raw-stream` / `live-view` produce no routable return payload.
- */
-function isReturnValuedOutput(output: ToolCommandResult['output']): boolean {
-  return output === 'command-result' || output === 'signal-envelope';
-}
-
-/** Drain the accumulator + the handler's return into a serializable result. */
-function toResult(
-  output: ToolCommandResult['output'],
-  acc: ResultAccumulator,
-  session: ToolSessionContribution | undefined,
-  returned: unknown,
-): ToolCommandResult {
-  return {
-    output,
-    ...(acc.render === undefined ? {} : { render: acc.render }),
-    ...(acc.envelope === undefined ? {} : { envelope: acc.envelope }),
-    ...(acc.json === undefined ? {} : { json: acc.json }),
-    ...(acc.raw === undefined ? {} : { raw: acc.raw }),
-    ...(acc.error === undefined ? {} : { error: acc.error }),
-    ...(acc.reportedFailure === undefined ? {} : { reportedFailure: acc.reportedFailure }),
-    ...(acc.exitCode === undefined ? {} : { exitCode: acc.exitCode }),
-    ...(session === undefined ? {} : { session }),
-    // Carry the handler's return for the return-valued modes so the supervisor
-    // routes it via the same `dispatchOutput` the in-process path uses (parity).
-    ...(returned === undefined || !isReturnValuedOutput(output) ? {} : { returned }),
-  };
-}
-
-function hasExplicitFinalResult(acc: ResultAccumulator): boolean {
-  return (
-    acc.render !== undefined ||
-    acc.envelope !== undefined ||
-    acc.json !== undefined ||
-    acc.raw !== undefined ||
-    acc.error !== undefined ||
-    acc.reportedFailure !== undefined ||
-    acc.exitCode !== undefined
-  );
-}
-
-function assertReturnValuedHandlerResult(
-  commandSpec: CommandSpec<unknown, ToolCliContext>,
-  acc: ResultAccumulator,
-  returned: unknown,
-): void {
-  if (!isReturnValuedOutput(commandSpec.output) || returned !== undefined) return;
-  if (hasExplicitFinalResult(acc)) return;
-  const err = new Error(
-    `tool command worker: command '${commandSpec.name}' declares output '${commandSpec.output}' but its handler returned undefined. Return a value, throw, or call reportFailure.`,
-  );
-  (err as Error & { failureClass: ToolCommandFailureClass }).failureClass = 'tool-handler-throw';
-  throw err;
 }
 
 /** Map a thrown error to its structured failure class for the IPC `error` message. */
