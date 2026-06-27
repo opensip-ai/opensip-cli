@@ -117,7 +117,13 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   }
 
   const headersBase: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (args.apiKey) headersBase['X-API-Key'] = args.apiKey;
+  // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
+  // token only (the api-key strategy matches `Bearer osk_`); the historical
+  // `X-API-Key` header never reached a route and is removed outright — no
+  // dual-header shim (DEC-587). `apiKey` carries the raw `osk_…` token; do not
+  // strip or transform it. The HTTPS guard above keeps this credential off
+  // plain HTTP.
+  if (args.apiKey) headersBase['Authorization'] = `Bearer ${args.apiKey}`;
 
   const chunkResults: boolean[] = Array.from({ length: chunks.length }, () => false);
   const errors: string[] = [];

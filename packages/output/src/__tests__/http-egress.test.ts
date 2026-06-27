@@ -218,15 +218,30 @@ describe('postChunked', () => {
     expect(r.outcome).toBe('ok');
   });
 
-  it('omits the X-API-Key header when no apiKey is supplied', async () => {
+  it('omits the Authorization header when no apiKey is supplied', async () => {
     let sawAuthHeader = true;
     const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
-      sawAuthHeader = 'X-API-Key' in (init.headers as Record<string, string>);
+      sawAuthHeader = 'Authorization' in (init.headers as Record<string, string>);
       return Promise.resolve(new Response(null, { status: 200 }));
     }) as unknown as typeof fetch;
     const r = await postChunked(args({ fetchImpl, apiKey: undefined }));
     expect(r.outcome).toBe('ok');
     expect(sawAuthHeader).toBe(false);
+  });
+
+  it('sends Authorization: Bearer osk_ (never X-API-Key) when an apiKey is supplied', async () => {
+    let authHeader: string | undefined;
+    let hadLegacyHeader = true;
+    const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
+      const headers = init.headers as Record<string, string>;
+      authHeader = headers['Authorization'];
+      hadLegacyHeader = 'X-API-Key' in headers;
+      return Promise.resolve(new Response(null, { status: 200 }));
+    }) as unknown as typeof fetch;
+    const r = await postChunked(args({ fetchImpl, apiKey: 'osk_testkey1234567890123456789012' }));
+    expect(r.outcome).toBe('ok');
+    expect(authHeader).toBe('Bearer osk_testkey1234567890123456789012');
+    expect(hadLegacyHeader).toBe(false);
   });
 
   it('records a non-Error rejection value as a string', async () => {
