@@ -675,6 +675,22 @@ function checkDependencyAutomation(snapshot: ProjectSnapshot, violations: CheckV
       severity: 'error',
     });
   }
+  // Disabling the npm/GitHub-Actions update surface (or ignoring everything)
+  // silently opts the repo out of dependency hygiene — mirror verify-supply-chain
+  // check 6 so the reusable check enforces the same policy.
+  if (
+    /ignore:\s*\[\s*\*/.test(content) ||
+    /enabled:\s*false[\s\S]*package-ecosystem:\s*npm/i.test(content)
+  ) {
+    pushViolation(violations, {
+      filePath,
+      type: 'dependency-automation-disabled-updates',
+      message: 'Dependency automation disables npm dependency updates',
+      suggestion:
+        'Keep npm dependency updates enabled — avoid `ignore: ["*"]` or `enabled: false` for the npm ecosystem.',
+      severity: 'error',
+    });
+  }
 }
 
 export async function analyzePackageSupplyChainPolicy(

@@ -418,6 +418,99 @@ describe('package-supply-chain-policy', () => {
     }
   });
 
+  it('flags dependency automation that disables npm update surfaces', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          { name: 'deps-app', private: true, packageManager: 'pnpm@11.5.1+sha512.abc123' },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      // `enabled: false` for the npm ecosystem opts the repo out of dependency updates.
+      writeFixture(
+        cwd,
+        '.github/dependabot.yml',
+        [
+          'version: 2',
+          'updates:',
+          '  - enabled: false',
+          '    package-ecosystem: npm',
+          '    directory: /',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types).toContain('dependency-automation-disabled-updates');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('does not flag a clean weekly dependency automation config', async () => {
+    const cwd = makeProject();
+    try {
+      writeFixture(
+        cwd,
+        'package.json',
+        JSON.stringify(
+          { name: 'deps-app', private: true, packageManager: 'pnpm@11.5.1+sha512.abc123' },
+          null,
+          2,
+        ),
+      );
+      writeFixture(cwd, 'pnpm-lock.yaml', ["lockfileVersion: '9.0'", 'packages: {}'].join('\n'));
+      writeFixture(
+        cwd,
+        'pnpm-workspace.yaml',
+        [
+          'packages:',
+          '  - "."',
+          'allowBuilds:',
+          '  esbuild: false',
+          'minimumReleaseAge: 1440',
+          'minimumReleaseAgeStrict: true',
+        ].join('\n'),
+      );
+      writeFixture(
+        cwd,
+        '.github/dependabot.yml',
+        [
+          'version: 2',
+          'updates:',
+          '  - package-ecosystem: npm',
+          '    directory: /',
+          '    schedule:',
+          '      interval: weekly',
+          '    open-pull-requests-limit: 10',
+        ].join('\n'),
+      );
+
+      const result = await runPolicy(cwd);
+      const types = result.signals.map((signal) => signal.metadata.type);
+      expect(types.some((t) => String(t).startsWith('dependency-automation-'))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it('does not emit a consumer-verification violation for ordinary projects', async () => {
     const cwd = makeProject();
     try {
