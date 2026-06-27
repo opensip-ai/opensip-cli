@@ -27,6 +27,7 @@
 import { extractPayloadVersion } from '@opensip-cli/core';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { SignalRepair } from '@opensip-cli/core';
 
 /** JSON-safe scalar — the metadata-value subset the persisted shape permits. */
 export type SessionPayloadScalar = string | number | boolean;
@@ -41,6 +42,8 @@ export interface DecodedSessionFinding {
   readonly column?: number;
   readonly suggestion?: string;
   readonly metadata?: Readonly<Record<string, SessionPayloadScalar>>;
+  /** Structured repair guidance (ADR-0086), preserved across the round-trip. */
+  readonly repair?: SignalRepair;
 }
 
 /** A decoded per-check row. */
@@ -182,6 +185,9 @@ function decodeFinding(value: unknown, opts: DecodeSessionPayloadOptions): Decod
   const column = optionalNumber(finding.column);
   const suggestion = optionalString(finding.suggestion);
   const metadata = opts.allowMetadata ? decodeMetadata(finding.metadata) : undefined;
+  // `repair` is a core cross-tool field (not tool vocabulary); decode it for any
+  // tool whose payload carries it (absent on legacy/sim rows ⇒ undefined).
+  const repair = decodeRepair(finding.repair);
   return {
     ruleId: stringField(finding, 'ruleId', label),
     message: stringField(finding, 'message', label),
@@ -191,6 +197,54 @@ function decodeFinding(value: unknown, opts: DecodeSessionPayloadOptions): Decod
     ...(column === undefined ? {} : { column }),
     ...(suggestion === undefined ? {} : { suggestion }),
     ...(metadata === undefined ? {} : { metadata }),
+    ...(repair === undefined ? {} : { repair }),
+  };
+}
+
+const REPAIR_KINDS = new Set([
+  'add-test',
+  'split-function',
+  'extract-module',
+  'fix-import',
+  'manual',
+  'unknown',
+]);
+
+/**
+ * Decode a persisted {@link SignalRepair} blob, tolerating absence and projecting
+ * only the known typed fields (the persisted JSON is our own, but the decoder
+ * stays defensive — anything unexpected is dropped rather than trusted). Returns
+ * undefined when the value is absent or nothing survives.
+ */
+function decodeRepair(value: unknown): SignalRepair | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  const out: {
+    -readonly [K in keyof SignalRepair]: SignalRepair[K];
+  } = {};
+  if (typeof raw.repairKind === 'string' && REPAIR_KINDS.has(raw.repairKind)) {
+    out.repairKind = raw.repairKind as SignalRepair['repairKind'];
+  }
+  if (typeof raw.autofixable === 'boolean') out.autofixable = raw.autofixable;
+  if (typeof raw.suggestedCommand === 'string') out.suggestedCommand = raw.suggestedCommand;
+  if (typeof raw.docsRef === 'string') out.docsRef = raw.docsRef;
+  if (typeof raw.confidence === 'number') out.confidence = raw.confidence;
+  const patchHint = decodePatchHint(raw.patchHint);
+  if (patchHint !== undefined) out.patchHint = patchHint;
+  return Object.keys(out).length === 0 ? undefined : out;
+}
+
+/** Decode the nested `patchHint`; requires a valid `kind` + string `summary`. */
+function decodePatchHint(value: unknown): SignalRepair['patchHint'] | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  if ((raw.kind !== 'text' && raw.kind !== 'structured') || typeof raw.summary !== 'string') {
+    return undefined;
+  }
+  return {
+    kind: raw.kind,
+    summary: raw.summary,
+    ...(typeof raw.target === 'string' ? { target: raw.target } : {}),
   };
 }
 

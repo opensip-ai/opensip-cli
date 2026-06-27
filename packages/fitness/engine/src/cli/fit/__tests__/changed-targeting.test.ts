@@ -105,8 +105,11 @@ describe('resolveChangedSet', () => {
     const scope = new RunScope({
       tools: new ToolRegistry(),
       languages: new LanguageRegistry(),
-      graphCatalog: () => catalog,
     });
+    // `graphCatalog` is a contributed scope slot (installed by graph's
+    // contributeScope() via Object.assign), not a constructor option — mirror
+    // that install here.
+    Object.assign(scope, { graphCatalog: () => catalog });
     runWithScopeSync(scope, () => {
       const result = resolveChangedSet({
         cwd,

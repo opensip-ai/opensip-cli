@@ -26,11 +26,15 @@ enforcement-reason: >
 (`resolveChangedFiles`); place the agent-filter engine (`applyAgentFilters`,
 `agentRunFlagSpecs`, `buildAgentFilteredResult`), pure impact compute
 (`computeImpact`), and `GraphImpactResult` in `@opensip-cli/contracts`;
-and wire `fit --include-impacted` to read the graph catalog through a
-host-wired `RunScope.graphCatalog` thunk (`() => unknown` in core, populated by
-the CLI bootstrap from graph's `CatalogRepo.loadCatalogContract()`, cast to
-`GraphCatalog` at the fitness boundary) — mirroring the existing
-`RunScope.datastore` thunk.
+and wire `fit --include-impacted` to read the graph catalog through a generic
+`RunScope.graphCatalog` thunk (`() => unknown`, declared on core's
+`ScopeContribution`). The graph tool INSTALLS the thunk from its own
+`contributeScope()` hook (the same IoC seam as `scope.graph`); the thunk reads
+the per-run datastore lazily via `currentScope()` and returns
+`CatalogRepo.loadCatalogContract()`, cast to `GraphCatalog` at the fitness
+boundary. The host never statically imports `@opensip-cli/graph` (install-source
+independence, ADR-0009/0027/0029) — the thunk type stays generic so fitness
+reads it without a `@opensip-cli/graph` edge.
 
 **Alternatives:**
 
@@ -49,7 +53,8 @@ fitness tests, and keeps core contracts-free.
 
 **Consequences:**
 
-- CLI bootstrap wires one more lazy thunk beside `datastore`.
+- The graph tool installs one more lazy thunk (`graphCatalog`) via its
+  `contributeScope()` hook; the host adds no static graph import.
 - `computeImpact` reads precomputed `features.blast` when present; catalogs
   without `features` still yield a correct impacted closure (blast tier skipped).
 - Filtered live runs emit a compact view but deliver/persist the unfiltered

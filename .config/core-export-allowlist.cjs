@@ -465,6 +465,7 @@ const EXPORT_ALLOWLIST = {
   resolveProjectPaths: 'run-kernel',
   resolveChangedFiles: 'run-kernel',
   resolveUserPaths: 'run-kernel',
+  toPosixRelative: 'run-kernel',
   runWithRetry: 'run-kernel',
   runWithScope: 'run-kernel',
   runWithScopeSync: 'run-kernel',

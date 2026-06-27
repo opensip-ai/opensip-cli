@@ -42,7 +42,7 @@
 
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, sep } from 'node:path';
+import { isAbsolute, join, normalize, relative, sep } from 'node:path';
 
 import type { BundledToolShortId } from '../tools/ids.js';
 
@@ -201,4 +201,18 @@ export function isPathInside(child: string, parent: string): boolean {
   }
   if (realChild === realParent) return true;
   return realChild.startsWith(realParent + sep);
+}
+
+/**
+ * Normalize a path to project-relative POSIX form: absolute paths are made
+ * relative to `cwd`, and OS separators are converted to `/`. Shared by the git
+ * changed-file resolver and `graph impact` so both compare paths against
+ * catalog occurrences in one canonical form (ADR-0085).
+ */
+export function toPosixRelative(cwd: string, filePath: string): string {
+  const normalized = normalize(filePath);
+  if (isAbsolute(normalized)) {
+    return relative(cwd, normalized).split(sep).join('/');
+  }
+  return normalized.split(sep).join('/');
 }

@@ -20,8 +20,6 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'phantom-dependency-detection': ['📦', 'Phantom Dependency Detection'],
   'subprocess-correlation-required': ['🔗', 'Subprocess Correlation Required'],
   'tsconfig-extends-validation': ['⚙️', 'tsconfig Extends Validation'],
-  'single-changed-file-resolver': ['📂', 'Single Changed-File Resolver'],
-  'single-agent-filter-engine': ['🔍', 'Single Agent Filter Engine'],
 });
 
 /** No documentation TS_AST checks; export empty object for symmetry */

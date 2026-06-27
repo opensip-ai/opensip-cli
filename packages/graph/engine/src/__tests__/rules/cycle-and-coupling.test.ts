@@ -211,6 +211,9 @@ describe('graph:unexpected-coupling package cycles', () => {
     expect(signals).toHaveLength(1);
     expect(signals[0]?.severity).toBe('high');
     expect(signals[0]?.metadata.packages).toEqual(['pkg-a', 'pkg-b']);
+    // Phase 2 Task 2.3: package-coupling rules carry highImpact so
+    // `--filter high-impact` selects them alongside the other high-impact rules.
+    expect(signals[0]?.metadata.highImpact).toBe(true);
   });
 
   it('emits nothing when there is no reverse edge (no cycle)', () => {

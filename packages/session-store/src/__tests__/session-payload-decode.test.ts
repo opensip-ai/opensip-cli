@@ -101,6 +101,60 @@ describe('decodeSessionPayload — fit-style options (all relaxed)', () => {
   });
 });
 
+describe('decodeSessionPayload — repair round-trip (ADR-0086)', () => {
+  it('decodes a full repair contract regardless of tool options', () => {
+    const repair = {
+      repairKind: 'split-function',
+      autofixable: false,
+      suggestedCommand: 'opensip graph impact --changed',
+      docsRef: 'https://opensip.ai/docs',
+      confidence: 0.7,
+      patchHint: { kind: 'structured', summary: 'extract helper', target: 'src/x.ts' },
+    };
+    const decoded = decodeSessionPayload(
+      {
+        summary: SUMMARY,
+        checks: [
+          fitCheck({ findings: [{ ruleId: 'r', message: 'm', severity: 'error', repair }] }),
+        ],
+      },
+      { tool: 'fit' },
+    );
+    expect(decoded.checks[0].findings[0].repair).toEqual(repair);
+  });
+
+  it('omits repair when the finding has none (forward-compat with pre-feature rows)', () => {
+    const decoded = decodeSessionPayload(
+      { summary: SUMMARY, checks: [fitCheck()] },
+      { tool: 'fit' },
+    );
+    expect(decoded.checks[0].findings[0]).not.toHaveProperty('repair');
+  });
+
+  it('drops unknown repairKind / non-object repair defensively', () => {
+    const decoded = decodeSessionPayload(
+      {
+        summary: SUMMARY,
+        checks: [
+          fitCheck({
+            findings: [
+              {
+                ruleId: 'r',
+                message: 'm',
+                severity: 'error',
+                repair: { repairKind: 'not-a-kind', autofixable: true },
+              },
+            ],
+          }),
+        ],
+      },
+      { tool: 'fit' },
+    );
+    // Unknown kind dropped; valid boolean retained.
+    expect(decoded.checks[0].findings[0].repair).toEqual({ autofixable: true });
+  });
+});
+
 describe('decodeSessionPayload — graph-style options (all strict)', () => {
   const graphOpts = {
     tool: 'graph',

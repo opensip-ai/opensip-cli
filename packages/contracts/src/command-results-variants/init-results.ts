@@ -38,7 +38,7 @@ export interface InitResult {
   createdFiles?: readonly string[];
   /** True when init appended `opensip-cli/.runtime/` to .gitignore. */
   gitignoreUpdated?: boolean;
-  /** True when init created a new AGENTS.md playbook (write-if-absent). */
+  /** True when init created a new AGENTS playbook file (write-if-absent). */
   agentsMdCreated?: boolean;
   /**
    * Files that existed before init ran, classified. Empty (or absent)

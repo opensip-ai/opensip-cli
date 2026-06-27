@@ -195,7 +195,12 @@ export type { RunTimer, RunLifecycle, RunTimingSnapshot } from './lib/run-timer.
 // Lib — path resolver (project-local opensip-cli/.runtime, user-level
 // ~/.opensip-cli/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
-export { resolveProjectPaths, resolveUserPaths, isPathInside } from './lib/paths.js';
+export {
+  resolveProjectPaths,
+  resolveUserPaths,
+  isPathInside,
+  toPosixRelative,
+} from './lib/paths.js';
 export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';
 
 // Lib — project-context resolver. One-shot ancestor walk from cwd to

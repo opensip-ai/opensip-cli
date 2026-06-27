@@ -6,6 +6,7 @@ import {
   applyAgentFilters,
   normalizeAgentRunFilters,
 } from '../agent-filters.js';
+import { EXIT_CODES, mapToolErrorToExitCode } from '../exit-codes.js';
 import { buildSignalEnvelope } from '../signal-envelope.js';
 
 function envelope(signals: ReturnType<typeof createSignal>[]) {
@@ -92,5 +93,18 @@ describe('applyAgentFilters', () => {
     expect(() => applyAgentFilters(env, ['bogus'])).toThrow(AgentFilterParseError);
     expect(() => normalizeAgentRunFilters([], '-1')).toThrow(AgentFilterParseError);
     expect(() => normalizeAgentRunFilters([], 'abc')).toThrow(AgentFilterParseError);
+  });
+
+  it('maps a bad live-run filter to the CONFIGURATION_ERROR exit code', () => {
+    // AgentFilterParseError extends ConfigurationError so the host error
+    // boundary exits 2 on a malformed --filter/--top, matching `graph impact`.
+    let caught: AgentFilterParseError | undefined;
+    try {
+      normalizeAgentRunFilters([], 'abc');
+    } catch (error) {
+      if (error instanceof AgentFilterParseError) caught = error;
+    }
+    expect(caught).toBeInstanceOf(AgentFilterParseError);
+    expect(mapToolErrorToExitCode(caught!)).toBe(EXIT_CODES.CONFIGURATION_ERROR);
   });
 });

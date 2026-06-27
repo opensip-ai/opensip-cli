@@ -1,3 +1,4 @@
+// @fitness-ignore-file no-markdown-references -- this module's whole job is to write/manage the AGENTS.md file, so it references it by name throughout.
 /**
  * Write-if-absent AGENTS.md agent playbook (ADR-0085, spec §5.7).
  */

@@ -6,6 +6,7 @@
  */
 import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
 
+/** One function in the impact result — a changed function or an impacted caller. */
 export interface ImpactFunction {
   readonly qualifiedName: string;
   readonly filePath: string;
@@ -16,11 +17,13 @@ export interface ImpactFunction {
   readonly reason: 'changed' | 'caller' | 'callee' | 'blast' | 'test-gap' | 'coupling';
 }
 
+/** A package touched by the impact set, with the count of its impacted functions. */
 export interface ImpactPackage {
   readonly name: string;
   readonly functionCount: number;
 }
 
+/** The full result of {@link computeImpact}: changed + impacted functions, packages, and whether `--top` truncated. */
 export interface ImpactComputation {
   readonly changedFunctions: readonly ImpactFunction[];
   readonly impactedFunctions: readonly ImpactFunction[];

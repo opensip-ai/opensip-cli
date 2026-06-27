@@ -6,7 +6,8 @@
  * both call this function.
  */
 import { execFileSync } from 'node:child_process';
-import path from 'node:path';
+
+import { toPosixRelative } from './paths.js';
 
 /** Basis metadata for a git-derived changed-file set. */
 export interface ChangedFileBasis {
@@ -15,6 +16,11 @@ export interface ChangedFileBasis {
   readonly ref?: string;
 }
 
+/**
+ * Result of {@link resolveChangedFiles}: either the resolved changed-file set
+ * with its basis, or a structured failure reason (never a throw for a non-repo
+ * / bad ref / missing git).
+ */
 export type ChangedFilesResult =
   | {
       readonly ok: true;
@@ -36,20 +42,13 @@ function git(
       cwd,
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
+      // @fitness-ignore-next-line no-hardcoded-timeouts -- bounded safety cap on a local git shell-out (never hangs the CLI)
       timeout: 5000,
     }).trim();
     return { ok: true, out };
   } catch {
     return { ok: false };
   }
-}
-
-function toPosixRelative(cwd: string, filePath: string): string {
-  const normalized = path.normalize(filePath);
-  if (path.isAbsolute(normalized)) {
-    return path.relative(cwd, normalized).split(path.sep).join('/');
-  }
-  return normalized.split(path.sep).join('/');
 }
 
 function parseNameOnlyOutput(output: string): string[] {
@@ -103,7 +102,11 @@ export function resolveChangedFiles(
     const refError = validateSinceRef(cwd, since);
     if (refError) return refError;
 
-    const diff = git(cwd, ['diff', '--name-only', '--diff-filter=ACMR', '--', `${since}...HEAD`]);
+    // NB: the ref range must NOT sit after `--` — everything after `--` is a
+    // pathspec, so `<since>...HEAD` would be read as a (non-existent) filename
+    // and the diff would be empty. The ref is already validated (no leading `-`,
+    // resolves via rev-parse) so there is no injection exposure without `--`.
+    const diff = git(cwd, ['diff', '--name-only', '--diff-filter=ACMR', `${since}...HEAD`]);
     if (!diff.ok) {
       return {
         ok: false,

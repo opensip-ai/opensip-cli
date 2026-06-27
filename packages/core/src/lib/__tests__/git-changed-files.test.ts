@@ -46,6 +46,29 @@ describe('resolveChangedFiles', () => {
     if (r.ok) expect(r.files).toContain('b.txt');
   });
 
+  it('lists files committed since a ref', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opensip-git-'));
+    dirs.push(dir);
+    git(dir, ['init']);
+    git(dir, ['config', 'user.email', 't@example.com']);
+    git(dir, ['config', 'user.name', 'T']);
+    writeFileSync(join(dir, 'a.txt'), '1\n', 'utf8');
+    git(dir, ['add', 'a.txt']);
+    git(dir, ['commit', '-m', 'init']);
+    writeFileSync(join(dir, 'b.txt'), '2\n', 'utf8');
+    git(dir, ['add', 'b.txt']);
+    git(dir, ['commit', '-m', 'second']);
+    // Regression guard: the diff range must not sit after `--` (that would read
+    // it as a pathspec and return zero files).
+    const r = resolveChangedFiles(dir, { since: 'HEAD~1' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.files).toContain('b.txt');
+      expect(r.files).not.toContain('a.txt');
+      expect(r.basis.ref).toBe('HEAD~1');
+    }
+  });
+
   it('rejects bad since refs', () => {
     const dir = mkdtempSync(join(tmpdir(), 'opensip-git-'));
     dirs.push(dir);

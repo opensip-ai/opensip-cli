@@ -1,8 +1,6 @@
 /**
  * `opensip graph impact` — read-only changed→impact analysis (ADR-0085, spec §5.3).
  */
-import path from 'node:path';
-
 import { computeImpact, type GraphImpactResult } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
@@ -10,6 +8,7 @@ import {
   resolveChangedFiles,
   SystemError,
   ToolError,
+  toPosixRelative,
 } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
@@ -39,14 +38,6 @@ function parseTopCap(top?: string): number | undefined {
     throw new ConfigurationError(`Invalid --top value "${top}": must be a non-negative integer`);
   }
   return n;
-}
-
-function toPosixRelative(cwd: string, filePath: string): string {
-  const normalized = path.normalize(filePath);
-  if (path.isAbsolute(normalized)) {
-    return path.relative(cwd, normalized).split(path.sep).join('/');
-  }
-  return normalized.split(path.sep).join('/');
 }
 
 function recommendedCommands(): readonly string[] {

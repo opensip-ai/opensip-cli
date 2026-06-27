@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-25T20:56:31.915Z",
+  "generatedAt": "2026-06-27T23:42:20.972Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,12 +11,14 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 210,
+        "total": 212,
         "bySlug": {
+          "no-markdown-references": 5,
           "silent-early-returns": 7,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 6,
+          "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
           "stream-buffer-size-limits": 1,
@@ -33,7 +35,6 @@
           "no-generic-error": 4,
           "numeric-validation": 11,
           "fitness-check-architecture": 4,
-          "no-hardcoded-timeouts": 7,
           "unsafe-secret-comparison": 7,
           "canonical-result-usage": 3,
           "logging-standards": 3,
@@ -49,7 +50,6 @@
           "sql-injection": 1,
           "fitness-ignore-hygiene": 1,
           "graph-ignore-hygiene": 1,
-          "no-markdown-references": 4,
           "no-window-alert": 1,
           "no-unbounded-concurrency": 6,
           "yagni-ignore-hygiene": 1,
@@ -83,9 +83,9 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 4,
+          "cli": 5,
           "cli-ui": 1,
-          "core": 4,
+          "core": 5,
           "dashboard": 1,
           "fitness/checks-typescript": 64,
           "fitness/checks-universal": 106,
@@ -105,12 +105,14 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 38,
+        "total": 40,
         "bySlug": {
+          "no-markdown-references": 3,
           "silent-early-returns": 5,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 2,
+          "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
           "stream-buffer-size-limits": 1,
@@ -124,16 +126,15 @@
           "no-unbounded-concurrency": 1,
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
-          "no-markdown-references": 2,
           "env-via-registry": 2,
           "unsafe-secret-comparison": 2,
           "no-raw-fetch": 1,
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 4,
+          "cli": 5,
           "cli-ui": 1,
-          "core": 4,
+          "core": 5,
           "dashboard": 1,
           "fitness/engine": 12,
           "graph/engine": 10,
@@ -362,20 +363,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 210,
+    "budgetGateFitness": 212,
     "budgetGateFitnessSlugs": 68,
-    "productRuntimeFitness": 38,
-    "productRuntimeFitnessSlugs": 22,
+    "productRuntimeFitness": 40,
+    "productRuntimeFitnessSlugs": 23,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 71,
+    "productRuntimeCombined": 73,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
-    "unbudgetedProductRuntimeSlugs": 21
+    "unbudgetedProductRuntimeSlugs": 22
   },
   "phase4Audit": {
     "baseline": {
@@ -388,10 +389,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -267,
+      "productRuntimeFitness": -265,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -241,
-      "budgetGateFitness": -332,
+      "productRuntimeCombined": -239,
+      "budgetGateFitness": -330,
       "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

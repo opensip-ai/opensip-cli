@@ -45,6 +45,7 @@ export function buildReplaySignal(input: BuildReplaySignalInput): Signal {
     ...(input.finding.column === undefined ? {} : { column: input.finding.column }),
     ...codeLocation(input.finding, filePath, input.alwaysIncludeCode === true),
     metadata: input.metadata ?? {},
+    ...(input.finding.repair === undefined ? {} : { repair: input.finding.repair }),
     createdAt: input.stored.startedAt,
   };
 }

@@ -4,7 +4,7 @@
  * Pure transform over SignalEnvelope signals. Used by live runs (fit/graph/sim)
  * and session replay — one implementation, no drift.
  */
-import { isErrorSeverity } from '@opensip-cli/core';
+import { ConfigurationError, isErrorSeverity } from '@opensip-cli/core';
 
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { OptionSpec, Signal, SignalSeverity } from '@opensip-cli/core';
@@ -14,13 +14,25 @@ const KNOWN_FILTER_TOKENS = new Set(['errors-only', 'warnings-only', 'high-impac
 
 const HIGH_IMPACT_BLAST_THRESHOLD = 10;
 
-export class AgentFilterParseError extends Error {
+/**
+ * Thrown when an agent filter token or `--top` value is malformed. Extends
+ * {@link ConfigurationError} so the host error boundary maps a bad live-run
+ * filter to `CONFIGURATION_ERROR` (exit 2) — the same clean usage-error exit
+ * `graph impact --top` already produces, rather than a generic system error.
+ */
+export class AgentFilterParseError extends ConfigurationError {
   constructor(message: string) {
     super(message);
     this.name = 'AgentFilterParseError';
   }
 }
 
+/**
+ * The compact view emitted by a filtered live run (`--filter`/`--top`): the
+ * filtered envelope plus the applied tokens and before/after signal counts. The
+ * UNFILTERED envelope is still what persists and egresses (filtering is
+ * presentation-only).
+ */
 export interface AgentFilteredResult {
   readonly type: 'agent-filtered';
   readonly envelope: SignalEnvelope;

@@ -18,7 +18,7 @@
 import { isErrorSignal } from '@opensip-cli/core';
 
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, SignalRepair } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
 export type FitnessFindingSeverity = 'error' | 'warning';
@@ -32,6 +32,8 @@ interface FitnessSessionFinding {
   readonly line?: number;
   readonly column?: number;
   readonly suggestion?: string;
+  /** Structured repair guidance (ADR-0086) — round-trips through replay. */
+  readonly repair?: SignalRepair;
 }
 
 /** Per-check result inside a {@link FitnessSessionPayload}. */
@@ -72,6 +74,7 @@ function findingsFor(signals: readonly Signal[]): FitnessSessionFinding[] {
     line: s.line,
     column: s.column,
     suggestion: s.suggestion,
+    ...(s.repair === undefined ? {} : { repair: s.repair }),
   }));
 }
 

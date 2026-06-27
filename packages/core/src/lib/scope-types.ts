@@ -114,7 +114,9 @@ export type DataStoreThunk = () => unknown;
 
 /**
  * Opaque accessor for the persisted graph catalog contract (ADR-0085).
- * Populated by the CLI bootstrap; fitness reads via `currentScope()?.graphCatalog`.
+ * Installed by the graph tool's `contributeScope()` hook; fitness reads via
+ * `currentScope()?.graphCatalog`. Generic `() => unknown` so core names no
+ * graph type and fitness reads it without a `@opensip-cli/graph` edge.
  */
 export type GraphCatalogThunk = () => unknown;
 
@@ -126,11 +128,24 @@ export type GraphCatalogThunk = () => unknown;
  * `ToolScope` (and therefore `RunScope`) extends this, so the same slots
  * are readable via `cli.scope.<tool>` / `currentScope()?.<tool>`.
  *
- * Empty here by design — every member arrives via tool augmentation, so
- * core never names a tool-specific type.
+ * Tool-specific members arrive via tool augmentation, so core never names a
+ * tool-specific type. The one core-declared member, {@link graphCatalog}, is a
+ * GENERIC `() => unknown` thunk (ADR-0085): graph installs it from its own
+ * `contributeScope()` like every other slot, but its type stays generic so a
+ * downstream tool (fitness `--include-impacted`) can read it through this
+ * interface WITHOUT importing `@opensip-cli/graph` (which the layer DAG forbids).
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentionally empty: every member is contributed by a tool via `declare module '@opensip-cli/core' { interface ScopeContribution { … } }`. `object`/`unknown` would not be augmentable.
-export interface ScopeContribution {}
+export interface ScopeContribution {
+  /**
+   * Lazy graph catalog reader (ADR-0085). Installed by the graph tool's
+   * `contributeScope()` (NOT a host static import — install-source
+   * independence, ADR-0009/0027/0029); the thunk reads the per-run datastore
+   * lazily and returns the `GraphCatalog` contract (or null/undefined when no
+   * catalog is available). Fitness casts it to `GraphCatalog` at the boundary;
+   * absent in runs where the graph tool is not registered.
+   */
+  graphCatalog?: GraphCatalogThunk;
+}
 
 /**
  * Wrapper form of a {@link Tool.contributeScope} return that carries a
@@ -226,9 +241,4 @@ export interface ToolScope extends ScopeContribution {
    * names no targeting concrete, so the kernel carries no targeting dependency.
    */
   readonly targets?: TargetResolver;
-  /**
-   * Lazy graph catalog reader (ADR-0085). Populated by the CLI bootstrap from
-   * graph's `CatalogRepo.loadCatalogContract()`; fitness casts at the boundary.
-   */
-  readonly graphCatalog?: GraphCatalogThunk;
 }

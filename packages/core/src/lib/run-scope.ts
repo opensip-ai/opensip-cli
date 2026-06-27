@@ -34,12 +34,7 @@ import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { Logger, LoggerImpl } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 import type { RunCorrelation } from './run-correlation.js';
-import type {
-  DataStoreThunk,
-  GraphCatalogThunk,
-  RecipeUnitConfigSlot,
-  ToolScope,
-} from './scope-types.js';
+import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
 import type { SignalSink } from '../signals/signal-sink.js';
 import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
@@ -76,8 +71,6 @@ export interface RunScopeOptions {
   readonly parseCache?: LanguageParseCache;
   readonly projectContext?: ProjectContext;
   readonly datastore?: DataStoreThunk;
-  /** Lazy graph catalog reader (ADR-0085); CLI bootstrap wires from graph's repo. */
-  readonly graphCatalog?: GraphCatalogThunk;
   readonly tools?: ToolRegistry;
   readonly languages?: LanguageRegistry;
   /**
@@ -174,7 +167,6 @@ export class RunScope {
   readonly recipeUnitConfig: RecipeUnitConfigSlot;
   readonly projectContext: ProjectContext | undefined;
   readonly datastore: DataStoreThunk;
-  readonly graphCatalog: GraphCatalogThunk | undefined;
   readonly tools: ToolRegistry;
   readonly languages: LanguageRegistry;
   /** Per-invocation presentation settings; `undefined` outside the CLI render path. */
@@ -236,7 +228,6 @@ export class RunScope {
     this.projectContext = opts.projectContext;
     // eslint-disable-next-line unicorn/no-useless-undefined -- explicit no-store sentinel matches the prior `cli.datastore` contract (tools cast to `DataStore | undefined`).
     this.datastore = opts.datastore ?? (() => undefined);
-    this.graphCatalog = opts.graphCatalog;
     this.tools = opts.tools ?? new ToolRegistry();
     this.languages = opts.languages ?? new LanguageRegistry();
     this.ui = opts.ui;
