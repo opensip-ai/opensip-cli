@@ -15,15 +15,11 @@
  * Internal command — not user-facing; the live runner is its only caller.
  */
 
-import { readFileSync } from 'node:fs';
-
 import {
   defineCommand,
-  sendWorkerIpcMessage,
-  startWorkerHeartbeat,
+  runJsonSpecWorker,
   type CommandSpec,
   type ToolCliContext,
-  type WorkerMessage,
 } from '@opensip-cli/core';
 
 import { executeFit } from './fit.js';
@@ -35,13 +31,20 @@ import type { FitOptions } from '@opensip-cli/contracts';
  *  identically whether it ran in-process or in the forked worker. */
 type FitWorkerResult = Awaited<ReturnType<typeof executeFit>>;
 
-/** Post one IPC message to the parent (no-op when not forked). */
-function send(msg: WorkerMessage<ProgressEvent, FitWorkerResult>): void {
-  sendWorkerIpcMessage(msg);
-}
+const FIT_STAGE_START: ProgressEvent = {
+  type: 'stage-start',
+  stage: 'checks',
+  label: 'Running checks...',
+};
 
-function failureClass(error: unknown): string | undefined {
-  return (error as { failureClass?: string }).failureClass;
+function executeFitWorkerSpec(
+  args: FitOptions,
+  emit: (event: ProgressEvent) => void,
+): Promise<FitWorkerResult> {
+  return executeFit(args, {
+    onProgress: (completed, total) =>
+      emit({ type: 'stage-progress', stage: 'checks', completed, total }),
+  });
 }
 
 /**
@@ -50,31 +53,11 @@ function failureClass(error: unknown): string | undefined {
  * a `{ kind: 'error' }` message so the parent's `result` promise rejects cleanly.
  */
 export async function executeFitWorker(specPath: string): Promise<void> {
-  const stopHeartbeat = startWorkerHeartbeat();
-  try {
-    const args = JSON.parse(readFileSync(specPath, 'utf8')) as FitOptions;
-    send({
-      kind: 'progress',
-      event: { type: 'stage-start', stage: 'checks', label: 'Running checks...' },
-    });
-    const fitResult = await executeFit(args, {
-      onProgress: (completed, total) =>
-        send({
-          kind: 'progress',
-          event: { type: 'stage-progress', stage: 'checks', completed, total },
-        }),
-    });
-    send({ kind: 'result', value: fitResult });
-  } catch (error) {
-    send({
-      kind: 'error',
-      message: error instanceof Error ? error.message : String(error),
-      ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
-      ...(failureClass(error) === undefined ? {} : { failureClass: failureClass(error) }),
-    });
-  } finally {
-    stopHeartbeat();
-  }
+  await runJsonSpecWorker<FitOptions, ProgressEvent, FitWorkerResult>({
+    specPath,
+    startEvent: FIT_STAGE_START,
+    run: executeFitWorkerSpec,
+  });
 }
 
 /** `fit-run-worker` — [internal] headless fit run, IPC progress/result. */

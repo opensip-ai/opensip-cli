@@ -21,6 +21,9 @@ export {
 export type { WorkerLimits } from './runtime/worker-limits.js';
 export { measureIpcPayloadBytes, isIpcPayloadTooLarge } from './runtime/ipc-payload.js';
 export { sendWorkerIpcMessage, IpcPayloadTooLargeError } from './runtime/worker-ipc-send.js';
+export { getWorkerErrorFailureClass } from './runtime/worker-error-failure-class.js';
+export { runJsonSpecWorker } from './runtime/json-spec-worker.js';
+export type { JsonSpecWorkerOptions } from './runtime/json-spec-worker.js';
 export {
   assertCapturedOutputFits,
   CapturedOutputTooLargeError,

@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   defineCommand,
+  getWorkerErrorFailureClass,
   sendWorkerIpcMessage,
   startWorkerHeartbeat,
   type CommandSpec,
@@ -52,10 +53,6 @@ interface GraphWorkerSpec {
 /** Post one IPC message to the parent (no-op when not forked). */
 function send(msg: WorkerMessage<ProgressEvent, LiveGraphOutput>): void {
   sendWorkerIpcMessage(msg);
-}
-
-function failureClass(error: unknown): string | undefined {
-  return (error as { failureClass?: string }).failureClass;
 }
 
 /**
@@ -121,7 +118,9 @@ export async function executeGraphWorker(specPath: string, cli: ToolCliContext):
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
       ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
-      ...(failureClass(error) === undefined ? {} : { failureClass: failureClass(error) }),
+      ...(getWorkerErrorFailureClass(error) === undefined
+        ? {}
+        : { failureClass: getWorkerErrorFailureClass(error) }),
     });
   } finally {
     stopHeartbeat();

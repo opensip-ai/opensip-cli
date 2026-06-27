@@ -13,15 +13,11 @@
  * persistence-free; Phase 2). Internal command — the live runner is its only caller.
  */
 
-import { readFileSync } from 'node:fs';
-
 import {
   defineCommand,
-  sendWorkerIpcMessage,
-  startWorkerHeartbeat,
+  runJsonSpecWorker,
   type CommandSpec,
   type ToolCliContext,
-  type WorkerMessage,
 } from '@opensip-cli/core';
 
 import { executeSim } from './sim.js';
@@ -33,13 +29,20 @@ type SimWorkerArgs = ToolOptions & { readonly verbose?: boolean };
 /** Mirrors `executeSim`'s return — the parent handles it identically either way. */
 type SimWorkerResult = Awaited<ReturnType<typeof executeSim>>;
 
-/** Post one IPC message to the parent (no-op when not forked). */
-function send(msg: WorkerMessage<ProgressEvent, SimWorkerResult>): void {
-  sendWorkerIpcMessage(msg);
-}
+const SIM_STAGE_START: ProgressEvent = {
+  type: 'stage-start',
+  stage: 'scenarios',
+  label: 'Running scenarios...',
+};
 
-function failureClass(error: unknown): string | undefined {
-  return (error as { failureClass?: string }).failureClass;
+function executeSimWorkerSpec(
+  args: SimWorkerArgs,
+  emit: (event: ProgressEvent) => void,
+): Promise<SimWorkerResult> {
+  return executeSim(args, {
+    onProgress: (completed, total) =>
+      emit({ type: 'stage-progress', stage: 'scenarios', completed, total }),
+  });
 }
 
 /**
@@ -48,31 +51,11 @@ function failureClass(error: unknown): string | undefined {
  * `{ kind: 'error' }` message so the parent's `result` promise rejects cleanly.
  */
 export async function executeSimWorker(specPath: string): Promise<void> {
-  const stopHeartbeat = startWorkerHeartbeat();
-  try {
-    const args = JSON.parse(readFileSync(specPath, 'utf8')) as SimWorkerArgs;
-    send({
-      kind: 'progress',
-      event: { type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' },
-    });
-    const simResult = await executeSim(args, {
-      onProgress: (completed, total) =>
-        send({
-          kind: 'progress',
-          event: { type: 'stage-progress', stage: 'scenarios', completed, total },
-        }),
-    });
-    send({ kind: 'result', value: simResult });
-  } catch (error) {
-    send({
-      kind: 'error',
-      message: error instanceof Error ? error.message : String(error),
-      ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
-      ...(failureClass(error) === undefined ? {} : { failureClass: failureClass(error) }),
-    });
-  } finally {
-    stopHeartbeat();
-  }
+  await runJsonSpecWorker<SimWorkerArgs, ProgressEvent, SimWorkerResult>({
+    specPath,
+    startEvent: SIM_STAGE_START,
+    run: executeSimWorkerSpec,
+  });
 }
 
 /** `sim-run-worker` — [internal] headless sim run, IPC progress/result. */

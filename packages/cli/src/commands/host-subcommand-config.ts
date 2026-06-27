@@ -14,6 +14,7 @@ import {
 } from './host-subcommand-shared.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { OptionSpec } from '@opensip-cli/core';
 
 /** @throws {Error} When the tool registry is missing from context and scope. */
 function requireTools(ctx: CliCommandsContext) {
@@ -28,11 +29,49 @@ export function buildConfigGroupLeaves(ctx: CliCommandsContext): readonly HostSp
   return [buildConfigValidateSpec(ctx), buildConfigSchemaSpec(ctx)];
 }
 
-function buildConfigValidateSpec(ctx: CliCommandsContext): HostSpec {
+interface ConfigCommandRawOpts {
+  readonly cwd?: string;
+  readonly out?: string;
+  readonly projectContext?: ProjectContext;
+}
+
+interface ConfigCommandDefinition {
+  readonly name: string;
+  readonly description: string;
+  readonly options: readonly OptionSpec[];
+  readonly run: (base: ReturnType<typeof configCommandBase>, opts: ConfigCommandRawOpts) => unknown;
+}
+
+function configCommandBase(ctx: CliCommandsContext, opts: ConfigCommandRawOpts) {
+  const scope = currentScope();
+  return {
+    tools: requireTools(ctx),
+    manifests: ctx.manifests ?? scope?.toolManifests,
+    provenance: ctx.provenance ?? scope?.toolProvenance,
+    configPath: opts.projectContext?.configPath ?? scope?.projectContext?.configPath,
+    cwd: effectiveCwd(opts),
+  };
+}
+
+function buildConfigCommandSpec(ctx: CliCommandsContext, spec: ConfigCommandDefinition): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    name: spec.name,
+    description: spec.description,
+    commonFlags: ['json', 'cwd'],
+    options: spec.options,
+    scope: PROJECT_SCOPE,
+    output: COMMAND_RESULT,
+    handler: (rawOpts) => {
+      const opts = rawOpts as ConfigCommandRawOpts;
+      return spec.run(configCommandBase(ctx, opts), opts);
+    },
+  });
+}
+
+function buildConfigValidateSpec(ctx: CliCommandsContext): HostSpec {
+  return buildConfigCommandSpec(ctx, {
     name: 'validate',
     description: 'Validate the effective project config against the composed schema',
-    commonFlags: ['json', 'cwd'],
     options: [
       {
         flag: '--config',
@@ -40,27 +79,14 @@ function buildConfigValidateSpec(ctx: CliCommandsContext): HostSpec {
         description: 'Validate the config at this path instead of the discovered project config',
       },
     ],
-    scope: PROJECT_SCOPE,
-    output: COMMAND_RESULT,
-    handler: (rawOpts) => {
-      const opts = rawOpts as { cwd?: string; projectContext?: ProjectContext };
-      const scope = currentScope();
-      return executeConfigValidate({
-        tools: requireTools(ctx),
-        manifests: ctx.manifests ?? scope?.toolManifests,
-        provenance: ctx.provenance ?? scope?.toolProvenance,
-        configPath: opts.projectContext?.configPath ?? scope?.projectContext?.configPath,
-        cwd: effectiveCwd(opts),
-      });
-    },
+    run: (base) => executeConfigValidate(base),
   });
 }
 
 function buildConfigSchemaSpec(ctx: CliCommandsContext): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
+  return buildConfigCommandSpec(ctx, {
     name: 'schema',
     description: 'Export the composed project config JSON Schema',
-    commonFlags: ['json', 'cwd'],
     options: [
       {
         flag: '--config',
@@ -74,23 +100,6 @@ function buildConfigSchemaSpec(ctx: CliCommandsContext): HostSpec {
         description: 'Write the JSON Schema to a file instead of stdout',
       },
     ],
-    scope: PROJECT_SCOPE,
-    output: COMMAND_RESULT,
-    handler: (rawOpts) => {
-      const opts = rawOpts as {
-        cwd?: string;
-        out?: string;
-        projectContext?: ProjectContext;
-      };
-      const scope = currentScope();
-      return executeConfigSchema({
-        tools: requireTools(ctx),
-        manifests: ctx.manifests ?? scope?.toolManifests,
-        provenance: ctx.provenance ?? scope?.toolProvenance,
-        configPath: opts.projectContext?.configPath ?? scope?.projectContext?.configPath,
-        cwd: effectiveCwd(opts),
-        outPath: opts.out,
-      });
-    },
+    run: (base, opts) => executeConfigSchema({ ...base, outPath: opts.out }),
   });
 }

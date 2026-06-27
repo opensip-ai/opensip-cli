@@ -227,6 +227,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'resolveToolHooks',
   'resolveUserPaths',
   'runOffThreadOrInProcess',
+  'getWorkerErrorFailureClass',
+  'runJsonSpecWorker',
   'sendWorkerIpcMessage',
   'startWorkerHeartbeat',
   'runWithRetry',
