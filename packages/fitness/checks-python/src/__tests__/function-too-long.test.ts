@@ -44,7 +44,9 @@ describe('python-function-too-long', () => {
 // (the pure analyzer above is called directly and never goes through `.run()`).
 // Mirrors run.test.ts: an empty scope drives applyContentFilter's no-adapter path.
 describe('pythonFunctionTooLong.run() execution coverage', () => {
-  const emptyScope = makeFitnessTestScope({ languages: new LanguageRegistry() });
+  const emptyScope = makeFitnessTestScope({
+    languages: new LanguageRegistry(),
+  });
   let cwd: string;
   let longTarget: string;
   let shortTarget: string;

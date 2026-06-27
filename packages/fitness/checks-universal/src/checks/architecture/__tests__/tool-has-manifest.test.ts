@@ -48,7 +48,11 @@ describe('analyzeToolHasManifest (pure detector)', () => {
   it('flags a missing id', () => {
     const v = analyzeToolHasManifest(
       {
-        opensipTools: { kind: 'tool', apiVersion: 1, commands: [{ name: 'x', description: 'y' }] },
+        opensipTools: {
+          kind: 'tool',
+          apiVersion: 1,
+          commands: [{ name: 'x', description: 'y' }],
+        },
       },
       FILE,
     );
@@ -75,7 +79,11 @@ describe('analyzeToolHasManifest (pure detector)', () => {
   it('flags a missing apiVersion', () => {
     const v = analyzeToolHasManifest(
       {
-        opensipTools: { kind: 'tool', id: 'fitness', commands: [{ name: 'x', description: 'y' }] },
+        opensipTools: {
+          kind: 'tool',
+          id: 'fitness',
+          commands: [{ name: 'x', description: 'y' }],
+        },
       },
       FILE,
     );
@@ -109,7 +117,14 @@ describe('analyzeToolHasManifest (pure detector)', () => {
 
   it('flags an empty commands array', () => {
     const v = analyzeToolHasManifest(
-      { opensipTools: { kind: 'tool', id: 'fitness', apiVersion: 1, commands: [] } },
+      {
+        opensipTools: {
+          kind: 'tool',
+          id: 'fitness',
+          apiVersion: 1,
+          commands: [],
+        },
+      },
       FILE,
     );
     expect(v).toHaveLength(1);
@@ -180,7 +195,10 @@ describe('analyzeAllToolManifests (self-targeting over the file set)', () => {
     const files = {
       '/repo/packages/fitness/engine/package.json': JSON.stringify(CONFORMANT),
       '/repo/packages/graph/engine/package.json': JSON.stringify({
-        opensipTools: { kind: 'tool', id: 'graph' /* no apiVersion, no commands */ },
+        opensipTools: {
+          kind: 'tool',
+          id: 'graph' /* no apiVersion, no commands */,
+        },
       }),
       '/repo/packages/core/package.json': JSON.stringify({ name: '@x/core' }),
     };

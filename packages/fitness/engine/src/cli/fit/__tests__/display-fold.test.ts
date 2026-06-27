@@ -38,7 +38,9 @@ function fitnessScope(): RunScope {
 
 describe('applyCheckDisplay', () => {
   it('folds icon + displayName onto a check whose slug has a map entry', () => {
-    const map: Record<string, CheckDisplayEntry> = { 'my-check': ['🚀', 'My Check'] };
+    const map: Record<string, CheckDisplayEntry> = {
+      'my-check': ['🚀', 'My Check'],
+    };
     const [folded] = applyCheckDisplay([stubCheck('my-check')], map);
     expect(folded?.config.icon).toBe('🚀');
     expect(folded?.config.displayName).toBe('My Check');
@@ -52,7 +54,9 @@ describe('applyCheckDisplay', () => {
 
   it('does not mutate the original check (returns a new object)', () => {
     const original = stubCheck('immutable');
-    const [folded] = applyCheckDisplay([original], { immutable: ['🔒', 'Immutable'] });
+    const [folded] = applyCheckDisplay([original], {
+      immutable: ['🔒', 'Immutable'],
+    });
     expect(original.config.icon).toBeUndefined();
     expect(folded).not.toBe(original);
   });

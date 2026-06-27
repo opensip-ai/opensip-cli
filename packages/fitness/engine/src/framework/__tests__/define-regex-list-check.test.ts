@@ -47,7 +47,10 @@ async function runOnContent(
     // No-scope test path: pass a fresh per-call FileCache explicitly.
     // createExecutionContext no longer falls back to a module singleton
     // (parallel-tool-invocations Phase 1); the empty cache reads through to disk.
-    const result = await check.run(cwd, { targetFiles: [abs], fileCache: new FileCache() });
+    const result = await check.run(cwd, {
+      targetFiles: [abs],
+      fileCache: new FileCache(),
+    });
     return result.signals ?? [];
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -106,7 +109,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo-pat', regex: /FOO/, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo-pat',
+            regex: /FOO/,
+            message: 'FOO',
+            severity: 'error',
+          },
           { id: PATTERN_ID_B, slug: 'bar-pat', regex: /BAR/, message: 'BAR' },
         ],
       });
@@ -124,7 +133,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO match', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO match',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'FOO FOO FOO\n');
@@ -143,7 +158,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/, message: 'FOO match', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/,
+            message: 'FOO match',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'FOO FOO FOO\n');
@@ -158,7 +179,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO match', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO match',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'FOO\nFOO\nFOO\n');
@@ -174,7 +201,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, '// FOO\nFOO\n');
@@ -191,7 +224,13 @@ describe('defineRegexListCheck', () => {
         fileTypes: ['ts'],
         options: { skipCommentLines: false },
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, '// FOO\nFOO\n');
@@ -207,7 +246,13 @@ describe('defineRegexListCheck', () => {
         fileTypes: ['ts'],
         options: { skipTestFiles: true },
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'FOO\n', 'src/foo.test.ts');
@@ -223,7 +268,13 @@ describe('defineRegexListCheck', () => {
         fileTypes: ['ts'],
         options: { skipCheckAuthoringSources: true },
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(
@@ -242,7 +293,13 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'FOO\n', 'src/foo.test.ts');
@@ -257,8 +314,20 @@ describe('defineRegexListCheck', () => {
         tags: ['demo'],
         fileTypes: ['ts'],
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
-          { id: PATTERN_ID_B, slug: 'bar', regex: /BAR/g, message: 'BAR', severity: 'warning' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
+          {
+            id: PATTERN_ID_B,
+            slug: 'bar',
+            regex: /BAR/g,
+            message: 'BAR',
+            severity: 'warning',
+          },
         ],
       });
       const signals = await runOnContent(check, 'FOO BAR\n');
@@ -299,7 +368,13 @@ describe('defineRegexListCheck', () => {
         fileTypes: ['ts'],
         options: { skipFile: (p) => p.includes('/cli-output/') },
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const inFile = await runOnContent(check, 'FOO\n', 'src/cli-output/foo.ts');
@@ -317,7 +392,13 @@ describe('defineRegexListCheck', () => {
         fileTypes: ['ts'],
         options: { skipLine: (trimmed) => trimmed.startsWith('import ') },
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
         ],
       });
       const signals = await runOnContent(check, 'import { FOO } from "x"\nFOO\n');
@@ -335,8 +416,20 @@ describe('defineRegexListCheck', () => {
         fileTypes: ['ts'],
         options: { oneViolationPerLine: true },
         patterns: [
-          { id: PATTERN_ID_A, slug: 'foo', regex: /FOO/g, message: 'FOO', severity: 'error' },
-          { id: PATTERN_ID_B, slug: 'bar', regex: /BAR/g, message: 'BAR', severity: 'error' },
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex: /FOO/g,
+            message: 'FOO',
+            severity: 'error',
+          },
+          {
+            id: PATTERN_ID_B,
+            slug: 'bar',
+            regex: /BAR/g,
+            message: 'BAR',
+            severity: 'error',
+          },
         ],
       });
       // Line 1 has both FOO and BAR — only one violation should be

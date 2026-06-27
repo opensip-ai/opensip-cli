@@ -42,7 +42,12 @@ function makeRecipe(overrides: Partial<FitnessRecipe> = {}): FitnessRecipe {
     displayName: 'Test',
     description: 'integration test recipe',
     checks: { type: 'all', exclude: [] },
-    execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000, maxParallel: 4 },
+    execution: {
+      mode: 'parallel',
+      stopOnFirstFailure: false,
+      timeout: 30_000,
+      maxParallel: 4,
+    },
     reporting: { format: 'table', verbose: false },
     ...overrides,
   };
@@ -125,7 +130,11 @@ describe('parallel execution — error paths', () => {
     // is reliably gated on the first's status.
     await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: true, timeout: 30_000 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: true,
+          timeout: 30_000,
+        },
       }),
     );
 
@@ -161,7 +170,11 @@ describe('sequential execution — timeout', () => {
 
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 50 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 50,
+        },
       }),
     );
 
@@ -193,7 +206,11 @@ describe('sequential execution — timeout', () => {
 
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 5000 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 5000,
+        },
       }),
     );
     expect(result.checkResults[0]?.passed).toBe(true);
@@ -263,7 +280,11 @@ describe('check-result-processor — error result fields', () => {
 
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 50 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 50,
+        },
       }),
     );
 
@@ -297,7 +318,11 @@ describe('check-result-processor — error result fields', () => {
 
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 5000 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 5000,
+        },
       }),
     );
 

@@ -15,7 +15,12 @@ describe('executeWithRetry', () => {
   it('returns result on first success without retrying', async () => {
     const fn = vi.fn().mockResolvedValue(42);
     const out = await executeWithRetry(fn, opts());
-    expect(out).toEqual({ result: 42, lastError: undefined, retryCount: 0, wasRetried: false });
+    expect(out).toEqual({
+      result: 42,
+      lastError: undefined,
+      retryCount: 0,
+      wasRetried: false,
+    });
     expect(fn).toHaveBeenCalledTimes(1);
   });
 

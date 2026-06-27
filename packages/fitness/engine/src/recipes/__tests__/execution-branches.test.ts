@@ -43,7 +43,12 @@ function makeRecipe(overrides: Partial<FitnessRecipe> = {}): FitnessRecipe {
     displayName: 'Test',
     description: 'integration test recipe',
     checks: { type: 'all', exclude: [] },
-    execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000, maxParallel: 4 },
+    execution: {
+      mode: 'parallel',
+      stopOnFirstFailure: false,
+      timeout: 30_000,
+      maxParallel: 4,
+    },
     reporting: { format: 'table', verbose: false },
     ...overrides,
   };
@@ -106,7 +111,12 @@ describe('parallel execution — stopOnFirstFailure', () => {
       makeRecipe({
         // maxParallel=1 forces serialized completion so stopOnFirstFailure
         // reliably gates the remaining checks.
-        execution: { mode: 'parallel', stopOnFirstFailure: true, timeout: 30_000, maxParallel: 1 },
+        execution: {
+          mode: 'parallel',
+          stopOnFirstFailure: true,
+          timeout: 30_000,
+          maxParallel: 1,
+        },
       }),
     );
 
@@ -207,7 +217,12 @@ describe('parallel execution — advanceWindow', () => {
     // remaining 3 are dispatched via advanceWindow.
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000, maxParallel: 2 },
+        execution: {
+          mode: 'parallel',
+          stopOnFirstFailure: false,
+          timeout: 30_000,
+          maxParallel: 2,
+        },
       }),
     );
     expect(result.summary.totalChecks).toBe(5);
@@ -396,7 +411,11 @@ describe('sequential execution — option propagation', () => {
     // Note: the recipe timeout fallback path executes when check.config.timeout is undefined.
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 10_000 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 10_000,
+        },
       }),
     );
     expect(result.checkResults[0]?.passed).toBe(true);
@@ -485,7 +504,11 @@ describe('sequential execution — stopOnFirstFailure with non-passing result', 
 
     await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: true, timeout: 30_000 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: true,
+          timeout: 30_000,
+        },
       }),
     );
 
@@ -508,7 +531,14 @@ describe('check-result-processor — fileFilter', () => {
         tags: ['quality'],
         analyze: (content, filePath) => {
           if (content.includes('FAIL')) {
-            return [{ line: 1, message: 'fail', severity: 'error' as const, filePath }];
+            return [
+              {
+                line: 1,
+                message: 'fail',
+                severity: 'error' as const,
+                filePath,
+              },
+            ];
           }
           return [];
         },
@@ -643,11 +673,20 @@ describe('check-result-processor — appliedDirectives carry through', () => {
         description: 'flag TODO',
         tags: ['quality'],
         analyze: (content, filePath) => {
-          const out: { line: number; message: string; severity: 'warning'; filePath: string }[] =
-            [];
+          const out: {
+            line: number;
+            message: string;
+            severity: 'warning';
+            filePath: string;
+          }[] = [];
           for (const [i, line] of content.split('\n').entries()) {
             if (line.includes('TODO')) {
-              out.push({ line: i + 1, message: 'TODO', severity: 'warning' as const, filePath });
+              out.push({
+                line: i + 1,
+                message: 'TODO',
+                severity: 'warning' as const,
+                filePath,
+              });
             }
           }
           return out;
@@ -702,7 +741,11 @@ describe('check-result-processor — non-Error error path', () => {
     // String(error) branch handles non-Error throws downstream.
     const result = await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 30_000 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 30_000,
+        },
       }),
     );
     expect(result.checkResults[0]?.passed).toBe(false);
@@ -742,7 +785,11 @@ describe('check-result-processor — onError callback', () => {
 
     await svc.start(
       makeRecipe({
-        execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 50 },
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 50,
+        },
       }),
     );
 

@@ -90,7 +90,9 @@ function buildFromParsed(
         include: Object.freeze([...entry.include]),
         exclude: Object.freeze([...(entry.exclude ?? DEFAULT_EXCLUDES)]),
         ...(entry.tags && { tags: Object.freeze([...entry.tags]) }),
-        ...(entry.languages && { languages: Object.freeze([...entry.languages]) }),
+        ...(entry.languages && {
+          languages: Object.freeze([...entry.languages]),
+        }),
         ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
       });
       registry.register(Object.freeze({ config }));
@@ -143,7 +145,9 @@ function buildFromParsed(
         }),
         ...(rawPlugins.autoDiscoverGraphAdapters === undefined
           ? {}
-          : { autoDiscoverGraphAdapters: rawPlugins.autoDiscoverGraphAdapters }),
+          : {
+              autoDiscoverGraphAdapters: rawPlugins.autoDiscoverGraphAdapters,
+            }),
       })
     : undefined;
 
@@ -195,7 +199,10 @@ function projectTargetsConfig(
  * @throws {ValidationError} When the file is missing, unreadable, contains
  *   invalid YAML, or fails schema validation.
  */
-function loadYamlConfig(filePath: string): { registry: TargetRegistry; config: TargetsConfig } {
+function loadYamlConfig(filePath: string): {
+  registry: TargetRegistry;
+  config: TargetsConfig;
+} {
   // Strict YAML read + parse via the shared core helper (audit-round-3
   // Finding G — completes the round-2 migration that signalers/loader
   // already adopted). Raises `SystemError` for oversized files and

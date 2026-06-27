@@ -143,7 +143,9 @@ describe('result-pattern-consistency — additionalThrowAllowedPaths config', ()
   it('treats a configured path as a throw-allowed boundary', async () => {
     await runWithScope(testScope, async () => {
       setCurrentRecipeCheckConfig(testScope, {
-        'result-pattern-consistency': { additionalThrowAllowedPaths: ['/acme-bridge/'] },
+        'result-pattern-consistency': {
+          additionalThrowAllowedPaths: ['/acme-bridge/'],
+        },
       });
       fx(
         'src/acme-bridge/edge.ts',

@@ -1184,8 +1184,14 @@ describe('broad fixture — many checks', () => {
           type: 'module',
           main: './dist/index.js',
           types: './dist/index.d.ts',
-          exports: { '.': { import: './dist/index.js', types: './dist/index.d.ts' } },
-          dependencies: { 'drizzle-orm': '^0.30.0', react: '^18.0.0', 'typed-inject': '^4.0.0' },
+          exports: {
+            '.': { import: './dist/index.js', types: './dist/index.d.ts' },
+          },
+          dependencies: {
+            'drizzle-orm': '^0.30.0',
+            react: '^18.0.0',
+            'typed-inject': '^4.0.0',
+          },
         },
         null,
         2,

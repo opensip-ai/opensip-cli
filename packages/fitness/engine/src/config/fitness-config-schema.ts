@@ -61,7 +61,15 @@ export const fitnessConfigDeclaration: ToolConfigDeclaration = {
   schema: FitnessNamespaceSchema,
   defaults: FITNESS_CONFIG_DEFAULTS,
   env: [
-    { envVar: 'OPENSIP_FIT_FAIL_ON_ERRORS', key: 'failOnErrors', type: 'number' },
-    { envVar: 'OPENSIP_FIT_FAIL_ON_WARNINGS', key: 'failOnWarnings', type: 'number' },
+    {
+      envVar: 'OPENSIP_FIT_FAIL_ON_ERRORS',
+      key: 'failOnErrors',
+      type: 'number',
+    },
+    {
+      envVar: 'OPENSIP_FIT_FAIL_ON_WARNINGS',
+      key: 'failOnWarnings',
+      type: 'number',
+    },
   ],
 };

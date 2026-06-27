@@ -288,7 +288,12 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
 
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node)) {
-        const violation = checkCallExpressionForViolation({ node, sourceFile, content, filePath });
+        const violation = checkCallExpressionForViolation({
+          node,
+          sourceFile,
+          content,
+          filePath,
+        });
         if (violation) {
           violations.push(violation);
         }

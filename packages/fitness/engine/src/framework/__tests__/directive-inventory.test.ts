@@ -18,7 +18,11 @@ describe('parseDirectiveLine', () => {
 
     it('parses @fitness-ignore-next-line without reason', () => {
       const result = parseDirectiveLine('// @fitness-ignore-next-line no-any-types');
-      expect(result).toEqual({ type: 'next-line', checkId: 'no-any-types', reason: null });
+      expect(result).toEqual({
+        type: 'next-line',
+        checkId: 'no-any-types',
+        reason: null,
+      });
     });
 
     it('rejects lines without the directive prefix', () => {
@@ -30,41 +34,69 @@ describe('parseDirectiveLine', () => {
   describe('block comments (/* form) — parity with suppression parser', () => {
     it('parses single-line block directive with reason', () => {
       const result = parseDirectiveLine('/* @fitness-ignore-file no-console-log -- legacy file */');
-      expect(result).toEqual({ type: 'file', checkId: 'no-console-log', reason: 'legacy file' });
+      expect(result).toEqual({
+        type: 'file',
+        checkId: 'no-console-log',
+        reason: 'legacy file',
+      });
     });
 
     it('parses single-line block directive without reason', () => {
       const result = parseDirectiveLine('/* @fitness-ignore-next-line no-any-types */');
-      expect(result).toEqual({ type: 'next-line', checkId: 'no-any-types', reason: null });
+      expect(result).toEqual({
+        type: 'next-line',
+        checkId: 'no-any-types',
+        reason: null,
+      });
     });
 
     it('strips trailing whitespace before */', () => {
       const result = parseDirectiveLine('/* @fitness-ignore-file some-check   */');
-      expect(result).toEqual({ type: 'file', checkId: 'some-check', reason: null });
+      expect(result).toEqual({
+        type: 'file',
+        checkId: 'some-check',
+        reason: null,
+      });
     });
   });
 
   describe('HTML comments (<!-- form)', () => {
     it('parses single-line HTML directive with reason', () => {
       const result = parseDirectiveLine('<!-- @fitness-ignore-file md-check -- doc fixture -->');
-      expect(result).toEqual({ type: 'file', checkId: 'md-check', reason: 'doc fixture' });
+      expect(result).toEqual({
+        type: 'file',
+        checkId: 'md-check',
+        reason: 'doc fixture',
+      });
     });
 
     it('parses HTML directive without reason', () => {
       const result = parseDirectiveLine('<!-- @fitness-ignore-next-line md-check -->');
-      expect(result).toEqual({ type: 'next-line', checkId: 'md-check', reason: null });
+      expect(result).toEqual({
+        type: 'next-line',
+        checkId: 'md-check',
+        reason: null,
+      });
     });
   });
 
   describe('hash comments (# form)', () => {
     it('parses hash directive with reason', () => {
       const result = parseDirectiveLine('# @fitness-ignore-file yaml-check -- ci config exempt');
-      expect(result).toEqual({ type: 'file', checkId: 'yaml-check', reason: 'ci config exempt' });
+      expect(result).toEqual({
+        type: 'file',
+        checkId: 'yaml-check',
+        reason: 'ci config exempt',
+      });
     });
 
     it('parses hash directive without reason', () => {
       const result = parseDirectiveLine('# @fitness-ignore-next-line yaml-check');
-      expect(result).toEqual({ type: 'next-line', checkId: 'yaml-check', reason: null });
+      expect(result).toEqual({
+        type: 'next-line',
+        checkId: 'yaml-check',
+        reason: null,
+      });
     });
   });
 
@@ -105,10 +137,22 @@ describe('inventory + suppression parity across comment styles', () => {
   // (handled by directive-inventory.ts via a stricter `// ` / `/* `
   // check). Now both consume the shared table.
   const cases: { name: string; line: string }[] = [
-    { name: 'line comment', line: '// @fitness-ignore-file shared-fixture-check' },
-    { name: 'block comment', line: '/* @fitness-ignore-file shared-fixture-check */' },
-    { name: 'HTML comment', line: '<!-- @fitness-ignore-file shared-fixture-check -->' },
-    { name: 'hash comment', line: '# @fitness-ignore-file shared-fixture-check' },
+    {
+      name: 'line comment',
+      line: '// @fitness-ignore-file shared-fixture-check',
+    },
+    {
+      name: 'block comment',
+      line: '/* @fitness-ignore-file shared-fixture-check */',
+    },
+    {
+      name: 'HTML comment',
+      line: '<!-- @fitness-ignore-file shared-fixture-check -->',
+    },
+    {
+      name: 'hash comment',
+      line: '# @fitness-ignore-file shared-fixture-check',
+    },
   ];
 
   for (const { name, line } of cases) {

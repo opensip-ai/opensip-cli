@@ -263,7 +263,10 @@ export const fitnessTool: Tool = defineTool({
       defaults: fitnessConfigDeclaration.defaults,
       env: fitnessConfigDeclaration.env,
     },
-    capabilityRegistrars: { 'fit-pack': registerFitCheck, 'fit-recipe': registerFitRecipe },
+    capabilityRegistrars: {
+      'fit-pack': registerFitCheck,
+      'fit-recipe': registerFitRecipe,
+    },
     fingerprintStrategy: fitnessFingerprintStrategy,
     scaffoldExamples: fitScaffoldExamples,
     stableExampleIds: fitStableExampleIds,

@@ -132,7 +132,9 @@ describe('fitReplayFromSession', () => {
       },
       {
         name: 'missing checks[]',
-        payload: { summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+        payload: {
+          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+        },
         message: /missing checks\[\]/,
       },
       {

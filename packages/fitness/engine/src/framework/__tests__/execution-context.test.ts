@@ -16,7 +16,11 @@ import type { Logger, RunScopeOptions } from '@opensip-cli/core';
  *  cannot use `@opensip-cli/test-support` (it depends on this package —
  *  the dev edge would make the package graph cyclic; ADR-0040). */
 const makeTestScope = (opts: RunScopeOptions = {}): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry(), ...opts });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+    ...opts,
+  });
 const withScopeSync = runWithScopeSync;
 
 let testDir: string;
@@ -52,7 +56,11 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
     setupCachedFiles();
     await fileCache.prewarm(testDir, ['**/*.ts', '**/*.md', '**/*.json']);
 
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     // No-scope test path: pass the (test-only) module singleton explicitly as
     // options.fileCache. createExecutionContext no longer falls back to a global
     // (parallel-tool-invocations Phase 1) — it resolves options.fileCache or the
@@ -96,7 +104,11 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
 
 describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   it('extractSnippet delegates to result-builder.extractSnippet with a default of 2 context lines', () => {
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const ctx = createExecutionContext(
       { id: 'test-id', slug: 'test-slug', itemType: 'files' },
       testDir,
@@ -109,7 +121,11 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   });
 
   it('log routes verbose output through the scope logger only when verbose is true', () => {
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const infoSpy = vi.fn();
     const stubLogger = {
       debug: vi.fn(),
@@ -148,7 +164,11 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   });
 
   it('checkAborted throws CheckAbortedError when the signal is aborted', () => {
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const ac = new AbortController();
     const ctx = createExecutionContext(
       { id: 'id', slug: 'slug', itemType: 'files' },
@@ -166,7 +186,11 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   });
 
   it('readFile rejects files that exceed the 10MB limit', async () => {
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const ctx = createExecutionContext(
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
@@ -178,7 +202,11 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   });
 
   it('fileExists delegates to fileCache', async () => {
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const ctx = createExecutionContext(
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
@@ -190,7 +218,11 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   });
 
   it('getMatcher returns the same matcher passed in', () => {
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const ctx = createExecutionContext(
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
@@ -203,7 +235,11 @@ describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
   it('matchFiles with explicit patterns ignores the targetFiles override', async () => {
     mkdirSync(join(testDir, 'src'), { recursive: true });
     writeFileSync(join(testDir, 'src', 'a.ts'), 'x');
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     const ctx = createExecutionContext(
       { id: 'id', slug: 'slug', itemType: 'files' },
       testDir,
@@ -221,7 +257,11 @@ describe('createExecutionContext > per-run FileCache is required (no global fall
   it('throws SYSTEM.FITNESS.NO_FILE_CACHE when neither options.fileCache nor a scope cache is present', () => {
     // No scope entered AND no options.fileCache → resolve-or-throw fires
     // (parallel-tool-invocations Phase 1 removed the module-singleton fallback).
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     expect(() =>
       createExecutionContext(
         { id: 'id', slug: 'needs-cache', itemType: 'files' },
@@ -237,7 +277,11 @@ describe('createExecutionContext > per-run FileCache is required (no global fall
     const scopeCache = fileCache;
     const scope = makeTestScope();
     Object.assign(scope, { fitness: { fileCache: scopeCache } });
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     withScopeSync(scope, () => {
       expect(() =>
         createExecutionContext(

@@ -360,7 +360,10 @@ function getSeverityForIssueType(issueType: IssueType): 'error' | 'warning' {
 export const eslintJustifications = defineCheck({
   id: '92d8f5de-dc11-40eb-aaf4-e77159975825',
   slug: 'eslint-justifications',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

@@ -33,7 +33,9 @@ export class CheckAbortedError extends SystemError {
   readonly checkId: string;
 
   constructor(checkId: string, message?: string) {
-    super(message ?? `Check ${checkId} was aborted`, { code: 'SYSTEM.FITNESS.CHECK_ABORTED' });
+    super(message ?? `Check ${checkId} was aborted`, {
+      code: 'SYSTEM.FITNESS.CHECK_ABORTED',
+    });
     this.checkId = checkId;
     Object.setPrototypeOf(this, CheckAbortedError.prototype);
   }

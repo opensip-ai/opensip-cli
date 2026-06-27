@@ -216,7 +216,10 @@ export function createErrorResult(message: string, error?: Error): CheckResult {
       totalItems: 0,
       signals: [],
       extra: error
-        ? { originalError: error.message, ...(error.stack ? { stack: error.stack } : {}) }
+        ? {
+            originalError: error.message,
+            ...(error.stack ? { stack: error.stack } : {}),
+          }
         : undefined,
     },
   };

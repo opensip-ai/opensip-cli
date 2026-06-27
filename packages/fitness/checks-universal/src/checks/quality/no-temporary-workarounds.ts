@@ -30,7 +30,10 @@ function matchTemporaryWorkaround(line: string): boolean {
 export const noTemporaryWorkarounds = defineCheck({
   id: '09a93ec8-7b08-47b2-946a-c635e135b67b',
   slug: 'no-temporary-workarounds',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detects HACK/FIXME comments that describe themselves as temporary',

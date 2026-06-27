@@ -96,8 +96,14 @@ describe('phantom-dependency-detection (AST)', () => {
 
   it('flags a devDependency used in non-test code, but allows it in a test file', async () => {
     const matches = await phantomMatches(
-      { path: 'a.ts', content: `import { d } from 'dev-only-pkg'\nexport const y = d` },
-      { path: 'a.test.ts', content: `import { d } from 'dev-only-pkg'\nexport const y = d` },
+      {
+        path: 'a.ts',
+        content: `import { d } from 'dev-only-pkg'\nexport const y = d`,
+      },
+      {
+        path: 'a.test.ts',
+        content: `import { d } from 'dev-only-pkg'\nexport const y = d`,
+      },
     );
     // Exactly the non-test usage is flagged.
     expect(matches.filter((m) => m === 'dev-only-pkg')).toHaveLength(1);
@@ -116,9 +122,15 @@ describe('phantom-dependency-detection (AST)', () => {
       files: [
         {
           path: 'package.json',
-          content: JSON.stringify({ name: 'demo', dependencies: { '@scope/ws': 'workspace:*' } }),
+          content: JSON.stringify({
+            name: 'demo',
+            dependencies: { '@scope/ws': 'workspace:*' },
+          }),
         },
-        { path: 'a.ts', content: `import { w } from '@scope/ws'\nexport const y = w` },
+        {
+          path: 'a.ts',
+          content: `import { w } from '@scope/ws'\nexport const y = w`,
+        },
       ],
     });
     expect(run.findings).toEqual([]);

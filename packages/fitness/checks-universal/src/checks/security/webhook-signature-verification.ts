@@ -37,7 +37,13 @@ interface CreateSecurityPatternOptions {
 function createSecurityPattern(options: CreateSecurityPatternOptions): SecurityPattern {
   const { pattern, flags, message, suggestion, severity, category } = options;
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
-  return { regex: new RegExp(pattern, flags), message, suggestion, severity, category };
+  return {
+    regex: new RegExp(pattern, flags),
+    message,
+    suggestion,
+    severity,
+    category,
+  };
 }
 
 /**

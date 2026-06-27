@@ -86,7 +86,10 @@ export function detectConfigsNotExtendingBase(input: VitestExtendsBaseInput): Ch
 export const vitestConfigExtendsBase = defineCheck({
   id: 'f1b9c2e4-7a3d-4c8e-9b6f-2d5a1e8c4b07',
   slug: 'vitest-config-extends-base',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   confidence: 'high',
   description:
     'Per-package vitest configs must extend the shared .config/vitest.base (when one exists)',

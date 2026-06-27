@@ -395,7 +395,10 @@ export function analyzeContextMutation(content: string, filePath: string): Check
 export const contextMutationCheck = defineCheck({
   id: 'abed5b29-960b-486f-bb0d-5b9e1744241d',
   slug: 'context-mutation',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'medium',

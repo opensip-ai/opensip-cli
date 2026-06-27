@@ -39,7 +39,10 @@ function isCliOutputFile(filePath: string): boolean {
 export const noConsoleLog = defineRegexListCheck({
   id: '86403377-5903-478a-bdf2-e4f2f17df39f',
   slug: 'no-console-log',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   description: 'Disallow console.log in production code - use a structured logger',
   longDescription: `**Purpose:** Ensures production code uses a structured logger (e.g., pino, winston) instead of console methods, which lack structured fields and log levels.
 

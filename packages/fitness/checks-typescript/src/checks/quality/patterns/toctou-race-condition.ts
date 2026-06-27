@@ -111,7 +111,11 @@ export function analyzeFileForToctou(filePath: string, content: string): CheckVi
 
   const visit = (node: ts.Node): void => {
     if (isFunctionLikeNode(node)) {
-      const violation = checkFunctionForToctou({ node, sourceFile, interfaceCollectionFields });
+      const violation = checkFunctionForToctou({
+        node,
+        sourceFile,
+        interfaceCollectionFields,
+      });
       if (violation) {
         violations.push(violation);
       }

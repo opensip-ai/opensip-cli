@@ -27,6 +27,7 @@ import { currentCheckRegistry } from '../framework/scope-registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
 import { FitnessRecipeService } from '../recipes/service.js';
 
+import { resolveChangedSet, restrictFileMapToChanged } from './fit/changed-targeting.js';
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import {
@@ -169,8 +170,21 @@ export async function executeFit(
     const check = checkRegistry.getBySlug(key);
     return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
   });
-  const scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
-  const checkTargetFiles = scopeMap.size > 0 ? scopeMap : undefined;
+  let scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
+  const changedWarnings: string[] = [];
+  if (args.changed === true || args.since) {
+    const changed = resolveChangedSet(args);
+    if (!changed.ok) {
+      changedWarnings.push(changed.warning);
+    } else if (changed.files.size === 0) {
+      changedWarnings.push('No changed files detected — fit run will target nothing.');
+      scopeMap = new Map();
+    } else {
+      scopeMap = restrictFileMapToChanged(scopeMap, changed.files);
+    }
+  }
+  const checkTargetFiles =
+    args.changed === true || args.since || scopeMap.size > 0 ? scopeMap : undefined;
 
   // CLI --exclude (and any config-level per-run exclude) are additive runtime filters for this invocation.
   // They are merged into disabledChecks so the recipe service skips them exactly as permanently-disabled checks.
@@ -204,7 +218,7 @@ export async function executeFit(
   // and from config validation (validateLanguagesAgainstAdapters). Both flow
   // through the result rather than direct stderr writes so the live renderer
   // can surface them without breaking Ink's frame tracking.
-  const warnings = [...getLoadWarnings(), ...validationWarnings];
+  const warnings = [...getLoadWarnings(), ...validationWarnings, ...changedWarnings];
 
   const result = buildFitPresentation({
     args,

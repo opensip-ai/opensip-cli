@@ -330,7 +330,13 @@ function collectFileViolations(
   };
   const allowDevDeps = allowsDevDependencies(filePath);
 
-  const ctx: FileDepContext = { pkgJson, allDeps, allowDevDeps, filePath, pkgJsonPath };
+  const ctx: FileDepContext = {
+    pkgJson,
+    allDeps,
+    allowDevDeps,
+    filePath,
+    pkgJsonPath,
+  };
   const out: CheckViolation[] = [];
   for (const imp of imports) {
     const violation = violationForImport(imp, ctx);
@@ -353,7 +359,10 @@ function collectFileViolations(
 export const phantomDependencyDetection = defineCheck({
   id: '67284374-69b8-4711-9c66-33d2ad44ef79',
   slug: 'phantom-dependency-detection',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   // AST-based: needs the real source (string stripping would blank module specifiers).
   contentFilter: 'raw',
 

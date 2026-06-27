@@ -91,7 +91,10 @@ describe('executeCommand', () => {
       parseOutput: () => [],
     };
     setTimeout(() => ctrl.abort(), 30);
-    const result = await executeCommand(config, [], { cwd, signal: ctrl.signal });
+    const result = await executeCommand(config, [], {
+      cwd,
+      signal: ctrl.signal,
+    });
     expect(result.aborted).toBe(true);
     expect(result.violations).toEqual([]);
   });

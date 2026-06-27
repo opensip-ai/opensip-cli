@@ -120,7 +120,10 @@ function findMarkdownReferences(
 export const noMarkdownReferences = defineCheck({
   id: '8be86917-6908-49e5-a185-a6bd18045b31',
   slug: 'no-markdown-references',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

@@ -144,7 +144,10 @@ describe('isInPublicApiSurface', () => {
       JSON.stringify({
         name: '@org/b',
         exports: {
-          '.': { import: ['./dist/main.js', './dist/main.js'], require: './dist/main.js' },
+          '.': {
+            import: ['./dist/main.js', './dist/main.js'],
+            require: './dist/main.js',
+          },
           './sub': './dist/sub.js',
           './glob/*': './dist/glob/*.js',
         },

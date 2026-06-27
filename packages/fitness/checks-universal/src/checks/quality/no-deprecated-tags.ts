@@ -39,7 +39,10 @@ function isDeprecatedJsdocLine(line: string): boolean {
 export const noDeprecatedTags = defineCheck({
   id: '3a27c17d-a926-46a8-864d-610de1a385eb',
   slug: 'no-deprecated-tags',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detects @deprecated JSDoc tags in production code',

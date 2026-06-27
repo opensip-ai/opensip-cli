@@ -26,7 +26,10 @@ describe('validateCheckConfig', () => {
   });
 
   it('accepts arbitrary tag strings', () => {
-    const config = { ...BASE_CONFIG, tags: ['custom-tag', 'another-one', 'cwe-89'] };
+    const config = {
+      ...BASE_CONFIG,
+      tags: ['custom-tag', 'another-one', 'cwe-89'],
+    };
     expect(() => validateCheckConfig(config)).not.toThrow();
   });
 

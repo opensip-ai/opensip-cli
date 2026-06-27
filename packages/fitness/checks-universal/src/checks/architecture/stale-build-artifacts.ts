@@ -34,7 +34,10 @@ function isArtifactInSource(filePath: string): { ext: string } | null {
 export const staleBuildArtifacts = defineCheck({
   id: '8d36209b-5aeb-4ab0-8255-3134a20fdfd5',
   slug: 'stale-build-artifacts',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   confidence: 'high',
   description:
     'Detects compiled .js/.d.ts/.js.map files in source directories that should only exist in dist/',

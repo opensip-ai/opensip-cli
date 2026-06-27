@@ -32,7 +32,10 @@ import type { ResolvedToolConfig, VerdictPolicy } from '@opensip-cli/core';
  *  cannot use `@opensip-cli/test-support` (it depends on this package —
  *  the dev edge would make the package graph cyclic; ADR-0040). */
 const makeTestScope = (): RunScope =>
-  new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
 
 /** The minimal `signalersConfig` shape `resolveFitVerdictPolicy` reads as the FALLBACK source. */
 function makeSignalersConfig(failOnErrors: number, failOnWarnings: number): SignalersConfig {

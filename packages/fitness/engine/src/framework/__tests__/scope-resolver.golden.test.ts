@@ -107,8 +107,14 @@ describe('scope-resolver golden (byte-identical through the substrate migration)
     };
 
     const checks: { slug: string; scope?: CheckScope }[] = [
-      { slug: 'ts-check', scope: { languages: ['typescript'], concerns: ['backend'] } },
-      { slug: 'multi-check', scope: { languages: ['typescript', 'rust'], concerns: ['backend'] } },
+      {
+        slug: 'ts-check',
+        scope: { languages: ['typescript'], concerns: ['backend'] },
+      },
+      {
+        slug: 'multi-check',
+        scope: { languages: ['typescript', 'rust'], concerns: ['backend'] },
+      },
       { slug: 'override-check' }, // tier 1 via checkOverrides
       { slug: 'unscoped-check' }, // tier 3 → absent from the map
     ];

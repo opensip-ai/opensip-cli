@@ -74,7 +74,10 @@ function analyze(content: string, filePath: string): CheckViolation[] {
 export const sentrySourceMaps = defineCheck({
   id: 'e5a1c7d4-8f6b-4c2e-d345-b7a9e1f3c6d8',
   slug: 'sentry-source-maps',
-  scope: { languages: ['typescript', 'javascript'], concerns: ['backend', 'frontend'] },
+  scope: {
+    languages: ['typescript', 'javascript'],
+    concerns: ['backend', 'frontend'],
+  },
   description: 'Detects missing Sentry source map upload — stack traces will be unreadable',
   longDescription: `**Purpose:** Ensures bundler configurations include a Sentry source map upload plugin so production stack traces are readable.
 

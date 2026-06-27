@@ -80,7 +80,15 @@ function addESLintDirectives(options: AddESLintDirectivesOptions): void {
 
   if (rules.length === 0) {
     directives.push(
-      createESLintDirective({ rule: '*', scope, lineNumber, file, filePath, reason, rawLine }),
+      createESLintDirective({
+        rule: '*',
+        scope,
+        lineNumber,
+        file,
+        filePath,
+        reason,
+        rawLine,
+      }),
     );
     return;
   }

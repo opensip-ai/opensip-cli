@@ -448,7 +448,12 @@ export function analyzeFileForResultPatternConsistency(
 
     /* v8 ignore next -- defensive nullish fallback */
     const bodyText = node.body?.getText(sourceFile) ?? '';
-    const violation = checkResultFunctionBody({ bodyText, node, sourceFile, filePath });
+    const violation = checkResultFunctionBody({
+      bodyText,
+      node,
+      sourceFile,
+      filePath,
+    });
     if (violation) {
       violations.push(violation);
     }

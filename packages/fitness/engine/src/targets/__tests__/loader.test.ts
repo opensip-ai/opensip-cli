@@ -215,7 +215,10 @@ plugins:
  *  installed via Object.assign exactly like the CLI pre-action hook does
  *  (scope-types.ts declares it readonly for readers). */
 const makeScopeWithDocument = (configDocument: Record<string, unknown>): RunScope => {
-  const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  const scope = new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
   Object.assign(scope, { configDocument });
   return scope;
 };
@@ -245,7 +248,10 @@ describe('loadTargetsConfig — scope-first (ADR-0023 one-reader)', () => {
   });
 
   it('rejects scoped calls that lack the host-validated config document', () => {
-    const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+    });
     expect(() => runWithScopeSync(scope, () => loadTargetsConfig(testDir))).toThrow(
       ValidationError,
     );

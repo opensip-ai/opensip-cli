@@ -51,7 +51,11 @@ describe('fileCache-fallback excludes match the substrate applyGlobalExcludes', 
     const globalExcludes = ['docs/**', '**/*.snap', '.cache/**'];
 
     // The scope-empty fallback (empty include patterns → fileCache fallback).
-    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const matcher = PathMatcher.create({
+      cwd: testDir,
+      include: [],
+      exclude: [],
+    });
     // No-scope test path: pass the (test-only) module singleton explicitly —
     // createExecutionContext no longer falls back to a global (Phase 1).
     const ctx = createExecutionContext(

@@ -914,8 +914,11 @@ describe('no-duplicate-packages http and date categories', () => {
 describe('dependency-security-audit parseOutput', () => {
   it('parses npm audit JSON with vulnerabilities', async () => {
     const mod = await import('../checks/security/dependency-vulnerability-audit.js');
-    const cmd = (mod.dependencyVulnerabilityAudit as { config: { commandConfig?: unknown } })
-      .config;
+    const cmd = (
+      mod.dependencyVulnerabilityAudit as {
+        config: { commandConfig?: unknown };
+      }
+    ).config;
     // The check has a command config — but it's wrapped. We just ensure it's there.
     expect(cmd).toBeDefined();
   });

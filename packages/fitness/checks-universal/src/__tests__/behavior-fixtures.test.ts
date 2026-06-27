@@ -160,7 +160,9 @@ describe('transaction-timeout', () => {
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 
   it('flags manual transaction usage missing timeout configuration', async () => {
-    const result = await findCheck('transaction-timeout').run(cwd, { targetFiles: files });
+    const result = await findCheck('transaction-timeout').run(cwd, {
+      targetFiles: files,
+    });
     const types = result.signals.map((s) => s.metadata.type);
     expect(types).toContain('missing-transaction-timeout');
   });
@@ -207,7 +209,9 @@ describe('reentrancy-guard', () => {
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 
   it('flags a module-scoped boolean reentrancy guard', async () => {
-    const result = await findCheck('reentrancy-guard').run(cwd, { targetFiles: files });
+    const result = await findCheck('reentrancy-guard').run(cwd, {
+      targetFiles: files,
+    });
     const types = result.signals.map((s) => s.metadata.type);
     expect(types).toContain('boolean-reentrancy-guard');
   });

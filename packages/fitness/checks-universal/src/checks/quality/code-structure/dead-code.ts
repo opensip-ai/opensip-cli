@@ -222,7 +222,10 @@ function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
 export const deadCode = defineCheck({
   id: '0ed970d8-0cfc-4263-b82d-c6e08e768a59',
   slug: 'dead-code',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
 
   confidence: 'medium',
   description: 'Detect unused files, exports, types, and dependencies using Knip',

@@ -19,7 +19,10 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cl
 export const projectReadmeExistence = defineCheck({
   id: 'b7c3a2c2-0448-405f-86e3-8b5fca987bc7',
   slug: 'project-readme-existence',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
 
   confidence: 'medium',
   description: 'Ensures every package has a README.md file',

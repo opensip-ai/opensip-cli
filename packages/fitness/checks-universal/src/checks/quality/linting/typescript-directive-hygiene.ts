@@ -80,7 +80,10 @@ function isGeneric(justification: string): boolean {
 export const typescriptDirectiveHygiene = defineCheck({
   id: CHECK_ID,
   slug: CHECK_SLUG,
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

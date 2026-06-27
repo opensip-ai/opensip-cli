@@ -182,7 +182,11 @@ const preReleaseRecipe: FitnessRecipe = defineRecipe({
   displayName: 'Pre-Release',
   description: 'Comprehensive checks before release',
   checks: { type: 'all' },
-  execution: { mode: 'sequential', stopOnFirstFailure: false, timeout: 120_000 },
+  execution: {
+    mode: 'sequential',
+    stopOnFirstFailure: false,
+    timeout: 120_000,
+  },
   reporting: { format: 'unified', verbose: true },
   tags: ['comprehensive', 'release', 'thorough'],
 });
@@ -203,7 +207,11 @@ const nightlyFullRecipe: FitnessRecipe = defineRecipe({
     timeout: 300_000,
     maxParallel: DEFAULT_MAX_PARALLEL,
   },
-  reporting: { format: 'unified', verbose: true, outputPath: 'fitness-nightly-report.json' },
+  reporting: {
+    format: 'unified',
+    verbose: true,
+    outputPath: 'fitness-nightly-report.json',
+  },
   tags: ['nightly', 'comprehensive', 'scheduled'],
 });
 
@@ -220,6 +228,56 @@ const ciRecipe: FitnessRecipe = defineRecipe({
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 60_000 },
   reporting: { format: 'json', verbose: false },
   tags: ['ci', 'pipeline', 'automated'],
+});
+
+// =============================================================================
+// AGENT RECIPES (ADR-0085 / spec §5.6)
+// =============================================================================
+
+/** Agent-fast: bounded cheap checks for tight edit loops. */
+const agentFastRecipe: FitnessRecipe = defineRecipe({
+  name: 'agent-fast',
+  displayName: 'Agent Fast',
+  description: 'Bounded high-confidence cheap checks for agent edit loops',
+  checks: {
+    type: 'explicit',
+    checkIds: [
+      'no-console-log',
+      'no-any-types',
+      'null-safety',
+      'detached-promises',
+      'no-hardcoded-secrets',
+      'no-skipped-tests',
+    ],
+  },
+  execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 15_000 },
+  reporting: { format: 'table', verbose: false },
+  tags: ['agent', 'fast'],
+});
+
+/** Agent-risk: architecture + security focused checks. */
+const agentRiskRecipe: FitnessRecipe = defineRecipe({
+  name: 'agent-risk',
+  displayName: 'Agent Risk',
+  description: 'Architecture and security checks for agent risk passes',
+  checks: {
+    type: 'pattern',
+    include: ['architecture/*', 'security/*'],
+  },
+  execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
+  reporting: { format: 'table', verbose: false },
+  tags: ['agent', 'risk'],
+});
+
+/** Agent-final: full verification gate (CI-equivalent). */
+const agentFinalRecipe: FitnessRecipe = defineRecipe({
+  name: 'agent-final',
+  displayName: 'Agent Final',
+  description: 'Full verification — equivalent to running all enabled checks (CI gate)',
+  checks: { type: 'all' },
+  execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 120_000 },
+  reporting: { format: 'unified', verbose: true },
+  tags: ['agent', 'final', 'comprehensive'],
 });
 
 // =============================================================================
@@ -244,6 +302,9 @@ const architectureRecipe: FitnessRecipe = defineRecipe({
 /** All built-in fitness recipes */
 export const builtInRecipes: readonly FitnessRecipe[] = Object.freeze([
   defaultRecipe,
+  agentFastRecipe,
+  agentRiskRecipe,
+  agentFinalRecipe,
   quickSmokeRecipe,
   backendRecipe,
   frontendRecipe,

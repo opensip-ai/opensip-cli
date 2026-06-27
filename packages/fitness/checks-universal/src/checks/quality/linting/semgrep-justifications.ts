@@ -237,7 +237,10 @@ function getSeverityForIssueType(issueType: IssueType): 'error' | 'warning' {
 export const semgrepJustifications = defineCheck({
   id: CHECK_ID,
   slug: CHECK_SLUG,
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

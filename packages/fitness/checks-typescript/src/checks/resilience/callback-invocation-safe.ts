@@ -227,7 +227,10 @@ export function analyzeCallbackInvocationSafe(content: string, filePath: string)
 export const callbackInvocationSafe = defineCheck({
   id: 'd3e7b1c8-95a2-4f6d-b8e2-2c4e7a9d1f3c',
   slug: 'callback-invocation-safe',
-  scope: { languages: ['typescript'], concerns: ['backend', 'architecture', 'resilience'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'architecture', 'resilience'],
+  },
   contentFilter: 'raw',
   confidence: 'low',
   description:

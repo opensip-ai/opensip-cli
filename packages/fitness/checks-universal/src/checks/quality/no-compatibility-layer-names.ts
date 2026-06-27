@@ -67,7 +67,10 @@ function matchesDeclaration(line: string, matcher: NameMatcher): boolean {
 export const noCompatibilityLayerNames = defineCheck({
   id: 'e39edca8-ee4d-4de8-9a39-655f4d0eb86d',
   slug: 'no-compatibility-layer-names',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detects compatibility-layer, legacy-wrapper, and backward-compat declarations',

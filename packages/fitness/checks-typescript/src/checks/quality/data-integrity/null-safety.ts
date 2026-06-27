@@ -28,7 +28,10 @@ export { SAFE_BUILDER_PREFIXES, SAFE_METHOD_PREFIXES } from './null-safety-confi
 export const nullSafety = defineCheck({
   id: '011c993e-829b-4423-8032-0b7c9baa22bf',
   slug: 'null-safety',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'strip-strings',
 
   confidence: 'high',

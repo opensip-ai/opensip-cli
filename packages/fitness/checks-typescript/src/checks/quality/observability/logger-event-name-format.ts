@@ -105,7 +105,10 @@ function analyzeEvtNames(content: string, filePath: string): CheckViolation[] {
 export const loggerEventNameFormat = defineCheck({
   id: '880c2472-9dd2-47c1-a1b8-03f06407a9ed',
   slug: 'logger-event-name-format',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
 
   confidence: 'medium',

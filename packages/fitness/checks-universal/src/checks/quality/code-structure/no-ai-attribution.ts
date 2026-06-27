@@ -30,7 +30,10 @@ const VIOLATION_MESSAGE = `AI-attribution comment found. ${FIX_MESSAGE}`;
 export const noAiAttribution = defineRegexListCheck({
   id: '4281da0e-2af1-447b-8a25-1da675f41f56',
   slug: 'no-ai-attribution',
-  scope: { languages: ['typescript'], concerns: ['backend', 'frontend', 'cli'] },
+  scope: {
+    languages: ['typescript'],
+    concerns: ['backend', 'frontend', 'cli'],
+  },
   contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detects AI-attribution metadata in comments',
