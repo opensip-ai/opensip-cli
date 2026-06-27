@@ -128,7 +128,9 @@ describe('handleParseError', () => {
     const errorLog = vi.fn();
     let observedExitCode: number | string | undefined;
     try {
-      handleFatalBootstrapError(new Error('bootstrap exploded'), { error: errorLog });
+      handleFatalBootstrapError(new Error('bootstrap exploded'), {
+        error: errorLog,
+      });
       observedExitCode = process.exitCode;
     } finally {
       spy.mockRestore();
@@ -136,7 +138,10 @@ describe('handleParseError', () => {
     }
     expect(writes.join('')).toContain('bootstrap exploded');
     expect(errorLog).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.bootstrap.failed', error: 'bootstrap exploded' }),
+      expect.objectContaining({
+        evt: 'cli.bootstrap.failed',
+        error: 'bootstrap exploded',
+      }),
     );
     expect(observedExitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
   });
@@ -243,7 +248,11 @@ describe('handleParseError', () => {
 });
 
 // 2.12.0 (§4.7 / §5.5): BootstrapError + the --json structured-outcome path.
-function spyStreams(): { stdout: string[]; stderr: string[]; restore: () => void } {
+function spyStreams(): {
+  stdout: string[];
+  stderr: string[];
+  restore: () => void;
+} {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const o = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {

@@ -144,7 +144,12 @@ describe('mountAllToolCommands', () => {
     // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
     const broken: Tool = {
       identity: { name: 'broken' },
-      metadata: { id: 'broken', name: 'Broken', version: '0.0.0', description: '' },
+      metadata: {
+        id: 'broken',
+        name: 'Broken',
+        version: '0.0.0',
+        description: '',
+      },
       commands: [{ name: 'broken', description: 'broken' }],
       commandSpecs: [
         {
@@ -153,7 +158,13 @@ describe('mountAllToolCommands', () => {
           commonFlags: [],
           scope: 'project',
           output: 'command-result',
-          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+          options: [
+            {
+              flag: '--flag',
+              description: 'boolean but required',
+              required: true,
+            },
+          ],
           handler: () => Promise.resolve({ type: 'noop' }),
         },
       ] as never,

@@ -185,11 +185,20 @@ export async function pluginAdd(
   const dir = ensurePluginHostDir(domain, cwd);
   const outcome = npmInstallIntoHost(dir, packageName);
   if (!outcome.ok) {
-    return { type: PLUGIN_ADD, packageName, success: false, error: outcome.error };
+    return {
+      type: PLUGIN_ADD,
+      packageName,
+      success: false,
+      error: outcome.error,
+    };
   }
   // Update the project config so discovery actually loads it.
   addToConfigPluginList(resolveProjectPaths(cwd).configFile, domain, outcome.installedName);
-  return { type: PLUGIN_ADD, packageName: outcome.installedName, success: true };
+  return {
+    type: PLUGIN_ADD,
+    packageName: outcome.installedName,
+    success: true,
+  };
 }
 
 // =============================================================================

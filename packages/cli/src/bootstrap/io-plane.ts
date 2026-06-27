@@ -135,7 +135,10 @@ export function createIoPlane(deps: {
   readonly runSession: ToolRunSessions;
 }): EgressPlane & LivePlane {
   return {
-    ...createEgressPlane({ setExitCode: deps.setExitCode, logger: deps.logger }),
+    ...createEgressPlane({
+      setExitCode: deps.setExitCode,
+      logger: deps.logger,
+    }),
     ...createLivePlane({
       liveViews: deps.liveViews,
       runPlane: deps.runPlane,

@@ -48,13 +48,19 @@ describe('SessionReplayRegistry.fromTools', () => {
     const contribution = reg.get('fit');
     expect(contribution).toBeDefined();
     const replay = await contribution?.replaySession(STORED);
-    expect(replay).toMatchObject({ fidelity: 'projection', envelope: { in: 'host' } });
+    expect(replay).toMatchObject({
+      fidelity: 'projection',
+      envelope: { in: 'host' },
+    });
   });
 
   it('EXTERNAL tool: replays via the INJECTED dispatcher (not the in-host closure)', async () => {
     const registry = registryWith([replayTool('ext', 'ext')]);
     const dispatch = vi.fn<ExternalReplayDispatcher>(() =>
-      Promise.resolve({ fidelity: 'projection', envelope: { runId: 's1', in: 'worker' } }),
+      Promise.resolve({
+        fidelity: 'projection',
+        envelope: { runId: 's1', in: 'worker' },
+      }),
     );
     const reg = SessionReplayRegistry.fromTools(registry, {
       provenance: [{ source: 'installed', id: 'ext', version: '0.0.0', manifestHash: 'h' }],
@@ -84,7 +90,12 @@ describe('SessionReplayRegistry.fromTools', () => {
 
   it('skips tools with no sessionReplay contribution', () => {
     const plain: Tool = {
-      metadata: { id: 'plain', name: 'plain', version: '0.0.0', description: 'p' },
+      metadata: {
+        id: 'plain',
+        name: 'plain',
+        version: '0.0.0',
+        description: 'p',
+      },
       commandSpecs: [],
     };
     const reg = SessionReplayRegistry.fromTools(registryWith([plain]));

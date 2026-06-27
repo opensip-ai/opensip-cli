@@ -65,7 +65,11 @@ describe('init config template round-trips through the composed schema', () => {
       const configPath = join(dir, 'opensip-cli.config.yml');
       writeFileSync(configPath, generateConfig([lang], scaffolds()), 'utf8');
       expect(() =>
-        composeAndValidateToolConfig({ tools: realRegistry(), configPath, env: {} }),
+        composeAndValidateToolConfig({
+          tools: realRegistry(),
+          configPath,
+          env: {},
+        }),
       ).not.toThrow();
     });
   }
@@ -74,7 +78,11 @@ describe('init config template round-trips through the composed schema', () => {
     const configPath = join(dir, 'opensip-cli.config.yml');
     writeFileSync(configPath, generateConfig(LANGUAGES, scaffolds()), 'utf8');
     expect(() =>
-      composeAndValidateToolConfig({ tools: realRegistry(), configPath, env: {} }),
+      composeAndValidateToolConfig({
+        tools: realRegistry(),
+        configPath,
+        env: {},
+      }),
     ).not.toThrow();
   });
 });

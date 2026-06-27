@@ -142,7 +142,10 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
     await discoverAndRegisterToolPackages(
       registry,
       // HOST env: allowlist the fixture, but NO OPENSIP_CLI_IN_TOOL_WORKER.
-      { sources: walkUpSourceList(), env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID } },
+      {
+        sources: walkUpSourceList(),
+        env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID },
+      },
       new Set<string>(),
       provenance,
     );
@@ -171,7 +174,10 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
       // WORKER env: the isolation boundary — the real runtime legitimately loads.
       {
         sources: walkUpSourceList(),
-        env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID, OPENSIP_CLI_IN_TOOL_WORKER: '1' },
+        env: {
+          [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID,
+          OPENSIP_CLI_IN_TOOL_WORKER: '1',
+        },
       },
       new Set<string>(),
     );

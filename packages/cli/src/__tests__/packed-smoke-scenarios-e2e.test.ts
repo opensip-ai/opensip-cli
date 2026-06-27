@@ -59,7 +59,9 @@ beforeAll(() => {
   // node_modules). Node follows the symlink to its real path, so fitness's own
   // deps resolve from the workspace exactly as the packed install resolves
   // them from the consumer tree.
-  mkdirSync(join(consumerCwd, 'node_modules', '@opensip-cli'), { recursive: true });
+  mkdirSync(join(consumerCwd, 'node_modules', '@opensip-cli'), {
+    recursive: true,
+  });
   symlinkSync(
     fileURLToPath(new URL('../../../fitness/engine', import.meta.url)),
     join(consumerCwd, 'node_modules', '@opensip-cli', 'fitness'),

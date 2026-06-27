@@ -34,7 +34,11 @@ interface DetectionMarker {
 const MARKERS: readonly DetectionMarker[] = [
   { language: 'rust', file: 'Cargo.toml', description: 'Rust workspace' },
   { language: 'python', file: 'pyproject.toml', description: 'Python project' },
-  { language: 'python', file: 'setup.py', description: 'Python project (setup.py)' },
+  {
+    language: 'python',
+    file: 'setup.py',
+    description: 'Python project (setup.py)',
+  },
   { language: 'go', file: 'go.mod', description: 'Go module' },
   { language: 'java', file: 'pom.xml', description: 'Maven project' },
   { language: 'java', file: 'build.gradle', description: 'Gradle project' },

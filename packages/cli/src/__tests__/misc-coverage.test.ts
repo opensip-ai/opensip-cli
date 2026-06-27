@@ -72,14 +72,24 @@ describe('isValidTool', () => {
   it('rejects when metadata is missing or non-object', () => {
     expect(isValidTool({ register: () => undefined, commands: [] })).toBe(false);
     expect(isValidTool({ metadata: null, register: () => undefined, commands: [] })).toBe(false);
-    expect(isValidTool({ metadata: 'fake', register: () => undefined, commands: [] })).toBe(false);
+    expect(
+      isValidTool({
+        metadata: 'fake',
+        register: () => undefined,
+        commands: [],
+      }),
+    ).toBe(false);
   });
 
   it('rejects when metadata.id is missing or non-string', () => {
     expect(isValidTool({ metadata: {}, register: () => undefined, commands: [] })).toBe(false);
-    expect(isValidTool({ metadata: { id: 123 }, register: () => undefined, commands: [] })).toBe(
-      false,
-    );
+    expect(
+      isValidTool({
+        metadata: { id: 123 },
+        register: () => undefined,
+        commands: [],
+      }),
+    ).toBe(false);
   });
 
   it('rejects when identity is missing or invalid', () => {
@@ -94,11 +104,19 @@ describe('isValidTool', () => {
   });
 
   it('rejects when metadata.name is missing or drifts from identity', () => {
-    expect(isValidTool({ identity: { name: 'x' }, metadata: { id: 'x' }, commands: [] })).toBe(
-      false,
-    );
     expect(
-      isValidTool({ identity: { name: 'x' }, metadata: { id: 'x', name: 'y' }, commands: [] }),
+      isValidTool({
+        identity: { name: 'x' },
+        metadata: { id: 'x' },
+        commands: [],
+      }),
+    ).toBe(false);
+    expect(
+      isValidTool({
+        identity: { name: 'x' },
+        metadata: { id: 'x', name: 'y' },
+        commands: [],
+      }),
     ).toBe(false);
   });
 });
@@ -115,14 +133,20 @@ describe('update-notifier default write fallback', () => {
   });
 
   afterEach(() => {
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
     vi.restoreAllMocks();
     vi.resetModules();
   });
 
   it('writes the "update available" line to stderr when no `write` override is given', async () => {
     // Force a TTY so the early-skip doesn't fire.
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
 
     // Mock update-notifier to report a stale-version update synchronously.
     vi.resetModules();

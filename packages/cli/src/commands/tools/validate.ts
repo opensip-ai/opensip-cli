@@ -242,10 +242,18 @@ function runtimeSectionsFor(
   staged: StagedCandidate,
   manifestDeclaresConfig: boolean,
   manifestToolId: string | undefined,
-): { sections: ToolsValidateSection[]; toolId: string | undefined; incomplete: boolean } {
+): {
+  sections: ToolsValidateSection[];
+  toolId: string | undefined;
+  incomplete: boolean;
+} {
   const probe = runRuntimeProbe(staged.pkgDir);
   if (isExpectedMissingDep(probe, staged.stagedByInstall)) {
-    return { sections: skippedRuntimeSections(), toolId: manifestToolId, incomplete: true };
+    return {
+      sections: skippedRuntimeSections(),
+      toolId: manifestToolId,
+      incomplete: true,
+    };
   }
   const sections = probe.sections
     .filter((s) => s.section !== 'manifest' && s.section !== 'compatibility')
@@ -276,7 +284,11 @@ function verdictFor(
 export async function runToolValidation(
   opts: ToolValidationOptions,
   { keepStaged = false }: { keepStaged?: boolean } = {},
-): Promise<{ result: ToolsValidateResult; stagedPkgDir?: string; cleanup: () => void }> {
+): Promise<{
+  result: ToolsValidateResult;
+  stagedPkgDir?: string;
+  cleanup: () => void;
+}> {
   process.stderr.write(VALIDATE_EXECUTION_NOTICE);
   const staged = stageCandidate(opts);
   try {

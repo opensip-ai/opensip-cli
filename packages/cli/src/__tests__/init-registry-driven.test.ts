@@ -48,7 +48,10 @@ function scaffoldsFor(tools: readonly Tool[]): ToolScaffold[] {
 
 /** The pinned check id fitness embeds for a single language — from the tool itself. */
 function pinnedCheckId(language: string): string {
-  const files = resolveToolHooks(fitnessTool).scaffoldExamples?.({ languages: [language] }) ?? [];
+  const files =
+    resolveToolHooks(fitnessTool).scaffoldExamples?.({
+      languages: [language],
+    }) ?? [];
   const check = files.find((f) => f.filename.startsWith('example-check'));
   if (!check) throw new Error(`no example-check contribution for ${language}`);
   return check.stableId;
@@ -82,7 +85,12 @@ describe('init — fixture tool scaffolds with no CLI change (ADR-0038)', () => 
     const toyScaffold: ToolScaffold = {
       layout: { domain: 'toy', userSubdirs: ['rules'] },
       scaffoldExamples: () => [
-        { kind: 'rules', filename: 'example-rule.mjs', content: '// toy\n', stableId: 'toy-1' },
+        {
+          kind: 'rules',
+          filename: 'example-rule.mjs',
+          content: '// toy\n',
+          stableId: 'toy-1',
+        },
       ],
       stableExampleIds: () => ['toy-1'],
     };

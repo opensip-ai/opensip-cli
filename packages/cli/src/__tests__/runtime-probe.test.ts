@@ -34,7 +34,10 @@ describe('runRuntimeProbe', () => {
     expect(report.toolId).toBeNull();
     expect(report.toolConfigNamespace).toBeNull();
     expect(report.sections).toHaveLength(1);
-    expect(report.sections[0]).toMatchObject({ section: 'runtime-load', ok: false });
+    expect(report.sections[0]).toMatchObject({
+      section: 'runtime-load',
+      ok: false,
+    });
     expect(report.sections[0]?.diagnostic).toMatch(/runtime probe/);
   });
 

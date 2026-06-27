@@ -11,7 +11,11 @@ import {
 
 /** Build a structural spec the inventory assembler can read. */
 function spec(name: string, common: CommonFlagKey[], optionFlags: string[]): SpecLike {
-  return { name, commonFlags: common, options: optionFlags.map((flag) => ({ flag })) };
+  return {
+    name,
+    commonFlags: common,
+    options: optionFlags.map((flag) => ({ flag })),
+  };
 }
 
 /** A representative inventory exercising tool + host commands. The egress
@@ -82,7 +86,10 @@ function groupedInventory(): CompletionInventory {
     toolSpecs: [spec('fit', ['cwd', 'json'], ['--recipe'])],
     hostSpecs: [],
     groups: [
-      { name: 'plugin', leaves: [{ name: 'list' }, { name: 'add' }, { name: 'remove' }] },
+      {
+        name: 'plugin',
+        leaves: [{ name: 'list' }, { name: 'add' }, { name: 'remove' }],
+      },
       { name: 'sessions', leaves: [{ name: 'list' }, { name: 'purge' }] },
     ],
   });

@@ -51,7 +51,11 @@ describe('provenanceSourceFor / isExternalToolProvenance', () => {
 
   it('provenanceRecordFor returns the full record (or undefined)', () => {
     const t = tool('uuid-3', 'ext');
-    const rec = prov({ source: 'project-local', id: 'ext', stableId: 'uuid-3' });
+    const rec = prov({
+      source: 'project-local',
+      id: 'ext',
+      stableId: 'uuid-3',
+    });
     expect(provenanceRecordFor(t, [rec])).toBe(rec);
     expect(provenanceRecordFor(tool('other'), [rec])).toBeUndefined();
   });

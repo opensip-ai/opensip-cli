@@ -85,9 +85,17 @@ describe('tools list handler', () => {
 describe('tools validate handler', () => {
   it('returns the validation result and sets no exit code on a passing verdict', async () => {
     runToolValidation.mockResolvedValue({
-      result: { type: 'tools-validate', spec: 'x', verdict: 'passed', sections: [] },
+      result: {
+        type: 'tools-validate',
+        spec: 'x',
+        verdict: 'passed',
+        sections: [],
+      },
     });
-    const result = (await handlerFor('validate')({ cwd: tmp, _args: ['x'] })) as {
+    const result = (await handlerFor('validate')({
+      cwd: tmp,
+      _args: ['x'],
+    })) as {
       verdict: string;
     };
     expect(result.verdict).toBe('passed');
@@ -96,7 +104,12 @@ describe('tools validate handler', () => {
 
   it('sets the configuration-error exit code on a non-passing verdict', async () => {
     runToolValidation.mockResolvedValue({
-      result: { type: 'tools-validate', spec: 'x', verdict: 'failed', sections: [] },
+      result: {
+        type: 'tools-validate',
+        spec: 'x',
+        verdict: 'failed',
+        sections: [],
+      },
     });
     await handlerFor('validate')({ cwd: tmp, _args: ['x'], installDeps: true });
     expect(exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
@@ -118,17 +131,33 @@ describe('tools install handler', () => {
   });
 
   it('delegates a valid install and passes success through', async () => {
-    toolsInstall.mockResolvedValue({ type: 'tools-install', spec: 'pkg', success: true });
-    const result = (await handlerFor('install')({ cwd: tmp, _args: ['pkg'], project: true })) as {
+    toolsInstall.mockResolvedValue({
+      type: 'tools-install',
+      spec: 'pkg',
+      success: true,
+    });
+    const result = (await handlerFor('install')({
+      cwd: tmp,
+      _args: ['pkg'],
+      project: true,
+    })) as {
       success: boolean;
     };
     expect(result.success).toBe(true);
-    expect(toolsInstall).toHaveBeenCalledWith({ spec: 'pkg', cwd: tmp, project: true });
+    expect(toolsInstall).toHaveBeenCalledWith({
+      spec: 'pkg',
+      cwd: tmp,
+      project: true,
+    });
     expect(exitCodes).toEqual([]);
   });
 
   it('sets the exit code when the install fails', async () => {
-    toolsInstall.mockResolvedValue({ type: 'tools-install', spec: 'pkg', success: false });
+    toolsInstall.mockResolvedValue({
+      type: 'tools-install',
+      spec: 'pkg',
+      success: false,
+    });
     await handlerFor('install')({ cwd: tmp, _args: ['pkg'] });
     expect(exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
   });
@@ -148,7 +177,11 @@ describe('tools uninstall handler', () => {
   });
 
   it('sets the exit code and returns when the uninstall fails', async () => {
-    toolsUninstall.mockReturnValue({ type: 'tools-uninstall', target: 't', success: false });
+    toolsUninstall.mockReturnValue({
+      type: 'tools-uninstall',
+      target: 't',
+      success: false,
+    });
     await handlerFor('uninstall')({ cwd: tmp, _args: ['t'] });
     expect(exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
     expect(toolsDataPurge).not.toHaveBeenCalled();
@@ -212,7 +245,9 @@ describe('tools handlers — empty argv defaults to an empty spec/target', () =>
     expect(uninstall.target).toBe('');
 
     ds = undefined;
-    const purge = (await handlerFor('data-purge')({ cwd: tmp, _args: [] })) as { target: string };
+    const purge = (await handlerFor('data-purge')({ cwd: tmp, _args: [] })) as {
+      target: string;
+    };
     expect(purge.target).toBe('');
   });
 });
@@ -220,7 +255,10 @@ describe('tools handlers — empty argv defaults to an empty spec/target', () =>
 describe('tools data-purge handler', () => {
   it('errors when no project datastore is available', async () => {
     ds = undefined;
-    const result = (await handlerFor('data-purge')({ cwd: tmp, _args: ['demo'] })) as {
+    const result = (await handlerFor('data-purge')({
+      cwd: tmp,
+      _args: ['demo'],
+    })) as {
       success: boolean;
       error: string;
     };
@@ -239,7 +277,10 @@ describe('tools data-purge handler', () => {
       baselineMeta: false,
       stateRows: 0,
     });
-    const result = (await handlerFor('data-purge')({ cwd: tmp, _args: ['demo'] })) as {
+    const result = (await handlerFor('data-purge')({
+      cwd: tmp,
+      _args: ['demo'],
+    })) as {
       type: string;
     };
     expect(result.type).toBe('tools-data-purge');

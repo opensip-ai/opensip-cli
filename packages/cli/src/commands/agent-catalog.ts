@@ -83,7 +83,10 @@ function compareCodePoint(left: string, right: string): number {
  *   (`*-run-worker` / `*-shard-worker` / `*-equivalence-check`).
  */
 function assertNoInternalEntryPoints(
-  entryPoints: readonly { readonly command: string; readonly tier?: CommandTier }[],
+  entryPoints: readonly {
+    readonly command: string;
+    readonly tier?: CommandTier;
+  }[],
 ): void {
   const leaked = entryPoints.find(
     (e) => e.tier === 'internal' || INTERNAL_COMMAND_NAME_RE.test(e.command),
@@ -98,12 +101,22 @@ function assertNoInternalEntryPoints(
 
 const TOOL_ENTRY_OVERLAYS: Readonly<Record<string, Partial<EntryPoint>>> = {
   fitness: {
-    description: 'Run fitness checks. Use --json for machine output (SignalEnvelope). Alias: fit.',
-    examples: ['opensip fitness --recipe default --json', 'opensip fit --check some-check --json'],
+    description:
+      'Run fitness checks. Use --json for machine output (SignalEnvelope). Agent recipes: agent-fast, agent-risk, agent-final.',
+    examples: [
+      'opensip fit --recipe agent-fast --json --filter errors-only',
+      'opensip fit --changed --include-impacted --json',
+      'opensip fit --recipe agent-final --gate-compare',
+    ],
   },
   graph: {
-    description: 'Build static call graph + rules. --json yields SignalEnvelope.',
-    examples: ['opensip graph --json', 'opensip graph --sarif out.sarif'],
+    description:
+      'Build static call graph + rules. --json yields SignalEnvelope. Use graph impact for change-aware blast radius.',
+    examples: [
+      'opensip graph --json',
+      'opensip graph impact --changed --json --top 20',
+      'opensip graph --recipe agent-risk --json --filter high-impact',
+    ],
   },
   sim: {
     description: 'Run simulation scenarios. Use --json for machine output (SignalEnvelope).',
@@ -207,6 +220,19 @@ export function buildAgentCatalog(
     entryPoints,
     commonPatterns: [
       {
+        name: 'Read latest result first (read-latest-result)',
+        description:
+          'When the user says a tool already reported findings, inspect the latest stored result before re-running.',
+        example:
+          'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
+      },
+      {
+        name: 'Agent edit loop',
+        description: 'Fast check → impact analysis → changed-only fit → final gate.',
+        example:
+          'opensip fit --recipe agent-fast --json && opensip graph impact --changed --json && opensip fit --changed --include-impacted --json',
+      },
+      {
         name: 'Inspect latest fit with focus on errors',
         description:
           'After a fit run, pull only actionable errors (high severity) and limit count.',
@@ -240,6 +266,9 @@ export function buildAgentCatalog(
         'For sessions list: { type: "history", sessions: HistorySession[] } where each has showCommand + optional summary.',
     },
     notes: [
+      'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
+      'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',
+      'graph impact answers changed→impacted without a separate git diff dance.',
       'All machine output is under --json. Use --raw on show for the smallest possible payload.',
       'filtersApplied, originalSignalCount, returnedSignalCount appear when --filter is used.',
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',

@@ -14,10 +14,18 @@ import { createRunPlaneFactory, createRunSessionSeam } from '../run-plane.js';
 
 import type { Logger, LiveViewRenderer } from '@opensip-cli/core';
 
-const SILENT: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const SILENT: Logger = {
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
 
 function makePlaneDeps() {
-  const runPlane = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+  const runPlane = createRunPlaneFactory({
+    getDatastore: () => undefined,
+    logger: SILENT,
+  });
   const runSession = createRunSessionSeam(runPlane);
   const liveViews = createLiveViewRegistry(SILENT);
   return { runPlane, runSession, liveViews };

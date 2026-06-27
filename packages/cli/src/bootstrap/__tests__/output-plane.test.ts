@@ -84,7 +84,11 @@ describe('createOutputPlane — emit seams', () => {
     } finally {
       restore();
     }
-    const parsed = JSON.parse(out[0]) as { bare?: boolean; data?: unknown; status?: unknown };
+    const parsed = JSON.parse(out[0]) as {
+      bare?: boolean;
+      data?: unknown;
+      status?: unknown;
+    };
     expect(parsed.bare).toBe(true);
     expect(parsed.data).toBeUndefined();
     expect(parsed.status).toBeUndefined();

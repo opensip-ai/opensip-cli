@@ -102,7 +102,14 @@ describe('session-replay view', () => {
       tool: 'graph',
       runId: 'GRAPH_X',
       createdAt: '2026-01-01T00:00:00.000Z',
-      units: [{ slug: 'graph:cycle', passed: false, violationCount: 2, durationMs: 0 }],
+      units: [
+        {
+          slug: 'graph:cycle',
+          passed: false,
+          violationCount: 2,
+          durationMs: 0,
+        },
+      ],
       signals: [],
       policy: HOST_VERDICT_POLICY_FALLBACK,
       runFaulted: false,
@@ -156,13 +163,28 @@ describe('sim notice + help + report views', () => {
 describe('clear/configure/uninstall done views', () => {
   it('clear-done: empty / cancelled / done', () => {
     expect(
-      text({ type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 }),
+      text({
+        type: 'clear-done',
+        action: 'empty',
+        deletedCount: 0,
+        sessionCount: 0,
+      }),
     ).toContain('No session data');
     expect(
-      text({ type: 'clear-done', action: 'cancelled', deletedCount: 0, sessionCount: 3 }),
+      text({
+        type: 'clear-done',
+        action: 'cancelled',
+        deletedCount: 0,
+        sessionCount: 3,
+      }),
     ).toContain('Cancelled');
     expect(
-      text({ type: 'clear-done', action: 'done', deletedCount: 1, sessionCount: 1 }),
+      text({
+        type: 'clear-done',
+        action: 'done',
+        deletedCount: 1,
+        sessionCount: 1,
+      }),
     ).toContain('1 session deleted.');
   });
 
@@ -170,18 +192,35 @@ describe('clear/configure/uninstall done views', () => {
     expect(text({ type: 'configure-done', action: 'saved', configPath: '/c.yml' })).toContain(
       'API key saved to /c.yml',
     );
-    expect(text({ type: 'configure-done', action: 'cancelled', configPath: '/c.yml' })).toContain(
-      'No key provided',
-    );
+    expect(
+      text({
+        type: 'configure-done',
+        action: 'cancelled',
+        configPath: '/c.yml',
+      }),
+    ).toContain('No key provided');
   });
 
   it('uninstall-done: removed / dry-run / empty / cancelled', () => {
-    const base = { type: 'uninstall-done', mode: 'user', rootPath: '/r', sizeBytes: 2048 } as const;
+    const base = {
+      type: 'uninstall-done',
+      mode: 'user',
+      rootPath: '/r',
+      sizeBytes: 2048,
+    } as const;
     expect(
-      text({ ...base, action: 'removed', targets: [{ path: '/r/a', kind: 'file' }] }),
+      text({
+        ...base,
+        action: 'removed',
+        targets: [{ path: '/r/a', kind: 'file' }],
+      }),
     ).toContain('Removed 1 target');
     expect(
-      text({ ...base, action: 'dry-run', targets: [{ path: '/r/a', kind: 'file' }] }),
+      text({
+        ...base,
+        action: 'dry-run',
+        targets: [{ path: '/r/a', kind: 'file' }],
+      }),
     ).toContain('[dry-run]');
     expect(text({ ...base, action: 'empty', targets: [] })).toContain('Nothing to remove');
     expect(text({ ...base, action: 'cancelled', targets: [] })).toContain('Cancelled');
@@ -233,7 +272,10 @@ describe('init view', () => {
     const out = text({
       ...base,
       created: false,
-      insideExistingProject: { discoveredRoot: '/p', message: 'line one\nline two' },
+      insideExistingProject: {
+        discoveredRoot: '/p',
+        message: 'line one\nline two',
+      },
     });
     expect(out).toContain('line one');
     expect(out).toContain('line two');
@@ -243,7 +285,10 @@ describe('init view', () => {
     const out = text({
       ...base,
       created: false,
-      ambiguousLanguageError: { detected: ['ts', 'py'], message: 'pass --language' },
+      ambiguousLanguageError: {
+        detected: ['ts', 'py'],
+        message: 'pass --language',
+      },
     });
     expect(out).toContain('language ambiguous');
     expect(out).toContain('pass --language');
@@ -327,8 +372,16 @@ describe('plugin view', () => {
       domains: ['graph-adapter', 'tool'],
       totalCount: 2,
       plugins: [
-        { domain: 'graph-adapter', namespace: '@acme/graph-go', pluginType: 'package' },
-        { domain: 'tool', namespace: '@acme/custom-tool', pluginType: 'package' },
+        {
+          domain: 'graph-adapter',
+          namespace: '@acme/graph-go',
+          pluginType: 'package',
+        },
+        {
+          domain: 'tool',
+          namespace: '@acme/custom-tool',
+          pluginType: 'package',
+        },
       ],
       toolProvenance: [],
     });
@@ -342,12 +395,22 @@ describe('plugin view', () => {
   it('add / remove success and failure', () => {
     expect(text({ type: 'plugin-add', packageName: 'p', success: true })).toContain('Installed p');
     expect(
-      text({ type: 'plugin-add', packageName: 'p', success: false, error: 'eperm' }),
+      text({
+        type: 'plugin-add',
+        packageName: 'p',
+        success: false,
+        error: 'eperm',
+      }),
     ).toContain('Failed to install p (eperm)');
     expect(text({ type: 'plugin-remove', packageName: 'p', success: true })).toContain('Removed p');
     // remove failure exercises addRemoveView's failure arm for the remove verb.
     expect(
-      text({ type: 'plugin-remove', packageName: 'p', success: false, error: 'busy' }),
+      text({
+        type: 'plugin-remove',
+        packageName: 'p',
+        success: false,
+        error: 'busy',
+      }),
     ).toContain('Failed to remove p (busy)');
   });
 

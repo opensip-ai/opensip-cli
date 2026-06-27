@@ -91,7 +91,11 @@ export async function executeConfigure(): Promise<ConfigureDoneResult> {
 
   const key = await prompt('Enter your OpenSIP Cloud API key: ');
   if (!key) {
-    return { type: 'configure-done', action: 'cancelled', configPath: GLOBAL_CONFIG_PATH };
+    return {
+      type: 'configure-done',
+      action: 'cancelled',
+      configPath: GLOBAL_CONFIG_PATH,
+    };
   }
 
   existing.apiKey = key;

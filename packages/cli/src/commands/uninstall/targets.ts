@@ -101,7 +101,14 @@ export function collectTargets(
 ): Target[] {
   if (mode === 'user') {
     if (!existsSync(userRoot)) return [];
-    return [{ path: userRoot, kind: 'dir', sizeBytes: dirSize(userRoot), bucket: 'user-level' }];
+    return [
+      {
+        path: userRoot,
+        kind: 'dir',
+        sizeBytes: dirSize(userRoot),
+        bucket: 'user-level',
+      },
+    ];
   }
   return collectProjectTargets(projectDir);
 }

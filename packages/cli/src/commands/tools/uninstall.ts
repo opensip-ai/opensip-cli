@@ -48,14 +48,21 @@ interface InstalledCandidate {
 /** Manifest-scan both install hosts for removable candidates (no imports). */
 function scanInstalledCandidates(cwd: string): InstalledCandidate[] {
   const hosts: readonly { dir: string; scope: InstalledCandidate['scope'] }[] = [
-    { dir: resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN), scope: 'project' },
+    {
+      dir: resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN),
+      scope: 'project',
+    },
     { dir: resolveUserPaths().pluginsDir(TOOL_DOMAIN), scope: 'global' },
   ];
   const candidates: InstalledCandidate[] = [];
   for (const host of hosts) {
     for (const pkg of discoverPackagesInNodeModules(join(host.dir, 'node_modules'), 'tool')) {
       const manifest = loadToolManifest('installed', pkg.packageDir);
-      candidates.push({ id: manifest?.id ?? pkg.name, packageName: pkg.name, scope: host.scope });
+      candidates.push({
+        id: manifest?.id ?? pkg.name,
+        packageName: pkg.name,
+        scope: host.scope,
+      });
     }
   }
   return candidates;
@@ -121,6 +128,10 @@ export function toolsUninstall(opts: ToolsUninstallOptions): ToolsUninstallResul
     type: 'tools-uninstall',
     target: opts.target,
     success: true,
-    removed: { id: chosen.id, packageName: chosen.packageName, scope: chosen.scope },
+    removed: {
+      id: chosen.id,
+      packageName: chosen.packageName,
+      scope: chosen.scope,
+    },
   };
 }

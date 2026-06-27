@@ -88,7 +88,10 @@ describe('ensurePluginHostDir', () => {
     const dir = ensurePluginHostDir('sim', projectRoot);
     writeFileSync(
       join(dir, HOST_PACKAGE_JSON),
-      JSON.stringify({ name: 'sim-plugins', dependencies: { '@org/keep': '1.0.0' } }),
+      JSON.stringify({
+        name: 'sim-plugins',
+        dependencies: { '@org/keep': '1.0.0' },
+      }),
       'utf8',
     );
     // Second call must be idempotent — the existing file is preserved.
@@ -108,7 +111,10 @@ describe('readHostDependencies', () => {
     const dir = ensurePluginHostDir('fit', projectRoot);
     writeFileSync(
       join(dir, HOST_PACKAGE_JSON),
-      JSON.stringify({ name: 'x', dependencies: { '@org/a': '1.0.0', '@org/b': '2.0.0' } }),
+      JSON.stringify({
+        name: 'x',
+        dependencies: { '@org/a': '1.0.0', '@org/b': '2.0.0' },
+      }),
       'utf8',
     );
     expect(readHostDependencies(dir)).toEqual(new Set(['@org/a', '@org/b']));
@@ -143,7 +149,10 @@ describe('findInstalledName', () => {
     writeInstalledPackage(nm, '@org/from-local', { version: '0.0.1' });
     writeFileSync(
       join(dir, HOST_PACKAGE_JSON),
-      JSON.stringify({ name: 'host', dependencies: { '@org/from-local': 'file:../local' } }),
+      JSON.stringify({
+        name: 'host',
+        dependencies: { '@org/from-local': 'file:../local' },
+      }),
       'utf8',
     );
     const depsBefore = new Set<string>(); // nothing was installed before
@@ -155,7 +164,10 @@ describe('findInstalledName', () => {
     mkdirSync(join(dir, 'node_modules'), { recursive: true });
     writeFileSync(
       join(dir, HOST_PACKAGE_JSON),
-      JSON.stringify({ name: 'host', dependencies: { '@org/ghost': 'file:../local' } }),
+      JSON.stringify({
+        name: 'host',
+        dependencies: { '@org/ghost': 'file:../local' },
+      }),
       'utf8',
     );
     expect(findInstalledName(dir, 'file:../local', new Set())).toBeUndefined();

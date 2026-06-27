@@ -373,7 +373,9 @@ describe('executeInit (partial-dir-only state)', () => {
   beforeEach(() => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
     // Create only the dir + a custom file (no config).
-    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), { recursive: true });
+    mkdirSync(join(testDir, 'opensip-cli', 'fit', 'checks'), {
+      recursive: true,
+    });
     writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
   });
 
@@ -483,6 +485,39 @@ describe('executeInit (.gitignore)', () => {
 
     const second = readFileSync(join(testDir, '.gitignore'), 'utf8');
     expect(second).toBe(first);
+  });
+});
+
+// =============================================================================
+// AGENTS.md handling
+// =============================================================================
+
+describe('executeInit (AGENTS.md)', () => {
+  beforeEach(() => {
+    writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
+  });
+
+  it('creates AGENTS.md on pristine init', () => {
+    const result = executeInit(makeArgs());
+    expect(result.agentsMdCreated).toBe(true);
+    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('Agent Playbook');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('agent-fast');
+  });
+
+  it('does not overwrite an existing AGENTS.md', () => {
+    writeFileSync(join(testDir, 'AGENTS.md'), '# Custom playbook\n', 'utf8');
+    const result = executeInit(makeArgs());
+    expect(result.agentsMdCreated).toBe(false);
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe('# Custom playbook\n');
+  });
+
+  it('preserves AGENTS.md on re-init with --keep', () => {
+    executeInit(makeArgs());
+    const first = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
+    const result = executeInit(makeArgs({ keep: true }));
+    expect(result.agentsMdCreated).toBe(false);
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe(first);
   });
 });
 

@@ -81,7 +81,12 @@ describe('renderOutcome — human', () => {
     spyStdout();
     const data = { type: 'history' } as unknown as CommandResult;
     const render = vi.fn<(r: CommandResult) => Promise<void>>().mockResolvedValue(undefined);
-    const outcome: CommandOutcome = { kind: 'history', status: 'ok', exitCode: 0, data };
+    const outcome: CommandOutcome = {
+      kind: 'history',
+      status: 'ok',
+      exitCode: 0,
+      data,
+    };
 
     await renderOutcome(outcome, { jsonRequested: false, render });
 

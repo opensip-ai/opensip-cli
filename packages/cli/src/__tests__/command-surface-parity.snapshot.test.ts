@@ -123,7 +123,10 @@ function makeStubToolContext(): ToolCliContext {
 
 /** Build the fully-mounted program: bundled tools + CLI-owned host commands. */
 function buildFullProgram(): Command {
-  const scope = new RunScope({ languages: new LanguageRegistry(), tools: new ToolRegistry() });
+  const scope = new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+  });
   return runWithScopeSync(scope, () => {
     const program = new Command('opensip').description(
       'Codebase intelligence from your terminal — pluggable tools for fitness, simulation, and more',

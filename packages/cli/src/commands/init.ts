@@ -169,7 +169,11 @@ export function executeInit(
 
   const resolution = resolveLanguages(cwd, args.language);
   if (!resolution.ok) {
-    return { ...baseResult, created: false, ambiguousLanguageError: resolution.error };
+    return {
+      ...baseResult,
+      created: false,
+      ambiguousLanguageError: resolution.error,
+    };
   }
   const { languages } = resolution;
 

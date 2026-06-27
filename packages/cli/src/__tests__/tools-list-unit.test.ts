@@ -169,7 +169,11 @@ describe('toolsList — installed-but-not-loaded marker scan', () => {
     const result = toolsList({ cwd: projectDir });
     const proj = result.tools.find((t) => t.id === 'installed-proj');
     const glob = result.tools.find((t) => t.id === 'installed-glob');
-    expect(proj).toMatchObject({ source: 'project', status: 'manifest-only', version: '4.5.6' });
+    expect(proj).toMatchObject({
+      source: 'project',
+      status: 'manifest-only',
+      version: '4.5.6',
+    });
     expect(glob).toMatchObject({ source: 'global', status: 'manifest-only' });
   });
 
@@ -179,7 +183,12 @@ describe('toolsList — installed-but-not-loaded marker scan', () => {
     const result = toolsList({
       cwd: projectDir,
       provenance: [
-        prov({ id: 'dup-tool', packageName: '@x/dup', source: 'installed', resolvedPath: '' }),
+        prov({
+          id: 'dup-tool',
+          packageName: '@x/dup',
+          source: 'installed',
+          resolvedPath: '',
+        }),
       ],
       manifests: [manifest()],
     });

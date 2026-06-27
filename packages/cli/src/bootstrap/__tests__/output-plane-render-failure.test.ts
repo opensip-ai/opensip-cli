@@ -29,7 +29,9 @@ beforeEach(() => {
   savedExit = process.exitCode;
   process.exitCode = 0;
   logged = [];
-  logger = { error: (o: Record<string, unknown>) => logged.push(o) } as unknown as Logger;
+  logger = {
+    error: (o: Record<string, unknown>) => logged.push(o),
+  } as unknown as Logger;
   renderOutcome.mockReset();
   renderRaw.mockReset();
 });
@@ -48,7 +50,10 @@ async function tick(): Promise<void> {
 describe('output-plane — render failure forces exit when the run had not failed', () => {
   it('emitJson logs and forces exit 1 from a clean run', async () => {
     renderOutcome.mockRejectedValue(new Error('render boom'));
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     plane.emits.emitJson({ type: 'x' });
     await tick();
     expect(plane.getExitCode()).toBe(1);
@@ -57,7 +62,10 @@ describe('output-plane — render failure forces exit when the run had not faile
 
   it('emitEnvelope logs and forces exit 1 from a clean run', async () => {
     renderOutcome.mockRejectedValue(new Error('render boom'));
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     plane.emits.emitEnvelope({ schemaVersion: 2 });
     await tick();
     expect(plane.getExitCode()).toBe(1);
@@ -66,7 +74,10 @@ describe('output-plane — render failure forces exit when the run had not faile
 
   it('preserves an already-chosen failure code instead of overwriting with 1', async () => {
     renderOutcome.mockRejectedValue('boom-string'); // also drives the non-Error coercion
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     plane.setExitCode(3); // a specific prior failure code (e.g. REPORT_FAILED)
     plane.emits.emitJson({ type: 'x' });
     await tick();
@@ -75,7 +86,10 @@ describe('output-plane — render failure forces exit when the run had not faile
 
   it('emitError forces exit 1 when the error detail itself indicated success (edge)', async () => {
     renderOutcome.mockRejectedValue(new Error('render boom'));
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     // detail.exitCode 0 → setExitCode(0) first; the catch then forces 1.
     plane.emits.emitError({ message: 'oops', exitCode: 0 });
     await tick();
@@ -85,7 +99,10 @@ describe('output-plane — render failure forces exit when the run had not faile
 
   it('emitEnvelope preserves an already-chosen failure code', async () => {
     renderOutcome.mockRejectedValue(new Error('render boom'));
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     plane.setExitCode(4);
     plane.emits.emitEnvelope({ schemaVersion: 2 });
     await tick();
@@ -94,7 +111,10 @@ describe('output-plane — render failure forces exit when the run had not faile
 
   it('emitError keeps the detail exit code when it already indicated failure', async () => {
     renderOutcome.mockRejectedValue(new Error('render boom'));
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     // detail.exitCode 2 → setExitCode(2); the catch sees a non-zero code and
     // does NOT clobber it to 1.
     plane.emits.emitError({ message: 'bad', exitCode: 2 });
@@ -103,7 +123,10 @@ describe('output-plane — render failure forces exit when the run had not faile
   });
 
   it('emitRaw routes through the renderRaw seam (no outcome wrapping)', () => {
-    const plane = createOutputPlane({ render: () => Promise.resolve(), logger });
+    const plane = createOutputPlane({
+      render: () => Promise.resolve(),
+      logger,
+    });
     plane.emits.emitRaw({ bare: true });
     expect(renderRaw).toHaveBeenCalledWith({ bare: true });
     expect(renderOutcome).not.toHaveBeenCalled();

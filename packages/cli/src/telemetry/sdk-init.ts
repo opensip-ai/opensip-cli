@@ -173,7 +173,9 @@ export function initTelemetry(cliEntryUrl: string): void {
     resource,
     readers: [
       new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter({ timeoutMillis: SHUTDOWN_TIMEOUT_MS }),
+        exporter: new OTLPMetricExporter({
+          timeoutMillis: SHUTDOWN_TIMEOUT_MS,
+        }),
         exportIntervalMillis: 5000, // short for CLI; shutdown forces final export
       }),
     ],

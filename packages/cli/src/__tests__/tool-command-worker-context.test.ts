@@ -65,7 +65,12 @@ describe('buildWorkerContext — FRR seams', () => {
     expect(acc.json).toEqual({ j: 1 });
     expect(acc.envelope).toEqual({ e: 1 });
     expect(acc.raw).toBe('raw');
-    expect(acc.error).toEqual({ message: 'm', exitCode: 2, suggestion: 's', code: 'c' });
+    expect(acc.error).toEqual({
+      message: 'm',
+      exitCode: 2,
+      suggestion: 's',
+      code: 'c',
+    });
     expect(acc.exitCode).toBe(0);
     expect(ctx.getExitCode?.()).toBe(0);
   });
@@ -115,7 +120,12 @@ describe('buildWorkerContext — RPC seams upcall the client', () => {
     ]);
     const deliver = calls.find((c) => c.seam === 'deliverSignals');
     expect(deliver).toMatchObject({
-      opts: { cwd: '/x', reportTo: 'https://h', apiKey: 'secret', runFailed: true },
+      opts: {
+        cwd: '/x',
+        reportTo: 'https://h',
+        apiKey: 'secret',
+        runFailed: true,
+      },
     });
     expect(calls.find((c) => c.seam === 'writeArtifact')).toEqual({
       seam: 'writeArtifact',

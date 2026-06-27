@@ -38,44 +38,64 @@ function projectResult(r: { name: string; ok: boolean; failures: string[] }): {
 
 describe('checkScenario', () => {
   it('flags an exitCode mismatch as a single failure', () => {
-    const failures = checkScenario(spawnResult({ exitCode: 1 }), { exitCode: 0 });
+    const failures = checkScenario(spawnResult({ exitCode: 1 }), {
+      exitCode: 0,
+    });
     expect(failures).toHaveLength(1);
     expect(failures[0]).toContain('exitCode');
   });
 
   it('passes when exitCode matches', () => {
-    const failures = checkScenario(spawnResult({ exitCode: 0 }), { exitCode: 0 });
+    const failures = checkScenario(spawnResult({ exitCode: 0 }), {
+      exitCode: 0,
+    });
     expect(failures).toEqual([]);
   });
 
   it('honours exitCodeOneOf membership', () => {
     expect(checkScenario(spawnResult({ exitCode: 1 }), { exitCodeOneOf: [0, 1] })).toEqual([]);
-    const miss = checkScenario(spawnResult({ exitCode: 2 }), { exitCodeOneOf: [0, 1] });
+    const miss = checkScenario(spawnResult({ exitCode: 2 }), {
+      exitCodeOneOf: [0, 1],
+    });
     expect(miss).toHaveLength(1);
     expect(miss[0]).toContain('one of');
   });
 
   it('checks stdoutIncludes', () => {
     expect(
-      checkScenario(spawnResult({ stdout: 'hello world' }), { stdoutIncludes: 'world' }),
+      checkScenario(spawnResult({ stdout: 'hello world' }), {
+        stdoutIncludes: 'world',
+      }),
     ).toEqual([]);
-    const miss = checkScenario(spawnResult({ stdout: 'hello' }), { stdoutIncludes: 'world' });
+    const miss = checkScenario(spawnResult({ stdout: 'hello' }), {
+      stdoutIncludes: 'world',
+    });
     expect(miss).toHaveLength(1);
     expect(miss[0]).toContain('stdout missing substring');
   });
 
   it('checks stdoutExcludes', () => {
-    expect(checkScenario(spawnResult({ stdout: 'clean' }), { stdoutExcludes: 'oops' })).toEqual([]);
-    const hit = checkScenario(spawnResult({ stdout: 'oops happened' }), { stdoutExcludes: 'oops' });
+    expect(
+      checkScenario(spawnResult({ stdout: 'clean' }), {
+        stdoutExcludes: 'oops',
+      }),
+    ).toEqual([]);
+    const hit = checkScenario(spawnResult({ stdout: 'oops happened' }), {
+      stdoutExcludes: 'oops',
+    });
     expect(hit).toHaveLength(1);
     expect(hit[0]).toContain('unexpectedly contains');
   });
 
   it('checks stderrIncludes', () => {
     expect(
-      checkScenario(spawnResult({ stderr: 'warn: bad tag' }), { stderrIncludes: 'bad tag' }),
+      checkScenario(spawnResult({ stderr: 'warn: bad tag' }), {
+        stderrIncludes: 'bad tag',
+      }),
     ).toEqual([]);
-    const miss = checkScenario(spawnResult({ stderr: '' }), { stderrIncludes: 'bad tag' });
+    const miss = checkScenario(spawnResult({ stderr: '' }), {
+      stderrIncludes: 'bad tag',
+    });
     expect(miss).toHaveLength(1);
     expect(miss[0]).toContain('stderr missing substring');
   });
@@ -114,17 +134,32 @@ describe('expectGraphCatalogNonEmpty', () => {
 
   it('accepts a graph envelope with at least one unit', () => {
     expect(
-      predicate({ schemaVersion: 2, tool: 'graph', signals: [], units: [{ slug: 'x' }] }),
+      predicate({
+        schemaVersion: 2,
+        tool: 'graph',
+        signals: [],
+        units: [{ slug: 'x' }],
+      }),
     ).toEqual([]);
   });
 
   it('rejects an empty graph catalog (no signals, no units)', () => {
-    const failures = predicate({ schemaVersion: 2, tool: 'graph', signals: [], units: [] });
+    const failures = predicate({
+      schemaVersion: 2,
+      tool: 'graph',
+      signals: [],
+      units: [],
+    });
     expect(failures.some((f) => f.includes('empty catalog'))).toBe(true);
   });
 
   it('rejects a non-graph tool', () => {
-    const failures = predicate({ schemaVersion: 2, tool: 'fit', signals: [{}], units: [] });
+    const failures = predicate({
+      schemaVersion: 2,
+      tool: 'fit',
+      signals: [{}],
+      units: [],
+    });
     expect(failures.some((f) => f.includes('tool'))).toBe(true);
   });
 });
@@ -148,7 +183,11 @@ describe('.mjs core / TS wrapper parity', () => {
         args: ['--version'],
         expect: { exitCode: 0, stdoutIncludes: CLI_PKG_VERSION },
       },
-      { name: 'version fails (deliberate)', args: ['--version'], expect: { exitCode: 1 } },
+      {
+        name: 'version fails (deliberate)',
+        args: ['--version'],
+        expect: { exitCode: 1 },
+      },
     ];
     const descriptor = {
       kind: 'node-script' as const,

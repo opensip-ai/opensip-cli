@@ -76,11 +76,23 @@ function liveViewCommandFixture(): string {
 describe('Tier A storage-contract scan (ADR-0042)', () => {
   it('flags every documented pattern family', () => {
     const cases: readonly { body: string; clauseIncludes: string }[] = [
-      { body: 'const q = "CREATE TABLE evil (id int)";', clauseIncludes: 'no DDL' },
+      {
+        body: 'const q = "CREATE TABLE evil (id int)";',
+        clauseIncludes: 'no DDL',
+      },
       { body: 'const q = "DROP TABLE tool_state";', clauseIncludes: 'no DDL' },
-      { body: 'const q = "CREATE UNIQUE INDEX ix ON t(c)";', clauseIncludes: 'no DDL' },
-      { body: 'const p = "PRAGMA writable_schema = 1";', clauseIncludes: 'pragmas' },
-      { body: 'const f = ".runtime/datastore.sqlite";', clauseIncludes: 'datastore-file' },
+      {
+        body: 'const q = "CREATE UNIQUE INDEX ix ON t(c)";',
+        clauseIncludes: 'no DDL',
+      },
+      {
+        body: 'const p = "PRAGMA writable_schema = 1";',
+        clauseIncludes: 'pragmas',
+      },
+      {
+        body: 'const f = ".runtime/datastore.sqlite";',
+        clauseIncludes: 'datastore-file',
+      },
       {
         body: 'import { x } from "@opensip-cli/datastore/schema/baseline.js";',
         clauseIncludes: 'imports',
@@ -129,7 +141,10 @@ describe('validate verdicts over the storage fixtures', () => {
     const dir = fixtureWith(
       'export const tool = { identity: { name: "storage-case" }, metadata: { id: "storage-case", name: "storage-case", version: "0.0.0", description: "d" }, commands: [{ name: "storage-case", description: "noop" }], commandSpecs: [{ name: "storage-case", description: "noop", commonFlags: [], scope: "project", output: "raw-stream", rawStreamReason: "diagnostic-gate", flags: [], handler: () => Promise.resolve() }], apiVersion: 1 };\nconst q = "CREATE TABLE evil (id int)";',
     );
-    const { result } = await runToolValidation({ spec: dir, cwd: process.cwd() });
+    const { result } = await runToolValidation({
+      spec: dir,
+      cwd: process.cwd(),
+    });
     expect(result.verdict).toBe('failed');
     const storage = result.sections.find((s) => s.name === 'storage-contract');
     expect(storage?.status).toBe('failed');
@@ -161,7 +176,10 @@ describe('validate — incomplete verdict (in-place candidate, deps not installe
     const dir = fixtureWith(
       "import 'totally-missing-dep-xyz-12345';\nexport const tool = undefined;",
     );
-    const { result } = await runToolValidation({ spec: dir, cwd: process.cwd() });
+    const { result } = await runToolValidation({
+      spec: dir,
+      cwd: process.cwd(),
+    });
     expect(result.verdict).toBe('incomplete');
     const runtimeLoad = result.sections.find((s) => s.name === 'runtime-load');
     expect(runtimeLoad?.status).toBe('skipped');
@@ -208,7 +226,9 @@ describe('bundled tools pass tools validate unchanged (ADR-0042 parity pin)', ()
     let dir = dirname(requireFromHere.resolve(pkg));
     for (let i = 0; i < 50; i++) {
       try {
-        const json = requireFromHere(join(dir, 'package.json')) as { name?: string };
+        const json = requireFromHere(join(dir, 'package.json')) as {
+          name?: string;
+        };
         if (json.name === pkg) return dir;
       } catch {
         /* keep climbing */
@@ -223,7 +243,10 @@ describe('bundled tools pass tools validate unchanged (ADR-0042 parity pin)', ()
   it.each(['@opensip-cli/fitness', '@opensip-cli/simulation', '@opensip-cli/graph'])(
     '%s passes every section',
     async (pkg) => {
-      const { result } = await runToolValidation({ spec: bundledDir(pkg), cwd: process.cwd() });
+      const { result } = await runToolValidation({
+        spec: bundledDir(pkg),
+        cwd: process.cwd(),
+      });
       expect(
         result.sections
           .filter((s) => s.status === 'failed')

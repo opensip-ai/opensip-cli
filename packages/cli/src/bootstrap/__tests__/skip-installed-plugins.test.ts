@@ -18,12 +18,16 @@ describe('skip-installed-plugins', () => {
   });
 
   it('shouldSkipInstalledToolDiscovery honors OPENSIP_CLI_SKIP_INSTALLED', () => {
-    expect(shouldSkipInstalledToolDiscovery(['fit'], { [SKIP_INSTALLED_PLUGINS_ENV]: '1' })).toBe(
-      true,
-    );
+    expect(
+      shouldSkipInstalledToolDiscovery(['fit'], {
+        [SKIP_INSTALLED_PLUGINS_ENV]: '1',
+      }),
+    ).toBe(true);
     expect(shouldSkipInstalledToolDiscovery(['fit'], {})).toBe(false);
-    expect(shouldSkipInstalledToolDiscovery(['fit'], { [SKIP_INSTALLED_PLUGINS_ENV]: '' })).toBe(
-      false,
-    );
+    expect(
+      shouldSkipInstalledToolDiscovery(['fit'], {
+        [SKIP_INSTALLED_PLUGINS_ENV]: '',
+      }),
+    ).toBe(false);
   });
 });

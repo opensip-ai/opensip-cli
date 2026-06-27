@@ -84,7 +84,11 @@ function bundled(id: string): ToolProvenance {
 
 describe('toolsUninstall — rejection / resolution failures (no shell-out)', () => {
   it('refuses to uninstall a bundled tool', () => {
-    const result = toolsUninstall({ target: 'fit', cwd: projectDir, provenance: [bundled('fit')] });
+    const result = toolsUninstall({
+      target: 'fit',
+      cwd: projectDir,
+      provenance: [bundled('fit')],
+    });
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/bundled tool/);
     expect(removeToolPlugin).not.toHaveBeenCalled();
@@ -116,7 +120,11 @@ describe('toolsUninstall — rejection / resolution failures (no shell-out)', ()
 
   it('fails when the requested scope has no matching install', () => {
     writeToolPackage(projectHost(), '@x/proj-only', 'proj-only');
-    const result = toolsUninstall({ target: 'proj-only', cwd: projectDir, global: true });
+    const result = toolsUninstall({
+      target: 'proj-only',
+      cwd: projectDir,
+      global: true,
+    });
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/not installed in the global scope/);
   });
@@ -132,7 +140,11 @@ describe('toolsUninstall — removal (mocked npm boundary)', () => {
     });
     const result = toolsUninstall({ target: 'solo', cwd: projectDir });
     expect(result.success).toBe(true);
-    expect(result.removed).toEqual({ id: 'solo', packageName: '@x/solo', scope: 'project' });
+    expect(result.removed).toEqual({
+      id: 'solo',
+      packageName: '@x/solo',
+      scope: 'project',
+    });
     expect(removeToolPlugin).toHaveBeenCalledWith('@x/solo', projectDir, true);
   });
 
@@ -144,7 +156,11 @@ describe('toolsUninstall — removal (mocked npm boundary)', () => {
       packageName: '@x/dual',
       success: true,
     });
-    const result = toolsUninstall({ target: 'dual', cwd: projectDir, global: true });
+    const result = toolsUninstall({
+      target: 'dual',
+      cwd: projectDir,
+      global: true,
+    });
     expect(result.success).toBe(true);
     expect(result.removed?.scope).toBe('global');
     expect(removeToolPlugin).toHaveBeenCalledWith('@x/dual', projectDir, false);

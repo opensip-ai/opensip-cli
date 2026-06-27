@@ -39,7 +39,10 @@ describe('createWriteArtifactSeam', () => {
   it('works inside a scope without projectContext', async () => {
     dir = mkdtempSync(join(tmpdir(), 'artifact-seam-'));
     const target = join(dir, 'catalog.json');
-    const scope = new RunScope({ logger: makeLogger(), runId: 'r-artifact-seam' });
+    const scope = new RunScope({
+      logger: makeLogger(),
+      runId: 'r-artifact-seam',
+    });
     const writeArtifact = createWriteArtifactSeam(makeLogger());
 
     await runWithScope(scope, () => writeArtifact(target, 'plain bytes\n'));
@@ -68,7 +71,11 @@ describe('createWriteArtifactSeam', () => {
       walkedUp: 0,
       scope: 'project',
     };
-    const scope = new RunScope({ logger: makeLogger(), runId: 'r-pc', projectContext });
+    const scope = new RunScope({
+      logger: makeLogger(),
+      runId: 'r-pc',
+      projectContext,
+    });
     const writeArtifact = createWriteArtifactSeam(makeLogger());
 
     await runWithScope(scope, () => writeArtifact(target, 'scoped\n'));

@@ -30,7 +30,10 @@ export interface StorageFinding {
 }
 
 /** The Tier A pattern families (exported for the drift-parity test). */
-export const TIER_A_PATTERNS: readonly { readonly pattern: RegExp; readonly clause: string }[] = [
+export const TIER_A_PATTERNS: readonly {
+  readonly pattern: RegExp;
+  readonly clause: string;
+}[] = [
   {
     pattern: /\b(CREATE|ALTER|DROP)\s+TABLE\b/i,
     clause: 'no DDL against the OpenSIP datastore (ADR-0042 Tier A)',

@@ -37,7 +37,12 @@ function makeStubContext(): ToolCliContext {
     registerLiveView: vi.fn(),
     renderLive: vi.fn(() => Promise.resolve()),
     maybeOpenReport: vi.fn(() => Promise.resolve()),
-    logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    logger: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    } as never,
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitRaw: vi.fn(),
@@ -136,7 +141,10 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
     mountAllToolCommands(registry, program, makeStubContext(), []);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.tool.no_command_surface', toolId: 'empty-tool' }),
+      expect.objectContaining({
+        evt: 'cli.tool.no_command_surface',
+        toolId: 'empty-tool',
+      }),
     );
     expect(program.commands.map((c) => c.name())).not.toContain('empty-tool');
   });
@@ -177,7 +185,10 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
     // No matching parent → mounted flat at root, and the mis-declaration is loud.
     expect(program.commands.map((c) => c.name())).toContain('lonely');
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.tool.unknown_command_parent', toolId: 'orphan-tool' }),
+      expect.objectContaining({
+        evt: 'cli.tool.unknown_command_parent',
+        toolId: 'orphan-tool',
+      }),
     );
   });
 });
@@ -191,7 +202,13 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
       commandSpecs: [
         {
           ...makeSpec('badcmd'),
-          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+          options: [
+            {
+              flag: '--flag',
+              description: 'boolean but required',
+              required: true,
+            },
+          ],
         },
       ],
     };
@@ -219,7 +236,13 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
       commandSpecs: [
         {
           ...makeSpec('badcmd'),
-          options: [{ flag: '--flag', description: 'boolean but required', required: true }],
+          options: [
+            {
+              flag: '--flag',
+              description: 'boolean but required',
+              required: true,
+            },
+          ],
         },
       ],
     };
@@ -248,7 +271,10 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
     // The good tool mounted despite the bad tool throwing; the failure was logged.
     expect(program.commands.map((c) => c.name())).toContain('okcmd');
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.tool.register_failed', toolId: 'bad-tool' }),
+      expect.objectContaining({
+        evt: 'cli.tool.register_failed',
+        toolId: 'bad-tool',
+      }),
     );
   });
 });
@@ -289,7 +315,11 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
 });
 
 describe('isValidTool — command-surface requirement', () => {
-  const base = { identity: { name: 'c' }, metadata: { id: 'x', name: 'c' }, commands: [] };
+  const base = {
+    identity: { name: 'c' },
+    metadata: { id: 'x', name: 'c' },
+    commands: [],
+  };
 
   it('accepts a tool with a non-empty commandSpecs', () => {
     expect(isValidTool({ ...base, commandSpecs: [makeSpec('c')] })).toBe(true);

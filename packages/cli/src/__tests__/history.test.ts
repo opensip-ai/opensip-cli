@@ -39,7 +39,10 @@ function makeSession(
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), 'cli-hist-'));
-  ds = DataStoreFactory.open({ backend: 'sqlite', path: join(tmp, 'd.sqlite') });
+  ds = DataStoreFactory.open({
+    backend: 'sqlite',
+    path: join(tmp, 'd.sqlite'),
+  });
 });
 
 afterEach(() => {
@@ -111,7 +114,15 @@ describe('showHistory — summary projection guards', () => {
   it('omits the summary when any field is the wrong type', () => {
     new SessionRepo(ds).save(
       makeSession('wt', 90, Date.now(), {
-        payload: { summary: { total: 'NaN', passed: 1, failed: 0, errors: 0, warnings: 0 } },
+        payload: {
+          summary: {
+            total: 'NaN',
+            passed: 1,
+            failed: 0,
+            errors: 0,
+            warnings: 0,
+          },
+        },
       }),
     );
     expect(showHistory(ds).sessions[0]?.summary).toBeUndefined();

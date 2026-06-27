@@ -41,6 +41,7 @@ import {
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-cli/core';
+import { createGraphCatalogThunk } from '@opensip-cli/graph';
 import { resolveSignalSink } from '@opensip-cli/output';
 
 import { buildDatastoreThunk } from '../cli-context.js';
@@ -228,6 +229,8 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // the cached SQLite connection on teardown — checkpointing/truncating the WAL
   // and freeing the handle, which otherwise leaked for the process lifetime.
   const datastoreThunk = buildDatastoreThunk(project, logger, input.parentCommand);
+  const graphCatalogThunk =
+    project.scope === 'project' ? createGraphCatalogThunk(datastoreThunk) : undefined;
   const scope = new RunScope({
     logger,
     projectContext: project,
@@ -240,6 +243,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // (post-action handlers, error printers) that read via
     // `getOrOpenDatastore()` find the same instance.
     datastore: datastoreThunk,
+    graphCatalog: graphCatalogThunk,
     // Presentation settings the render paths read via currentScope()?.ui.
     // bannerSize stays an untyped string at the kernel boundary; the
     // cli-ui render sites narrow it with normalizeBannerSize.

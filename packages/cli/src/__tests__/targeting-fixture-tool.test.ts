@@ -80,7 +80,11 @@ describe('ADR-0037 adoption: a non-fitness tool resolves a target via scope.targ
     const targets = buildTargets({
       document: {
         targets: {
-          backend: { description: 'b', include: ['src/**/*.ts'], tags: ['fast'] },
+          backend: {
+            description: 'b',
+            include: ['src/**/*.ts'],
+            tags: ['fast'],
+          },
         },
         globalExcludes: ['**/dist/**'],
       },

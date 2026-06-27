@@ -17,7 +17,13 @@ import {
 } from '../commands/uninstall/targets.js';
 
 function target(over: Partial<Target>): Target {
-  return { path: '/p/x', kind: 'dir', sizeBytes: 0, bucket: 'runtime', ...over };
+  return {
+    path: '/p/x',
+    kind: 'dir',
+    sizeBytes: 0,
+    bucket: 'runtime',
+    ...over,
+  };
 }
 
 function capture(): { out: () => string; write: (s: string) => void } {
@@ -29,7 +35,12 @@ describe('printUserModeTargets — formatSize buckets', () => {
   it('formats bytes / KB / MB / GB and marks dir vs file', () => {
     const c = capture();
     printUserModeTargets(c.write, [
-      target({ path: '/p/tiny', kind: 'file', sizeBytes: 512, bucket: 'config' }),
+      target({
+        path: '/p/tiny',
+        kind: 'file',
+        sizeBytes: 512,
+        bucket: 'config',
+      }),
       target({ path: '/p/kb', sizeBytes: 2048 }),
       target({ path: '/p/mb', sizeBytes: 5 * 1024 * 1024 }),
       target({ path: '/p/gb', sizeBytes: 3 * 1024 * 1024 * 1024 }),
@@ -55,9 +66,19 @@ describe('printProjectDefault', () => {
     const c = capture();
     printProjectDefault(
       c.write,
-      [target({ path: '/proj/opensip-cli/.runtime', sizeBytes: 4096, bucket: 'runtime' })],
       [
-        target({ path: '/proj/opensip-cli.config.yml', kind: 'file', bucket: 'config' }),
+        target({
+          path: '/proj/opensip-cli/.runtime',
+          sizeBytes: 4096,
+          bucket: 'runtime',
+        }),
+      ],
+      [
+        target({
+          path: '/proj/opensip-cli.config.yml',
+          kind: 'file',
+          bucket: 'config',
+        }),
         target({
           path: '/proj/opensip-cli/fit',
           bucket: 'user-content',
@@ -89,7 +110,13 @@ describe('printProjectPurge', () => {
     const c = capture();
     printProjectPurge(
       c.write,
-      [target({ path: '/proj/opensip-cli', sizeBytes: 1024 * 1024, bucket: 'user-content' })],
+      [
+        target({
+          path: '/proj/opensip-cli',
+          sizeBytes: 1024 * 1024,
+          bucket: 'user-content',
+        }),
+      ],
       '/proj',
     );
     const out = c.out();

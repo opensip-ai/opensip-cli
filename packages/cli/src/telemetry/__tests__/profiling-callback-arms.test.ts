@@ -115,7 +115,10 @@ describe('CPU profiling callback arms (synchronous fake inspector session)', () 
   });
 
   it('swallows a disconnect() failure during cleanup', () => {
-    const flags = h.installSyncFakeSession({ profile: { nodes: [] }, throwOnDisconnect: true });
+    const flags = h.installSyncFakeSession({
+      profile: { nodes: [] },
+      throwOnDisconnect: true,
+    });
 
     startProfiling(scope, 'fit');
     expect(() => stopProfiling(scope)).not.toThrow();
@@ -135,7 +138,10 @@ describe('CPU profiling callback arms (synchronous fake inspector session)', () 
     expect(() => stopProfiling(scope)).not.toThrow();
     expect(h.readdirHasCpuprofile()).toBe(false);
     expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.profiling.stop_failed', error: 'stop wire fault' }),
+      expect.objectContaining({
+        evt: 'cli.profiling.stop_failed',
+        error: 'stop wire fault',
+      }),
     );
     // The catch arm still ran cleanup (disconnect attempted).
     expect(flags.disconnected).toBe(true);
@@ -220,7 +226,10 @@ describe('CPU profiling callback arms (synchronous fake inspector session)', () 
     startProfiling(scope, 'fit');
     stopProfiling(scope);
     expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.profiling.stop_failed', error: String(blankError) }),
+      expect.objectContaining({
+        evt: 'cli.profiling.stop_failed',
+        error: String(blankError),
+      }),
     );
   });
 

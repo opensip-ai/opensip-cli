@@ -52,7 +52,12 @@ describe('decideReportOpen', () => {
   });
 
   it('opens under SSH if DISPLAY is set', () => {
-    expect(decideReportOpen({ ...base(), env: { SSH_CONNECTION: 'x', DISPLAY: ':0' } })).toEqual({
+    expect(
+      decideReportOpen({
+        ...base(),
+        env: { SSH_CONNECTION: 'x', DISPLAY: ':0' },
+      }),
+    ).toEqual({
       shouldOpen: true,
       reason: 'ok',
     });
@@ -60,12 +65,18 @@ describe('decideReportOpen', () => {
 
   it('opens under SSH if WAYLAND_DISPLAY is set', () => {
     expect(
-      decideReportOpen({ ...base(), env: { SSH_CONNECTION: 'x', WAYLAND_DISPLAY: 'wayland-0' } }),
+      decideReportOpen({
+        ...base(),
+        env: { SSH_CONNECTION: 'x', WAYLAND_DISPLAY: 'wayland-0' },
+      }),
     ).toEqual({ shouldOpen: true, reason: 'ok' });
   });
 
   it('opens in the happy path', () => {
-    expect(decideReportOpen(base())).toEqual({ shouldOpen: true, reason: 'ok' });
+    expect(decideReportOpen(base())).toEqual({
+      shouldOpen: true,
+      reason: 'ok',
+    });
   });
 });
 

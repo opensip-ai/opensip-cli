@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { ensureAgentsMd } from './agents-md.js';
 import { generateConfig } from './config-templates.js';
 
 import type { SupportedLanguage } from './language-detection.js';
@@ -93,7 +94,9 @@ function scaffoldToolExamples(
   for (const ts of toolScaffolds) {
     if (!ts.scaffoldExamples) continue;
     for (const kind of ts.layout.userSubdirs) {
-      mkdirSync(paths.userPluginDir(ts.layout.domain, kind), { recursive: true });
+      mkdirSync(paths.userPluginDir(ts.layout.domain, kind), {
+        recursive: true,
+      });
     }
     for (const file of ts.scaffoldExamples(ctx)) {
       writeScaffoldedFile(
@@ -151,6 +154,7 @@ export function runScaffold(
   scaffoldToolExamples(paths, toolScaffolds, ctx, { keepCustom, preExistingByPath }, createdFiles);
 
   const gitignoreUpdated = ensureGitignore(cwd);
+  const agentsMdCreated = ensureAgentsMd(cwd, { toolScaffolds });
 
   return {
     ...baseResult,
@@ -159,6 +163,7 @@ export function runScaffold(
     languages,
     createdFiles,
     gitignoreUpdated,
+    agentsMdCreated,
     preExistingFiles: state === 'pristine' ? [] : preExistingFiles,
   };
 }

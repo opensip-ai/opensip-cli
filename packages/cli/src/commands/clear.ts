@@ -49,7 +49,12 @@ export async function executeClear(opts: ClearOptions): Promise<ClearDoneResult>
   const repo = new SessionRepo(opts.datastore);
   const sessionCount = repo.count();
   if (sessionCount === 0) {
-    return { type: 'clear-done', action: 'empty', deletedCount: 0, sessionCount: 0 };
+    return {
+      type: 'clear-done',
+      action: 'empty',
+      deletedCount: 0,
+      sessionCount: 0,
+    };
   }
 
   if (!opts.yes) {
@@ -69,7 +74,12 @@ export async function executeClear(opts: ClearOptions): Promise<ClearDoneResult>
 
     const answer = await ask('  Continue? (y/n) ');
     if (answer !== 'y') {
-      return { type: 'clear-done', action: 'cancelled', deletedCount: 0, sessionCount };
+      return {
+        type: 'clear-done',
+        action: 'cancelled',
+        deletedCount: 0,
+        sessionCount,
+      };
     }
   }
 

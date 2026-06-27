@@ -22,7 +22,12 @@ import {
 import type { Logger, ToolRunCompletion, ToolSessionContribution } from '@opensip-cli/core';
 
 /** Silent logger so the best-effort warn/info paths don't spam test output. */
-const SILENT: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const SILENT: Logger = {
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
 
 function contribution(overrides: Partial<ToolSessionContribution> = {}): ToolSessionContribution {
   return {
@@ -37,7 +42,10 @@ function contribution(overrides: Partial<ToolSessionContribution> = {}): ToolSes
 
 describe('createRunPlaneFactory — invocation lifecycle', () => {
   it('beginRun and current return the same single invocation', () => {
-    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const factory = createRunPlaneFactory({
+      getDatastore: () => undefined,
+      logger: SILENT,
+    });
     const a = factory.beginRun();
     const b = factory.current();
     expect(b).toBe(a);
@@ -50,7 +58,10 @@ describe('createRunPlaneFactory — invocation lifecycle', () => {
     // action calls beginRun, NOT eagerly at buildToolCliContext time. Capture a
     // boundary AFTER construction, spin, then begin — a lazily-created lifecycle
     // starts after the boundary; an eagerly-created one would start before it.
-    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const factory = createRunPlaneFactory({
+      getDatastore: () => undefined,
+      logger: SILENT,
+    });
     const afterConstruction = Date.now();
     const spinStart = Date.now();
     while (Date.now() - spinStart < 5) {
@@ -61,7 +72,10 @@ describe('createRunPlaneFactory — invocation lifecycle', () => {
   });
 
   it('completeAndPersist is best-effort with no datastore — returns undefined, never throws', () => {
-    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const factory = createRunPlaneFactory({
+      getDatastore: () => undefined,
+      logger: SILENT,
+    });
     const inv = factory.current();
     expect(inv.completeAndPersist(contribution())).toBeUndefined();
     expect(inv.sessionId()).toBeUndefined();
@@ -127,7 +141,10 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+    factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      logger: SILENT,
+    });
   });
   afterEach(() => {
     datastore.close();
@@ -200,7 +217,10 @@ describe('completeLiveRender', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+    factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      logger: SILENT,
+    });
   });
   afterEach(() => {
     datastore.close();
@@ -228,7 +248,10 @@ describe('completeLiveRender', () => {
 
 describe('createRunSessionSeam', () => {
   it('exposes the current invocation lifecycle as `timing`', () => {
-    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const factory = createRunPlaneFactory({
+      getDatastore: () => undefined,
+      logger: SILENT,
+    });
     const seam = createRunSessionSeam(factory);
     expect(seam.timing).toBe(factory.current().lifecycle);
   });
@@ -240,7 +263,10 @@ describe('createRunActionHooks', () => {
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+    factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      logger: SILENT,
+    });
   });
   afterEach(() => {
     datastore.close();
@@ -249,7 +275,9 @@ describe('createRunActionHooks', () => {
   it('completeRun persists when the result carries a session contribution', () => {
     const hooks = createRunActionHooks(factory);
     hooks.beginRun?.();
-    hooks.completeRun?.({ session: contribution() } satisfies ToolRunCompletion);
+    hooks.completeRun?.({
+      session: contribution(),
+    } satisfies ToolRunCompletion);
     expect(factory.current().sessionId()).toBeDefined();
   });
 

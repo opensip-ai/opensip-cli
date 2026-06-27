@@ -50,7 +50,11 @@ function makeTool(id: string, contribution?: Record<string, unknown>): Tool {
     metadata: { id, name: id, version: '0.0.0', description: id },
     commandSpecs: [],
     ...(contribution
-      ? { extensionPoints: { collectReportData: (_scope: ToolScope) => contribution } }
+      ? {
+          extensionPoints: {
+            collectReportData: (_scope: ToolScope) => contribution,
+          },
+        }
       : {}),
   };
 }
@@ -100,7 +104,11 @@ describe('composeAndWriteReport', () => {
     const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
 
     const expectedPath = join(resolveProjectPaths(projectRoot).reportsDir, 'latest.html');
-    expect(result).toEqual({ type: 'report', path: expectedPath, opened: false });
+    expect(result).toEqual({
+      type: 'report',
+      path: expectedPath,
+      opened: false,
+    });
 
     const html = readFileSync(expectedPath, 'utf8');
     // Cross-tool panels are present.
@@ -117,7 +125,12 @@ describe('composeAndWriteReport', () => {
     );
 
     const external: Tool = {
-      metadata: { id: 'ext-tool', name: 'ext-tool', version: '0.0.0', description: 'ext' },
+      metadata: {
+        id: 'ext-tool',
+        name: 'ext-tool',
+        version: '0.0.0',
+        description: 'ext',
+      },
       commandSpecs: [],
       extensionPoints: {
         collectReportData: () => ({ externalOnly: true }),
@@ -125,7 +138,12 @@ describe('composeAndWriteReport', () => {
     };
     const bundled = makeTool('fitness', { checkCatalog: [{ slug: 'legit' }] });
     const provenance: ToolProvenance[] = [
-      { source: 'installed', id: 'ext-tool', version: '0.0.0', manifestHash: 'h' },
+      {
+        source: 'installed',
+        id: 'ext-tool',
+        version: '0.0.0',
+        manifestHash: 'h',
+      },
     ];
 
     const scope = makeScope([external, bundled], undefined, provenance);
@@ -174,7 +192,12 @@ describe('composeAndWriteReport', () => {
     // instead (which fails here, since the test process is not the CLI binary), is
     // caught best-effort, and the report still renders for the bundled tool.
     const external: Tool = {
-      metadata: { id: 'ext-tool', name: 'ext-tool', version: '0.0.0', description: 'ext' },
+      metadata: {
+        id: 'ext-tool',
+        name: 'ext-tool',
+        version: '0.0.0',
+        description: 'ext',
+      },
       commandSpecs: [],
       extensionPoints: {
         collectReportData: () => {
@@ -184,7 +207,12 @@ describe('composeAndWriteReport', () => {
     };
     const bundled = makeTool('fitness', { checkCatalog: [{ slug: 'legit' }] });
     const provenance: ToolProvenance[] = [
-      { source: 'installed', id: 'ext-tool', version: '0.0.0', manifestHash: 'h' },
+      {
+        source: 'installed',
+        id: 'ext-tool',
+        version: '0.0.0',
+        manifestHash: 'h',
+      },
     ];
 
     const scope = makeScope([external, bundled], undefined, provenance);

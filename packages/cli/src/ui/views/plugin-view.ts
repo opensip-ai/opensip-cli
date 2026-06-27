@@ -139,7 +139,10 @@ function syncView(
     line([{ text: 'Plugin sync', bold: true }]),
     ...synced.map((entry) =>
       line([
-        { text: entry.installed ? '✔' : '✗', tone: entry.installed ? 'success' : 'error' },
+        {
+          text: entry.installed ? '✔' : '✗',
+          tone: entry.installed ? 'success' : 'error',
+        },
         { text: ' ' },
         { text: `${entry.domain}/`, dim: true },
         { text: entry.package },

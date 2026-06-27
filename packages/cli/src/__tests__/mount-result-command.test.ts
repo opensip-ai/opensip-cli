@@ -102,6 +102,9 @@ describe('mountResultCommandWithArg', () => {
 
     expect(handler).toHaveBeenCalledOnce();
     expect(handler.mock.calls[0]?.[0]).toBe('pkg-a');
-    expect(handler.mock.calls[0]?.[1]).toMatchObject({ flag: 'v1', json: false });
+    expect(handler.mock.calls[0]?.[1]).toMatchObject({
+      flag: 'v1',
+      json: false,
+    });
   });
 });

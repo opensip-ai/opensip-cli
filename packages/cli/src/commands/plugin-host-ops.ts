@@ -90,9 +90,18 @@ export function addToolPlugin(packageName: string, cwd: string, project: boolean
     : ensureUserPluginHostDir(TOOL_DOMAIN);
   const outcome = npmInstallIntoHost(dir, packageName);
   if (!outcome.ok) {
-    return { type: PLUGIN_ADD, packageName, success: false, error: outcome.error };
+    return {
+      type: PLUGIN_ADD,
+      packageName,
+      success: false,
+      error: outcome.error,
+    };
   }
-  return { type: PLUGIN_ADD, packageName: outcome.installedName, success: true };
+  return {
+    type: PLUGIN_ADD,
+    packageName: outcome.installedName,
+    success: true,
+  };
 }
 
 /** npm-uninstall a package from a host dir. Pure of config concerns. */

@@ -65,7 +65,10 @@ describe('buildDatastoreLockContext', () => {
   const logger = new LoggerImpl({ level: 'error' });
 
   it('records the resolved command label and cwd basename in lock metadata', () => {
-    const ctx = buildDatastoreLockContext(logger, { commandName: 'fit', cwd: '/projects/demo' });
+    const ctx = buildDatastoreLockContext(logger, {
+      commandName: 'fit',
+      cwd: '/projects/demo',
+    });
     expect(ctx.command).toBe('fit');
     expect(ctx.cwdBasename).toBe('demo');
   });
@@ -89,7 +92,10 @@ describe('createStateLockEventBridge', () => {
       debug: vi.fn(),
       error: vi.fn(),
     };
-    const scope = new RunScope({ logger: new LoggerImpl({ level: 'error' }), runId: 'run-lock' });
+    const scope = new RunScope({
+      logger: new LoggerImpl({ level: 'error' }),
+      runId: 'run-lock',
+    });
     const bridge = createStateLockEventBridge(logger);
 
     runWithScopeSync(scope, () => {

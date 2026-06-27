@@ -32,7 +32,9 @@ afterEach(() => {
 describe('buildTargets — toTarget normalization', () => {
   it('defaults exclude to node_modules/dist when a target declares none', () => {
     const targets = buildTargets({
-      document: { targets: { backend: { description: 'b', include: ['src/**/*.ts'] } } },
+      document: {
+        targets: { backend: { description: 'b', include: ['src/**/*.ts'] } },
+      },
     });
     expect(targets?.getByName('backend')?.config.exclude).toEqual([
       '**/node_modules/**',

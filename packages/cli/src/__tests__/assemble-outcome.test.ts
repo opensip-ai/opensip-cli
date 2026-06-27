@@ -41,7 +41,12 @@ describe('kind derivation', () => {
 describe('outcomeFromEnvelope', () => {
   it('wraps the UNCHANGED envelope under .envelope as a status:ok outcome', () => {
     const outcome = outcomeFromEnvelope(ENVELOPE, 1);
-    expect(outcome).toEqual({ kind: 'graph.run', status: 'ok', exitCode: 1, envelope: ENVELOPE });
+    expect(outcome).toEqual({
+      kind: 'graph.run',
+      status: 'ok',
+      exitCode: 1,
+      envelope: ENVELOPE,
+    });
     expect(outcome.envelope).toBe(ENVELOPE); // identity preserved — the break is purely the wrapper
   });
 });
@@ -137,7 +142,11 @@ describe('outcome assembly contract — uniform CommandOutcome across host paths
   });
 
   it('emitError path (diagnosed handler error) uses outcomeFromErrorMessage → status:error + errors', () => {
-    const o = outcomeFromErrorMessage({ message: 'bad', exitCode: 2, kind: 'command.error' });
+    const o = outcomeFromErrorMessage({
+      message: 'bad',
+      exitCode: 2,
+      kind: 'command.error',
+    });
     expect(o.status).toBe('error');
     expect(o.errors?.[0]?.message).toBe('bad');
   });

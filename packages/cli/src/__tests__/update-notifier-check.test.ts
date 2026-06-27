@@ -35,14 +35,20 @@ beforeEach(() => {
   delete process.env.OPENSIP_NO_UPDATE;
   delete process.env.NO_UPDATE_NOTIFIER;
   fakeUpdate = undefined;
-  Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: true,
+    configurable: true,
+  });
   tmpDir = mkdtempSync(join(tmpdir(), 'osip-upd-'));
   stateFile = join(tmpDir, 'update-state.json');
   vi.resetModules();
 });
 
 afterEach(() => {
-  Object.defineProperty(process.stdout, 'isTTY', { value: savedTTY, configurable: true });
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: savedTTY,
+    configurable: true,
+  });
   vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });

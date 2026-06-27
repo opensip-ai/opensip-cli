@@ -12,7 +12,10 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = { ...originalEnv };
-  Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: originalIsTTY,
+    configurable: true,
+  });
 });
 
 /** Pattern that matches the ANSI CSI prefix (ESC + '['). Constructed from
@@ -45,7 +48,10 @@ describe('buildWelcome', () => {
   it('emits ANSI codes when stdout is a TTY', () => {
     delete process.env.NO_COLOR;
     delete process.env.FORCE_COLOR;
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     const out = buildWelcome({ version: '1.0.0' });
     expect(out).toMatch(ANSI_PATTERN);
   });
@@ -53,7 +59,10 @@ describe('buildWelcome', () => {
   it('emits plain text when stdout is not a TTY and no FORCE_COLOR', () => {
     delete process.env.NO_COLOR;
     delete process.env.FORCE_COLOR;
-    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
     const out = buildWelcome({ version: '1.0.0' });
     expect(out).not.toMatch(ANSI_PATTERN);
   });

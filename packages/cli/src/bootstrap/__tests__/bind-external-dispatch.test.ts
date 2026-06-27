@@ -91,7 +91,12 @@ describe('buildMaybeDispatchExternal — external arm forks + forwards config', 
   it('forks the worker and forwards the namespaced raw config block', async () => {
     const scope = new RunScope({
       toolProvenance: [externalProvenance()],
-      toolManifests: [manifest({ stableId: TOOL_ID, config: { namespace: 'demo', schema: {} } })],
+      toolManifests: [
+        manifest({
+          stableId: TOOL_ID,
+          config: { namespace: 'demo', schema: {} },
+        }),
+      ],
     });
     // `configDocument` is an Object.assign'd slot (the bootstrap sets it after
     // construction; the constructor does not read it), so mirror that here.
@@ -122,7 +127,11 @@ describe('buildMaybeDispatchExternal — external arm forks + forwards config', 
     const scope = new RunScope({
       toolProvenance: [externalProvenance()],
       toolManifests: [
-        manifest({ id: TOOL_NAME, stableId: otherId, config: { namespace: 'demo', schema: {} } }),
+        manifest({
+          id: TOOL_NAME,
+          stableId: otherId,
+          config: { namespace: 'demo', schema: {} },
+        }),
       ],
     });
     Object.assign(scope, { configDocument: { demo: { matched: 'by-name' } } });

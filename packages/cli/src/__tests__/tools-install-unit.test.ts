@@ -39,7 +39,11 @@ function validation(verdict: ToolsValidateResult['verdict']): ToolsValidateResul
 
 /** Make runToolValidation resolve a verdict, with a staged dir + cleanup spy. */
 function stageValidation(verdict: ToolsValidateResult['verdict'], stagedPkgDir = '/staged/demo') {
-  runToolValidation.mockResolvedValue({ result: validation(verdict), stagedPkgDir, cleanup });
+  runToolValidation.mockResolvedValue({
+    result: validation(verdict),
+    stagedPkgDir,
+    cleanup,
+  });
 }
 
 beforeEach(() => {
@@ -78,7 +82,11 @@ describe('toolsInstall — activation', () => {
       },
     });
 
-    const result = await toolsInstall({ spec: '@x/demo', cwd: '/proj', project: true });
+    const result = await toolsInstall({
+      spec: '@x/demo',
+      cwd: '/proj',
+      project: true,
+    });
     expect(result.success).toBe(true);
     expect(result.scope).toBe('project');
     expect(result.toolId).toBe('demo');

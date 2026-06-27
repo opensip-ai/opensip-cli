@@ -249,7 +249,10 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     const sink: SignalSink = {
       emit: (batch: SignalBatch): Promise<EmitResult> => {
         seen.push(batch);
-        return Promise.resolve({ accepted: batch.signals.length, authRejected: false });
+        return Promise.resolve({
+          accepted: batch.signals.length,
+          authRejected: false,
+        });
       },
     };
 
@@ -306,7 +309,11 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     try {
       const sink: SignalSink = {
         emit: () =>
-          Promise.resolve({ accepted: 0, authRejected: false, skippedReason: 'unentitled' }),
+          Promise.resolve({
+            accepted: 0,
+            authRejected: false,
+            skippedReason: 'unentitled',
+          }),
       };
       const out = await runWithScope(makeScope(sink), () =>
         deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
@@ -386,7 +393,10 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
     expect(out.reportSuccess).toBe(true);
     expect(seen).toHaveLength(1);
     expect(seen[0].url).toContain('/sarif');
-    const sarif = JSON.parse(seen[0].body) as { version: string; runs: unknown[] };
+    const sarif = JSON.parse(seen[0].body) as {
+      version: string;
+      runs: unknown[];
+    };
     expect(sarif.version).toBe('2.1.0');
     expect(sarif.runs).toHaveLength(1);
   });
@@ -436,7 +446,12 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
       verdict: { ...ENVELOPE.verdict, passed: true },
     };
     await runWithScope(makeScope(NOOP_SINK), () =>
-      deliverEnvelope(passing, { cwd: process.cwd(), repo: {}, setExitCode, fetchImpl: OK_200 }),
+      deliverEnvelope(passing, {
+        cwd: process.cwd(),
+        repo: {},
+        setExitCode,
+        fetchImpl: OK_200,
+      }),
     );
     expect(setExitCode).not.toHaveBeenCalled();
   });

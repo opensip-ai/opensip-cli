@@ -1,4 +1,4 @@
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { applyAgentFilters, EXIT_CODES } from '@opensip-cli/contracts';
 import { buildToolIdentityIndex, currentScope, SystemError } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
@@ -143,60 +143,16 @@ function canonicalToolForDisplay(
   return identityIndex === undefined ? tool : identityIndex.canonicalForStoredTool(tool);
 }
 
-/** Sort rank for `top:N` severity ordering: high (0) before medium (1) before low (2). */
-function severityRank(severity: string): number {
-  if (severity === 'high') return 0;
-  if (severity === 'medium') return 1;
-  return 2;
-}
-
-/**
- * Simple, host-side filter applicator for SignalEnvelope signals.
- * errors-only  => severity === 'high'
- * warnings-only => severity === 'medium'
- * top:<n>      => take first N after severity sort (high, medium, low) + stable order
- * Composable: errors-only + top:20 means top 20 errors.
- */
+/** Apply shared agent filters to a replay envelope (ADR-0085). */
 function applyFiltersToReplay(
-  session: StoredSession,
+  _session: StoredSession,
   replay: ToolSessionReplay<CommandResult>,
   filters: string[],
 ): ToolSessionReplay<CommandResult> {
-  const envelope = replay.envelope;
-  let signals = [...envelope.signals];
-
-  const hasErrorsOnly = filters.some((f) => f === 'errors-only' || f === 'high');
-  const hasWarningsOnly = filters.some((f) => f === 'warnings-only' || f === 'medium');
-
-  if (hasErrorsOnly && !hasWarningsOnly) {
-    signals = signals.filter((s) => s.severity === 'high');
-  } else if (hasWarningsOnly && !hasErrorsOnly) {
-    signals = signals.filter((s) => s.severity === 'medium');
-  }
-  // If both or neither, no severity filter (top will still apply).
-
-  // Apply top:N (last filter wins for simplicity; or take min if multiple).
-  const topFilter = filters.find((f) => f.startsWith('top:'));
-  if (topFilter) {
-    const n = Number.parseInt(topFilter.split(':')[1] || '0', 10);
-    if (Number.isFinite(n) && n > 0) {
-      // Re-sort for "top": high first, then medium, low, preserving original relative order.
-      signals = signals
-        .map((s, i) => ({ s, i }))
-        .sort((a, b) => {
-          const so = severityRank(a.s.severity) - severityRank(b.s.severity);
-          return so === 0 ? a.i - b.i : so;
-        })
-        .slice(0, n)
-        .map((x) => x.s);
-    }
-  }
-
-  const filteredEnvelope = { ...envelope, signals };
-
+  const filtered = applyAgentFilters(replay.envelope, filters);
   return {
     ...replay,
-    envelope: filteredEnvelope,
+    envelope: filtered.envelope,
   };
 }
 

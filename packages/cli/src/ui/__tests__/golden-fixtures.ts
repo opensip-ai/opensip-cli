@@ -52,7 +52,15 @@ const FIT_CLEAN_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
   tool: 'fit',
   runId: 'r',
   createdAt: CREATED_AT,
-  units: [{ slug: 'naming', passed: true, durationMs: 3, filesValidated: 10, itemType: 'files' }],
+  units: [
+    {
+      slug: 'naming',
+      passed: true,
+      durationMs: 3,
+      filesValidated: 10,
+      itemType: 'files',
+    },
+  ],
   signals: [],
   policy: HOST_VERDICT_POLICY_FALLBACK,
   runFaulted: false,
@@ -96,7 +104,12 @@ const FIT_FINDINGS_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
       filePath: 'b.ts',
       line: 4,
     }),
-    fitSignal({ source: 'naming', severity: 'medium', message: 'bad name', filePath: 'c.ts' }),
+    fitSignal({
+      source: 'naming',
+      severity: 'medium',
+      message: 'bad name',
+      filePath: 'c.ts',
+    }),
   ],
   policy: HOST_VERDICT_POLICY_FALLBACK,
   runFaulted: false,
@@ -118,7 +131,14 @@ const FIT_ERRORED_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
       ignoredCount: 3,
     },
   ],
-  signals: [fitSignal({ source: 'naming', severity: 'medium', message: 'w0', filePath: 'b.ts' })],
+  signals: [
+    fitSignal({
+      source: 'naming',
+      severity: 'medium',
+      message: 'w0',
+      filePath: 'b.ts',
+    }),
+  ],
   policy: HOST_VERDICT_POLICY_FALLBACK,
   runFaulted: false,
 });
@@ -231,8 +251,18 @@ const GRAPH_CLEAN_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
   runId: 'r',
   createdAt: CREATED_AT,
   units: [
-    { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
-    { slug: 'graph.dead-code.orphan-subtree', passed: true, violationCount: 0, durationMs: 0 },
+    {
+      slug: 'graph.architecture.cycle',
+      passed: true,
+      violationCount: 0,
+      durationMs: 0,
+    },
+    {
+      slug: 'graph.dead-code.orphan-subtree',
+      passed: true,
+      violationCount: 0,
+      durationMs: 0,
+    },
   ],
   signals: [],
   policy: HOST_VERDICT_POLICY_FALLBACK,
@@ -246,8 +276,18 @@ const GRAPH_FINDINGS_ENVELOPE: SignalEnvelope = buildSignalEnvelope({
   createdAt: CREATED_AT,
   resolutionMode: 'fast',
   units: [
-    { slug: 'graph.dead-code.orphan-subtree', passed: true, violationCount: 3, durationMs: 0 },
-    { slug: 'graph.architecture.cycle', passed: true, violationCount: 0, durationMs: 0 },
+    {
+      slug: 'graph.dead-code.orphan-subtree',
+      passed: true,
+      violationCount: 3,
+      durationMs: 0,
+    },
+    {
+      slug: 'graph.architecture.cycle',
+      passed: true,
+      violationCount: 0,
+      durationMs: 0,
+    },
   ],
   signals: [
     graphSignal({

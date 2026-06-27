@@ -80,8 +80,11 @@ describe('ADR-0054 M4-F — external lifecycle/capability hooks run off-host', (
     });
 
     // The hook ran and contributed its keyed catalog (the host merges this).
-    const report = (result as { extDispatchReport?: { ran: boolean; pid: number; marker: string } })
-      .extDispatchReport;
+    const report = (
+      result as {
+        extDispatchReport?: { ran: boolean; pid: number; marker: string };
+      }
+    ).extDispatchReport;
     expect(report?.ran).toBe(true);
     expect(report?.marker).toBe('report-from-worker');
     // The DECISIVE assertion: the hook ran in a SEPARATE process (the worker), not
@@ -92,7 +95,12 @@ describe('ADR-0054 M4-F — external lifecycle/capability hooks run off-host', (
 
   it('sessionReplay: rebuilds the replay in a worker — the envelope is stamped with the worker pid (not the host pid)', async () => {
     const cap = makeDispatchHostCtx();
-    const stored = { id: 'sess-1', tool: 'external-dispatch-tool', score: 42, passed: true };
+    const stored = {
+      id: 'sess-1',
+      tool: 'external-dispatch-tool',
+      score: 42,
+      passed: true,
+    };
     const result = await dispatchExternalToolHook({
       provenance: provenance(),
       hook: 'sessionReplay',
@@ -148,7 +156,9 @@ describe('ADR-0054 M4-F — external lifecycle/capability hooks run off-host', (
       ctx: cap.ctx,
       cliScript: CLI_SCRIPT,
     });
-    const env = cap.envelopes[0] as { signals: { initialized?: boolean; initPid?: number }[] };
+    const env = cap.envelopes[0] as {
+      signals: { initialized?: boolean; initPid?: number }[];
+    };
     expect(env.signals[0]?.initialized).toBe(true);
     // initialize ran in the SAME worker process as the handler (a separate process
     // from this host).

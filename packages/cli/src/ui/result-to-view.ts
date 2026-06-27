@@ -285,6 +285,17 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'graph-status': {
       return linesView(result.lines);
     }
+    case 'graph-impact': {
+      const lines = [
+        `Changed ${String(result.changedFiles.length)} file(s) → ${String(result.changedFunctions.length)} function(s)`,
+        `Impacted ${String(result.impactedFunctions.length)} additional function(s) across ${String(result.impactedPackages.length)} package(s)`,
+        ...(result.truncated ? ['(truncated — use --top or --json for full detail)'] : []),
+        '',
+        'Recommended:',
+        ...result.recommendedCommands.map((c) => `  ${c}`),
+      ];
+      return linesView(lines);
+    }
     case 'text-lines': {
       return titledLinesView(result.title, result.lines);
     }

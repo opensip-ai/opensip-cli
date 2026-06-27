@@ -40,7 +40,10 @@ function fitSession(id: string): StoredSession {
     score: 100,
     passed: true,
     durationMs: 10,
-    payload: { summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 }, checks: [] },
+    payload: {
+      summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+      checks: [],
+    },
   };
 }
 

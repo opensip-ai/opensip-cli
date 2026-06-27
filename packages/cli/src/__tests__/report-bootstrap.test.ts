@@ -32,18 +32,26 @@ describe('maybeOpenReport', () => {
       delete process.env.CI;
       delete process.env.SSH_CONNECTION;
       delete process.env.SSH_CLIENT;
-      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
     });
 
     afterEach(() => {
       process.env = { ...savedEnv };
-      Object.defineProperty(process.stdout, 'isTTY', { value: savedTTY, configurable: true });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: savedTTY,
+        configurable: true,
+      });
     });
 
     it('composes and opens the cross-tool dashboard', async () => {
-      const compose = vi
-        .spyOn(composeMod, 'composeAndWriteReport')
-        .mockResolvedValue({ type: 'report', path: 'reports/latest.html', opened: true });
+      const compose = vi.spyOn(composeMod, 'composeAndWriteReport').mockResolvedValue({
+        type: 'report',
+        path: 'reports/latest.html',
+        opened: true,
+      });
       const mod = await import('../bootstrap/report.js');
       await mod.maybeOpenReport({ openRequested: true, jsonOutput: false });
       expect(compose).toHaveBeenCalledWith({ open: true });

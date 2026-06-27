@@ -11,7 +11,11 @@ import { formatCliTooOldMessage, formatNoProjectFoundMessage } from '../pre-acti
 
 describe('formatCliTooOldMessage', () => {
   it('renders the upgrade-the-CLI message with the version mismatch', () => {
-    const msg = formatCliTooOldMessage({ root: '/p', configVersion: 4, cliVersion: 2 });
+    const msg = formatCliTooOldMessage({
+      root: '/p',
+      configVersion: 4,
+      cliVersion: 2,
+    });
     expect(msg).toContain('newer schema than your CLI supports');
     expect(msg).toContain('Project:        /p');
     expect(msg).toContain('Config schema:  v4');

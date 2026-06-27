@@ -43,7 +43,9 @@ describe('getProjectDatastore', () => {
   });
 
   it('propagates any other datastore error unchanged', async () => {
-    const other = new SystemError('disk exploded', { code: 'SYSTEM.DATASTORE.IO' });
+    const other = new SystemError('disk exploded', {
+      code: 'SYSTEM.DATASTORE.IO',
+    });
     await withScope(scopeThrowing(other), () => {
       expect(() => getProjectDatastore()).toThrow('disk exploded');
     });

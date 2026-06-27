@@ -231,7 +231,11 @@ function buildUninstallSpec(): HostSpec {
       'Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.',
     commonFlags: [],
     options: [
-      { flag: '-y, --yes', description: 'Skip confirmation prompt', default: false },
+      {
+        flag: '-y, --yes',
+        description: 'Skip confirmation prompt',
+        default: false,
+      },
       {
         flag: '--dry-run',
         description: 'Print what would be removed; take no action',
