@@ -24,6 +24,7 @@ import {
   DEFAULT_EXIT_MODEL,
   deriveAdapterConfigManifest,
   deriveAdapterManifestCommands,
+  deriveAdapterManifestRequires,
   ingestSarif,
   interpretExit,
   normalizedSignalShape,
@@ -205,17 +206,15 @@ describe('trivy tool — manifest ↔ runtime host-shape guards', () => {
     expect(generated).toEqual(derived);
   });
 
-  it('declares subprocess + filesystem resource needs (local-only posture)', () => {
-    expect(PKG.opensipTools.requires).toEqual([
-      {
-        resource: 'subprocess',
-        reason: 'Executes the user-installed trivy binary via execFile (no shell)',
-      },
-      {
-        resource: 'filesystem',
-        reason:
-          'Reads the project working tree and writes the raw scan artifact under .runtime/artifacts',
-      },
+  it('the generated manifest requires equal the posture-derived requires (no drift)', () => {
+    // A13: `requires` is DERIVED from the network posture, not hand-typed.
+    expect(PKG.opensipTools.requires).toEqual(deriveAdapterManifestRequires(tool));
+  });
+
+  it('derives subprocess + filesystem only (local-only posture, no network)', () => {
+    expect((PKG.opensipTools.requires as { resource: string }[]).map((r) => r.resource)).toEqual([
+      'subprocess',
+      'filesystem',
     ]);
   });
 

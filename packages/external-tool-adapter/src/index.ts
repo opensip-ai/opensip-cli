@@ -74,7 +74,12 @@ export type {
 export { resolveScannerArtifactPath } from './artifact-path.js';
 export type { ArtifactPathScope } from './artifact-path.js';
 export { deriveAdapterManifestCommands } from './manifest-commands.js';
-export { adapterConfigManifestOf, deriveAdapterConfigManifest } from './adapter-manifest.js';
+export {
+  adapterConfigManifestOf,
+  adapterNetworkOf,
+  deriveAdapterConfigManifest,
+  deriveAdapterManifestRequires,
+} from './adapter-manifest.js';
 export type { AdapterToolMarkers } from './adapter-manifest.js';
 
 // ── Config namespace claim (binary pin + verdict keys) ───────────────────────

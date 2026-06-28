@@ -9,11 +9,26 @@
  * (a sibling) derives the command shells; the helpers here derive the remaining
  * adapter-shaped manifest fields from data the substrate STAMPS on the built Tool
  * ({@link AdapterToolMarkers}) — the substrate's own data, never a core `Tool`
- * concept.
+ * concept:
+ *
+ *   - {@link deriveAdapterManifestRequires} forward-maps the declared `network`
+ *     posture (ADR-0092) onto `opensipTools.requires`: `subprocess` + `filesystem`
+ *     ALWAYS (every adapter `execFile`s a binary and reads/writes the project +
+ *     artifact store), plus `network` WHEN the posture is not `local-only`. This is
+ *     the §4.8 "honest labeling" mapping the `types.ts` contract claims — derived,
+ *     not hand-authored, so flipping an adapter to `networked` produces a `--check`
+ *     drift the gate catches.
+ *   - {@link deriveAdapterConfigManifest} returns the coarse config descriptor the
+ *     adapter claims (its namespace + `binaries` block) so the host pre-fork pass
+ *     recognizes the namespace and an operator's `<tool>:` block no longer bricks.
  */
 
 import type { NetworkPosture } from './types.js';
-import type { Tool, ToolConfigManifestDescriptor } from '@opensip-cli/core';
+import type {
+  Tool,
+  ToolConfigManifestDescriptor,
+  ToolResourceRequirement,
+} from '@opensip-cli/core';
 
 /**
  * The adapter-substrate markers {@link defineExternalToolAdapter} stamps on the
@@ -27,9 +42,41 @@ export interface AdapterToolMarkers {
   readonly adapterConfigManifest?: ToolConfigManifestDescriptor;
 }
 
+/** Read the stamped network posture; defaults to `'local-only'` (the safe, no-network posture). */
+export function adapterNetworkOf(tool: Tool): NetworkPosture {
+  return (tool as Tool & AdapterToolMarkers).adapterNetwork ?? 'local-only';
+}
+
 /** Read the stamped config descriptor, or `undefined` when the adapter uses a custom config. */
 export function adapterConfigManifestOf(tool: Tool): ToolConfigManifestDescriptor | undefined {
   return (tool as Tool & AdapterToolMarkers).adapterConfigManifest;
+}
+
+/**
+ * Derive `opensipTools.requires` from the adapter's network posture (ADR-0092
+ * §4.8). `subprocess` + `filesystem` are unconditional; `network` is added only
+ * when the posture is `networked`/`auth-required`. Pure — the manifest generator
+ * writes the result and the per-tool `--check` parity gate fails on drift.
+ */
+export function deriveAdapterManifestRequires(tool: Tool): readonly ToolResourceRequirement[] {
+  const requires: ToolResourceRequirement[] = [
+    {
+      resource: 'subprocess',
+      reason: `Executes the user-installed ${tool.metadata.name} binary via execFile (no shell)`,
+    },
+    {
+      resource: 'filesystem',
+      reason:
+        'Reads the project working tree and writes the raw scan artifact under .runtime/artifacts',
+    },
+  ];
+  if (adapterNetworkOf(tool) !== 'local-only') {
+    requires.push({
+      resource: 'network',
+      reason: `Performs network I/O for the ${adapterNetworkOf(tool)} scanner posture`,
+    });
+  }
+  return requires;
 }
 
 /**

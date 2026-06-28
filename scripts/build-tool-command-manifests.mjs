@@ -44,8 +44,9 @@ const log = (msg) => console.error(`[build-tool-command-manifests] ${msg}`);
 
 /**
  * The substrate's manifest-derivation helpers, loaded from its built dist. The
- * coarse `config` descriptor (the namespace claim, ADR-0090 §4.3) is DERIVED from
- * the runtime Tool here so it can never drift from the spec — single-sourced in the
+ * adapter `requires` (network→resource forward-map, ADR-0092 §4.8) and the coarse
+ * `config` descriptor (the namespace claim, ADR-0090 §4.3) are DERIVED from the
+ * runtime Tool here so they can never drift from the spec — single-sourced in the
  * substrate, exactly as the command shells are. Loaded lazily (only when an adapter
  * dir is processed) so the bundled-only run does not require the substrate dist.
  */
@@ -59,6 +60,7 @@ async function loadAdapterManifestHelpers() {
   }
   const mod = await import(pathToFileURL(entry).href);
   adapterManifestHelpers = {
+    deriveAdapterManifestRequires: mod.deriveAdapterManifestRequires,
     deriveAdapterConfigManifest: mod.deriveAdapterConfigManifest,
   };
   return adapterManifestHelpers;
@@ -168,11 +170,14 @@ async function main() {
     const tool = await loadBundledTool(toolDir);
     pkg.opensipTools.commands = tool.commandSpecs.map((spec) => deriveCommandShell(spec));
 
-    // ADR-0090 §4.3: for an adapter, ALSO derive the `config` namespace claim.
-    // Single-sourced in the substrate so the static manifest can never drift from
+    // ADR-0092 §4.8 / ADR-0090 §4.3: for an adapter, ALSO derive `requires` (from
+    // the network posture) and `config` (the coarse namespace claim). Both are
+    // single-sourced in the substrate so the static manifest can never drift from
     // the runtime; the `--check` lane fails CI on a derivation mismatch.
     if (ADAPTER_TOOL_DIRS.includes(toolDir)) {
-      const { deriveAdapterConfigManifest } = await loadAdapterManifestHelpers();
+      const { deriveAdapterManifestRequires, deriveAdapterConfigManifest } =
+        await loadAdapterManifestHelpers();
+      pkg.opensipTools.requires = deriveAdapterManifestRequires(tool);
       const config = deriveAdapterConfigManifest(tool);
       if (config === undefined) {
         delete pkg.opensipTools.config;

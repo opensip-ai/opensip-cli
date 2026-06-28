@@ -23,9 +23,13 @@ import type {
 
 /**
  * The network posture an adapter declares (ADR-0092). The host displays it
- * (`doctor`, `tools list`) and forward-maps it onto `opensipTools.requires`
- * (`subprocess` + `filesystem` always; `network` when networked/auth). Declaration
- * + display only in v1 — enforcement inherits spec 03 Gate A.
+ * (`doctor`, `tools list`) and the manifest generator forward-maps it onto
+ * `opensipTools.requires` via {@link deriveAdapterManifestRequires}: `subprocess` +
+ * `filesystem` always; `network` when `networked`/`auth-required`. The mapping is
+ * DERIVED (not hand-authored), so flipping an adapter to a networked posture
+ * produces a `--check` drift the gate catches — the §4.8 honest-labeling guarantee.
+ * `requires` enforcement (a sandbox) is still deferred (ADR-0061); declaration +
+ * the honest label land now.
  */
 export type NetworkPosture = 'local-only' | 'networked' | 'auth-required';
 

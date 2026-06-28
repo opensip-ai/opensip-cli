@@ -1,7 +1,7 @@
 import { createSignal, ValidationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { deriveAdapterConfigManifest } from '../adapter-manifest.js';
+import { deriveAdapterConfigManifest, deriveAdapterManifestRequires } from '../adapter-manifest.js';
 import { defineExternalToolAdapter } from '../define-external-tool-adapter.js';
 import { messageHashFingerprintStrategy } from '../fingerprint.js';
 
@@ -135,6 +135,28 @@ describe('defineExternalToolAdapter', () => {
     it('emits NO static descriptor for a custom config (validation defers to the worker)', () => {
       const tool = defineExternalToolAdapter({ ...baseSpec, config: { schema: { marker: true } } });
       expect(deriveAdapterConfigManifest(tool)).toBeUndefined();
+    });
+  });
+
+  // A13 (ADR-0092 §4.8): `requires` is DERIVED from the network posture — the
+  // documented forward-map, not a hand-typed list. `network` rides only on a
+  // non-local-only posture, so a future flip to `networked` is a visible drift.
+  describe('network posture → requires derivation (A13)', () => {
+    it('a local-only adapter derives [subprocess, filesystem] (no network)', () => {
+      const requires = deriveAdapterManifestRequires(defineExternalToolAdapter(baseSpec));
+      expect(requires.map((r) => r.resource)).toEqual(['subprocess', 'filesystem']);
+    });
+
+    it('a networked adapter derives an added network requirement', () => {
+      const tool = defineExternalToolAdapter({ ...baseSpec, network: 'networked' });
+      const requires = deriveAdapterManifestRequires(tool);
+      expect(requires.map((r) => r.resource)).toEqual(['subprocess', 'filesystem', 'network']);
+      expect(requires.find((r) => r.resource === 'network')?.reason).toContain('networked');
+    });
+
+    it('an auth-required adapter also derives a network requirement', () => {
+      const tool = defineExternalToolAdapter({ ...baseSpec, network: 'auth-required' });
+      expect(deriveAdapterManifestRequires(tool).some((r) => r.resource === 'network')).toBe(true);
     });
   });
 
