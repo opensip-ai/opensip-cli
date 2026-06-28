@@ -41,7 +41,7 @@ import { ingestSarif } from './ingest-sarif.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
 import { buildAdapterRunContext } from './run-context.js';
-import { deliverOptions, emitScanCompletion } from './scan-emit.js';
+import { buildScanCompletion, deliverOptions, emitScanCompletion } from './scan-emit.js';
 
 import type { BinaryResolveDeps } from './binary-resolver.js';
 import type { SarifLog } from './ingest-sarif.js';
@@ -414,21 +414,17 @@ export async function runScanLoop(
   });
 
   const deliver = deliverOptions(input.opts, ctx.projectRoot);
-  const completion: ScanCompletion = {
+  // The session contribution (incl. the dashboard-shaped grouped payload) is shaped
+  // in a sibling helper so this orchestration body stays flat (file-length budget).
+  const completion = buildScanCompletion({
+    tool,
+    cwd: deliver.cwd,
     envelope,
-    session: {
-      tool,
-      cwd: deliver.cwd,
-      score: envelope.verdict.score,
-      passed: envelope.verdict.passed,
-      payload: {
-        binary: { path: resolution.path, layer: resolution.layer, version: version ?? null },
-        artifact: artifactFullPath,
-        findings: signals.length,
-        durationMs,
-      },
-    },
-  };
+    signals,
+    binary: { path: resolution.path, layer: resolution.layer, version: version ?? null },
+    artifact: artifactFullPath,
+    durationMs,
+  });
 
   // Emit + deliver + return. The gate-ratchet branch (ADR-0036) and the normal
   // emit live in a sibling helper so this orchestration body stays flat.

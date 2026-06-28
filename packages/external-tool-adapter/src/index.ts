@@ -61,6 +61,15 @@ export { messageHashFingerprintStrategy, resolveFingerprintStrategy } from './fi
 export { stampProvenance, stampProvenanceAll } from './provenance.js';
 export { redactSecret, secretHash } from './redact.js';
 
+// ── Session payload (tool-owned, dashboard-shaped detail) ────────────────────
+export { buildAdapterSessionPayload } from './session-payload.js';
+export type {
+  AdapterFindingSeverity,
+  AdapterSessionCheck,
+  AdapterSessionFinding,
+  AdapterSessionPayload,
+} from './session-payload.js';
+
 // ── Artifact path + manifest parity ─────────────────────────────────────────
 export { resolveScannerArtifactPath } from './artifact-path.js';
 export type { ArtifactPathScope } from './artifact-path.js';

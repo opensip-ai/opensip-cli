@@ -248,6 +248,43 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
     expect(payload?.binary?.path).toContain('gitleaks');
     expect(payload?.findings).toBe(2);
   });
+
+  // A2: the session payload must carry grouped `checks[]` + a populated `summary`
+  // so the HTML report renders the leaked credentials instead of "this run was
+  // clean. Every rule passed" (the dashboard groups `payload.checks[]` and reads
+  // `payload.summary` for its clean/dirty decision).
+  it('persists a grouped session payload (checks[] + summary) so the report is NOT falsely clean', () => {
+    const list = runCli(['sessions', 'list', '--json']);
+    const data = parseOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const gitleaksRow = (data.sessions ?? []).find((s) => s.tool === 'gitleaks');
+    const payload = gitleaksRow?.payload as {
+      summary?: { errors?: number; warnings?: number };
+      checks?: { checkSlug: string; passed: boolean; findings: unknown[] }[];
+    };
+    // Grouped per-rule detail is present (the two golden secrets are two rules).
+    expect(Array.isArray(payload?.checks)).toBe(true);
+    expect(payload?.checks?.length).toBe(2);
+    expect(payload?.checks?.every((c) => c.passed === false)).toBe(true);
+    // The dashboard's clean test (`errors === 0 && warnings === 0`) is FALSE here.
+    expect(payload?.summary?.errors).toBe(2);
+    const clean = (payload?.summary?.errors ?? 0) === 0 && (payload?.summary?.warnings ?? 0) === 0;
+    expect(clean).toBe(false);
+  });
+
+  // A2 secret hygiene: the newly-persisted per-finding text must NOT leak a raw
+  // credential into the stored payload (redaction happens at ingest, before the
+  // envelope/payload build — prove it holds through to the persisted row).
+  it('NEVER persists a raw Secret/Match into the session payload (only the masked preview)', () => {
+    const list = runCli(['sessions', 'list', '--json']);
+    const data = parseOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const gitleaksRow = (data.sessions ?? []).find((s) => s.tool === 'gitleaks');
+    const payloadBlob = JSON.stringify(gitleaksRow?.payload ?? {});
+    for (const raw of RAW_SECRETS) expect(payloadBlob).not.toContain(raw);
+    expect(payloadBlob).not.toContain('"Match"');
+    expect(payloadBlob).not.toContain('"Secret"');
+    // The masked preview survives so the finding stays identifiable in the report.
+    expect(payloadBlob).toContain('AKIA…');
+  });
 });
 
 describe('gitleaks worker E2E — doctor / version diagnostics', () => {
@@ -288,6 +325,40 @@ describe('gitleaks worker E2E — doctor / version diagnostics', () => {
     const report = parseOutcome(run.stdout).data as { found: boolean; version?: string };
     expect(report.found).toBe(true);
     expect(report.version).toBe('8.18.4');
+  });
+});
+
+/**
+ * A5/A6 — the typed exit-class must survive the worker boundary. The scan handler
+ * runs in a FORKED worker; a `ConfigurationError` it throws (binary-not-found) must
+ * arrive at the host as exit 2, the SAME contract `doctor` and the in-process
+ * bundled path honour. Before the fix the worker IPC flattened the typed error to
+ * a generic `tool-handler-throw` → SystemError → exit 1, silently losing the
+ * frozen exit-2 contract; NO E2E asserted the scan exit code.
+ */
+describe('gitleaks worker E2E — typed exit-class survives the worker boundary (A5/A6)', () => {
+  it('`opensip gitleaks` with a binary-not-found ConfigurationError exits 2 (not 1)', () => {
+    // Pin the binary to a non-existent absolute path so resolution hard-misses
+    // worker-side and the run loop throws ConfigurationError(ADAPTER.BINARY.NOT_FOUND).
+    const run = runCli(['gitleaks', '--json'], {
+      OPENSIP_GITLEAKS_BIN: '/nonexistent/path/to/gitleaks',
+      OPENSIP_CLI_TOOL_ENV_PASSTHROUGH: 'FAKE_GITLEAKS_GOLDEN OPENSIP_GITLEAKS_BIN',
+    });
+    expect(run.status).toBe(2);
+  });
+
+  it('`opensip gitleaks` with no opensip-cli project exits 2 (not 1)', () => {
+    // A project-less run has no targeting root to scan — the exit-2 config contract.
+    const noProject = mkdtempSync(join(tmpdir(), 'opensip-gitleaks-noproj-'));
+    const scopeDir = join(noProject, 'node_modules', '@opensip-cli');
+    mkdirSync(scopeDir, { recursive: true });
+    symlinkSync(GITLEAKS_PKG_DIR, join(scopeDir, 'tool-gitleaks'), 'dir');
+    try {
+      const run = runCli(['gitleaks', '--json'], {}, noProject);
+      expect(run.status).toBe(2);
+    } finally {
+      rmSync(noProject, { recursive: true, force: true });
+    }
   });
 });
 

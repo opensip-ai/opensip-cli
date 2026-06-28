@@ -12,9 +12,11 @@
 import { resolveFailOnDegraded } from '@opensip-cli/core';
 
 import { renderGateCompareLines, renderGateSaveLines } from './gate-render.js';
+import { buildAdapterSessionPayload } from './session-payload.js';
 
+import type { BinaryResolutionLayer } from './types.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
-import type { ToolCliContext } from '@opensip-cli/core';
+import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 /** Logger `module` field for every event this module emits. */
 const MODULE = 'external-tool-adapter';
@@ -44,6 +46,44 @@ export function deliverOptions(opts: Record<string, unknown>, fallbackCwd: strin
     cwd: typeof opts.cwd === 'string' ? opts.cwd : fallbackCwd,
     ...(typeof opts.reportTo === 'string' ? { reportTo: opts.reportTo } : {}),
     ...(typeof opts.apiKey === 'string' ? { apiKey: opts.apiKey } : {}),
+  };
+}
+
+/** Inputs the run loop hands {@link buildScanCompletion} to shape the session row. */
+export interface ScanCompletionInput {
+  readonly tool: string;
+  readonly cwd: string;
+  readonly envelope: SignalEnvelope;
+  readonly signals: readonly Signal[];
+  readonly binary: { readonly path: string; readonly layer: BinaryResolutionLayer; readonly version: string | null };
+  readonly artifact: string;
+  readonly durationMs: number;
+}
+
+/**
+ * Shape the {@link ScanCompletion} the host persists/dispatches. The session
+ * payload carries the dashboard-shaped grouped detail (`__version`/`summary`/
+ * `checks[]` from {@link buildAdapterSessionPayload}) so the HTML report renders
+ * the scan's findings instead of falsely "clean" — plus the operational
+ * provenance the row also keeps (binary/artifact/findings/durationMs). Built from
+ * the already-redacted signals, so no raw secret reaches the persisted row.
+ */
+export function buildScanCompletion(input: ScanCompletionInput): ScanCompletion {
+  return {
+    envelope: input.envelope,
+    session: {
+      tool: input.tool,
+      cwd: input.cwd,
+      score: input.envelope.verdict.score,
+      passed: input.envelope.verdict.passed,
+      payload: {
+        ...buildAdapterSessionPayload(input.signals),
+        binary: input.binary,
+        artifact: input.artifact,
+        findings: input.signals.length,
+        durationMs: input.durationMs,
+      },
+    },
   };
 }
 
