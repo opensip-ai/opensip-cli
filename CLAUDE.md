@@ -609,7 +609,7 @@ design exploration not yet ready for external readers, it stays in
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 34 packages
+Releases are tag-driven. See `RELEASING.md` — there are 38 packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 When asked to prep a release, use the **release-prep** skill
