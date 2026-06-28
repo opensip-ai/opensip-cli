@@ -17,7 +17,7 @@ describe('createCloudSignalSink', () => {
     const seen: { key?: string; auth?: string; legacy?: string }[] = [];
     const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
       const h = init.headers as Record<string, string>;
-      seen.push({ key: h['Idempotency-Key'], auth: h['Authorization'], legacy: h['X-API-Key'] });
+      seen.push({ key: h['Idempotency-Key'], auth: h.Authorization, legacy: h['X-API-Key'] });
       return Promise.resolve(new Response(null, { status: 200 }));
     }) as unknown as typeof fetch;
 

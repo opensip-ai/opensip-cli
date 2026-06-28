@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-21
-release: v0.1.13
+release: v0.1.14
 title: "Command surface taxonomy"
 audience: [plugin-authors, contributors, ci-integrators]
 purpose: "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
@@ -39,8 +39,8 @@ plugins.
 
 Authoring on-ramps: `opensip tools create` (`minimal-js`, `ts-local`). See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/),
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## The three tiers
 

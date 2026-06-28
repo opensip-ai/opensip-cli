@@ -36,7 +36,7 @@ inputs:
     default: '.'
   version:
     description: >-
-      The `opensip-cli` npm version to run via npx (e.g. `0.1.13` or `latest`).
+      The `opensip-cli` npm version to run via npx (e.g. `0.1.14` or `latest`).
     required: false
     default: latest
   fail-on-upload-error:

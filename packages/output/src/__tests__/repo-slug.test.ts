@@ -10,9 +10,9 @@ describe('repoSlugFromIdentity', () => {
   });
 
   it('parses an https URL-style remote (strips scheme + .git)', () => {
-    expect(repoSlugFromIdentity({ remoteUrl: 'https://github.com/opensip-ai/opensip-cli.git' })).toBe(
-      'opensip-ai/opensip-cli',
-    );
+    expect(
+      repoSlugFromIdentity({ remoteUrl: 'https://github.com/opensip-ai/opensip-cli.git' }),
+    ).toBe('opensip-ai/opensip-cli');
   });
 
   it('parses an https remote without a .git suffix', () => {
@@ -26,9 +26,9 @@ describe('repoSlugFromIdentity', () => {
   });
 
   it('takes the last two path segments for nested (GitLab-style) groups', () => {
-    expect(
-      repoSlugFromIdentity({ remoteUrl: 'https://gitlab.com/group/subgroup/repo.git' }),
-    ).toBe('subgroup/repo');
+    expect(repoSlugFromIdentity({ remoteUrl: 'https://gitlab.com/group/subgroup/repo.git' })).toBe(
+      'subgroup/repo',
+    );
   });
 
   it('handles a trailing slash', () => {
@@ -42,9 +42,9 @@ describe('repoSlugFromIdentity', () => {
   });
 
   it('ignores a non-slug id and falls back to the remote', () => {
-    expect(repoSlugFromIdentity({ id: 'not-a-slug', remoteUrl: 'git@github.com:org/repo.git' })).toBe(
-      'org/repo',
-    );
+    expect(
+      repoSlugFromIdentity({ id: 'not-a-slug', remoteUrl: 'git@github.com:org/repo.git' }),
+    ).toBe('org/repo');
   });
 
   it('returns undefined when nothing parses', () => {

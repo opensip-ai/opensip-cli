@@ -140,6 +140,56 @@ describe('computeImpact', () => {
     expect(r.truncated).toBe(true);
   });
 
+  it('does not truncate when the top cap covers the full result', () => {
+    const r = computeImpact(minimalCatalog(), ['src/callee.ts'], { top: 10 });
+    expect(r.truncated).toBe(false);
+    expect(r.impactedFunctions).toHaveLength(1);
+  });
+
+  it('treats negative top caps as uncapped for forward-compatible callers', () => {
+    const r = computeImpact(minimalCatalog(), ['src/callee.ts'], { top: -1 });
+    expect(r.truncated).toBe(false);
+    expect(r.impactedFunctions).toHaveLength(1);
+  });
+
+  it('normalizes changed file paths before matching catalog occurrences', () => {
+    const r = computeImpact(minimalCatalog(), ['src\\callee.ts']);
+    expect(r.changedFunctions.map((f) => f.qualifiedName)).toEqual(['callee']);
+  });
+
+  it('classifies impacted callers with blast and test-gap reasons', () => {
+    const blastCatalog: GraphCatalog = {
+      ...minimalCatalog(),
+      features: {
+        function: {
+          caller: {
+            bodyLines: 5,
+            blast: { direct: 1, transitive: 9, score: 10 },
+            testReachable: true,
+          },
+        },
+      },
+    };
+    expect(computeImpact(blastCatalog, ['src/callee.ts']).impactedFunctions[0]?.reason).toBe(
+      'blast',
+    );
+
+    const testGapCatalog: GraphCatalog = {
+      ...minimalCatalog(),
+      features: {
+        function: {
+          caller: {
+            bodyLines: 5,
+            testReachable: false,
+          },
+        },
+      },
+    };
+    expect(computeImpact(testGapCatalog, ['src/callee.ts']).impactedFunctions[0]?.reason).toBe(
+      'test-gap',
+    );
+  });
+
   it('works without features block (forward-compat)', () => {
     const cat = minimalCatalog();
     const r = computeImpact(cat, ['src/callee.ts']);

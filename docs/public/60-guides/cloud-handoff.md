@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.13
+release: v0.1.14
 title: "Send CLI findings to OpenSIP Cloud"
 audience: [ci-integrators, cloud-adopters]
 purpose: "Task-led: hand opensip fit findings to OpenSIP Cloud over --report-to (or the published GitHub Action) so they become tickets — with no manual ingest step."

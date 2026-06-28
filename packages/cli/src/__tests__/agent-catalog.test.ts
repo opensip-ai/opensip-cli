@@ -98,6 +98,56 @@ describe('buildAgentCatalog', () => {
     assertCatalogCoversTools(c, tools);
   });
 
+  it('omits tools without a public primary command', () => {
+    const tools = new ToolRegistry();
+    tools.register({
+      identity: { name: 'internal-only-tool' },
+      metadata: {
+        id: 'internal-only-tool',
+        name: 'internal-only-tool',
+        version: '0.0.0',
+        description: 'fixture internal-only tool',
+      },
+      commandSpecs: [
+        {
+          name: 'internal-only-run-worker',
+          description: '[internal] worker',
+          output: 'raw-stream',
+          rawStreamReason: 'worker-ipc',
+          visibility: 'internal',
+          handler: () => undefined,
+        },
+      ],
+    } satisfies Tool);
+
+    const c = buildAgentCatalog({ tools });
+    expect(c.entryPoints.map((entry) => entry.command)).not.toContain('internal-only-run-worker');
+  });
+
+  it('honors the host-provided internal command denylist', () => {
+    const tools = new ToolRegistry();
+    tools.register({
+      identity: { name: 'hidden-tool' },
+      metadata: {
+        id: 'hidden-tool',
+        name: 'hidden-tool',
+        version: '0.0.0',
+        description: 'fixture hidden tool',
+      },
+      commandSpecs: [
+        {
+          name: 'hidden-tool',
+          description: 'hidden by host policy',
+          output: 'command-result',
+          handler: () => ({ type: 'text-lines', lines: ['hidden'] }),
+        },
+      ],
+    } satisfies Tool);
+
+    const c = buildAgentCatalog({ tools, internalCommands: new Set(['hidden-tool']) });
+    expect(c.entryPoints.map((entry) => entry.command)).not.toContain('hidden-tool');
+  });
+
   // tool-command-surface-taxonomy Task 4.5 — the catalog is grouped by tier and
   // never surfaces a Tier-3 internal command.
   describe('command taxonomy — tiered + no Tier-3 leakage', () => {

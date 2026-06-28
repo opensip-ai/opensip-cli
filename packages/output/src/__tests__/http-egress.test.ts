@@ -234,7 +234,7 @@ describe('postChunked', () => {
     let hadLegacyHeader = true;
     const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
       const headers = init.headers as Record<string, string>;
-      authHeader = headers['Authorization'];
+      authHeader = headers.Authorization;
       hadLegacyHeader = 'X-API-Key' in headers;
       return Promise.resolve(new Response(null, { status: 200 }));
     }) as unknown as typeof fetch;

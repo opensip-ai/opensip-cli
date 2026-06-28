@@ -51,7 +51,7 @@ describe('checkEntitlement', () => {
       RequestInit,
     ];
     const headers = init.headers as Record<string, string>;
-    expect(headers['Authorization']).toBe('Bearer osk_secret');
+    expect(headers.Authorization).toBe('Bearer osk_secret');
     expect(headers['X-API-Key']).toBeUndefined();
   });
 

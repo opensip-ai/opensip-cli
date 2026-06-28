@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { ConfigurationError } from '@opensip-cli/core';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { graphCommandSpec } from '../graph/graph-command-spec.js';
 import { planGraphExecution, validateGraphCommandFlags } from '../graph-command-plan.js';
 
 import type { GraphCommandOptions } from '../graph-options.js';
@@ -56,6 +57,17 @@ describe('planGraphExecution', () => {
   it('selects single-path for zero or one positional path', () => {
     expect(planGraphExecution(baseOpts()).shape).toBe('single-path');
     expect(planGraphExecution(baseOpts({ paths: ['src'] })).shape).toBe('single-path');
+  });
+});
+
+describe('graphCommandSpec option parsers', () => {
+  it('parses positive concurrency and rejects invalid values', () => {
+    const concurrency = (graphCommandSpec.options ?? []).find(
+      (option) => option.flag === '--concurrency',
+    );
+    expect(concurrency?.parse?.('3', undefined)).toBe(3);
+    expect(() => concurrency?.parse?.('0', undefined)).toThrow(/positive integer/);
+    expect(() => concurrency?.parse?.('abc', undefined)).toThrow(/positive integer/);
   });
 });
 

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.13
+release: v0.1.14
 title: "FAQ"
 audience: [getting-started]
 purpose: "Common questions about adoption, edge cases, and what opensip-cli does or doesn't do."

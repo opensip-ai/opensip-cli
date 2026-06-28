@@ -2,6 +2,57 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.14] - 2026-06-28
+
+An agent-ergonomics and Cloud handoff release. Coding agents now have a
+structured discovery surface, filtered and raw JSON inspection paths, changed-file
+targeting, and graph impact analysis for edit loops. The CLI also ships the
+OpenSIP Cloud SARIF handoff path and a published GitHub Action for turning local
+`fit` findings into cloud tickets. The changes are backward-compatible:
+human-readable output remains stable, agent filters are presentation-only, and
+upload failures do not alter local findings.
+
+### Added
+
+- `opensip agent-catalog --json` — a structured discovery surface for agents,
+  covering common command loops, output shapes, sessions, filters, and graph
+  impact usage.
+- Agent-oriented run controls across `fit`, `graph`, and `sim`: repeatable
+  `--filter`, `--top`, and `--raw` JSON output, plus session `--summary-only` and
+  raw replay paths for token-sensitive historical-result inspection.
+- Changed-file targeting for agent edit loops: `fit --changed`, `--since`, and
+  `--include-impacted`, backed by a shared git-change resolver and graph impact
+  expansion.
+- `opensip graph impact` — changed-to-impacted analysis over the persisted graph
+  catalog, with `--changed`, `--since`, `--files`, `--top`, JSON output, and
+  recommended follow-up commands.
+- `opensip init` now writes an `AGENTS.md` playbook when absent, giving coding
+  agents the recommended Discover / Edit / Final command loop for the project.
+- Structured `signal.repair` metadata for agent-readable repair guidance.
+- A published `opensip-ai/opensip-cli@v0` GitHub Action and cloud handoff guide
+  for running `opensip fit --report-to` in CI.
+
+### Changed
+
+- `--report-to` Cloud handoff now posts SARIF with `Authorization: Bearer` and an
+  `x-opensip-repo` header derived from the git `origin` remote, so Cloud can scope
+  stored signals to the right repository before ticket reconciliation.
+- Agent filters apply only to presentation surfaces (`--json` and session replay);
+  gates, session persistence, and egress continue to use the unfiltered envelope.
+- Agent recipes (`agent-fast`, `agent-risk`, `agent-final`) are documented as the
+  recommended fast loop, risk loop, and final verification loop for first-party
+  tools.
+
+### Fixed
+
+- Corrected changed-file and graph-impact edge cases that could break agent
+  round-trips, including path handling, impact computation, and persisted session
+  signal replay.
+- Distinguished `401` and `403` failures on `--report-to` uploads so operators
+  can tell invalid API keys from keys that lack `ingest:write`.
+- Fixed OpenSIP Cloud authentication headers for `osk_` keys, including the
+  entitlement probe, to use Bearer auth instead of `X-API-Key`.
+
 ## [0.1.13] - 2026-06-26
 
 A worker-supervision and external-tool trust hardening release. External tool

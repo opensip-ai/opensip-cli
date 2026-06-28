@@ -142,7 +142,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   // dual-header shim (DEC-587). `apiKey` carries the raw `osk_…` token; do not
   // strip or transform it. The HTTPS guard above keeps this credential off
   // plain HTTP.
-  if (args.apiKey) headersBase['Authorization'] = `Bearer ${args.apiKey}`;
+  if (args.apiKey) headersBase.Authorization = `Bearer ${args.apiKey}`;
 
   const chunkResults: boolean[] = Array.from({ length: chunks.length }, () => false);
   const errors: string[] = [];

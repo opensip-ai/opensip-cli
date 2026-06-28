@@ -445,8 +445,10 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
       return true;
     });
     try {
-      const reject = (status: number): typeof fetch => () =>
-        Promise.resolve(new Response('denied', { status }));
+      const reject =
+        (status: number): typeof fetch =>
+        () =>
+          Promise.resolve(new Response('denied', { status }));
 
       await runWithScope(makeScope(NOOP_SINK), () =>
         deliverEnvelope(ENVELOPE, {

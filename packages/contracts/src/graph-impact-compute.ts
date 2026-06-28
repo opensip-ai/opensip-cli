@@ -127,11 +127,7 @@ interface CallerBfsContext {
   readonly queue: { readonly hash: string; readonly depth: number }[];
 }
 
-function enqueueUnvisitedCallers(
-  ctx: CallerBfsContext,
-  bodyHash: string,
-  depth: number,
-): void {
+function enqueueUnvisitedCallers(ctx: CallerBfsContext, bodyHash: string, depth: number): void {
   for (const caller of ctx.reverse.get(bodyHash) ?? []) {
     if (ctx.changedBodyHashes.has(caller) || ctx.visited.has(caller)) continue;
     ctx.visited.add(caller);

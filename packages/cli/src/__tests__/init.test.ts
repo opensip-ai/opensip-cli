@@ -505,6 +505,15 @@ describe('executeInit (AGENTS.md)', () => {
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('agent-fast');
   });
 
+  it('creates a graph-only AGENTS.md when no fit scaffold domain is registered', () => {
+    const result = executeInit({ ...makeArgs(), toolScaffolds: [] });
+    const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
+    expect(result.agentsMdCreated).toBe(true);
+    expect(agents).toContain('opensip graph impact --changed --json --top 20');
+    expect(agents).toContain('opensip graph --recipe agent-final --gate-compare');
+    expect(agents).not.toContain('agent-fast');
+  });
+
   it('does not overwrite an existing AGENTS.md', () => {
     writeFileSync(join(testDir, 'AGENTS.md'), '# Custom playbook\n', 'utf8');
     const result = executeInit(makeArgs());

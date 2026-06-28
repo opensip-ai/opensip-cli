@@ -2,11 +2,12 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError } from '@opensip-cli/core';
+import { ConfigurationError, SystemError } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
+import { graphImpactCommandSpec } from '../graph/graph-aux-command-specs.js';
 import { executeImpact } from '../impact.js';
 
 import type { Catalog } from '../../types.js';
@@ -76,7 +77,7 @@ function makeCatalog(over: Partial<Catalog> = {}): Catalog {
   };
 }
 
-function mockCli(datastore: DataStore): ToolCliContext {
+function mockCli(datastore?: DataStore): ToolCliContext {
   return {
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
@@ -103,6 +104,45 @@ describe('executeImpact', () => {
     expect(result.changedFiles).toContain('src/callee.ts');
     expect(result.changedFunctions.some((f) => f.qualifiedName === 'callee')).toBe(true);
     expect(result.recommendedCommands.length).toBeGreaterThan(0);
+    expect(cli.emitJson).toHaveBeenCalledWith(result);
+    datastore.close();
+  });
+
+  it('--json --raw emits the raw graph-impact payload', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const result = await executeImpact(
+      {
+        cwd: '/proj',
+        json: true,
+        raw: true,
+        files: ['src/callee.ts'],
+      },
+      cli,
+    );
+    expect(cli.emitRaw).toHaveBeenCalledWith(result);
+    expect(cli.emitJson).not.toHaveBeenCalled();
+    datastore.close();
+  });
+
+  it('renders human impact lines and the truncation hint outside JSON mode', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const result = await executeImpact(
+      {
+        cwd: '/proj',
+        files: ['src/callee.ts'],
+        top: '1',
+      },
+      cli,
+    );
+    expect(result.truncated).toBe(true);
+    const renderCalls = (cli.render as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const rendered = renderCalls[0]?.[0] as { lines?: readonly string[] } | undefined;
+    expect(rendered?.lines?.some((line) => line.includes('truncated'))).toBe(true);
+    expect(rendered?.lines?.some((line) => line.includes('Recommended next commands'))).toBe(true);
     datastore.close();
   });
 
@@ -115,6 +155,46 @@ describe('executeImpact', () => {
       executeImpact({ cwd: dir, json: true, changed: true }, cli),
     ).rejects.toBeInstanceOf(ConfigurationError);
     datastore.close();
+  });
+
+  it('requires an explicit changed-file basis', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    await expect(executeImpact({ cwd: '/proj', json: true }, cli)).rejects.toBeInstanceOf(
+      ConfigurationError,
+    );
+    datastore.close();
+  });
+
+  it('requires a datastore on the CLI context', async () => {
+    const cli = mockCli();
+    await expect(
+      executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'] }, cli),
+    ).rejects.toBeInstanceOf(ConfigurationError);
+  });
+
+  it('wraps unexpected context failures as SystemError', async () => {
+    const cli = {
+      setExitCode: vi.fn(),
+      emitJson: vi.fn(),
+      emitRaw: vi.fn(),
+      render: vi.fn().mockResolvedValue(undefined),
+      scope: {
+        datastore: () => {
+          throw new Error('scope exploded');
+        },
+      },
+    } as unknown as ToolCliContext;
+
+    let caught: unknown;
+    try {
+      await executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'] }, cli);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SystemError);
+    expect((caught as Error).message).toContain('scope exploded');
   });
 
   it('rejects path traversal in --files (matches nothing, no filesystem read)', async () => {
@@ -149,5 +229,23 @@ describe('executeImpact', () => {
     );
     expect(result.truncated).toBe(true);
     datastore.close();
+  });
+
+  it('rejects invalid --top values before emitting output', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    await expect(
+      executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'], top: 'abc' }, cli),
+    ).rejects.toBeInstanceOf(ConfigurationError);
+    expect(cli.emitJson).not.toHaveBeenCalled();
+    datastore.close();
+  });
+
+  it('declares --files as a repeatable parser on the command spec', () => {
+    const filesOption = graphImpactCommandSpec.options?.find((option) => option.flag === '--files');
+    expect(filesOption?.arrayDefault).toEqual([]);
+    expect(filesOption?.parse?.('src/a.ts', [])).toEqual(['src/a.ts']);
+    expect(filesOption?.parse?.('src/b.ts', ['src/a.ts'])).toEqual(['src/a.ts', 'src/b.ts']);
   });
 });

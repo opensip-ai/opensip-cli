@@ -23,6 +23,14 @@ import type { RepoIdentity } from '@opensip-cli/core';
 /** A bare `<org>/<repo>` slug: two non-empty, slash-free segments. */
 const SLUG_RE = /^[^/\s]+\/[^/\s]+$/;
 
+function trimSlashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === '/') start++;
+  while (end > start && value[end - 1] === '/') end--;
+  return value.slice(start, end);
+}
+
 /**
  * Extract the last two path segments (`org/repo`) from a git remote URL,
  * handling both scp-style (`git@host:org/repo`) and URL-style
@@ -33,7 +41,7 @@ function slugFromRemoteUrl(remoteUrl: string): string | undefined {
   if (s.length === 0) return undefined;
 
   // Strip a trailing `.git` (case-insensitive) and any trailing slash.
-  s = s.replace(/\/+$/, '');
+  s = trimSlashes(s);
   s = s.replace(/\.git$/i, '');
 
   // Normalize scp-style `git@host:org/repo` → the `org/repo` tail. The colon
@@ -55,7 +63,7 @@ function slugFromRemoteUrl(remoteUrl: string): string | undefined {
     if (firstSlash !== -1) s = s.slice(firstSlash + 1);
   }
 
-  s = s.replace(/^\/+/, '').replace(/\/+$/, '');
+  s = trimSlashes(s);
   if (s.length === 0) return undefined;
 
   const segments = s.split('/').filter((seg) => seg.length > 0);

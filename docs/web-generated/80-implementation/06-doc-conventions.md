@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.13
+release: v0.1.14
 title: "Doc conventions"
 audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
@@ -125,7 +125,7 @@ No binary images unless unavoidable. They diff poorly, can't be searched, and br
 
 ## Cross-linking
 
-Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-cli/80-implementation/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.13/packages/core/src/index.ts)``.
+Use Markdown links for prominent cross-links and inline code links for source-file references. Prefer real relative targets such as `[**Layer policy**](/docs/opensip-cli/80-implementation/05-layer-policy/)` or ``[`packages/core/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/core/src/index.ts)``.
 
 Always link forward and back. A doc that depends on another doc's concept links to that doc; the linked-from doc, when relevant, links back to the dependent.
 
@@ -154,7 +154,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 ```markdown
 ## Verification trail
 
-Last verified at v0.1.13 against:
+Last verified at v0.1.14 against:
 
 - `packages/` directory listing (37 publishable packages plus workspace-private support packages ...).
 - Each package's `package.json` `description` and `name` field, read directly.
