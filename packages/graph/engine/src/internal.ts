@@ -63,3 +63,10 @@ export {
   totalSystemMemoryMb,
 } from './cli/heap-preflight.js';
 export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';
+
+// Catalog freshness/staleness classification — surfaced on the internal contract
+// for `@opensip-cli/mcp` (ADR-0084) so the MCP server can report a stale/missing
+// catalog with a warning. MCP's depcruise exception is scoped to this file, so
+// these must live here (not reached directly in `cache/invalidate.ts`).
+export { classifyCatalog, computeFilesFingerprint } from './cache/invalidate.js';
+export type { ValidationContext, CatalogVerdict } from './cache/invalidate.js';
