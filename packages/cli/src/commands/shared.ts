@@ -20,6 +20,7 @@ import type {
   ToolPluginManifest,
   ToolProvenance,
   ToolRegistry,
+  ToolCliContext,
 } from '@opensip-cli/core';
 
 /**
@@ -111,6 +112,8 @@ export interface CliCommandsContext {
   readonly toolInternalCommands?: ReadonlySet<string>;
   /** Live tool registry for identity-aware host commands (optional in tests). */
   readonly tools?: ToolRegistry;
+  /** Full tool context for host commands that re-dispatch tool specs (suite run). */
+  readonly toolContext?: ToolCliContext;
   /** Admitted tool manifests for config declaration composition (optional in tests). */
   readonly manifests?: readonly ToolPluginManifest[];
   /** Per-run tool provenance for config declaration composition (optional in tests). */

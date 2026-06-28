@@ -55,6 +55,7 @@ fitness: {}               # FitnessConfig
 simulation: {}            # SimulationConfig
 cli: {}                   # CliDefaults
 plugins: {}               # per-domain pin lists
+suites: {}                # host-owned multi-tool suites
 dashboard: {}             # dashboard.editor
 graph: {}                 # graph rule knobs (tool-contributed namespace)
 yagni: {}                 # YAGNI reduction audit knobs (tool-contributed namespace)
@@ -62,7 +63,7 @@ yagni: {}                 # YAGNI reduction audit knobs (tool-contributed namesp
 
 Every section is optional; a missing section becomes `{}`.
 
-The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
@@ -219,6 +220,43 @@ plugins:
 ```
 
 **Sim-pack discovery is by name-pattern** (ADR-0029): the simulation tool's manifest declares a `name-pattern` discovery mode (`prefix: "scenarios-"`, default scope `@opensip-cli`), so any installed `<scope>/scenarios-*` package is discovered automatically. There is **no** `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. The three layers that contribute scenario packs are: the `<scope>/scenarios-*` name-pattern scan (governed by `packageScopes` / `autoDiscoverScenarios`), explicit `scenarioPackages` pins, and project-local scenario files under `opensip-cli/sim/scenarios/`. See [plugin loader](../80-implementation/02-plugin-loader.md).
+
+## `suites`
+
+Host-owned named multi-tool runs. Each step resolves by the tool's stable UUID
+(`metadata.id` / manifest `stableId`), not by display name. `name` is optional
+readability only.
+
+```yaml
+suites:
+  security:
+    description: Run security checks and graph rules
+    steps:
+      - tool: 7f3a1b2c-0000-4000-8000-000000000001
+        name: fitness
+        command: fit
+        args:
+          recipe: security
+      - tool: 9c4d0000-0000-4000-8000-000000000002
+        name: graph
+        command: graph
+        args:
+          gateCompare: true
+```
+
+`args` are validated against the selected command's declared options. Run-scope
+flags (`cwd`, `config`, `json`, `debug`, `reportTo`, `apiKey`, `open`, targeting)
+are rejected inside a step because the suite invocation owns one shared scope.
+
+Reserved keys: `suites.<name>.execution` and per-step `cwd` are reserved for
+future execution modes and rejected in v1.
+
+Use `opensip tools list --json` to find stable UUIDs, or let the host write the
+step:
+
+```bash
+opensip suite add security --tool fitness --command fit --arg recipe=security
+```
 
 ## `dashboard`
 

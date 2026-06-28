@@ -81,6 +81,18 @@ describe('SessionRepo — save / get', () => {
     expect(fetched?.payload).toBeUndefined();
   });
 
+  it('round-trips suite grouping fields through get() and list()', () => {
+    const session = makeSession({
+      id: 'suite-step-1',
+      suiteRunId: 'suite-run-123',
+      suiteName: 'security',
+    });
+    repo.save(session);
+
+    expect(repo.get(session.id)).toEqual(session);
+    expect(repo.list()[0]).toEqual(session);
+  });
+
   it('treats the payload as fully opaque — any JSON shape round-trips verbatim', () => {
     const payload = {
       kind: 'graph',

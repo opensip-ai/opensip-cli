@@ -22,6 +22,8 @@ export const sessions = sqliteTable(
     completed_at: integer('completed_at'), // completedAt ms epoch
     completed_at_iso: text('completed_at_iso'), // completedAt original ISO string
     cwd: text('cwd').notNull(),
+    suite_run_id: text('suite_run_id'),
+    suite_name: text('suite_name'),
     recipe: text('recipe'),
     score: integer('score').notNull(),
     passed: integer('passed', { mode: 'boolean' }).notNull(),

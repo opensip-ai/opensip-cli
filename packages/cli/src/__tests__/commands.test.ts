@@ -79,6 +79,7 @@ describe('registerCliCommands', () => {
       'init',
       'report',
       'sessions',
+      'suite',
       'tools',
       'uninstall',
     ]);
@@ -88,6 +89,12 @@ describe('registerCliCommands', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge', 'show']);
+  });
+
+  it('mounts the documented suite subcommands', () => {
+    const program = new Command('opensip');
+    registerCliCommands(program, makeContext());
+    expect(subcommandNames(program, 'suite')).toEqual(['add', 'list', 'run']);
   });
 
   it('mounts the domain-bound plugin subcommands UNDER each pack-supporting tool primary', () => {

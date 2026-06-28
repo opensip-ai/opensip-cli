@@ -88,6 +88,20 @@ describe('showHistory', () => {
     });
     expect(result.sessions[0]?.showCommand).toBe('opensip sessions show FIT_01 --json');
   });
+
+  it('keeps suite grouping keys in the JSON projection', () => {
+    const repo = new SessionRepo(ds);
+    repo.save(
+      makeSession('FIT_SUITE_01', 95, Date.now(), {
+        suiteRunId: 'suite-run-1',
+        suiteName: 'security',
+      }),
+    );
+
+    const [session] = showHistory(ds).sessions;
+    expect(session?.suiteRunId).toBe('suite-run-1');
+    expect(session?.suiteName).toBe('security');
+  });
 });
 
 // ---------------------------------------------------------------------------

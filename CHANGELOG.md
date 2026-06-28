@@ -14,6 +14,9 @@ upload failures do not alter local findings.
 
 ### Added
 
+- `opensip suite run/list/add` host-owned tool suites, with UUID-addressed suite
+  config, shared option assembly, suite session grouping, and dashboard/history
+  suite visibility.
 - `opensip agent-catalog --json` — a structured discovery surface for agents,
   covering common command loops, output shapes, sessions, filters, and graph
   impact usage.

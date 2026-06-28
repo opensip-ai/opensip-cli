@@ -727,7 +727,13 @@ describe('buildHostCommandInventory', () => {
       'data-purge',
     ]);
     expect(inventory.groupSubcommands.config).toEqual(['validate', 'schema']);
+    expect(inventory.groupSubcommands.suite).toEqual(['run', 'list', 'add']);
     // Exactly the documented action-less groups — no drift.
-    expect(Object.keys(inventory.groupSubcommands).sort()).toEqual(['config', 'sessions', 'tools']);
+    expect(Object.keys(inventory.groupSubcommands).sort()).toEqual([
+      'config',
+      'sessions',
+      'suite',
+      'tools',
+    ]);
   });
 });

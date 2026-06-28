@@ -95,6 +95,8 @@ export class SessionRepo {
               completed_at: completedMs,
               completed_at_iso: session.completedAt,
               cwd: session.cwd,
+              suite_run_id: session.suiteRunId ?? null,
+              suite_name: session.suiteName ?? null,
               recipe: session.recipe ?? null,
               score: session.score,
               passed: session.passed,
@@ -367,6 +369,12 @@ export class SessionRepo {
       startedAt,
       completedAt,
       cwd: row.cwd,
+      ...(row.suite_run_id === null || row.suite_run_id === undefined
+        ? {}
+        : { suiteRunId: row.suite_run_id }),
+      ...(row.suite_name === null || row.suite_name === undefined
+        ? {}
+        : { suiteName: row.suite_name }),
       recipe: row.recipe ?? undefined,
       score: row.score,
       passed,

@@ -33,6 +33,8 @@ declare global {
     tool: string;
     startedAt: string;
     recipe?: string;
+    suiteRunId?: string;
+    suiteName?: string;
     score: number;
     passed?: boolean;
     /** Persisted run health (ADR-0060). Legacy rows omit — infer from passed. */

@@ -48,6 +48,7 @@ import {
   viewHelp,
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
+import { viewSuiteAdd, viewSuiteList, viewSuiteRun } from './views/suite-views.js';
 import {
   viewToolsCreate,
   viewToolsDataPurge,
@@ -145,6 +146,28 @@ function titledLinesView(title: string | undefined, lines: readonly string[]): V
 /** @throws {Error} When the closed command-result union and renderer drift. */
 function assertNever(result: never): never {
   throw new Error(`Unhandled command result '${JSON.stringify(result)}'`);
+}
+
+type SuiteCommandResult = Extract<
+  CommandResult,
+  { type: 'suite-run' | 'suite-list' | 'suite-add' }
+>;
+
+function suiteResultToView(result: SuiteCommandResult): ViewNode {
+  switch (result.type) {
+    case 'suite-run': {
+      return viewSuiteRun(result);
+    }
+    case 'suite-list': {
+      return viewSuiteList(result);
+    }
+    case 'suite-add': {
+      return viewSuiteAdd(result);
+    }
+    default: {
+      return assertNever(result);
+    }
+  }
 }
 
 // --- Envelope-derived terminal table (ADR-0011) -----------------------------
@@ -340,6 +363,11 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'tools-data-purge': {
       return viewToolsDataPurge(result);
+    }
+    case 'suite-add':
+    case 'suite-list':
+    case 'suite-run': {
+      return suiteResultToView(result);
     }
     case 'plugin-list':
     case 'plugin-add':

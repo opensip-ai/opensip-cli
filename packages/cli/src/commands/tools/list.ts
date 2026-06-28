@@ -80,47 +80,17 @@ function sourceLabelFor(
 export function toolsList(opts: ToolsListOptions): ToolsListResult {
   const projectHostDir = resolveProjectPaths(opts.cwd).pluginsDir(TOOL_DOMAIN);
   const globalHostDir = resolveUserPaths().pluginsDir(TOOL_DOMAIN);
-
-  const provenance = opts.provenance ?? [];
-  const manifests = opts.manifests ?? [];
-
-  const rows: ToolsListRow[] = [];
   const loadedPackageNames = new Set<string>();
-
-  // Loaded set — provenance and manifests are pushed pairwise at admission,
-  // so they index together.
-  for (const [i, prov] of provenance.entries()) {
-    const manifest = manifests[i];
-    if (prov.packageName !== undefined) loadedPackageNames.add(prov.packageName);
-    rows.push({
-      id: prov.id,
-      ...(prov.packageName === undefined ? {} : { packageName: prov.packageName }),
-      version: prov.version,
-      source: sourceLabelFor(prov, projectHostDir, globalHostDir),
-      commands: manifest?.commands.map((c) => c.name) ?? [],
-      status: 'loaded',
-    });
-  }
 
   // Installed-but-not-loaded set — marker scan + manifest file read per host.
   const hosts: readonly { dir: string; source: ListSource }[] = [
     { dir: projectHostDir, source: 'project' },
     { dir: globalHostDir, source: 'global' },
   ];
-  for (const host of hosts) {
-    for (const pkg of discoverPackagesInNodeModules(join(host.dir, 'node_modules'), 'tool')) {
-      if (loadedPackageNames.has(pkg.name)) continue;
-      const manifest = loadToolManifest('installed', pkg.packageDir);
-      rows.push({
-        id: manifest?.id ?? pkg.name,
-        packageName: pkg.name,
-        version: manifest?.version ?? 'unknown',
-        source: host.source,
-        commands: manifest?.commands.map((c) => c.name) ?? [],
-        status: 'manifest-only',
-      });
-    }
-  }
+  const rows = [
+    ...loadedRows(opts, projectHostDir, globalHostDir, loadedPackageNames),
+    ...manifestOnlyRows(hosts, loadedPackageNames),
+  ];
 
   // Shadow-marking: a project row shadows a global row with the same tool id
   // (matches discovery's first-occurrence-wins ordering: project precedes
@@ -130,10 +100,75 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
   const marked: ToolsListRow[] = rows.map((row) =>
     row.source === 'global' && projectIds.has(row.id) ? { ...row, shadowed: true } : row,
   );
-
-  let filtered = marked;
-  if (opts.global === true) filtered = marked.filter((r) => r.source === 'global');
-  else if (opts.project === true) filtered = marked.filter((r) => r.source === 'project');
+  const filtered = filterRows(marked, opts);
 
   return { type: 'tools-list', tools: filtered, totalCount: filtered.length };
+}
+
+function loadedRows(
+  opts: ToolsListOptions,
+  projectHostDir: string,
+  globalHostDir: string,
+  loadedPackageNames: Set<string>,
+): ToolsListRow[] {
+  const rows: ToolsListRow[] = [];
+  const provenance = opts.provenance ?? [];
+  const manifests = opts.manifests ?? [];
+
+  // Loaded set — provenance and manifests are pushed pairwise at admission,
+  // so they index together.
+  for (const [i, prov] of provenance.entries()) {
+    const manifest = manifests[i];
+    if (prov.packageName !== undefined) loadedPackageNames.add(prov.packageName);
+    rows.push({
+      id: prov.id,
+      ...(prov.stableId === undefined ? {} : { stableId: prov.stableId, uuid: prov.stableId }),
+      ...(prov.packageName === undefined ? {} : { packageName: prov.packageName }),
+      version: prov.version,
+      source: sourceLabelFor(prov, projectHostDir, globalHostDir),
+      commands: manifest?.commands.map((c) => c.name) ?? [],
+      status: 'loaded',
+    });
+  }
+  return rows;
+}
+
+function manifestOnlyRows(
+  hosts: readonly { dir: string; source: ListSource }[],
+  loadedPackageNames: ReadonlySet<string>,
+): ToolsListRow[] {
+  const rows: ToolsListRow[] = [];
+  for (const host of hosts) {
+    rows.push(...manifestRowsForHost(host, loadedPackageNames));
+  }
+  return rows;
+}
+
+function manifestRowsForHost(
+  host: { dir: string; source: ListSource },
+  loadedPackageNames: ReadonlySet<string>,
+): ToolsListRow[] {
+  const rows: ToolsListRow[] = [];
+  for (const pkg of discoverPackagesInNodeModules(join(host.dir, 'node_modules'), 'tool')) {
+    if (loadedPackageNames.has(pkg.name)) continue;
+    const manifest = loadToolManifest('installed', pkg.packageDir);
+    rows.push({
+      id: manifest?.id ?? pkg.name,
+      ...(manifest?.stableId === undefined
+        ? {}
+        : { stableId: manifest.stableId, uuid: manifest.stableId }),
+      packageName: pkg.name,
+      version: manifest?.version ?? 'unknown',
+      source: host.source,
+      commands: manifest?.commands.map((c) => c.name) ?? [],
+      status: 'manifest-only',
+    });
+  }
+  return rows;
+}
+
+function filterRows(rows: readonly ToolsListRow[], opts: ToolsListOptions): ToolsListRow[] {
+  if (opts.global === true) return rows.filter((r) => r.source === 'global');
+  if (opts.project === true) return rows.filter((r) => r.source === 'project');
+  return [...rows];
 }

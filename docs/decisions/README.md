@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0093](ADR-0093-host-owned-suite-plane.md) — Host-owned `suite` command group and `suites:` config namespace for one-scope multi-tool runs.
 - [ADR-0087](ADR-0087-public-ecosystem-readiness-shelved.md) — Shelve public ecosystem readiness; keep ADR-0061's interim private-extension posture because Phase 0 did not prove a portable network capability mechanism.
 - [ADR-0086](ADR-0086-signal-repair-metadata.md) — Additive nested `signal.repair` structured-repair contract for agent triage (JSON/session only; SARIF omits it).
 - [ADR-0085](ADR-0085-change-detection-substrate.md) — Host-owned change-detection substrate: core resolver, contracts filter/impact compute, `RunScope.graphCatalog` thunk for fit `--include-impacted`.

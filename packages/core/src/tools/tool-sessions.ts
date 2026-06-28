@@ -26,6 +26,8 @@ export interface ToolSessionRecord {
   readonly startedAt: string;
   readonly completedAt: string;
   readonly cwd: string;
+  readonly suiteRunId?: string;
+  readonly suiteName?: string;
   readonly recipe?: string;
   readonly score: number;
   readonly passed: boolean;

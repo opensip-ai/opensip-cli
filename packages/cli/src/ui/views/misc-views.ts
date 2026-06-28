@@ -115,6 +115,7 @@ function historyRow(s: StoredSession): Span[] {
   const counts = payloadCounts(s.payload);
   return [
     { text: s.id, dim: true },
+    { text: s.suiteName ?? '-', dim: s.suiteName === undefined },
     { text: s.tool, tone: 'brand', bold: true },
     { text: new Date(s.startedAt).toLocaleString(), dim: true },
     { text: `${s.score}%`, tone: scoreTone(s.score) },
@@ -128,6 +129,7 @@ function historyRow(s: StoredSession): Span[] {
 /** Columns for the run-history table — Score/Checks/Duration right-align. */
 const HISTORY_COLUMNS: readonly (string | TableColumnSpec)[] = [
   'Session',
+  'Suite',
   'Tool',
   'When',
   { header: 'Score', align: 'right' },
