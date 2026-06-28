@@ -16,6 +16,13 @@ export default mergeConfig(
           'src/types.ts',
           // Pure type / interface declarations — no runtime code.
           'src/graph-catalog.ts',
+          'src/cli-program.ts',
+          'src/command-outcome.ts',
+          'src/command-results.ts',
+          'src/command-results-variants/**',
+          'src/session-types.ts',
+          'src/run-presentation.ts',
+          'src/cli-diagnostic.ts',
         ],
         thresholds: {
           statements: 95,

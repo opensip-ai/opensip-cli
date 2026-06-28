@@ -46,4 +46,19 @@ describe('resolveToolCommands', () => {
 
     expect(resolveToolCommandNames(tool)).toEqual(['legacy-only']);
   });
+
+  it('returns an empty list when neither commandSpecs nor commands are present', () => {
+    const tool = {
+      identity: { name: 'empty-tool' },
+      metadata: {
+        id: 'demo',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
+    } satisfies Tool;
+
+    expect(resolveToolCommandNames(tool)).toEqual([]);
+    expect(resolveToolCommands(tool)).toEqual([]);
+  });
 });

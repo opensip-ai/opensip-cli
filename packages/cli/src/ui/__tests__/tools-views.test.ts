@@ -10,7 +10,9 @@ import { renderToText } from '@opensip-cli/cli-ui';
 import { describe, expect, it } from 'vitest';
 
 import {
+  viewToolsCreate,
   viewToolsDataPurge,
+  viewToolsDoctor,
   viewToolsInstall,
   viewToolsList,
   viewToolsUninstall,
@@ -183,6 +185,110 @@ describe('viewToolsUninstall', () => {
     expect(out).toContain('Failed to uninstall demo-tool');
     expect(out).toContain('not installed');
   });
+
+  it('renders a failure without an error suffix when detail is absent', () => {
+    expect(
+      renderToText(
+        viewToolsUninstall({
+          type: 'tools-uninstall',
+          success: false,
+          target: 'demo-tool',
+        }),
+      ),
+    ).toContain('Failed to uninstall demo-tool');
+  });
+});
+
+describe('viewToolsCreate', () => {
+  it('renders scaffold failures', () => {
+    const out = renderToText(
+      viewToolsCreate({
+        type: 'tools-create',
+        toolId: 'demo-tool',
+        dir: '/tmp/demo-tool',
+        files: [],
+        success: false,
+        error: 'directory exists',
+      }),
+    );
+    expect(out).toContain('Tool scaffold failed');
+    expect(out).toContain('directory exists');
+  });
+
+  it('renders a minimal successful scaffold without optional follow-ups', () => {
+    const out = renderToText(
+      viewToolsCreate({
+        type: 'tools-create',
+        toolId: 'demo-tool',
+        dir: '/tmp/demo-tool',
+        files: ['package.json'],
+        success: true,
+      }),
+    );
+    expect(out).toContain('Scaffolded tool demo-tool');
+    expect(out).not.toContain('Next steps:');
+  });
+
+  it('renders a successful scaffold with next steps and a hint', () => {
+    const out = renderToText(
+      viewToolsCreate({
+        type: 'tools-create',
+        toolId: 'demo-tool',
+        dir: '/tmp/demo-tool',
+        files: ['package.json', 'src/tool.ts'],
+        success: true,
+        nextSteps: ['pnpm install', 'opensip demo-tool'],
+        hint: 'Remember to register the tool in opensip-cli.config.yml.',
+      }),
+    );
+    expect(out).toContain('Scaffolded tool demo-tool');
+    expect(out).toContain('package.json');
+    expect(out).toContain('Next steps:');
+    expect(out).toContain('opensip-cli.config.yml');
+  });
+});
+
+describe('viewToolsDoctor', () => {
+  it('renders the empty diagnostics state', () => {
+    expect(
+      renderToText(
+        viewToolsDoctor({
+          type: 'tools-doctor',
+          diagnostics: [],
+          totalCount: 0,
+        }),
+      ),
+    ).toContain('No bootstrap diagnostics');
+  });
+
+  it('renders recorded diagnostics with severity tones', () => {
+    const out = renderToText(
+      viewToolsDoctor({
+        type: 'tools-doctor',
+        diagnostics: [
+          {
+            code: 'BOOT.LOAD.FAIL',
+            category: 'bootstrap',
+            severity: 'error',
+            message: 'tool package failed to load',
+            impact: 'tool omitted from registry',
+            detail: 'see log',
+          },
+          {
+            code: 'BOOT.MANIFEST.WARN',
+            category: 'bootstrap',
+            severity: 'warning',
+            message: 'manifest hash drifted',
+            impact: 'continuing with warning',
+          },
+        ],
+        totalCount: 2,
+      }),
+    );
+    expect(out).toContain('Bootstrap diagnostics (2)');
+    expect(out).toContain('tool package failed to load');
+    expect(out).toContain('manifest hash drifted');
+  });
 });
 
 describe('viewToolsDataPurge', () => {
@@ -203,5 +309,20 @@ describe('viewToolsDataPurge', () => {
     expect(out).toContain('7 baseline entr(ies)');
     expect(out).toContain('1 baseline marker(s)');
     expect(out).toContain('2 state row(s)');
+  });
+
+  it('renders zero baseline markers when none were removed', () => {
+    expect(
+      renderToText(
+        viewToolsDataPurge({
+          type: 'tools-data-purge',
+          toolId: 'fit',
+          sessions: 0,
+          baselineEntries: 0,
+          baselineMeta: false,
+          stateRows: 0,
+        }),
+      ),
+    ).toContain('0 baseline marker(s)');
   });
 });

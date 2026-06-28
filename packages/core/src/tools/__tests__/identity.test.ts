@@ -38,7 +38,9 @@ describe('validateToolIdentity', () => {
 
   it('rejects malformed identities and alias drift', () => {
     expect(() => validateToolIdentity(undefined as never)).toThrow(/required/);
+    expect(() => validateToolIdentity({ name: 1 as never })).toThrow(/required/);
     expect(() => validateToolIdentity({ name: 'BadName' })).toThrow(/kebab-case/);
+    expect(() => validateToolIdentity({ name: 'fit', aliases: [''] })).toThrow(/non-empty/);
     expect(() => validateToolIdentity({ name: 'fit', aliases: 'f' as never })).toThrow(/aliases/);
     expect(() => validateToolIdentity({ name: 'fit', aliases: ['fit'] })).toThrow(/aliases/);
     expect(() => validateToolIdentity({ name: 'fit', aliases: ['f', 'f'] })).toThrow(/Duplicate/);

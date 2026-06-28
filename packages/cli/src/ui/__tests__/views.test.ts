@@ -465,3 +465,235 @@ describe('plugin view', () => {
     expect(out).toContain('One or more plugins failed');
   });
 });
+
+describe('suite views', () => {
+  it('renders suite run, list, and add results', () => {
+    const run = text({
+      type: 'suite-run',
+      suite: 'security',
+      suiteRunId: 'run-1',
+      exitCode: 1,
+      durationMs: 1200,
+      steps: [
+        {
+          tool: 'fitness',
+          command: 'fit',
+          exitCode: 0,
+          durationMs: 400,
+        },
+        {
+          tool: 'graph',
+          command: 'graph',
+          exitCode: 1,
+          durationMs: 500,
+          error: 'gate failed',
+        },
+      ],
+    });
+    expect(run).toContain('Suite security');
+    expect(run).toContain('gate failed');
+    expect(run).toContain('-');
+
+    const list = text({
+      type: 'suite-list',
+      totalCount: 1,
+      suites: [
+        {
+          name: 'security',
+          description: 'security suite',
+          steps: [
+            {
+              tool: 'fitness',
+              stableId: 'uuid-1',
+              command: 'fit',
+              args: { recipe: 'security' },
+            },
+          ],
+        },
+      ],
+    });
+    expect(list).toContain('Suites (1)');
+    expect(list).toContain('security');
+    expect(list).toContain('uuid-1');
+
+    expect(
+      text({
+        type: 'suite-add',
+        suite: 'security',
+        tool: 'fitness',
+        stableId: 'uuid-1',
+        command: 'fit',
+        configPath: '/tmp/opensip-cli.config.yml',
+        changed: true,
+      }),
+    ).toContain('Added fitness fit to security');
+
+    expect(
+      text({
+        type: 'suite-add',
+        suite: 'security',
+        tool: 'fitness',
+        stableId: 'uuid-1',
+        command: 'fit',
+        configPath: '/tmp/opensip-cli.config.yml',
+        changed: false,
+      }),
+    ).toContain('Suite already contained');
+
+    expect(
+      text({
+        type: 'suite-list',
+        totalCount: 0,
+        suites: [],
+      }),
+    ).toContain('No suites configured');
+  });
+});
+
+describe('tools command views via resultToView', () => {
+  it('routes tools create and doctor results through the shared mapper', () => {
+    expect(
+      text({
+        type: 'tools-create',
+        toolId: 'demo-tool',
+        dir: '/tmp/demo-tool',
+        files: [],
+        success: false,
+        error: 'exists',
+      }),
+    ).toContain('Tool scaffold failed');
+
+    expect(
+      text({
+        type: 'tools-doctor',
+        diagnostics: [],
+        totalCount: 0,
+      }),
+    ).toContain('No bootstrap diagnostics');
+  });
+});
+
+describe('grouped history and config views', () => {
+  it('renders suite-grouped history with standalone runs', () => {
+    const out = text({
+      type: 'history',
+      sessions: [
+        {
+          id: 'STEP_1',
+          tool: 'fit',
+          startedAt: '2026-06-28T10:00:00.000Z',
+          completedAt: '2026-06-28T10:00:00.000Z',
+          score: 100,
+          passed: true,
+          durationMs: 100,
+          showCommand: 'opensip sessions show STEP_1 --json',
+        },
+        {
+          id: 'SOLO_1',
+          tool: 'graph',
+          startedAt: '2026-06-28T11:00:00.000Z',
+          completedAt: '2026-06-28T11:00:00.000Z',
+          score: 90,
+          passed: true,
+          durationMs: 200,
+          showCommand: 'opensip sessions show SOLO_1 --json',
+        },
+      ],
+      suiteGroups: [
+        {
+          suiteRunId: 'run-1',
+          suiteName: 'security',
+          sessions: [
+            {
+              id: 'STEP_1',
+              tool: 'fit',
+              startedAt: '2026-06-28T10:00:00.000Z',
+              completedAt: '2026-06-28T10:00:00.000Z',
+              score: 100,
+              passed: true,
+              durationMs: 100,
+              showCommand: 'opensip sessions show STEP_1 --json',
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    expect(out).toContain('Suite: security');
+    expect(out).toContain('Standalone runs');
+    expect(out).toContain('SOLO_1');
+  });
+
+  it('skips suite groups whose sessions fall outside the visible history window', () => {
+    const sessions = Array.from({ length: 21 }, (_, index) => ({
+      id: `S_${String(index)}`,
+      tool: 'fit',
+      startedAt: `2026-06-28T${String(10 + index).padStart(2, '0')}:00:00.000Z`,
+      completedAt: `2026-06-28T${String(10 + index).padStart(2, '0')}:00:00.000Z`,
+      score: 100,
+      passed: true,
+      durationMs: 100,
+      showCommand: `opensip sessions show S_${String(index)} --json`,
+    }));
+    const out = text({
+      type: 'history',
+      sessions,
+      suiteGroups: [
+        {
+          suiteRunId: 'hidden-run',
+          suiteName: 'hidden',
+          sessions: [sessions[20]!],
+        },
+      ],
+    } as never);
+
+    expect(out).toContain('Run History (21 sessions)');
+    expect(out).not.toContain('Suite: hidden');
+  });
+
+  it('renders graph lookup and config command results', () => {
+    expect(
+      text({
+        type: 'graph-lookup',
+        name: 'foo',
+        resolutionMode: 'fast',
+        matches: [{}, {}],
+      } as never),
+    ).toContain('fast catalog');
+
+    expect(
+      text({
+        type: 'graph-lookup',
+        name: 'foo',
+        resolutionMode: 'exact',
+        matches: [{}],
+      } as never),
+    ).toContain('1 occurrence');
+    expect(
+      text({
+        type: 'graph-lookup',
+        name: 'foo',
+        resolutionMode: 'exact',
+        matches: [{}, {}],
+      } as never),
+    ).not.toContain('fast catalog');
+
+    const validate = text({
+      type: 'config-validate',
+      configPath: '/repo/opensip-cli.config.yml',
+      namespaces: ['fitness', 'graph'],
+      warnings: ['deprecated key'],
+    } as never);
+    expect(validate).toContain('Configuration valid');
+    expect(validate).toContain('deprecated key');
+
+    expect(
+      text({
+        type: 'config-schema',
+        outPath: '/repo/schema.json',
+      } as never),
+    ).toContain('Wrote JSON Schema');
+
+    expect(text({ type: 'config-schema' } as never)).toContain('Use --json');
+  });
+});

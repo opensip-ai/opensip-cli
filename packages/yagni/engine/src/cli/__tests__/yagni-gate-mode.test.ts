@@ -4,6 +4,7 @@
  * the dogfood gate uses `failOnWarnings` (not `isErrorSignal`).
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { createSignal, type Signal, type ToolCliContext } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -125,6 +126,76 @@ describe('runYagniGateMode --gate-save', () => {
     });
 
     await runYagniGateMode({ cwd: '/x', gateSave: true }, cli);
+
+    expect(deliverSignals).toHaveBeenCalledWith(
+      envelope,
+      expect.objectContaining({ runFailed: true }),
+    );
+  });
+
+  it('writes SARIF after gate-save when --sarif is set', async () => {
+    const { cli, deliverSignals } = mockCli();
+    const writeSarif = vi.fn(() => Promise.resolve());
+    Object.assign(cli, { writeSarif });
+    const envelope = envelopeOf([]);
+    executeYagniMock.mockResolvedValue({
+      envelope,
+      session: { tool: 'yagni', cwd: '/x', score: 100, passed: true, payload: {} },
+    });
+
+    await runYagniGateMode({ cwd: '/x', gateSave: true, sarif: 'yagni.sarif' }, cli);
+
+    expect(writeSarif).toHaveBeenCalledWith(envelope, 'yagni.sarif');
+    expect(deliverSignals).toHaveBeenCalled();
+  });
+});
+
+describe('runYagniGateMode --gate-compare', () => {
+  it('rejects mutually exclusive gate flags', async () => {
+    const { cli, setExitCode } = mockCli();
+
+    await runYagniGateMode({ cwd: '/x', gateSave: true, gateCompare: true }, cli);
+
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(executeYagniMock).not.toHaveBeenCalled();
+  });
+
+  it('passes when compareBaseline reports no regressions', async () => {
+    const { cli, deliverSignals } = mockCli();
+    const compareBaseline = vi.fn(() =>
+      Promise.resolve({ degraded: false, added: [], resolved: [1] }),
+    );
+    const writeSarif = vi.fn(() => Promise.resolve());
+    Object.assign(cli, { compareBaseline, writeSarif });
+    const envelope = envelopeOf([]);
+    executeYagniMock.mockResolvedValue({
+      envelope,
+      session: { tool: 'yagni', cwd: '/x', score: 100, passed: true, payload: {} },
+    });
+
+    await runYagniGateMode({ cwd: '/x', gateCompare: true, sarif: 'yagni.sarif' }, cli);
+
+    expect(compareBaseline).toHaveBeenCalledWith('yagni', envelope);
+    expect(deliverSignals).toHaveBeenCalledWith(
+      envelope,
+      expect.objectContaining({ runFailed: false }),
+    );
+    expect(writeSarif).toHaveBeenCalledWith(envelope, 'yagni.sarif');
+  });
+
+  it('fails when compareBaseline reports regressions', async () => {
+    const { cli, deliverSignals } = mockCli();
+    const compareBaseline = vi.fn(() =>
+      Promise.resolve({ degraded: true, added: [1], resolved: [] }),
+    );
+    Object.assign(cli, { compareBaseline });
+    const envelope = envelopeOf([signal()]);
+    executeYagniMock.mockResolvedValue({
+      envelope,
+      session: { tool: 'yagni', cwd: '/x', score: 0, passed: false, payload: {} },
+    });
+
+    await runYagniGateMode({ cwd: '/x', gateCompare: true }, cli);
 
     expect(deliverSignals).toHaveBeenCalledWith(
       envelope,

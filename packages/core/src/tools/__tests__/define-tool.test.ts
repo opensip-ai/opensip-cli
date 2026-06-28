@@ -134,6 +134,36 @@ describe('defineTool', () => {
     ).toThrow(/pluginLayout\.domain/);
   });
 
+  it('accepts a hand-written primary command when aliases match identity exactly', () => {
+    const tool = defineTool({
+      identity: { name: 'demo', aliases: ['dm'] },
+      metadata: {
+        id: '00000000-0000-4000-8000-000000000007',
+        version: '0.0.0',
+        description: 'demo',
+      },
+      commandSpecs: [
+        defineCommand({
+          name: 'demo',
+          aliases: ['dm'],
+          description: 'Run',
+          commonFlags: [],
+          scope: 'project',
+          output: 'command-result',
+          handler: noopHandler,
+        }),
+      ],
+      extensionPoints: {
+        initialize: noopHandler,
+        sessionReplay: { replaySession: () => ({}) },
+      },
+    });
+
+    expect(tool.commandSpecs?.[0]?.aliases).toEqual(['dm']);
+    expect(tool.extensionPoints?.config).toBeUndefined();
+    expect(tool.extensionPoints?.sessionReplay?.tool).toBe('demo');
+  });
+
   it('rejects command specs that drift from the declared identity', () => {
     expect(() =>
       defineTool({
