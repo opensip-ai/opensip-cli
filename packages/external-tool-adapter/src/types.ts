@@ -14,6 +14,7 @@
 
 import type {
   Logger,
+  ManifestOptionDescriptor,
   Signal,
   SignalSeverity,
   ToolConfigContribution,
@@ -190,6 +191,8 @@ export interface ManifestCommandShell {
   readonly description: string;
   readonly aliases: readonly string[];
   readonly commonFlags: readonly string[];
+  /** Tool-specific options (e.g. the gate flags), MINUS the non-serializable `parse` closure. */
+  readonly options?: readonly ManifestOptionDescriptor[];
   readonly scope: 'project' | 'none';
   readonly output: string;
   readonly parent?: string;

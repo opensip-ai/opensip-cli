@@ -24,7 +24,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 
-import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { buildSignalEnvelope, EXIT_CODES } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   isErrorSignal,
@@ -40,10 +40,12 @@ import { ingestSarif } from './ingest-sarif.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
 import { buildAdapterRunContext } from './run-context.js';
+import { deliverOptions, emitScanCompletion } from './scan-emit.js';
 
 import type { BinaryResolveDeps } from './binary-resolver.js';
 import type { SarifLog } from './ingest-sarif.js';
 import type { ProbeVersionInput, ProcessResult, RunProcessInput } from './process-exec.js';
+import type { ScanCompletion } from './scan-emit.js';
 import type {
   AdapterProvenance,
   AdapterRunContext,
@@ -103,18 +105,6 @@ export interface ScanLoopInput {
   readonly opts: Record<string, unknown>;
 }
 
-/** What the host persists + dispatches after a scan. */
-export interface ScanCompletion {
-  readonly envelope: ReturnType<typeof buildSignalEnvelope>;
-  readonly session: {
-    readonly tool: string;
-    readonly cwd: string;
-    readonly score: number;
-    readonly passed: boolean;
-    readonly payload: Record<string, unknown>;
-  };
-}
-
 const ARTIFACT_EXT: Record<ExternalCommandSpec['output']['kind'], string> = {
   sarif: 'sarif',
   json: 'json',
@@ -154,20 +144,39 @@ function parseSignals(
   return command.parse(payload, ctx);
 }
 
-function summaryLines(tool: string, signalCount: number, score: number, passed: boolean): string[] {
-  return [
-    `${tool}: ${String(signalCount)} finding(s)`,
-    `verdict: ${passed ? 'PASS' : 'FAIL'} (score ${score.toFixed(2)})`,
-  ];
-}
-
-/** Run one scanner command end-to-end. */
+/**
+ * Run one scanner command end-to-end.
+ *
+ * Returns the {@link ScanCompletion} the host persists/dispatches, or `undefined`
+ * when the invocation is a config error (`--gate-save` + `--gate-compare` together)
+ * — the loop has already recorded the failure + exit via `cli.reportFailure`, so
+ * there is no envelope/session to return.
+ */
 export async function runScanLoop(
   input: ScanLoopInput,
   overrides?: Partial<ScanLoopDeps>,
-): Promise<ScanCompletion> {
+): Promise<ScanCompletion | undefined> {
   const deps: ScanLoopDeps = { ...DEFAULT_DEPS, ...overrides };
   const { cli, tool, command, binary } = input;
+
+  // ADR-0036 gate-ratchet: --gate-save and --gate-compare are mutually exclusive
+  // (mirrors fit's runGateMode). Validate BEFORE any IO so a misconfiguration
+  // fails fast — no wasted scanner subprocess — and return early (the host replays
+  // the recorded reportFailure → exit 2).
+  if (input.opts.gateSave === true && input.opts.gateCompare === true) {
+    cli.logger.warn({
+      evt: 'adapter.gate.config_error',
+      module: MODULE,
+      tool,
+      reason: 'mutually-exclusive flags',
+    });
+    await cli.reportFailure({
+      message: 'Error: --gate-save and --gate-compare are mutually exclusive.',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      jsonRequested: input.opts.json === true,
+    });
+    return undefined;
+  }
 
   const config = (cli.scope.toolConfig?.[tool] ?? {}) as Readonly<Record<string, unknown>>;
   const envVar = binary.envVar ?? defaultBinaryEnvVar(tool);
@@ -307,37 +316,12 @@ export async function runScanLoop(
     fingerprintStrategy: input.fingerprintStrategy,
   });
 
-  const jsonRequested = input.opts.json === true;
-  if (jsonRequested) {
-    cli.emitEnvelope(envelope);
-  } else {
-    await cli.render({
-      type: 'text-lines',
-      title: `${tool} scan`,
-      lines: summaryLines(tool, signals.length, envelope.verdict.score, envelope.verdict.passed),
-    });
-  }
-
-  const deliverCwd = typeof input.opts.cwd === 'string' ? input.opts.cwd : ctx.projectRoot;
-  await cli.deliverSignals(envelope, {
-    cwd: deliverCwd,
-    ...(typeof input.opts.reportTo === 'string' ? { reportTo: input.opts.reportTo } : {}),
-    ...(typeof input.opts.apiKey === 'string' ? { apiKey: input.opts.apiKey } : {}),
-  });
-
-  cli.logger.info({
-    evt: 'adapter.scan.completed',
-    module: MODULE,
-    tool,
-    findings: signals.length,
-    passed: envelope.verdict.passed,
-  });
-
-  return {
+  const deliver = deliverOptions(input.opts, ctx.projectRoot);
+  const completion: ScanCompletion = {
     envelope,
     session: {
       tool,
-      cwd: deliverCwd,
+      cwd: deliver.cwd,
       score: envelope.verdict.score,
       passed: envelope.verdict.passed,
       payload: {
@@ -348,4 +332,8 @@ export async function runScanLoop(
       },
     },
   };
+
+  // Emit + deliver + return. The gate-ratchet branch (ADR-0036) and the normal
+  // emit live in a sibling helper so this orchestration body stays flat.
+  return emitScanCompletion(cli, tool, input.opts, envelope, signals.length, deliver, completion);
 }

@@ -36,6 +36,21 @@ describe('deriveAdapterManifestCommands', () => {
       description: 'Example scanner',
       aliases: ['ex'],
       commonFlags: ['json', 'cwd', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
+      // The scan command carries the inherited gate flags (minus the `parse` closure).
+      options: [
+        {
+          flag: '--gate-save',
+          description:
+            'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)',
+          default: false,
+        },
+        {
+          flag: '--gate-compare',
+          description:
+            'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
+          default: false,
+        },
+      ],
       scope: 'project',
       output: 'raw-stream',
       rawStreamReason: 'runtime-render-dispatch',
@@ -50,6 +65,8 @@ describe('deriveAdapterManifestCommands', () => {
       rawStreamReason: 'diagnostic-gate',
       commonFlags: ['json', 'cwd'],
     });
+    // doctor/version take no gate flags — they carry no options shell.
+    expect(doctor.options).toBeUndefined();
 
     // The whole thing is JSON-serializable (it is written into package.json).
     expect(() => JSON.stringify(shells)).not.toThrow();

@@ -28,6 +28,7 @@ import { buildVersionCommand } from './version-command.js';
 
 import type { ExternalCommandSpec, ExternalToolAdapterSpec } from './types.js';
 import type {
+  OptionSpec,
   Tool,
   ToolCliContext,
   ToolCommandSpecInput,
@@ -45,6 +46,29 @@ const SCAN_COMMON_FLAGS = [
   'open',
 ] as const;
 
+/**
+ * The baseline-ratchet flags every scanner verb inherits (ADR-0036). Wired ONCE
+ * here so all adapters get the host gate loop verbatim — `--gate-save` captures
+ * the current fingerprint-stamped findings as the project baseline; `--gate-compare`
+ * diffs against it and (per the reserved `failOnDegraded` key) hard-fails on
+ * net-new findings. Mirrors fit's `--gate-save` / `--gate-compare` descriptions;
+ * the run loop reads them as `opts.gateSave` / `opts.gateCompare`.
+ */
+const SCAN_GATE_OPTIONS: readonly OptionSpec[] = [
+  {
+    flag: '--gate-save',
+    description:
+      'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)',
+    default: false,
+  },
+  {
+    flag: '--gate-compare',
+    description:
+      'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
+    default: false,
+  },
+];
+
 /** Run one scanner command and shape its result as a `ToolRunCompletion`. */
 async function dispatchScan(
   cli: ToolCliContext,
@@ -61,6 +85,9 @@ async function dispatchScan(
     fingerprintStrategy: resolveFingerprintStrategy(spec.fingerprintStrategy),
     opts: rawOpts as Record<string, unknown>,
   });
+  // `undefined` ⇒ a gate config error the loop already recorded via reportFailure
+  // (the host replays the exit). No envelope/session to persist.
+  if (completion === undefined) return {};
   return { envelope: completion.envelope, session: completion.session };
 }
 
@@ -97,6 +124,7 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
   const scanPrimary = definePrimaryCommand<unknown, ToolCliContext>({
     description: primary.description ?? spec.metadata.description,
     commonFlags: [...SCAN_COMMON_FLAGS],
+    options: [...SCAN_GATE_OPTIONS],
     scope: 'project',
     output: 'raw-stream',
     rawStreamReason: 'runtime-render-dispatch',
@@ -108,6 +136,7 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
       name: command.name,
       description: command.description ?? `Run the ${spec.identity.name} ${command.name} scan`,
       commonFlags: [...SCAN_COMMON_FLAGS],
+      options: [...SCAN_GATE_OPTIONS],
       scope: 'project',
       output: 'raw-stream',
       rawStreamReason: 'runtime-render-dispatch',

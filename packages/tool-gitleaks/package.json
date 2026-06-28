@@ -70,6 +70,18 @@
           "apiKey",
           "open"
         ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
         "scope": "project",
         "output": "raw-stream",
         "rawStreamReason": "runtime-render-dispatch"
