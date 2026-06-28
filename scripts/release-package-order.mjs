@@ -197,6 +197,17 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/dashboard',
     publishReason: 'Self-contained HTML dashboard generator consumed by report composition',
   },
+  // Layer 3 — External Tool Adapter substrate (ADR-0090; core + contracts only,
+  // output devDep). Publishes before any adapter that builds on it; placed with
+  // the layer-3 libs (after dashboard), before the tool engines.
+  {
+    unscoped: 'external-tool-adapter',
+    name: '@opensip-cli/external-tool-adapter',
+    dir: 'packages/external-tool-adapter',
+    filter: '@opensip-cli/external-tool-adapter',
+    publishReason:
+      'External Tool Adapter substrate: wrap a CLI scanner (gitleaks/osv-scanner/trivy) as a Tool',
+  },
   // Layer 3 — tools
   {
     unscoped: 'fitness',

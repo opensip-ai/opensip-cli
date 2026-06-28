@@ -23,6 +23,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 3 | `@opensip-cli/targeting` | host file-targeting runtime substrate (scope.targets; depends on core + config) |
 | 3 | `@opensip-cli/lang-*` | language adapters |
 | 3 | `@opensip-cli/dashboard` | HTML report generator (core + contracts) |
+| 3 | `@opensip-cli/external-tool-adapter` | External Tool Adapter substrate (core + contracts; output devDep) |
 | 4 | `@opensip-cli/fitness` | fitness engine + cli/* commands |
 | 4 | `@opensip-cli/simulation` | simulation engine + cli/* commands |
 | 4 | `@opensip-cli/graph` | graph engine + cli/* commands |
@@ -30,7 +31,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |
 
-## Workspace packages (39)
+## Workspace packages (40)
 
 - `@opensip-cli/checks-cpp`
 - `@opensip-cli/checks-go`
@@ -47,6 +48,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/core`
 - `@opensip-cli/dashboard`
 - `@opensip-cli/datastore`
+- `@opensip-cli/external-tool-adapter`
 - `@opensip-cli/fitness`
 - `@opensip-cli/graph`
 - `@opensip-cli/graph-adapter-common`

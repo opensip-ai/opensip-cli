@@ -21,6 +21,7 @@
       "@opensip-cli/cli-live": ["packages/cli-live/src/index.ts"],
       "opensip-cli": ["packages/cli/src/index.ts"],
       "@opensip-cli/dashboard": ["packages/dashboard/src/index.ts"],
+      "@opensip-cli/external-tool-adapter": ["packages/external-tool-adapter/src/index.ts"],
       "@opensip-cli/fitness": ["packages/fitness/engine/src/index.ts"],
       "@opensip-cli/fitness/internal": ["packages/fitness/engine/src/internal.ts"],
       "@opensip-cli/simulation": ["packages/simulation/engine/src/index.ts"],

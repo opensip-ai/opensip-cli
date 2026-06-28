@@ -81,6 +81,10 @@ const OVERRIDES = {
   '@opensip-cli/cli-ui': ['cli', 'terminal', 'ink', 'react'],
   '@opensip-cli/cli-live': ['cli', 'terminal', 'ink', 'react'],
   '@opensip-cli/graph-adapter-common': ['call-graph', 'tree-sitter'],
+  '@opensip-cli/external-tool-adapter': ['security', 'scanners', 'adapters', 'sarif'],
+  // Preserve the MCP package's distinctive search keywords (the generator is the
+  // source of truth; its package.json keyword set pre-dated this map entry).
+  '@opensip-cli/mcp': ['mcp', 'model-context-protocol', 'code-graph'],
 };
 
 /** Derive the (deduplicated, order-preserving) keyword list for one package. */
