@@ -41,12 +41,27 @@ export interface DeadCodeDto {
   readonly message: string;
 }
 
-/** The outcome of {@link GraphReadPort.tracePath}: an ordered symbol chain. */
+/** The outcome of the `trace_path` tool: an ordered symbol chain. */
 export interface PathTraceDto {
   /** `true` when a call path `from → … → to` exists within the depth bound. */
   readonly found: boolean;
   /** The ordered path (empty when not found). */
   readonly path: readonly SymbolRef[];
+}
+
+/**
+ * A walkable adjacency snapshot for one call direction. The MCP call-graph tools
+ * (`who_calls`/`callees_of`/`trace_path`) run the shared `boundedBfs` over this
+ * — the port exposes the engine's `Indexes.callers`/`callees` body-hash
+ * adjacency (twin-union per ADR-0003) plus a body-hash → {@link SymbolRef}
+ * resolver, so the single walk lives in MCP (rule of three) and the port never
+ * re-implements a parallel BFS.
+ */
+export interface AdjacencySnapshot {
+  /** Body-hash → neighbor body-hashes for this direction. */
+  readonly edges: ReadonlyMap<string, readonly string[]>;
+  /** Resolve a body hash to its representative {@link SymbolRef} (metadata only). */
+  resolve(bodyHash: string): SymbolRef | undefined;
 }
 
 /** One package-coupling row in the architecture summary. */
@@ -83,18 +98,10 @@ export interface GraphReadPort {
   ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
   /** All symbols declared in `file` enclosing (or starting at) `line`. */
   findBySpan(file: string, line: number): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
-  /** Bounded reverse walk: who calls `symbolId`, out to `depth` (≤ 5). */
-  callersOf(
-    symbolId: string,
-    depth: number,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
-  /** Bounded forward walk: what `symbolId` calls, out to `depth` (≤ 5). */
-  calleesOf(
-    symbolId: string,
-    depth: number,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
-  /** Shortest call path `from → to` within the depth bound. */
-  tracePath(from: string, to: string): Result<McpToolResult<PathTraceDto>, McpReadError>;
+  /** Reverse-call adjacency snapshot (who-calls): walked by MCP's `boundedBfs`. */
+  callerGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError>;
+  /** Forward-call adjacency snapshot (callees): walked by MCP's `boundedBfs`. */
+  calleeGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError>;
   /** Blast radius of `symbolId` — graph's canonical `buildFeatures` scoring. */
   blast(symbolId: string): Result<McpToolResult<BlastDto | undefined>, McpReadError>;
   /** Orphan (dead-code) symbols via `graph:orphan-subtree` (no filesystem reads). */

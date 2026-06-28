@@ -25,13 +25,13 @@ import { readError } from './mcp-error.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type {
+  AdjacencySnapshot,
   ArchitecturePackageDto,
   ArchitectureSummaryDto,
   BlastDto,
   DeadCodeDto,
   GraphGeneration,
   GraphReadPort,
-  PathTraceDto,
   SearchSymbolsOptions,
 } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
@@ -41,10 +41,6 @@ import type { DataStore } from '@opensip-cli/datastore';
 import type { Catalog, FeatureColumn, FunctionOccurrence, Indexes } from '@opensip-cli/graph';
 import type { GraphConfig, ValidationContext } from '@opensip-cli/graph/internal';
 
-/** Hard depth cap on bounded adjacency walks (bounds memory; ADR-0084 §Hardening). */
-const MAX_DEPTH = 5;
-/** Hard node cap on a single walk before `truncated` is set. */
-const MAX_WALK_NODES = 2000;
 /** Default search-result cap. */
 const DEFAULT_SEARCH_LIMIT = 50;
 /** Default architecture package-row cap. */
@@ -183,45 +179,36 @@ export class SqliteGraphReadPort implements GraphReadPort {
     return ok(this.wrap(out));
   }
 
-  callersOf(
-    symbolId: string,
-    depth: number,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError> {
-    return this.walkFrom(symbolId, depth, (gen) => gen.indexes.callers);
+  callerGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError> {
+    return ok(this.wrap(this.adjacency((gen) => gen.indexes.callers)));
   }
 
-  calleesOf(
-    symbolId: string,
-    depth: number,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError> {
-    return this.walkFrom(symbolId, depth, (gen) => gen.indexes.callees);
+  calleeGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError> {
+    return ok(this.wrap(this.adjacency((gen) => gen.indexes.callees)));
   }
 
-  private walkFrom(
-    symbolId: string,
-    depth: number,
+  /**
+   * Project one direction's body-hash adjacency into a walkable
+   * {@link AdjacencySnapshot}. The map IS the engine's `Indexes.callers`/
+   * `callees` (no copy); the resolver closes over `byBodyHash`. The bounded
+   * walk itself lives in MCP's `boundedBfs` (rule of three) — the port never
+   * re-implements a BFS.
+   */
+  private adjacency(
     pick: (gen: CatalogGeneration) => ReadonlyMap<string, readonly string[]>,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError> {
+  ): AdjacencySnapshot {
     const gen = this.current();
-    if (gen === undefined) return ok(this.wrap([] as readonly SymbolRef[]));
-    const start = gen.indexes.byOccId.get(symbolId);
-    if (start === undefined) return ok(this.wrap([] as readonly SymbolRef[]));
-    const walk = boundedWalk(start.bodyHash, pick(gen), depth);
-    const refs = hashesToRefs(walk.hashes, gen.indexes);
-    return ok(this.wrap(refs, walk.truncated));
-  }
-
-  tracePath(from: string, to: string): Result<McpToolResult<PathTraceDto>, McpReadError> {
-    const gen = this.current();
-    if (gen === undefined) return ok(this.wrap({ found: false, path: [] }));
-    const start = gen.indexes.byOccId.get(from);
-    const goal = gen.indexes.byOccId.get(to);
-    if (start === undefined || goal === undefined) {
-      return ok(this.wrap({ found: false, path: [] }));
+    if (gen === undefined) {
+      return { edges: new Map(), resolve: () => undefined };
     }
-    const hashes = tracePathHashes(start.bodyHash, goal.bodyHash, gen.indexes);
-    if (hashes === undefined) return ok(this.wrap({ found: false, path: [] }));
-    return ok(this.wrap({ found: true, path: hashesToRefs(hashes, gen.indexes) }));
+    const indexes = gen.indexes;
+    return {
+      edges: pick(gen),
+      resolve: (bodyHash) => {
+        const occ = indexes.byBodyHash.get(bodyHash);
+        return occ === undefined ? undefined : toSymbolRef(occ);
+      },
+    };
   }
 
   blast(symbolId: string): Result<McpToolResult<BlastDto | undefined>, McpReadError> {
@@ -338,105 +325,6 @@ function toSymbolRef(occ: FunctionOccurrence): SymbolRef {
     kind: occ.kind,
     visibility: occ.visibility,
   };
-}
-
-/** Resolve body hashes to `SymbolRef`s (skipping any that no longer resolve). */
-function hashesToRefs(hashes: readonly string[], indexes: Indexes): SymbolRef[] {
-  const refs: SymbolRef[] = [];
-  for (const hash of hashes) {
-    const occ = indexes.byBodyHash.get(hash);
-    if (occ !== undefined) refs.push(toSymbolRef(occ));
-  }
-  return refs;
-}
-
-/** Bounded BFS over an adjacency map from a start body hash (depth-/node-capped). */
-function boundedWalk(
-  start: string,
-  adjacency: ReadonlyMap<string, readonly string[]>,
-  depth: number,
-): { hashes: string[]; truncated: boolean } {
-  const maxDepth = Math.min(Math.max(Math.trunc(depth), 1), MAX_DEPTH);
-  const visited = new Set<string>([start]);
-  const out: string[] = [];
-  let frontier: string[] = [start];
-  for (let d = 0; d < maxDepth && frontier.length > 0; d++) {
-    const step = expandFrontier(frontier, adjacency, visited, out);
-    if (step.truncated) return { hashes: out, truncated: true };
-    frontier = step.next;
-  }
-  return { hashes: out, truncated: false };
-}
-
-/** Expand one BFS frontier, appending newly-seen neighbors (node-capped). */
-function expandFrontier(
-  frontier: readonly string[],
-  adjacency: ReadonlyMap<string, readonly string[]>,
-  visited: Set<string>,
-  out: string[],
-): { next: string[]; truncated: boolean } {
-  const next: string[] = [];
-  for (const node of frontier) {
-    for (const neighbor of adjacency.get(node) ?? []) {
-      if (visited.has(neighbor)) continue;
-      visited.add(neighbor);
-      if (out.length >= MAX_WALK_NODES) return { next, truncated: true };
-      out.push(neighbor);
-      next.push(neighbor);
-    }
-  }
-  return { next, truncated: false };
-}
-
-/** Shortest call path `from → to` over `callees`, within the depth bound. */
-function tracePathHashes(fromHash: string, toHash: string, indexes: Indexes): string[] | undefined {
-  if (fromHash === toHash) return [fromHash];
-  const parent = new Map<string, string>();
-  const visited = new Set<string>([fromHash]);
-  let frontier: string[] = [fromHash];
-  for (let d = 0; d < MAX_DEPTH && frontier.length > 0; d++) {
-    const step = traceFrontier(frontier, indexes, visited, parent, toHash);
-    if (step.found) return reconstructPath(parent, fromHash, toHash);
-    frontier = step.next;
-  }
-  return undefined;
-}
-
-/** Expand one trace frontier; returns `found` the moment `toHash` is reached. */
-function traceFrontier(
-  frontier: readonly string[],
-  indexes: Indexes,
-  visited: Set<string>,
-  parent: Map<string, string>,
-  toHash: string,
-): { next: string[]; found: boolean } {
-  const next: string[] = [];
-  for (const node of frontier) {
-    for (const neighbor of indexes.callees.get(node) ?? []) {
-      if (visited.has(neighbor)) continue;
-      visited.add(neighbor);
-      parent.set(neighbor, node);
-      if (neighbor === toHash) return { next, found: true };
-      next.push(neighbor);
-    }
-  }
-  return { next, found: false };
-}
-
-/** Rebuild the path `from → … → to` from a parent map (built front-to-back). */
-function reconstructPath(
-  parent: ReadonlyMap<string, string>,
-  fromHash: string,
-  toHash: string,
-): string[] {
-  const path: string[] = [];
-  let cursor: string | undefined = toHash;
-  while (cursor !== undefined) {
-    path.unshift(cursor);
-    if (cursor === fromHash) break;
-    cursor = parent.get(cursor);
-  }
-  return path;
 }
 
 /** Map an `graph:orphan-subtree` signal to a {@link DeadCodeDto} (no FS reads). */

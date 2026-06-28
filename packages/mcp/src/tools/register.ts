@@ -7,8 +7,11 @@
  * port (never `currentScope()`, never a run-command entry point).
  */
 
+import { registerCalleesOf } from './callees-of.js';
 import { registerGetSymbol } from './get-symbol.js';
 import { registerSearchSymbols } from './search-symbols.js';
+import { registerTracePath } from './trace-path.js';
+import { registerWhoCalls } from './who-calls.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
@@ -18,4 +21,7 @@ export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): voi
   // ── Graph tools (over GraphReadPort) ──────────────────────────────
   registerSearchSymbols(server, deps);
   registerGetSymbol(server, deps);
+  registerWhoCalls(server, deps);
+  registerCalleesOf(server, deps);
+  registerTracePath(server, deps);
 }
