@@ -104,8 +104,14 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     });
 
     // Mount the tool catalog through the server's scope-wrapping register seam.
-    // `validToolIds` lets the result tools reject an unknown `tool` argument.
-    const validToolIds = new Set(scope.tools.list().map((t) => t.identity.name));
+    // `validToolIds` lets the result tools reject an unknown `tool` argument. It
+    // must be the per-tool LAYOUT KEY (`fit`/`sim`/`graph`/`yagni`) — the key
+    // sessions are stored under and the value `sessions show --tool <k>` accepts —
+    // NOT `identity.name` (`fitness`/`simulation`), or `get_latest_findings({ tool:
+    // 'fit' })`, the headline result-first path, would be rejected as unknown.
+    const validToolIds = new Set(
+      scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
+    );
     // `void`: registerMcpTools is synchronous (returns void); the leading `void`
     // marks the discard explicitly so the detached-promises heuristic (which can't
     // see cross-file sync callables) doesn't read this floating call as a promise.

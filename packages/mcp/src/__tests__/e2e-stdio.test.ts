@@ -137,11 +137,10 @@ let helperFile: string;
 let helperLine: number;
 
 /**
- * A seeded run whose `tool` aligns on BOTH the registry id (`validToolIds`, from
- * `identity.name`) and the replay key (`layoutKey`). `graph` is `'graph'` on both
- * axes — so get_latest_findings resolves + replays it. (fit's `identity.name`
- * `'fitness'` ≠ its `layoutKey` `'fit'`, so the fit path is unreachable over MCP
- * today — a Phase-4 `validToolIds` mismatch reported separately.)
+ * A seeded run keyed by the per-tool LAYOUT KEY — the value `get_latest_findings`
+ * / `show_run` accept and that sessions are stored under. `validToolIds` is now
+ * built from `identity.layoutKey ?? identity.name`, so `fit`/`sim`/`graph`/`yagni`
+ * all resolve + replay. `graph` (layoutKey `'graph'`) is used here.
  */
 function graphSession(root: string): StoredSession {
   return {
