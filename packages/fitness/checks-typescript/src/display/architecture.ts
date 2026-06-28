@@ -12,6 +12,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'drizzle-orm-migration-guardrails': ['🛡️', 'Drizzle ORM Migration Guardrails'],
   'host-tool-runtime-import-boundary': ['🧱', 'Host Tool Runtime Import Boundary'],
   'live-view-through-cli-live': ['🖥️', 'Live View Through cli-live'],
+  'mcp-results-no-rerun': ['♻️', 'MCP Results Replay (No Re-Run)'],
   'missing-type-exports': ['📤', 'Missing Type Exports'],
   'module-coupling-fan-out': ['🕸️', 'Module Coupling Fan-Out'],
   'no-bootstrap-tool-import': ['🔌', 'No Bootstrap Tool Import'],
