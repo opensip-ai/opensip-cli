@@ -25,6 +25,31 @@ import { join } from 'node:path';
  */
 export const DEFAULT_ARTIFACT_RETENTION_KEEP = 10;
 
+/**
+ * In-flight grace window (A12): a run-dir whose mtime is within this many ms of
+ * `now` is NEVER evicted, regardless of its rank past `keep`.
+ *
+ * A slow CONCURRENT same-tool run creates its dir at scan start and only appends
+ * to the report inside it — directory mtime is set at creation and report appends
+ * do NOT bump it — so under load that dir can rank below `keep` while the peer is
+ * still scanning. A naive rank-only prune would `rmSync` it mid-scan, faulting the
+ * peer with a spurious `artifactValid=false`. The window MUST be >= the scanner
+ * process budget (`DEFAULT_TIMEOUT_MS` = 300_000 ms in the substrate run loop): a
+ * run cannot legitimately be in flight longer than its timeout, so any dir older
+ * than this is guaranteed finished and safe to prune. Kept a literal (with a
+ * margin over the substrate timeout) because the cli layer must not import the
+ * substrate; the comment is the sync point.
+ */
+export const ARTIFACT_INFLIGHT_GRACE_MS = 6 * 60 * 1000;
+
+/** Options for {@link pruneArtifactRetention}'s in-flight-safety floor (A12). */
+export interface PruneRetentionOptions {
+  /** `Date.now()` by default; injectable for deterministic tests. */
+  readonly now?: number;
+  /** The current run's dir name (== `runId`) — never pruned even if it ranks low. */
+  readonly currentRunId?: string;
+}
+
 interface RunDir {
   readonly name: string;
   readonly full: string;
@@ -79,12 +104,26 @@ function listRunDirs(toolDir: string): RunDir[] {
  *   - missing tool dir → no-op;
  *   - `keep <= 0` (or non-finite) → treated as disabled, no-op;
  *   - a failed removal is swallowed (best-effort) and never propagated.
+ *
+ * A12 in-flight safety: a dir is RANK-INDEPENDENTLY retained when it is the
+ * current run's own dir (`opts.currentRunId`) or its mtime is within
+ * {@link ARTIFACT_INFLIGHT_GRACE_MS} of `now` — a peer run that could still be
+ * scanning is never deleted out from under it, regardless of how it ranks.
  */
-export function pruneArtifactRetention(tool: string, artifactsDir: string, keep: number): void {
+export function pruneArtifactRetention(
+  tool: string,
+  artifactsDir: string,
+  keep: number,
+  opts: PruneRetentionOptions = {},
+): void {
   if (!Number.isFinite(keep) || keep <= 0) return;
+  const now = opts.now ?? Date.now();
   const toolDir = join(artifactsDir, tool);
   const runDirs = listRunDirs(toolDir).sort(byMostRecent);
   for (const stale of runDirs.slice(keep)) {
+    // A12: never evict a possibly-in-flight peer run even when it ranks past keep.
+    if (opts.currentRunId !== undefined && stale.name === opts.currentRunId) continue;
+    if (now - stale.mtimeMs < ARTIFACT_INFLIGHT_GRACE_MS) continue;
     try {
       rmSync(stale.full, { recursive: true, force: true });
     } catch {
