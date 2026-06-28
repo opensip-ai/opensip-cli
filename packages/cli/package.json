@@ -67,6 +67,7 @@
     "@opensip-cli/lang-python": "workspace:*",
     "@opensip-cli/lang-rust": "workspace:*",
     "@opensip-cli/lang-typescript": "workspace:*",
+    "@opensip-cli/mcp": "workspace:*",
     "@opensip-cli/output": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
     "@opensip-cli/simulation": "workspace:*",

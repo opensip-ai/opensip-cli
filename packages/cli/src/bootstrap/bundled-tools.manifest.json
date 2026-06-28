@@ -5,7 +5,8 @@
     "@opensip-cli/fitness",
     "@opensip-cli/simulation",
     "@opensip-cli/graph",
-    "@opensip-cli/yagni"
+    "@opensip-cli/yagni",
+    "@opensip-cli/mcp"
   ],
   "scaffoldingToolIds": ["fit", "sim"],
   "bundledCapabilityPacks": {

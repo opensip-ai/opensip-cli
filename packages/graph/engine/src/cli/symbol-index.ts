@@ -39,6 +39,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const log = createToolLogger('graph:cli');
 
+/** Options for {@link executeSymbolIndex} — the `opensip graph index` command. */
 export interface SymbolIndexCommandOptions {
   readonly cwd: string;
   readonly out: string;
@@ -49,7 +50,8 @@ export interface SymbolIndexCommandOptions {
   readonly build?: boolean;
 }
 
-interface SymbolEntry {
+/** One symbol occurrence in the index — its location, kind, visibility, and body hash. */
+export interface SymbolEntry {
   readonly qualifiedName: string;
   readonly filePath: string;
   readonly line: number;
@@ -59,7 +61,12 @@ interface SymbolEntry {
   readonly bodyHash: string;
 }
 
-interface SymbolIndexArtifact {
+/**
+ * The bidirectional symbol-index JSON artifact: `symbols` maps a simple name to
+ * its occurrences ({@link SymbolEntry}), `fileSymbols` maps a file path to the
+ * names it declares. Written to `--out` for agent / downstream-tool consumption.
+ */
+export interface SymbolIndexArtifact {
   readonly version: '1.0';
   readonly tool: 'graph';
   readonly generatedAt: string;
@@ -67,6 +74,11 @@ interface SymbolIndexArtifact {
   readonly fileSymbols: Record<string, readonly string[]>;
 }
 
+/**
+ * Execute `opensip graph index`: resolve the catalog (optionally rebuilding it
+ * first when `opts.build` is set), serialize it to a {@link SymbolIndexArtifact}
+ * via {@link buildArtifact}, and write the JSON to `opts.out`.
+ */
 export async function executeSymbolIndex(
   opts: SymbolIndexCommandOptions,
   cli: ToolCliContext,
@@ -138,6 +150,32 @@ async function resolveCatalogForIndex(
   return new CatalogRepo(datastore).loadFullCatalog();
 }
 
+/**
+ * The pure symbol-entry core: flatten every non-`module-init` occurrence in the
+ * catalog into a flat {@link SymbolEntry} list (the keyless counterpart to
+ * {@link buildArtifact}). Shared with `@opensip-cli/mcp`'s `search_symbols` so
+ * MCP returns the SAME shape as `graph symbol-index` without re-deriving symbol
+ * metadata from raw AST (ADR-0084). No CLI side effects — data → data.
+ */
+export function buildSymbolIndexEntries(catalog: Catalog): SymbolEntry[] {
+  const entries: SymbolEntry[] = [];
+  // fileSymbols is the file→names index `buildArtifact` keeps; the flat-entry
+  // core does not need it, so collect into a throwaway map.
+  const fileSymbols: Record<string, string[]> = {};
+  for (const name of Object.keys(catalog.functions)) {
+    const bucket = catalog.functions[name];
+    if (!bucket) continue;
+    for (const entry of collectEntriesForName(bucket, name, fileSymbols)) {
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
+/**
+ * Project a {@link Catalog} into the serializable {@link SymbolIndexArtifact},
+ * building both the name→occurrences and file→names maps in one pass.
+ */
 export function buildArtifact(catalog: Catalog): SymbolIndexArtifact {
   const symbols: Record<string, SymbolEntry[]> = {};
   const fileSymbols: Record<string, string[]> = {};

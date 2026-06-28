@@ -171,6 +171,7 @@ const KNOWN_SYNC_FUNCTION_NAMES = [
   'send',
   'abort',
   'throwIfAborted',
+  'configureLogger',
   // OpenTelemetry Span methods (void-returning)
   'recordException',
   'setStatus',

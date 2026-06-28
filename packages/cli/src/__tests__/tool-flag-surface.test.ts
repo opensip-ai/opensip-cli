@@ -161,6 +161,9 @@ const EXPECTED: Record<string, string[]> = {
     '--report-to',
     '--verbose',
   ],
+  // ADR-0084: the `mcp` command is a long-lived stdio JSON-RPC server
+  // (output: 'raw-stream'). Its only flag is the shared `--cwd`.
+  mcp: ['--cwd'],
 };
 
 describe('first-party tool flag-surface contract', () => {

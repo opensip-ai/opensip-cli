@@ -270,6 +270,14 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/graph-java',
     publishReason: 'Java graph adapter; plugin discovery target',
   },
+  // Layer 4 — MCP tool engine (depends on graph + session-store; consumed by cli).
+  {
+    unscoped: 'mcp',
+    name: '@opensip-cli/mcp',
+    dir: 'packages/mcp',
+    filter: '@opensip-cli/mcp',
+    publishReason: 'Bundled MCP server tool (ADR-0084); stdio graph/results surface for agents',
+  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',

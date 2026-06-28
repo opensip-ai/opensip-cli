@@ -14,6 +14,13 @@
 // index builder; nothing in production consumes the engine's.
 export { buildIndexes } from './pipeline/indexes.js';
 
+// Feature derivation (blast / reachability / coupling). Surfaced on the internal
+// contract for `@opensip-cli/mcp` (ADR-0084): MCP's `blast_radius` reuses the
+// single canonical `buildFeatures(['blast'])` scoring site so its numbers never
+// diverge from `opensip graph` (NOT a re-implemented BFS). The dashboard has its
+// own feature derivation; nothing else in production consumes the engine's.
+export { buildFeatures } from './pipeline/features.js';
+
 // `GraphConfig` — the engine's tuning/config data type. No external consumer
 // imports it from the public barrel; rule unit tests that construct a config to
 // drive `.evaluate(...)` import it from here instead (ADR-0009 surface policy).
@@ -63,3 +70,19 @@ export {
   totalSystemMemoryMb,
 } from './cli/heap-preflight.js';
 export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';
+
+// Symbol-index builder — surfaced on the internal contract for `@opensip-cli/mcp`
+// (ADR-0084) so the MCP `search_symbols` tool returns the SAME shape as
+// `graph symbol-index` without re-deriving symbol metadata from raw AST. The
+// keyed-artifact builder + flat-entry core + their DTO types are CLI-handler
+// symbols (the command runs via `graphTool.commandSpecs`), so they live here on
+// the internal surface, not the public barrel.
+export { buildSymbolIndexEntries, buildArtifact } from './cli/symbol-index.js';
+export type { SymbolEntry, SymbolIndexArtifact } from './cli/symbol-index.js';
+
+// Catalog freshness/staleness classification — surfaced on the internal contract
+// for `@opensip-cli/mcp` (ADR-0084) so the MCP server can report a stale/missing
+// catalog with a warning. MCP's depcruise exception is scoped to this file, so
+// these must live here (not reached directly in `cache/invalidate.ts`).
+export { classifyCatalog, computeFilesFingerprint } from './cache/invalidate.js';
+export type { ValidationContext, CatalogVerdict } from './cache/invalidate.js';

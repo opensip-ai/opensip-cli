@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-27T23:42:20.972Z",
+  "generatedAt": "2026-06-28T05:02:23.911Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,7 +11,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 212,
+        "total": 215,
         "bySlug": {
           "no-markdown-references": 5,
           "silent-early-returns": 7,
@@ -23,7 +23,7 @@
           "env-secret-exposure": 3,
           "stream-buffer-size-limits": 1,
           "module-coupling-fan-out": 4,
-          "shipped-checks-must-be-generic": 5,
+          "shipped-checks-must-be-generic": 6,
           "fitness-check-standards": 17,
           "null-safety": 7,
           "correlation-id-coverage": 6,
@@ -78,6 +78,8 @@
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
+          "hot-paths-require-spans": 1,
+          "missing-type-exports": 1,
           "no-raw-fetch": 1,
           "array-validation": 1,
           "phantom-dependency-detection": 1
@@ -87,12 +89,13 @@
           "cli-ui": 1,
           "core": 5,
           "dashboard": 1,
-          "fitness/checks-typescript": 64,
+          "fitness/checks-typescript": 65,
           "fitness/checks-universal": 106,
           "fitness/engine": 12,
           "graph/engine": 10,
           "graph/graph-typescript": 2,
           "languages/lang-typescript": 2,
+          "mcp": 2,
           "simulation": 2,
           "test-support": 2
         }
@@ -105,7 +108,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 40,
+        "total": 42,
         "bySlug": {
           "no-markdown-references": 3,
           "silent-early-returns": 5,
@@ -128,6 +131,8 @@
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
           "unsafe-secret-comparison": 2,
+          "hot-paths-require-spans": 1,
+          "missing-type-exports": 1,
           "no-raw-fetch": 1,
           "array-validation": 1
         },
@@ -140,6 +145,7 @@
           "graph/engine": 10,
           "graph/graph-typescript": 2,
           "languages/lang-typescript": 2,
+          "mcp": 2,
           "simulation": 2
         }
       },
@@ -168,9 +174,9 @@
     },
     "check-package": {
       "fitness": {
-        "total": 170,
+        "total": 171,
         "bySlug": {
-          "shipped-checks-must-be-generic": 5,
+          "shipped-checks-must-be-generic": 6,
           "fitness-check-standards": 17,
           "null-safety": 7,
           "correlation-id-coverage": 6,
@@ -225,7 +231,7 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 64,
+          "fitness/checks-typescript": 65,
           "fitness/checks-universal": 106
         }
       },
@@ -363,20 +369,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 212,
-    "budgetGateFitnessSlugs": 68,
-    "productRuntimeFitness": 40,
-    "productRuntimeFitnessSlugs": 23,
+    "budgetGateFitness": 215,
+    "budgetGateFitnessSlugs": 70,
+    "productRuntimeFitness": 42,
+    "productRuntimeFitnessSlugs": 25,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 73,
-    "checkPackageFitness": 170,
+    "productRuntimeCombined": 75,
+    "checkPackageFitness": 171,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
-    "unbudgetedProductRuntimeSlugs": 22
+    "unbudgetedProductRuntimeSlugs": 24
   },
   "phase4Audit": {
     "baseline": {
@@ -389,11 +395,11 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -265,
+      "productRuntimeFitness": -263,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -239,
-      "budgetGateFitness": -330,
-      "checkPackageFitness": -64,
+      "productRuntimeCombined": -237,
+      "budgetGateFitness": -327,
+      "checkPackageFitness": -63,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
     },

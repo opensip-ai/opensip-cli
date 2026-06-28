@@ -12,6 +12,7 @@ source-files:
   - packages/cli/src/commands/internal-command-visibility.ts
   - packages/fitness/engine/src/cli/fit/fit-aux-command-specs.ts
   - packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts
+  - packages/mcp/src/command.ts
 related-docs:
   - ../10-concepts/02-tool-plugin-model.md
   - ./06-full-tool-plugins.md
@@ -68,6 +69,7 @@ config namespace from `identity.name`. Short forms are **CLI aliases** only.
 | `@opensip-cli/simulation` | `715d32c2-…` | `simulation` | `sim` | `simulation:` | `sim` |
 | `@opensip-cli/graph` | UUID | `graph` | — | `graph:` | `graph` |
 | `@opensip-cli/yagni` | UUID | `yagni` | `yag` | `yagni:` | `yagni` |
+| `@opensip-cli/mcp` | `f313c020-…` | `mcp` | — | — (no config block) | `mcp` |
 
 `opensip fitness` and `opensip fit` invoke the same handler. Config blocks use the
 canonical namespace (`fitness:`, not `fit:`). Plugin pins and on-disk layout remain
@@ -129,6 +131,37 @@ fingerprints.
 
 Add new formats by extending the `choices` array on the export spec — no new
 top-level command name.
+
+## Long-lived stream commands (`output: 'raw-stream'`)
+
+Most tool primaries use `output: 'command-result'` (the host renders a
+`CommandResult` / delivers a `SignalEnvelope`). A few commands instead own stdout
+directly and declare `output: 'raw-stream'` with a **`rawStreamReason`** that
+records *why* the host renders nothing. The reason is a closed enum (members
+include `completion-script`, `file-export`, `worker-ipc`,
+`runtime-render-dispatch`, `session-replay`, `diagnostic-gate`, and
+`mcp-stdio`), each pinned to a real command by the `raw-stream-parity` inventory
+test. The three most relevant to this taxonomy:
+
+| `rawStreamReason` | Owner | Why it owns stdout |
+|-------------------|-------|--------------------|
+| `file-export` | `fit export`, `graph export` | The byte stream is a file artifact (SARIF / JSON), not a render. |
+| `worker-ipc` | `fit-run-worker`, `graph-*-worker` (Tier 3) | An internal worker pipes structured IPC frames to its parent. |
+| `mcp-stdio` | `mcp` (Tier 2) | A genuine JSON-RPC **transport** — see below. |
+
+`opensip mcp` (the bundled [`@opensip-cli/mcp`](/docs/opensip-cli/70-reference/01-cli-commands/#mcp--serve-the-call-graph--results-to-agents-over-stdio)
+tool) is the taxonomy's one **long-lived stdio server**: a `scope: 'project'`
+primary that blocks for its whole serve lifetime instead of running an analysis
+and exiting. It uses `mcp-stdio` — *distinct from `worker-ipc`* — because stdout
+is a real [Model Context Protocol](https://modelcontextprotocol.io) JSON-RPC
+channel an external agent speaks over, not an internal worker pipe. **stdout
+carries only JSON-RPC frames; all logging and diagnostics route to stderr** for
+the serve lifetime. There is no run verdict to render, so the command emits no
+`SignalEnvelope` and persists no session — it is a transport, not a run. This is
+the documented escape hatch from the `SignalEnvelope`/`CommandResult` currency,
+recorded in `raw-stream-parity` and justified in-file for
+`command-handler-host-owned-output`. See
+[ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0084-mcp-server-surface.md).
 
 ## Tier 3 — Internal commands
 

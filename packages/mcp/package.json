@@ -1,0 +1,103 @@
+{
+  "name": "@opensip-cli/mcp",
+  "version": "0.1.14",
+  "license": "Apache-2.0",
+  "description": "MCP server exposing the OpenSIP call graph and stored results to coding agents over stdio",
+  "keywords": [
+    "opensip-cli",
+    "mcp",
+    "model-context-protocol",
+    "static-analysis",
+    "code-graph"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "mcp",
+    "identity": {
+      "name": "mcp"
+    },
+    "stableId": "f313c020-5b48-4e17-a579-e303907b6392",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "mcp",
+        "description": "Serve the OpenSIP call graph + stored results to MCP agents over stdio",
+        "aliases": [],
+        "commonFlags": [
+          "cwd"
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "mcp-stdio"
+      }
+    ],
+    "capabilities": [
+      {
+        "id": "mcp-graph-adapter",
+        "apiVersion": 1,
+        "contributionKind": "module-export",
+        "contributionSchema": {
+          "requiredKeys": [
+            "id"
+          ]
+        },
+        "discovery": {
+          "discovery": {
+            "mode": "marker",
+            "markerKind": "graph-adapter"
+          },
+          "exportName": "adapter",
+          "exportShape": "single",
+          "configKeys": {
+            "packages": "graphAdapters",
+            "autoDiscover": "autoDiscoverGraphAdapters"
+          },
+          "builtinScope": "@opensip-cli"
+        },
+        "minSupportedApiVersion": 1
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
+    "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
+    "typescript": "~6.0.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@opensip-cli/graph-typescript": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}

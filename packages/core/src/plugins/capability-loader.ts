@@ -101,9 +101,16 @@ export async function loadCapabilityDomain(
     packageTargetDomain,
     packageTargetDomainApiVersion,
   } of contributions) {
-    // A co-contribution (§5.3) routes to its OWN domain (e.g. recipes → fit-recipe);
-    // a primary contribution routes to the domain being loaded.
-    const target = targetDomainId ?? domainId;
+    // A co-contribution (§5.3) routes to its OWN domain (e.g. recipes → fit-recipe).
+    // A primary contribution routes to the domain it DECLARES (`packageTargetDomain`,
+    // from the pack's `opensipTools.targetDomain`), falling back to the domain being
+    // loaded when the pack declares none. This lets a domain whose `markerKind`
+    // matches a shared pack family (ADR-0084: `mcp-graph-adapter` shares the
+    // `graph-adapter` markerKind) DISCOVER those packs and route each to its real
+    // target domain (`graph-adapter`) — registered there with that domain's
+    // registrar — instead of rejecting it as a cross-domain mismatch. Same-domain
+    // packs (`packageTargetDomain === domainId`) and undeclared packs are unchanged.
+    const target = targetDomainId ?? packageTargetDomain ?? domainId;
     const domainSpec = registry.getDomain(target);
     if (domainSpec === undefined) {
       const msg = `unknown capability domain '${target}'`;

@@ -16,17 +16,30 @@
  */
 import { fitnessTool } from '@opensip-cli/fitness';
 import { graphTool } from '@opensip-cli/graph';
+import { mcpTool } from '@opensip-cli/mcp';
 import { simulationTool } from '@opensip-cli/simulation';
 import { yagniTool } from '@opensip-cli/yagni';
 
 import type { Tool } from '@opensip-cli/core';
 
 /** The bundled tool runtimes, in registration (and thus help/listing) order. */
-export const BUNDLED_TOOLS: readonly Tool[] = [fitnessTool, simulationTool, graphTool, yagniTool];
+export const BUNDLED_TOOLS: readonly Tool[] = [
+  fitnessTool,
+  simulationTool,
+  graphTool,
+  yagniTool,
+  mcpTool,
+];
 
 /**
  * The bundled tool ids (human keys = `metadata.name` = `identity.name`), in
  * registration order — the discovery skip-set. Canonical names are the full tool
- * verbs (`fitness`/`simulation`/`graph`/`yagni`); short forms are CLI aliases.
+ * verbs (`fitness`/`simulation`/`graph`/`yagni`/`mcp`); short forms are CLI aliases.
  */
-export const BUNDLED_TOOL_IDS: readonly string[] = ['fitness', 'simulation', 'graph', 'yagni'];
+export const BUNDLED_TOOL_IDS: readonly string[] = [
+  'fitness',
+  'simulation',
+  'graph',
+  'yagni',
+  'mcp',
+];

@@ -1,6 +1,6 @@
-import { applyAgentFilters, EXIT_CODES } from '@opensip-cli/contracts';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { buildToolIdentityIndex, currentScope, SystemError } from '@opensip-cli/core';
-import { resolveSession } from '@opensip-cli/session-store';
+import { resolveAndReplaySession } from '@opensip-cli/session-store';
 
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
@@ -53,56 +53,26 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
   }
   const registry = opts.registry ?? currentScope()?.tools;
   const identityIndex = registry === undefined ? undefined : buildToolIdentityIndex(registry);
-  const resolved = resolveSession(datastore as DataStore, {
+  const replayRegistry = opts.replayRegistry ?? SessionReplayRegistry.empty();
+  // Resolve + replay + filter via the session-store read core (ADR-0084). The
+  // per-tool replay closure is injected from the host's replay registry (which
+  // carries the external-isolation gate); identity display + emission stay here.
+  const outcome = await resolveAndReplaySession(datastore as DataStore, {
     ref: opts.ref,
     tool: opts.tool,
+    replayFor: (tool) => replayRegistry.get(tool)?.replaySession,
+    ...(opts.filters === undefined ? {} : { filters: opts.filters }),
   });
-  if (!resolved.ok) {
-    await emitSessionShowError(opts, resolved.reason, resolved.detail);
+  if (!outcome.ok) {
+    await emitSessionShowError(opts, outcome.reason, outcome.detail);
     return;
   }
 
-  const contribution = (opts.replayRegistry ?? SessionReplayRegistry.empty()).get(
-    resolved.session.tool,
-  );
-  if (contribution === undefined) {
-    await emitSessionShowError(
-      opts,
-      'replay-unavailable',
-      `session replay is not available for ${resolved.session.tool}`,
-    );
-    return;
-  }
-
-  let replay: ToolSessionReplay<CommandResult>;
-  try {
-    // ADR-0054 M4-F: replaySession may be ASYNC — a BUNDLED tool resolves
-    // synchronously (in-host closure); an EXTERNAL tool forks a hook worker (its
-    // runtime never runs in-host). Await covers both.
-    replay = await contribution.replaySession(resolved.session);
-  } catch (error) {
-    // @handles — a corrupt/legacy stored payload is surfaced to the caller as a
-    // structured `decode-error` outcome (not swallowed); see emitSessionShowError.
-    await emitSessionShowError(
-      opts,
-      'decode-error',
-      error instanceof Error ? error.message : String(error),
-    );
-    return;
-  }
-
-  // Apply agent filters (Phase 1) *after* tool replay but before host emission.
-  // This keeps per-tool replays pure while enabling token-efficient, focused
-  // historical results for agents. The resulting envelope remains a valid
-  // (possibly filtered) SignalEnvelope.
-  const originalSignalCount = replay.envelope.signals.length;
-  const filteredReplay = opts.filters?.length
-    ? applyFiltersToReplay(resolved.session, replay, opts.filters)
-    : replay;
+  const { session, replay: filteredReplay, originalSignalCount } = outcome;
 
   if (opts.json === true) {
     const jsonPayload = sessionShowJson(
-      resolved.session,
+      session,
       filteredReplay,
       opts.filters,
       originalSignalCount,
@@ -126,13 +96,7 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
     return;
   }
   await opts.render(
-    sessionReplayResult(
-      resolved.session,
-      filteredReplay,
-      opts.filters,
-      originalSignalCount,
-      identityIndex,
-    ),
+    sessionReplayResult(session, filteredReplay, opts.filters, originalSignalCount, identityIndex),
   );
 }
 
@@ -141,19 +105,6 @@ function canonicalToolForDisplay(
   identityIndex?: ReturnType<typeof buildToolIdentityIndex>,
 ): string {
   return identityIndex === undefined ? tool : identityIndex.canonicalForStoredTool(tool);
-}
-
-/** Apply shared agent filters to a replay envelope (ADR-0085). */
-function applyFiltersToReplay(
-  _session: StoredSession,
-  replay: ToolSessionReplay<CommandResult>,
-  filters: string[],
-): ToolSessionReplay<CommandResult> {
-  const filtered = applyAgentFilters(replay.envelope, filters);
-  return {
-    ...replay,
-    envelope: filtered.envelope,
-  };
 }
 
 /**

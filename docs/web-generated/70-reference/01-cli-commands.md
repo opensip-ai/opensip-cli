@@ -18,6 +18,8 @@ source-files:
   - packages/simulation/engine/src/tool.ts
   - packages/graph/engine/src/tool.ts
   - packages/yagni/engine/src/tool.ts
+  - packages/mcp/src/command.ts
+  - packages/mcp/src/tools/register.ts
 related-docs:
   - ../80-implementation/01-cli-dispatch.md
   - ../70-reference/03-configuration.md
@@ -26,7 +28,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
 
 ---
 
@@ -360,6 +362,79 @@ opensip yagni packages/cli/src
 **Exit codes:** 0 by default (advisory). Non-zero only when `yagni.failOnErrors` / `yagni.failOnWarnings` thresholds are exceeded, or on configuration/runtime errors (2).
 
 **Suppressions:** `@yagni-ignore-file` and `@yagni-ignore-next-line` (ADR-0014). The `yagni-ignore-hygiene` fitness check audits directive quality.
+
+---
+
+## `mcp` — serve the call graph + results to agents over stdio
+
+Tool-owned: [`packages/mcp/src/command.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/mcp/src/command.ts) (the bundled `@opensip-cli/mcp` tool, [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0084-mcp-server-surface.md)).
+
+`opensip mcp` is a **long-lived, blocking [Model Context Protocol](https://modelcontextprotocol.io) server**. Unlike every other command, it does not run an analysis and exit — an MCP-capable coding agent (Claude Code, Codex, …) spawns it as a child process and speaks **JSON-RPC over stdio** for the whole session. **stdout carries only JSON-RPC frames**; every log line and diagnostic goes to **stderr**. The server blocks until stdin reaches EOF (or a graceful SIGINT), then exits 0. Because the protocol genuinely owns stdout, the command is declared `output: 'raw-stream'` with `rawStreamReason: 'mcp-stdio'` (see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/)); it emits no `SignalEnvelope`, persists no session, and renders no banner.
+
+```
+opensip mcp                      # serve over stdio from the current project
+opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
+```
+
+`mcp` takes **only `--cwd`** — there are no tool-specific CLI flags. Every per-query argument (a `symbolId`, a `depth`, a `tool` filter) is an **MCP JSON-RPC tool parameter**, not a command-line flag. The server reads the project's persisted catalog and sessions from `<project>/opensip-cli/.runtime/datastore.sqlite`, so it must be run from inside an initialized project (run `opensip init` and at least one `opensip graph` first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
+
+**Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
+
+### Graph tools (9 — read-only, over the persisted call graph)
+
+| Tool | Purpose |
+|------|---------|
+| `search_symbols` | Find functions/methods by name (case-insensitive substring). Returns a `symbolId` + `bodyHash` per match to feed the other tools. |
+| `get_symbol` | Resolve the function/method declared at a file + line into a stable `symbolId` + `bodyHash`; ambiguity returns a candidate list, never a silent pick. |
+| `who_calls` | Callers of a symbol (reverse call graph), out to `depth` (default 5, max 5). Large fan-in is node-capped with `truncated: true`. |
+| `callees_of` | Symbols a symbol calls (forward call graph), out to `depth`. Large fan-out is node-capped with `truncated: true`. |
+| `trace_path` | A forward call path from one symbol to another within `depth`; returns the ordered path or `{ found: false }`. |
+| `blast_radius` | Change-impact score for a symbol: direct callers, transitive callers, and a composite blast score — the same scoring `opensip graph` uses. |
+| `find_dead_code` | Symbols unreachable from any entry point (the graph orphan-subtree rule); each finding carries a `symbolId` + reason. |
+| `get_architecture` | High-level shape: function/edge counts, languages, the most-coupled packages, and the highest blast-radius hotspots. A cheap first call to orient. |
+| `refresh_graph` | Rebuild the catalog from the working tree — the **only** state-changing tool. EXPENSIVE; see freshness below. |
+
+### Result tools (4 — replay stored runs, never re-run)
+
+| Tool | Purpose |
+|------|---------|
+| `get_agent_catalog` | The self-describing catalog of OpenSIP commands an agent can run. |
+| `list_runs` | List recent stored runs (`fit`/`graph`/`yagni`/`sim`) as lean pointers — id, tool, timing, score/passed, replay command. |
+| `show_run` | Replay a stored run by id, or `"latest"` (with `tool`); same `filters`/`raw` shape as `opensip sessions show`. |
+| `get_latest_findings` | The findings from the most recent run of a tool, filterable by `severity`. |
+
+The four result tools **replay persisted sessions only** — they never re-run `fit`/`graph`/`sim`/`yagni`. This is enforced by the `mcp-results-no-rerun` fitness check.
+
+### The `symbolId` contract
+
+`search_symbols` and `get_symbol` return a stable `symbolId = "<filePath>:<line>:<column>"` plus a `bodyHash`. Every downstream graph tool (`who_calls`, `callees_of`, `trace_path`, `blast_radius`) accepts that **`symbolId`, not a bare name** — so an agent resolves a name once, then traverses. A query that names an ambiguous symbol returns a **structured candidate list or error**, never a silent pick.
+
+### Freshness and `refresh_graph`
+
+Every graph result carries a `freshness` verdict. A **stale or missing catalog is served with a warning** (`freshness.fresh === false`) — it is never silently rebuilt. There is **no auto-build** on a missing catalog or on startup: rebuilding is the agent's explicit, cost-warned decision. `refresh_graph` is the only way to rebuild — it parses the whole project, so it is **expensive**; call it once when a tool reports `freshness.fresh === false`, then read, and **do not loop it per query**. It returns `{ builtAt, durationMs, freshness }`.
+
+### Result-first guidance
+
+When the user references **existing** findings ("what were the fit errors?", "show the last graph run"), an agent should call `get_latest_findings` (or `show_run` / `list_runs`) to replay the stored result **before** re-running a tool. Re-running is expensive and usually unnecessary; the result tools exist precisely to steer the agent to the persisted result first.
+
+### Example MCP client config
+
+Register `opensip mcp` as a stdio server in your agent's MCP config (the shape below is the common `mcpServers` form used by Claude Code, Codex, and similar clients):
+
+```json
+{
+  "mcpServers": {
+    "opensip": {
+      "command": "opensip",
+      "args": ["mcp", "--cwd", "/absolute/path/to/your/project"]
+    }
+  }
+}
+```
+
+The client owns the process lifetime: it spawns `opensip mcp`, exchanges JSON-RPC over the pipe, and closes stdin to shut the server down cleanly.
+
+**Limitations (v1):** no cloud egress / no `SignalEnvelope` delivery; no live render; `refresh_graph` builds the single project program (no `--workspace` fan-out). `impact_of_diff` is not in the v1 tool surface.
 
 ---
 
