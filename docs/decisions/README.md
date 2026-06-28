@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0087](ADR-0087-public-ecosystem-readiness-shelved.md) — Shelve public ecosystem readiness; keep ADR-0061's interim private-extension posture because Phase 0 did not prove a portable network capability mechanism.
 - [ADR-0086](ADR-0086-signal-repair-metadata.md) — Additive nested `signal.repair` structured-repair contract for agent triage (JSON/session only; SARIF omits it).
 - [ADR-0085](ADR-0085-change-detection-substrate.md) — Host-owned change-detection substrate: core resolver, contracts filter/impact compute, `RunScope.graphCatalog` thunk for fit `--include-impacted`.
 - [ADR-0084](ADR-0084-mcp-server-surface.md) — Bundled `@opensip-cli/mcp`: read-only stdio JSON-RPC server exposing the call graph + stored results to coding agents; `GraphReadPort`/`ResultsReadPort`; freshness-with-warning; no auto-build; result tools replay-only (never re-run).
