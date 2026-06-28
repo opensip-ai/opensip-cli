@@ -1,0 +1,122 @@
+{
+  "name": "@opensip-cli/tool-trivy",
+  "version": "0.1.14",
+  "license": "Apache-2.0",
+  "description": "External Tool Adapter for Trivy — wraps the trivy vulnerability + misconfiguration scanner as an opensip-cli tool (opensip trivy)",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-trivy"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "trivy",
+    "identity": {
+      "name": "trivy"
+    },
+    "stableId": "a26ea0eb-ee3b-4e22-a3f3-7e1f93e16000",
+    "apiVersion": 1,
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Executes the user-installed trivy binary via execFile (no shell)"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      }
+    ],
+    "commands": [
+      {
+        "name": "trivy",
+        "description": "Scan the project filesystem for vulnerabilities and misconfigurations (Trivy)",
+        "aliases": [],
+        "commonFlags": [
+          "json",
+          "cwd",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch"
+      },
+      {
+        "name": "doctor",
+        "description": "Check that the trivy binary is installed and ready",
+        "parent": "trivy",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "version",
+        "description": "Print the resolved trivy binary version",
+        "parent": "trivy",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}
