@@ -973,13 +973,22 @@ The scanner's **raw native report** persists under `<project>/opensip-cli/.runti
 
 ### Binary resolution
 
-Resolution is deterministic, first hit wins, and **never fetches** a binary. For the three MVP adapters the functional pin is the **`OPENSIP_<TOOL>_BIN`** env var — `OPENSIP_GITLEAKS_BIN`, `OPENSIP_OSV_SCANNER_BIN`, `OPENSIP_TRIVY_BIN` — which beats the system `PATH` lookup:
+Resolution is deterministic, first hit wins, and **never fetches** a binary: an **`OPENSIP_<TOOL>_BIN`** env var — `OPENSIP_GITLEAKS_BIN`, `OPENSIP_OSV_SCANNER_BIN`, `OPENSIP_TRIVY_BIN` — then a config-file pin **`binaries.<tool>.path`**, then the system `PATH`:
 
 ```bash
+# env override (highest):
 OPENSIP_GITLEAKS_BIN=/opt/homebrew/bin/gitleaks opensip gitleaks doctor
 ```
 
-A missing binary yields a `doctor` install hint, never an install. The substrate also supports a config-file pin (`binaries.<tool>.path`), but exposing it requires the adapter to contribute a config schema; the three MVP adapters do **not**, so for them the env override and `PATH` are the resolution surface.
+```yaml
+# config-file pin (opensip-cli.config.yml) — every adapter claims its namespace by default:
+gitleaks:
+  binaries:
+    gitleaks:
+      path: /opt/homebrew/bin/gitleaks
+```
+
+A missing binary yields a `doctor` install hint, never an install. **Both** the env override and the `binaries.<tool>.path` config pin work out of the box for the three MVP adapters — the substrate claims each adapter's config namespace by default (no per-adapter config schema required).
 
 ---
 

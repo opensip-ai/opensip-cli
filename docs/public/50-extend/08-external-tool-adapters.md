@@ -173,8 +173,11 @@ the host loads.
   line-shift-tolerant message hash is a better baseline id than the host
   `ruleId|file|line|col` default. It is stamped **worker-side** when the envelope
   is built; the host ratchet only reads `signal.fingerprint`.
-- **`config`** — an optional namespaced config contribution (a Zod schema for, e.g.,
-  the `binaries.<tool>.path` block).
+- **`config`** — an **optional** namespaced config contribution. **Omit it** for the
+  standard behaviour: the substrate claims your namespace by default (the
+  `binaries.<tool>.path` operator pin + the reserved verdict-policy keys), so the
+  binary pin resolves and the gate thresholds are configurable like a bundled tool.
+  Supply a custom contribution only to claim **extra** keys.
 
 ### The `scan` command
 
@@ -316,13 +319,24 @@ binary yields a `doctor` install hint instead. The `BinarySpec`:
   the binary is missing.
 
 So resolution is: operator config pin → `OPENSIP_<TOOL>_BIN` → `PATH`. The
-`OPENSIP_<TOOL>_BIN` env override always works. The config-file pin
-(`binaries.<tool>.path`) is read by the substrate, but to let an operator set it
-you must **declare a `config` contribution** (a Zod schema for the `binaries` block)
-on the spec — the config document is strict-validated, so an unschematized key is
-rejected. The three MVP adapters declare no `config`, so they rely on the env
-override + `PATH`. What OpenSIP owns: the lookup, the version probe, the readiness
-verdict. What you own: the `command` name and the install hint.
+`OPENSIP_<TOOL>_BIN` env override always works, **and so does the config-file pin
+`binaries.<tool>.path`** — every adapter **claims its config namespace by default**
+(omit `config` on the spec and the substrate supplies a schema for the `binaries`
+block plus the reserved verdict-policy keys), so the strict-validated config
+document accepts:
+
+```yaml
+gitleaks:
+  binaries:
+    gitleaks:
+      path: /opt/homebrew/bin/gitleaks # operator pin, beats PATH
+  failOnWarnings: 1 # the reserved verdict-policy keys are configurable too
+```
+
+Declare a `config` contribution explicitly only to claim **extra** keys; doing so
+opts out of the auto-generated static descriptor (its validation then defers to the
+worker). What OpenSIP owns: the lookup, the version probe, the readiness verdict.
+What you own: the `command` name and the install hint.
 
 ## `doctor` and `version` (auto-added)
 
@@ -406,12 +420,16 @@ A `fault` raises `ADAPTER.SCAN.FAULT` (with a stderr tail) and exits non-zero; a
 
 Every adapter declares a `network` posture (ADR-0092): `'local-only'`,
 `'networked'`, or `'auth-required'`. The host **displays** it (`doctor`,
-`tools list`) and **forward-maps** it onto the capability manifest's
-`opensipTools.requires`: **all** adapters emit `subprocess` + `filesystem` (they
-`execFile` a binary and read/write the project + artifact store), and `network` is
-added **only** for a `networked`/`auth-required` posture. All three MVP adapters
-are `local-only` (`subprocess` + `filesystem` only) — Trivy is `local-only`
-because it scans against a **pre-populated local DB cache** with `--offline-scan`.
+`tools list`) and the manifest generator **forward-maps** it onto the capability
+manifest's `opensipTools.requires` — **derived, not hand-authored**: **all**
+adapters emit `subprocess` + `filesystem` (they `execFile` a binary and read/write
+the project + artifact store), and `network` is added **only** for a
+`networked`/`auth-required` posture. Because the mapping is derived, flipping an
+adapter's posture surfaces as a `tool-manifests --check` drift (CI fails until the
+manifest is regenerated) — you can't ship a `networked` adapter that still claims
+`[subprocess, filesystem]`. All three MVP adapters are `local-only` (`subprocess` +
+`filesystem` only) — Trivy is `local-only` because it scans against a
+**pre-populated local DB cache** with `--offline-scan`.
 
 `requires` is **declaration-only in v1** — honest labeling for review and
 provenance, not an enforced sandbox. Capability *enforcement* is deferred to a
