@@ -39,6 +39,7 @@ const RECOGNIZED_SEAMS = new Set<HostRpcCall['seam']>([
   'deliverSignals',
   'writeSarif',
   'writeArtifact',
+  'ensureArtifactDir',
   'saveBaseline',
   'compareBaseline',
   'exportBaselineSarif',
@@ -131,6 +132,9 @@ async function performHostRpc(request: HostRpcRequest, ctx: ToolCliContext): Pro
     }
     case 'writeArtifact': {
       return ctx.writeArtifact(request.path, request.bytes);
+    }
+    case 'ensureArtifactDir': {
+      return ctx.ensureArtifactDir(request.path);
     }
     case 'saveBaseline': {
       return ctx.saveBaseline(request.tool, request.envelope);

@@ -113,6 +113,11 @@ export const tool: Tool = defineExternalToolAdapter({
       // 128) across versions.
       exitCodes: { ok: [0, 128], findings: [1], errorFrom: 2 },
       parse: parseOsvJson,
+      // A3 (no `excludeScan`): OSV-Scanner only parses recognized lockfiles/SBOMs,
+      // never an arbitrary JSON report, so it does NOT re-detect opensip's own
+      // persisted reports under `.runtime/` — there is no fingerprint churn to guard
+      // against, and OSV-Scanner v1.x exposes no path-exclude flag (only `--no-ignore`
+      // for .gitignore and vuln-id ignores). It is therefore left without an exclusion.
     },
   ],
   // Scanner output is line-volatile → the line-shift-tolerant message hash, not the

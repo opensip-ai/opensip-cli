@@ -1,0 +1,61 @@
+#!/bin/sh
+# Walking fake `gitleaks` for the A3 no-churn worker E2E.
+#
+# Unlike `fake-gitleaks` (which ignores the scan args and copies a golden), this
+# fake ACTUALLY walks `--source <root>` and emits one finding per file that
+# contains the literal token `OPENSIP_TEST_SECRET` — so a prior run's persisted
+# report under `.runtime/` (which embeds that token) WOULD be re-detected, minting
+# a net-new fingerprint, UNLESS the substrate's A3 exclusion suppresses it.
+#
+# It honors the SAME exclusion the real binary reads: the substrate injects a
+# `--config` allowlist whose first line is `# opensip-cli A3 exclude: <tail>`; this
+# fake reads that marker and skips any walked path containing <tail>. With the
+# exclusion the `.runtime` store is skipped (clean re-scan); without it the prior
+# reports churn the baseline.
+set -eu
+
+case "${1:-}" in
+  version)
+    echo "8.18.4"
+    exit 0
+    ;;
+esac
+
+source=""
+report=""
+config=""
+prev=""
+for arg in "$@"; do
+  case "$prev" in
+    --source) source="$arg" ;;
+    --report-path) report="$arg" ;;
+    --config) config="$arg" ;;
+  esac
+  prev="$arg"
+done
+
+exclude=""
+if [ -n "$config" ] && [ -f "$config" ]; then
+  exclude=$(sed -n 's/^# opensip-cli A3 exclude: //p' "$config" | head -1)
+fi
+
+findings=""
+count=0
+# Prune node_modules; tmp paths have no spaces so word-splitting is safe here.
+for f in $(find "$source" -path '*/node_modules/*' -prune -o -type f -print 2>/dev/null); do
+  if [ -n "$exclude" ] && printf '%s' "$f" | grep -q "$exclude"; then
+    continue
+  fi
+  if grep -q 'OPENSIP_TEST_SECRET' "$f" 2>/dev/null; then
+    item="{\"Description\":\"OPENSIP test secret\",\"StartLine\":1,\"EndLine\":1,\"StartColumn\":1,\"EndColumn\":20,\"Match\":\"OPENSIP_TEST_SECRET\",\"Secret\":\"OPENSIP_TEST_SECRET\",\"File\":\"$f\",\"RuleID\":\"opensip-test-secret\",\"Tags\":[],\"Fingerprint\":\"$f:opensip-test-secret:1\"}"
+    if [ -z "$findings" ]; then findings="$item"; else findings="$findings,$item"; fi
+    count=$((count + 1))
+  fi
+done
+
+printf '[%s]' "$findings" > "$report"
+
+if [ "$count" -gt 0 ]; then
+  exit 1
+fi
+exit 0

@@ -28,7 +28,9 @@ for arg in "$@"; do
 done
 
 if [ -n "$output" ] && [ -n "${FAKE_OSV_GOLDEN:-}" ]; then
-  mkdir -p "$(dirname "$output")"
+  # A1: the per-run dir is created by the host `ensureArtifactDir` seam BEFORE the
+  # scan — this fake deliberately does NOT `mkdir -p`, so the copy proves the dir
+  # pre-existed (a real scanner does a bare open() with no mkdir).
   cp "$FAKE_OSV_GOLDEN" "$output"
 fi
 

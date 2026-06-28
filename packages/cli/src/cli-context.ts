@@ -26,7 +26,10 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
-import { createWriteArtifactSeam } from './bootstrap/artifact-seams.js';
+import {
+  createEnsureArtifactDirSeam,
+  createWriteArtifactSeam,
+} from './bootstrap/artifact-seams.js';
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
 import { loadCliDefaults } from './bootstrap/cli-defaults.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
@@ -119,6 +122,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   const writeArtifact = createWriteArtifactSeam(log, {
     retentionKeep: resolveArtifactRetentionKeep(),
   });
+  const ensureArtifactDir = createEnsureArtifactDirSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
   const hostPlanes = buildHostPlanes({
     getDatastore: projectDatastore,
@@ -181,6 +185,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     deliverSignals: ioPlane.deliverSignals,
     writeSarif: ioPlane.writeSarif,
     writeArtifact,
+    ensureArtifactDir,
     // Host baseline/ratchet plane seams (ADR-0036) — persistence + diff + exports.
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,
@@ -227,6 +232,7 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
   const writeArtifact = createWriteArtifactSeam(log, {
     retentionKeep: resolveArtifactRetentionKeep(),
   });
+  const ensureArtifactDir = createEnsureArtifactDirSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
   const hostPlanes = buildHostPlanes({
     getDatastore: projectDatastore,
@@ -255,6 +261,7 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
     deliverSignals: deniedHookSeam('deliverSignals'),
     writeSarif: deniedHookSeam('writeSarif'),
     writeArtifact,
+    ensureArtifactDir,
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,
     exportBaselineSarif: baselineSeams.exportBaselineSarif,

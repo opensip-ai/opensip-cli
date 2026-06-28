@@ -206,14 +206,20 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
     }
   });
 
-  it('lands the raw artifact under .runtime/artifacts/gitleaks/<runId>/gitleaks.json with mode 0600', () => {
+  it('lands the raw artifact under .runtime/artifacts/gitleaks/<runId>/gitleaks.json with mode 0600 in a 0700 dir', () => {
     const runDir = join(projectDir, 'opensip-cli', '.runtime', 'artifacts', 'gitleaks');
     expect(existsSync(runDir)).toBe(true);
     const runs = readdirSync(runDir);
     expect(runs.length).toBeGreaterThan(0);
-    const artifact = join(runDir, runs[0], 'gitleaks.json');
+    const perRunDir = join(runDir, runs[0]);
+    const artifact = join(perRunDir, 'gitleaks.json');
+    // A1: the fake binary does NOT `mkdir -p` its --report-path dir — this artifact
+    // exists only because the host `ensureArtifactDir` seam created the per-run dir
+    // BEFORE the scan. A missing seam would ENOENT the fake's `cp` (no artifact).
     expect(existsSync(artifact)).toBe(true);
-    // Owner-only read/write (0600) — the artifact carries the raw scanner output.
+    // A7: the per-run dir is owner-only (0700) so a scanner's umask-default report is
+    // not world-traversable; the artifact file itself is 0600 (host atomic re-write).
+    expect(statSync(perRunDir).mode & 0o777).toBe(0o700);
     expect(statSync(artifact).mode & 0o777).toBe(0o600);
     // The persisted artifact is the byte-preserved golden.
     expect(JSON.parse(readFileSync(artifact, 'utf8'))).toHaveLength(2);
@@ -385,5 +391,57 @@ describe('gitleaks worker E2E — full gate ratchet (§4.12)', () => {
     expect(out).toMatch(/DEGRADED|Added/i);
     // The raw secret never leaks into the gate output.
     expect(out).not.toContain('sk_live_NEWFAKEKEYDONOTUSE');
+  });
+});
+
+/**
+ * A3 acceptance — the scanner must NEVER re-walk opensip's own persisted reports
+ * under `.runtime/`. Uses a WALKING fake that actually scans `--source` and
+ * re-detects `OPENSIP_TEST_SECRET` in any non-excluded file (so a prior run's
+ * report would mint a net-new fingerprint), honoring the SAME `--config` allowlist
+ * marker the substrate injects. Without the A3 fix the first `--gate-compare`
+ * re-detects the gate-save run's report (a new runId path) and degrades; with it,
+ * two consecutive compares over an UNCHANGED project stay clean.
+ */
+describe('gitleaks worker E2E — A3 no-churn over the .runtime artifact store', () => {
+  let churnProject: string;
+  let walkBinDir: string;
+  let save: CliRun;
+  let compare1: CliRun;
+  let compare2: CliRun;
+
+  beforeAll(() => {
+    walkBinDir = mkdtempSync(join(tmpdir(), 'opensip-gitleaks-walk-bin-'));
+    cpSync(join(FIXTURES, 'fake-gitleaks-walking'), join(walkBinDir, 'gitleaks'));
+    execFileSync('chmod', ['+x', join(walkBinDir, 'gitleaks')]);
+
+    churnProject = makeGitleaksProject();
+    // Exactly one real secret planted in the project source tree.
+    mkdirSync(join(churnProject, 'src'), { recursive: true });
+    writeFileSync(join(churnProject, 'src', 'leak.txt'), 'token = OPENSIP_TEST_SECRET\n', 'utf8');
+
+    // Override PATH so the WALKING fake is the resolved `gitleaks`.
+    const env = { PATH: `${walkBinDir}:${process.env.PATH ?? ''}` };
+    save = runCli(['gitleaks', '--gate-save'], env, churnProject);
+    compare1 = runCli(['gitleaks', '--gate-compare'], env, churnProject);
+    compare2 = runCli(['gitleaks', '--gate-compare'], env, churnProject);
+  });
+
+  afterAll(() => {
+    if (churnProject !== undefined) rmSync(churnProject, { recursive: true, force: true });
+    if (walkBinDir !== undefined) rmSync(walkBinDir, { recursive: true, force: true });
+  });
+
+  it('captures a baseline of exactly the planted secret (gate-save exits 1 on findings)', () => {
+    expect(save.status).toBe(1);
+  });
+
+  it('two consecutive --gate-compare cycles over the UNCHANGED project stay clean (exit 0)', () => {
+    // Without the A3 exclusion, each compare re-detects the prior run's persisted
+    // report under `.runtime/` (a NEW runId path ⇒ net-new fingerprint ⇒ degraded,
+    // exit ≠ 0). The exclusion keeps the scanner off `.runtime`, so the only finding
+    // is the unchanged planted secret → no net-new → exit 0, repeatably.
+    expect(compare1.status).toBe(0);
+    expect(compare2.status).toBe(0);
   });
 });

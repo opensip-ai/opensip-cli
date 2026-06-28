@@ -183,6 +183,11 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       cap.ctx,
     );
     expect(cap.artifacts).toEqual([{ path: '/artifact.json', bytes: '{"ok":true}\n' }]);
+    await handleHostRpc(
+      { rpcId: 31, seam: 'ensureArtifactDir', path: '/run/report.json' },
+      cap.ctx,
+    );
+    expect(cap.ensuredDirs).toEqual(['/run/report.json']);
     const compare = (await handleHostRpc(
       { rpcId: 4, seam: 'compareBaseline', tool: 't', envelope: {} },
       cap.ctx,

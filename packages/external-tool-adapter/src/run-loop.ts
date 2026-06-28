@@ -28,6 +28,7 @@ import { buildSignalEnvelope, EXIT_CODES } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   isErrorSignal,
+  resolveProjectPaths,
   resolveVerdictPolicy,
   TimeoutError,
   ToolError,
@@ -144,6 +145,88 @@ function parseSignals(
   return command.parse(payload, ctx);
 }
 
+/** Why a file-backed scanner report is unusable (A11). */
+type ArtifactInvalidReason = 'missing' | 'oversize' | 'empty' | 'unparseable';
+
+interface ReportRead {
+  readonly raw: string;
+  readonly artifactValid: boolean;
+  readonly invalidReason?: ArtifactInvalidReason;
+}
+
+/**
+ * Read a FILE-backed scanner report and classify its validity (A11). Size-guarded:
+ * an over-cap report (OOM guard) is never read into memory. Returns the reason a
+ * report is unusable so the caller can fault with a size-distinguished message and
+ * never overwrite the on-disk report with an empty/truncated buffer.
+ */
+function readReportArtifact(path: string, deps: ScanLoopDeps): ReportRead {
+  let size = -1;
+  try {
+    size = deps.fileSize(path);
+  } catch {
+    return { raw: '', artifactValid: false, invalidReason: 'missing' };
+  }
+  if (size > deps.maxBuffer) return { raw: '', artifactValid: false, invalidReason: 'oversize' };
+  let raw: string;
+  try {
+    raw = deps.readFile(path);
+  } catch {
+    return { raw: '', artifactValid: false, invalidReason: 'missing' };
+  }
+  if (raw.length === 0) return { raw, artifactValid: false, invalidReason: 'empty' };
+  if (!safeParseJson(raw).ok) return { raw, artifactValid: false, invalidReason: 'unparseable' };
+  return { raw, artifactValid: true };
+}
+
+/**
+ * A3: append the descriptor's exclusion of opensip's `.runtime` artifact store to
+ * the scanner argv. The substrate supplies the path (run-context-driven) while the
+ * descriptor supplies the per-scanner flag shape; a config-file form (gitleaks's
+ * allowlist) is written through the host `writeArtifact` seam into the per-run dir,
+ * never a raw substrate fs write. No user-facing flag — the command manifest is
+ * unchanged.
+ */
+async function applyScanExclusion(
+  cli: ToolCliContext,
+  command: ExternalCommandSpec,
+  ctx: AdapterRunContext,
+  args: string[],
+): Promise<void> {
+  if (command.excludeScan === undefined) return;
+  const exclusion = command.excludeScan({
+    excludePath: resolveProjectPaths(ctx.projectRoot).runtimeDir,
+    configPath: (name) => ctx.artifactPath(name),
+  });
+  if (exclusion.configFile !== undefined) {
+    await cli.writeArtifact(exclusion.configFile.path, exclusion.configFile.contents);
+  }
+  if (exclusion.args !== undefined) args.push(...exclusion.args);
+}
+
+/**
+ * A11: raise the typed `ADAPTER.ARTIFACT.INVALID` fault for an unusable file-backed
+ * report, distinguishing the oversize-cap case from missing/empty/unparseable.
+ */
+function faultInvalidArtifact(
+  tool: string,
+  command: ExternalCommandSpec,
+  read: ReportRead,
+  maxBuffer: number,
+  stderr: string,
+): never {
+  const maxMiB = Math.floor(maxBuffer / (1024 * 1024));
+  const detail =
+    read.invalidReason === 'oversize'
+      ? `report exceeded the ${String(maxMiB)} MiB cap`
+      : `report ${read.invalidReason ?? 'invalid'}`;
+  throw new ToolError(
+    `${tool} produced no usable ${command.output.kind} report (${detail}).`,
+    'ADAPTER.ARTIFACT.INVALID',
+    { stderrTail: stderr.slice(-STDERR_TAIL) },
+  );
+}
+
 /**
  * Run one scanner command end-to-end.
  *
@@ -212,7 +295,19 @@ export async function runScanLoop(
 
   const artifactName = command.output.path ?? defaultArtifactName(tool, command.output.kind);
   const artifactFullPath = ctx.artifactPath(artifactName);
+
+  // A1/A7: create the per-run artifact dir (owner-only 0o700) through the HOST seam
+  // BEFORE the scan. The scanner gets `artifactFullPath` as its `--report-path`/
+  // `--output` and does a bare `open(path,'w')` with no `mkdir -p`, so a missing
+  // fresh per-run dir would ENOENT every run; `writeArtifact` also creates the dir
+  // but runs AFTER the scan. The substrate never `mkdir`s `.runtime` itself (layer
+  // rule) — the host owns the privileged FS effect, worker-side via host RPC.
+  await cli.ensureArtifactDir(artifactFullPath);
+
+  // A3: keep the scanner off opensip's own persisted reports under `.runtime/`
+  // (see applyScanExclusion) — inherited by every adapter, no user flag.
   const args = [...command.args(ctx)];
+  await applyScanExclusion(cli, command, ctx, args);
 
   cli.logger.info({
     evt: 'adapter.binary.resolved',
@@ -247,29 +342,15 @@ export async function runScanLoop(
     });
   }
 
-  // Read the native output: from the artifact file for json/sarif, stdout otherwise.
-  let raw: string;
-  let artifactValid = true;
-  if (command.output.kind === 'stdout') {
-    raw = proc.stdout;
-  } else {
-    raw = '';
-    try {
-      // Size-guarded read: a scanner report is attacker-influenced bytes, so cap
-      // it at maxBuffer (statSync via deps.fileSize) to avoid OOMing on a
-      // pathological/huge report. An over-cap or missing file leaves raw empty →
-      // an invalid artifact (fault), the same as a missing file.
-      if (deps.fileSize(artifactFullPath) <= deps.maxBuffer) {
-        raw = deps.readFile(artifactFullPath);
-      }
-    } catch {
-      raw = '';
-    }
-    artifactValid = raw.length > 0 && safeParseJson(raw).ok;
-  }
+  // Read the native output: stdout commands use the captured stdout (always valid);
+  // file-backed commands read + classify the report (A11) via readReportArtifact.
+  const read: ReportRead =
+    command.output.kind === 'stdout'
+      ? { raw: proc.stdout, artifactValid: true }
+      : readReportArtifact(artifactFullPath, deps);
 
   const verdict = interpretExit(proc.code, command.exitCodes ?? DEFAULT_EXIT_MODEL, {
-    artifactValid,
+    artifactValid: read.artifactValid,
   });
   if (verdict === 'fault') {
     cli.logger.warn({
@@ -283,6 +364,22 @@ export async function runScanLoop(
     });
   }
 
+  // A11: a FILE-backed scanner MUST produce a readable, parseable report. An invalid
+  // artifact is a FAULT even under an `ok`/`findings` verdict — otherwise trivy's
+  // `ok:[0]` model would read a broken report as a clean PASS and the `writeArtifact`
+  // below would overwrite the real report with the empty buffer. We throw BEFORE
+  // writeArtifact, so the scanner's report on disk is never destroyed.
+  if (!read.artifactValid) {
+    cli.logger.warn({
+      evt: 'adapter.scan.faulted',
+      module: MODULE,
+      tool,
+      reason: `artifact-${read.invalidReason ?? 'invalid'}`,
+    });
+    faultInvalidArtifact(tool, command, read, deps.maxBuffer, proc.stderr);
+  }
+
+  const raw = read.raw;
   // Persist the raw artifact through the HOST seam (0600 + retention, ADR-0080/0091).
   await cli.writeArtifact(artifactFullPath, raw);
   cli.logger.info({

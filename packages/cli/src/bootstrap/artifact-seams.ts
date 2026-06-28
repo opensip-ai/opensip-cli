@@ -2,8 +2,8 @@
  * Host-owned general artifact write seam.
  */
 
-import { statSync } from 'node:fs';
-import { basename, relative, resolve, sep } from 'node:path';
+import { mkdirSync, statSync } from 'node:fs';
+import { basename, dirname, relative, resolve, sep } from 'node:path';
 
 import {
   ConfigurationError,
@@ -56,7 +56,9 @@ function maybePruneArtifactStore(
     // composes `<tool>/<runId>/<name>` underneath it.
     const tool = relative(artifactsDir, target).split(sep)[0];
     if (tool === undefined || tool === '' || tool === '..') return;
-    pruneArtifactRetention(tool, artifactsDir, retentionKeep);
+    // A12: pass the current run id so its own dir is never pruned, and let the
+    // grace-window floor protect concurrent in-flight peers.
+    pruneArtifactRetention(tool, artifactsDir, retentionKeep, { currentRunId: scope?.runId });
   } catch (error) {
     log.debug({
       evt: 'state.artifact.retention.prune.skipped',
@@ -86,6 +88,45 @@ function assertWritableFileTarget(path: string): void {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
     throw error;
   }
+}
+
+/**
+ * Owner-only mode for the host-owned per-run artifact directory (A7).
+ *
+ * The dir holds a scanner's raw report, which can carry live secrets/matches.
+ * Creating it `0o700` means even a report file the scanner writes at its default
+ * umask (typically 0644) is not world-readable, because no other user can
+ * traverse the parent dir — closing the window between the scanner's first write
+ * and the host's `0o600` re-write through {@link createWriteArtifactSeam}.
+ */
+const ARTIFACT_DIR_MODE = 0o700;
+
+/**
+ * Build the public `cli.ensureArtifactDir(artifactPath)` implementation
+ * (ADR-0091; External Tool Adapter A1/A7).
+ *
+ * Creates `dirname(artifactPath)` recursively at {@link ARTIFACT_DIR_MODE}. This
+ * is the HOST seam a tool calls BEFORE handing the path to an external scanner as
+ * its output target, so the per-run dir exists for a scanner that does a bare
+ * `open(path, 'w')`. Idempotent (`recursive: true`); a pre-existing dir keeps its
+ * mode (only freshly-created dirs get `0o700`, which is exactly the per-run dir).
+ */
+export function createEnsureArtifactDirSeam(
+  logger: Logger = defaultLogger,
+): (artifactPath: string) => Promise<void> {
+  return (artifactPath) =>
+    Promise.resolve().then(() => {
+      const dir = dirname(resolve(artifactPath));
+      try {
+        mkdirSync(dir, { recursive: true, mode: ARTIFACT_DIR_MODE });
+      } catch (error) {
+        throw new SystemError(
+          `ensureArtifactDir failed for '${dir}': ${error instanceof Error ? error.message : String(error)}`,
+          { code: 'SYSTEM.ARTIFACT_DIR_FAILED' },
+        );
+      }
+      logger.debug({ evt: 'state.artifact.dir.ensured', module: 'cli:artifact-seams', dir });
+    });
 }
 
 /** Build the public `cli.writeArtifact(path, bytes)` implementation. */

@@ -22,7 +22,13 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { parseGitleaksJson } from '../parse-gitleaks-json.js';
-import { buildScanArgs, GITLEAKS_STABLE_ID, parseGitleaksVersion, tool } from '../tool.js';
+import {
+  buildGitleaksExclude,
+  buildScanArgs,
+  GITLEAKS_STABLE_ID,
+  parseGitleaksVersion,
+  tool,
+} from '../tool.js';
 
 import type { ToolPluginManifest } from '@opensip-cli/core';
 import type { AdapterRunContext, ScannerExitModel } from '@opensip-cli/external-tool-adapter';
@@ -124,6 +130,27 @@ describe('gitleaks tool — binary helpers', () => {
       '--report-path',
       '/proj/.runtime/artifacts/gitleaks/run1/gitleaks.json',
     ]);
+  });
+});
+
+describe('gitleaks tool — A3 .runtime exclusion (buildGitleaksExclude)', () => {
+  const ex = buildGitleaksExclude({
+    excludePath: '/proj/opensip-cli/.runtime',
+    configPath: (name) => `/proj/opensip-cli/.runtime/artifacts/gitleaks/run1/${name}`,
+  });
+
+  it('references a generated --config allowlist written to the per-run dir', () => {
+    const cfg = '/proj/opensip-cli/.runtime/artifacts/gitleaks/run1/gitleaks-exclude.toml';
+    expect(ex.args).toEqual(['--config', cfg]);
+    expect(ex.configFile.path).toBe(cfg);
+  });
+
+  it('extends the default ruleset and allowlists the .runtime store (with the E2E marker)', () => {
+    expect(ex.configFile.contents).toContain('useDefault = true');
+    // The allowlist path regex matches any file under opensip-cli/.runtime.
+    expect(ex.configFile.contents).toContain('opensip-cli/\\.runtime');
+    // The marker the deterministic worker-E2E fake reads to honor the exclusion.
+    expect(ex.configFile.contents).toContain('# opensip-cli A3 exclude: opensip-cli/.runtime');
   });
 });
 

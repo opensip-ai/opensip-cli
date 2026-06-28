@@ -73,6 +73,38 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 }
 
 /**
+ * A3: build gitleaks's exclusion of opensip's own `.runtime` artifact store.
+ *
+ * gitleaks has NO CLI path-exclude, so we generate a `--config` allowlist that
+ * EXTENDS the default ruleset (secret detection still runs) and allowlists any
+ * file under `opensip-cli/.runtime`. Without this, a raw `Secret`/`Match` in a
+ * prior run's JSON report is re-detected with a new runId in its path → a net-new
+ * message-hash fingerprint every run → permanently degraded `--gate-compare`.
+ *
+ * The leading `# opensip-cli A3 exclude:` marker is load-bearing for the
+ * deterministic worker-E2E fake (it honors the SAME injected exclusion the real
+ * binary reads from the allowlist). VERIFY-against-installed-binary: gitleaks
+ * allowlist `paths` regex semantics (matched against the reported file path).
+ */
+export function buildGitleaksExclude(input: {
+  readonly excludePath: string;
+  readonly configPath: (name: string) => string;
+}): { readonly args: readonly string[]; readonly configFile: { path: string; contents: string } } {
+  const path = input.configPath('gitleaks-exclude.toml');
+  const contents = [
+    '# opensip-cli A3 exclude: opensip-cli/.runtime',
+    '[extend]',
+    'useDefault = true',
+    '',
+    '[allowlist]',
+    'description = "opensip-cli: skip the .runtime artifact store"',
+    "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
+    '',
+  ].join('\n');
+  return { args: ['--config', path], configFile: { path, contents } };
+}
+
+/**
  * The gitleaks external-tool adapter `Tool`. The host loads it by name through
  * the installed-tool worker-dispatch path (the barrel re-exports it as `tool`).
  */
@@ -111,6 +143,9 @@ export const tool: Tool = defineExternalToolAdapter({
       // missing/garbage ⇒ fault).
       exitCodes: { ok: [0], findings: [1], errorFrom: 2 },
       parse: parseGitleaksJson,
+      // A3: never re-detect secrets in opensip's OWN persisted reports under
+      // `.runtime/` (see {@link buildGitleaksExclude}).
+      excludeScan: buildGitleaksExclude,
     },
   ],
   // Scanner output is line-volatile → the line-shift-tolerant message hash, not

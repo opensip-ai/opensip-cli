@@ -48,6 +48,7 @@ function makeCli(compareResult?: GateCompareResult): {
     emitEnvelope: ReturnType<typeof vi.fn>;
     reportFailure: ReturnType<typeof vi.fn>;
     writeArtifact: ReturnType<typeof vi.fn>;
+    ensureArtifactDir: ReturnType<typeof vi.fn>;
   };
 } {
   const spies = {
@@ -60,6 +61,7 @@ function makeCli(compareResult?: GateCompareResult): {
     emitEnvelope: vi.fn(),
     reportFailure: vi.fn(() => Promise.resolve()),
     writeArtifact: vi.fn(() => Promise.resolve()),
+    ensureArtifactDir: vi.fn(() => Promise.resolve()),
   };
   const cli = {
     ...spies,

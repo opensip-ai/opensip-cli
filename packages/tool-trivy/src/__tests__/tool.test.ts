@@ -31,7 +31,13 @@ import {
 } from '@opensip-cli/external-tool-adapter';
 import { describe, expect, it } from 'vitest';
 
-import { buildScanArgs, parseTrivyVersion, tool, TRIVY_STABLE_ID } from '../tool.js';
+import {
+  buildScanArgs,
+  buildTrivyExclude,
+  parseTrivyVersion,
+  tool,
+  TRIVY_STABLE_ID,
+} from '../tool.js';
 
 import type { ToolPluginManifest } from '@opensip-cli/core';
 import type {
@@ -137,6 +143,15 @@ describe('trivy tool — binary helpers', () => {
       '--skip-java-db-update',
       '--offline-scan',
       '/proj',
+    ]);
+  });
+});
+
+describe('trivy tool — A3 .runtime exclusion (buildTrivyExclude)', () => {
+  it('skips the opensip artifact store via --skip-dirs', () => {
+    expect(buildTrivyExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
+      '--skip-dirs',
+      '/proj/opensip-cli/.runtime',
     ]);
   });
 });

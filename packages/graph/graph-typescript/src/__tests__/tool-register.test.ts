@@ -70,6 +70,7 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
     emitError: vi.fn(),
     reportFailure: vi.fn(() => Promise.resolve()),
     writeArtifact: vi.fn(() => Promise.resolve()),
+    ensureArtifactDir: vi.fn(() => Promise.resolve()),
     deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
     saveBaseline: vi.fn(() => Promise.resolve()),

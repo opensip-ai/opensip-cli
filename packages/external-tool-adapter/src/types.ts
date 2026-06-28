@@ -138,6 +138,36 @@ export interface ExternalCommandSpec {
   readonly parse?: (raw: ParsedScannerOutput, ctx: AdapterRunContext) => readonly Signal[];
   /** Optional raw-label → severity overrides consulted by the adapter's `parse`. */
   readonly severityMap?: Readonly<Record<string, SignalSeverity>>;
+  /**
+   * A3: declare how THIS scanner excludes a directory from its walk, so the
+   * substrate can keep it from re-scanning opensip's own persisted reports under
+   * `.runtime/` (which would mint a net-new fingerprint every run and permanently
+   * degrade `--gate-compare`). The substrate calls this with `excludePath` set to
+   * the project's `.runtime` dir and appends the returned `args` to the scanner
+   * argv — so every adapter inherits the guard WITHOUT a user-facing flag (the
+   * mounted command's options are unchanged; the manifest does not regen).
+   *
+   * Scanners spell exclusion differently: trivy `--skip-dirs <path>`; gitleaks has
+   * NO CLI path-exclude and needs a `--config` allowlist file, so this may also
+   * return a `configFile` — the substrate writes it (through the host `writeArtifact`
+   * seam, never a raw substrate fs write) into the per-run dir via `configPath(name)`
+   * and the `args` reference it. A scanner that only parses recognized lockfiles
+   * (osv-scanner) never re-detects a JSON report and may omit this entirely.
+   *
+   * VERIFY-against-installed-binary: the exact exclude-flag / config semantics per
+   * scanner version.
+   */
+  readonly excludeScan?: (input: {
+    /** Absolute path the scanner must NOT walk (the project `.runtime` dir). */
+    readonly excludePath: string;
+    /** Compose a per-run artifact path for an ephemeral config file. */
+    readonly configPath: (name: string) => string;
+  }) => {
+    /** Extra scanner argv appended verbatim (e.g. `['--skip-dirs', excludePath]`). */
+    readonly args?: readonly string[];
+    /** An ephemeral config the substrate writes (host seam) before the scan. */
+    readonly configFile?: { readonly path: string; readonly contents: string };
+  };
 }
 
 /**

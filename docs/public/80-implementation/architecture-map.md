@@ -102,6 +102,7 @@ per-run `ToolCliContext` (ADR-0051). See
 - `cwd`
 - `writeSarif`
 - `writeArtifact`
+- `ensureArtifactDir`
 - `saveBaseline`
 - `compareBaseline`
 - `exportBaselineSarif`

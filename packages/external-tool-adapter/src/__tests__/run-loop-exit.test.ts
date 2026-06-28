@@ -34,6 +34,7 @@ function makeCli(): {
     emitEnvelope: ReturnType<typeof vi.fn>;
     reportFailure: ReturnType<typeof vi.fn>;
     writeArtifact: ReturnType<typeof vi.fn>;
+    ensureArtifactDir: ReturnType<typeof vi.fn>;
     saveBaseline: ReturnType<typeof vi.fn>;
     compareBaseline: ReturnType<typeof vi.fn>;
   };
@@ -44,6 +45,7 @@ function makeCli(): {
     emitEnvelope: vi.fn(),
     reportFailure: vi.fn(() => Promise.resolve()),
     writeArtifact: vi.fn(() => Promise.resolve()),
+    ensureArtifactDir: vi.fn(() => Promise.resolve()),
     saveBaseline: vi.fn(() => Promise.resolve()),
     compareBaseline: vi.fn(() =>
       Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),

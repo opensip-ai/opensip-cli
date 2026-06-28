@@ -89,6 +89,19 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 }
 
 /**
+ * A3: build trivy's exclusion of opensip's own `.runtime` artifact store. Trivy
+ * takes a directory skip via `--skip-dirs`; the substrate supplies the path and
+ * the run loop appends the flag (no user-facing flag, so the command manifest is
+ * unchanged). VERIFY-against-installed-binary: `--skip-dirs` accepts an absolute
+ * path / glob and may be passed after the positional scan root.
+ */
+export function buildTrivyExclude(input: { readonly excludePath: string }): {
+  readonly args: readonly string[];
+} {
+  return { args: ['--skip-dirs', input.excludePath] };
+}
+
+/**
  * The trivy external-tool adapter `Tool`. The host loads it by name through the
  * installed-tool worker-dispatch path (the barrel re-exports it as `tool`).
  */
@@ -124,6 +137,9 @@ export const tool: Tool = defineExternalToolAdapter({
       // SARIF adapter: no `parse` — the substrate's shared `ingestSarif` reads it,
       // recovering severity from `driver.rules[ruleIndex].properties["security-severity"]`.
       output: { kind: 'sarif', path: 'trivy.sarif' },
+      // A3: never re-walk opensip's own persisted reports under `.runtime/` (see
+      // {@link buildTrivyExclude}).
+      excludeScan: buildTrivyExclude,
       // ADR-0091 Phase-0 decision 4 (Trivy): Trivy exits `0` even WITH findings (no
       // `--exit-code` passed), so findings are derived from the parsed SARIF, not the
       // exit code. Only `0` is clean; there is NO findings code; any nonzero (>= 1)
