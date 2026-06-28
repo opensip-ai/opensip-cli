@@ -1,0 +1,36 @@
+#!/bin/sh
+# Fake `osv-scanner` binary for deterministic adapter E2E (ADR-0090 D6 Tier 2).
+#
+# It ignores the scan arguments and instead copies the committed golden report to
+# whatever `--output` path the adapter passes, then exits 1 (the osv-scanner
+# "vulnerabilities found" code). The golden source is injected via FAKE_OSV_GOLDEN
+# so the ONE committed golden (__fixtures__/osv-golden.json) drives both the
+# in-process parse tests and this worker E2E (no drift).
+#
+# `osv-scanner --version` is answered with a fixed banner so the substrate's
+# version probe + doctor see a ready binary.
+set -eu
+
+case "${1:-}" in
+  --version|version)
+    echo "osv-scanner version: 1.9.1"
+    exit 0
+    ;;
+esac
+
+output=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--output" ]; then
+    output="$arg"
+  fi
+  prev="$arg"
+done
+
+if [ -n "$output" ] && [ -n "${FAKE_OSV_GOLDEN:-}" ]; then
+  mkdir -p "$(dirname "$output")"
+  cp "$FAKE_OSV_GOLDEN" "$output"
+fi
+
+# osv-scanner exits 1 when vulnerabilities are found.
+exit 1
