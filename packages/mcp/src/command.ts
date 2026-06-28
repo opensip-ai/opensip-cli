@@ -22,6 +22,7 @@ import { definePrimaryCommand, readPackageVersion } from '@opensip-cli/core';
 import { McpStdioServer } from './server.js';
 import { SessionResultsReadPort } from './session-results-read-port.js';
 import { SqliteGraphReadPort } from './sqlite-graph-read-port.js';
+import { registerMcpTools } from './tools/register.js';
 
 import type { RunScope, ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -74,6 +75,11 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       results,
       version: readPackageVersion(import.meta.url),
     });
+
+    // Mount the tool catalog through the server's scope-wrapping register seam.
+    // `validToolIds` lets the result tools reject an unknown `tool` argument.
+    const validToolIds = new Set(scope.tools.list().map((t) => t.identity.name));
+    registerMcpTools(server, { graph, results, validToolIds });
 
     // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
     await server.serve();

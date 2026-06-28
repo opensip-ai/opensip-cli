@@ -33,6 +33,7 @@ import { configureLogger, logger, runWithScope } from '@opensip-cli/core';
 
 import type { GraphReadPort } from './graph-read-port.js';
 import type { ResultsReadPort } from './results-read-port.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RunScope } from '@opensip-cli/core';
 
 /** Server identity advertised in the MCP `initialize` handshake. */
@@ -40,12 +41,13 @@ const SERVER_NAME = 'opensip-cli-mcp';
 /** `module` field stamped on every structured logger event from this file. */
 const LOG_MODULE = 'mcp:server';
 
-// Derive the SDK's tool-registration shapes from its own generic `registerTool`
-// so this file needs no SDK-internal subpath type imports (the SDK's public
-// surface is the `./server/mcp.js` value import).
+// The SDK's tool-registration signature comes from its own generic `registerTool`
+// (the public `./server/mcp.js` value import). `CallToolResult` is the SDK's
+// concrete result type — re-exported from its public `./types.js` surface because
+// deriving it positionally from the generic `registerTool` callback collapses to
+// `never` (the generics resolve to their bounds), which a real handler can't return.
 type SdkRegisterTool = McpServer['registerTool'];
-/** The MCP tool-call result the SDK serialises into a JSON-RPC reply. */
-export type CallToolResult = Awaited<ReturnType<Parameters<SdkRegisterTool>[2]>>;
+export type { CallToolResult };
 
 /** Construction deps — captured ONCE; handlers never read ambient scope. */
 export interface McpStdioServerDeps {

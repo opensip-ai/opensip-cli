@@ -91,7 +91,8 @@
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@opensip-cli/graph-typescript": "workspace:*",
