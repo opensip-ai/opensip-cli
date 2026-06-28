@@ -120,18 +120,22 @@ function impactReason(catalog: GraphCatalog, bodyHash: string): ImpactFunction['
   return 'caller';
 }
 
+interface CallerBfsContext {
+  readonly reverse: Map<string, readonly string[]>;
+  readonly changedBodyHashes: Set<string>;
+  readonly visited: Set<string>;
+  readonly queue: { readonly hash: string; readonly depth: number }[];
+}
+
 function enqueueUnvisitedCallers(
-  reverse: Map<string, readonly string[]>,
+  ctx: CallerBfsContext,
   bodyHash: string,
-  changedBodyHashes: Set<string>,
-  visited: Set<string>,
-  queue: { readonly hash: string; readonly depth: number }[],
   depth: number,
 ): void {
-  for (const caller of reverse.get(bodyHash) ?? []) {
-    if (changedBodyHashes.has(caller) || visited.has(caller)) continue;
-    visited.add(caller);
-    queue.push({ hash: caller, depth });
+  for (const caller of ctx.reverse.get(bodyHash) ?? []) {
+    if (ctx.changedBodyHashes.has(caller) || ctx.visited.has(caller)) continue;
+    ctx.visited.add(caller);
+    ctx.queue.push({ hash: caller, depth });
   }
 }
 
@@ -140,26 +144,23 @@ function collectImpactedBodyHashes(
   changedBodyHashes: Set<string>,
   maxDepth: number,
 ): string[] {
-  const visited = new Set<string>();
+  const ctx: CallerBfsContext = {
+    reverse,
+    changedBodyHashes,
+    visited: new Set<string>(),
+    queue: [],
+  };
   const impactedBodyHashes: string[] = [];
-  const queue: { readonly hash: string; readonly depth: number }[] = [];
 
   for (const hash of changedBodyHashes) {
-    enqueueUnvisitedCallers(reverse, hash, changedBodyHashes, visited, queue, 1);
+    enqueueUnvisitedCallers(ctx, hash, 1);
   }
 
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  while (ctx.queue.length > 0) {
+    const current = ctx.queue.shift()!;
     if (current.depth > maxDepth) continue;
     impactedBodyHashes.push(current.hash);
-    enqueueUnvisitedCallers(
-      reverse,
-      current.hash,
-      changedBodyHashes,
-      visited,
-      queue,
-      current.depth + 1,
-    );
+    enqueueUnvisitedCallers(ctx, current.hash, current.depth + 1);
   }
 
   return impactedBodyHashes;
