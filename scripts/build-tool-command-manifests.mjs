@@ -65,7 +65,11 @@ const BUNDLED_TOOL_DIRS = [
  * produces the identical shape from the same `commandSpecs`; `deriveCommandShell`
  * below is the generator-local equivalent already used for bundled tools.
  */
-const ADAPTER_TOOL_DIRS = ['packages/tool-gitleaks', 'packages/tool-osv-scanner'];
+const ADAPTER_TOOL_DIRS = [
+  'packages/tool-gitleaks',
+  'packages/tool-osv-scanner',
+  'packages/tool-trivy',
+];
 
 /** Every tool dir whose static manifest carries a generated command shell. */
 const TOOL_DIRS = [...BUNDLED_TOOL_DIRS, ...ADAPTER_TOOL_DIRS];

@@ -307,6 +307,14 @@ export const RELEASE_PACKAGE_ORDER = [
     publishReason:
       'OSV-Scanner external tool adapter; dependency vulnerability scanning (opensip osv-scanner / osv)',
   },
+  {
+    unscoped: 'tool-trivy',
+    name: '@opensip-cli/tool-trivy',
+    dir: 'packages/tool-trivy',
+    filter: '@opensip-cli/tool-trivy',
+    publishReason:
+      'Trivy external tool adapter; SARIF vulnerability + misconfiguration scanning (opensip trivy)',
+  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',
