@@ -1,3 +1,4 @@
+// @fitness-ignore-file missing-type-exports -- McpServer/StdioServerTransport/CallToolResult exist ONLY at the SDK's deep paths (no @modelcontextprotocol/sdk barrel surfaces them); they are public, runtime-resolvable entries declared via the SDK's "./*" exports wildcard.
 /**
  * The stdio MCP server (ADR-0084).
  *

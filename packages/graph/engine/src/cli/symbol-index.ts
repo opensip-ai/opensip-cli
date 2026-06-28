@@ -39,6 +39,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const log = createToolLogger('graph:cli');
 
+/** Options for {@link executeSymbolIndex} — the `opensip graph index` command. */
 export interface SymbolIndexCommandOptions {
   readonly cwd: string;
   readonly out: string;
@@ -49,6 +50,7 @@ export interface SymbolIndexCommandOptions {
   readonly build?: boolean;
 }
 
+/** One symbol occurrence in the index — its location, kind, visibility, and body hash. */
 export interface SymbolEntry {
   readonly qualifiedName: string;
   readonly filePath: string;
@@ -59,6 +61,11 @@ export interface SymbolEntry {
   readonly bodyHash: string;
 }
 
+/**
+ * The bidirectional symbol-index JSON artifact: `symbols` maps a simple name to
+ * its occurrences ({@link SymbolEntry}), `fileSymbols` maps a file path to the
+ * names it declares. Written to `--out` for agent / downstream-tool consumption.
+ */
 export interface SymbolIndexArtifact {
   readonly version: '1.0';
   readonly tool: 'graph';
@@ -67,6 +74,11 @@ export interface SymbolIndexArtifact {
   readonly fileSymbols: Record<string, readonly string[]>;
 }
 
+/**
+ * Execute `opensip graph index`: resolve the catalog (optionally rebuilding it
+ * first when `opts.build` is set), serialize it to a {@link SymbolIndexArtifact}
+ * via {@link buildArtifact}, and write the JSON to `opts.out`.
+ */
 export async function executeSymbolIndex(
   opts: SymbolIndexCommandOptions,
   cli: ToolCliContext,
@@ -160,6 +172,10 @@ export function buildSymbolIndexEntries(catalog: Catalog): SymbolEntry[] {
   return entries;
 }
 
+/**
+ * Project a {@link Catalog} into the serializable {@link SymbolIndexArtifact},
+ * building both the name→occurrences and file→names maps in one pass.
+ */
 export function buildArtifact(catalog: Catalog): SymbolIndexArtifact {
   const symbols: Record<string, SymbolEntry[]> = {};
   const fileSymbols: Record<string, string[]> = {};

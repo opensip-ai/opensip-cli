@@ -1,3 +1,4 @@
+// @fitness-ignore-file hot-paths-require-spans -- Registration wiring, not a runtime hot path: this registrar runs once per adapter at scope build (it just routes the contribution into the scope-owned registry). It mirrors graph's own internal registerGraphAdapter; the graph engine owns the span boundary and traces adapter work centrally per pipeline stage.
 /**
  * MCP's registrar for its `mcp-graph-adapter` capability domain (ADR-0084).
  *

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-28T04:41:22.610Z",
+  "generatedAt": "2026-06-28T05:02:23.911Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,7 +11,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 213,
+        "total": 215,
         "bySlug": {
           "no-markdown-references": 5,
           "silent-early-returns": 7,
@@ -78,6 +78,8 @@
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
+          "hot-paths-require-spans": 1,
+          "missing-type-exports": 1,
           "no-raw-fetch": 1,
           "array-validation": 1,
           "phantom-dependency-detection": 1
@@ -93,6 +95,7 @@
           "graph/engine": 10,
           "graph/graph-typescript": 2,
           "languages/lang-typescript": 2,
+          "mcp": 2,
           "simulation": 2,
           "test-support": 2
         }
@@ -105,7 +108,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 40,
+        "total": 42,
         "bySlug": {
           "no-markdown-references": 3,
           "silent-early-returns": 5,
@@ -128,6 +131,8 @@
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
           "unsafe-secret-comparison": 2,
+          "hot-paths-require-spans": 1,
+          "missing-type-exports": 1,
           "no-raw-fetch": 1,
           "array-validation": 1
         },
@@ -140,6 +145,7 @@
           "graph/engine": 10,
           "graph/graph-typescript": 2,
           "languages/lang-typescript": 2,
+          "mcp": 2,
           "simulation": 2
         }
       },
@@ -363,20 +369,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 213,
-    "budgetGateFitnessSlugs": 68,
-    "productRuntimeFitness": 40,
-    "productRuntimeFitnessSlugs": 23,
+    "budgetGateFitness": 215,
+    "budgetGateFitnessSlugs": 70,
+    "productRuntimeFitness": 42,
+    "productRuntimeFitnessSlugs": 25,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 73,
+    "productRuntimeCombined": 75,
     "checkPackageFitness": 171,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
-    "unbudgetedProductRuntimeSlugs": 22
+    "unbudgetedProductRuntimeSlugs": 24
   },
   "phase4Audit": {
     "baseline": {
@@ -389,10 +395,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -265,
+      "productRuntimeFitness": -263,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -239,
-      "budgetGateFitness": -329,
+      "productRuntimeCombined": -237,
+      "budgetGateFitness": -327,
       "checkPackageFitness": -63,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

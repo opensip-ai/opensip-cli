@@ -29,6 +29,12 @@ export interface ListSessionSummariesOptions {
   readonly registry?: ToolRegistry;
 }
 
+/**
+ * Read-only projection of stored sessions into a {@link HistoryResult} DTO — the
+ * pure core of `opensip sessions list`, also consumed by `@opensip-cli/mcp`.
+ * Applies the {@link ListSessionSummariesOptions} filters and, when a registry is
+ * supplied, renders canonical tool names. Callers never see {@link SessionRepo}.
+ */
 export function listSessionSummaries(
   store: DataStore,
   opts: ListSessionSummariesOptions = {},

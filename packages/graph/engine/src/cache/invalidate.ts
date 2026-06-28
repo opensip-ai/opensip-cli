@@ -23,6 +23,12 @@ import { logger } from '@opensip-cli/core';
 
 import type { Catalog } from '../types.js';
 
+/**
+ * The current-run signals a cached {@link Catalog} is validated against:
+ * the active adapter language, its opaque per-adapter cache key, and the current
+ * source file set. {@link classifyCatalog} compares these against the cached
+ * catalog to decide valid / incremental / invalid.
+ */
 export interface ValidationContext {
   readonly currentLanguage: string;
   readonly currentCacheKey: string;
@@ -45,6 +51,13 @@ export type CatalogVerdict =
   | { readonly kind: 'incremental'; readonly changedFiles: readonly string[] }
   | { readonly kind: 'invalid'; readonly reason: string };
 
+/**
+ * Classify a cached catalog against the current run ({@link ValidationContext})
+ * into a {@link CatalogVerdict}: `valid` (reuse as-is), `incremental` (reuse but
+ * re-walk the listed changed files), or `invalid` (full rebuild). Language and
+ * cache-key mismatches force `invalid`; otherwise the per-file fingerprint
+ * decides between `valid` and `incremental`.
+ */
 export function classifyCatalog(cached: Catalog, ctx: ValidationContext): CatalogVerdict {
   if (cached.language !== ctx.currentLanguage) {
     logger.info({

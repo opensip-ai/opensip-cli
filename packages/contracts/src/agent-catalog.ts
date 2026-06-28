@@ -34,6 +34,13 @@ import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
  */
 export type CommandTier = 'platform' | 'tool' | 'internal';
 
+/**
+ * The machine-readable description of opensip-cli's command surface emitted by
+ * `opensip agent-catalog` and consumed over MCP. It advertises the public entry
+ * points (Tier-1 platform commands + Tier-2 tool verbs), common usage patterns,
+ * the shapes a caller gets back, and free-form usage notes — everything an agent
+ * needs to drive the CLI without reading its source.
+ */
 export interface AgentCatalog {
   readonly version: string;
   readonly description: string;
@@ -207,6 +214,12 @@ function deriveToolEntryPoints(
     .sort((a, b) => compareCodePoint(a.command, b.command));
 }
 
+/**
+ * Build the {@link AgentCatalog} for this invocation: derive a Tier-2 entry
+ * point per registered tool, append the static Tier-1 platform commands, assert
+ * no Tier-3 (`internal`) command leaks into the surface, and return the assembled
+ * catalog. With no `tools` registry the result carries only the platform entries.
+ */
 export function buildAgentCatalog(
   input: {
     readonly tools?: ToolRegistry;
