@@ -97,6 +97,7 @@ export function compareVersion(
   return 'ok';
 }
 
+/** The inputs to {@link probeAdapter}: the tool identity, posture, binary spec, and resolved config. */
 export interface ProbeAdapterInput {
   readonly tool: string;
   readonly network: NetworkPosture;
@@ -186,6 +187,7 @@ export function doctorReportLines(report: AdapterDoctorReport): string[] {
   return lines;
 }
 
+/** The inputs to {@link buildDoctorCommand}: the tool identity, posture, and binary spec. */
 export interface DoctorCommandInput {
   readonly tool: string;
   readonly network: NetworkPosture;

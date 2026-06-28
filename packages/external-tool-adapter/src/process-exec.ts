@@ -108,6 +108,9 @@ export function probeBinaryVersion(input: ProbeVersionInput): string | undefined
     const text = typeof stdout === 'string' ? stdout : String(stdout);
     return (input.parse ?? ((s: string) => s.trim()))(text);
   } catch {
+    // intentionally silent: a version probe failure (binary missing, slow, or
+    // a non-version output) is a normal "version unknown" — surfaced as
+    // undefined, which doctor renders. No logger is available in this pure seam.
     return undefined;
   }
 }
@@ -122,6 +125,9 @@ export function whichBinary(command: string, platform: NodeJS.Platform): string 
       .map((line) => line.trim())
       .find((line) => line.length > 0);
   } catch {
+    // intentionally silent: a `which`/`where` miss means "not on PATH" — a normal
+    // resolution outcome surfaced as undefined (the resolver then reports a
+    // not-found with an install hint). No logger in this pure IO seam.
     return undefined;
   }
 }

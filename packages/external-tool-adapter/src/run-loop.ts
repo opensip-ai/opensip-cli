@@ -21,7 +21,7 @@
  * E2E (ADR-0090 D6 Tier 2).
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
@@ -67,6 +67,16 @@ export interface ScanLoopDeps {
   readonly runProcess: (input: RunProcessInput) => Promise<ProcessResult>;
   readonly probeVersion: (input: ProbeVersionInput) => string | undefined;
   readonly readFile: (path: string) => string;
+  /** The artifact file's byte size — used to cap the read (OOM guard) before {@link readFile}. */
+  readonly fileSize: (path: string) => number;
+  /**
+   * The environment the operator binary-pin (`OPENSIP_<TOOL>_BIN`) is read from
+   * — injected (mirrors the doctor/version probe's `DoctorProbeDeps.env`) so the
+   * read flows through a seam, not a raw `process.env` reach, and stays
+   * unit-testable. The pin name is per-tool/dynamic, so it cannot be a static
+   * EnvRegistry `EnvVarSpec`.
+   */
+  readonly env: NodeJS.ProcessEnv;
   readonly timeoutMs: number;
   readonly maxBuffer: number;
 }
@@ -76,6 +86,8 @@ const DEFAULT_DEPS: ScanLoopDeps = {
   runProcess: runScannerProcess,
   probeVersion: probeBinaryVersion,
   readFile: (path) => readFileSync(path, 'utf8'),
+  fileSize: (path) => statSync(path).size,
+  env: process.env,
   timeoutMs: DEFAULT_TIMEOUT_MS,
   maxBuffer: DEFAULT_MAX_BUFFER,
 };
@@ -163,7 +175,7 @@ export async function runScanLoop(
     {
       command: binary.command,
       configuredPath: configuredBinaryPath(config, tool),
-      envPath: process.env[envVar],
+      envPath: deps.env[envVar],
     },
     deps.binaryDeps,
   );
@@ -232,8 +244,15 @@ export async function runScanLoop(
   if (command.output.kind === 'stdout') {
     raw = proc.stdout;
   } else {
+    raw = '';
     try {
-      raw = deps.readFile(artifactFullPath);
+      // Size-guarded read: a scanner report is attacker-influenced bytes, so cap
+      // it at maxBuffer (statSync via deps.fileSize) to avoid OOMing on a
+      // pathological/huge report. An over-cap or missing file leaves raw empty →
+      // an invalid artifact (fault), the same as a missing file.
+      if (deps.fileSize(artifactFullPath) <= deps.maxBuffer) {
+        raw = deps.readFile(artifactFullPath);
+      }
     } catch {
       raw = '';
     }

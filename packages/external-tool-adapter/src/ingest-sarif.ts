@@ -25,21 +25,25 @@ import type { Signal, SignalSeverity } from '@opensip-cli/core';
 
 // ── Defensive SARIF 2.1.0 INPUT types (all optional — foreign output) ────────
 
+/** A SARIF 2.1.0 log: the top-level document a foreign scanner emits (one or more runs). */
 export interface SarifLog {
   readonly version?: string;
   readonly $schema?: string;
   readonly runs?: readonly SarifRun[];
 }
 
+/** One analysis run within a {@link SarifLog} — a tool plus its results. */
 export interface SarifRun {
   readonly tool?: SarifTool;
   readonly results?: readonly SarifResult[];
 }
 
+/** The tool component of a {@link SarifRun}; carries the `driver` (the scanner). */
 export interface SarifTool {
   readonly driver?: SarifDriver;
 }
 
+/** The scanner driver: its identity and the rule catalog `result.ruleIndex` joins against. */
 export interface SarifDriver {
   readonly name?: string;
   readonly version?: string;
@@ -47,6 +51,7 @@ export interface SarifDriver {
   readonly rules?: readonly SarifReportingDescriptor[];
 }
 
+/** A rule descriptor in `driver.rules[]` — `properties["security-severity"]` carries the CVSS. */
 export interface SarifReportingDescriptor {
   readonly id?: string;
   readonly name?: string;
@@ -57,6 +62,7 @@ export interface SarifReportingDescriptor {
   readonly properties?: Readonly<Record<string, unknown>>;
 }
 
+/** A single finding: rule id/index, coarse `level`, message, locations, and native fingerprints. */
 export interface SarifResult {
   readonly ruleId?: string;
   readonly ruleIndex?: number;
@@ -70,10 +76,12 @@ export interface SarifResult {
   readonly properties?: Readonly<Record<string, unknown>>;
 }
 
+/** A result location — wraps the {@link SarifPhysicalLocation} (file + region). */
 export interface SarifLocation {
   readonly physicalLocation?: SarifPhysicalLocation;
 }
 
+/** The physical location of a finding: an artifact (file) URI and an optional source region. */
 export interface SarifPhysicalLocation {
   readonly artifactLocation?: { readonly uri?: string; readonly uriBaseId?: string };
   readonly region?: {
@@ -83,6 +91,7 @@ export interface SarifPhysicalLocation {
   };
 }
 
+/** A SARIF message object — the `text` is the human-readable finding description. */
 export interface SarifMessage {
   readonly text?: string;
 }

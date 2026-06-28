@@ -35,6 +35,7 @@ const DEFAULT_PROBE_DEPS: DoctorProbeDeps = {
   env: process.env,
 };
 
+/** The inputs to {@link probeVersionReport}: the tool identity, binary spec, and resolved config. */
 export interface VersionProbeInput {
   readonly tool: string;
   readonly binary: BinarySpec;
@@ -72,6 +73,7 @@ export function probeVersionReport(
   };
 }
 
+/** The inputs to {@link buildVersionCommand}: the tool identity and binary spec. */
 export interface VersionCommandInput {
   readonly tool: string;
   readonly binary: BinarySpec;

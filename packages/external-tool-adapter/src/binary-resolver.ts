@@ -23,6 +23,7 @@ export interface BinaryResolveDeps {
   readonly which: (command: string, platform: NodeJS.Platform) => string | undefined;
 }
 
+/** The inputs to {@link resolveBinary}: the lookup name plus the optional operator pins. */
 export interface ResolveBinaryInput {
   /** The PATH lookup name (`'gitleaks'`). */
   readonly command: string;
