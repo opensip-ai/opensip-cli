@@ -8,6 +8,7 @@
 import { defineCommand, RAW_STREAM_REASONS } from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
 import { graphTool } from '@opensip-cli/graph';
+import { mcpTool } from '@opensip-cli/mcp';
 import { simulationTool } from '@opensip-cli/simulation';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
@@ -44,6 +45,7 @@ describe('raw-stream inventory (bundled tools)', () => {
   const inventory = [
     ...collectRawStreamSpecs('fitness', fitnessTool.commandSpecs ?? []),
     ...collectRawStreamSpecs('graph', graphTool.commandSpecs ?? []),
+    ...collectRawStreamSpecs('mcp', mcpTool.commandSpecs ?? []),
     ...collectRawStreamSpecs('simulation', simulationTool.commandSpecs ?? []),
   ];
 
@@ -67,6 +69,12 @@ describe('raw-stream inventory (bundled tools)', () => {
     expect(workerCommands).toContain('fit-run-worker');
     expect(workerCommands).toContain('graph-run-worker');
     expect(workerCommands).toContain('sim-run-worker');
+  });
+
+  it('includes the mcp command with the mcp-stdio reason (long-lived stdio transport)', () => {
+    const entry = inventory.find((e) => e.tool === 'mcp' && e.command === 'mcp');
+    expect(entry, 'expected the mcp command in the raw-stream inventory').toBeDefined();
+    expect(entry?.reason).toBe('mcp-stdio');
   });
 
   it('has no lookup raw-stream entries', () => {
