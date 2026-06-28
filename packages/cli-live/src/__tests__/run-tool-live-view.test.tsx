@@ -278,6 +278,10 @@ describe('runToolLiveView', () => {
       stdoutCalls.push(String(chunk));
       return originalWrite(chunk, ...args);
     });
+    let resolveSubscriberAttached!: () => void;
+    const subscriberAttached = new Promise<void>((resolve) => {
+      resolveSubscriberAttached = resolve;
+    });
 
     await runWithScope(scope, () =>
       runToolLiveView({
@@ -293,10 +297,9 @@ describe('runToolLiveView', () => {
         produce: async (_progressEmit, helpers) => {
           helpers.setRunning((cb) => {
             cb({ type: 'stage-done', stage: 'parse', durationMs: 1200, detail: '42 file(s)' });
+            resolveSubscriberAttached();
           });
-          await new Promise((resolve) => {
-            setTimeout(resolve, 10);
-          });
+          await subscriberAttached;
           return {
             kind: 'done',
             done: { summary: { passed: true, errors: 0, warnings: 0 } },
