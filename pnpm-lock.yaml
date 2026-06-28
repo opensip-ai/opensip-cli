@@ -192,7 +192,7 @@ importers:
         version: link:../languages/lang-typescript
       '@opensip-cli/mcp':
         specifier: workspace:*
-        version: file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
       '@opensip-cli/output':
         specifier: workspace:*
         version: link:../output
@@ -987,12 +987,21 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@opensip-cli/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../core
+      '@opensip-cli/datastore':
+        specifier: workspace:*
+        version: link:../datastore
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/session-store':
+        specifier: workspace:*
+        version: link:../session-store
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -5517,10 +5526,13 @@ snapshots:
       '@opensip-cli/core': file:packages/core
       typescript: 6.0.3
 
-  '@opensip-cli/mcp@file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/mcp@file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)':
     dependencies:
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
+      '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)
       typescript: 6.0.3
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
@@ -5543,6 +5555,7 @@ snapshots:
       - better-sqlite3
       - bufferutil
       - bun-types
+      - commander
       - expo-sqlite
       - gel
       - knex

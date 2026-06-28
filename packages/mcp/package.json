@@ -85,8 +85,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
+    "@opensip-cli/session-store": "workspace:*",
     "typescript": "~6.0.3"
   },
   "devDependencies": {
