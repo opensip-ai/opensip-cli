@@ -85,11 +85,23 @@ contract for MCP to consume.
   because JSON-RPC owns stdout for the protocol; all logging/diagnostics go to
   **stderr** for the serve lifetime. This is the documented escape hatch from the
   `SignalEnvelope`/`CommandResult` currency, recorded in `raw-stream-parity`.
-- `@opensip-cli/mcp` is added to `bundledPackages` (package count 34 → 35) and to
+- `@opensip-cli/mcp` is added to `bundledPackages` (5th bundled tool) and to
   the publish order (after the `graph-*` adapters, before `cli`). It declares a
   capability domain `mcp-graph-adapter` (distinct id, first-writer-wins) with
   `markerKind: 'graph-adapter'`, so the bundled `graph-*` adapter packs load under
-  MCP's domain via MCP's own registrar.
+  MCP's domain.
+- **Capability-loader routing (as-built).** Sharing the `graph-adapter`
+  markerKind across two domains required one host change: a *primary* capability
+  contribution now routes to the **target domain it declares**
+  (`opensipTools.targetDomain` → `packageTargetDomain`), falling back to the
+  domain being loaded only when the pack declares none
+  (`capability-loader.ts`: `targetDomainId ?? packageTargetDomain ?? domainId`).
+  The bundled `graph-*` adapters declare `targetDomain: graph-adapter`, so when
+  MCP's `mcp-graph-adapter` domain discovers them (by markerKind) they register
+  through graph's own `graph-adapter` registrar into `scope.graph.adapters` —
+  which is what `refresh_graph`'s `runGraph` reads. Existing single-domain loads
+  are unchanged (`packageTargetDomain === domainId` for graph's own load), so this
+  is a strict generalization, not a behavior change for existing tools.
 - **Symbol identity contract:** `search_symbols`/`get_symbol` return
   `symbolId = "${filePath}:${line}:${column}"` plus `bodyHash`; downstream tools
   accept `symbolId` (not bare names); ambiguous name queries return a structured
