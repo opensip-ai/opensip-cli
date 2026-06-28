@@ -77,10 +77,10 @@ let binDir: string;
 let baseEnv: Record<string, string>;
 
 /** Run the built CLI as a child process, capturing stdout/stderr + exit code. */
-function runCli(args: string[], extraEnv: Record<string, string> = {}): CliRun {
+function runCli(args: string[], extraEnv: Record<string, string> = {}, cwd = projectDir): CliRun {
   try {
     const stdout = execFileSync('node', [CLI_DIST, ...args], {
-      cwd: projectDir,
+      cwd,
       env: { ...process.env, ...baseEnv, ...extraEnv },
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
@@ -90,6 +90,16 @@ function runCli(args: string[], extraEnv: Record<string, string> = {}): CliRun {
     const e = error as { stdout?: string; stderr?: string; status?: number };
     return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', status: e.status ?? 1 };
   }
+}
+
+/** Scaffold a throwaway opensip-cli project that resolves the installed gitleaks tool. */
+function makeGitleaksProject(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'opensip-gitleaks-gate-'));
+  writeFileSync(join(dir, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
+  const scopeDir = join(dir, 'node_modules', '@opensip-cli');
+  mkdirSync(scopeDir, { recursive: true });
+  symlinkSync(GITLEAKS_PKG_DIR, join(scopeDir, 'tool-gitleaks'), 'dir');
+  return dir;
 }
 
 /** Parse the `--json` outcome wrapper (`{ kind, status, exitCode, envelope?, data? }`). */
@@ -284,5 +294,96 @@ describe('gitleaks worker E2E — installed tools are deny-by-default', () => {
     expect(`${run.stdout}${run.stderr}`.toLowerCase()).toMatch(
       /unknown command|not found|gitleaks/,
     );
+  });
+});
+
+/**
+ * §4.12 ratchet acceptance — the FULL baseline/gate loop over a REAL forked worker.
+ * The substrate wires `--gate-save` / `--gate-compare` once (ADR-0036), so the
+ * gitleaks adapter inherits it. This proves: capture a baseline → an unchanged
+ * re-scan is clean (exit 0) → a NET-NEW secret surfaces and fails (exit ≠ 0).
+ *
+ * Runs in its OWN throwaway project so the baseline + sessions are isolated from
+ * the scan suites above. The fake binary copies `FAKE_GITLEAKS_GOLDEN` to
+ * `--report-path`; pointing it at an AUGMENTED golden (the two originals + one new
+ * finding) is how the "regression" run injects a net-new finding.
+ */
+describe('gitleaks worker E2E — full gate ratchet (§4.12)', () => {
+  let gateProject: string;
+  let augmentedGolden: string;
+  let save: CliRun;
+  let compareClean: CliRun;
+  let compareRegressed: CliRun;
+
+  beforeAll(() => {
+    gateProject = makeGitleaksProject();
+
+    // The augmented golden = the committed two findings + one NET-NEW secret in a
+    // new file/rule (a distinct message-hash fingerprint ⇒ the ratchet sees it as
+    // net-new, not unchanged).
+    const original = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8')) as Record<string, unknown>[];
+    const augmented = [
+      ...original,
+      {
+        Description: 'Stripe Access Token',
+        StartLine: 7,
+        EndLine: 7,
+        StartColumn: 14,
+        EndColumn: 45,
+        Match: 'stripe = sk_live_NEWFAKEKEYDONOTUSE',
+        Secret: 'sk_live_NEWFAKEKEYDONOTUSE',
+        File: 'src/payments.ts',
+        RuleID: 'stripe-access-token',
+        Tags: [],
+        Fingerprint: 'src/payments.ts:stripe-access-token:7',
+      },
+    ];
+    augmentedGolden = join(gateProject, 'augmented-golden.json');
+    writeFileSync(augmentedGolden, JSON.stringify(augmented), 'utf8');
+
+    // 1) Capture the baseline (two findings). The findings gate (ADR-0020) makes
+    //    gate-save itself exit 1 — it records the baseline AND honours the verdict.
+    save = runCli(['gitleaks', '--gate-save'], {}, gateProject);
+    // 2) Re-scan the SAME golden and compare → no net-new ⇒ clean (exit 0).
+    compareClean = runCli(['gitleaks', '--gate-compare'], {}, gateProject);
+    // 3) Compare against the augmented golden → one net-new finding ⇒ degraded.
+    compareRegressed = runCli(
+      ['gitleaks', '--gate-compare'],
+      { FAKE_GITLEAKS_GOLDEN: augmentedGolden },
+      gateProject,
+    );
+  });
+
+  afterAll(() => {
+    if (gateProject !== undefined) rmSync(gateProject, { recursive: true, force: true });
+  });
+
+  it('--gate-save records the baseline and persists a session', () => {
+    // The findings gate makes gate-save exit 1 (two high-severity secrets present),
+    // but the baseline IS written — proven by the clean compare below.
+    expect(save.status).toBe(1);
+    const list = runCli(['sessions', 'list', '--json'], {}, gateProject);
+    const data = parseOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const gitleaksRows = (data.sessions ?? []).filter((s) => s.tool === 'gitleaks');
+    expect(gitleaksRows.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('--gate-compare on the SAME scan is a clean no-op (exit 0, no regression)', () => {
+    // Pre-existing findings recorded in the baseline are NOT a regression — only
+    // net-new findings fail the ratchet. The clean exit also proves gate-save wrote
+    // the baseline (a missing baseline would throw ConfigurationError → exit 2).
+    expect(compareRegressed).toBeDefined();
+    expect(compareClean.status).toBe(0);
+    expect(`${compareClean.stdout}${compareClean.stderr}`).toMatch(/STABLE|no change/i);
+  });
+
+  it('--gate-compare surfaces a NET-NEW finding and exits non-zero (degraded)', () => {
+    expect(compareRegressed.status).not.toBe(0);
+    const out = `${compareRegressed.stdout}${compareRegressed.stderr}`;
+    // The net-new secret is named in the diff; the verdict footer says DEGRADED.
+    expect(out).toContain('stripe-access-token');
+    expect(out).toMatch(/DEGRADED|Added/i);
+    // The raw secret never leaks into the gate output.
+    expect(out).not.toContain('sk_live_NEWFAKEKEYDONOTUSE');
   });
 });
