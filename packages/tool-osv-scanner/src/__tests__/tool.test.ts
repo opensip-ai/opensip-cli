@@ -232,10 +232,13 @@ describe('osv-scanner tool — acceptance harness (normalize → envelope)', () 
   });
 
   it('preserves provenance-friendly native severity + advisory metadata (no loss)', () => {
-    const [high, moderate] = result.signals;
-    expect(high?.metadata.nativeSeverity).toBe('HIGH');
-    expect(high?.metadata.cvss).toBe('7.5');
-    expect(moderate?.metadata.nativeSeverity).toBe('MODERATE');
-    expect(moderate?.metadata.aliases).toEqual(['CVE-2021-44906']);
+    // A10: both golden members are 9.8/CRITICAL (lodash CVE-2019-10744 +
+    // minimist CVE-2021-44906), so the native label is CRITICAL and the CVSS is 9.8.
+    const [lodash, minimist] = result.signals;
+    expect(lodash?.metadata.nativeSeverity).toBe('CRITICAL');
+    expect(lodash?.metadata.cvss).toBe('9.8');
+    expect(minimist?.metadata.nativeSeverity).toBe('CRITICAL');
+    expect(minimist?.metadata.cvss).toBe('9.8');
+    expect(minimist?.metadata.aliases).toEqual(['CVE-2021-44906']);
   });
 });

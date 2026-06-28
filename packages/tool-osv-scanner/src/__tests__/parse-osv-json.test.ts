@@ -29,6 +29,63 @@ const EXPECTED = JSON.parse(
 /** A minimal context — the osv-scanner parser ignores it entirely. */
 const CTX = { tool: 'osv-scanner' } as unknown as AdapterRunContext;
 
+// ── CVSS v3.1 base-score helper (A10 fixture-consistency guard) ──────────────
+//
+// Real osv-scanner derives `groups[].max_severity` as the max CVSS base score
+// across the group's members, so a member's `CVSS_V3` vector can never disagree
+// with its group's max_severity. This small, self-contained CVSS-v3.1 base-score
+// calculator lets the golden assert that invariant: max_severity ≥ the score the
+// member's vector computes. (Equation per FIRST CVSS v3.1 §7.) A future
+// contradictory golden — like the prior `9.8`-vector vuln tagged `max_severity:"7.5"`
+// — then fails loudly instead of banding the wrong severity.
+const AV: Record<string, number> = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 };
+const AC: Record<string, number> = { L: 0.77, H: 0.44 };
+const PR_U: Record<string, number> = { N: 0.85, L: 0.62, H: 0.27 };
+const PR_C: Record<string, number> = { N: 0.85, L: 0.68, H: 0.5 };
+const UI: Record<string, number> = { N: 0.85, R: 0.62 };
+const CIA: Record<string, number> = { H: 0.56, L: 0.22, N: 0 };
+
+/** CVSS 3.1 "Roundup": smallest 1-decimal number ≥ input (FIRST appendix A). */
+function roundUp(input: number): number {
+  const intInput = Math.round(input * 100_000);
+  return intInput % 10_000 === 0 ? intInput / 100_000 : (Math.floor(intInput / 10_000) + 1) / 10;
+}
+
+/** Compute the CVSS v3.x base score from a vector string (`CVSS:3.1/AV:N/.../A:H`). */
+function cvss3BaseScore(vector: string): number {
+  const m = new Map(
+    vector
+      .split('/')
+      .map((part) => part.split(':'))
+      .filter((pair): pair is [string, string] => pair.length === 2)
+      .map(([k, v]) => [k, v] as const),
+  );
+  const scopeChanged = m.get('S') === 'C';
+  const iscBase =
+    1 - (1 - CIA[m.get('C') ?? 'N']) * (1 - CIA[m.get('I') ?? 'N']) * (1 - CIA[m.get('A') ?? 'N']);
+  const impact = scopeChanged
+    ? 7.52 * (iscBase - 0.029) - 3.25 * (iscBase - 0.02) ** 15
+    : 6.42 * iscBase;
+  const pr = (scopeChanged ? PR_C : PR_U)[m.get('PR') ?? 'N'];
+  const exploitability =
+    8.22 * AV[m.get('AV') ?? 'N'] * AC[m.get('AC') ?? 'L'] * pr * UI[m.get('UI') ?? 'N'];
+  if (impact <= 0) return 0;
+  const raw = scopeChanged ? 1.08 * (impact + exploitability) : impact + exploitability;
+  return roundUp(Math.min(raw, 10));
+}
+
+interface GoldenDoc {
+  results: {
+    packages: {
+      vulnerabilities?: {
+        id: string;
+        severity?: { type: string; score: string }[];
+      }[];
+      groups?: { ids: string[]; max_severity?: string }[];
+    }[];
+  }[];
+}
+
 function parsed(raw: string): ParsedScannerOutput {
   let json: unknown;
   try {
@@ -54,16 +111,20 @@ describe('parseOsvJson', () => {
     }
   });
 
-  it('CVSS path: groups[].max_severity "7.5" → high, preserving the raw label + score', () => {
+  it('CVSS path: groups[].max_severity "9.8" → critical, preserving the raw label + score', () => {
+    // A10: the golden member carries the 9.8 vector (C:H/I:H/A:H), so the group's
+    // max_severity is 9.8 and the band is `critical` — a real osv-scanner capture
+    // could never pair that vector with a 7.5 max_severity (see the self-consistency
+    // guard below). VERIFY-against-installed-osv for the exact emitted values.
     const [first] = parseOsvJson(parsed(GOLDEN_RAW), CTX);
-    expect(first?.severity).toBe('high');
+    expect(first?.severity).toBe('critical');
     expect(first?.metadata).toMatchObject({
       aliases: ['CVE-2019-10744'],
       ecosystem: 'npm',
       pkg: 'lodash',
       installed: '4.17.15',
-      cvss: '7.5',
-      nativeSeverity: 'HIGH',
+      cvss: '9.8',
+      nativeSeverity: 'CRITICAL',
     });
     // The lockfile finding carries no line/column anchor.
     expect(first?.line).toBeUndefined();
@@ -71,13 +132,48 @@ describe('parseOsvJson', () => {
     expect(first?.filePath).toBe('package-lock.json');
   });
 
-  it('LABEL path: database_specific.severity "MODERATE" (no max_severity) → medium', () => {
+  it('CVSS path: the second golden member (minimist, 9.8 vector) is also critical', () => {
+    // A10: minimist CVE-2021-44906 is 9.8/CRITICAL at NVD (vector C:H/I:H/A:H), so
+    // its group max_severity is 9.8 — the prior fixture fabricated an omitted
+    // max_severity → MODERATE path. VERIFY-against-installed-osv.
     const [, second] = parseOsvJson(parsed(GOLDEN_RAW), CTX);
-    expect(second?.severity).toBe('medium');
+    expect(second?.severity).toBe('critical');
     expect(second?.metadata).toMatchObject({
-      cvss: null,
-      nativeSeverity: 'MODERATE',
+      aliases: ['CVE-2021-44906'],
+      pkg: 'minimist',
+      installed: '1.2.5',
+      cvss: '9.8',
+      nativeSeverity: 'CRITICAL',
     });
+  });
+
+  it('LABEL fallback: database_specific.severity "MODERATE" with no CVSS score → medium', () => {
+    // Synthetic case (not a real-binary golden): an advisory that carries a GHSA
+    // label but NO CVSS vector / max_severity (e.g. some Go or reserved-CVE records)
+    // falls back to the label, and MODERATE ⇒ medium — the one non-obvious mapping.
+    const doc = JSON.stringify({
+      results: [
+        {
+          source: { path: 'go.mod' },
+          packages: [
+            {
+              package: { name: 'pkg-mod', version: '1.0.0', ecosystem: 'Go' },
+              vulnerabilities: [
+                {
+                  id: 'GO-2024-1234',
+                  summary: 'mod issue',
+                  database_specific: { severity: 'MODERATE' },
+                },
+              ],
+              groups: [{ ids: ['GO-2024-1234'] }],
+            },
+          ],
+        },
+      ],
+    });
+    const [s] = parseOsvJson(parsed(doc), CTX);
+    expect(s?.severity).toBe('medium');
+    expect(s?.metadata).toMatchObject({ cvss: null, nativeSeverity: 'MODERATE' });
   });
 
   it('carries the advisory details as a suggestion', () => {
@@ -187,5 +283,37 @@ describe('parseOsvJson', () => {
     // The acceptance-harness path passes only raw; the parser must still work.
     const signals = parseOsvJson({ kind: 'json', raw: GOLDEN_RAW }, CTX);
     expect(signals).toHaveLength(2);
+  });
+});
+
+describe('osv-golden.json — CVSS self-consistency (A10 guard)', () => {
+  it('the base-score helper computes 9.8 for the C:H/I:H/A:H network vector', () => {
+    // Sanity-pin the helper against a known FIRST example before trusting it below.
+    expect(cvss3BaseScore('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H')).toBe(9.8);
+    expect(cvss3BaseScore('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N')).toBe(0);
+  });
+
+  it('every CVSS_V3 golden member has a group max_severity ≥ the score its vector computes', () => {
+    // The load-bearing invariant: osv-scanner sets max_severity to the max base
+    // score across members, so it can never be LOWER than a member vector's score.
+    // The prior golden (9.8 vector, max_severity "7.5") violated this and banded the
+    // lodash finding "high" where a real binary yields "critical".
+    const doc = JSON.parse(GOLDEN_RAW) as GoldenDoc;
+    let checked = 0;
+    for (const result of doc.results) {
+      for (const pkg of result.packages) {
+        for (const vuln of pkg.vulnerabilities ?? []) {
+          const vector = (vuln.severity ?? []).find((s) => s.type === 'CVSS_V3')?.score;
+          if (vector === undefined) continue;
+          const group = (pkg.groups ?? []).find((g) => g.ids.includes(vuln.id));
+          const maxSeverity = Number.parseFloat(group?.max_severity ?? '');
+          expect(Number.isFinite(maxSeverity)).toBe(true);
+          expect(maxSeverity).toBeGreaterThanOrEqual(cvss3BaseScore(vector));
+          checked += 1;
+        }
+      }
+    }
+    // Guard the guard: the golden must actually exercise at least one CVSS_V3 member.
+    expect(checked).toBeGreaterThan(0);
   });
 });

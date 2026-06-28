@@ -27,7 +27,7 @@
                 }
               ],
               "database_specific": {
-                "severity": "HIGH"
+                "severity": "CRITICAL"
               }
             }
           ],
@@ -35,7 +35,7 @@
             {
               "ids": ["GHSA-jf85-cpcp-j695"],
               "aliases": ["CVE-2019-10744", "GHSA-jf85-cpcp-j695"],
-              "max_severity": "7.5"
+              "max_severity": "9.8"
             }
           ]
         },
@@ -53,15 +53,22 @@
               "aliases": ["CVE-2021-44906"],
               "modified": "2023-11-08T04:06:00Z",
               "published": "2022-03-17T20:00:00Z",
+              "severity": [
+                {
+                  "type": "CVSS_V3",
+                  "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                }
+              ],
               "database_specific": {
-                "severity": "MODERATE"
+                "severity": "CRITICAL"
               }
             }
           ],
           "groups": [
             {
               "ids": ["GHSA-xvch-5gv4-984h"],
-              "aliases": ["CVE-2021-44906", "GHSA-xvch-5gv4-984h"]
+              "aliases": ["CVE-2021-44906", "GHSA-xvch-5gv4-984h"],
+              "max_severity": "9.8"
             }
           ]
         }

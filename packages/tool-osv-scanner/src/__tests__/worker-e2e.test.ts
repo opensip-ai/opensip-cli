@@ -197,10 +197,12 @@ describe('osv-scanner worker E2E — opensip osv (real forked worker)', () => {
       expect(provenance.adapterPackage).toBe('@opensip-cli/tool-osv-scanner');
     }
     // Native scanner severity preserved beside the mapped four-bucket severity.
-    const [high, moderate] = envelope.signals;
-    expect(high?.metadata.nativeSeverity).toBe('HIGH');
-    expect(high?.metadata.cvss).toBe('7.5');
-    expect(moderate?.metadata.nativeSeverity).toBe('MODERATE');
+    // A10: both golden members are 9.8/CRITICAL (lodash + minimist).
+    const [lodash, minimist] = envelope.signals;
+    expect(lodash?.metadata.nativeSeverity).toBe('CRITICAL');
+    expect(lodash?.metadata.cvss).toBe('9.8');
+    expect(minimist?.metadata.nativeSeverity).toBe('CRITICAL');
+    expect(minimist?.metadata.cvss).toBe('9.8');
   });
 
   it('lands the raw artifact under .runtime/artifacts/osv-scanner/<runId>/osv.json with mode 0600', () => {
