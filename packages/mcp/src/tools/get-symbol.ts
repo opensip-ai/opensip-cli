@@ -13,8 +13,8 @@
  * catalog's project-relative paths).
  */
 
-import { errorResult, failure, jsonResult } from './tool-result.js';
 import { filePath as filePathSchema, line as lineSchema } from './schemas.js';
+import { errorResult, failure, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';

@@ -52,7 +52,10 @@ export const filePath = () =>
       (p) => !p.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(p),
       'file must be a project-relative path (not absolute)',
     )
-    .refine((p) => !p.split(/[\\/]/).includes('..'), 'file must not contain ".." traversal segments');
+    .refine(
+      (p) => !p.split(/[\\/]/).includes('..'),
+      'file must not contain ".." traversal segments',
+    );
 
 /** A 1-based source line number. */
 export const line = () => z.number().int().positive();

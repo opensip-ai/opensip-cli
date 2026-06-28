@@ -43,6 +43,8 @@ import type { GraphConfig, ValidationContext } from '@opensip-cli/graph/internal
 
 /** Default search-result cap. */
 const DEFAULT_SEARCH_LIMIT = 50;
+/** Shared empty adjacency for the no-catalog case (avoids per-call allocation). */
+const EMPTY_EDGES: ReadonlyMap<string, readonly string[]> = new Map();
 /** Default architecture package-row cap. */
 const DEFAULT_ARCH_LIMIT = 25;
 
@@ -78,7 +80,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
     | ReadonlyMap<string, { direct: number; transitive: number; score: number }>
     | undefined;
   /** In-flight rebuild — serializes concurrent `refresh()` to a single build. */
-  private inFlightRefresh: Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> | undefined;
+  private inFlightRefresh:
+    | Promise<Result<McpToolResult<GraphGeneration>, McpReadError>>
+    | undefined;
 
   constructor(private readonly deps: SqliteGraphReadPortDeps) {
     this.store = deps.store;
@@ -199,14 +203,12 @@ export class SqliteGraphReadPort implements GraphReadPort {
     pick: (gen: CatalogGeneration) => ReadonlyMap<string, readonly string[]>,
   ): AdjacencySnapshot {
     const gen = this.current();
-    if (gen === undefined) {
-      return { edges: new Map(), resolve: () => undefined };
-    }
-    const indexes = gen.indexes;
+    const edges = gen === undefined ? EMPTY_EDGES : pick(gen);
+    const byBodyHash = gen?.indexes.byBodyHash;
     return {
-      edges: pick(gen),
+      edges,
       resolve: (bodyHash) => {
-        const occ = indexes.byBodyHash.get(bodyHash);
+        const occ = byBodyHash?.get(bodyHash);
         return occ === undefined ? undefined : toSymbolRef(occ);
       },
     };

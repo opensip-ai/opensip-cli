@@ -9,8 +9,8 @@
 
 import { z } from 'zod';
 
-import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
 import { toolId as toolIdSchema } from './schemas.js';
+import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';

@@ -8,8 +8,8 @@
  */
 
 import { boundedBfs, MAX_WALK_NODES, reconstructPath } from './graph-walk.js';
-import { errorResult, failure, jsonResult } from './tool-result.js';
 import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
+import { errorResult, failure, jsonResult } from './tool-result.js';
 
 import type { PathTraceDto } from '../graph-read-port.js';
 import type { McpToolDeps } from './types.js';

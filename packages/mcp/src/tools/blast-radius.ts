@@ -7,8 +7,8 @@
  * direct/transitive caller counts + the composite score.
  */
 
-import { errorResult, failure, jsonResult } from './tool-result.js';
 import { symbolId as symbolIdSchema } from './schemas.js';
+import { errorResult, failure, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';

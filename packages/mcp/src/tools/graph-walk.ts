@@ -64,31 +64,57 @@ export function boundedBfs(
 ): BoundedBfsResult {
   const maxDepth = clampDepth(opts.depth);
   const cap = opts.cap > 0 ? Math.trunc(opts.cap) : MAX_WALK_NODES;
-  const visited = new Set<string>([start]);
-  const parents = new Map<string, string>();
-  const order: string[] = [];
+  const state: WalkState = {
+    visited: new Set<string>([start]),
+    parents: new Map<string, string>(),
+    order: [],
+  };
   let frontier: string[] = [start];
 
   for (let d = 0; d < maxDepth && frontier.length > 0; d++) {
-    const next: string[] = [];
-    for (const node of frontier) {
-      for (const neighbor of adjacency.get(node) ?? []) {
-        if (visited.has(neighbor)) continue;
-        visited.add(neighbor);
-        parents.set(neighbor, node);
-        order.push(neighbor);
-        if (neighbor === opts.goal) {
-          return { order, parents, foundGoal: true, truncated: false };
-        }
-        if (order.length >= cap) {
-          return { order, parents, foundGoal: false, truncated: true };
-        }
-        next.push(neighbor);
-      }
+    const step = expandFrontier(frontier, adjacency, state, cap, opts.goal);
+    if (step.halt !== undefined) {
+      return { order: state.order, parents: state.parents, ...step.halt };
     }
-    frontier = next;
+    frontier = step.next;
   }
-  return { order, parents, foundGoal: false, truncated: false };
+  return { order: state.order, parents: state.parents, foundGoal: false, truncated: false };
+}
+
+/** Mutable accumulators threaded through the BFS frontier expansion. */
+interface WalkState {
+  readonly visited: Set<string>;
+  readonly parents: Map<string, string>;
+  readonly order: string[];
+}
+
+/** The terminal verdict of a frontier step, when the walk must stop. */
+interface StepHalt {
+  readonly foundGoal: boolean;
+  readonly truncated: boolean;
+}
+
+/** Expand one BFS level: record newly-seen neighbors, halting on goal/cap. */
+function expandFrontier(
+  frontier: readonly string[],
+  adjacency: ReadonlyMap<string, readonly string[]>,
+  state: WalkState,
+  cap: number,
+  goal: string | undefined,
+): { next: string[]; halt?: StepHalt } {
+  const next: string[] = [];
+  for (const node of frontier) {
+    for (const neighbor of adjacency.get(node) ?? []) {
+      if (state.visited.has(neighbor)) continue;
+      state.visited.add(neighbor);
+      state.parents.set(neighbor, node);
+      state.order.push(neighbor);
+      if (neighbor === goal) return { next, halt: { foundGoal: true, truncated: false } };
+      if (state.order.length >= cap) return { next, halt: { foundGoal: false, truncated: true } };
+      next.push(neighbor);
+    }
+  }
+  return { next };
 }
 
 /**

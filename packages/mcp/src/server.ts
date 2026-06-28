@@ -47,7 +47,7 @@ const LOG_MODULE = 'mcp:server';
 // deriving it positionally from the generic `registerTool` callback collapses to
 // `never` (the generics resolve to their bounds), which a real handler can't return.
 type SdkRegisterTool = McpServer['registerTool'];
-export type { CallToolResult };
+export type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 /** Construction deps — captured ONCE; handlers never read ambient scope. */
 export interface McpStdioServerDeps {

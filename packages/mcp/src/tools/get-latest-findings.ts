@@ -8,8 +8,12 @@
  * Validates `tool` against the live registry → structured unknown-tool error.
  */
 
+import {
+  limit as limitSchema,
+  severity as severitySchema,
+  toolId as toolIdSchema,
+} from './schemas.js';
 import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
-import { limit as limitSchema, severity as severitySchema, toolId as toolIdSchema } from './schemas.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
@@ -20,7 +24,7 @@ export function registerGetLatestFindings(server: McpStdioServer, deps: McpToolD
     {
       title: 'Latest findings for a tool',
       description:
-        "Get the findings from the most recent OpenSIP run of a tool (fit, graph, yagni, sim). " +
+        'Get the findings from the most recent OpenSIP run of a tool (fit, graph, yagni, sim). ' +
         'Use this before re-running OpenSIP when the user mentions existing fit, graph, yagni, ' +
         'sim, errors, warnings, findings, or prior results. Filter by `severity` ' +
         '(errors/warnings/all) and cap with `limit`. Replays the persisted session; never ' +

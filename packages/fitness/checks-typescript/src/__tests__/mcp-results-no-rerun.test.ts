@@ -69,7 +69,8 @@ describe('mcp-results-no-rerun (gate)', () => {
     expect(
       await findingsFor({
         path: 'packages/mcp/src/tools/bad.ts',
-        content: "import { runGraph } from '@opensip-cli/graph/internal';\nexport const x = runGraph;",
+        content:
+          "import { runGraph } from '@opensip-cli/graph/internal';\nexport const x = runGraph;",
       }),
     ).toBeGreaterThanOrEqual(1);
   });
@@ -78,7 +79,8 @@ describe('mcp-results-no-rerun (gate)', () => {
     expect(
       await findingsFor({
         path: 'packages/mcp/src/command.ts',
-        content: "import { runGraph } from '@opensip-cli/graph/internal';\nexport const x = runGraph;",
+        content:
+          "import { runGraph } from '@opensip-cli/graph/internal';\nexport const x = runGraph;",
       }),
     ).toBe(0);
   });

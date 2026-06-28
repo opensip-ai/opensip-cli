@@ -75,13 +75,20 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     // the rebuilt catalog persists where the port reads it. v1 is the exact
     // single-program build (no cloud egress, no live render).
     const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
-    const rebuild = async (): Promise<Catalog> => {
+    /**
+     * The `refresh_graph` rebuild thunk: runs the graph engine's programmatic
+     * build over the project root and returns the fresh catalog.
+     *
+     * @throws {Error} when the build discovers no source files (no catalog
+     *   produced) — surfaced to the refresh tool as an infra-boundary failure.
+     */
+    async function rebuild(): Promise<Catalog> {
       const outcome = await runGraph({ cwd: projectRoot, datastore: store });
       if (outcome.catalog === null) {
         throw new Error('graph rebuild produced no catalog (no source files discovered).');
       }
       return outcome.catalog;
-    };
+    }
     const graph = new SqliteGraphReadPort({
       store,
       freshnessContext: workingTreeContextFromCatalog,
@@ -99,6 +106,7 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     // Mount the tool catalog through the server's scope-wrapping register seam.
     // `validToolIds` lets the result tools reject an unknown `tool` argument.
     const validToolIds = new Set(scope.tools.list().map((t) => t.identity.name));
+    // @fitness-ignore-next-line detached-promises -- registerMcpTools is synchronous (returns void); the check cannot infer cross-file sync callables, so this floating call is a false positive.
     registerMcpTools(server, { graph, results, validToolIds });
 
     // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
