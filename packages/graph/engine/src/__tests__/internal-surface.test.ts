@@ -25,7 +25,14 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'HEAP_TARGETS',
   'MemoryPressureError',
   'alwaysThrowsBranchRule',
+  // Symbol-index builder surfaced for @opensip-cli/mcp's `search_symbols`
+  // (ADR-0084): MCP returns the same shape as `graph symbol-index`.
+  'buildArtifact',
+  // Feature derivation surfaced for @opensip-cli/mcp's `blast_radius`
+  // (ADR-0084): the single canonical `buildFeatures(['blast'])` scoring site.
+  'buildFeatures',
   'buildIndexes',
+  'buildSymbolIndexEntries',
   'buildUnifiedReportLines',
   // Freshness helpers surfaced for @opensip-cli/mcp (ADR-0084).
   'classifyCatalog',

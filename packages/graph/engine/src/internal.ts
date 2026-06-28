@@ -64,6 +64,15 @@ export {
 } from './cli/heap-preflight.js';
 export type { Shard, ShardBuildResult } from './cli/orchestrate/shard-model.js';
 
+// Symbol-index builder — surfaced on the internal contract for `@opensip-cli/mcp`
+// (ADR-0084) so the MCP `search_symbols` tool returns the SAME shape as
+// `graph symbol-index` without re-deriving symbol metadata from raw AST. The
+// keyed-artifact builder + flat-entry core + their DTO types are CLI-handler
+// symbols (the command runs via `graphTool.commandSpecs`), so they live here on
+// the internal surface, not the public barrel.
+export { buildSymbolIndexEntries, buildArtifact } from './cli/symbol-index.js';
+export type { SymbolEntry, SymbolIndexArtifact } from './cli/symbol-index.js';
+
 // Catalog freshness/staleness classification — surfaced on the internal contract
 // for `@opensip-cli/mcp` (ADR-0084) so the MCP server can report a stale/missing
 // catalog with a warning. MCP's depcruise exception is scoped to this file, so

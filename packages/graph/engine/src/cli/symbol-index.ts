@@ -49,7 +49,7 @@ export interface SymbolIndexCommandOptions {
   readonly build?: boolean;
 }
 
-interface SymbolEntry {
+export interface SymbolEntry {
   readonly qualifiedName: string;
   readonly filePath: string;
   readonly line: number;
@@ -59,7 +59,7 @@ interface SymbolEntry {
   readonly bodyHash: string;
 }
 
-interface SymbolIndexArtifact {
+export interface SymbolIndexArtifact {
   readonly version: '1.0';
   readonly tool: 'graph';
   readonly generatedAt: string;
@@ -136,6 +136,28 @@ async function resolveCatalogForIndex(
     return result.catalog;
   }
   return new CatalogRepo(datastore).loadFullCatalog();
+}
+
+/**
+ * The pure symbol-entry core: flatten every non-`module-init` occurrence in the
+ * catalog into a flat {@link SymbolEntry} list (the keyless counterpart to
+ * {@link buildArtifact}). Shared with `@opensip-cli/mcp`'s `search_symbols` so
+ * MCP returns the SAME shape as `graph symbol-index` without re-deriving symbol
+ * metadata from raw AST (ADR-0084). No CLI side effects — data → data.
+ */
+export function buildSymbolIndexEntries(catalog: Catalog): SymbolEntry[] {
+  const entries: SymbolEntry[] = [];
+  // fileSymbols is the file→names index `buildArtifact` keeps; the flat-entry
+  // core does not need it, so collect into a throwaway map.
+  const fileSymbols: Record<string, string[]> = {};
+  for (const name of Object.keys(catalog.functions)) {
+    const bucket = catalog.functions[name];
+    if (!bucket) continue;
+    for (const entry of collectEntriesForName(bucket, name, fileSymbols)) {
+      entries.push(entry);
+    }
+  }
+  return entries;
 }
 
 export function buildArtifact(catalog: Catalog): SymbolIndexArtifact {
