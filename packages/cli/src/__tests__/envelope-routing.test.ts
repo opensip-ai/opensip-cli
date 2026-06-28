@@ -401,6 +401,101 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
     expect(sarif.runs).toHaveLength(1);
   });
 
+  it('attaches x-opensip-repo: <org>/<repo> derived from the repo remote (slot 16)', async () => {
+    const headersSeen: Record<string, string>[] = [];
+    const captureFetch: typeof fetch = (_url, init) => {
+      headersSeen.push((init?.headers ?? {}) as Record<string, string>);
+      return Promise.resolve(new Response('{}', { status: 200 }));
+    };
+    const out = await runWithScope(makeScope(NOOP_SINK), () =>
+      deliverEnvelope(ENVELOPE, {
+        cwd: process.cwd(),
+        repo: { remoteUrl: 'git@github.com:opensip-ai/opensip-cli.git' },
+        reportTo: 'https://sink.example',
+        fetchImpl: captureFetch,
+      }),
+    );
+    expect(out.reportSuccess).toBe(true);
+    expect(headersSeen).toHaveLength(1);
+    expect(headersSeen[0]['x-opensip-repo']).toBe('opensip-ai/opensip-cli');
+  });
+
+  it('omits x-opensip-repo when no <org>/<repo> slug can be derived (soft accept)', async () => {
+    const headersSeen: Record<string, string>[] = [];
+    const captureFetch: typeof fetch = (_url, init) => {
+      headersSeen.push((init?.headers ?? {}) as Record<string, string>);
+      return Promise.resolve(new Response('{}', { status: 200 }));
+    };
+    await runWithScope(makeScope(NOOP_SINK), () =>
+      deliverEnvelope(ENVELOPE, {
+        cwd: process.cwd(),
+        repo: {}, // no remote → no slug
+        reportTo: 'https://sink.example',
+        fetchImpl: captureFetch,
+      }),
+    );
+    expect(headersSeen).toHaveLength(1);
+    expect('x-opensip-repo' in headersSeen[0]).toBe(false);
+  });
+
+  it('surfaces a distinct hint on 401 (key rejected) vs 403 (missing ingest:write)', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    try {
+      const reject = (status: number): typeof fetch => () =>
+        Promise.resolve(new Response('denied', { status }));
+
+      await runWithScope(makeScope(NOOP_SINK), () =>
+        deliverEnvelope(ENVELOPE, {
+          cwd: process.cwd(),
+          repo: {},
+          reportTo: 'https://sink.example',
+          runFailed: false,
+          setExitCode: vi.fn(),
+          fetchImpl: reject(401),
+        }),
+      );
+      const after401 = writes.join('');
+      expect(after401).toContain('--report-to failed');
+      expect(after401).toContain('the API key was rejected');
+
+      writes.length = 0;
+      await runWithScope(makeScope(NOOP_SINK), () =>
+        deliverEnvelope(ENVELOPE, {
+          cwd: process.cwd(),
+          repo: {},
+          reportTo: 'https://sink.example',
+          runFailed: false,
+          setExitCode: vi.fn(),
+          fetchImpl: reject(403),
+        }),
+      );
+      const after403 = writes.join('');
+      expect(after403).toContain('ingest:write');
+      expect(after403).not.toContain('the API key was rejected');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('preserves exit-code precedence on a 403 report failure (exit 4 only when run passed)', async () => {
+    const setExitCode = vi.fn();
+    await runWithScope(makeScope(NOOP_SINK), () =>
+      deliverEnvelope(ENVELOPE, {
+        cwd: process.cwd(),
+        repo: {},
+        reportTo: 'https://sink.example',
+        runFailed: false,
+        setExitCode,
+        fetchImpl: () => Promise.resolve(new Response('denied', { status: 403 })),
+      }),
+    );
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+  });
+
   it('sets exit 4 when the report upload fails on an otherwise-passing run', async () => {
     const setExitCode = vi.fn();
     const out = await runWithScope(makeScope(NOOP_SINK), () =>

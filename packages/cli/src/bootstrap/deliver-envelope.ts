@@ -30,6 +30,7 @@ import { buildSignalBatch, currentScope, logger as defaultLogger } from '@opensi
 import {
   formatSignalSarif,
   postChunked,
+  repoSlugFromIdentity,
   resolveRepoIdentity,
   type EgressResult,
 } from '@opensip-cli/output';
@@ -179,11 +180,16 @@ async function reportSarif(
   url: string,
   apiKey: string | undefined,
   fetchImpl: typeof fetch | undefined,
+  repoSlug: string | undefined,
 ): Promise<EgressResult> {
   const sarif = formatSignalSarif(envelope);
   // The receiver accepts a SARIF body at `<url>/sarif`; one chunk (the whole
   // SARIF log) — the envelope is already capped upstream.
   const target = url.endsWith('/sarif') ? url : `${url}/sarif`;
+  // Attach `x-opensip-repo` when an <org>/<repo> slug was derivable. The cloud
+  // scopes ingested signals to this repo within the caller's tenant (DEC-587);
+  // an absent slug is a soft accept (repo-less, DEC-588), so we simply omit it.
+  const extraHeaders = repoSlug === undefined ? undefined : { 'x-opensip-repo': repoSlug };
   return postChunked({
     url: target,
     apiKey,
@@ -196,6 +202,7 @@ async function reportSarif(
       honorRetryAfter: true,
     },
     evtPrefix: 'cli.report',
+    ...(extraHeaders ? { extraHeaders } : {}),
     fetchImpl,
   });
 }
@@ -256,11 +263,22 @@ export async function deliverEnvelope(
     return cloudLeg;
   }
 
-  const result = await reportSarif(envelope, opts.reportTo, opts.apiKey, opts.fetchImpl);
+  const repoSlug = repoSlugFromIdentity(repo);
+  const result = await reportSarif(envelope, opts.reportTo, opts.apiKey, opts.fetchImpl, repoSlug);
   const reportSuccess = result.outcome === 'ok';
   if (!reportSuccess) {
+    // Branch on the typed auth-status discriminator (never string-sniff
+    // `errors[]`): 401 = the key was rejected; 403 = authenticated but missing
+    // the `ingest:write` permission. The hint tells the user whether to fix the
+    // key or upgrade its role — the funnel's incentive to grant ingest:write.
+    let hint = '';
+    if (result.authStatus === 401) {
+      hint = ` — the API key was rejected; check --api-key / your config`;
+    } else if (result.authStatus === 403) {
+      hint = ` — the API key lacks the \`ingest:write\` permission; use an operator/admin key`;
+    }
     process.stderr.write(
-      `opensip: --report-to failed (${opts.reportTo}): ` +
+      `opensip: --report-to failed (${opts.reportTo})${hint}: ` +
         `${result.errors.length > 0 ? result.errors.join('; ') : 'unknown error'}\n`,
     );
   }

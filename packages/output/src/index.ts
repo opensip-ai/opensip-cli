@@ -41,3 +41,4 @@ export {
   type ResolveSignalSinkInput,
 } from './sink/resolve-signal-sink.js';
 export { resolveRepoIdentity } from './sink/repo-identity.js';
+export { repoSlugFromIdentity } from './sink/repo-slug.js';

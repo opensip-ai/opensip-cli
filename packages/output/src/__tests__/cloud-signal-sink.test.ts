@@ -13,23 +13,24 @@ function sigs(n: number): Signal[] {
 const batch = (n: number) => buildSignalBatch({ tool: 'fit', repo: {}, signals: sigs(n) });
 
 describe('createCloudSignalSink', () => {
-  it('POSTs with X-API-Key + idempotency key and returns the accepted signal count', async () => {
-    const seen: { key?: string; auth?: string }[] = [];
+  it('POSTs with Authorization: Bearer + idempotency key and returns the accepted signal count', async () => {
+    const seen: { key?: string; auth?: string; legacy?: string }[] = [];
     const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
       const h = init.headers as Record<string, string>;
-      seen.push({ key: h['Idempotency-Key'], auth: h['X-API-Key'] });
+      seen.push({ key: h['Idempotency-Key'], auth: h['Authorization'], legacy: h['X-API-Key'] });
       return Promise.resolve(new Response(null, { status: 200 }));
     }) as unknown as typeof fetch;
 
     const sink = createCloudSignalSink({
       endpoint: 'https://x.test/api',
-      apiKey: 'secret',
+      apiKey: 'osk_secret',
       fetchImpl,
     });
     const b = batch(3);
     const r = await sink.emit(b);
     expect(r).toEqual({ accepted: 3, authRejected: false });
-    expect(seen[0].auth).toBe('secret');
+    expect(seen[0].auth).toBe('Bearer osk_secret');
+    expect(seen[0].legacy).toBeUndefined();
     expect(seen[0].key).toBe(`${b.runId}:0`);
   });
 

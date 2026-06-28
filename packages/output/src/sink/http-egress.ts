@@ -36,6 +36,14 @@ export interface EgressResult {
   readonly outcome: 'ok' | 'partial' | 'failed';
   /** Saw a 401/403 — caller should bust any auth/entitlement cache. */
   readonly authRejected: boolean;
+  /**
+   * The auth-rejection status when `authRejected` is true, so callers branch on
+   * a typed value rather than string-sniffing `errors[]`: `401` = the key was
+   * not authenticated (unknown/bad key); `403` = authenticated but lacking the
+   * required permission (e.g. `ingest:write`). Undefined when no auth rejection
+   * occurred.
+   */
+  readonly authStatus?: 401 | 403;
   /** Saw a 429. */
   readonly throttled: boolean;
   /** Stopped early because the overall deadline elapsed. */
@@ -56,6 +64,12 @@ export interface PostChunkedArgs {
   readonly policy: RetryPolicy;
   /** Log event prefix, e.g. `cli.report` or `cli.signal-sync`. */
   readonly evtPrefix: string;
+  /**
+   * Extra request headers merged into every chunk POST (e.g.
+   * `x-opensip-repo`). The transport-owned `Content-Type` and `Authorization`
+   * headers always win — a caller cannot override auth via this bag.
+   */
+  readonly extraHeaders?: Readonly<Record<string, string>>;
   readonly fetchImpl?: typeof fetch;
   /** Injectable clock/sleep for deterministic tests. */
   readonly now?: () => number;
@@ -116,13 +130,25 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     };
   }
 
-  const headersBase: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (args.apiKey) headersBase['X-API-Key'] = args.apiKey;
+  // Caller-supplied headers go in first so the transport-owned `Content-Type`
+  // and `Authorization` below always win (auth is never caller-overridable).
+  const headersBase: Record<string, string> = {
+    ...args.extraHeaders,
+    'Content-Type': 'application/json',
+  };
+  // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
+  // token only (the api-key strategy matches `Bearer osk_`); the historical
+  // `X-API-Key` header never reached a route and is removed outright — no
+  // dual-header shim (DEC-587). `apiKey` carries the raw `osk_…` token; do not
+  // strip or transform it. The HTTPS guard above keeps this credential off
+  // plain HTTP.
+  if (args.apiKey) headersBase['Authorization'] = `Bearer ${args.apiKey}`;
 
   const chunkResults: boolean[] = Array.from({ length: chunks.length }, () => false);
   const errors: string[] = [];
   let acceptedChunks = 0;
   let authRejected = false;
+  let authStatus: 401 | 403 | undefined;
   let throttled = false;
   let deadlineExceeded = false;
 
@@ -160,6 +186,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
         if (res.status === 401 || res.status === 403) {
           authRejected = true;
+          authStatus = res.status;
           logger.warn({
             evt: `${evtPrefix}.auth-rejected`,
             module: MODULE_TAG,
@@ -225,6 +252,7 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     chunkResults,
     outcome,
     authRejected,
+    ...(authStatus === undefined ? {} : { authStatus }),
     throttled,
     deadlineExceeded,
     errors,
