@@ -270,7 +270,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
   architectureSummary(limit?: number): Result<McpToolResult<ArchitectureSummaryDto>, McpReadError> {
     const gen = this.current();
     if (gen === undefined) {
-      return ok(this.wrap({ functionCount: 0, edgeCount: 0, packages: [] }));
+      return ok(
+        this.wrap({ functionCount: 0, edgeCount: 0, languages: [], packages: [], hotspots: [] }),
+      );
     }
     const columns: readonly FeatureColumn[] = ['packageCoupling'];
     const features = buildFeatures(gen.catalog, gen.indexes, this.config, columns);
@@ -281,16 +283,31 @@ export class SqliteGraphReadPort implements GraphReadPort {
     }
     rows.sort((a, b) => b.couplingOut + b.couplingIn - (a.couplingOut + a.couplingIn));
     const packages = rows.slice(0, cap);
+    const hotspots = this.topHotspots(gen, cap);
     return ok(
       this.wrap(
         {
           functionCount: gen.indexes.byBodyHash.size,
           edgeCount: edgeCount(gen.indexes),
+          languages: [gen.catalog.language],
           packages,
+          hotspots,
         },
         packages.length < rows.length,
       ),
     );
+  }
+
+  /** The `cap` highest-blast symbols (graph's canonical scoring; reused, not reinvented). */
+  private topHotspots(gen: CatalogGeneration, cap: number): BlastDto[] {
+    const scores = this.blastScores(gen);
+    const ranked: BlastDto[] = [];
+    for (const [hash, score] of scores) {
+      const occ = gen.indexes.byBodyHash.get(hash);
+      if (occ !== undefined) ranked.push({ symbol: toSymbolRef(occ), ...score });
+    }
+    ranked.sort((a, b) => b.score - a.score);
+    return ranked.slice(0, cap);
   }
 
   async refresh(): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> {

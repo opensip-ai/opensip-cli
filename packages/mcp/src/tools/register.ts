@@ -7,7 +7,10 @@
  * port (never `currentScope()`, never a run-command entry point).
  */
 
+import { registerBlastRadius } from './blast-radius.js';
 import { registerCalleesOf } from './callees-of.js';
+import { registerFindDeadCode } from './find-dead-code.js';
+import { registerGetArchitecture } from './get-architecture.js';
 import { registerGetSymbol } from './get-symbol.js';
 import { registerSearchSymbols } from './search-symbols.js';
 import { registerTracePath } from './trace-path.js';
@@ -24,4 +27,7 @@ export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): voi
   registerWhoCalls(server, deps);
   registerCalleesOf(server, deps);
   registerTracePath(server, deps);
+  registerBlastRadius(server, deps);
+  registerFindDeadCode(server, deps);
+  registerGetArchitecture(server, deps);
 }

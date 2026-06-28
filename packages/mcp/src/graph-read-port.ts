@@ -73,11 +73,15 @@ export interface ArchitecturePackageDto {
   readonly couplingIn: number;
 }
 
-/** A compact architecture overview: node/edge counts + top-coupled packages. */
+/** A compact architecture overview: counts, languages, top-coupled packages, blast hotspots. */
 export interface ArchitectureSummaryDto {
   readonly functionCount: number;
   readonly edgeCount: number;
+  /** Languages present in the catalog (single-language per catalog today). */
+  readonly languages: readonly string[];
   readonly packages: readonly ArchitecturePackageDto[];
+  /** Highest-blast symbols (graph's canonical scoring), capped. */
+  readonly hotspots: readonly BlastDto[];
 }
 
 /** Options for {@link GraphReadPort.searchSymbols}. */
