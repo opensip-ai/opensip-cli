@@ -2,6 +2,61 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [Unreleased]
+
+An external-scanner integration release. OpenSIP CLI can now wrap a
+user-installed CLI scanner — Gitleaks, OSV-Scanner, or Trivy — as a first-class
+Tool: it runs the scanner as a subprocess, normalizes its native output to the
+platform `Signal` currency, and feeds the same session store, baseline ratchet,
+SARIF/cloud egress, and HTML report as the built-in tools. The adapters are
+**opt-in and not bundled** — install the one you want, then trust it. The changes
+are additive: no built-in command or output shape changes, and the new artifact
+store and config field default to safe values.
+
+### Added
+
+- `@opensip-cli/external-tool-adapter` — a new layer-3 substrate that turns a
+  local scanner into an OpenSIP Tool from a descriptor plus a parser
+  (`defineExternalToolAdapter(spec)`). It owns binary resolution (config/env →
+  `PATH`, never a fetch), the run loop, the shared SARIF/JSON ingest, secret
+  redaction, provenance, and the auto-added `doctor`/`version` commands
+  ([ADR-0090](docs/decisions/ADR-0090-external-tool-adapter-substrate.md)).
+- Three opt-in adapter packages (not bundled): `@opensip-cli/tool-gitleaks`
+  (`opensip gitleaks` — committed-secret scanning), `@opensip-cli/tool-osv-scanner`
+  (`opensip osv-scanner` — dependency vulnerabilities), and
+  `@opensip-cli/tool-trivy` (`opensip trivy` — vulnerabilities + misconfigurations).
+  Each adds a primary scan command plus `doctor` (binary/version/posture/ready,
+  exit 0 ready / 2 not-ready) and `version`. Adapters are deny-by-default: after
+  `opensip tools install`, trust one via
+  `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS=<id>`.
+- A shared SARIF ingest (`ingestSarif`) that recovers four-bucket severity from
+  the SARIF rule descriptor's `security-severity` (CVSS) before the lossy `level`
+  fallback; the JSON adapters ship per-scanner parsers
+  ([ADR-0091](docs/decisions/ADR-0091-external-scanner-finding-ingestion.md)).
+- A host-owned raw-artifact store at `.runtime/artifacts/<tool>/<runId>/`
+  (gitignored, `0600`, never egressed), extending the ADR-0080 `writeArtifact`
+  seam with `ProjectPaths.artifactsDir`/`artifactDir(tool)`, mode-`0600` writes,
+  and host-side retention governed by the new `cli.artifacts.keep` config field
+  (default 10; `0` disables pruning).
+- `--gate-save` / `--gate-compare` parity for adapters: scanner findings inherit
+  the host-owned baseline ratchet (ADR-0036) verbatim via worker-side
+  `message-hash` fingerprints, the same as `fit` and `graph`.
+- A `network` posture declaration (`local-only` / `networked` / `auth-required`)
+  surfaced by `doctor` and forward-mapped to the capability manifest's `requires`
+  (`subprocess` + `filesystem` always; `network` only when networked/auth) —
+  declaration-only in v1
+  ([ADR-0092](docs/decisions/ADR-0092-external-adapter-network-auth-trust.md)).
+- An authoring guide ([External tool adapters](docs/public/50-extend/08-external-tool-adapters.md))
+  and a CLI reference section for the opt-in adapter flow.
+
+### Security
+
+- Secret-scanner findings are redacted before they leave the parser: only a short
+  non-reversible preview (or hash) of a matched credential reaches a `Signal`; the
+  raw value is never placed in `Signal.message`, `Signal.metadata`, or any egress
+  payload. Raw scanner reports persist `0600` in the gitignored artifact store and
+  are never egressed — only normalized `Signal`s leave the process (ADR-0091/0092).
+
 ## [0.1.14] - 2026-06-28
 
 An agent-ergonomics and Cloud handoff release. Coding agents now have a
