@@ -289,6 +289,16 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/mcp',
     publishReason: 'Bundled MCP server tool (ADR-0084); stdio graph/results surface for agents',
   },
+  // Layer 4 — external tool adapters (ADR-0090; depend on external-tool-adapter +
+  // core/contracts). Opt-in / installed (NOT bundled); published after the
+  // substrate, before the CLI.
+  {
+    unscoped: 'tool-gitleaks',
+    name: '@opensip-cli/tool-gitleaks',
+    dir: 'packages/tool-gitleaks',
+    filter: '@opensip-cli/tool-gitleaks',
+    publishReason: 'Gitleaks external tool adapter; secret scanning (opensip gitleaks / secrets)',
+  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',

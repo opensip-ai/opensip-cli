@@ -55,6 +55,22 @@ const BUNDLED_TOOL_DIRS = [
 ];
 
 /**
+ * External Tool Adapter packages (ADR-0090, Phase-0 decision 7). These are
+ * OPT-IN / installed (NOT in `bundled-tools.manifest.json`), but they mount from
+ * the SAME static-manifest path bundled tools use — so `assertCommandNamesMatch`
+ * throws on drift at install + worker import. There is no other generator for
+ * them, so the command-shell parity gate (scan + auto-added doctor/version) lives
+ * here too: the adapter's runtime `commandSpecs` are the single source, and the
+ * `--check` lane fails CI on drift. The substrate's `deriveAdapterManifestCommands`
+ * produces the identical shape from the same `commandSpecs`; `deriveCommandShell`
+ * below is the generator-local equivalent already used for bundled tools.
+ */
+const ADAPTER_TOOL_DIRS = ['packages/tool-gitleaks'];
+
+/** Every tool dir whose static manifest carries a generated command shell. */
+const TOOL_DIRS = [...BUNDLED_TOOL_DIRS, ...ADAPTER_TOOL_DIRS];
+
+/**
  * Derive the serializable command SHELL from a runtime `CommandSpec`. Mirrors the
  * fields `ToolCommandManifest` carries (ADR-0054 M4-G) — everything `mountCommandSpec`
  * reads EXCEPT the `handler` fn and each option's non-serializable `parse` closure.
@@ -114,7 +130,7 @@ async function main() {
   const drift = [];
   let written = 0;
 
-  for (const toolDir of BUNDLED_TOOL_DIRS) {
+  for (const toolDir of TOOL_DIRS) {
     const pjPath = join(REPO_ROOT, toolDir, 'package.json');
     const raw = readFileSync(pjPath, 'utf8');
     const pkg = JSON.parse(raw);
@@ -152,7 +168,7 @@ async function main() {
   if (CHECK_ONLY) {
     if (drift.length === 0) {
       log(
-        `all ${BUNDLED_TOOL_DIRS.length} bundled tool manifest(s) carry the current command shell.`,
+        `all ${TOOL_DIRS.length} tool manifest(s) (bundled + adapter) carry the current command shell.`,
       );
       return;
     }
@@ -165,7 +181,7 @@ async function main() {
   }
 
   log(
-    `considered ${BUNDLED_TOOL_DIRS.length} bundled tool(s); updated command shell on ${written}.`,
+    `considered ${TOOL_DIRS.length} tool(s) (bundled + adapter); updated command shell on ${written}.`,
   );
 }
 

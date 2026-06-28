@@ -21,7 +21,7 @@ packages) is a separate trust gate — see
 [ADR-0068](../docs/decisions/ADR-0068-consumption-side-verification-policy.md)
 and [ADR-0061](../docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
-## The 39 packages
+## The 40 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -60,6 +60,7 @@ contract tests derive from or verify against that source.
 | Graph adapters | `@opensip-cli/graph-go`             | `packages/graph/graph-go`             |
 | Graph adapters | `@opensip-cli/graph-java`           | `packages/graph/graph-java`           |
 | Tools          | `@opensip-cli/mcp`                  | `packages/mcp`                        |
+| Tool adapters  | `@opensip-cli/tool-gitleaks`        | `packages/tool-gitleaks`              |
 | Check packs    | `@opensip-cli/checks-universal`     | `packages/fitness/checks-universal`   |
 | Check packs    | `@opensip-cli/checks-typescript`    | `packages/fitness/checks-typescript`  |
 | Check packs    | `@opensip-cli/checks-python`        | `packages/fitness/checks-python`      |
@@ -82,8 +83,8 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 
 ### 1. Version fields (hand-set, lockstep)
 
-All 39 publishable packages **plus** the private root (`@opensip-cli/root`) and
-the private `@opensip-cli/test-support` carry one shared version — 41
+All 40 publishable packages **plus** the private root (`@opensip-cli/root`) and
+the private `@opensip-cli/test-support` carry one shared version — 42
 `package.json` files. The bump script matches `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
@@ -184,7 +185,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
   for p in core datastore contracts tool-test-kit clone-detection session-store output config targeting cli-ui cli-live tree-sitter \
             lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
             dashboard external-tool-adapter fitness simulation graph yagni graph-adapter-common graph-typescript \
-            graph-python graph-rust graph-go graph-java mcp checks-universal checks-typescript \
+            graph-python graph-rust graph-go graph-java mcp tool-gitleaks checks-universal checks-typescript \
             checks-python checks-go checks-java checks-cpp checks-rust; do
      printf '%-40s %s\n' "@opensip-cli/$p" "$(npm view "@opensip-cli/$p" version 2>/dev/null || echo MISSING)"
    done

@@ -376,11 +376,16 @@ module.exports = {
       comment:
         'An external tool adapter (tool-gitleaks / tool-osv-scanner / tool-trivy) ' +
         'is layer-4 (ADR-0090): it imports @opensip-cli/external-tool-adapter + ' +
-        'core + contracts ONLY — never cli, output, a tool engine, or a ' +
-        'check/graph/lang pack. Scoped to the three MVP adapters to avoid the ' +
-        'layer-2 tool-test-kit collision.',
-      from: { path: '^packages/tool-(gitleaks|osv-scanner|trivy)/src/' },
-      to: { path: '^packages/(?!core/|contracts/|external-tool-adapter/)' },
+        'core + contracts ONLY — never cli, output, a tool engine, a check/graph/lang ' +
+        'pack, OR another adapter. The `from` captures the adapter package dir ($1) ' +
+        'so `to.pathNot` excludes its OWN intra-package relative imports; a sibling ' +
+        'adapter (a DIFFERENT tool-*) therefore still violates. Scoped to the three ' +
+        'MVP adapters to avoid the layer-2 tool-test-kit collision.',
+      from: { path: '^packages/(tool-(?:gitleaks|osv-scanner|trivy))/src/' },
+      to: {
+        path: '^packages/(?!core/|contracts/|external-tool-adapter/)',
+        pathNot: '^packages/$1/',
+      },
     },
 
     // -------------------------------------------------------------------
