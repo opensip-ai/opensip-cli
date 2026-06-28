@@ -10,10 +10,14 @@
 import { registerBlastRadius } from './blast-radius.js';
 import { registerCalleesOf } from './callees-of.js';
 import { registerFindDeadCode } from './find-dead-code.js';
+import { registerGetAgentCatalog } from './get-agent-catalog.js';
 import { registerGetArchitecture } from './get-architecture.js';
+import { registerGetLatestFindings } from './get-latest-findings.js';
 import { registerGetSymbol } from './get-symbol.js';
+import { registerListRuns } from './list-runs.js';
 import { registerRefreshGraph } from './refresh-graph.js';
 import { registerSearchSymbols } from './search-symbols.js';
+import { registerShowRun } from './show-run.js';
 import { registerTracePath } from './trace-path.js';
 import { registerWhoCalls } from './who-calls.js';
 
@@ -32,4 +36,10 @@ export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): voi
   registerFindDeadCode(server, deps);
   registerGetArchitecture(server, deps);
   registerRefreshGraph(server, deps);
+
+  // ── Result/history tools (over ResultsReadPort — replay only) ─────
+  registerGetAgentCatalog(server, deps);
+  registerListRuns(server, deps);
+  registerShowRun(server, deps);
+  registerGetLatestFindings(server, deps);
 }

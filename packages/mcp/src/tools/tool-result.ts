@@ -37,3 +37,9 @@ export function errorResult(error: McpReadError): CallToolResult {
 export function failure(code: string, message: string): CallToolResult {
   return errorResult({ code, message });
 }
+
+/** A structured `unknown-tool` error for a `tool` argument outside the live registry. */
+export function unknownToolError(tool: string, valid: ReadonlySet<string>): CallToolResult {
+  const known = [...valid].sort().join(', ') || '(none registered)';
+  return failure('unknown-tool', `Unknown tool "${tool}". Registered tools: ${known}.`);
+}
