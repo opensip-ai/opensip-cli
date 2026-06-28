@@ -38,11 +38,11 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
     output: COMMAND_RESULT,
     handler: async (rawOpts) => {
       if (ctx.toolContext === undefined) {
-        ctx.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return {
           type: 'error',
           message: 'suite run requires the full ToolCliContext handle.',
-          exitCode: EXIT_CODES.RUNTIME_ERROR,
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         };
       }
       const opts = rawOpts as Record<string, unknown> & {

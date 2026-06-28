@@ -102,6 +102,37 @@ describe('showHistory', () => {
     expect(session?.suiteRunId).toBe('suite-run-1');
     expect(session?.suiteName).toBe('security');
   });
+
+  it('adds suiteGroups when multiple steps share a suiteRunId', () => {
+    const repo = new SessionRepo(ds);
+    repo.save(
+      makeSession('FIT_SUITE_01', 95, Date.now(), {
+        suiteRunId: 'suite-run-1',
+        suiteName: 'security',
+      }),
+    );
+    repo.save(
+      makeSession('GRAPH_SUITE_01', 90, Date.now() + 1, {
+        tool: 'graph',
+        suiteRunId: 'suite-run-1',
+        suiteName: 'security',
+      }),
+    );
+    repo.save(makeSession('FIT_SOLO_01', 95, Date.now() + 2));
+
+    const result = showHistory(ds);
+    expect(result.suiteGroups).toEqual([
+      {
+        suiteRunId: 'suite-run-1',
+        suiteName: 'security',
+        sessions: expect.arrayContaining([
+          expect.objectContaining({ id: 'FIT_SUITE_01' }),
+          expect.objectContaining({ id: 'GRAPH_SUITE_01' }),
+        ]),
+      },
+    ]);
+    expect(result.suiteGroups?.[0]?.sessions).toHaveLength(2);
+  });
 });
 
 // ---------------------------------------------------------------------------

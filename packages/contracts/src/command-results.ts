@@ -53,6 +53,7 @@ export type {
   ListChecksResult,
   ListRecipesResult,
   HistorySession,
+  HistorySuiteGroup,
   HistoryResult,
   ReportResult,
 } from './command-results-variants/list-history-results.js';

@@ -135,20 +135,34 @@ async function runStep(args: {
       tool: args.step.tool.metadata.id,
       command: args.step.spec.name,
     });
-    exitCode = await withProcessExitGuard(async () => {
-      hooks.resetRun?.();
-      hooks.beginRun?.();
-      const dispatched = await hooks.maybeDispatchExternal?.(
-        args.step.spec.name,
-        opts,
-        args.step.positionals,
-      );
-      if (dispatched === true) return maxExit(capture.exitCodes);
-      const result = await args.step.spec.handler(opts, capture.context);
-      hooks.completeRun?.(result);
-      await dispatchOutput(result, args.step.spec, opts, args.step.positionals, capture.context);
-      return maxExit(capture.exitCodes);
-    }, capture.exitCodes);
+    exitCode = await withProcessExitGuard(
+      async () => {
+        hooks.resetRun?.();
+        hooks.beginRun?.();
+        const dispatched = await hooks.maybeDispatchExternal?.(
+          args.step.spec.name,
+          opts,
+          args.step.positionals,
+        );
+        if (dispatched === true) return maxExit(capture.exitCodes);
+        const result = await args.step.spec.handler(opts, capture.context);
+        hooks.completeRun?.(result);
+        await dispatchOutput(result, args.step.spec, opts, args.step.positionals, capture.context);
+        return maxExit(capture.exitCodes);
+      },
+      capture.exitCodes,
+      (code) => {
+        log.warn?.({
+          evt: 'cli.suite.run.step',
+          suite: args.suite.name,
+          suiteRunId: args.suiteRunId,
+          tool: args.step.tool.metadata.id,
+          command: args.step.spec.name,
+          exitCode: code,
+          msg: 'Bundled step called process.exit directly; captured as step verdict.',
+        });
+      },
+    );
     diagnostics?.event('execute', 'debug', `suite step '${args.step.spec.name}' completed`, {
       suite: args.suite.name,
       suiteRunId: args.suiteRunId,
@@ -219,9 +233,10 @@ function stepOpts(
   return { ...common, ...assembled, _args: step.positionals };
 }
 
-async function withProcessExitGuard<T>(
-  fn: () => Promise<T>,
+async function withProcessExitGuard(
+  fn: () => Promise<number>,
   exitCodes: readonly number[],
+  onDirectExit?: (code: number) => void,
 ): Promise<number> {
   // eslint-disable-next-line @typescript-eslint/unbound-method -- process.exit has no `this` contract; identity must be restored after the guard.
   const original = process.exit;
@@ -230,10 +245,12 @@ async function withProcessExitGuard<T>(
     throw new DirectProcessExit(typeof code === 'number' ? code : 0);
   };
   try {
-    const value = await fn();
-    return typeof value === 'number' ? value : maxExit(exitCodes);
+    return await fn();
   } catch (error) {
-    if (error instanceof DirectProcessExit) return error.code;
+    if (error instanceof DirectProcessExit) {
+      onDirectExit?.(error.code);
+      return error.code;
+    }
     throw error;
   } finally {
     (process as unknown as { exit: typeof process.exit }).exit = original;

@@ -226,6 +226,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         startedAt: snapshot.startedAt,
         completedAt: snapshot.completedAt,
         durationMs: snapshot.durationMs,
+        ...suiteSessionFields(),
       };
     }
 

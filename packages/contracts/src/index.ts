@@ -71,6 +71,7 @@ export type {
   ListChecksResult,
   ListRecipesResult,
   HistorySession,
+  HistorySuiteGroup,
   HistoryResult,
   ReportResult,
   InitResult,

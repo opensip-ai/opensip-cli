@@ -50,6 +50,11 @@ export {
 // `@opensip-cli/mcp` consumes WITHOUT naming `SessionRepo`.
 export { listSessionSummaries, type ListSessionSummariesOptions } from './list-summaries.js';
 export {
+  buildSuiteSessionGroups,
+  orderSessionsForSuiteGrouping,
+  type SuiteSessionGroup,
+} from './suite-session-grouping.js';
+export {
   resolveAndReplaySession,
   type SessionReplayFn,
   type ResolveAndReplayOptions,

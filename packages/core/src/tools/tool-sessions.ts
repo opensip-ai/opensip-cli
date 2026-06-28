@@ -103,6 +103,8 @@ export interface RecordedToolRunSession {
   readonly startedAt: string;
   readonly completedAt: string;
   readonly durationMs: number;
+  readonly suiteRunId?: string;
+  readonly suiteName?: string;
 }
 
 /**

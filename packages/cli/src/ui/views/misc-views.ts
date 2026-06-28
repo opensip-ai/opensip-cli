@@ -139,6 +139,10 @@ const HISTORY_COLUMNS: readonly (string | TableColumnSpec)[] = [
   { header: 'Duration', align: 'right' },
 ];
 
+function historyTableRows(sessions: readonly StoredSession[]): ViewNode {
+  return group([viewTable(HISTORY_COLUMNS, sessions.map(historyRow))], 2);
+}
+
 export function viewHistory(result: HistoryResult): ViewNode {
   if (result.sessions.length === 0) {
     return group(
@@ -154,14 +158,41 @@ export function viewHistory(result: HistoryResult): ViewNode {
     );
   }
   const visible = result.sessions.slice(0, 20);
-  return group([
-    line([
-      { text: 'Run History', bold: true },
-      { text: ` (${result.sessions.length} sessions)`, dim: true },
-    ]),
-    SPACER,
-    group([viewTable(HISTORY_COLUMNS, visible.map(historyRow))], 2),
+  const header = line([
+    { text: 'Run History', bold: true },
+    { text: ` (${result.sessions.length} sessions)`, dim: true },
   ]);
+
+  if (result.suiteGroups !== undefined && result.suiteGroups.length > 0) {
+    const groupedIds = new Set(
+      result.suiteGroups.flatMap((suiteGroup) => suiteGroup.sessions.map((session) => session.id)),
+    );
+    const standalone = visible.filter((session) => !groupedIds.has(session.id));
+    const children: ViewNode[] = [header, SPACER];
+    for (const suiteGroup of result.suiteGroups) {
+      const rows = suiteGroup.sessions.filter((session) =>
+        visible.some((candidate) => candidate.id === session.id),
+      );
+      if (rows.length === 0) continue;
+      children.push(
+        line([
+          {
+            text: `Suite: ${suiteGroup.suiteName ?? suiteGroup.suiteRunId}`,
+            bold: true,
+          },
+          { text: ` (${rows.length} steps)`, dim: true },
+        ]),
+        historyTableRows(rows),
+        SPACER,
+      );
+    }
+    if (standalone.length > 0) {
+      children.push(line([{ text: 'Standalone runs', bold: true }]), historyTableRows(standalone));
+    }
+    return group(children);
+  }
+
+  return group([header, SPACER, historyTableRows(visible)]);
 }
 
 // --- sim notice ------------------------------------------------------------

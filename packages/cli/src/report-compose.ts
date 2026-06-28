@@ -37,7 +37,7 @@ import {
   generateDashboardHtml,
   type DashboardInput as HtmlReportInput,
 } from '@opensip-cli/dashboard';
-import { SessionRepo } from '@opensip-cli/session-store';
+import { orderSessionsForSuiteGrouping, SessionRepo } from '@opensip-cli/session-store';
 
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
 import { type DispatchHostCtx } from './bootstrap/dispatch-replay-result.js';
@@ -87,7 +87,7 @@ async function composeReportInput(): Promise<HtmlReportInput> {
   const log = scope.logger ?? defaultLogger;
   const datastore = scope.datastore() as DataStore | undefined;
   const repo = datastore ? new SessionRepo(datastore) : undefined;
-  const sessions = repo ? [...repo.list({ limit: 20 })] : [];
+  const sessions = repo ? orderSessionsForSuiteGrouping([...repo.list({ limit: 20 })]) : [];
 
   const input: HtmlReportInput = { sessions };
   const claimedKeys = new Map<string, string>();

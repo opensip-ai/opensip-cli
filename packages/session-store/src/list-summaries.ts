@@ -15,6 +15,7 @@
 import { buildToolIdentityIndex } from '@opensip-cli/core';
 
 import { SessionRepo } from './session-repo.js';
+import { buildSuiteSessionGroups } from './suite-session-grouping.js';
 
 import type { HistoryResult, HistorySession, StoredSession } from '@opensip-cli/contracts';
 import type { ToolRegistry, ToolShortId } from '@opensip-cli/core';
@@ -43,9 +44,11 @@ export function listSessionSummaries(
   const identityIndex =
     opts.registry === undefined ? undefined : buildToolIdentityIndex(opts.registry);
   const sessions = repo.list(opts).map((s) => toHistorySession(s, opts.summaryOnly, identityIndex));
+  const suiteGroups = buildSuiteSessionGroups(sessions);
   return {
     type: 'history',
     sessions,
+    ...(suiteGroups === undefined ? {} : { suiteGroups }),
   };
 }
 
