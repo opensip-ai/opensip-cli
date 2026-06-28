@@ -96,6 +96,7 @@
   },
   "devDependencies": {
     "@opensip-cli/graph-typescript": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
     "@types/node": "^24.13.2",
     "vitest": "^4.1.8"
   }

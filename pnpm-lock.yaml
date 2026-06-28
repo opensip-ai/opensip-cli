@@ -1015,6 +1015,9 @@ importers:
       '@opensip-cli/graph-typescript':
         specifier: workspace:*
         version: link:../graph/graph-typescript
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
