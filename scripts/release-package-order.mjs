@@ -299,6 +299,14 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/tool-gitleaks',
     publishReason: 'Gitleaks external tool adapter; secret scanning (opensip gitleaks / secrets)',
   },
+  {
+    unscoped: 'tool-osv-scanner',
+    name: '@opensip-cli/tool-osv-scanner',
+    dir: 'packages/tool-osv-scanner',
+    filter: '@opensip-cli/tool-osv-scanner',
+    publishReason:
+      'OSV-Scanner external tool adapter; dependency vulnerability scanning (opensip osv-scanner / osv)',
+  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',
