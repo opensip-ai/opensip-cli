@@ -123,11 +123,31 @@ module.exports = {
       comment:
         "Production code must not import a package's `src/internal.ts` barrel — those are " +
         'test-only surfaces exposed via the `<pkg>/internal` subpath for cross-package test ' +
-        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it.',
+        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it. ' +
+        'The sole sanctioned exception is `packages/mcp/` → `graph/internal` (ADR-0084), ' +
+        'governed by the narrowly-scoped `mcp-graph-internal-scope` rule below.',
       from: {
-        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+        // `packages/mcp/` is exempt from the GENERIC rule; its single allowed
+        // internal edge (graph/internal only) is governed by the scoped rule below.
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`, '^packages/mcp/'],
       },
       to: { path: String.raw`/src/internal\.ts$` },
+    },
+    {
+      name: 'mcp-graph-internal-scope',
+      severity: 'error',
+      comment:
+        'ADR-0084: `@opensip-cli/mcp` may import `@opensip-cli/graph/internal` (read-only, ' +
+        'in-monorepo) — and ONLY graph/internal. Any other `*/src/internal.ts` import from ' +
+        'packages/mcp/ is forbidden (use the package public barrel).',
+      from: {
+        path: '^packages/mcp/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: String.raw`/src/internal\.ts$`,
+        pathNot: String.raw`^packages/graph/engine/src/internal\.ts$`,
+      },
     },
     {
       name: 'no-prod-import-of-test-support',
