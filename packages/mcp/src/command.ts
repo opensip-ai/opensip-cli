@@ -106,8 +106,10 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     // Mount the tool catalog through the server's scope-wrapping register seam.
     // `validToolIds` lets the result tools reject an unknown `tool` argument.
     const validToolIds = new Set(scope.tools.list().map((t) => t.identity.name));
-    // @fitness-ignore-next-line detached-promises -- registerMcpTools is synchronous (returns void); the check cannot infer cross-file sync callables, so this floating call is a false positive.
-    registerMcpTools(server, { graph, results, validToolIds });
+    // `void`: registerMcpTools is synchronous (returns void); the leading `void`
+    // marks the discard explicitly so the detached-promises heuristic (which can't
+    // see cross-file sync callables) doesn't read this floating call as a promise.
+    void registerMcpTools(server, { graph, results, validToolIds });
 
     // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
     await server.serve();
