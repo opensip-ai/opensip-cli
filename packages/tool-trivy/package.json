@@ -101,7 +101,18 @@
         "output": "raw-stream",
         "rawStreamReason": "diagnostic-gate"
       }
-    ]
+    ],
+    "config": {
+      "namespace": "trivy",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
   },
   "scripts": {
     "build": "tsc",

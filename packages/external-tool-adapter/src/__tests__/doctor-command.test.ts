@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
+import { defaultAdapterConfigSchema } from '../adapter-config.js';
 import { compareVersion, doctorReportLines, probeAdapter } from '../doctor-command.js';
 import { probeVersionReport } from '../version-command.js';
 
 import type { DoctorProbeDeps } from '../doctor-command.js';
+
+/**
+ * Build the `gitleaks` namespace config block the way PRODUCTION does — by parsing
+ * it through the adapter's own (default) namespace schema. This is the same Zod the
+ * worker deep pass runs and the same shape the composer projects onto
+ * `scope.toolConfig.gitleaks`, so a test that feeds the parsed result to
+ * `probeAdapter` exercises a genuinely reachable config — not a hand-built shape the
+ * resolver could never deliver (the A4 "production-unreachable" hole).
+ */
+function producibleConfig(raw: Record<string, unknown>): Readonly<Record<string, unknown>> {
+  const parsed = defaultAdapterConfigSchema().safeParse(raw);
+  if (!parsed.success) throw new Error('config block is not producible by the adapter schema');
+  return parsed.data as Readonly<Record<string, unknown>>;
+}
 
 function deps(over: Partial<DoctorProbeDeps> = {}): DoctorProbeDeps {
   return {
@@ -64,13 +79,16 @@ describe('probeAdapter', () => {
     expect(report.ready).toBe(false);
   });
 
-  it('honors a config-file pin', () => {
+  it('honors a config-file pin (from a producible namespace block)', () => {
     const report = probeAdapter(
       {
         tool: 'gitleaks',
         network: 'local-only',
         binary,
-        config: { binaries: { gitleaks: { path: '/opt/gitleaks' } } },
+        // The pin is validated through the adapter's own schema first, so this is
+        // exactly the shape the composer projects onto scope.toolConfig.gitleaks —
+        // not a production-unreachable hand-built object (A4).
+        config: producibleConfig({ binaries: { gitleaks: { path: '/opt/gitleaks' } } }),
       },
       deps(),
     );

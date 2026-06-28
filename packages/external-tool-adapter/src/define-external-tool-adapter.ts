@@ -21,6 +21,8 @@ import {
   ValidationError,
 } from '@opensip-cli/core';
 
+import { defaultAdapterConfig, defaultAdapterConfigManifest } from './adapter-config.js';
+import { type AdapterToolMarkers } from './adapter-manifest.js';
 import { buildDoctorCommand } from './doctor-command.js';
 import { resolveFingerprintStrategy } from './fingerprint.js';
 import { runScanLoop } from './run-loop.js';
@@ -32,6 +34,7 @@ import type {
   Tool,
   ToolCliContext,
   ToolCommandSpecInput,
+  ToolConfigManifestDescriptor,
   ToolRunCompletion,
 } from '@opensip-cli/core';
 
@@ -121,6 +124,18 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
   assertSpec(spec);
   const [primary, ...rest] = spec.commands;
 
+  // R6 (ADR-0090 §4.3): an adapter that declares no `config` DEFAULTS to claiming
+  // its namespace (`binaries.<tool>.path` operator pin + the reserved verdict-policy
+  // keys) so the resolver/gate keys are configurable AND an operator's `<tool>:`
+  // block never bricks the project. When the adapter uses the DEFAULT config the
+  // substrate can also emit a coarse, serializable manifest descriptor (the host
+  // pre-fork pass needs it — it cannot import the runtime Zod). A custom `spec.config`
+  // keeps the runtime Zod but emits NO descriptor (its validation defers to the
+  // worker deep pass), so `adapterConfigManifest` stays undefined.
+  const config = spec.config ?? defaultAdapterConfig();
+  const configManifest: ToolConfigManifestDescriptor | undefined =
+    spec.config === undefined ? defaultAdapterConfigManifest(spec.identity.name) : undefined;
+
   const scanPrimary = definePrimaryCommand<unknown, ToolCliContext>({
     description: primary.description ?? spec.metadata.description,
     commonFlags: [...SCAN_COMMON_FLAGS],
@@ -144,7 +159,7 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
     }),
   );
 
-  return defineTool({
+  const tool = defineTool({
     identity: spec.identity,
     metadata: {
       id: spec.metadata.id,
@@ -160,7 +175,17 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
     ...(spec.contractVersion === undefined ? {} : { contractVersion: spec.contractVersion }),
     extensionPoints: {
       fingerprintStrategy: resolveFingerprintStrategy(spec.fingerprintStrategy),
-      ...(spec.config === undefined ? {} : { config: spec.config }),
+      config,
     },
   });
+
+  // Stamp the adapter-substrate markers the manifest generator + parity gate read
+  // back (`adapter-manifest.ts`): the network posture (→ `requires`) and the coarse
+  // config descriptor (→ `opensipTools.config`). Kept off the core `Tool` contract
+  // — these are adapter concepts, not kernel ones.
+  const markers: AdapterToolMarkers = {
+    adapterNetwork: spec.network,
+    ...(configManifest === undefined ? {} : { adapterConfigManifest: configManifest }),
+  };
+  return Object.assign(tool, markers);
 }

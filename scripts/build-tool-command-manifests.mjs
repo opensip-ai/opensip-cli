@@ -43,6 +43,28 @@ const CHECK_ONLY = process.argv.slice(2).includes('--check');
 const log = (msg) => console.error(`[build-tool-command-manifests] ${msg}`);
 
 /**
+ * The substrate's manifest-derivation helpers, loaded from its built dist. The
+ * coarse `config` descriptor (the namespace claim, ADR-0090 §4.3) is DERIVED from
+ * the runtime Tool here so it can never drift from the spec — single-sourced in the
+ * substrate, exactly as the command shells are. Loaded lazily (only when an adapter
+ * dir is processed) so the bundled-only run does not require the substrate dist.
+ */
+let adapterManifestHelpers;
+async function loadAdapterManifestHelpers() {
+  if (adapterManifestHelpers !== undefined) return adapterManifestHelpers;
+  const entry = join(REPO_ROOT, 'packages', 'external-tool-adapter', 'dist', 'index.js');
+  if (!existsSync(entry)) {
+    log(`MISSING build artifact: ${relative(REPO_ROOT, entry)} — run \`pnpm build\` first`);
+    process.exit(1);
+  }
+  const mod = await import(pathToFileURL(entry).href);
+  adapterManifestHelpers = {
+    deriveAdapterConfigManifest: mod.deriveAdapterConfigManifest,
+  };
+  return adapterManifestHelpers;
+}
+
+/**
  * The bundled tool packages whose manifests carry a derived command shell. Keyed
  * to the dirs the central bundled manifest declares (kept in sync by the data in
  * packages/cli/src/bootstrap/bundled-tools.manifest.json).
@@ -145,6 +167,19 @@ async function main() {
 
     const tool = await loadBundledTool(toolDir);
     pkg.opensipTools.commands = tool.commandSpecs.map((spec) => deriveCommandShell(spec));
+
+    // ADR-0090 §4.3: for an adapter, ALSO derive the `config` namespace claim.
+    // Single-sourced in the substrate so the static manifest can never drift from
+    // the runtime; the `--check` lane fails CI on a derivation mismatch.
+    if (ADAPTER_TOOL_DIRS.includes(toolDir)) {
+      const { deriveAdapterConfigManifest } = await loadAdapterManifestHelpers();
+      const config = deriveAdapterConfigManifest(tool);
+      if (config === undefined) {
+        delete pkg.opensipTools.config;
+      } else {
+        pkg.opensipTools.config = config;
+      }
+    }
     // ADR-0054 M4-G: carry the serializable pluginLayout (`{ domain, userSubdirs }`)
     // so a pack-supporting tool loaded via the external path synthesizes the same
     // `<tool> plugin …` group + init scaffolding. A tool with no layout (e.g. graph)

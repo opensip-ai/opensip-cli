@@ -195,7 +195,15 @@ export interface ExternalToolAdapterSpec {
   readonly commands: readonly ExternalCommandSpec[];
   /** Adapter default `'message-hash'` (ADR-0091 §4.5). */
   readonly fingerprintStrategy?: FingerprintStrategyChoice;
-  /** Optional namespaced config contribution (e.g. the `binaries.<tool>.path` block). */
+  /**
+   * Optional namespaced config contribution. OMIT it for the standard behaviour:
+   * the substrate DEFAULTS to a claimed namespace ({@link defaultAdapterConfigSchema}
+   * — the `binaries.<tool>.path` operator pin + the reserved verdict-policy keys),
+   * so the binary pin resolves and the gate thresholds are configurable like a
+   * bundled tool. Supply a custom contribution only to claim extra keys; doing so
+   * opts out of the auto-generated static config descriptor (its validation then
+   * defers entirely to the worker deep pass).
+   */
   readonly config?: Omit<ToolConfigContribution, 'namespace'>;
   /** Optional per-tool contract version marker (ADR-0046). */
   readonly contractVersion?: string;

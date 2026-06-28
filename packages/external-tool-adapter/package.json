@@ -41,7 +41,8 @@
   "dependencies": {
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@opensip-cli/output": "workspace:*",

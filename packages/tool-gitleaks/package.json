@@ -110,7 +110,18 @@
         "output": "raw-stream",
         "rawStreamReason": "diagnostic-gate"
       }
-    ]
+    ],
+    "config": {
+      "namespace": "gitleaks",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
   },
   "scripts": {
     "build": "tsc",

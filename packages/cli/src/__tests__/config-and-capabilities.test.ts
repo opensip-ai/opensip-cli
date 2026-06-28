@@ -3,9 +3,10 @@
  * wiring seam (release 2.10.0, ADR-0023 / §5.3, Phase 4 Task 4.3).
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   CapabilityRegistry,
@@ -14,6 +15,7 @@ import {
   type CapabilityRegistrar,
   type Tool,
   type ToolPluginManifest,
+  type ToolProvenance,
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -524,5 +526,133 @@ describe('wireCapabilityRegistry', () => {
     });
     registry.routeContribution('graph-adapter', { id: 'ts' });
     expect(real).toHaveBeenCalledOnce();
+  });
+});
+
+/**
+ * A4 (ADR-0090 §4.3) — an External Tool Adapter must CLAIM its config namespace
+ * via its STATIC manifest descriptor (`opensipTools.config`), the path the host
+ * folds for an INSTALLED tool (it never imports the runtime Zod). Without the
+ * claim, an operator's `<tool>:` block hits the ADR-0043 unclaimed-namespace gate
+ * and BRICKS every project command (exit 2). These tests pin: (1) the bug shape —
+ * a same-named installed tool with NO descriptor bricks — and (2) the fix — the
+ * REAL committed gitleaks manifest claims its namespace, so a `gitleaks:` block is
+ * accepted AND `binaries.gitleaks.path` + the verdict keys resolve into toolConfig.
+ */
+/** Write an `opensip-cli.config.yml` under `targetDir` and return its path. */
+function writeConfigFile(targetDir: string, body: string): string {
+  const path = join(targetDir, 'opensip-cli.config.yml');
+  writeFileSync(path, body, 'utf8');
+  return path;
+}
+
+/** The real, committed gitleaks manifest as the host admits it from package.json. */
+function gitleaksManifest(): ToolPluginManifest {
+  const pkg = JSON.parse(
+    readFileSync(
+      fileURLToPath(new URL('../../../tool-gitleaks/package.json', import.meta.url)),
+      'utf8',
+    ),
+  ) as { name: string; version: string; opensipTools: Record<string, unknown> };
+  return {
+    ...(pkg.opensipTools as object),
+    name: pkg.name,
+    version: pkg.version,
+    apiVersion: pkg.opensipTools.apiVersion as number,
+  } as ToolPluginManifest;
+}
+
+describe('A4: external adapters claim a config namespace (no brick)', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cfg-adapter-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const writeConfig = (body: string): string => writeConfigFile(dir, body);
+
+  /**
+   * An INSTALLED-provenance gitleaks tool (no runtime config — the host uses the
+   * MANIFEST descriptor), loaded ALONGSIDE a bundled config-declaring tool. The
+   * co-tool mirrors production: `opensip fit` always loads fitness (declares
+   * config), and an installed gitleaks rides in the same document — which is the
+   * exact condition under which an unclaimed `gitleaks:` block bricks.
+   */
+  const gitleaksTool = makeTool({ id: 'gitleaks' });
+  const tools = () => registryWith([fitnessTool, gitleaksTool]);
+  const installedProvenance: ToolProvenance[] = [
+    { source: 'installed', id: 'gitleaks', version: '0.1.14', manifestHash: 'h' },
+  ];
+  const blockWithPin = 'gitleaks:\n  binaries:\n    gitleaks:\n      path: /opt/bin/gitleaks\n';
+
+  it('the bug: an installed adapter with NO config descriptor bricks on its own namespace block', () => {
+    // A manifest WITHOUT `config` — the pre-fix shape. The `gitleaks:` block is
+    // unclaimed AND names a loaded tool → the ADR-0043 toolBug branch hard-rejects
+    // (exit 2 on EVERY command reading project config — the brick).
+    const noConfigManifest: ToolPluginManifest = {
+      kind: 'tool',
+      id: 'gitleaks',
+      name: 'gitleaks',
+      version: '0.1.14',
+      apiVersion: 1,
+      commands: [],
+    };
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: tools(),
+        manifests: [noConfigManifest],
+        provenance: installedProvenance,
+        configPath: writeConfig(blockWithPin),
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it('the fix: the committed gitleaks manifest claims its namespace — the block is ACCEPTED (no brick)', () => {
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: tools(),
+        manifests: [gitleaksManifest()],
+        provenance: installedProvenance,
+        configPath: writeConfig(blockWithPin),
+        env: {},
+      }),
+    ).not.toThrow();
+  });
+
+  it('binaries.gitleaks.path resolves into scope.toolConfig (the operator pin works)', () => {
+    const result = composeAndValidateToolConfig({
+      tools: tools(),
+      manifests: [gitleaksManifest()],
+      provenance: installedProvenance,
+      configPath: writeConfig(blockWithPin),
+      env: {},
+    });
+    const block = result.config?.gitleaks as { binaries?: { gitleaks?: { path?: string } } };
+    expect(block?.binaries?.gitleaks?.path).toBe('/opt/bin/gitleaks');
+  });
+
+  it('the reserved verdict-policy keys are configurable on the adapter namespace', () => {
+    const result = composeAndValidateToolConfig({
+      tools: tools(),
+      manifests: [gitleaksManifest()],
+      provenance: installedProvenance,
+      configPath: writeConfig('gitleaks:\n  failOnWarnings: 2\n  failOnDegraded: false\n'),
+      env: {},
+    });
+    expect(result.config?.gitleaks).toMatchObject({ failOnWarnings: 2, failOnDegraded: false });
+  });
+
+  it('a typo inside the claimed gitleaks namespace is strict-rejected', () => {
+    expect(() =>
+      composeAndValidateToolConfig({
+        tools: tools(),
+        manifests: [gitleaksManifest()],
+        provenance: installedProvenance,
+        configPath: writeConfig('gitleaks:\n  binares: {}\n'),
+        env: {},
+      }),
+    ).toThrow(ConfigurationError);
   });
 });

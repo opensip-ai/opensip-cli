@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { assertManifestMatchesTool } from '@opensip-cli/core';
 import {
   DEFAULT_EXIT_MODEL,
+  deriveAdapterConfigManifest,
   deriveAdapterManifestCommands,
   interpretExit,
   normalizedSignalShape,
@@ -197,6 +198,12 @@ describe('osv-scanner tool — manifest ↔ runtime host-shape guards', () => {
           'Reads the project working tree and writes the raw scan artifact under .runtime/artifacts',
       },
     ]);
+  });
+
+  it('the generated manifest config descriptor equals the derived namespace claim (A4)', () => {
+    const derived = deriveAdapterConfigManifest(tool);
+    expect(derived?.namespace).toBe('osv-scanner');
+    expect(PKG.opensipTools.config).toEqual(derived);
   });
 });
 

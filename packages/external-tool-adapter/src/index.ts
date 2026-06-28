@@ -74,6 +74,16 @@ export type {
 export { resolveScannerArtifactPath } from './artifact-path.js';
 export type { ArtifactPathScope } from './artifact-path.js';
 export { deriveAdapterManifestCommands } from './manifest-commands.js';
+export { adapterConfigManifestOf, deriveAdapterConfigManifest } from './adapter-manifest.js';
+export type { AdapterToolMarkers } from './adapter-manifest.js';
+
+// ── Config namespace claim (binary pin + verdict keys) ───────────────────────
+export {
+  defaultAdapterConfig,
+  defaultAdapterConfigManifest,
+  defaultAdapterConfigSchema,
+} from './adapter-config.js';
+export type { AdapterConfigContribution } from './adapter-config.js';
 
 // ── doctor / version reports ────────────────────────────────────────────────
 export { compareVersion } from './doctor-command.js';

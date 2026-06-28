@@ -106,7 +106,18 @@
         "output": "raw-stream",
         "rawStreamReason": "diagnostic-gate"
       }
-    ]
+    ],
+    "config": {
+      "namespace": "osv-scanner",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
   },
   "scripts": {
     "build": "tsc",

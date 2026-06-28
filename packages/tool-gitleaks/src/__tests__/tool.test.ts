@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { assertManifestMatchesTool } from '@opensip-cli/core';
 import {
   DEFAULT_EXIT_MODEL,
+  deriveAdapterConfigManifest,
   deriveAdapterManifestCommands,
   interpretExit,
   normalizedSignalShape,
@@ -215,6 +216,14 @@ describe('gitleaks tool — manifest ↔ runtime host-shape guards', () => {
           'Reads the project working tree and writes the raw scan artifact under .runtime/artifacts',
       },
     ]);
+  });
+
+  it('the generated manifest config descriptor equals the derived namespace claim (A4)', () => {
+    // A4: the installed-path namespace claim (so the host pre-fork pass recognizes a
+    // `gitleaks:` block and never bricks). Generator parity guards against drift.
+    const derived = deriveAdapterConfigManifest(tool);
+    expect(derived?.namespace).toBe('gitleaks');
+    expect(PKG.opensipTools.config).toEqual(derived);
   });
 });
 

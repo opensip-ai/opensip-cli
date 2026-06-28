@@ -1,6 +1,7 @@
 import { createSignal, ValidationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import { deriveAdapterConfigManifest } from '../adapter-manifest.js';
 import { defineExternalToolAdapter } from '../define-external-tool-adapter.js';
 import { messageHashFingerprintStrategy } from '../fingerprint.js';
 
@@ -92,6 +93,48 @@ describe('defineExternalToolAdapter', () => {
     expect(tool.extensionPoints?.config).toMatchObject({
       namespace: 'examplescan',
       schema: { marker: true },
+    });
+  });
+
+  // A4 / R6 (ADR-0090 §4.3): an adapter that declares NO `config` must still CLAIM
+  // its namespace by default — otherwise `scope.toolConfig[<tool>]` is always
+  // undefined (binary pin dead, verdict keys non-configurable, and an operator's
+  // `<tool>:` block bricks the project via the ADR-0043 unclaimed-namespace gate).
+  describe('default config namespace claim (A4 / R6)', () => {
+    it('claims the namespace on the runtime when config is omitted', () => {
+      const tool = defineExternalToolAdapter(baseSpec);
+      const config = tool.extensionPoints?.config;
+      expect(config?.namespace).toBe('examplescan');
+      // The runtime schema is the worker deep-pass Zod (exposes safeParse).
+      expect(typeof (config?.schema as { safeParse?: unknown }).safeParse).toBe('function');
+    });
+
+    it('the runtime schema accepts the binary pin AND the reserved verdict keys', () => {
+      const tool = defineExternalToolAdapter(baseSpec);
+      const schema = tool.extensionPoints?.config?.schema as {
+        safeParse: (v: unknown) => { success: boolean };
+      };
+      expect(
+        schema.safeParse({
+          binaries: { examplescan: { path: '/opt/examplescan' } },
+          failOnWarnings: 2,
+          failOnDegraded: false,
+        }).success,
+      ).toBe(true);
+      // A typo inside the block is rejected by the deep pass (strict).
+      expect(schema.safeParse({ binares: {} }).success).toBe(false);
+    });
+
+    it('emits a coarse static config descriptor (the installed-path namespace claim)', () => {
+      const tool = defineExternalToolAdapter(baseSpec);
+      const descriptor = deriveAdapterConfigManifest(tool);
+      expect(descriptor?.namespace).toBe('examplescan');
+      expect(descriptor?.schema.properties?.binaries).toEqual({ type: 'object' });
+    });
+
+    it('emits NO static descriptor for a custom config (validation defers to the worker)', () => {
+      const tool = defineExternalToolAdapter({ ...baseSpec, config: { schema: { marker: true } } });
+      expect(deriveAdapterConfigManifest(tool)).toBeUndefined();
     });
   });
 
