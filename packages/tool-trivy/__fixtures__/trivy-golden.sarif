@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "fullName": "Trivy Vulnerability Scanner",
+          "name": "Trivy",
+          "version": "0.50.1",
+          "informationUri": "https://github.com/aquasecurity/trivy",
+          "rules": [
+            {
+              "id": "CVE-2023-37920",
+              "name": "LanguageSpecificPackageVulnerability",
+              "shortDescription": {
+                "text": "certifi: Removal of e-Tugra root certificate"
+              },
+              "fullDescription": {
+                "text": "Certifi is a curated collection of Root Certificates. Certifi prior to version 2023.07.22 recognizes e-Tugra root certificates."
+              },
+              "helpUri": "https://avd.aquasec.com/nvd/cve-2023-37920",
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "security-severity": "9.8",
+                "tags": ["vulnerability", "security", "CRITICAL"],
+                "precision": "very-high"
+              }
+            },
+            {
+              "id": "CVE-2022-40897",
+              "name": "LanguageSpecificPackageVulnerability",
+              "shortDescription": {
+                "text": "setuptools: Regular Expression Denial of Service (ReDoS)"
+              },
+              "fullDescription": {
+                "text": "Python Packaging Authority (PyPA) setuptools before 65.5.1 allows remote attackers to cause a denial of service via HTML in a crafted package index page."
+              },
+              "helpUri": "https://avd.aquasec.com/nvd/cve-2022-40897",
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "security-severity": "7.5",
+                "tags": ["vulnerability", "security", "HIGH"],
+                "precision": "very-high"
+              }
+            },
+            {
+              "id": "DS002",
+              "name": "DockerfileMisconfiguration",
+              "shortDescription": {
+                "text": "Image user should not be 'root'"
+              },
+              "fullDescription": {
+                "text": "Running containers with 'root' user can lead to a container escape situation. It is a best practice to run containers as non-root users."
+              },
+              "helpUri": "https://avd.aquasec.com/misconfig/ds002",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": ["misconfiguration", "security", "MEDIUM"]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2023-37920",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "certifi: Removal of e-Tugra root certificate"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "requirements.txt",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CVE-2022-40897",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "setuptools: Regular Expression Denial of Service (ReDoS)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "requirements.txt",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "DS002",
+          "ruleIndex": 2,
+          "level": "warning",
+          "message": {
+            "text": "Image user should not be 'root'"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Dockerfile",
+                  "uriBaseId": "ROOTPATH"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
