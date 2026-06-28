@@ -371,6 +371,16 @@
       "purpose": "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
     },
     {
+      "file": "docs/web-generated/50-extend/08-external-tool-adapters.md",
+      "path": "/docs/opensip-cli/50-extend/08-external-tool-adapters/",
+      "section": "50-extend",
+      "title": "External tool adapters",
+      "audience": [
+        "plugin-authors"
+      ],
+      "purpose": "Wrap a local CLI scanner (gitleaks/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
+    },
+    {
       "file": "docs/web-generated/55-yagni/01-command-reference.md",
       "path": "/docs/opensip-cli/55-yagni/01-command-reference/",
       "section": "55-yagni",
@@ -746,7 +756,8 @@
         "/docs/opensip-cli/50-extend/04-check-pack-architecture/",
         "/docs/opensip-cli/50-extend/05-language-adapters/",
         "/docs/opensip-cli/50-extend/06-full-tool-plugins/",
-        "/docs/opensip-cli/50-extend/07-command-taxonomy/"
+        "/docs/opensip-cli/50-extend/07-command-taxonomy/",
+        "/docs/opensip-cli/50-extend/08-external-tool-adapters/"
       ]
     },
     {
@@ -854,6 +865,7 @@
         "/docs/opensip-cli/50-extend/05-language-adapters/",
         "/docs/opensip-cli/50-extend/06-full-tool-plugins/",
         "/docs/opensip-cli/50-extend/07-command-taxonomy/",
+        "/docs/opensip-cli/50-extend/08-external-tool-adapters/",
         "/docs/opensip-cli/60-guides/01-write-your-first-check/",
         "/docs/opensip-cli/60-guides/02-ban-an-api-pattern/",
         "/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/",

@@ -88,7 +88,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | Evaluating opensip-cli | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [FAQ](./00-start/04-faq.md) |
 | New user | [Quick start](./00-start/00-quick-start.md) -> [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) -> [Write your first check](./60-guides/01-write-your-first-check.md) |
 | CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
-| Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) |
+| Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) -> [External tool adapters](./50-extend/08-external-tool-adapters.md) |
 | Graph adopter | [Use graph](./60-guides/06-use-graph.md) -> [Stages and catalog](./40-graph/01-stages-and-catalog.md) -> [Rules and gating](./40-graph/02-rules-and-gating.md) |
 | Contributor | [Architecture overview](./00-start/07-architecture-overview.md) -> [Layered package graph](./10-concepts/03-modular-monolith.md) -> [Layer policy](./80-implementation/05-layer-policy.md) |
 

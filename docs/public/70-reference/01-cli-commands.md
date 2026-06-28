@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-06-28
 release: v0.1.14
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -20,6 +20,10 @@ source-files:
   - packages/yagni/engine/src/tool.ts
   - packages/mcp/src/command.ts
   - packages/mcp/src/tools/register.ts
+  - packages/external-tool-adapter/src/define-external-tool-adapter.ts
+  - packages/tool-gitleaks/src/tool.ts
+  - packages/tool-osv-scanner/src/tool.ts
+  - packages/tool-trivy/src/tool.ts
 related-docs:
   - ../80-implementation/01-cli-dispatch.md
   - ../70-reference/03-configuration.md
@@ -916,6 +920,66 @@ opensip tools data-purge <tool-id>
 ```
 
 `validate` runs the same admission pipeline the CLI's own bootstrap admits tools through — one validator, shared. `install` is atomic: stage → validate → activate; a failed install leaves nothing behind. `uninstall` never deletes project SQLite data; `data-purge` deletes rows (sessions, baselines, tool state), never tables. **`validate` and `install` execute the package's module** — see the trust notes in the full reference.
+
+---
+
+## External tool adapters (opt-in)
+
+Tool-owned: [`@opensip-cli/external-tool-adapter`](../../../packages/external-tool-adapter) + the three MVP adapter packages ([ADR-0090](../../decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)).
+
+An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want, then trust it. To author your own, see [External tool adapters](../50-extend/08-external-tool-adapters.md).
+
+The full user flow:
+
+```
+opensip tools install @opensip-cli/tool-gitleaks   # opt-in, not bundled
+export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='gitleaks' # trust it (deny-by-default)
+opensip gitleaks doctor                            # binary found? version? posture? ready?
+opensip gitleaks                                   # scan → normalize → store → signals
+opensip gitleaks --json --gate-compare             # envelope + net-new ratchet
+```
+
+> **You must trust the tool after installing it.** Installed tools are **deny-by-default**: a bare `opensip gitleaks` errors *tool-not-found* until you add the adapter's manifest `id` to `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` (comma/whitespace-separated; `*` admits all). The trust value is the manifest **`id`** — `gitleaks`, `osv-scanner`, `trivy` — **not** the UUID. `opensip tools install` prints the exact export in its `nextSteps`. This is the headline gotcha: install alone is not enough. The same trust surface and `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) apply to all three.
+
+### The three MVP adapters
+
+| Command | Wraps | Scans | Posture |
+|---------|-------|-------|---------|
+| `opensip gitleaks` (alias `secrets`) | `gitleaks` | Committed secrets in the working tree | `local-only` |
+| `opensip osv-scanner` (alias `osv`) | `osv-scanner` | Dependency vulnerabilities (lockfiles) | `local-only` |
+| `opensip trivy` | `trivy` | Vulnerabilities + misconfigurations (filesystem) | `local-only` |
+
+Each adapter mounts three commands — the primary `scan` (`opensip <tool>`), plus nested `opensip <tool> doctor` and `opensip <tool> version`:
+
+- **`opensip <tool>`** — resolve the binary → `execFile` (no shell) → read the native report → persist the raw artifact → normalize to `Signal`s → emit + deliver. Inherits the common flags (`--json`, `--cwd`, `--quiet`, `--report-to`, …) and the gate flags below.
+- **`opensip <tool> doctor`** — probe the binary and report readiness: **binary** (found / path / resolution layer), **version** (detected vs. `minVersion`), **network posture**, install hint when missing, and a `ready` verdict. Exits **`0` when ready, `2` when not** (`--json` for the structured `AdapterDoctorReport`), so CI can gate on it. **Run `doctor` first** — it surfaces the local-binary and DB-cache prerequisites below.
+- **`opensip <tool> version`** — print the resolved binary version + path (`--json` for the structured shape).
+
+**Local-binary + DB-cache prerequisites (surfaced by `doctor`):**
+
+- **gitleaks** — needs the `gitleaks` binary on `PATH` (or pinned). Offline; no DB.
+- **osv-scanner** — needs the `osv-scanner` binary. It ships an embedded/offline advisory DB, so the scan is local-only; a project with **no lockfiles** is a clean no-op, not a failure.
+- **trivy** — needs the `trivy` binary **and a pre-populated local vulnerability DB cache**. The adapter scans with `--skip-db-update --skip-java-db-update --offline-scan`, so Trivy will **not** fetch its DB at scan time. Populate the cache once online (e.g. `trivy image --download-db-only`) before the first offline scan; `doctor`'s install hint notes this.
+
+### The gate ratchet, JSON, and the artifact store
+
+Adapters inherit the host-owned baseline ratchet ([ADR-0036](../../decisions/ADR-0036-host-owned-baseline-ratchet-plane.md)) verbatim, the same as `fit`/`graph`:
+
+- **`--gate-save`** — capture the current findings as the project baseline in the SQLite store (mutually exclusive with `--gate-compare`).
+- **`--gate-compare`** — diff against the saved baseline; exit non-zero on a net-new finding (the `failOnDegraded` reserved key). Findings are fingerprinted with the line-shift-tolerant `message-hash` strategy.
+- **`--json`** — emit the `SignalEnvelope` for machine consumption (the same envelope the gate and egress read).
+
+The scanner's **raw native report** persists under `<project>/opensip-cli/.runtime/artifacts/<tool>/<runId>/` (host-owned, [ADR-0080](../../decisions/ADR-0080-host-owned-artifact-write-seam.md)/[ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md)): **`0600`** (owner-only), **gitignored**, and **never egressed** — only normalized, redacted `Signal`s leave the process. The host keeps the most-recent run-dirs per tool and prunes the rest after each write, governed by **`cli.artifacts.keep`** in `opensip-cli.config.yml` (default **10**; `0` disables pruning). Secret-scanner findings are **redacted** — only a short non-reversible preview reaches the signal, never the matched credential.
+
+### Binary resolution
+
+Resolution is deterministic, first hit wins, and **never fetches** a binary. For the three MVP adapters the functional pin is the **`OPENSIP_<TOOL>_BIN`** env var — `OPENSIP_GITLEAKS_BIN`, `OPENSIP_OSV_SCANNER_BIN`, `OPENSIP_TRIVY_BIN` — which beats the system `PATH` lookup:
+
+```bash
+OPENSIP_GITLEAKS_BIN=/opt/homebrew/bin/gitleaks opensip gitleaks doctor
+```
+
+A missing binary yields a `doctor` install hint, never an install. The substrate also supports a config-file pin (`binaries.<tool>.path`), but exposing it requires the adapter to contribute a config schema; the three MVP adapters do **not**, so for them the env override and `PATH` are the resolution surface.
 
 ---
 
