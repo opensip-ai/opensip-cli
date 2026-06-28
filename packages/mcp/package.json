@@ -85,6 +85,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/datastore": "workspace:*",
