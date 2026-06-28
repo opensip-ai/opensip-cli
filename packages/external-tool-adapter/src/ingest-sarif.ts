@@ -15,6 +15,16 @@
  * reads the CVSS `security-severity` number (off the rule descriptor, falling
  * back to the result) and applies the FIRST/NVD v3 bands BEFORE falling back to
  * `level`. The native level/severity are preserved on `Signal.metadata`.
+ *
+ * Message stability is the second job: real scanners (Trivy) put a VERBOSE,
+ * version-volatile block in `result.message.text` (e.g. a `Package:/Installed
+ * Version:/Severity:/Fixed Version:/Link:` listing). Surfacing that as
+ * `Signal.message` would also feed it into the `message-hash` fingerprint, so the
+ * baseline would churn on every dependency bump — defeating the whole point of a
+ * line-shift-tolerant hash. So `ingestSarif` prefers the STABLE rule title
+ * (`driver.rules[ruleIndex].shortDescription.text`) for `Signal.message` when
+ * present and stashes the verbose `result.message.text` on `metadata.detail`. It
+ * falls back to `result.message.text` only when no rule/shortDescription exists.
  */
 
 import { createSignal } from '@opensip-cli/core';
@@ -180,12 +190,34 @@ function primaryLocation(result: SarifResult): {
   };
 }
 
-/** Build the opaque metadata bag for one result (native severity/level/fingerprint/help). */
+/**
+ * Resolve `Signal.message` (the fingerprint basis) for one result, preferring the
+ * STABLE rule title over the version-volatile `result.message.text`. When a title
+ * is used and a distinct verbose result message exists, the verbose block is
+ * returned as `detail` to stash on metadata (so nothing is lost).
+ */
+function resolveMessage(
+  result: SarifResult,
+  rule: SarifReportingDescriptor | undefined,
+  ruleId: string,
+): { readonly message: string; readonly detail?: string } {
+  const title = rule?.shortDescription?.text;
+  const verbose = result.message?.text;
+  if (title !== undefined && title.length > 0) {
+    return {
+      message: title,
+      ...(verbose !== undefined && verbose !== title ? { detail: verbose } : {}),
+    };
+  }
+  return { message: verbose ?? rule?.fullDescription?.text ?? ruleId };
+}
+
+/** Build the opaque metadata bag for one result (native severity/level/fingerprint/help/detail). */
 function buildMetadata(
   result: SarifResult,
   rule: SarifReportingDescriptor | undefined,
   severity: { readonly securitySeverity?: unknown; readonly nativeLevel?: string },
-  extraLocations: number,
+  extras: { readonly extraLocations: number; readonly detail?: string },
 ): Record<string, unknown> {
   const nativeFingerprint = result.guid ?? result.fingerprints ?? result.partialFingerprints;
   const helpUri = rule?.helpUri ?? result.helpUri;
@@ -196,7 +228,8 @@ function buildMetadata(
       ? {}
       : { securitySeverity: severity.securitySeverity }),
     ...(nativeFingerprint === undefined ? {} : { nativeFingerprint }),
-    ...(extraLocations > 0 ? { additionalLocations: extraLocations } : {}),
+    ...(extras.extraLocations > 0 ? { additionalLocations: extras.extraLocations } : {}),
+    ...(extras.detail === undefined ? {} : { detail: extras.detail }),
     ...(helpUri === undefined ? {} : { helpUri }),
   };
 }
@@ -211,8 +244,7 @@ function resultToSignal(
   const rule = resolveRule(result, rules);
   const ruleId = result.ruleId ?? rule?.id ?? 'unknown';
   const severity = recoverSeverity(result, rule);
-  const message =
-    result.message?.text ?? rule?.shortDescription?.text ?? rule?.fullDescription?.text ?? ruleId;
+  const { message, detail } = resolveMessage(result, rule, ruleId);
   const location = primaryLocation(result);
   return createSignal({
     source,
@@ -225,7 +257,7 @@ function resultToSignal(
       ...(location.line === undefined ? {} : { line: location.line }),
       ...(location.column === undefined ? {} : { column: location.column }),
     },
-    metadata: buildMetadata(result, rule, severity, location.extra),
+    metadata: buildMetadata(result, rule, severity, { extraLocations: location.extra, detail }),
   });
 }
 

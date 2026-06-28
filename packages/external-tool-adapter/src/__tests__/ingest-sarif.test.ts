@@ -3,6 +3,7 @@ import { buildOpenSipSarif } from '@opensip-cli/output';
 import { describe, expect, it } from 'vitest';
 
 import { normalizedSignalShape } from '../acceptance-harness.js';
+import { messageHashFingerprintStrategy } from '../fingerprint.js';
 import { ingestSarif } from '../ingest-sarif.js';
 
 import type { SarifLog } from '../ingest-sarif.js';
@@ -100,6 +101,93 @@ describe('ingestSarif — severity recovery from security-severity (the core job
     };
     const [signal] = ingestSarif(sarif);
     expect(signal.severity).toBe('high');
+  });
+});
+
+/**
+ * A Trivy-shaped result: the STABLE rule title in `shortDescription`, and a
+ * VERBOSE, version-volatile block in `result.message.text` (the `Installed
+ * Version:` line shifts on every dependency bump). `installed` parameterizes that
+ * volatile line.
+ */
+function trivyLikeSarif(installed: string): SarifLog {
+  return {
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: 'Trivy',
+            rules: [
+              {
+                id: 'CVE-2023-37920',
+                shortDescription: { text: 'certifi: Removal of e-Tugra root certificate' },
+                properties: { 'security-severity': '9.8' },
+              },
+            ],
+          },
+        },
+        results: [
+          {
+            ruleId: 'CVE-2023-37920',
+            ruleIndex: 0,
+            level: 'error',
+            message: {
+              text: `Package: certifi\nInstalled Version: ${installed}\nVulnerability CVE-2023-37920\nSeverity: CRITICAL\nFixed Version: 2023.7.22\nLink: https://avd.aquasec.com/nvd/cve-2023-37920`,
+            },
+            locations: [
+              {
+                physicalLocation: {
+                  artifactLocation: { uri: 'requirements.txt' },
+                  region: { startLine: 1 },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+describe('ingestSarif — stable rule-title message (A9, version-invariant fingerprint basis)', () => {
+  it('uses the rule shortDescription as Signal.message and stashes the verbose block in metadata.detail', () => {
+    const [signal] = ingestSarif(trivyLikeSarif('2022.12.7'), { source: 'trivy' });
+    expect(signal.message).toBe('certifi: Removal of e-Tugra root certificate');
+    expect(signal.metadata.detail).toContain('Package: certifi');
+    expect(signal.metadata.detail).toContain('Installed Version: 2022.12.7');
+  });
+
+  it('keeps the message-hash fingerprint STABLE when only the verbose Installed Version line churns', () => {
+    const [oldVer] = ingestSarif(trivyLikeSarif('2022.12.7'), { source: 'trivy' });
+    const [newVer] = ingestSarif(trivyLikeSarif('2023.5.7'), { source: 'trivy' });
+    // The verbose detail differs across the dependency bump...
+    expect(oldVer.metadata.detail).not.toBe(newVer.metadata.detail);
+    // ...but the stable title (and thus the message-hash fingerprint basis) does not,
+    // so the baseline does NOT churn — message-hash's whole reason for being.
+    expect(oldVer.message).toBe(newVer.message);
+    expect(messageHashFingerprintStrategy.fingerprint(oldVer)).toBe(
+      messageHashFingerprintStrategy.fingerprint(newVer),
+    );
+  });
+
+  it('falls back to result.message.text when the rule has no shortDescription (no detail stashed)', () => {
+    const [signal] = ingestSarif({
+      runs: [
+        {
+          tool: { driver: { name: 'X', rules: [{ id: 'R' }] } },
+          results: [
+            {
+              ruleId: 'R',
+              ruleIndex: 0,
+              message: { text: 'verbose only' },
+              locations: [{ physicalLocation: { artifactLocation: { uri: 'f' } } }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(signal.message).toBe('verbose only');
+    expect(signal.metadata.detail).toBeUndefined();
   });
 });
 
