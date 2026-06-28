@@ -55,7 +55,11 @@ export interface ScanCompletionInput {
   readonly cwd: string;
   readonly envelope: SignalEnvelope;
   readonly signals: readonly Signal[];
-  readonly binary: { readonly path: string; readonly layer: BinaryResolutionLayer; readonly version: string | null };
+  readonly binary: {
+    readonly path: string;
+    readonly layer: BinaryResolutionLayer;
+    readonly version: string | null;
+  };
   readonly artifact: string;
   readonly durationMs: number;
 }
