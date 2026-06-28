@@ -119,6 +119,6 @@ describe('tools list', () => {
     const all = listRows();
     const bundled = all.rows.filter((t) => t.source === 'bundled').map((t) => t.id);
     // Tool identity uses the canonical name as the human id; short forms remain aliases/layout keys.
-    expect([...bundled].sort()).toEqual(['fitness', 'graph', 'simulation', 'yagni']);
+    expect([...bundled].sort()).toEqual(['fitness', 'graph', 'mcp', 'simulation', 'yagni']);
   });
 });

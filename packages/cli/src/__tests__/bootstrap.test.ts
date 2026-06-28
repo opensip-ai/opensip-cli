@@ -102,6 +102,7 @@ describe('registerFirstPartyTools', () => {
       'simulation',
       'graph',
       'yagni',
+      'mcp',
     ]);
   });
 });

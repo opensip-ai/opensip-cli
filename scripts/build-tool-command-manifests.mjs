@@ -51,6 +51,7 @@ const BUNDLED_TOOL_DIRS = [
   'packages/fitness/engine',
   'packages/simulation/engine',
   'packages/graph/engine',
+  'packages/mcp',
 ];
 
 /**

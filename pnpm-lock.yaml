@@ -190,6 +190,9 @@ importers:
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../languages/lang-typescript
+      '@opensip-cli/mcp':
+        specifier: workspace:*
+        version: file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
       '@opensip-cli/output':
         specifier: workspace:*
         version: link:../output
@@ -975,6 +978,28 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/mcp:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/graph':
+        specifier: workspace:*
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+    devDependencies:
+      '@opensip-cli/graph-typescript':
+        specifier: workspace:*
+        version: link:../graph/graph-typescript
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -1945,6 +1970,9 @@ packages:
 
   '@opensip-cli/lang-typescript@file:packages/languages/lang-typescript':
     resolution: {directory: packages/languages/lang-typescript, type: directory}
+
+  '@opensip-cli/mcp@file:packages/mcp':
+    resolution: {directory: packages/mcp, type: directory}
 
   '@opensip-cli/session-store@file:packages/session-store':
     resolution: {directory: packages/session-store, type: directory}
@@ -5488,6 +5516,45 @@ snapshots:
     dependencies:
       '@opensip-cli/core': file:packages/core
       typescript: 6.0.3
+
+  '@opensip-cli/mcp@file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+    dependencies:
+      '@opensip-cli/core': file:packages/core
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/pg'
+      - '@types/react'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
+      - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - mysql2
+      - pg
+      - postgres
+      - prisma
+      - react-devtools-core
+      - sql.js
+      - sqlite3
+      - utf-8-validate
 
   '@opensip-cli/session-store@file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)':
     dependencies:

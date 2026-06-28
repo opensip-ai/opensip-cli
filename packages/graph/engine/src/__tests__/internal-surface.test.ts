@@ -27,6 +27,9 @@ const EXPECTED_INTERNAL_EXPORTS = [
   'alwaysThrowsBranchRule',
   'buildIndexes',
   'buildUnifiedReportLines',
+  // Freshness helpers surfaced for @opensip-cli/mcp (ADR-0084).
+  'classifyCatalog',
+  'computeFilesFingerprint',
   'decideHeapTargetMb',
   'duplicatedFunctionBodyRule',
   'executeGraph',
