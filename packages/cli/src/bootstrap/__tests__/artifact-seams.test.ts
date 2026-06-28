@@ -1,8 +1,22 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, RunScope, SystemError, runWithScope } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  RunScope,
+  SystemError,
+  resolveProjectPaths,
+  runWithScope,
+} from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createWriteArtifactSeam } from '../artifact-seams.js';
@@ -81,6 +95,59 @@ describe('createWriteArtifactSeam', () => {
     await runWithScope(scope, () => writeArtifact(target, 'scoped\n'));
 
     expect(readFileSync(target, 'utf8')).toBe('scoped\n');
+  });
+
+  it('prunes old per-tool run dirs after writing inside the artifact store', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'artifact-seam-'));
+    const { artifactsDir } = resolveProjectPaths(dir);
+    const toolDir = join(artifactsDir, 'gitleaks');
+    // Two pre-existing (older) run dirs the new write should evict at keep=1.
+    for (const [i, name] of ['run-old-1', 'run-old-2'].entries()) {
+      mkdirSync(join(toolDir, name), { recursive: true });
+      const seconds = 1_700_000_000 + i * 100;
+      utimesSync(join(toolDir, name), seconds, seconds);
+    }
+    const projectContext: ProjectContext = {
+      cwd: dir,
+      cwdExplicit: false,
+      projectRoot: dir,
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'project',
+    };
+    const scope = new RunScope({ logger: makeLogger(), runId: 'run-new', projectContext });
+    const target = join(toolDir, 'run-new', 'gitleaks.json');
+    const writeArtifact = createWriteArtifactSeam(makeLogger(), { retentionKeep: 1 });
+
+    await runWithScope(scope, () => writeArtifact(target, '[]\n'));
+
+    // Only the just-written (newest) run dir survives.
+    expect(readdirSync(toolDir).sort()).toEqual(['run-new']);
+  });
+
+  it('does not prune for a write outside the artifact store', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'artifact-seam-'));
+    const { artifactsDir } = resolveProjectPaths(dir);
+    const toolDir = join(artifactsDir, 'gitleaks');
+    mkdirSync(join(toolDir, 'run-old'), { recursive: true });
+    const projectContext: ProjectContext = {
+      cwd: dir,
+      cwdExplicit: false,
+      projectRoot: dir,
+      configPath: undefined,
+      walkedUp: 0,
+      scope: 'project',
+    };
+    const scope = new RunScope({ logger: makeLogger(), runId: 'r-outside', projectContext });
+    // A generic write outside `.runtime/artifacts` (e.g. graph --catalog-output).
+    const target = join(dir, 'catalog.json');
+    const writeArtifact = createWriteArtifactSeam(makeLogger(), { retentionKeep: 1 });
+
+    await runWithScope(scope, () => writeArtifact(target, '{}\n'));
+
+    expect(readFileSync(target, 'utf8')).toBe('{}\n');
+    // The unrelated artifact-store run dir is untouched.
+    expect(readdirSync(toolDir)).toEqual(['run-old']);
   });
 
   it('wraps a non-ToolError write failure as a SystemError', async () => {

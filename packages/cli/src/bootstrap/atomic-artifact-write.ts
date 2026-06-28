@@ -4,7 +4,15 @@
  * Owns SARIF and baseline fingerprint JSON exports at the CLI composition root.
  */
 
-import { closeSync, mkdirSync, openSync, renameSync, unlinkSync, writeSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import {
@@ -52,13 +60,18 @@ export function writeArtifactAtomically(
     },
     () => {
       try {
-        const fd = openSync(tempPath, 'w');
+        // Owner-only read/write (0600). Artifacts can carry findings (and, for
+        // external scanners, redacted-but-sensitive context), so they are never
+        // group/world-readable. The open mode is umask-masked on some platforms,
+        // so we also chmod the rename target below (belt-and-suspenders).
+        const fd = openSync(tempPath, 'w', 0o600);
         try {
           writeSync(fd, bytes);
         } finally {
           closeSync(fd);
         }
         renameSync(tempPath, targetPath);
+        chmodSync(targetPath, 0o600);
         ctx.logger.info({
           evt: 'state.artifact.write.complete',
           module: 'cli:atomic-artifact-write',

@@ -3,19 +3,68 @@
  */
 
 import { statSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, relative, resolve, sep } from 'node:path';
 
 import {
   ConfigurationError,
   currentScope,
+  isPathInside,
+  resolveProjectPaths,
   SystemError,
   ToolError,
   logger as defaultLogger,
   type Logger,
+  type RunScope,
 } from '@opensip-cli/core';
 
+import { DEFAULT_ARTIFACT_RETENTION_KEEP, pruneArtifactRetention } from './artifact-retention.js';
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { resolveStateLockPolicy } from './state-lock-policy.js';
+
+/** Options for {@link createWriteArtifactSeam}. */
+export interface WriteArtifactSeamOptions {
+  /**
+   * Number of per-tool run-dirs to retain under `.runtime/artifacts/<tool>/`
+   * (`cli.artifacts.keep`). Undefined → {@link DEFAULT_ARTIFACT_RETENTION_KEEP}.
+   * The host prunes the store after each write whose target lives inside it.
+   */
+  readonly retentionKeep?: number;
+}
+
+/**
+ * After a successful artifact write, prune the per-tool run-dirs IFF the target
+ * lives inside the project's host-owned artifact store
+ * (`.runtime/artifacts/<tool>/<runId>/<name>`). Generic writes outside the store
+ * (e.g. a graph `--catalog-output` to an arbitrary path) skip pruning naturally.
+ *
+ * Fully defensive: a no-project run (no `projectContext`) skips; an unreadable
+ * store skips; ANY prune error is logged at debug and never thrown out of the
+ * write seam (a retention problem must not fail the run).
+ */
+function maybePruneArtifactStore(
+  target: string,
+  scope: RunScope | undefined,
+  retentionKeep: number,
+  log: Logger,
+): void {
+  try {
+    const projectRoot = scope?.projectContext?.projectRoot;
+    if (projectRoot === undefined) return; // project-less run: no store to prune
+    const { artifactsDir } = resolveProjectPaths(projectRoot);
+    if (!isPathInside(target, artifactsDir)) return; // not an artifact-store write
+    // The dir immediately under the store is the `<tool>` segment; the substrate
+    // composes `<tool>/<runId>/<name>` underneath it.
+    const tool = relative(artifactsDir, target).split(sep)[0];
+    if (tool === undefined || tool === '' || tool === '..') return;
+    pruneArtifactRetention(tool, artifactsDir, retentionKeep);
+  } catch (error) {
+    log.debug({
+      evt: 'state.artifact.retention.prune.skipped',
+      module: 'cli:artifact-seams',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 /**
  * @throws {ConfigurationError} When the target already exists as a directory.
@@ -42,7 +91,9 @@ function assertWritableFileTarget(path: string): void {
 /** Build the public `cli.writeArtifact(path, bytes)` implementation. */
 export function createWriteArtifactSeam(
   logger: Logger = defaultLogger,
+  options: WriteArtifactSeamOptions = {},
 ): (path: string, bytes: string) => Promise<void> {
+  const retentionKeep = options.retentionKeep ?? DEFAULT_ARTIFACT_RETENTION_KEEP;
   return (path, bytes) =>
     Promise.resolve().then(() => {
       const target = resolve(path);
@@ -65,5 +116,8 @@ export function createWriteArtifactSeam(
           { code: 'SYSTEM.ARTIFACT_WRITE_FAILED' },
         );
       }
+      // Retention runs AFTER the write succeeds and covers worker writes too (the
+      // worker RPC routes through this same host seam). Never fails the run.
+      maybePruneArtifactStore(target, scope, retentionKeep, scope?.logger ?? logger);
     });
 }
