@@ -44,3 +44,15 @@ export {
   type BuildReplaySignalInput,
   type BuildReplaySignalsInput,
 } from './session-replay-signal.js';
+
+// Read-only replay/list projections (ADR-0084) — the pure cores the CLI
+// `sessions list` / `sessions show` commands now adapt over, and the read API
+// `@opensip-cli/mcp` consumes WITHOUT naming `SessionRepo`.
+export { listSessionSummaries, type ListSessionSummariesOptions } from './list-summaries.js';
+export {
+  resolveAndReplaySession,
+  type SessionReplayFn,
+  type ResolveAndReplayOptions,
+  type ReplaySessionOutcome,
+} from './replay-session.js';
+export { bundledReplayResolver } from './bundled-replay.js';
