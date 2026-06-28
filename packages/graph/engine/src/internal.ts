@@ -14,6 +14,13 @@
 // index builder; nothing in production consumes the engine's.
 export { buildIndexes } from './pipeline/indexes.js';
 
+// Feature derivation (blast / reachability / coupling). Surfaced on the internal
+// contract for `@opensip-cli/mcp` (ADR-0084): MCP's `blast_radius` reuses the
+// single canonical `buildFeatures(['blast'])` scoring site so its numbers never
+// diverge from `opensip graph` (NOT a re-implemented BFS). The dashboard has its
+// own feature derivation; nothing else in production consumes the engine's.
+export { buildFeatures } from './pipeline/features.js';
+
 // `GraphConfig` — the engine's tuning/config data type. No external consumer
 // imports it from the public barrel; rule unit tests that construct a config to
 // drive `.evaluate(...)` import it from here instead (ADR-0009 surface policy).

@@ -43,6 +43,9 @@
         "@opensip-cli/graph-java"
       ]
     },
+    "packages/mcp": {
+      "entry": ["src/sqlite-graph-read-port.ts", "src/session-results-read-port.ts"]
+    },
     "packages/dashboard": {
       "entry": ["src/client/index.ts", "src/client/globals.ts", "scripts/*.mjs"],
       "ignore": ["src/vendor/cytoscape-bundle.js"],
