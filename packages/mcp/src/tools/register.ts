@@ -12,6 +12,7 @@ import { registerCalleesOf } from './callees-of.js';
 import { registerFindDeadCode } from './find-dead-code.js';
 import { registerGetArchitecture } from './get-architecture.js';
 import { registerGetSymbol } from './get-symbol.js';
+import { registerRefreshGraph } from './refresh-graph.js';
 import { registerSearchSymbols } from './search-symbols.js';
 import { registerTracePath } from './trace-path.js';
 import { registerWhoCalls } from './who-calls.js';
@@ -30,4 +31,5 @@ export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): voi
   registerBlastRadius(server, deps);
   registerFindDeadCode(server, deps);
   registerGetArchitecture(server, deps);
+  registerRefreshGraph(server, deps);
 }

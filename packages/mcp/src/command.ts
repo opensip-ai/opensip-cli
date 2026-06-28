@@ -18,7 +18,9 @@
  * fix). It resolves to a clean exit (0) when the transport closes on stdin EOF.
  */
 import { definePrimaryCommand, readPackageVersion } from '@opensip-cli/core';
+import { runGraph } from '@opensip-cli/graph/internal';
 
+import { workingTreeContextFromCatalog } from './freshness.js';
 import { McpStdioServer } from './server.js';
 import { SessionResultsReadPort } from './session-results-read-port.js';
 import { SqliteGraphReadPort } from './sqlite-graph-read-port.js';
@@ -26,6 +28,7 @@ import { registerMcpTools } from './tools/register.js';
 
 import type { RunScope, ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+import type { Catalog } from '@opensip-cli/graph';
 
 export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
   description: 'Serve the OpenSIP call graph + stored results to MCP agents over stdio',
@@ -57,16 +60,33 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     }
 
     // Pre-build both read ports from the captured datastore (Phase 2 impls).
-    // Freshness verification is wired in Phase 4 alongside the graph
-    // adapter-discovery / `refresh` rebuild: a CORRECT working-tree
-    // `ValidationContext` needs the engine's exact cache-key stamping + canonical
-    // file-set reduction (the same internals `runGraph` brings in). Computing a
-    // partial key now would mis-report every catalog as stale — strictly worse
-    // than the port's graceful fallback, which reports a loaded catalog as
-    // unverified-fresh (matching `opensip graph lookup`) and a missing catalog as
-    // `fresh: false` with no silent auto-build. So no `freshnessContext` is wired
-    // here; Phase 4 supplies the real provider + the `rebuild` thunk together.
-    const graph = new SqliteGraphReadPort({ store });
+    //
+    // Freshness (Task 4.4): the provider derives the working-tree
+    // `ValidationContext` from the served catalog's OWN recorded inputs
+    // (`workingTreeContextFromCatalog`) — the file set (recovered from the
+    // persisted `filesFingerprint`, in order) plus the catalog's language +
+    // cacheKey. `classifyCatalog` then re-stats those files, so a mutated/deleted
+    // tracked file flips `fresh` to false. (Newly-added files / a tsconfig change
+    // are catalog-additive and resolved by the explicit `refresh_graph` op — see
+    // the helper's doc for the precise approximation.)
+    //
+    // Rebuild (Task 4.4): `refresh_graph` runs the graph engine's programmatic
+    // build (`runGraph`) over the project root, threading the same datastore so
+    // the rebuilt catalog persists where the port reads it. v1 is the exact
+    // single-program build (no cloud egress, no live render).
+    const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
+    const rebuild = async (): Promise<Catalog> => {
+      const outcome = await runGraph({ cwd: projectRoot, datastore: store });
+      if (outcome.catalog === null) {
+        throw new Error('graph rebuild produced no catalog (no source files discovered).');
+      }
+      return outcome.catalog;
+    };
+    const graph = new SqliteGraphReadPort({
+      store,
+      freshnessContext: workingTreeContextFromCatalog,
+      rebuild,
+    });
     const results = new SessionResultsReadPort({ store, tools: scope.tools });
 
     const server = new McpStdioServer({

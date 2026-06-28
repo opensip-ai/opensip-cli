@@ -53,3 +53,51 @@ export function freshnessFromVerdict(verdict: CatalogVerdict, builtAt: string): 
 export function classifyFreshness(catalog: Catalog, ctx: ValidationContext): Freshness {
   return freshnessFromVerdict(classifyCatalog(catalog, ctx), catalog.builtAt);
 }
+
+/**
+ * Build the working-tree {@link ValidationContext} a real staleness check needs,
+ * derived from the catalog's OWN recorded inputs (Task 4.4).
+ *
+ * A fully-correct context (the one `runGraph`/the cache path builds) requires
+ * re-running discovery + the adapter `cacheKey` over the live tree. We implement
+ * the closest correct subset that needs no engine re-entry: the catalog persists
+ * its `filesFingerprint` (`<count>\n<path>|<mtime>|<size>` per file), so we
+ * recover the EXACT tracked file set (in the recorded order) and echo the
+ * catalog's own `language`/`cacheKey`. `classifyCatalog` then re-stats those
+ * files and recomputes the fingerprint — so any **mutated or deleted tracked
+ * file** flips the verdict to stale (`fresh === false`), which is what Phase 7
+ * asserts.
+ *
+ * Documented approximation: a brand-new source file (absent from the recorded
+ * set) is NOT detected as a staleness trigger without re-running discovery; and
+ * a language/tsconfig change is not detected (we echo the cached key rather than
+ * recomputing it). Those are catalog-additive changes the explicit `refresh_graph`
+ * op resolves. Mutations/deletions of tracked files — the common drift — ARE
+ * detected. Returns `undefined` when the catalog carries no fingerprint (older
+ * builds), leaving the port on its unverified-fresh fallback.
+ */
+export function workingTreeContextFromCatalog(catalog: Catalog): ValidationContext | undefined {
+  const fingerprint = (catalog as { filesFingerprint?: string }).filesFingerprint;
+  if (typeof fingerprint !== 'string') return undefined;
+  const currentFiles = filesFromFingerprint(fingerprint);
+  if (currentFiles.length === 0) return undefined;
+  return {
+    currentLanguage: catalog.language,
+    currentCacheKey: catalog.cacheKey,
+    currentFiles,
+  };
+}
+
+/** Recover the tracked file paths (in order) from a `computeFilesFingerprint` string. */
+function filesFromFingerprint(fingerprint: string): string[] {
+  const lines = fingerprint.split('\n');
+  const files: string[] = [];
+  // Line 0 is the leading file-count; each subsequent line is `path|mtime|size`.
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (typeof line !== 'string' || line.length === 0) continue;
+    const pipe = line.indexOf('|');
+    files.push(pipe === -1 ? line : line.slice(0, pipe));
+  }
+  return files;
+}

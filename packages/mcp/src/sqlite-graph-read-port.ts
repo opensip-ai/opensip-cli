@@ -51,11 +51,12 @@ export interface SqliteGraphReadPortDeps {
   /** The datastore handle the long-lived server captured at construction. */
   readonly store: DataStore;
   /**
-   * Build the current working-tree {@link ValidationContext} for freshness
-   * (file set + adapter cache key). Wired in Phase 3; absent ⇒ a loaded catalog
-   * is reported `fresh: true` (unverified, matching `graph lookup`).
+   * Build the working-tree {@link ValidationContext} for freshness, given the
+   * served generation's catalog (file set + language + adapter cache key). Wired
+   * in Phase 4 (`workingTreeContextFromCatalog`); absent ⇒ a loaded catalog is
+   * reported `fresh: true` (unverified, matching `graph lookup`).
    */
-  readonly freshnessContext?: () => ValidationContext | undefined;
+  readonly freshnessContext?: (catalog: Catalog) => ValidationContext | undefined;
   /**
    * Rebuild the catalog (the `refresh` op) and return the new {@link Catalog}.
    * Wired in Phase 4; absent ⇒ `refresh()` returns a structured error.
@@ -70,11 +71,14 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private readonly config: GraphConfig;
   private generation: CatalogGeneration | undefined;
   private loaded = false;
-  // Per-generation memoized derivations (reset on (re)load / refresh).
-  private freshnessCache: Freshness | undefined;
+  // Per-generation memoized derivations (reset on (re)load / refresh). Freshness
+  // is deliberately NOT memoized: a long-lived server must re-verify the working
+  // tree on each read so a mid-session file mutation flips `fresh` to false.
   private blastCache:
     | ReadonlyMap<string, { direct: number; transitive: number; score: number }>
     | undefined;
+  /** In-flight rebuild — serializes concurrent `refresh()` to a single build. */
+  private inFlightRefresh: Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> | undefined;
 
   constructor(private readonly deps: SqliteGraphReadPortDeps) {
     this.store = deps.store;
@@ -97,19 +101,16 @@ export class SqliteGraphReadPort implements GraphReadPort {
   }
 
   private invalidateDerived(): void {
-    this.freshnessCache = undefined;
     this.blastCache = undefined;
   }
 
   freshness(): Freshness {
-    if (this.freshnessCache !== undefined) return this.freshnessCache;
     const gen = this.current();
-    this.freshnessCache = gen === undefined ? missingFreshness() : this.classify(gen);
-    return this.freshnessCache;
+    return gen === undefined ? missingFreshness() : this.classify(gen);
   }
 
   private classify(gen: CatalogGeneration): Freshness {
-    const ctx = this.deps.freshnessContext?.();
+    const ctx = this.deps.freshnessContext?.(gen.catalog);
     if (ctx === undefined) return unverifiedFreshness(gen.builtAt);
     return classifyFreshness(gen.catalog, ctx);
   }
@@ -311,17 +312,33 @@ export class SqliteGraphReadPort implements GraphReadPort {
   }
 
   async refresh(): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> {
-    if (this.deps.rebuild === undefined) {
+    const rebuild = this.deps.rebuild;
+    if (rebuild === undefined) {
       return err(
         readError(
           'refresh-unavailable',
-          'graph refresh is not wired (the rebuild provider is supplied in Phase 4).',
+          'graph refresh is not wired (the rebuild provider is supplied by the host command).',
         ),
       );
     }
+    // Serialize concurrent refreshes to ONE rebuild: a second caller awaits the
+    // in-flight build rather than launching a duplicate. In-flight reads keep the
+    // prior generation until the swap completes (TOCTOU-safe; catalog-generation.ts).
+    this.inFlightRefresh ??= this.runRebuild(rebuild);
+    try {
+      return await this.inFlightRefresh;
+    } finally {
+      this.inFlightRefresh = undefined;
+    }
+  }
+
+  /** One rebuild: runs the provider, then swaps the generation atomically on success. */
+  private async runRebuild(
+    rebuild: () => Promise<Catalog>,
+  ): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> {
     // The rebuild runs `runGraph` at a genuine infra boundary; its throw (child
-    // build failure) propagates. On success, swap the generation atomically.
-    const catalog = await this.deps.rebuild();
+    // build failure) propagates to the caller (the tool logs the decision point).
+    const catalog = await rebuild();
     this.generation = createGeneration(catalog);
     this.loaded = true;
     this.invalidateDerived();
