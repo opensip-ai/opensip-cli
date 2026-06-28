@@ -60,15 +60,22 @@ export function parseTrivyVersion(stdout: string): string {
 
 /**
  * Build the trivy scan argv (no shell — args are passed to `execFile`). Scans the
- * project filesystem (`fs <root>`) for vulnerabilities + misconfigurations and
- * writes a SARIF 2.1.0 report to the host-owned artifact path the substrate
+ * project filesystem (`fs <root>`) for vulnerabilities + secrets + misconfigurations
+ * and writes a SARIF 2.1.0 report to the host-owned artifact path the substrate
  * composes for this run.
+ *
+ * Scanner selection (A8): `trivy fs` defaults to `vuln,secret` ONLY — misconfig is
+ * OFF unless requested. The adapter advertises misconfig (metadata, docs, the DS002
+ * golden), so it MUST pass `--scanners vuln,secret,misconfig` or a real run would
+ * silently emit zero misconfig findings while the fixtures assert them. VERIFY-
+ * against-installed-trivy: the `--scanners` value set + name across versions.
  *
  * Local-only posture (ADR-0092): Trivy fetches its vulnerability DB from GHCR on
  * first run, so the scan is pinned offline with `--skip-db-update`,
- * `--skip-java-db-update`, and `--offline-scan`. This REQUIRES a pre-populated DB
- * cache (`trivy fs` once online, or `trivy image --download-db-only`); the
- * adapter's `doctor` notes the cache caveat.
+ * `--skip-java-db-update`, `--offline-scan`, and — because the misconfig scanner
+ * pulls a separate "checks" bundle from GHCR — `--skip-check-update`. This REQUIRES
+ * a pre-populated cache (the vuln DB AND, for misconfig, the checks bundle); the
+ * adapter's `doctor`/`installHint` notes the cache caveat.
  *
  * VERIFY-against-installed-binary: the local-only flag set across versions.
  * Trivy is NOT passed `--exit-code` — it exits 0 even with findings, and the
@@ -77,6 +84,8 @@ export function parseTrivyVersion(stdout: string): string {
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'fs',
+    '--scanners',
+    'vuln,secret,misconfig',
     '--format',
     'sarif',
     '--output',
@@ -84,6 +93,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     '--skip-db-update',
     '--skip-java-db-update',
     '--offline-scan',
+    '--skip-check-update',
     ctx.projectRoot,
   ];
 }
@@ -124,7 +134,7 @@ export const tool: Tool = defineExternalToolAdapter({
     // PATH; resolution never fetches a binary.
     resolution: ['config', 'path'],
     installHint:
-      'Install trivy: https://aquasecurity.github.io/trivy/latest/getting-started/installation/ (brew install trivy). Pre-populate the vuln DB cache for offline scans (e.g. `trivy image --download-db-only`).',
+      'Install trivy: https://aquasecurity.github.io/trivy/latest/getting-started/installation/ (brew install trivy). Pre-populate the offline caches: the vuln DB (e.g. `trivy image --download-db-only`) AND, for misconfiguration scanning, the checks bundle (e.g. run `trivy fs .` once online so the misconfig checks are cached).',
   },
   // Trivy queries its LOCAL vuln DB cache via execFile with --offline-scan — no
   // network, no credentials at scan time (the DB cache must be pre-populated).

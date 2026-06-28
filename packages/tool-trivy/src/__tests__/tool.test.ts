@@ -137,6 +137,8 @@ describe('trivy tool — binary helpers', () => {
     } as unknown as AdapterRunContext;
     expect(buildScanArgs(ctx)).toEqual([
       'fs',
+      '--scanners',
+      'vuln,secret,misconfig',
       '--format',
       'sarif',
       '--output',
@@ -144,8 +146,25 @@ describe('trivy tool — binary helpers', () => {
       '--skip-db-update',
       '--skip-java-db-update',
       '--offline-scan',
+      '--skip-check-update',
       '/proj',
     ]);
+  });
+
+  it('A8: requests the misconfig scanner (offline) so the advertised Dockerfile findings are actually produced', () => {
+    // `trivy fs` defaults to `vuln,secret` only — without `--scanners …,misconfig`
+    // a real run emits ZERO misconfig results while metadata/docs/the DS002 golden
+    // all advertise misconfig. The companion `--skip-check-update` keeps the
+    // misconfig checks-bundle fetch offline.
+    const ctx = {
+      projectRoot: '/proj',
+      artifactPath: (name: string) => `/proj/.runtime/artifacts/trivy/run1/${name}`,
+    } as unknown as AdapterRunContext;
+    const args = buildScanArgs(ctx);
+    const i = args.indexOf('--scanners');
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(args[i + 1]?.split(',')).toContain('misconfig');
+    expect(args).toContain('--skip-check-update');
   });
 });
 
