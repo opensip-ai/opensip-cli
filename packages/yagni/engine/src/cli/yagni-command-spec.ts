@@ -10,6 +10,7 @@ import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js'
 
 import { executeYagni } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
+import { runYagniGateMode } from './yagni-gate-mode.js';
 import { buildYagniRunPresentation } from './yagni-presentation.js';
 
 import type { YagniLiveArgs } from './yagni-runner.js';
@@ -29,6 +30,9 @@ interface YagniCommandOptions {
   detector?: string | string[];
   category?: string | string[];
   includeTests?: boolean;
+  gateSave?: boolean;
+  gateCompare?: boolean;
+  sarif?: string;
 }
 
 function parseMinConfidence(raw: string | undefined): YagniConfidence | undefined {
@@ -84,6 +88,10 @@ async function runYagniCommand(
   setUpLiveView: (cli: ToolCliContext) => void,
 ): Promise<ToolRunCompletion> {
   const opts = rawOpts as YagniCommandOptions;
+  if (opts.gateSave === true || opts.gateCompare === true) {
+    return (await runYagniGateMode(opts, cli)) ?? {};
+  }
+
   const config = loadYagniConfig(opts.cwd);
   const positionals = (opts as unknown as { _args?: readonly unknown[] })._args ?? [];
   const paths = (positionals[0] ?? []) as readonly string[];
@@ -138,14 +146,35 @@ async function runYagniCommand(
 
   await deliverYagniRun(opts, cli, config, outcome);
 
+  if (opts.sarif !== undefined && opts.sarif !== '') {
+    await cli.writeSarif(outcome.envelope, opts.sarif);
+  }
+
   return { session: outcome.session };
 }
 
 export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {
   return definePrimaryCommand<unknown, ToolCliContext>({
-    description: 'Run YAGNI reduction audit detectors (advisory; exit 0 by default)',
+    description: 'Run YAGNI reduction audit detectors',
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     options: [
+      {
+        flag: '--gate-save',
+        description:
+          'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)',
+        default: false,
+      },
+      {
+        flag: '--gate-compare',
+        description:
+          'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
+        default: false,
+      },
+      {
+        flag: '--sarif',
+        value: '<path>',
+        description: 'Write this run findings as SARIF 2.1.0 (composes with --gate-save)',
+      },
       {
         flag: '--min-confidence',
         value: '<level>',
