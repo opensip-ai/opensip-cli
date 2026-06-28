@@ -1,0 +1,36 @@
+#!/bin/sh
+# Fake `gitleaks` binary for deterministic adapter E2E (ADR-0090 D6 Tier 2).
+#
+# It ignores the scan arguments and instead copies the committed golden report to
+# whatever `--report-path` the adapter passes, then exits 1 (the gitleaks
+# "findings" code). The golden source is injected via FAKE_GITLEAKS_GOLDEN so the
+# ONE committed golden (__fixtures__/gitleaks-golden.json) drives both the
+# in-process parse tests and this worker E2E (no drift).
+#
+# `gitleaks version` is answered with a fixed semver so the substrate's version
+# probe + doctor see a ready binary.
+set -eu
+
+case "${1:-}" in
+  version)
+    echo "8.18.4"
+    exit 0
+    ;;
+esac
+
+report=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--report-path" ]; then
+    report="$arg"
+  fi
+  prev="$arg"
+done
+
+if [ -n "$report" ] && [ -n "${FAKE_GITLEAKS_GOLDEN:-}" ]; then
+  mkdir -p "$(dirname "$report")"
+  cp "$FAKE_GITLEAKS_GOLDEN" "$report"
+fi
+
+# Gitleaks exits 1 when leaks are found (default --exit-code).
+exit 1

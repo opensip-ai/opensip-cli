@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "aws-access-token",
+    "severity": "high",
+    "message": "AWS Access Key",
+    "file": "config/prod.env",
+    "line": 12,
+    "column": 19
+  },
+  {
+    "ruleId": "gitlab-pat",
+    "severity": "high",
+    "message": "GitLab Personal Access Token",
+    "file": "src/client.ts",
+    "line": 4,
+    "column": 7
+  }
+]

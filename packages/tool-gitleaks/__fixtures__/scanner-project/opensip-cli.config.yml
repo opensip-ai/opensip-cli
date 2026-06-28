@@ -1,0 +1,4 @@
+# Minimal opensip-cli project marker for the tool-gitleaks scanner fixture.
+# A comment-only document is a valid EMPTY config (no namespaces).
+schemaVersion: 1
+targets: {}
