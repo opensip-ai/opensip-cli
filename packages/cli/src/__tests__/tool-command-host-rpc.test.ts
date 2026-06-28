@@ -14,6 +14,7 @@
  * `external-tool-dispatch.test.ts` (modes `rpc` / `rpc-fail`).
  */
 
+import { ConfigurationError } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { handleHostRpc } from '../bootstrap/dispatch-host-rpc-handler.js';
@@ -294,6 +295,30 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       code: 'E_HOST_CODE',
     });
     expect(reply.error.stack).toContain('coded host fault');
+  });
+
+  it('carries the canonical toolErrorCode for a TYPED ToolError fault (compareBaseline reject → exit-2 survives the boundary)', async () => {
+    // A5/A6: the compareBaseline seam rejects with a ConfigurationError (a missing
+    // baseline). The host fault reply must carry the canonical exit-class code so
+    // the worker shim rebuilds a TYPED error and the exit-2 contract survives —
+    // alongside the original subcode for diagnostics.
+    const ctx = {
+      ...makeDispatchHostCtx().ctx,
+      compareBaseline: () =>
+        Promise.reject(
+          new ConfigurationError("No baseline found for 'gitleaks'", {
+            code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+          }),
+        ),
+    } as unknown as Parameters<typeof handleHostRpc>[1];
+
+    const reply = (await handleHostRpc(
+      { rpcId: 1, seam: 'compareBaseline', tool: 'gitleaks', envelope: {} },
+      ctx,
+    )) as Extract<RpcReply, { ok: false }>;
+    expect(reply.ok).toBe(false);
+    expect(reply.error.toolErrorCode).toBe('CONFIGURATION_ERROR');
+    expect(reply.error.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
   });
 
   it('stringifies a non-Error host fault (the String(error) ternary else)', async () => {

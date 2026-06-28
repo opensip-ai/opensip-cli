@@ -103,4 +103,14 @@ export type WorkerMessage<TEvent, TResult> =
        * `'exit_nonzero'`) when it logs `cli.subprocess.failed`.
        */
       readonly failureClass?: string;
+      /**
+       * The canonical exit-class `ToolErrorCode` (`canonicalToolErrorCode`) when
+       * the worker error originated as a typed `ToolError`. Carried across the IPC
+       * boundary — which flattens the prototype chain — so the parent supervisor
+       * can rebuild the right `ToolError` subclass (`toolErrorFromCanonicalCode`)
+       * and preserve the frozen exit code instead of collapsing every worker-thrown
+       * typed error to `SystemError` (exit 1). Optional: absent for an untyped
+       * throw or an older worker build.
+       */
+      readonly code?: string;
     };

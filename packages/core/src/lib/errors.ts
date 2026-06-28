@@ -203,6 +203,75 @@ export class CapabilitySchemaMismatchError extends ValidationError {
   }
 }
 
+/**
+ * The canonical exit-class {@link ToolErrorCode} for a typed error, derived by
+ * `instanceof` — the inverse of each subclass's default-code policy and the
+ * direct counterpart of `mapToolErrorToExitCode`'s instanceof ladder. Subclasses
+ * collapse to their canonical parent bucket (e.g. {@link
+ * UnknownCapabilityDomainError} → `NOT_FOUND`, {@link
+ * CapabilitySchemaMismatchError} → `VALIDATION_ERROR`).
+ *
+ * This is the discriminator a typed error needs to survive a serialization
+ * boundary that flattens its prototype chain (the ADR-0054 worker IPC marshals
+ * errors to plain `{ message, code, stack }`): the boundary carries this value
+ * and {@link toolErrorFromCanonicalCode} rebuilds the right subclass on the far
+ * side, so the frozen exit-code contract is preserved across the fork instead of
+ * silently collapsing every worker-thrown typed error to `SystemError` (exit 1).
+ */
+export function canonicalToolErrorCode(error: ToolError): ToolErrorCode {
+  if (error instanceof NotFoundError) return 'NOT_FOUND';
+  if (error instanceof ConfigurationError) return 'CONFIGURATION_ERROR';
+  if (error instanceof ValidationError) return 'VALIDATION_ERROR';
+  if (error instanceof NetworkError) return 'NETWORK_ERROR';
+  if (error instanceof PluginIncompatibleError) return 'PLUGIN_INCOMPATIBLE';
+  if (error instanceof TimeoutError) return 'TIMEOUT';
+  return 'SYSTEM_ERROR';
+}
+
+/**
+ * Rebuild the canonical {@link ToolError} subclass from a {@link
+ * canonicalToolErrorCode} value — the inverse direction, used at the parent side
+ * of a serialization boundary (the ADR-0054 worker IPC) to restore a typed
+ * error's exit class. `options.code` (when supplied) overrides the subclass
+ * default so the original subcode (e.g. `CONFIGURATION.GATE.BASELINE_MISSING`)
+ * round-trips onto the rebuilt instance for diagnostics.
+ *
+ * Returns `undefined` for an unrecognized code so the caller can fall through to
+ * its own default (the SystemError → exit 1 fallback).
+ */
+export function toolErrorFromCanonicalCode(
+  code: string,
+  message: string,
+  options?: ToolErrorOptions,
+): ToolError | undefined {
+  switch (code) {
+    case 'NOT_FOUND': {
+      return new NotFoundError(message, options);
+    }
+    case 'CONFIGURATION_ERROR': {
+      return new ConfigurationError(message, options);
+    }
+    case 'VALIDATION_ERROR': {
+      return new ValidationError(message, options);
+    }
+    case 'NETWORK_ERROR': {
+      return new NetworkError(message, options);
+    }
+    case 'PLUGIN_INCOMPATIBLE': {
+      return new PluginIncompatibleError(message, options);
+    }
+    case 'TIMEOUT': {
+      return new TimeoutError(message, options);
+    }
+    case 'SYSTEM_ERROR': {
+      return new SystemError(message, options);
+    }
+    default: {
+      return undefined;
+    }
+  }
+}
+
 // =============================================================================
 // RESULT PATTERN
 // =============================================================================

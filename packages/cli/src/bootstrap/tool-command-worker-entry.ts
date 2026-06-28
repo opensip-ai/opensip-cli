@@ -33,7 +33,9 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  canonicalToolErrorCode,
   CapturedOutputTooLargeError,
+  ConfigurationError,
   createRunTimer,
   currentScope,
   defineCommand,
@@ -41,6 +43,7 @@ import {
   resolveToolHooks,
   sendWorkerIpcMessage,
   startWorkerHeartbeat,
+  ToolError,
   type CommandSpec,
   type ToolCliContext,
   type Tool,
@@ -151,17 +154,25 @@ async function runWorkerInitialize(tool: Tool): Promise<void> {
   await initialize();
 }
 
-/** Build a structured `error` IPC message with a failure class (+ stack when present). */
+/**
+ * Build a structured `error` IPC message with a failure class (+ stack when
+ * present). `code` carries the thrown error's canonical exit-class
+ * `ToolErrorCode` when it originated as a typed `ToolError`, so the supervisor
+ * can rebuild the right subclass on the host side and the frozen exit code
+ * survives the worker boundary (the IPC flattens the prototype chain).
+ */
 function errorMessage(
   message: string,
   failureClass: ToolCommandFailureClass,
   stack?: string,
+  code?: string,
 ): DispatchWorkerMessage {
   return {
     kind: 'error',
     message,
     failureClass,
     ...(stack === undefined ? {} : { stack }),
+    ...(code === undefined ? {} : { code }),
   };
 }
 
@@ -179,11 +190,23 @@ function readSpec(specPath: string): ToolCommandWorkerSpec | DispatchWorkerMessa
   }
 }
 
-/** Map a thrown error to its structured failure class for the IPC `error` message. */
+/**
+ * Map a thrown error to its structured failure class for the IPC `error` message.
+ *
+ * A thrown `ConfigurationError` maps to `'config-invalid'` so the supervisor's
+ * `dispatchError` reconstructs a `ConfigurationError` (→ exit 2) — the SAME
+ * contract the in-process bundled path and `doctor` honour. Without this, a
+ * binary-not-found / no-project / baseline-missing config fault thrown in the
+ * worker would flatten to the generic `'tool-handler-throw'` → `SystemError` →
+ * exit 1, silently losing the frozen exit-2 contract over the fork boundary. The
+ * non-config typed exit classes (NotFound → 3, Network → 4, …) ride the separate
+ * `code` carry (`canonicalToolErrorCode`) — see `errorMessage`/`runToolCommandWorker`.
+ */
 function classifyThrow(error: unknown): ToolCommandFailureClass {
   if (error instanceof UnsupportedSeamError) return error.failureClass;
   if (error instanceof CapturedOutputTooLargeError) return error.failureClass;
   if (error instanceof IpcPayloadTooLargeError) return error.failureClass;
+  if (error instanceof ConfigurationError) return 'config-invalid';
   return (error as { failureClass?: ToolCommandFailureClass }).failureClass ?? 'tool-handler-throw';
 }
 
@@ -335,6 +358,11 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
       error instanceof Error ? error.message : String(error),
       classifyThrow(error),
       error instanceof Error ? error.stack : undefined,
+      // Carry the canonical exit-class code for a typed ToolError so the host
+      // rebuilds the right subclass (NotFound → 3, Network → 4, …) instead of the
+      // SystemError → exit 1 fallthrough. ConfigurationError ALSO rides
+      // `failureClass: 'config-invalid'` above; this carry generalizes the rest.
+      error instanceof ToolError ? canonicalToolErrorCode(error) : undefined,
     );
   }
 }

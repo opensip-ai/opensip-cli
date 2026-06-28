@@ -9,6 +9,10 @@ import {
   NetworkError,
   ConfigurationError,
   PluginIncompatibleError,
+  UnknownCapabilityDomainError,
+  CapabilitySchemaMismatchError,
+  canonicalToolErrorCode,
+  toolErrorFromCanonicalCode,
   ok,
   err,
   tryCatch,
@@ -261,5 +265,80 @@ describe('Result pattern', () => {
     /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/only-throw-error */
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toBe('string error');
+  });
+});
+
+describe('canonicalToolErrorCode', () => {
+  it('maps each typed subclass to its canonical exit-class code', () => {
+    expect(canonicalToolErrorCode(new NotFoundError('x'))).toBe('NOT_FOUND');
+    expect(canonicalToolErrorCode(new ConfigurationError('x'))).toBe('CONFIGURATION_ERROR');
+    expect(canonicalToolErrorCode(new ValidationError('x'))).toBe('VALIDATION_ERROR');
+    expect(canonicalToolErrorCode(new NetworkError('x'))).toBe('NETWORK_ERROR');
+    expect(canonicalToolErrorCode(new PluginIncompatibleError('x'))).toBe('PLUGIN_INCOMPATIBLE');
+    expect(canonicalToolErrorCode(new TimeoutError('x'))).toBe('TIMEOUT');
+    expect(canonicalToolErrorCode(new SystemError('x'))).toBe('SYSTEM_ERROR');
+    expect(canonicalToolErrorCode(new ToolError('x', 'CUSTOM'))).toBe('SYSTEM_ERROR');
+  });
+
+  it('collapses deeper subclasses to their canonical parent bucket', () => {
+    // A subcode-carrying ConfigurationError (e.g. the gate baseline-missing fault)
+    // still maps to the CONFIGURATION_ERROR bucket — the carry is keyed on the
+    // instanceof class, not the (open) subcode.
+    const gate = new ConfigurationError('no baseline', {
+      code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+    });
+    expect(canonicalToolErrorCode(gate)).toBe('CONFIGURATION_ERROR');
+    expect(
+      canonicalToolErrorCode(
+        new UnknownCapabilityDomainError('x', { domainId: 'd', knownDomains: [] }),
+      ),
+    ).toBe('NOT_FOUND');
+    expect(
+      canonicalToolErrorCode(
+        new CapabilitySchemaMismatchError('x', {
+          domainId: 'd',
+          ownerToolId: 't',
+          diagnostic: 'why',
+        }),
+      ),
+    ).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('toolErrorFromCanonicalCode', () => {
+  it('rebuilds the matching subclass for each canonical code (round-trips canonicalToolErrorCode)', () => {
+    const codes = [
+      'NOT_FOUND',
+      'CONFIGURATION_ERROR',
+      'VALIDATION_ERROR',
+      'NETWORK_ERROR',
+      'PLUGIN_INCOMPATIBLE',
+      'TIMEOUT',
+      'SYSTEM_ERROR',
+    ] as const;
+    for (const code of codes) {
+      const rebuilt = toolErrorFromCanonicalCode(code, 'msg');
+      expect(rebuilt).toBeInstanceOf(ToolError);
+      // The rebuilt instance round-trips back to the SAME canonical bucket.
+      expect(canonicalToolErrorCode(rebuilt!)).toBe(code);
+    }
+    expect(toolErrorFromCanonicalCode('CONFIGURATION_ERROR', 'm')).toBeInstanceOf(
+      ConfigurationError,
+    );
+    expect(toolErrorFromCanonicalCode('NOT_FOUND', 'm')).toBeInstanceOf(NotFoundError);
+  });
+
+  it('preserves a supplied subcode on the rebuilt instance', () => {
+    const rebuilt = toolErrorFromCanonicalCode('CONFIGURATION_ERROR', 'no baseline', {
+      code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+    });
+    expect(rebuilt).toBeInstanceOf(ConfigurationError);
+    expect(rebuilt?.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
+    expect(rebuilt?.message).toBe('no baseline');
+  });
+
+  it('returns undefined for an unrecognized code (caller falls through to its default)', () => {
+    expect(toolErrorFromCanonicalCode('NOT_A_REAL_CODE', 'm')).toBeUndefined();
+    expect(toolErrorFromCanonicalCode('CONFIGURATION.GATE.BASELINE_MISSING', 'm')).toBeUndefined();
   });
 });

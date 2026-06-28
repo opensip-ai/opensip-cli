@@ -357,7 +357,8 @@ describe('osv-scanner worker E2E — full gate ratchet (§4.12)', () => {
   it('--gate-compare on the SAME scan is a clean no-op (exit 0, no regression)', () => {
     // Pre-existing findings recorded in the baseline are NOT a regression — only
     // net-new findings fail the ratchet. The clean exit also proves gate-save wrote
-    // the baseline (a missing baseline would throw ConfigurationError → exit 2).
+    // the baseline (the missing-baseline → exit 2 contract is asserted directly in
+    // the "typed exit-class survives the worker boundary" suite below).
     expect(compareRegressed).toBeDefined();
     expect(compareClean.status).toBe(0);
     expect(`${compareClean.stdout}${compareClean.stderr}`).toMatch(/STABLE|no change/i);
@@ -369,5 +370,28 @@ describe('osv-scanner worker E2E — full gate ratchet (§4.12)', () => {
     // The net-new advisory is named in the diff; the verdict footer says DEGRADED.
     expect(out).toContain('GHSA-NEWVULN-FAKE-0001');
     expect(out).toMatch(/DEGRADED|Added/i);
+  });
+});
+
+/**
+ * A5/A6 — the typed exit-class must survive the worker boundary on the host-RPC
+ * REJECT path too. `--gate-compare` with NO saved baseline makes the host
+ * `compareBaseline` seam reject with a ConfigurationError (BASELINE_MISSING). That
+ * rejection crosses the worker IPC as a structured reply; before the fix the worker
+ * shim rebuilt a PLAIN Error → SystemError → exit 1, silently losing the frozen
+ * exit-2 config contract. This asserts the contract end-to-end over a REAL fork.
+ */
+describe('osv-scanner worker E2E — gate-compare with no baseline exits 2 (A5/A6)', () => {
+  it('`opensip osv --gate-compare` before any --gate-save exits 2 (not 1)', () => {
+    // A fresh project with NO baseline captured: the compareBaseline host seam
+    // rejects ConfigurationError(BASELINE_MISSING) over the host-RPC channel.
+    const freshProject = makeOsvProject();
+    try {
+      const run = runCli(['osv', '--gate-compare'], {}, freshProject);
+      expect(run.status).toBe(2);
+      expect(`${run.stdout}${run.stderr}`).toMatch(/baseline|gate-save/i);
+    } finally {
+      rmSync(freshProject, { recursive: true, force: true });
+    }
   });
 });

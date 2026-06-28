@@ -34,6 +34,7 @@ import {
   forkAndSettle,
   getWorkerLimits,
   SystemError,
+  toolErrorFromCanonicalCode,
   type ToolError,
   type ToolProvenance,
   type WorkerMessage,
@@ -272,12 +273,26 @@ function specLabel(spec: ToolCommandWorkerSpec): string {
   return spec.commandName ?? spec.hook ?? 'unknown';
 }
 
-/** Build a structured supervisor-side dispatch error, logged with its failure class. */
+/**
+ * Build a structured supervisor-side dispatch error, logged with its failure
+ * class. `code` is the worker error's canonical exit-class `ToolErrorCode` (when
+ * the worker threw a typed `ToolError`); it preserves the typed exit code across
+ * the fork boundary, which flattens the prototype chain. Reconstruction order:
+ *
+ *   1. `config-invalid` → `ConfigurationError` (exit 2). The frozen config
+ *      contract — set for a thrown `ConfigurationError` (binary-not-found /
+ *      no-project / baseline-missing) AND for the deep-config-pass failure.
+ *   2. a recognized canonical `code` → that subclass (NotFound → 3, Network → 4,
+ *      Validation/Configuration → 2, PluginIncompatible → 5, Timeout → 1).
+ *   3. otherwise → `SystemError` (exit 1) — genuine worker/transport faults
+ *      (`spawn` / `exit_nonzero` / `rpc_flood` / `timeout` / `ipc_error`).
+ */
 export function dispatchError(
   spec: ToolCommandWorkerSpec,
   message: string,
   failureClass: string,
   stderrTail?: string,
+  code?: string,
 ): ToolError {
   const label = specLabel(spec);
   currentScope()?.logger.error({
@@ -294,6 +309,10 @@ export function dispatchError(
       stderrTail,
     });
   }
+  if (code !== undefined) {
+    const rebuilt = toolErrorFromCanonicalCode(code, message, { code, failureClass, stderrTail });
+    if (rebuilt !== undefined) return rebuilt;
+  }
   return new SystemError(`external tool '${spec.toolId}' ${label} failed: ${message}`, {
     code: 'SYSTEM.DISPATCH.WORKER_FAILED',
     failureClass,
@@ -307,5 +326,5 @@ function workerErrorToToolError(
   msg: DispatchWorkerError,
   stderrTail?: string,
 ): ToolError {
-  return dispatchError(spec, msg.message, msg.failureClass ?? 'ipc_error', stderrTail);
+  return dispatchError(spec, msg.message, msg.failureClass ?? 'ipc_error', stderrTail, msg.code);
 }

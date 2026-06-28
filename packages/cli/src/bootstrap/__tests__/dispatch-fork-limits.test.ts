@@ -5,7 +5,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SystemError } from '@opensip-cli/core';
+import { mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import { ConfigurationError, NetworkError, NotFoundError, SystemError } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { makeDispatchHostCtx } from '../../__tests__/harness/dispatch-host-ctx.js';
@@ -28,6 +29,41 @@ describe('dispatchError', () => {
     const err = dispatchError(SPEC, 'boom', 'timeout');
     expect(err).toBeInstanceOf(SystemError);
     expect(err.failureClass).toBe('timeout');
+  });
+
+  it('rebuilds a ConfigurationError (→ exit 2) from a config-invalid worker error', () => {
+    // The frozen exit-2 contract: a worker-side ConfigurationError (binary-not-found /
+    // no-project / baseline-missing) arrives tagged `config-invalid` and the host
+    // reconstructs a ConfigurationError — NOT a SystemError (which would be exit 1).
+    const err = dispatchError(SPEC, 'no baseline found', 'config-invalid');
+    expect(err).toBeInstanceOf(ConfigurationError);
+    expect(mapToolErrorToExitCode(err)).toBe(2);
+  });
+
+  it('rebuilds the typed subclass from the canonical code carried over the boundary', () => {
+    // A non-config typed throw rides `tool-handler-throw` + its canonical code, so
+    // the host restores the exact exit class (NotFound → 3, Network → 4).
+    const notFound = dispatchError(SPEC, 'missing', 'tool-handler-throw', undefined, 'NOT_FOUND');
+    expect(notFound).toBeInstanceOf(NotFoundError);
+    expect(mapToolErrorToExitCode(notFound)).toBe(3);
+
+    const network = dispatchError(
+      SPEC,
+      'egress fail',
+      'tool-handler-throw',
+      undefined,
+      'NETWORK_ERROR',
+    );
+    expect(network).toBeInstanceOf(NetworkError);
+    expect(mapToolErrorToExitCode(network)).toBe(4);
+  });
+
+  it('falls through to SystemError (exit 1) for an absent or unrecognized canonical code', () => {
+    const unknown = dispatchError(SPEC, 'boom', 'ipc_error', undefined, 'NOT_A_REAL_CODE');
+    expect(unknown).toBeInstanceOf(SystemError);
+    expect(mapToolErrorToExitCode(unknown)).toBe(1);
+    // No code at all → still SystemError (the pre-existing genuine-fault path).
+    expect(dispatchError(SPEC, 'boom', 'exit_nonzero')).toBeInstanceOf(SystemError);
   });
 });
 

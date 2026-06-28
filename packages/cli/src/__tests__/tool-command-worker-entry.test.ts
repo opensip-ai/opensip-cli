@@ -21,7 +21,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  ConfigurationError,
   LanguageRegistry,
+  NotFoundError,
   RunScope,
   ToolRegistry,
   runWithScope,
@@ -100,6 +102,25 @@ function toolWithConfig(config: unknown): Tool {
   } as Tool;
 }
 
+/** A tool whose single command's handler throws `thrown` (typed-error exit tests). */
+function toolThatThrows(thrown: unknown): Tool {
+  return {
+    metadata: { ...fixtureTool.metadata },
+    commandSpecs: [
+      {
+        name: 'throws',
+        description: 'handler that throws a typed error',
+        commonFlags: [],
+        scope: 'project',
+        output: 'signal-envelope',
+        handler: () => {
+          throw thrown;
+        },
+      },
+    ],
+  } as Tool;
+}
+
 describe('runToolCommandWorker', () => {
   it('runs the handler and returns its recorded final-result (FRR seams)', async () => {
     const msg = await runInScope(writeSpec(specFor({ opts: { mode: 'ok', echo: 'x' } })));
@@ -167,6 +188,43 @@ describe('runToolCommandWorker', () => {
     expect(msg.failureClass).toBe('tool-handler-throw');
     expect(msg.message).toContain('external handler boom');
     expect(msg.stack).toBeTypeOf('string');
+  });
+
+  it('maps a thrown ConfigurationError to config-invalid + carries CONFIGURATION_ERROR (exit-2 contract survives the worker boundary)', async () => {
+    // The substrate throws ConfigurationError for binary-not-found / no-project.
+    // Without the fix this flattens to `tool-handler-throw` → SystemError → exit 1
+    // over the fork; with it the worker tags `config-invalid` (+ the canonical code)
+    // so the host rebuilds a ConfigurationError → exit 2.
+    const msg = await runInScope(writeSpec(specFor({ commandName: 'throws' })), {
+      tool: toolThatThrows(
+        new ConfigurationError('gitleaks: binary not found', { code: 'ADAPTER.BINARY.NOT_FOUND' }),
+      ),
+    });
+    expect(msg.kind).toBe('error');
+    if (msg.kind !== 'error') throw new Error('expected error');
+    expect(msg.failureClass).toBe('config-invalid');
+    expect(msg.code).toBe('CONFIGURATION_ERROR');
+  });
+
+  it('carries the canonical exit-class code for a NON-config typed throw (NotFound → NOT_FOUND, exit-3 contract)', async () => {
+    // The generalized carry: a non-config typed error keeps `tool-handler-throw`
+    // but rides its canonical code, so the host rebuilds the right subclass (exit 3)
+    // instead of collapsing every worker throw to SystemError (exit 1).
+    const msg = await runInScope(writeSpec(specFor({ commandName: 'throws' })), {
+      tool: toolThatThrows(new NotFoundError('no such recipe')),
+    });
+    expect(msg.kind).toBe('error');
+    if (msg.kind !== 'error') throw new Error('expected error');
+    expect(msg.failureClass).toBe('tool-handler-throw');
+    expect(msg.code).toBe('NOT_FOUND');
+  });
+
+  it('an untyped throw carries no canonical code (stays the SystemError → exit 1 default)', async () => {
+    const msg = await runInScope(writeSpec(specFor({ opts: { mode: 'throw' } })));
+    expect(msg.kind).toBe('error');
+    if (msg.kind !== 'error') throw new Error('expected error');
+    expect(msg.failureClass).toBe('tool-handler-throw');
+    expect(msg.code).toBeUndefined();
   });
 
   it('fails loud (unsupported-seam) when the handler calls a host-only live-view seam', async () => {
