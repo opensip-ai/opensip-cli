@@ -121,13 +121,14 @@ async function runStep(args: {
   // ADR-0054 out-of-process dispatch must run through the CAPTURING context, not
   // the raw bound ctx. For an external-provenance step the worker replay
   // (`replayResult`) calls `ctx.setExitCode` with the tool's verdict exit code;
-  // binding the hook to `capture.context` routes that into `capture.exitCodes` so
-  // the external step participates in the suite worst-of aggregation exactly like
-  // the in-process handler (which already runs against `capture.context`). Binding
-  // to `bound` instead dropped the external step's exit code (it never reached
-  // `capture.exitCodes`, so a findings/regression verdict silently aggregated to 0)
-  // AND leaked the code into the outer host context — the same isolation the
-  // bundled path preserves. (04↔05 regression: external adapter as a suite step.)
+  // binding the hook to `capture.context` routes that into the capture's exit slot
+  // (`capture.getExitCode()`) so the external step participates in the suite
+  // worst-of aggregation exactly like the in-process handler (which already runs
+  // against `capture.context`). Binding to `bound` instead dropped the external
+  // step's exit code (it never reached the slot, so a findings/regression verdict
+  // silently aggregated to 0) AND leaked the code into the outer host context — the
+  // same isolation the bundled path preserves. (04↔05 regression: external adapter
+  // as a suite step.)
   Object.assign(capture.context, {
     maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, capture.context),
   });
@@ -153,14 +154,17 @@ async function runStep(args: {
           opts,
           args.step.positionals,
         );
-        if (dispatched === true) return maxExit(capture.exitCodes);
+        if (dispatched === true) return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
         const result = await args.step.spec.handler(opts, capture.context);
         hooks.completeRun?.(result);
         await dispatchOutput(result, args.step.spec, opts, args.step.positionals, capture.context);
-        return maxExit(capture.exitCodes);
+        return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
       },
-      capture.exitCodes,
       (code) => {
+        // A bundled step called `process.exit(code)` directly: route the code into
+        // the capture's last-write-wins slot (the single per-step exit source of
+        // truth) just as `setExitCode` would, then record it.
+        capture.context.setExitCode(code);
         log.warn?.({
           evt: 'cli.suite.run.step',
           suite: args.suite.name,
@@ -244,8 +248,7 @@ function stepOpts(
 
 async function withProcessExitGuard(
   fn: () => Promise<number>,
-  exitCodes: readonly number[],
-  onDirectExit?: (code: number) => void,
+  onDirectExit: (code: number) => void,
 ): Promise<number> {
   // eslint-disable-next-line @typescript-eslint/unbound-method -- process.exit has no `this` contract; identity must be restored after the guard.
   const original = process.exit;
@@ -257,15 +260,11 @@ async function withProcessExitGuard(
     return await fn();
   } catch (error) {
     if (error instanceof DirectProcessExit) {
-      onDirectExit?.(error.code);
+      onDirectExit(error.code);
       return error.code;
     }
     throw error;
   } finally {
     (process as unknown as { exit: typeof process.exit }).exit = original;
   }
-}
-
-function maxExit(codes: readonly number[]): number {
-  return Math.max(EXIT_CODES.SUCCESS, ...codes);
 }
