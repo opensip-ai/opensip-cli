@@ -17,6 +17,7 @@ import { executeYagni } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
 
 import type { YagniConfidence } from '../types/yagni-metadata.js';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 export interface YagniGateCommandOptions {
   readonly cwd: string;
@@ -52,6 +53,27 @@ function renderGateCompareLines(result: {
     : [
         `YAGNI gate PASS: no regressions (${String(result.resolved.length)} resolved since baseline).`,
       ];
+}
+
+/**
+ * Finalize a gate run: deliver the signal envelope and (when `--sarif` is set)
+ * write the SARIF report. The two are independent I/O — signal egress vs. a
+ * local file write, both read-only over the same envelope — so they run
+ * concurrently. Shared by the gate-save and gate-compare tails (identical
+ * finalize sequence; the only difference is how `runFailed` is derived).
+ */
+async function deliverAndExport(
+  cli: ToolCliContext,
+  envelope: SignalEnvelope,
+  runFailed: boolean,
+  deliverOpts: { readonly cwd: string; readonly reportTo?: string; readonly apiKey?: string },
+  sarifPath: string | undefined,
+): Promise<void> {
+  const tasks: Promise<unknown>[] = [cli.deliverSignals(envelope, { ...deliverOpts, runFailed })];
+  if (sarifPath !== undefined && sarifPath !== '') {
+    tasks.push(cli.writeSarif(envelope, sarifPath));
+  }
+  await Promise.all(tasks);
 }
 
 export async function runYagniGateMode(
@@ -98,10 +120,7 @@ export async function runYagniGateMode(
           ]
         : [`YAGNI baseline saved (${String(outcome.envelope.signals.length)} signal(s))`],
     });
-    await cli.deliverSignals(outcome.envelope, { ...deliverOpts, runFailed });
-    if (opts.sarif !== undefined && opts.sarif !== '') {
-      await cli.writeSarif(outcome.envelope, opts.sarif);
-    }
+    await deliverAndExport(cli, outcome.envelope, runFailed, deliverOpts, opts.sarif);
     return { session: outcome.session };
   }
 
@@ -111,9 +130,6 @@ export async function runYagniGateMode(
     type: 'gate-done',
     lines: renderGateCompareLines(result),
   });
-  await cli.deliverSignals(outcome.envelope, { ...deliverOpts, runFailed });
-  if (opts.sarif !== undefined && opts.sarif !== '') {
-    await cli.writeSarif(outcome.envelope, opts.sarif);
-  }
+  await deliverAndExport(cli, outcome.envelope, runFailed, deliverOpts, opts.sarif);
   return { session: outcome.session };
 }
