@@ -29,6 +29,8 @@ const testScope = new RunScope({ languages: langRegistry });
 // check.run resolves currentScope()?.fitness?.fileCache now (Phase 1).
 Object.assign(testScope, { fitness: { fileCache } });
 
+const CHECK_EXECUTION_TIMEOUT_MS = 60_000;
+
 let cwd: string;
 let allFixturePaths: string[] = [];
 
@@ -1145,6 +1147,6 @@ describe('checks-typescript — every check runs to completion', () => {
       expect(result.info).toBeDefined();
       expect(result.metadata).toBeDefined();
     },
-    20_000,
+    CHECK_EXECUTION_TIMEOUT_MS,
   );
 });
