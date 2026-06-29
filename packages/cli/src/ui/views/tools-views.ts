@@ -31,6 +31,7 @@ const SPACER: ViewNode = { kind: 'spacer' };
 
 const TOOLS_LIST_COLUMNS: readonly (string | TableColumnSpec)[] = [
   'Tool',
+  'UUID',
   'Source',
   'Status',
   'Version',
@@ -71,6 +72,7 @@ function verdictTone(verdict: ToolsValidateResult['verdict']): Tone {
 function toolsListRow(row: ToolsListRow): Span[] {
   return [
     { text: row.id, tone: 'brand', bold: true },
+    { text: row.stableId ?? '-', dim: row.stableId === undefined },
     { text: row.shadowed === true ? `${row.source} (shadowed)` : row.source },
     { text: row.status, tone: row.status === 'loaded' ? 'success' : 'muted' },
     { text: row.version },

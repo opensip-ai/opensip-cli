@@ -30,16 +30,39 @@ export function renderOverview(): void {
   const table = el('table', { class: 'data-table sortable' });
   const thead = el('thead');
   const headerRow = el('tr');
-  ['Timestamp', 'Tool', 'Recipe', 'Pass Rate', 'Status', 'Checks', 'Findings', 'Duration'].forEach(
-    (h) => {
-      headerRow.append(el('th', { text: h }));
-    },
-  );
+  [
+    'Timestamp',
+    'Tool',
+    'Recipe',
+    'Suite',
+    'Pass Rate',
+    'Status',
+    'Checks',
+    'Findings',
+    'Duration',
+  ].forEach((h) => {
+    headerRow.append(el('th', { text: h }));
+  });
   thead.append(headerRow);
   table.append(thead);
 
   const tbody = el('tbody');
+  let lastSuiteRunId: string | undefined;
   sessions.forEach((s) => {
+    if (s.suiteRunId !== undefined && s.suiteRunId !== lastSuiteRunId) {
+      lastSuiteRunId = s.suiteRunId;
+      const label = s.suiteName ?? s.suiteRunId;
+      const header = el('tr', { class: 'suite-group-header' });
+      const cell = el('td', {
+        text: 'Suite: ' + label,
+        colSpan: '9',
+        style: 'font-weight:600;color:var(--text-muted);background:var(--surface-2)',
+      });
+      header.append(cell);
+      tbody.append(header);
+    } else if (s.suiteRunId === undefined) {
+      lastSuiteRunId = undefined;
+    }
     const sc2 = scoreColorStyle(s.score);
     // Per-session counts live in the tool-owned opaque payload. Tools that
     // persist no summary (or none yet) fall back to zeros so the cross-tool row
@@ -79,6 +102,13 @@ export function renderOverview(): void {
     );
     row.append(toolCell);
     row.append(el('td', { text: s.recipe ?? 'default', style: 'color:var(--text-muted)' }));
+    row.append(
+      el('td', {
+        text: s.suiteName ?? '—',
+        title: s.suiteRunId ?? '',
+        style: s.suiteName === undefined ? 'color:var(--text-dim)' : 'color:var(--text-muted)',
+      }),
+    );
     row.append(el('td', { text: s.score + '%', style: 'font-weight:600;' + sc2 }));
     const statusCell = el('td');
     statusCell.append(statusBadge(sessionStatus(s)));

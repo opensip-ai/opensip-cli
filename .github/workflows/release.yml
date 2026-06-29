@@ -95,6 +95,8 @@ jobs:
       #     (the `critical`/`high` rung, core's isErrorSignal), mirroring fit:ci
       #     (ADR-0020). Net-new (ratchet) detection is the complementary Code
       #     Scanning annotation layer in ci.yml, not what gates the release here.
+      #   - `pnpm yagni:ci`      — dogfood: fails on any yagni finding
+      #     (`failOnWarnings: 1`; yagni signals are warning-rung).
       #
       # The dogfood gates run the COMPILED engine from dist
       # (node packages/cli/dist/index.js …), so they must run AFTER `pnpm -r run
@@ -120,6 +122,8 @@ jobs:
         run: pnpm fit:ci
       - name: Graph (dogfood — mirror ci.yml; ADR-0017)
         run: pnpm graph:ci
+      - name: YAGNI (dogfood — mirror ci.yml; ADR-0017)
+        run: pnpm yagni:ci
 
       # Probe the registry for every package we are about to publish. A
       # package whose name is not yet on npm needs trusted publishing

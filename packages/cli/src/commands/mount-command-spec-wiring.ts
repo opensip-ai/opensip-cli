@@ -7,7 +7,11 @@
 
 import { Option } from 'commander';
 
+import { optionDefaultValue } from './assemble-opts.js';
+
 import type { ArgSpec, OptionSpec } from '@opensip-cli/core';
+
+export { optionKey } from './assemble-opts.js';
 
 /**
  * Build a Commander {@link Option} from an {@link OptionSpec}, covering every
@@ -34,10 +38,9 @@ export function buildOption(spec: OptionSpec, commandName: string): Option {
   }
   // `arrayDefault` (repeatable accumulators) wins over a scalar `default`;
   // Commander uses it as the seed the `parse` reducer accumulates onto.
-  if (spec.arrayDefault !== undefined) {
-    option.default([...spec.arrayDefault]);
-  } else if (spec.default !== undefined) {
-    option.default(spec.default);
+  const defaultValue = optionDefaultValue(spec);
+  if (defaultValue !== undefined) {
+    option.default(defaultValue);
   }
   if (spec.required === true) {
     if (valuePlaceholder === undefined) {

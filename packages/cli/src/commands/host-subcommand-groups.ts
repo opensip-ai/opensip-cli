@@ -21,6 +21,7 @@
 import { buildConfigGroupLeaves } from './host-subcommand-config.js';
 import { buildSessionsGroupLeaves } from './host-subcommand-sessions.js';
 import { type HostSpec } from './host-subcommand-shared.js';
+import { buildSuiteGroupLeaves } from './suite/suite-command-specs.js';
 import { buildToolsGroupLeaves } from './tools/index.js';
 
 import type { CliCommandsContext } from './shared.js';
@@ -48,7 +49,12 @@ export interface HostSubcommandGroup {
  * This is the FINITE, NAMED set the Phase 7 `command-surface-parity` guardrail
  * allow-lists as documented host exceptions. Every other host command IS a spec.
  */
-export const HOST_SUBCOMMAND_GROUPS: readonly string[] = ['config', 'sessions', 'tools'] as const;
+export const HOST_SUBCOMMAND_GROUPS: readonly string[] = [
+  'config',
+  'sessions',
+  'suite',
+  'tools',
+] as const;
 
 /** Build the subcommand-group parents with their leaf specs. */
 export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly HostSubcommandGroup[] {
@@ -62,6 +68,11 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
       name: 'sessions',
       description: 'Manage session data',
       leaves: buildSessionsGroupLeaves(ctx),
+    },
+    {
+      name: 'suite',
+      description: 'Run configured tool suites',
+      leaves: buildSuiteGroupLeaves(ctx),
     },
     {
       name: 'tools',

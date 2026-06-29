@@ -37,9 +37,17 @@ export interface HistorySession extends StoredSession {
   readonly showCommand: string;
 }
 
+export interface HistorySuiteGroup {
+  readonly suiteRunId: string;
+  readonly suiteName?: string;
+  readonly sessions: readonly HistorySession[];
+}
+
 export interface HistoryResult {
   type: 'history';
   sessions: HistorySession[];
+  /** Present when one or more rows share a `suiteRunId`; standalone rows stay in `sessions` only. */
+  suiteGroups?: readonly HistorySuiteGroup[];
 }
 
 export interface ReportResult {

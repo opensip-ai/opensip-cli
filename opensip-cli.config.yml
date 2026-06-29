@@ -195,13 +195,13 @@ graph:
 # YAGNI Configuration
 # =============================================================================
 #
-# Advisory reduction audit. As of v0.1.12 (ADR-0063) yagni owns no graph
-# evidence — it audits config-surface reduction; duplicate/near-duplicate
-# analysis lives in `opensip graph`. Findings do not gate merges.
+# Reduction audit (ADR-0063/0064). Findings are warning-rung (`low`/`medium`), so
+# the dogfood gate uses failOnWarnings (not error-rung isErrorSignal). Duplicate
+# detection shares @opensip-cli/clone-detection with graph.
 
 yagni:
   failOnErrors: 0
-  failOnWarnings: 0
+  failOnWarnings: 1
   defaultMinConfidence: medium
   includeTests: false
 

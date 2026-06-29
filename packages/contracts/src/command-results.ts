@@ -42,9 +42,18 @@ export type {
   ToolsUninstallResult,
 } from './command-results-variants/tools-results.js';
 export type {
+  SuiteAddResult,
+  SuiteListEntry,
+  SuiteListResult,
+  SuiteListStep,
+  SuiteRunResult,
+  SuiteStepSummary,
+} from './command-results-variants/suite-results.js';
+export type {
   ListChecksResult,
   ListRecipesResult,
   HistorySession,
+  HistorySuiteGroup,
   HistoryResult,
   ReportResult,
 } from './command-results-variants/list-history-results.js';
@@ -92,6 +101,11 @@ import type {
   ErrorResult,
 } from './command-results-variants/session-results.js';
 import type {
+  SuiteAddResult,
+  SuiteListResult,
+  SuiteRunResult,
+} from './command-results-variants/suite-results.js';
+import type {
   ToolsListResult,
   ToolsDoctorResult,
   ToolsCreateResult,
@@ -134,6 +148,9 @@ export type CommandResult =
   | ToolsInstallResult
   | ToolsUninstallResult
   | ToolsDataPurgeResult
+  | SuiteRunResult
+  | SuiteListResult
+  | SuiteAddResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;

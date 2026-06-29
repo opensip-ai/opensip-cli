@@ -47,6 +47,14 @@ export { loadCliDefaults, cliConfigSchema } from './document/cli-config.js';
 export type { CliDefaults } from './document/cli-config.js';
 export { dashboardConfigSchema } from './document/dashboard.js';
 export {
+  suiteDefinitionSchema,
+  suiteExecutionSchema,
+  suitesConfigSchema,
+  suiteStepArgsSchema,
+  suiteStepSchema,
+} from './document/suites.js';
+export type { SuiteDefinition, SuitesConfig, SuiteStep } from './document/suites.js';
+export {
   targetDefinitionSchema,
   checkTargetValueSchema,
   targetsRecordSchema,

@@ -19,6 +19,8 @@
  * tests) the plane writes nothing and returns `undefined`.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import {
   createRunLifecycle,
   deriveRunOutcome,
@@ -38,6 +40,21 @@ import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const MODULE_TAG = 'cli:run-plane';
+
+export interface SuiteRunContext {
+  readonly suiteRunId: string;
+  readonly suiteName: string;
+}
+
+const suiteContextStorage = new AsyncLocalStorage<SuiteRunContext>();
+
+export function currentSuiteRunContext(): SuiteRunContext | undefined {
+  return suiteContextStorage.getStore();
+}
+
+export function runWithSuiteRunContext<T>(ctx: SuiteRunContext, fn: () => T): T {
+  return suiteContextStorage.run(ctx, fn);
+}
 
 /** Stable dependencies the run-plane factory captures (no per-invocation state). */
 export interface RunPlaneDeps {
@@ -94,6 +111,8 @@ export interface RunActionHooks {
    * is no transitional generic-session writer left on the launch surface.
    */
   readonly completeRun?: (result: unknown) => void;
+  /** Reset the invocation slot so a host-owned multi-step command can time the next step. */
+  readonly resetRun?: () => void;
   /**
    * ADR-0054 out-of-process dispatch seam. When present AND the owning tool is
    * EXTERNAL-provenance, the command action calls this INSTEAD of invoking
@@ -120,6 +139,8 @@ export interface RunPlaneFactory {
   beginRun(): RunPlaneInvocation;
   /** The current invocation — lazily begun if the command action has not yet called beginRun. */
   current(): RunPlaneInvocation;
+  /** Drop the current invocation slot. Intended for host-owned suite step boundaries. */
+  reset(): void;
 }
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- factory and invocation closure intentionally share the per-command lifecycle slot.
@@ -168,6 +189,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           startedAt: snapshot.startedAt,
           completedAt: snapshot.completedAt,
           cwd: contribution.cwd,
+          ...suiteSessionFields(),
           recipe: contribution.recipe,
           score: contribution.score,
           passed: contribution.passed,
@@ -204,6 +226,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         startedAt: snapshot.startedAt,
         completedAt: snapshot.completedAt,
         durationMs: snapshot.durationMs,
+        ...suiteSessionFields(),
       };
     }
 
@@ -263,7 +286,15 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       invocation ??= makeInvocation();
       return invocation;
     },
+    reset() {
+      invocation = undefined;
+    },
   };
+}
+
+function suiteSessionFields(): { suiteRunId?: string; suiteName?: string } {
+  const suite = currentSuiteRunContext();
+  return suite === undefined ? {} : { suiteRunId: suite.suiteRunId, suiteName: suite.suiteName };
 }
 
 /**
@@ -301,6 +332,9 @@ export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
       // host-owned-run-timing Phase 3: the host freezes the lifecycle and
       // persists the returned session contribution. Best-effort.
       if (session) factory.current().completeAndPersist(session);
+    },
+    resetRun: () => {
+      factory.reset();
     },
   };
 }

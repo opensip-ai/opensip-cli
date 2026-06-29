@@ -2,8 +2,12 @@ import type { CliDiagnostic } from '../cli-diagnostic.js';
 
 /** One row of the `tools list` effective-tool inventory (ADR-0041). */
 export interface ToolsListRow {
-  /** The tool's stable id (from its manifest; package name when unreadable). */
+  /** The tool's human id (from its manifest; package name when unreadable). */
   readonly id: string;
+  /** The tool's stable UUID, when declared. */
+  readonly stableId?: string;
+  /** Alias for {@link stableId}, included for hand-authored suite config UX. */
+  readonly uuid?: string;
   /** npm package name, when the tool is a package install. */
   readonly packageName?: string;
   readonly version: string;

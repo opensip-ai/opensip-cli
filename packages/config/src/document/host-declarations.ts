@@ -21,6 +21,7 @@ import { z } from 'zod';
 
 import { cliConfigSchema } from './cli-config.js';
 import { dashboardConfigSchema } from './dashboard.js';
+import { suitesConfigSchema } from './suites.js';
 import {
   checkOverridesSchema,
   createPluginsConfigSchema,
@@ -69,6 +70,7 @@ export function hostConfigDeclarations(
     { namespace: 'targets', schema: targetsRecordSchema },
     { namespace: 'globalExcludes', schema: globalExcludesSchema },
     { namespace: 'checkOverrides', schema: checkOverridesSchema },
+    { namespace: 'suites', schema: suitesConfigSchema },
     {
       namespace: 'plugins',
       schema: createPluginsConfigSchema(options.pluginConfigKeys),

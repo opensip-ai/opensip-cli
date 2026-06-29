@@ -29,6 +29,13 @@
       "when": 1782200000000,
       "tag": "0003_baseline_identity_meta",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1782300000000,
+      "tag": "0004_suite_grouping",
+      "breakpoints": true
     }
   ]
 }

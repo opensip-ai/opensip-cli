@@ -874,6 +874,38 @@ The `--filter` and `--raw` options (plus `--summary-only` on `list`) were added 
 
 ---
 
+## `suite run/list/add` — run configured multi-tool suites
+
+CLI-owned. A suite runs several existing tool commands in one project scope.
+The suite invocation owns `--cwd`, `--config`, targeting, JSON/report flags, and
+cloud/report delivery; individual steps may only set tool-behavior options.
+
+```
+opensip suite list
+opensip suite run security
+opensip suite add security --tool fitness --command fit --arg recipe=security
+```
+
+| Subcommand | Flag | Effect |
+|---|---|---|
+| `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
+| `run` | `--cwd <path>` | Shared project root for every step. |
+| `run` | `--json` | Emit the suite summary as JSON. Step output still flows through each step's own output seams. |
+| `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
+| `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
+| `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
+| `add` | `--command <name>` | Tool command to run for the step. |
+| `add` | `--arg <key=value>` | Add a tool option to the step. Repeat for multiple options. |
+
+Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
+`sessions list --json` and reports can group the step rows from one suite run.
+Suites are intentionally one-scope: use separate CLI invocations when different
+tools must scan different roots or target sets.
+
+**See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites).
+
+---
+
 ## `<tool> plugin add/remove/list/sync` — manage a tool's extension packs
 
 CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/cli/src/commands/plugin.ts).

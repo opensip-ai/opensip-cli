@@ -16,6 +16,7 @@ import {
   createRunActionHooks,
   createRunPlaneFactory,
   createRunSessionSeam,
+  runWithSuiteRunContext,
   type RunPlaneFactory,
 } from '../run-plane.js';
 
@@ -179,6 +180,18 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
     const recorded = inv.completeAndPersist(contribution());
     const row = new SessionRepo(datastore).get(recorded!.id);
     expect(row?.hostMetrics?.persistMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('stamps suite grouping fields from the active suite context', () => {
+    let sessionId: string | undefined;
+    runWithSuiteRunContext({ suiteRunId: 'suite-run-1', suiteName: 'security' }, () => {
+      const recorded = factory.current().completeAndPersist(contribution());
+      sessionId = recorded?.id;
+    });
+
+    const row = new SessionRepo(datastore).get(sessionId!);
+    expect(row?.suiteRunId).toBe('suite-run-1');
+    expect(row?.suiteName).toBe('security');
   });
 
   it('freezes the lifecycle so a second persist reuses the same completion snapshot', () => {

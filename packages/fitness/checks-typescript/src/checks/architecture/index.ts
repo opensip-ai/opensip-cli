@@ -40,5 +40,6 @@ export * from './no-bootstrap-tool-import.js';
 export * from './no-run-done-result.js';
 export * from './package-json-exports-field.js';
 export * from './phantom-dependency-detection.js';
+export * from './single-opts-assembly-seam.js';
 export * from './subprocess-correlation-required.js';
 export * from './tsconfig-extends-validation.js';

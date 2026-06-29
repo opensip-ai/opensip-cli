@@ -42,6 +42,7 @@
     "bench:partition": "pnpm build && node scripts/bench-partition-strategies.mjs",
     "graph:equivalence:ci": "node packages/cli/dist/index.js graph-equivalence-check",
     "yagni": "turbo run build && node packages/cli/dist/index.js yagni",
+    "yagni:ci": "node packages/cli/dist/index.js yagni --gate-save --sarif yagni.sarif",
     "sim": "node packages/cli/dist/index.js sim",
     "report": "node packages/cli/dist/index.js report",
     "sessions": "node packages/cli/dist/index.js sessions",

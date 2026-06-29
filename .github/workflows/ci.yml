@@ -149,12 +149,20 @@ jobs:
           sarif_file: graph.sarif
           category: opensip-cli-graph
 
-      # Informational YAGNI dogfood — advisory only (failOnErrors/Warnings: 0).
-      # ADR-0063 (v0.1.12): yagni no longer builds a graph; duplicate analysis
-      # lives in `opensip graph`. No `--graph` flag (deprecated/inert).
-      - name: YAGNI (informational dogfood)
-        continue-on-error: true
-        run: node packages/cli/dist/index.js yagni --json
+      # Dogfood yagni the same way as fit/graph. `yagni --gate-save --sarif` records
+      # the baseline AND hard-fails on any finding (`failOnWarnings: 1` in
+      # opensip-cli.config.yml — yagni signals are warning-rung). The SARIF upload
+      # runs under `if: always()` for the net-new Code Scanning ratchet.
+      - name: YAGNI (dogfood)
+        id: yagni
+        run: pnpm yagni:ci
+
+      - name: Upload yagni SARIF
+        if: always() && hashFiles('yagni.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: yagni.sarif
+          category: opensip-cli-yagni
 
       # REAL-REPO equivalence guardrail (ADR-0032): assert the SHARDED build is
       # byte-equivalent to the EXACT single-program build on THIS repo — a genuine

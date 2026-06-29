@@ -100,6 +100,7 @@ function buildSessionHead(): HTMLElement {
   [
     'Timestamp',
     'Recipe',
+    'Suite',
     'Pass Rate',
     'Status',
     'Passed',
@@ -159,6 +160,13 @@ export function renderSessionTable(
       el('td', {
         text: s.recipe ?? 'default',
         style: 'color:var(--text-muted)',
+      }),
+    );
+    row.append(
+      el('td', {
+        text: s.suiteName ?? '—',
+        title: s.suiteRunId ?? '',
+        style: s.suiteName === undefined ? DIM : 'color:var(--text-muted)',
       }),
     );
     const scoreCell = el('td', { style: 'font-weight:600;' + sc });

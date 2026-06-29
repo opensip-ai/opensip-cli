@@ -141,6 +141,7 @@ async function main(): Promise<void> {
     datastore: () => getOrOpenDatastore(logger),
     manifests,
     provenance,
+    toolContext: ctx,
     ...registrationInput,
   };
 

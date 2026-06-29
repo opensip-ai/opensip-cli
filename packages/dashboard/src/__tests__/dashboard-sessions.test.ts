@@ -23,6 +23,8 @@ interface StoredSessionLike {
   completedAt: string;
   cwd: string;
   recipe?: string;
+  suiteRunId?: string;
+  suiteName?: string;
   score: number;
   passed: boolean;
   runOutcome?: 'passed' | 'failed' | 'degraded' | 'error';
@@ -121,6 +123,21 @@ describe('renderSessionTable / renderDetail', () => {
     expect(headers).not.toContain('Rule');
     // The check's slug renders in a row.
     expect(detail!.textContent).toContain('no-console-log');
+  });
+
+  it('shows suite grouping in the sessions table', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        suiteRunId: 'suite-run-1',
+        suiteName: 'security',
+      }),
+    ]);
+
+    const headers = [...panel.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(headers).toContain('Suite');
+    const row = panel.querySelector('tbody tr')!;
+    expect(row.textContent).toContain('security');
+    expect(row.querySelectorAll('td')[2]?.getAttribute('title')).toBe('suite-run-1');
   });
 
   it('renders per-detector detail with a "Detector" column for a yagni payload', () => {
@@ -430,7 +447,7 @@ describe('renderSessionTable / renderDetail', () => {
     ]);
     const badge = panel.querySelector('.badge')?.textContent;
     expect(badge).toBe('ERROR');
-    const scoreCell = panel.querySelector<HTMLElement>('tbody tr td:nth-child(3)');
+    const scoreCell = panel.querySelector<HTMLElement>('tbody tr td:nth-child(4)');
     expect(scoreCell?.style.color).toContain('var(--error)');
   });
 
