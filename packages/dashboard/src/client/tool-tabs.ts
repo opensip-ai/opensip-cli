@@ -104,6 +104,25 @@ export function renderFitnessTab(): void {
   });
 }
 
+/**
+ * Host-owned catch-all tab — renders every session whose tool is NOT claimed by a
+ * registered tool tab (external-adapter scans: gitleaks / osv-scanner / trivy).
+ * Those tools fork their runtime in a worker and are never loaded in-host, so they
+ * structurally cannot register a `defineToolTab` tab — yet they persist the SAME
+ * grouped `{summary, checks[]}` payload the per-tool tabs use. We therefore render
+ * them through the SAME tool-agnostic `renderSessionTable` → `renderSessionDetail`
+ * path, which already falls back to a "Check" column for unknown tools. No subtab
+ * bar (no catalog/recipes for adapters) — just the flat session table.
+ *
+ * The generator gates the tab/panel/render-call on `externalSessions` being
+ * non-empty, so this is only invoked when there is something to show.
+ */
+export function renderExternalTab(): void {
+  const panel = document.querySelector<HTMLElement>('#panel-' + externalTabId);
+  if (!panel) return;
+  renderSessionTable(panel, externalSessions, 'var(--accent)');
+}
+
 /** A sim scenario catalog entry (sim domain vocabulary, read structurally). */
 interface ScenarioEntry {
   name: string;

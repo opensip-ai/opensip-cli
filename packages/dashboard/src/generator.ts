@@ -62,6 +62,21 @@ export interface DashboardInput {
   editorProtocol?: string | null;
 }
 
+// Host-owned catch-all tab for sessions whose `tool` is NOT claimed by any
+// registered tool tab (external-adapter scans — gitleaks / osv-scanner / trivy).
+// Their worker-forked runtimes are never loaded in-host, so they structurally
+// cannot register a `defineToolTab` tab; the four per-tool tabs only bucket their
+// own same-tool sessions, leaving adapter findings rendered nowhere. This id /
+// label / icon is the single source of truth: the generator emits the tab,
+// panel, and render-call, and injects `externalTabId` as a page global so the
+// bundled overview row-click handler (client/overview.ts) routes unclaimed-tool
+// rows here and the catch-all renderer (client/tool-tabs.ts → renderExternalTab)
+// resolves the panel id.
+const EXTERNAL_TAB_ID = 'external';
+const EXTERNAL_TAB_LABEL = 'External Tools';
+// Shield icon (lucide) — external adapters are typically secret/vuln scanners.
+const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
+
 // Escape all < and > to prevent script injection in HTML <script> context
 function escapeForScriptContext(json: string): string {
   return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`);
@@ -158,13 +173,27 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // all derive from the same iteration so adding a new tab is a single
   // defineToolTab() call (see tool-tabs-registrations.ts).
   const toolTabs = listToolTabs();
-  const toolTabButtons = toolTabs
-    .map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`)
-    .join('\n');
-  const toolTabPanels = toolTabs
-    .map((t) => `<div id="panel-${t.id}" class="tab-panel"></div>`)
-    .join('\n');
-  const toolTabRenderCalls = toolTabs.map((t) => `${t.renderFunctionName}();`).join('\n');
+  // Bucket every session whose tool is NOT claimed by a registered tab into the
+  // host-owned catch-all "External Tools" tab. Emitted ONLY when such sessions
+  // exist so a fit-only repo never shows an empty External Tools tab.
+  const claimedTools = new Set(toolTabs.map((t) => t.tool));
+  const hasExternalSessions = sessions.some((s) => !claimedTools.has(s.tool));
+  const toolTabButtons = [
+    ...toolTabs.map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`),
+    ...(hasExternalSessions
+      ? [
+          `  <div class="tab" data-tab="${EXTERNAL_TAB_ID}">${EXTERNAL_TAB_ICON} ${EXTERNAL_TAB_LABEL}</div>`,
+        ]
+      : []),
+  ].join('\n');
+  const toolTabPanels = [
+    ...toolTabs.map((t) => `<div id="panel-${t.id}" class="tab-panel"></div>`),
+    ...(hasExternalSessions ? [`<div id="panel-${EXTERNAL_TAB_ID}" class="tab-panel"></div>`] : []),
+  ].join('\n');
+  const toolTabRenderCalls = [
+    ...toolTabs.map((t) => `${t.renderFunctionName}();`),
+    ...(hasExternalSessions ? ['renderExternalTab();'] : []),
+  ].join('\n');
   // Overview's `tool → badge style` and `tool → tab id` maps, derived from the
   // same registry and injected as page globals so the bundled overview renderer
   // (src/client/overview.ts) reads them as ambient data — the registry
@@ -224,6 +253,11 @@ const yagniSessions = sessions.filter(s => s.tool === 'yagni');
 // globals by the bundled overview renderer (src/client/overview.ts).
 const toolBadgeStyles = ${toolBadgeStylesJson};
 const tabMap = ${tabMapJson};
+// Host-owned catch-all: sessions whose tool is not claimed by a registered tab
+// (external-adapter scans). Rendered in the "External Tools" tab; the overview
+// row-click handler routes unclaimed-tool rows to externalTabId.
+const externalSessions = sessions.filter(s => !(s.tool in tabMap));
+const externalTabId = ${JSON.stringify(EXTERNAL_TAB_ID)};
 
 // The vendored Cytoscape renderer (defines the cytoscape / cytoscapeDagre
 // browser globals the Visualization view consumes). Inlined BEFORE the bundle so

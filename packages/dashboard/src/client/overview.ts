@@ -76,12 +76,19 @@ export function renderOverview(): void {
         // tabActivators registry. If one matches this session's tool, hand off
         // to it. Otherwise fall back to plain top-level tab switching by name.
         if (activateTabForSession(s)) return;
-        const tabName = tabMap[s.tool] ?? s.tool;
+        // Route to the session's per-tool tab, or — for a tool not claimed by any
+        // registered tab (external-adapter scans) — the host-owned catch-all
+        // "External Tools" tab. Resolve the targets BEFORE deactivating anything:
+        // if neither a tab nor a panel exists for the route, no-op (leave the
+        // current view intact) rather than deactivating every panel — including
+        // #panel-overview — and activating nothing, which would blank the report.
+        const tabName = s.tool in tabMap ? tabMap[s.tool] : externalTabId;
+        const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
+        const activePanel = document.querySelector('#panel-' + tabName);
+        if (!tab && !activePanel) return;
         document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-        const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
         if (tab) tab.classList.add('active');
-        const activePanel = document.querySelector('#panel-' + tabName);
         if (activePanel) activePanel.classList.add('active');
       },
     });
