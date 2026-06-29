@@ -18,7 +18,12 @@ import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 
 interface StoredSessionLike {
   id: string;
-  tool: 'fit' | 'sim' | 'graph' | 'yagni';
+  // Includes external-adapter tools (gitleaks / osv-scanner / trivy) alongside the
+  // four registered first-party tools. Typing the union as only the registered
+  // four is what hid the catch-all routing gap from the test suite — an adapter
+  // session is structurally a valid session row and must render through the same
+  // tool-agnostic session-detail path.
+  tool: 'fit' | 'sim' | 'graph' | 'yagni' | 'gitleaks' | 'osv-scanner' | 'trivy';
   startedAt: string;
   completedAt: string;
   cwd: string;
@@ -123,6 +128,54 @@ describe('renderSessionTable / renderDetail', () => {
     expect(headers).not.toContain('Rule');
     // The check's slug renders in a row.
     expect(detail!.textContent).toContain('no-console-log');
+  });
+
+  it('renders an external-adapter (gitleaks) payload with a fallback "Check" column and only the masked secret preview', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        id: 'gl1',
+        tool: 'gitleaks',
+        recipe: undefined,
+        payload: {
+          // The adapter persists the SAME grouped {summary, checks[]} shape graph
+          // and fitness own — the renderer must read it tool-agnostically.
+          summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
+          checks: [
+            {
+              checkSlug: 'aws-access-key',
+              passed: false,
+              violationCount: 1,
+              durationMs: 0,
+              findings: [
+                {
+                  ruleId: 'aws-access-key',
+                  // Already redacted at ingest — only a non-reversible preview.
+                  message: 'AWS access key detected: AKIA…',
+                  severity: 'error',
+                  filePath: 'src/config.ts',
+                  line: 12,
+                  suggestion: 'Rotate the credential and remove it from source.',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const detail = detailSection(panel);
+    expect(detail).not.toBeNull();
+    // An unknown tool falls back to the generic "Check" column (not Rule/Detector).
+    const headers = [...detail!.querySelectorAll('thead th')].map((th) => th.textContent);
+    expect(headers).toContain('Check');
+    expect(headers).not.toContain('Rule');
+    expect(headers).not.toContain('Detector');
+    // The rule and the masked preview render in the (collapsed-but-present) detail.
+    expect(detail!.textContent).toContain('aws-access-key');
+    expect(detail!.textContent).toContain('src/config.ts');
+    expect(detail!.textContent).toContain('AKIA…');
+    // The masked-secret guarantee: a raw credential never appears in the render.
+    expect(detail!.textContent).not.toContain('AKIAIOSFODNN7EXAMPLE');
   });
 
   it('shows suite grouping in the sessions table', () => {

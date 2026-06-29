@@ -523,7 +523,7 @@ describe('suite views', () => {
         tool: 'fitness',
         stableId: 'uuid-1',
         command: 'fit',
-        configPath: '/tmp/opensip-cli.config.yml',
+        configPath: '/workspace/opensip-cli.config.yml',
         changed: true,
       }),
     ).toContain('Added fitness fit to security');
@@ -535,7 +535,7 @@ describe('suite views', () => {
         tool: 'fitness',
         stableId: 'uuid-1',
         command: 'fit',
-        configPath: '/tmp/opensip-cli.config.yml',
+        configPath: '/workspace/opensip-cli.config.yml',
         changed: false,
       }),
     ).toContain('Suite already contained');
@@ -556,7 +556,7 @@ describe('tools command views via resultToView', () => {
       text({
         type: 'tools-create',
         toolId: 'demo-tool',
-        dir: '/tmp/demo-tool',
+        dir: '/workspace/demo-tool',
         files: [],
         success: false,
         error: 'exists',
@@ -642,7 +642,7 @@ describe('grouped history and config views', () => {
         {
           suiteRunId: 'hidden-run',
           suiteName: 'hidden',
-          sessions: [sessions[20]!],
+          sessions: [sessions[20]],
         },
       ],
     } as never);

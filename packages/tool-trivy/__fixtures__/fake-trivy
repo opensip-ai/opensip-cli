@@ -1,0 +1,40 @@
+#!/bin/sh
+# Fake `trivy` binary for deterministic adapter E2E (ADR-0090 D6 Tier 2).
+#
+# It ignores the scan arguments and instead copies the committed golden SARIF
+# report to whatever `--output` path the adapter passes, then exits 0 — Trivy
+# exits 0 EVEN WITH findings (no `--exit-code` is passed), so the substrate derives
+# findings from the parsed SARIF, not the exit code. The golden source is injected
+# via FAKE_TRIVY_GOLDEN so the ONE committed golden (__fixtures__/trivy-golden.sarif)
+# drives both the in-process ingest tests and this worker E2E (no drift).
+#
+# `trivy --version` is answered with a fixed banner so the substrate's version
+# probe + doctor see a ready binary.
+set -eu
+
+case "${1:-}" in
+  --version|version)
+    echo "Version: 0.50.1"
+    exit 0
+    ;;
+esac
+
+output=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--output" ]; then
+    output="$arg"
+  fi
+  prev="$arg"
+done
+
+if [ -n "$output" ] && [ -n "${FAKE_TRIVY_GOLDEN:-}" ]; then
+  # A1: the per-run dir is created by the host `ensureArtifactDir` seam BEFORE the
+  # scan — this fake deliberately does NOT `mkdir -p`, so the copy proves the dir
+  # pre-existed (a real scanner does a bare open() with no mkdir).
+  cp "$FAKE_TRIVY_GOLDEN" "$output"
+fi
+
+# Trivy exits 0 even when vulnerabilities are found (no --exit-code passed) — the
+# Trivy exit-model proof: findings come from the SARIF, any nonzero is a fault.
+exit 0

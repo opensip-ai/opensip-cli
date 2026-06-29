@@ -10,6 +10,7 @@
  * `call(...)` promise settles (or that an unrelated message is ignored).
  */
 
+import { ConfigurationError, NotFoundError, ToolError } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createWorkerRpcClient } from '../tool-command-worker-rpc.js';
@@ -149,6 +150,67 @@ describe('createWorkerRpcClient — host fault reply', () => {
     expect(err.code).toBeUndefined();
     // A bare Error keeps its own constructed stack (not the host's).
     expect(err.stack).toContain('minimal fault');
+  });
+
+  it('rebuilds the typed ToolError SUBCLASS when the host carries a canonical toolErrorCode', async () => {
+    // The host-RPC reject path (A5/A6): a `compareBaseline` BASELINE_MISSING
+    // rejection crosses back carrying the canonical exit-class code. The worker MUST
+    // re-throw a TYPED ConfigurationError (preserving the original subcode + stack)
+    // so the handler propagates it and the exit-2 contract survives the boundary —
+    // not a plain Error that would degrade to SystemError → exit 1.
+    const channel = makeChannel();
+    const client = createWorkerRpcClient(channel);
+
+    const pending = client.call({ seam: 'compareBaseline', tool: 'gitleaks', envelope: {} });
+    const { rpcId } = channel.sent[0];
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId,
+      ok: false,
+      error: {
+        message: "No baseline found for 'gitleaks'",
+        code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+        stack: 'Error: no baseline\n  at host',
+        toolErrorCode: 'CONFIGURATION_ERROR',
+      },
+    } satisfies RpcReply);
+
+    const err = await pending.catch((error: unknown) => error as ToolError);
+    expect(err).toBeInstanceOf(ConfigurationError);
+    // The original subcode round-trips onto the rebuilt instance for diagnostics.
+    expect(err.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
+    expect(err.stack).toBe('Error: no baseline\n  at host');
+  });
+
+  it('rebuilds a non-config typed subclass from its canonical code (NotFound)', async () => {
+    const channel = makeChannel();
+    const client = createWorkerRpcClient(channel);
+    const pending = client.call(CALL);
+    const { rpcId } = channel.sent[0];
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId,
+      ok: false,
+      error: { message: 'gone', toolErrorCode: 'NOT_FOUND' },
+    } satisfies RpcReply);
+    await expect(pending).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('falls back to a plain Error when the canonical toolErrorCode is unrecognized', async () => {
+    const channel = makeChannel();
+    const client = createWorkerRpcClient(channel);
+    const pending = client.call(CALL);
+    const { rpcId } = channel.sent[0];
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId,
+      ok: false,
+      error: { message: 'weird', code: 'SUB', toolErrorCode: 'NOT_A_REAL_CODE' },
+    } satisfies RpcReply);
+    const err = await pending.catch((error: unknown) => error as Error & { code?: string });
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(ToolError);
+    expect(err.code).toBe('SUB');
   });
 
   it('rejects with the code-only fault (stack-absent FALSE arm of L55)', async () => {

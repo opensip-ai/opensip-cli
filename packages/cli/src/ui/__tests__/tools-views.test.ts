@@ -205,7 +205,7 @@ describe('viewToolsCreate', () => {
       viewToolsCreate({
         type: 'tools-create',
         toolId: 'demo-tool',
-        dir: '/tmp/demo-tool',
+        dir: '/workspace/demo-tool',
         files: [],
         success: false,
         error: 'directory exists',
@@ -220,7 +220,7 @@ describe('viewToolsCreate', () => {
       viewToolsCreate({
         type: 'tools-create',
         toolId: 'demo-tool',
-        dir: '/tmp/demo-tool',
+        dir: '/workspace/demo-tool',
         files: ['package.json'],
         success: true,
       }),
@@ -234,7 +234,7 @@ describe('viewToolsCreate', () => {
       viewToolsCreate({
         type: 'tools-create',
         toolId: 'demo-tool',
-        dir: '/tmp/demo-tool',
+        dir: '/workspace/demo-tool',
         files: ['package.json', 'src/tool.ts'],
         success: true,
         nextSteps: ['pnpm install', 'opensip demo-tool'],

@@ -1,0 +1,26 @@
+[
+  {
+    "ruleId": "CVE-2023-37920",
+    "severity": "critical",
+    "message": "certifi: Removal of e-Tugra root certificate",
+    "file": "requirements.txt",
+    "line": 1,
+    "column": 1
+  },
+  {
+    "ruleId": "CVE-2022-40897",
+    "severity": "high",
+    "message": "setuptools: Regular Expression Denial of Service (ReDoS)",
+    "file": "requirements.txt",
+    "line": 1,
+    "column": 1
+  },
+  {
+    "ruleId": "DS002",
+    "severity": "medium",
+    "message": "Image user should not be 'root'",
+    "file": "Dockerfile",
+    "line": 1,
+    "column": 1
+  }
+]

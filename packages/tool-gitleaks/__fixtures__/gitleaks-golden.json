@@ -1,0 +1,42 @@
+[
+  {
+    "Description": "AWS Access Key",
+    "StartLine": 12,
+    "EndLine": 12,
+    "StartColumn": 19,
+    "EndColumn": 38,
+    "Match": "aws_key = AKIAIOSFODNN7EXAMPLE",
+    "Secret": "AKIAIOSFODNN7EXAMPLE",
+    "File": "config/prod.env",
+    "SymlinkFile": "",
+    "Commit": "",
+    "Entropy": 3.65,
+    "Author": "",
+    "Email": "",
+    "Date": "",
+    "Message": "",
+    "Tags": ["key", "AWS"],
+    "RuleID": "aws-access-token",
+    "Fingerprint": "config/prod.env:aws-access-token:12"
+  },
+  {
+    "Description": "GitLab Personal Access Token",
+    "StartLine": 4,
+    "EndLine": 4,
+    "StartColumn": 7,
+    "EndColumn": 52,
+    "Match": "token: \"glpat-XXXXXXXXXXXXXXXXXXXX\"",
+    "Secret": "glpat-XXXXXXXXXXXXXXXXXXXX",
+    "File": "src/client.ts",
+    "SymlinkFile": "",
+    "Commit": "",
+    "Entropy": 4.12,
+    "Author": "",
+    "Email": "",
+    "Date": "",
+    "Message": "",
+    "Tags": [],
+    "RuleID": "gitlab-pat",
+    "Fingerprint": "src/client.ts:gitlab-pat:4"
+  }
+]

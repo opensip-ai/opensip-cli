@@ -43,6 +43,30 @@ const CHECK_ONLY = process.argv.slice(2).includes('--check');
 const log = (msg) => console.error(`[build-tool-command-manifests] ${msg}`);
 
 /**
+ * The substrate's manifest-derivation helpers, loaded from its built dist. The
+ * adapter `requires` (network→resource forward-map, ADR-0092 §4.8) and the coarse
+ * `config` descriptor (the namespace claim, ADR-0090 §4.3) are DERIVED from the
+ * runtime Tool here so they can never drift from the spec — single-sourced in the
+ * substrate, exactly as the command shells are. Loaded lazily (only when an adapter
+ * dir is processed) so the bundled-only run does not require the substrate dist.
+ */
+let adapterManifestHelpers;
+async function loadAdapterManifestHelpers() {
+  if (adapterManifestHelpers !== undefined) return adapterManifestHelpers;
+  const entry = join(REPO_ROOT, 'packages', 'external-tool-adapter', 'dist', 'index.js');
+  if (!existsSync(entry)) {
+    log(`MISSING build artifact: ${relative(REPO_ROOT, entry)} — run \`pnpm build\` first`);
+    process.exit(1);
+  }
+  const mod = await import(pathToFileURL(entry).href);
+  adapterManifestHelpers = {
+    deriveAdapterManifestRequires: mod.deriveAdapterManifestRequires,
+    deriveAdapterConfigManifest: mod.deriveAdapterConfigManifest,
+  };
+  return adapterManifestHelpers;
+}
+
+/**
  * The bundled tool packages whose manifests carry a derived command shell. Keyed
  * to the dirs the central bundled manifest declares (kept in sync by the data in
  * packages/cli/src/bootstrap/bundled-tools.manifest.json).
@@ -53,6 +77,26 @@ const BUNDLED_TOOL_DIRS = [
   'packages/graph/engine',
   'packages/mcp',
 ];
+
+/**
+ * External Tool Adapter packages (ADR-0090, Phase-0 decision 7). These are
+ * OPT-IN / installed (NOT in `bundled-tools.manifest.json`), but they mount from
+ * the SAME static-manifest path bundled tools use — so `assertCommandNamesMatch`
+ * throws on drift at install + worker import. There is no other generator for
+ * them, so the command-shell parity gate (scan + auto-added doctor/version) lives
+ * here too: the adapter's runtime `commandSpecs` are the single source, and the
+ * `--check` lane fails CI on drift. The substrate's `deriveAdapterManifestCommands`
+ * produces the identical shape from the same `commandSpecs`; `deriveCommandShell`
+ * below is the generator-local equivalent already used for bundled tools.
+ */
+const ADAPTER_TOOL_DIRS = [
+  'packages/tool-gitleaks',
+  'packages/tool-osv-scanner',
+  'packages/tool-trivy',
+];
+
+/** Every tool dir whose static manifest carries a generated command shell. */
+const TOOL_DIRS = [...BUNDLED_TOOL_DIRS, ...ADAPTER_TOOL_DIRS];
 
 /**
  * Derive the serializable command SHELL from a runtime `CommandSpec`. Mirrors the
@@ -114,7 +158,7 @@ async function main() {
   const drift = [];
   let written = 0;
 
-  for (const toolDir of BUNDLED_TOOL_DIRS) {
+  for (const toolDir of TOOL_DIRS) {
     const pjPath = join(REPO_ROOT, toolDir, 'package.json');
     const raw = readFileSync(pjPath, 'utf8');
     const pkg = JSON.parse(raw);
@@ -125,6 +169,22 @@ async function main() {
 
     const tool = await loadBundledTool(toolDir);
     pkg.opensipTools.commands = tool.commandSpecs.map((spec) => deriveCommandShell(spec));
+
+    // ADR-0092 §4.8 / ADR-0090 §4.3: for an adapter, ALSO derive `requires` (from
+    // the network posture) and `config` (the coarse namespace claim). Both are
+    // single-sourced in the substrate so the static manifest can never drift from
+    // the runtime; the `--check` lane fails CI on a derivation mismatch.
+    if (ADAPTER_TOOL_DIRS.includes(toolDir)) {
+      const { deriveAdapterManifestRequires, deriveAdapterConfigManifest } =
+        await loadAdapterManifestHelpers();
+      pkg.opensipTools.requires = deriveAdapterManifestRequires(tool);
+      const config = deriveAdapterConfigManifest(tool);
+      if (config === undefined) {
+        delete pkg.opensipTools.config;
+      } else {
+        pkg.opensipTools.config = config;
+      }
+    }
     // ADR-0054 M4-G: carry the serializable pluginLayout (`{ domain, userSubdirs }`)
     // so a pack-supporting tool loaded via the external path synthesizes the same
     // `<tool> plugin …` group + init scaffolding. A tool with no layout (e.g. graph)
@@ -152,7 +212,7 @@ async function main() {
   if (CHECK_ONLY) {
     if (drift.length === 0) {
       log(
-        `all ${BUNDLED_TOOL_DIRS.length} bundled tool manifest(s) carry the current command shell.`,
+        `all ${TOOL_DIRS.length} tool manifest(s) (bundled + adapter) carry the current command shell.`,
       );
       return;
     }
@@ -165,7 +225,7 @@ async function main() {
   }
 
   log(
-    `considered ${BUNDLED_TOOL_DIRS.length} bundled tool(s); updated command shell on ${written}.`,
+    `considered ${TOOL_DIRS.length} tool(s) (bundled + adapter); updated command shell on ${written}.`,
   );
 }
 

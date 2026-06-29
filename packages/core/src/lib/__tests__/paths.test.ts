@@ -38,6 +38,15 @@ describe('resolveProjectPaths', () => {
     expect(p.cacheDir).toBe(join(p.runtimeDir, 'cache'));
   });
 
+  it('resolves the host-owned artifact store and per-tool subdirs', () => {
+    const p = resolveProjectPaths(PROJECT);
+    expect(p.artifactsDir).toBe(join(p.runtimeDir, 'artifacts'));
+    expect(p.artifactDir('gitleaks')).toBe(join(p.artifactsDir, 'gitleaks'));
+    expect(p.artifactDir('osv-scanner')).toBe(join(p.artifactsDir, 'osv-scanner'));
+    // Load-bearing: the artifact store is gitignored runtime state, never tracked.
+    expect(p.artifactsDir.startsWith(p.runtimeDir)).toBe(true);
+  });
+
   it('resolves per-domain plugin install dirs under runtime/plugins', () => {
     const p = resolveProjectPaths(PROJECT);
     expect(p.pluginsDir('fit')).toBe(join(p.runtimeDir, 'plugins', 'fit'));

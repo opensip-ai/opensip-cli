@@ -161,4 +161,24 @@ describe('loadCliDefaults', () => {
     writeConfig('cli:\n  cloud: "nope"\n');
     expect(loadCliDefaults(testDir).cloud).toBeUndefined();
   });
+
+  it('reads an explicit artifacts.keep value', () => {
+    writeConfig('cli:\n  artifacts:\n    keep: 5\n');
+    expect(loadCliDefaults(testDir).artifacts).toEqual({ keep: 5 });
+  });
+
+  it('defaults artifacts.keep to 10 when the artifacts block is present but empty', () => {
+    writeConfig('cli:\n  artifacts: {}\n');
+    expect(loadCliDefaults(testDir).artifacts).toEqual({ keep: 10 });
+  });
+
+  it('drops an artifacts block with an invalid keep', () => {
+    writeConfig('cli:\n  artifacts:\n    keep: -3\n');
+    expect(loadCliDefaults(testDir).artifacts).toBeUndefined();
+  });
+
+  it('leaves artifacts undefined when unset', () => {
+    writeConfig('cli:\n  verbose: true\n');
+    expect(loadCliDefaults(testDir).artifacts).toBeUndefined();
+  });
 });

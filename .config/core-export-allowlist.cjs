@@ -330,6 +330,8 @@ const EXPORT_ALLOWLIST = {
   CORRELATION_ENV_SPECS: 'run-kernel',
   CapabilitySchemaMismatchError: 'run-kernel',
   ConfigurationError: 'run-kernel',
+  canonicalToolErrorCode: 'run-kernel',
+  toolErrorFromCanonicalCode: 'run-kernel',
   ChangedFileBasis: 'run-kernel',
   ChangedFilesResult: 'run-kernel',
   ContributeScopeResult: 'run-kernel',

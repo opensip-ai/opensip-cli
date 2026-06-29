@@ -69,6 +69,7 @@ export interface ToolCliContextCaptured {
   readonly deliveredSignals: CapturedDelivery[];
   readonly sarifWrites: { readonly envelope: unknown; readonly path: string }[];
   readonly artifactWrites: CapturedArtifactWrite[];
+  readonly ensuredArtifactDirs: string[];
   readonly savedBaselines: CapturedBaselineCompare[];
   readonly comparedBaselines: CapturedBaselineCompare[];
   readonly exportedBaselineSarif: CapturedBaselineExport[];
@@ -107,6 +108,7 @@ function createCaptured(): ToolCliContextCaptured {
     deliveredSignals: [],
     sarifWrites: [],
     artifactWrites: [],
+    ensuredArtifactDirs: [],
     savedBaselines: [],
     comparedBaselines: [],
     exportedBaselineSarif: [],
@@ -222,6 +224,10 @@ export function createToolCliContextDouble(
     },
     writeArtifact: (path, bytes) => {
       captured.artifactWrites.push({ path, bytes });
+      return Promise.resolve();
+    },
+    ensureArtifactDir: (path) => {
+      captured.ensuredArtifactDirs.push(path);
       return Promise.resolve();
     },
     saveBaseline: (tool, envelope) => {

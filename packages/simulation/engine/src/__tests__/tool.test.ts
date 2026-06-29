@@ -116,6 +116,7 @@ function makeFakeContext(): {
     },
     writeSarif: () => Promise.resolve(),
     writeArtifact: () => Promise.resolve(),
+    ensureArtifactDir: () => Promise.resolve(),
     saveBaseline: () => Promise.resolve(),
     compareBaseline: () =>
       Promise.resolve({

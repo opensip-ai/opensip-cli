@@ -197,6 +197,17 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/dashboard',
     publishReason: 'Self-contained HTML dashboard generator consumed by report composition',
   },
+  // Layer 3 — External Tool Adapter substrate (ADR-0090; core + contracts only,
+  // output devDep). Publishes before any adapter that builds on it; placed with
+  // the layer-3 libs (after dashboard), before the tool engines.
+  {
+    unscoped: 'external-tool-adapter',
+    name: '@opensip-cli/external-tool-adapter',
+    dir: 'packages/external-tool-adapter',
+    filter: '@opensip-cli/external-tool-adapter',
+    publishReason:
+      'External Tool Adapter substrate: wrap a CLI scanner (gitleaks/osv-scanner/trivy) as a Tool',
+  },
   // Layer 3 — tools
   {
     unscoped: 'fitness',
@@ -277,6 +288,32 @@ export const RELEASE_PACKAGE_ORDER = [
     dir: 'packages/mcp',
     filter: '@opensip-cli/mcp',
     publishReason: 'Bundled MCP server tool (ADR-0084); stdio graph/results surface for agents',
+  },
+  // Layer 4 — external tool adapters (ADR-0090; depend on external-tool-adapter +
+  // core/contracts). Opt-in / installed (NOT bundled); published after the
+  // substrate, before the CLI.
+  {
+    unscoped: 'tool-gitleaks',
+    name: '@opensip-cli/tool-gitleaks',
+    dir: 'packages/tool-gitleaks',
+    filter: '@opensip-cli/tool-gitleaks',
+    publishReason: 'Gitleaks external tool adapter; secret scanning (opensip gitleaks / secrets)',
+  },
+  {
+    unscoped: 'tool-osv-scanner',
+    name: '@opensip-cli/tool-osv-scanner',
+    dir: 'packages/tool-osv-scanner',
+    filter: '@opensip-cli/tool-osv-scanner',
+    publishReason:
+      'OSV-Scanner external tool adapter; dependency vulnerability scanning (opensip osv-scanner / osv)',
+  },
+  {
+    unscoped: 'tool-trivy',
+    name: '@opensip-cli/tool-trivy',
+    dir: 'packages/tool-trivy',
+    filter: '@opensip-cli/tool-trivy',
+    publishReason:
+      'Trivy external tool adapter; SARIF vulnerability + misconfiguration scanning (opensip trivy)',
   },
   // Layer 4 — check packs
   {

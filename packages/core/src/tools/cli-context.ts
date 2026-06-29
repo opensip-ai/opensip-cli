@@ -297,6 +297,24 @@ export interface ToolCliContext {
    */
   readonly writeArtifact: (path: string, bytes: string) => Promise<void>;
   /**
+   * Ensure the parent directory of `artifactPath` exists, created recursively at
+   * owner-only mode `0o700`, through the host (ADR-0091; External Tool Adapter
+   * A1/A7). A tool that hands a per-run artifact path to an EXTERNAL scanner as
+   * its `--report-path`/`--output` must call this BEFORE launching the scanner —
+   * `writeArtifact` would create the dir, but it only runs AFTER the scan, so a
+   * scanner that does a bare `open(path, 'w')` (no `mkdir -p`) would `ENOENT` on
+   * a fresh per-run dir. The `0o700` dir mode also keeps a scanner's own
+   * default-umask (0644) report file from being world-traversable in the window
+   * before the host re-writes it at `0o600`.
+   *
+   * Like `writeArtifact`, this is a HOST seam (the host owns privileged FS
+   * effects): the substrate never `mkdir`s `.runtime` itself. For an INSTALLED
+   * adapter the call crosses the worker boundary via host RPC, the same path
+   * `writeArtifact` takes, so the host stays the only process that touches the FS.
+   * `artifactPath` is the artifact FILE path; the host creates `dirname(path)`.
+   */
+  readonly ensureArtifactDir: (artifactPath: string) => Promise<void>;
+  /**
    * Host baseline/ratchet plane seams (ADR-0036). The host owns persistence
    * (`BaselineRepo`), the diff, and exit derivation; a tool inherits a CI ratchet
    * by emitting fingerprint-stamped signals. The seams are **read-only** of

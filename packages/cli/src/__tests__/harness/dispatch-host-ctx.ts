@@ -39,6 +39,8 @@ export interface CapturedHostCtx {
   readonly delivered: unknown[];
   /** General artifacts written host-side via RPC. */
   readonly artifacts: { path: string; bytes: string }[];
+  /** Per-run artifact dirs ensured host-side via the `ensureArtifactDir` RPC. */
+  readonly ensuredDirs: string[];
 }
 
 const noop = (): void => {
@@ -62,6 +64,7 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
   const baselines: { tool: string; envelope: unknown }[] = [];
   const delivered: unknown[] = [];
   const artifacts: { path: string; bytes: string }[] = [];
+  const ensuredDirs: string[] = [];
 
   const logger = {
     debug: noop,
@@ -143,6 +146,11 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
       calls.push(`writeArtifact:${path}`);
       return Promise.resolve();
     }) as ToolCliContext['writeArtifact'],
+    ensureArtifactDir: ((path: string) => {
+      ensuredDirs.push(path);
+      calls.push(`ensureArtifactDir:${path}`);
+      return Promise.resolve();
+    }) as ToolCliContext['ensureArtifactDir'],
     saveBaseline: ((tool: string, envelope: unknown) => {
       baselines.push({ tool, envelope });
       calls.push(`saveBaseline:${tool}`);
@@ -202,5 +210,6 @@ export function makeDispatchHostCtx(scopeRunId = 'test-run'): CapturedHostCtx {
     baselines,
     delivered,
     artifacts,
+    ensuredDirs,
   };
 }

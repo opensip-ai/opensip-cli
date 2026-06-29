@@ -1,0 +1,142 @@
+{
+  "name": "@opensip-cli/tool-gitleaks",
+  "version": "0.1.14",
+  "license": "Apache-2.0",
+  "description": "External Tool Adapter for Gitleaks — wraps the gitleaks secret scanner as an opensip-cli tool (opensip gitleaks / opensip secrets)",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "security",
+    "gitleaks",
+    "secrets",
+    "scanner"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-gitleaks"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "gitleaks",
+    "identity": {
+      "name": "gitleaks",
+      "aliases": [
+        "secrets"
+      ]
+    },
+    "stableId": "cd08f737-ce8e-4813-9259-b4ffeb954268",
+    "apiVersion": 1,
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Executes the user-installed gitleaks binary via execFile (no shell)"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      }
+    ],
+    "commands": [
+      {
+        "name": "gitleaks",
+        "description": "Scan the project working tree for committed secrets (Gitleaks)",
+        "aliases": [
+          "secrets"
+        ],
+        "commonFlags": [
+          "json",
+          "cwd",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch"
+      },
+      {
+        "name": "doctor",
+        "description": "Check that the gitleaks binary is installed and ready",
+        "parent": "gitleaks",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "version",
+        "description": "Print the resolved gitleaks binary version",
+        "parent": "gitleaks",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      }
+    ],
+    "config": {
+      "namespace": "gitleaks",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.8"
+  }
+}

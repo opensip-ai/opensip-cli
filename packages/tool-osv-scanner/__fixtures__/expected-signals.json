@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "GHSA-jf85-cpcp-j695",
+    "severity": "critical",
+    "message": "Prototype Pollution in lodash (lodash@4.17.15)",
+    "file": "package-lock.json"
+  },
+  {
+    "ruleId": "GHSA-xvch-5gv4-984h",
+    "severity": "critical",
+    "message": "Prototype Pollution in minimist (minimist@1.2.5)",
+    "file": "package-lock.json"
+  }
+]

@@ -18,6 +18,7 @@
  *   3. @opensip-cli/targeting      — host file-targeting runtime substrate (scope.targets; depends on core + config)
  *   3. @opensip-cli/lang-*         — language adapters
  *   3. @opensip-cli/dashboard      — HTML report generator (core + contracts)
+ *   3. @opensip-cli/external-tool-adapter — External Tool Adapter substrate (core + contracts; output devDep)
  *   4. @opensip-cli/fitness        — fitness engine + cli/* commands
  *   4. @opensip-cli/simulation     — simulation engine + cli/* commands
  *   4. @opensip-cli/graph          — graph engine + cli/* commands
@@ -339,6 +340,76 @@ module.exports = {
         ],
       },
     },
+    // -------------------------------------------------------------------
+    // Layer enforcement — external-tool-adapter depends on core + contracts only
+    // (ADR-0090). The substrate wraps a user-installed scanner subprocess as a
+    // Tool; its PRODUCTION deps are core + contracts ONLY (output is a devDep for
+    // the SARIF round-trip golden — depcruise excludes tests). It must NEVER reach
+    // UP into cli, output, a tool engine, a check/graph/lang pack, datastore,
+    // config, targeting, session-store, or the UI kits. The negative-lookahead
+    // shape (mirroring `clone-detection-imports-nothing`) pins "core + contracts
+    // ONLY" without enumerating every upper package.
+    // -------------------------------------------------------------------
+    {
+      name: 'external-tool-adapter-imports-core-contracts-only',
+      severity: 'error',
+      comment:
+        'external-tool-adapter is the layer-3 External Tool Adapter substrate ' +
+        '(ADR-0090): binary resolution, the scan run loop, SARIF/JSON ingest, ' +
+        'doctor/version, provenance. Production deps are core + contracts ONLY ' +
+        '(output is a devDep for the SARIF round-trip golden; depcruise excludes ' +
+        'tests). It must not import cli, output, a tool engine, a check/graph/lang ' +
+        'pack, datastore, config, targeting, session-store, or the UI kits.',
+      from: { path: '^packages/external-tool-adapter/src/' },
+      to: { path: '^packages/(?!core/|contracts/|external-tool-adapter/)' },
+    },
+
+    // -------------------------------------------------------------------
+    // ADR-0090 — external tool adapters are layer-4: they import the substrate +
+    // core/contracts ONLY. Scoped to the three MVP adapter dirs so the `tool-`
+    // prefix does NOT collide with the layer-2 published `tool-test-kit` (Risk R8).
+    // Inert until the adapter packages land (Phase 3); recorded now as the boundary.
+    // -------------------------------------------------------------------
+    {
+      name: 'tool-adapters-import-substrate-core-contracts-only',
+      severity: 'error',
+      comment:
+        'An external tool adapter (tool-gitleaks / tool-osv-scanner / tool-trivy) ' +
+        'is layer-4 (ADR-0090): it imports @opensip-cli/external-tool-adapter + ' +
+        'core + contracts ONLY — never cli, output, a tool engine, a check/graph/lang ' +
+        'pack, OR another adapter. The `from` captures the adapter package dir ($1) ' +
+        'so `to.pathNot` excludes its OWN intra-package relative imports; a sibling ' +
+        'adapter (a DIFFERENT tool-*) therefore still violates. Scoped to the three ' +
+        'MVP adapters to avoid the layer-2 tool-test-kit collision.',
+      from: { path: '^packages/(tool-(?:gitleaks|osv-scanner|trivy))/src/' },
+      to: {
+        path: '^packages/(?!core/|contracts/|external-tool-adapter/)',
+        pathNot: '^packages/$1/',
+      },
+    },
+
+    // -------------------------------------------------------------------
+    // ADR-0091 — a SINGLE SARIF ingest/read path. There is exactly one SARIF
+    // reader in the workspace: `packages/external-tool-adapter/src/ingest-sarif.ts`
+    // (foreign-scanner severity recovery lives in one place). No module OUTSIDE the
+    // substrate may import a SARIF-ingest module (a deep `.../ingest-sarif` import
+    // or a second SARIF parser defined elsewhere). The `signal-sarif` WRITER in
+    // @opensip-cli/output is a separate, sanctioned EMIT path (governed by the
+    // `tool-engines-no-output-*` rules), not a reader.
+    // -------------------------------------------------------------------
+    {
+      name: 'single-sarif-ingest',
+      severity: 'error',
+      comment:
+        'ADR-0091: exactly one SARIF ingest/read path — ' +
+        'packages/external-tool-adapter/src/ingest-sarif.ts. No module outside the ' +
+        'substrate may import a SARIF-ingest module (severity recovery / foreign ' +
+        'SARIF reading is centralized). Consume normalized signals via the substrate ' +
+        'barrel instead of re-parsing SARIF.',
+      from: { pathNot: '^packages/external-tool-adapter/' },
+      to: { path: 'ingest-sarif' },
+    },
+
     // ADR-0064 enforcement: @opensip-cli/clone-detection must remain a leaf package
     // (no workspace deps) so graph and yagni can both depend on it with no tool→tool edge.
     {

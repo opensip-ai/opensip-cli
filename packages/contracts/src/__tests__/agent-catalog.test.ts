@@ -3,10 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { buildAgentCatalog } from '../agent-catalog.js';
 
-const noopHandler = async (): Promise<{ type: 'text-lines'; lines: string[] }> => ({
-  type: 'text-lines',
-  lines: [],
-});
+const noopHandler = (): Promise<{ type: 'text-lines'; lines: string[] }> =>
+  Promise.resolve({ type: 'text-lines', lines: [] });
 
 function fixtureTool(over: Partial<Tool> & Pick<Tool, 'metadata'>): Tool {
   return {

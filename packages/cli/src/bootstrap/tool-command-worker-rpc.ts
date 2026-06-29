@@ -18,6 +18,8 @@
  * child → parent), so it never races the worker's own outbound posts.
  */
 
+import { toolErrorFromCanonicalCode } from '@opensip-cli/core';
+
 import type { HostRpcCall, HostRpcRequest, RpcReply } from './tool-command-dispatch-types.js';
 import type { WorkerMessage } from '@opensip-cli/core';
 
@@ -48,8 +50,33 @@ interface PendingCall {
   readonly reject: (error: Error) => void;
 }
 
-/** Reconstruct an Error from a host reply's structured error (preserving stack). */
-function rpcError(detail: { message: string; code?: string; stack?: string }): Error {
+/**
+ * Reconstruct an Error from a host reply's structured error (preserving stack).
+ *
+ * When the host carried a canonical exit-class `toolErrorCode` (the fault was a
+ * typed `ToolError`, e.g. a `compareBaseline` BASELINE_MISSING rejection), rebuild
+ * the matching `ToolError` SUBCLASS — preserving the original subcode as `.code`
+ * — so the handler re-throws a TYPED error and the exit class survives the worker
+ * boundary (it propagates to the worker entry's catch, which maps a
+ * `ConfigurationError` → `config-invalid` → host exit 2). Otherwise (an untyped
+ * host fault, or an unrecognized code) fall back to a plain `Error` carrying the
+ * subcode, exactly as before.
+ */
+function rpcError(detail: {
+  message: string;
+  code?: string;
+  stack?: string;
+  toolErrorCode?: string;
+}): Error {
+  if (detail.toolErrorCode !== undefined) {
+    const typed = toolErrorFromCanonicalCode(detail.toolErrorCode, detail.message, {
+      ...(detail.code === undefined ? {} : { code: detail.code }),
+    });
+    if (typed !== undefined) {
+      if (detail.stack !== undefined) typed.stack = detail.stack;
+      return typed;
+    }
+  }
   const err = new Error(detail.message) as Error & { code?: string };
   if (detail.code !== undefined) err.code = detail.code;
   if (detail.stack !== undefined) err.stack = detail.stack;

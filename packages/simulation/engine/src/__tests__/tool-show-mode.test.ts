@@ -83,6 +83,7 @@ function makeContext(datastore: DataStore | undefined): {
     deliverSignals: () => Promise.resolve({ cloudAccepted: 0 }),
     writeSarif: () => Promise.resolve(),
     writeArtifact: () => Promise.resolve(),
+    ensureArtifactDir: () => Promise.resolve(),
     saveBaseline: () => Promise.resolve(),
     compareBaseline: () =>
       Promise.resolve({

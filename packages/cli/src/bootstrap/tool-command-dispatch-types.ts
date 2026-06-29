@@ -261,6 +261,10 @@ export type HostRpcCall =
       readonly bytes: string;
     }
   | {
+      readonly seam: 'ensureArtifactDir';
+      readonly path: string;
+    }
+  | {
       readonly seam: 'saveBaseline';
       readonly tool: string;
       readonly envelope: unknown;
@@ -340,5 +344,17 @@ export type RpcReply =
         readonly message: string;
         readonly code?: string;
         readonly stack?: string;
+        /**
+         * The host fault's canonical exit-class `ToolErrorCode`
+         * (`canonicalToolErrorCode`) when it was a typed `ToolError` (e.g. a
+         * `compareBaseline` rejection: `BASELINE_MISSING` /
+         * `BASELINE_IDENTITY_MISMATCH` → `CONFIGURATION_ERROR`). The worker shim
+         * rebuilds the matching `ToolError` subclass from it
+         * (`toolErrorFromCanonicalCode`) so the handler re-throws a TYPED error —
+         * preserving the exit class across the boundary instead of degrading it
+         * to a plain `Error` (→ SystemError → exit 1). `code` carries the original
+         * subcode for diagnostics; this carries the exit-class bucket.
+         */
+        readonly toolErrorCode?: string;
       };
     };

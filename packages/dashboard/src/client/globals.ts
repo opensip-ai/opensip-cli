@@ -61,6 +61,17 @@ declare global {
   const simSessions: readonly DashboardSession[];
   const yagniSessions: readonly DashboardSession[];
 
+  /**
+   * Host-owned catch-all session bucket + tab id, emitted by generator.ts as
+   * `const externalSessions = sessions.filter(s => !(s.tool in tabMap));` /
+   * `const externalTabId = 'external';`. Sessions whose tool is not claimed by any
+   * registered tool tab (external-adapter scans — gitleaks / osv-scanner / trivy)
+   * render in the "External Tools" tab via `renderExternalTab`, and the overview
+   * row-click handler routes their rows to `externalTabId`.
+   */
+  const externalSessions: readonly DashboardSession[];
+  const externalTabId: string;
+
   const checkCatalog: readonly unknown[];
   const recipeCatalog: readonly unknown[];
   const simScenarioCatalog: readonly unknown[];

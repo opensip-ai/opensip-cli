@@ -29,6 +29,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'CapabilityRegistry',
   'CapabilitySchemaMismatchError',
   'ConfigurationError',
+  'canonicalToolErrorCode',
+  'toolErrorFromCanonicalCode',
   'DiagnosticsBus',
   'EnvRegistry',
   'LanguageParseCache',

@@ -26,8 +26,12 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
-import { createWriteArtifactSeam } from './bootstrap/artifact-seams.js';
+import {
+  createEnsureArtifactDirSeam,
+  createWriteArtifactSeam,
+} from './bootstrap/artifact-seams.js';
 import { buildBaselineSeams } from './bootstrap/baseline-seams.js';
+import { loadCliDefaults } from './bootstrap/cli-defaults.js';
 import { buildHostPlanes } from './bootstrap/host-planes.js';
 import { createIoPlane, type LiveViewRegistry } from './bootstrap/io-plane.js';
 import { createOutputPlane } from './bootstrap/output-plane.js';
@@ -82,6 +86,21 @@ export interface ToolCliContextHandle {
   readonly getExitCode: () => number | undefined;
 }
 
+/**
+ * Resolve the configured artifact-retention keep count (`cli.artifacts.keep`)
+ * from the project's CLI defaults, to parametrize the host `writeArtifact` seam.
+ *
+ * Read at context-build time: from the entered scope's project root when one is
+ * available (host-command / hook-dispatch contexts are built inside a run), else
+ * from the process cwd (the primary path builds its context once at startup,
+ * before the per-run scope is entered). `undefined` when unset — the seam then
+ * falls back to its own default keep count.
+ */
+function resolveArtifactRetentionKeep(): number | undefined {
+  const projectRoot = currentScope()?.projectContext?.projectRoot;
+  return loadCliDefaults(projectRoot ?? process.cwd()).artifacts?.keep;
+}
+
 export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliContextHandle {
   const log = opts.logger ?? defaultLogger;
 
@@ -100,7 +119,10 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     getDatastore: projectDatastore,
     logger: log,
   });
-  const writeArtifact = createWriteArtifactSeam(log);
+  const writeArtifact = createWriteArtifactSeam(log, {
+    retentionKeep: resolveArtifactRetentionKeep(),
+  });
+  const ensureArtifactDir = createEnsureArtifactDirSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
   const hostPlanes = buildHostPlanes({
     getDatastore: projectDatastore,
@@ -163,6 +185,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     deliverSignals: ioPlane.deliverSignals,
     writeSarif: ioPlane.writeSarif,
     writeArtifact,
+    ensureArtifactDir,
     // Host baseline/ratchet plane seams (ADR-0036) — persistence + diff + exports.
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,
@@ -206,7 +229,10 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
     getDatastore: projectDatastore,
     logger: log,
   });
-  const writeArtifact = createWriteArtifactSeam(log);
+  const writeArtifact = createWriteArtifactSeam(log, {
+    retentionKeep: resolveArtifactRetentionKeep(),
+  });
+  const ensureArtifactDir = createEnsureArtifactDirSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
   const hostPlanes = buildHostPlanes({
     getDatastore: projectDatastore,
@@ -235,6 +261,7 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
     deliverSignals: deniedHookSeam('deliverSignals'),
     writeSarif: deniedHookSeam('writeSarif'),
     writeArtifact,
+    ensureArtifactDir,
     saveBaseline: baselineSeams.saveBaseline,
     compareBaseline: baselineSeams.compareBaseline,
     exportBaselineSarif: baselineSeams.exportBaselineSarif,

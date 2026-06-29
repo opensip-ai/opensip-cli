@@ -16,6 +16,8 @@
  * host crash, never a silent no-op.
  */
 
+import { canonicalToolErrorCode, ToolError } from '@opensip-cli/core';
+
 import type {
   DeliverSignalsOpts,
   HostPlaneKind,
@@ -39,6 +41,7 @@ const RECOGNIZED_SEAMS = new Set<HostRpcCall['seam']>([
   'deliverSignals',
   'writeSarif',
   'writeArtifact',
+  'ensureArtifactDir',
   'saveBaseline',
   'compareBaseline',
   'exportBaselineSarif',
@@ -132,6 +135,9 @@ async function performHostRpc(request: HostRpcRequest, ctx: ToolCliContext): Pro
     case 'writeArtifact': {
       return ctx.writeArtifact(request.path, request.bytes);
     }
+    case 'ensureArtifactDir': {
+      return ctx.ensureArtifactDir(request.path);
+    }
     case 'saveBaseline': {
       return ctx.saveBaseline(request.tool, request.envelope);
     }
@@ -197,6 +203,11 @@ export async function handleHostRpc(
           ? { code: (error as { code: string }).code }
           : {}),
         ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+        // Carry the canonical exit-class code for a typed ToolError (e.g. a
+        // compareBaseline BASELINE_MISSING rejection → CONFIGURATION_ERROR) so the
+        // worker shim re-throws a TYPED error and the exit class survives the
+        // boundary instead of degrading to a plain Error → SystemError → exit 1.
+        ...(error instanceof ToolError ? { toolErrorCode: canonicalToolErrorCode(error) } : {}),
       },
     };
   }

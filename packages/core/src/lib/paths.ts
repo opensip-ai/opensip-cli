@@ -20,6 +20,7 @@
  *       sessions/                               ← run history
  *       reports/                                ← dashboard HTML
  *       logs/                                   ← structured JSONL logs
+ *       artifacts/<tool>/                       ← host-owned raw scanner artifacts
  *       datastore.sqlite                        ← sessions, baselines, catalog
  *       cache/                                  ← AST + prewarm caches
  *       plugins/<fit|sim>/node_modules/         ← npm-installed plugins
@@ -80,6 +81,19 @@ export interface ProjectPaths {
   readonly reportsDir: string;
   /** <project>/opensip-cli/.runtime/logs */
   readonly logsDir: string;
+  /**
+   * `<project>/opensip-cli/.runtime/artifacts` — host-owned raw scanner artifact
+   * store. The host owns every write into it (SARIF, baselines, scanner output)
+   * through the `writeArtifact` seam; tool engines never write here directly.
+   */
+  readonly artifactsDir: string;
+  /**
+   * `<artifactsDir>/<tool>` — per-tool artifact subdir. The substrate composes
+   * the per-run segment underneath (`<artifactDir(tool)>/<runId>/<name>`); the
+   * run segment is substrate-owned, so the immediate children of this dir are the
+   * per-run dirs host-side retention prunes (ADR-0090 Phase-0 decision 1).
+   */
+  readonly artifactDir: (tool: string) => string;
   /** <project>/opensip-cli/.runtime/cache */
   readonly cacheDir: string;
   /** <project>/opensip-cli/.runtime/cache/graph — graph-tool catalog cache root. */
@@ -110,6 +124,7 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
   const runtimeDir = join(userSourceDir, '.runtime');
   const cacheDir = join(runtimeDir, 'cache');
   const graphCacheDir = join(cacheDir, 'graph');
+  const artifactsDir = join(runtimeDir, 'artifacts');
   return {
     projectDir,
     configFile: join(projectDir, 'opensip-cli.config.yml'),
@@ -120,6 +135,8 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     sessionsDir: join(runtimeDir, 'sessions'),
     reportsDir: join(runtimeDir, 'reports'),
     logsDir: join(runtimeDir, 'logs'),
+    artifactsDir,
+    artifactDir: (tool) => join(artifactsDir, tool),
     cacheDir,
     graphCacheDir,
     pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),

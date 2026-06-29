@@ -46,6 +46,15 @@
     "packages/mcp": {
       "entry": ["src/sqlite-graph-read-port.ts", "src/session-results-read-port.ts"]
     },
+    "packages/tool-gitleaks": {
+      "ignoreDependencies": ["@opensip-cli/contracts"]
+    },
+    "packages/tool-osv-scanner": {
+      "ignoreDependencies": ["@opensip-cli/contracts"]
+    },
+    "packages/tool-trivy": {
+      "ignoreDependencies": ["@opensip-cli/contracts"]
+    },
     "packages/dashboard": {
       "entry": ["src/client/index.ts", "src/client/globals.ts", "scripts/*.mjs"],
       "ignore": ["src/vendor/cytoscape-bundle.js"],

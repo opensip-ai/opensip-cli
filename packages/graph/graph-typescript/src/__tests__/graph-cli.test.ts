@@ -164,6 +164,7 @@ function makeCli(): CapturedCli {
       }
     }),
     writeArtifact: vi.fn(() => Promise.resolve()),
+    ensureArtifactDir: vi.fn(() => Promise.resolve()),
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn((envelope: unknown) => {
       process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);

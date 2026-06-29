@@ -1,0 +1,78 @@
+{
+  "results": [
+    {
+      "source": {
+        "path": "package-lock.json",
+        "type": "lockfile"
+      },
+      "packages": [
+        {
+          "package": {
+            "name": "lodash",
+            "version": "4.17.15",
+            "ecosystem": "npm"
+          },
+          "vulnerabilities": [
+            {
+              "id": "GHSA-jf85-cpcp-j695",
+              "summary": "Prototype Pollution in lodash",
+              "details": "Versions of lodash prior to 4.17.12 are vulnerable to Prototype Pollution. The function `defaultsDeep` allows a malicious user to modify the prototype of `Object`.",
+              "aliases": ["CVE-2019-10744"],
+              "modified": "2023-11-08T04:01:00Z",
+              "published": "2019-07-17T21:42:00Z",
+              "severity": [
+                {
+                  "type": "CVSS_V3",
+                  "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                }
+              ],
+              "database_specific": {
+                "severity": "CRITICAL"
+              }
+            }
+          ],
+          "groups": [
+            {
+              "ids": ["GHSA-jf85-cpcp-j695"],
+              "aliases": ["CVE-2019-10744", "GHSA-jf85-cpcp-j695"],
+              "max_severity": "9.8"
+            }
+          ]
+        },
+        {
+          "package": {
+            "name": "minimist",
+            "version": "1.2.5",
+            "ecosystem": "npm"
+          },
+          "vulnerabilities": [
+            {
+              "id": "GHSA-xvch-5gv4-984h",
+              "summary": "Prototype Pollution in minimist",
+              "details": "minimist before 1.2.6 is vulnerable to Prototype Pollution via the constructor and __proto__ payloads.",
+              "aliases": ["CVE-2021-44906"],
+              "modified": "2023-11-08T04:06:00Z",
+              "published": "2022-03-17T20:00:00Z",
+              "severity": [
+                {
+                  "type": "CVSS_V3",
+                  "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                }
+              ],
+              "database_specific": {
+                "severity": "CRITICAL"
+              }
+            }
+          ],
+          "groups": [
+            {
+              "ids": ["GHSA-xvch-5gv4-984h"],
+              "aliases": ["CVE-2021-44906", "GHSA-xvch-5gv4-984h"],
+              "max_severity": "9.8"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

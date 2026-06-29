@@ -103,6 +103,15 @@ export const cliConfigSchema = z.object({
       endpoint: httpsUrlSchema.optional(),
     })
     .optional(),
+  // Host-owned artifact-store retention (ADR-0090). The host keeps the `keep`
+  // most-recent per-tool run-dirs under `.runtime/artifacts/<tool>/` and prunes
+  // the rest after each artifact write; `0` disables pruning. The default (10)
+  // MUST stay in sync with `DEFAULT_ARTIFACT_RETENTION_KEEP` in the cli layer.
+  artifacts: z
+    .object({
+      keep: z.number().int().min(0).default(10),
+    })
+    .optional(),
 });
 
 /**

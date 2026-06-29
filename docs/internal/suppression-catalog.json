@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-28T12:52:42.322Z",
+  "generatedAt": "2026-06-29T01:09:07.863Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,7 +11,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 219,
+        "total": 220,
         "bySlug": {
           "no-markdown-references": 5,
           "silent-early-returns": 7,
@@ -20,7 +20,7 @@
           "dogfood-one-config-document-ratchet": 1,
           "one-outcome-shape": 1,
           "context-leakage": 1,
-          "duplicate-utility-functions": 6,
+          "duplicate-utility-functions": 7,
           "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
@@ -91,6 +91,7 @@
           "cli-ui": 1,
           "core": 5,
           "dashboard": 1,
+          "external-tool-adapter": 1,
           "fitness/checks-typescript": 66,
           "fitness/checks-universal": 106,
           "fitness/engine": 12,
@@ -110,7 +111,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 45,
+        "total": 46,
         "bySlug": {
           "no-markdown-references": 3,
           "silent-early-returns": 5,
@@ -119,7 +120,7 @@
           "dogfood-one-config-document-ratchet": 1,
           "one-outcome-shape": 1,
           "context-leakage": 1,
-          "duplicate-utility-functions": 2,
+          "duplicate-utility-functions": 3,
           "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
@@ -146,6 +147,7 @@
           "cli-ui": 1,
           "core": 5,
           "dashboard": 1,
+          "external-tool-adapter": 1,
           "fitness/engine": 12,
           "graph/engine": 10,
           "graph/graph-typescript": 2,
@@ -374,13 +376,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 219,
+    "budgetGateFitness": 220,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 45,
+    "productRuntimeFitness": 46,
     "productRuntimeFitnessSlugs": 28,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 78,
+    "productRuntimeCombined": 79,
     "checkPackageFitness": 172,
     "testSupportFitness": 2,
     "testsFitness": 61,
@@ -400,10 +402,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -260,
+      "productRuntimeFitness": -259,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -234,
-      "budgetGateFitness": -323,
+      "productRuntimeCombined": -233,
+      "budgetGateFitness": -322,
       "checkPackageFitness": -62,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

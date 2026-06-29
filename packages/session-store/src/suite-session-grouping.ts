@@ -70,13 +70,16 @@ export function orderSessionsForSuiteGrouping<
     | { readonly kind: 'standalone'; readonly session: T }
     | { readonly kind: 'group'; readonly sessions: readonly T[] };
 
-  const entries: Entry[] = [
-    ...standalone.map((session) => ({ kind: 'standalone' as const, session })),
-    ...[...grouped.values()].map((groupSessions) => ({
+  const entries: Entry[] = standalone.map((session) => ({
+    kind: 'standalone' as const,
+    session,
+  }));
+  for (const groupSessions of grouped.values()) {
+    entries.push({
       kind: 'group' as const,
       sessions: [...groupSessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
-    })),
-  ];
+    });
+  }
 
   entries.sort((a, b) => {
     const aTime = a.kind === 'standalone' ? a.session.startedAt : (a.sessions[0]?.startedAt ?? '');

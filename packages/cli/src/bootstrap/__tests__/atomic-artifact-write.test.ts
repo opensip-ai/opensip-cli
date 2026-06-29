@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,6 +41,22 @@ describe('writeArtifactAtomically', () => {
 
     expect(readFileSync(target, 'utf8')).toBe('{"ok":true}\n');
     expect(existsSync(`${target}.artifact.lock`)).toBe(false);
+  });
+
+  it('writes artifacts with owner-only 0600 permissions', () => {
+    dir = mkdtempSync(join(tmpdir(), 'artifact-write-'));
+    const target = join(dir, 'out.sarif');
+
+    writeArtifactAtomically(target, '{"ok":true}\n', {
+      policy: POLICY,
+      logger: makeLogger(),
+      command: 'test',
+      cwdBasename: 'repo',
+    });
+
+    // 0600 = owner read/write only; never group/world-readable (findings may be
+    // sensitive). Mask off the file-type bits and assert the permission bits.
+    expect(statSync(target).mode & 0o777).toBe(0o600);
   });
 
   it('emits a `persist` diagnostics event on success (parity with the lock/baseline bridges)', () => {

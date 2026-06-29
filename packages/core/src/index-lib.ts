@@ -12,6 +12,7 @@ export {
   CapabilitySchemaMismatchError,
 } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch } from './lib/errors.js';
+export { canonicalToolErrorCode, toolErrorFromCanonicalCode } from './lib/errors.js';
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 
 // Lib — logger.

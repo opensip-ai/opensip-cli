@@ -39,6 +39,10 @@ function replayEnvelope(tool: string) {
   };
 }
 
+const throwingReplay = () => {
+  throw new Error('bad payload');
+};
+
 let datastore: DataStore;
 let repo: SessionRepo;
 
@@ -53,7 +57,9 @@ afterEach(() => {
 
 describe('resolveAndReplaySession', () => {
   it('returns structured failures for resolve errors and missing replay', async () => {
-    expect(await resolveAndReplaySession(datastore, { ref: 'latest', replayFor: () => undefined })).toEqual({
+    expect(
+      await resolveAndReplaySession(datastore, { ref: 'latest', replayFor: () => undefined }),
+    ).toEqual({
       ok: false,
       reason: 'ambiguous-latest',
       detail: 'latest requires --tool fit|graph|sim',
@@ -76,9 +82,7 @@ describe('resolveAndReplaySession', () => {
     repo.save(makeSession({ id: 'FIT_01' }));
     const result = await resolveAndReplaySession(datastore, {
       ref: 'FIT_01',
-      replayFor: () => async () => {
-        throw new Error('bad payload');
-      },
+      replayFor: () => throwingReplay,
     });
 
     expect(result).toEqual({
@@ -105,10 +109,11 @@ describe('resolveAndReplaySession', () => {
         message: 'warn',
       }),
     ];
+    const replayFn = () => replay;
 
     const result = await resolveAndReplaySession(datastore, {
       ref: 'FIT_01',
-      replayFor: () => () => replay,
+      replayFor: () => replayFn,
       filters: ['errors-only'],
     });
 
