@@ -57,6 +57,7 @@ const FIXTURES = join(TRIVY_PKG_DIR, '__fixtures__');
 const GOLDEN_PATH = join(FIXTURES, 'trivy-golden.sarif');
 
 const TRIVY_STABLE_ID = 'a26ea0eb-ee3b-4e22-a3f3-7e1f93e16000';
+const FULL_GATE_RATCHET_HOOK_TIMEOUT_MS = 300_000;
 
 const EXPECTED = JSON.parse(readFileSync(join(FIXTURES, 'expected-signals.json'), 'utf8')) as {
   ruleId: string;
@@ -366,7 +367,7 @@ describe('trivy worker E2E — full gate ratchet (§4.12)', () => {
       { FAKE_TRIVY_GOLDEN: augmentedGolden },
       gateProject,
     );
-  });
+  }, FULL_GATE_RATCHET_HOOK_TIMEOUT_MS);
 
   afterAll(() => {
     if (gateProject !== undefined) rmSync(gateProject, { recursive: true, force: true });

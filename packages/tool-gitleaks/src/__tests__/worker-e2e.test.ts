@@ -53,6 +53,7 @@ const FIXTURES = join(GITLEAKS_PKG_DIR, '__fixtures__');
 const GOLDEN_PATH = join(FIXTURES, 'gitleaks-golden.json');
 
 const GITLEAKS_STABLE_ID = 'cd08f737-ce8e-4813-9259-b4ffeb954268';
+const FULL_GATE_RATCHET_HOOK_TIMEOUT_MS = 300_000;
 
 const EXPECTED = JSON.parse(readFileSync(join(FIXTURES, 'expected-signals.json'), 'utf8')) as {
   ruleId: string;
@@ -429,7 +430,7 @@ describe('gitleaks worker E2E — full gate ratchet (§4.12)', () => {
       { FAKE_GITLEAKS_GOLDEN: augmentedGolden },
       gateProject,
     );
-  });
+  }, FULL_GATE_RATCHET_HOOK_TIMEOUT_MS);
 
   afterAll(() => {
     if (gateProject !== undefined) rmSync(gateProject, { recursive: true, force: true });

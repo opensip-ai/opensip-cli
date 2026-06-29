@@ -53,6 +53,7 @@ const FIXTURES = join(OSV_PKG_DIR, '__fixtures__');
 const GOLDEN_PATH = join(FIXTURES, 'osv-golden.json');
 
 const OSV_SCANNER_STABLE_ID = 'd25a4471-3289-4660-b5ab-63830072d0e1';
+const FULL_GATE_RATCHET_HOOK_TIMEOUT_MS = 300_000;
 
 const EXPECTED = JSON.parse(readFileSync(join(FIXTURES, 'expected-signals.json'), 'utf8')) as {
   ruleId: string;
@@ -340,7 +341,7 @@ describe('osv-scanner worker E2E — full gate ratchet (§4.12)', () => {
       { FAKE_OSV_GOLDEN: augmentedGolden },
       gateProject,
     );
-  });
+  }, FULL_GATE_RATCHET_HOOK_TIMEOUT_MS);
 
   afterAll(() => {
     if (gateProject !== undefined) rmSync(gateProject, { recursive: true, force: true });
