@@ -86,6 +86,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | Role | Path |
 |---|---|
 | Evaluating opensip-cli | [What is opensip-cli?](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) -> [vs. other tools](/docs/opensip-cli/00-start/03-vs-other-tools/) -> [FAQ](/docs/opensip-cli/00-start/04-faq/) |
+| Understanding the two products | [What is opensip-cli?](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) -> [OpenSIP and OpenSIP CLI](/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/) |
 | New user | [Quick start](/docs/opensip-cli/00-start/00-quick-start/) -> [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/) -> [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/) |
 | CI owner | [Output, gate, SARIF](/docs/opensip-cli/20-fit/04-output-gate-sarif/) -> [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/) -> [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/) |
 | Plugin author | [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/) -> [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) -> [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) -> [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/) |
@@ -104,6 +105,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 5. [Vocabulary](/docs/opensip-cli/00-start/05-vocabulary/)
 6. [System context](/docs/opensip-cli/00-start/06-system-context/)
 7. [Architecture overview](/docs/opensip-cli/00-start/07-architecture-overview/)
+8. [OpenSIP and OpenSIP CLI](/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/)
 
 ### 10 - Concepts
 

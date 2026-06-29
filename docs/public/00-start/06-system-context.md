@@ -80,7 +80,12 @@ There are exactly four actors:
 3. **The dashboard browser.** When `--open` is passed (or auto-open conditions are met), the CLI launches the user's default browser onto the local HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` (a single rolling file overwritten on each generation). No server, just a static file.
 4. **OpenSIP Cloud (optional).** If `~/.opensip-cli/config.yml` carries an API key, the CLI POSTs the run summary to [opensip.ai](https://opensip.ai) for centralized reporting. Without the key, this side is dead — the cloud is fully optional.
 
-There is no fifth actor. Specifically: no daemon, no database, no message queue, no scheduled job, no agent. opensip-cli runs to completion and exits.
+For normal one-shot analysis commands, there is no fifth actor. Specifically:
+no daemon, no project-external database, no message queue, and no scheduled job;
+opensip-cli runs to completion and exits. The explicit exception is
+[`opensip mcp`](../70-reference/01-cli-commands.md#mcp--serve-the-call-graph--results-to-agents-over-stdio):
+an external coding agent may spawn the CLI as a stdio MCP server to read the
+project's persisted graph and sessions.
 
 ---
 

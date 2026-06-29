@@ -10,6 +10,8 @@ source-files:
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./04-faq.md
+  - ../60-guides/use-opensip-with-ai-agents.md
+  - ../../decisions/ADR-0095-ai-native-guardrail-platform-posture.md
 ---
 # vs. other tools
 
@@ -86,7 +88,10 @@ A short anti-claims list, since "what we don't do" is often more useful than "wh
 - **Not a service.** No daemon. No API server. The optional OpenSIP Cloud dashboard is a separate product that opensip-cli can post to, not require.
 - **Not opinionated about your bar.** The built-in checks (151 across seven packs) are a starting point. The point is *your* rules — the constraints that matter to your codebase.
 - **Not a CI runner.** It runs *under* GitHub Actions / GitLab CI / Buildkite. Produces an exit code and SARIF; doesn't replace your CI orchestrator.
-- **Not an AI tool.** No model calls, no embeddings, no agentic anything. (You can build an AI tool *on top of* the Tool plugin contract.)
+- **Not an AI runtime.** No model calls, no embeddings, no autonomous code
+  changes. It is deliberately AI-agent friendly through JSON, sessions,
+  `agent-catalog`, MCP, filters, and recipes — guardrails that external agents
+  can consume.
 - **Not a security scanner.** Limited security checks (no-eval, no-hardcoded-secrets, sql-injection patterns) ship in `checks-universal`, but Snyk / Dependabot / GitHub Advanced Security are the right call for CVE-scale work.
 
 ---

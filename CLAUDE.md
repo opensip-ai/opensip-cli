@@ -11,6 +11,37 @@ hosts pluggable tools for static analysis. Today it ships with four: `fit`
 `yagni` (advisory YAGNI reduction audit).
 Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
+## Product Origin And Intent
+
+OpenSIP exists because AI coding agents need enforceable guardrails, not just
+better prompts. The origin story is an AI-assisted change with too much blast
+radius: a narrow fix turned into a wide repo mutation because scope, proof, and
+architecture constraints were not enforced by the environment itself.
+
+The product thesis is: humans can trust agent-written code only when intent is
+documented, rules are executable, evidence is preserved, and capability is
+scoped. OpenSIP is the reusable control plane for that workflow:
+
+- ADRs and docs capture architectural intent.
+- `fit`, `graph`, `sim`, `yagni`, gates, and suites make intent executable.
+- Sessions, JSON, SARIF, dashboards, and MCP preserve machine-readable evidence.
+- Agent surfaces (`agent-catalog`, filters, recipes, MCP) help agents consume the
+  evidence without turning OpenSIP into an AI runtime.
+
+When working in this repo, do not weaken a guardrail just to make a change pass.
+Prefer fixing the code or improving the check with a documented decision. If a
+rule is wrong, update the intent and the enforcement together.
+
+**opensip-cli is the open-source guardrail layer; OpenSIP (the platform / Cloud)
+is the autonomous maintenance loop built on top of it.** opensip-cli produces
+deterministic evidence and calls no models; the platform consumes that evidence,
+proposes and validates fixes, and merges when safe. Do not add model calls or
+autonomous code mutation to the CLI's core paths — that belongs in the platform.
+Posture is recorded in `docs/decisions/ADR-0095-ai-native-guardrail-platform-posture.md`;
+the full product-family + origin story is the canonical doc
+`docs/public/00-start/08-opensip-and-opensip-cli.md` (published to
+opensip.ai/docs). Keep this block a short summary — extend the doc, not this.
+
 ## Repository Structure
 
 Turborepo + pnpm monorepo. Workspace scope: `@opensip-cli/*`. Layered —

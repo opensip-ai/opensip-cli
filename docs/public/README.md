@@ -86,6 +86,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | Role | Path |
 |---|---|
 | Evaluating opensip-cli | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [FAQ](./00-start/04-faq.md) |
+| Understanding the two products | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [OpenSIP and OpenSIP CLI](./00-start/08-opensip-and-opensip-cli.md) |
 | New user | [Quick start](./00-start/00-quick-start.md) -> [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) -> [Write your first check](./60-guides/01-write-your-first-check.md) |
 | CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
 | Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) -> [External tool adapters](./50-extend/08-external-tool-adapters.md) |
@@ -104,6 +105,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 5. [Vocabulary](./00-start/05-vocabulary.md)
 6. [System context](./00-start/06-system-context.md)
 7. [Architecture overview](./00-start/07-architecture-overview.md)
+8. [OpenSIP and OpenSIP CLI](./00-start/08-opensip-and-opensip-cli.md)
 
 ### 10 - Concepts
 

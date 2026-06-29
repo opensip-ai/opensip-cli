@@ -16,8 +16,10 @@ related-docs:
   - ./05-vocabulary.md
   - ./06-system-context.md
   - ./07-architecture-overview.md
+  - ../60-guides/use-opensip-with-ai-agents.md
   - ../10-concepts/01-fitness-loop.md
   - ../10-concepts/02-tool-plugin-model.md
+  - ../../decisions/ADR-0095-ai-native-guardrail-platform-posture.md
 ---
 # What is opensip-cli?
 
@@ -47,17 +49,42 @@ Exit code is `0` when nothing broke the bar, non-zero when something did. That's
 
 ---
 
+## Why it exists
+
+OpenSIP started from a practical AI-coding problem: agents can write a lot of
+plausible code very quickly, but speed without judgment creates dangerous blast
+radius. A small, well-intentioned fix can become a wide repo mutation unless the
+environment itself controls scope, checks architecture, and demands proof before
+trust.
+
+The answer is not better prompts alone. The answer is a governed feedback loop:
+document the intent, encode the rules, run the checks, preserve the evidence,
+and make violations fail in ways both humans and agents can act on.
+
+opensip-cli is that guardrail layer extracted into a reusable CLI. It does not
+call models or autonomously change code. It makes AI-assisted development more
+trustworthy by turning architecture, quality rules, graph context, sessions, and
+gates into deterministic evidence.
+
+---
+
 ## What it does well
 
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-cli can, in 15 lines.
 - **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 151 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
+- **AI-agent guardrails.** Structured JSON, sessions, `agent-catalog`, MCP, and
+  agent recipes give coding agents deterministic feedback without making the CLI
+  an AI runtime.
 
 ## What it deliberately isn't
 
 - **Not a linter replacement.** ESLint, Ruff, and golangci-lint are still the right call for syntactic patterns inside one language. opensip-cli sits *above* linters: it adds architectural and cross-language checks linters can't express.
 - **Not a bundled-rules product.** Useful checks ship with it, but the point is *you write your own* for the constraints that matter to your codebase. The built-ins are a starting point, not the product.
 - **Not a SaaS.** The binary runs locally and in your CI. There's an optional cloud reporting endpoint (`--report-to`), but it's opt-in; the tool works fully offline.
+- **Not an AI runtime.** It does not call models, create embeddings, or apply
+  autonomous code changes. It is built to help humans and agents trust the code
+  agents produce.
 
 ---
 

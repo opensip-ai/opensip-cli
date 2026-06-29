@@ -106,6 +106,18 @@
       "purpose": "A visual map of opensip: package layers, runtime flow, tool pipelines, output, and local persistence."
     },
     {
+      "file": "docs/web-generated/00-start/08-opensip-and-opensip-cli.md",
+      "path": "/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/",
+      "section": "00-start",
+      "title": "OpenSIP and OpenSIP CLI",
+      "audience": [
+        "getting-started",
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "The product family — what OpenSIP (the autonomous platform) and opensip-cli (the open-source guardrail layer) each are, how they fit together, and the shared origin that explains why both exist."
+    },
+    {
       "file": "docs/web-generated/10-concepts/01-fitness-loop.md",
       "path": "/docs/opensip-cli/10-concepts/01-fitness-loop/",
       "section": "10-concepts",
@@ -702,7 +714,8 @@
         "/docs/opensip-cli/00-start/04-faq/",
         "/docs/opensip-cli/00-start/05-vocabulary/",
         "/docs/opensip-cli/00-start/06-system-context/",
-        "/docs/opensip-cli/00-start/07-architecture-overview/"
+        "/docs/opensip-cli/00-start/07-architecture-overview/",
+        "/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/"
       ]
     },
     {
@@ -825,6 +838,7 @@
         "/docs/opensip-cli/00-start/02-show-me-the-loops/",
         "/docs/opensip-cli/00-start/03-vs-other-tools/",
         "/docs/opensip-cli/00-start/04-faq/",
+        "/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/",
         "/docs/opensip-cli/10-concepts/06-cloud-signal-sync/",
         "/docs/opensip-cli/50-extend/02-project-local-plugins/",
         "/docs/opensip-cli/60-guides/00-initialize-your-first-repo/",
@@ -888,6 +902,7 @@
         "/docs/opensip-cli/00-start/05-vocabulary/",
         "/docs/opensip-cli/00-start/06-system-context/",
         "/docs/opensip-cli/00-start/07-architecture-overview/",
+        "/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/",
         "/docs/opensip-cli/10-concepts/01-fitness-loop/",
         "/docs/opensip-cli/10-concepts/04-contract-surfaces/",
         "/docs/opensip-cli/10-concepts/05-architecture-gate/",
@@ -924,6 +939,7 @@
         "/docs/opensip-cli/00-start/05-vocabulary/",
         "/docs/opensip-cli/00-start/06-system-context/",
         "/docs/opensip-cli/00-start/07-architecture-overview/",
+        "/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/",
         "/docs/opensip-cli/10-concepts/01-fitness-loop/",
         "/docs/opensip-cli/10-concepts/02-tool-plugin-model/",
         "/docs/opensip-cli/10-concepts/03-modular-monolith/",

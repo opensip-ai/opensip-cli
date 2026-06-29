@@ -11,6 +11,8 @@ source-files:
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./03-vs-other-tools.md
+  - ../60-guides/use-opensip-with-ai-agents.md
+  - ../../decisions/ADR-0095-ai-native-guardrail-platform-posture.md
 ---
 # FAQ
 
@@ -133,7 +135,17 @@ See [vocabulary](./05-vocabulary.md) for the full glossary.
 
 ### Is this an AI tool?
 
-**No.** No model calls, no embeddings, no agentic anything. Plain TypeScript CLI. You can build an AI tool *on top of* the Tool plugin contract — that's exactly what the contract is for, and the contract is documented in [plugin authoring](../50-extend/01-plugin-authoring.md).
+**Not in the model-runtime sense.** opensip-cli does not call models, create
+embeddings, or autonomously change your code. It is a plain TypeScript CLI that
+emits deterministic evidence.
+
+It is intentionally **AI-agent friendly**: `--json`, sessions, `agent-catalog`,
+MCP, agent filters, and agent recipes let external coding agents inspect prior
+runs, understand blast radius, and verify their work. The product boundary is:
+agents may consume OpenSIP's guardrails; OpenSIP itself is not the agent.
+
+See [Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md) and
+[plugin authoring](../50-extend/01-plugin-authoring.md).
 
 ---
 
