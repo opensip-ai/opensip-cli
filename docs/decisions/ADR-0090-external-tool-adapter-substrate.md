@@ -128,9 +128,11 @@ load-bearing purpose of this ADR.
   add **no untrusted-JS surface**: they are opensip.ai-authored JS wrapping a
   user-installed subprocess (`execFile`, no shell), loaded through the normal
   installed-tool admission/worker path. No 03 Gate is implicated, so the MVP
-  proceeds. The **public third-party adapter ecosystem** and capability
-  *enforcement* stay gated on ADR-0061/03 (network/auth `requires` is
-  declaration-only in v1 — ADR-0092).
+  proceeds. Plan 03's outcome was to **shelve** the public untrusted ecosystem
+  (ADR-0087 — no portable, bypass-resistant network-capability mechanism was
+  proven), so the **public third-party adapter ecosystem** stays closed and
+  capability *enforcement* stays deferred indefinitely; network/auth `requires`
+  is declaration-only (ADR-0092).
 
 **Fitness check:** every structural invariant this ADR introduces is paired with
 its enforcement (an ADR without this section is incomplete):

@@ -431,10 +431,14 @@ manifest is regenerated) — you can't ship a `networked` adapter that still cla
 `filesystem` only) — Trivy is `local-only` because it scans against a
 **pre-populated local DB cache** with `--offline-scan`.
 
-`requires` is **declaration-only in v1** — honest labeling for review and
-provenance, not an enforced sandbox. Capability *enforcement* is deferred to a
-later spec ([ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)),
-with no contract change when it lands. Declare the posture honestly anyway.
+`requires` is **declaration-only** — honest labeling for review and
+provenance, not an enforced sandbox. Capability *enforcement* is **shelved**
+([ADR-0087](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0087-public-ecosystem-readiness-shelved.md): plan 03
+found no portable, bypass-resistant network mechanism — Node `--permission` blocks
+fs/child/worker but not raw `node:net` sockets), so external tools stay
+trusted/private extensions ([ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)).
+The field becomes enforceable with no contract change if a future ADR unshelves it.
+Declare the posture honestly anyway.
 
 ## Trust and execution model
 
