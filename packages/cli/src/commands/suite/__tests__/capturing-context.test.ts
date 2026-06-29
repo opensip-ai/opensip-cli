@@ -14,7 +14,7 @@ describe('createCapturingContext', () => {
 
     const capture = createCapturingContext(base);
     capture.context.setExitCode(2);
-    await capture.context.deliverSignals({} as never, { runFailed: true });
+    await capture.context.deliverSignals({}, { runFailed: true });
 
     expect(capture.exitCodes).toEqual([2, 1]);
     expect(capture.signalDeliveries).toHaveLength(1);

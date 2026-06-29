@@ -1,4 +1,3 @@
-import { EXIT_CODES } from '@opensip-cli/contracts';
 import { type ToolCliContext } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

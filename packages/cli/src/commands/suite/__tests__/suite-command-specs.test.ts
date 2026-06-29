@@ -86,15 +86,13 @@ function hostCtx(toolContext?: ToolCliContext) {
   };
 }
 
-function withSuiteScope<T>(
-  fn: () => Promise<T> | T,
-  suites: Record<string, unknown> = {
+function withSuiteScope<T>(fn: () => Promise<T> | T, suites?: Record<string, unknown>): Promise<T> {
+  const resolvedSuites = suites ?? {
     security: {
       description: 'Security suite',
       steps: [{ tool: TOOL_ID, command: 'fit', args: {} }],
     },
-  },
-): Promise<T> {
+  };
   const tools = new ToolRegistry();
   tools.register(fixtureTool());
   const scope = new RunScope({
@@ -102,7 +100,7 @@ function withSuiteScope<T>(
     languages: new LanguageRegistry(),
   });
   Object.assign(scope, {
-    configDocument: { suites },
+    configDocument: { suites: resolvedSuites },
     projectContext: { projectRoot: tmp, configPath: join(tmp, 'opensip-cli.config.yml') },
   });
   return runWithScope(scope, fn);
@@ -140,12 +138,7 @@ describe('buildSuiteGroupLeaves', () => {
     const ctx = hostCtx();
     const [, listSpec] = buildSuiteGroupLeaves(ctx);
 
-    const result = await withSuiteScope(() =>
-      listSpec.handler?.(
-        {},
-        ctx,
-      ),
-    );
+    const result = await withSuiteScope(() => listSpec.handler?.({}, ctx));
 
     expect(result).toEqual({
       type: 'suite-list',
@@ -169,7 +162,7 @@ describe('buildSuiteGroupLeaves', () => {
 
   it('adds a suite step and leaves exit code unchanged when the file is already up to date', async () => {
     const ctx = hostCtx();
-    const [, , addSpec] = buildSuiteGroupLeaves(ctx);
+    const addSpec = buildSuiteGroupLeaves(ctx)[2];
 
     await withSuiteScope(async () => {
       const first = await addSpec.handler?.(

@@ -16,6 +16,23 @@ const session: StoredSession = {
   durationMs: 100,
 };
 
+const replaySession = () => ({
+  fidelity: 'projection' as const,
+  envelope: {
+    schemaVersion: 2 as const,
+    tool: 'fit',
+    runId: 'r1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    verdict: {
+      score: 100,
+      passed: true,
+      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+    },
+    units: [],
+    signals: [],
+  },
+});
+
 describe('bundledReplayResolver', () => {
   it('returns undefined for tools without a sessionReplay contribution', () => {
     const tools = new ToolRegistry();
@@ -34,7 +51,7 @@ describe('bundledReplayResolver', () => {
           commonFlags: [],
           scope: 'project',
           output: 'command-result',
-          handler: async () => ({ type: 'text-lines', lines: [] }),
+          handler: () => Promise.resolve({ type: 'text-lines', lines: [] }),
         }),
       ],
     });
@@ -44,22 +61,6 @@ describe('bundledReplayResolver', () => {
 
   it('maps layout keys to replay closures that delegate to the tool contribution', () => {
     const tools = new ToolRegistry();
-    const replaySession = () => ({
-      fidelity: 'projection' as const,
-      envelope: {
-        schemaVersion: 2 as const,
-        tool: 'fit',
-        runId: 'r1',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        verdict: {
-          score: 100,
-          passed: true,
-          summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
-        },
-        units: [],
-        signals: [],
-      },
-    });
     tools.register({
       identity: { name: 'fitness', layoutKey: 'fit' },
       metadata: {
@@ -76,7 +77,7 @@ describe('bundledReplayResolver', () => {
           commonFlags: [],
           scope: 'project',
           output: 'command-result',
-          handler: async () => ({ type: 'text-lines', lines: [] }),
+          handler: () => Promise.resolve({ type: 'text-lines', lines: [] }),
         }),
       ],
       extensionPoints: {
