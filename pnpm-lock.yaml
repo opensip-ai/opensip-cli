@@ -45,7 +45,7 @@ importers:
         version: link:packages/fitness/checks-universal
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-go':
         specifier: workspace:*
         version: link:packages/graph/graph-go
@@ -65,8 +65,8 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(vitest@4.1.8)
       dependency-cruiser:
-        specifier: ^17.4.3
-        version: 17.4.3
+        specifier: ^18.0.0
+        version: 18.0.0
       eslint:
         specifier: ^10.4.1
         version: 10.4.1(jiti@2.7.0)
@@ -114,28 +114,28 @@ importers:
     dependencies:
       '@opensip-cli/checks-cpp':
         specifier: workspace:*
-        version: file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/checks-go':
         specifier: workspace:*
-        version: file:packages/fitness/checks-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/checks-java':
         specifier: workspace:*
-        version: file:packages/fitness/checks-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/checks-python':
         specifier: workspace:*
-        version: file:packages/fitness/checks-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/checks-rust':
         specifier: workspace:*
-        version: file:packages/fitness/checks-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/checks-typescript':
         specifier: workspace:*
-        version: file:packages/fitness/checks-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/checks-universal':
         specifier: workspace:*
-        version: file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/cli-ui':
         specifier: workspace:*
-        version: link:../cli-ui
+        version: file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../config
@@ -144,13 +144,13 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/dashboard':
         specifier: workspace:*
         version: link:../dashboard
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: link:../fitness/engine
@@ -159,19 +159,19 @@ importers:
         version: link:../graph/engine
       '@opensip-cli/graph-go':
         specifier: workspace:*
-        version: file:packages/graph/graph-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/graph-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-java':
         specifier: workspace:*
-        version: file:packages/graph/graph-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/graph-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-python':
         specifier: workspace:*
-        version: file:packages/graph/graph-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/graph-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-rust':
         specifier: workspace:*
-        version: file:packages/graph/graph-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/graph-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-typescript':
         specifier: workspace:*
-        version: file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-cpp':
         specifier: workspace:*
         version: link:../languages/lang-cpp
@@ -192,7 +192,7 @@ importers:
         version: link:../languages/lang-typescript
       '@opensip-cli/mcp':
         specifier: workspace:*
-        version: file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@opensip-cli/output':
         specifier: workspace:*
         version: link:../output
@@ -256,7 +256,7 @@ importers:
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -274,7 +274,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -283,13 +283,13 @@ importers:
     dependencies:
       '@opensip-cli/cli-ui':
         specifier: workspace:*
-        version: link:../cli-ui
+        version: file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/contracts':
         specifier: workspace:*
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       ink:
         specifier: ^7.0.5
         version: 7.0.5(@types/react@19.2.17)(react@19.2.7)
@@ -308,7 +308,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/cli-ui:
     dependencies:
@@ -333,7 +333,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/clone-detection:
     devDependencies:
@@ -345,13 +345,13 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/config:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -367,13 +367,13 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/contracts:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -386,7 +386,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/core:
     dependencies:
@@ -411,7 +411,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/dashboard:
     dependencies:
@@ -439,13 +439,13 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/datastore:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -470,7 +470,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/external-tool-adapter:
     dependencies:
@@ -479,7 +479,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -495,114 +495,114 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-cpp:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-go:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-java:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-python:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-python':
         specifier: workspace:*
         version: link:../../languages/lang-python
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-rust:
     dependencies:
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-typescript:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript
@@ -612,41 +612,41 @@ importers:
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/checks-universal:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     devDependencies:
       '@opensip-cli/test-support':
         specifier: workspace:*
-        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)
+        version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/fitness/engine:
     dependencies:
       '@opensip-cli/cli-live':
         specifier: workspace:*
-        version: link:../../cli-live
+        version: file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui':
         specifier: workspace:*
-        version: link:../../cli-ui
+        version: file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../../config
@@ -655,10 +655,10 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../../session-store
@@ -673,7 +673,7 @@ importers:
         version: 15.0.0
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       glob:
         specifier: ^13.0.0
         version: 13.0.6
@@ -701,16 +701,16 @@ importers:
         version: 19.2.17
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/engine:
     dependencies:
       '@opensip-cli/cli-live':
         specifier: workspace:*
-        version: link:../../cli-live
+        version: file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui':
         specifier: workspace:*
-        version: link:../../cli-ui
+        version: file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/clone-detection':
         specifier: workspace:*
         version: link:../../clone-detection
@@ -722,10 +722,10 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../../session-store
@@ -737,7 +737,7 @@ importers:
         version: 15.0.0
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       glob:
         specifier: ^13.0.0
         version: 13.0.6
@@ -762,16 +762,16 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/graph-adapter-common:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -784,16 +784,16 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/graph-go:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -809,16 +809,16 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/graph-java:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -834,16 +834,16 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/graph-python:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -859,16 +859,16 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/graph-rust:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/graph-adapter-common':
         specifier: workspace:*
         version: link:../graph-adapter-common
@@ -884,16 +884,16 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/graph/graph-typescript:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript
@@ -903,7 +903,7 @@ importers:
     devDependencies:
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/graph-python':
         specifier: workspace:*
         version: link:../graph-python
@@ -915,26 +915,26 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/languages/lang-cpp:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/languages/lang-go:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -944,13 +944,13 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/languages/lang-java:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -960,13 +960,13 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/languages/lang-python:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -976,13 +976,13 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/languages/lang-rust:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -992,13 +992,13 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/languages/lang-typescript:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -1008,7 +1008,7 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/mcp:
     dependencies:
@@ -1020,13 +1020,13 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/graph':
         specifier: workspace:*
-        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../session-store
@@ -1048,7 +1048,7 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/output:
     dependencies:
@@ -1057,7 +1057,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -1067,7 +1067,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/session-store:
     dependencies:
@@ -1076,16 +1076,16 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
       drizzle-orm:
         specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -1095,16 +1095,16 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/simulation/engine:
     dependencies:
       '@opensip-cli/cli-live':
         specifier: workspace:*
-        version: link:../../cli-live
+        version: file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui':
         specifier: workspace:*
-        version: link:../../cli-ui
+        version: file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../../config
@@ -1113,10 +1113,10 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/datastore':
         specifier: workspace:*
-        version: link:../../datastore
+        version: file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../../session-store
@@ -1141,7 +1141,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/targeting:
     dependencies:
@@ -1150,7 +1150,7 @@ importers:
         version: link:../config
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       glob:
         specifier: ^13.0.0
         version: 13.0.6
@@ -1166,16 +1166,16 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/test-support:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/fitness':
         specifier: workspace:*
-        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/tool-test-kit':
         specifier: workspace:*
         version: link:../tool-test-kit
@@ -1185,7 +1185,7 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/tool-gitleaks:
     dependencies:
@@ -1194,7 +1194,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/external-tool-adapter':
         specifier: workspace:*
         version: link:../external-tool-adapter
@@ -1207,7 +1207,7 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/tool-osv-scanner:
     dependencies:
@@ -1216,7 +1216,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/external-tool-adapter':
         specifier: workspace:*
         version: link:../external-tool-adapter
@@ -1229,7 +1229,7 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/tool-test-kit:
     dependencies:
@@ -1238,7 +1238,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -1248,7 +1248,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/tool-trivy:
     dependencies:
@@ -1257,7 +1257,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       '@opensip-cli/external-tool-adapter':
         specifier: workspace:*
         version: link:../external-tool-adapter
@@ -1270,13 +1270,13 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/tree-sitter:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../core
+        version: file:packages/core
       web-tree-sitter:
         specifier: 0.26.9
         version: 0.26.9
@@ -1286,16 +1286,16 @@ importers:
         version: 24.13.2
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/yagni/engine:
     dependencies:
       '@opensip-cli/cli-live':
         specifier: workspace:*
-        version: link:../../cli-live
+        version: file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui':
         specifier: workspace:*
-        version: link:../../cli-ui
+        version: file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/clone-detection':
         specifier: workspace:*
         version: link:../../clone-detection
@@ -1307,7 +1307,7 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: link:../../core
+        version: file:packages/core
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript
@@ -1326,7 +1326,7 @@ importers:
     devDependencies:
       '@opensip-cli/graph-typescript':
         specifier: workspace:*
-        version: file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+        version: file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -1335,7 +1335,7 @@ importers:
         version: 19.2.17
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
 packages:
 
@@ -1425,11 +1425,20 @@ packages:
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
 
+  '@emnapi/core@1.11.1':
+    resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
+
   '@emnapi/runtime@1.10.0':
     resolution: {integrity: sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==}
 
+  '@emnapi/runtime@1.11.1':
+    resolution: {integrity: sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==}
+
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
+
+  '@emnapi/wasi-threads@1.2.2':
+    resolution: {integrity: sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==}
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
@@ -2010,6 +2019,12 @@ packages:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
 
+  '@napi-rs/wasm-runtime@1.1.6':
+    resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
+    peerDependencies:
+      '@emnapi/core': ^1.7.1
+      '@emnapi/runtime': ^1.7.1
+
   '@opensip-cli/checks-cpp@file:packages/fitness/checks-cpp':
     resolution: {directory: packages/fitness/checks-cpp, type: directory}
 
@@ -2324,6 +2339,9 @@ packages:
   '@oxc-project/types@0.133.0':
     resolution: {integrity: sha512-KzkdCd6Uxqnf6l3HOw1xfatAlUURA0g14cvBYFyJ5SaNOQbOUvBr9PKArcPcrNIeRsBdgcUzOGrhKveVpvOIGA==}
 
+  '@oxc-project/types@0.137.0':
+    resolution: {integrity: sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA==}
+
   '@oxc-resolver/binding-android-arm-eabi@11.20.0':
     resolution: {integrity: sha512-IjfWOXRgJFNdORDl+Uf1aibNgZY2guOD3zmOhx1BGVb/MIiqlFTdmjpQNplSN58lhWehnX4UNqC3QwpUo8pjJg==}
     cpu: [arm]
@@ -2448,8 +2466,20 @@ packages:
     cpu: [arm64]
     os: [android]
 
+  '@rolldown/binding-android-arm64@1.1.3':
+    resolution: {integrity: sha512-DT6Z3PhvioeHMvxo+xHc3KtqggrI7CCTXCmC2h/5zUlp5jVitv7XEy+9q5/7v8IolhlioawpMo8Kg0EEBy7J0g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [android]
+
   '@rolldown/binding-darwin-arm64@1.0.3':
     resolution: {integrity: sha512-PcAhP+ynjURNyy8SKGl5DQP94aGuB/7JrXJb/t7P+hanXvQVMWzUvRRhBAcg/lNRadBhoUPqSoP4xw5tR/KBEA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@rolldown/binding-darwin-arm64@1.1.3':
+    resolution: {integrity: sha512-0NwgwsjM7LrsuVnXMK3koTpagBNOhloc/BNjKqZjv4V5zI5r13qx69uVhRx+o5Z0yy4Hzq+lpy7TAgUG/ocvrw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
@@ -2460,8 +2490,20 @@ packages:
     cpu: [x64]
     os: [darwin]
 
+  '@rolldown/binding-darwin-x64@1.1.3':
+    resolution: {integrity: sha512-YtiBp4disu6V560loT6PjMdiRaWmVvDNrUunAalbiFx2ggeJwxdAsgZMcoGP17uyAsTwAj5V1niksxlHnVQ1Sw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [darwin]
+
   '@rolldown/binding-freebsd-x64@1.0.3':
     resolution: {integrity: sha512-yB1IlAsSNHncV6SCTL27/MVGR5htvQsoGxIv5KMGXALp+Ll1wYsn+x98M9MW7qa+NdSbvrrY7ANI4wLJ0n1e6g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@rolldown/binding-freebsd-x64@1.1.3':
+    resolution: {integrity: sha512-yD3EkEdXk2LypPxnf/kSZHirarsI8gcPzc62SukhR9VJTyvV+F9Q/GxWNuCojc7sXyuVC4DxRGhdDK4X8VSsbw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [freebsd]
@@ -2472,8 +2514,21 @@ packages:
     cpu: [arm]
     os: [linux]
 
+  '@rolldown/binding-linux-arm-gnueabihf@1.1.3':
+    resolution: {integrity: sha512-c+8vieQbsD7HNAHKIA34w0GJ9FedFFuJGD+7E6vz7Q3uqAIugL5p45fhlsj4UaAsHpcmlqugBWMhA0/j7o0sIg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm]
+    os: [linux]
+
   '@rolldown/binding-linux-arm64-gnu@1.0.3':
     resolution: {integrity: sha512-jsO7R8To+AdlYgUmN5sHSCZbfhtMBkO0WUx8iORQnPcMMdgr7qM2DQmMwgabs3GhNztdmoKkMKQFHD6DTMCIQw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rolldown/binding-linux-arm64-gnu@1.1.3':
+    resolution: {integrity: sha512-50jD0uUwLvur7Zz9LHz17kaAdTPjn5wN93hEgjvmYFRZwiR7ZJYovTd5ipyWJDAnXKvZ+wgc+/Ika6dwSF5OcA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
@@ -2486,8 +2541,22 @@ packages:
     os: [linux]
     libc: [musl]
 
+  '@rolldown/binding-linux-arm64-musl@1.1.3':
+    resolution: {integrity: sha512-BO9+oPL8K9poZJBfYPsXNtYjPE5uM3qeehT3aFcW4LITOl+iSqhp0abzjR2nWBUNjIZeKXjAEWBZ64WjNoHd6w==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
   '@rolldown/binding-linux-ppc64-gnu@1.0.3':
     resolution: {integrity: sha512-5f1laC0SlIR0yDbFCd8acUhvJIag6N3zC5P7oUPN6wX0aOma+uKJ0wBDH5aq7I1PVI2ttTlhJwzwRIBnLiSGEg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rolldown/binding-linux-ppc64-gnu@1.1.3':
+    resolution: {integrity: sha512-f3VpLB1vQ0Eo6ecr/6cekLnvYMFF4YBFoVGkfkvPLq1bAkbAwHYQPZKoAmG6OJyTcxxoC+AvezGx/S1obNC0Mw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [ppc64]
     os: [linux]
@@ -2500,8 +2569,22 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@rolldown/binding-linux-s390x-gnu@1.1.3':
+    resolution: {integrity: sha512-AmurZ26Pqx/RI9N1gzEOCklkKXl927yjfXWUUS0O7Puh8ARM/Ob8qfrD3qnWksScdw6cSrW5PSHE9DyLu7+PtA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
   '@rolldown/binding-linux-x64-gnu@1.0.3':
     resolution: {integrity: sha512-B8m6tD5+/N5FeNQFbKlLA/2yVq9ycQP1SeedyEYYKWBNR3ZQbkvIUcNnDNM03lO1l5F2roiiFJGgvoLLyZXtSg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rolldown/binding-linux-x64-gnu@1.1.3':
+    resolution: {integrity: sha512-JJpqs8bRGITDOdbkNKnlojzBabbOHrqjSvDr0IVsZObE1lBcPjxItUEY9eWIDbxaJ3cGrXPWGfGkIxFijg/URg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
@@ -2514,8 +2597,21 @@ packages:
     os: [linux]
     libc: [musl]
 
+  '@rolldown/binding-linux-x64-musl@1.1.3':
+    resolution: {integrity: sha512-rSJcdjPxzA/by/6/rYs+v+bXU7UjvnbUWz8MJb6kh6+knqB1dCrtHg0uu7C/4haqJvqdkYHQ5IGn+tCH9GLW/g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
   '@rolldown/binding-openharmony-arm64@1.0.3':
     resolution: {integrity: sha512-OXXS3RKJgX2uLwM+gYyuH5omcH8fL1LJs96pZGgtetVCahON57+d4SJHzTgZiOjxgGkSnpXpOsWuPDGAKAigEg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [openharmony]
+
+  '@rolldown/binding-openharmony-arm64@1.1.3':
+    resolution: {integrity: sha512-hQ3/PYkDJICgevvyNcVrihVeqq7k1Pp3VZ9lY+dauAYUJKO+auqApvANhvR1An9BhmqYKvW2Mu1F9u4DXSMLxQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [openharmony]
@@ -2525,14 +2621,31 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [wasm32]
 
+  '@rolldown/binding-wasm32-wasi@1.1.3':
+    resolution: {integrity: sha512-Elcv/BtML9lXrV6JuKITc/grN2kYV9gjsQpW8Jfw4ioK0TOkjBjye0nnyqQNy9STNaI20lXNaQBRrD5gSgR0Yg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [wasm32]
+
   '@rolldown/binding-win32-arm64-msvc@1.0.3':
     resolution: {integrity: sha512-gEdFFEN70A/jxb2svrWsN3aDL7OUtmvlOy+6fa2jxG8K0wQ1ZbdeLGnidov6Yu5/733dI5ySfzFlQ/cb0bSz1g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
 
+  '@rolldown/binding-win32-arm64-msvc@1.1.3':
+    resolution: {integrity: sha512-2DrEfhluH9yhiaFApmsjsjwrSYbNcY1oFTzYSP1a535jDbV98zCFanA/96TBUd0iDFcxGmw9QRExwGCXz3U+/g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [win32]
+
   '@rolldown/binding-win32-x64-msvc@1.0.3':
     resolution: {integrity: sha512-eXB7CHuaQdqmJcc3koCNtNPmT/bj2gc999kUFgBxG8Ac0NdgXc4rkCHhqrgrhN3zddvvvrgzj1e90SuSfmyIXA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [win32]
+
+  '@rolldown/binding-win32-x64-msvc@1.1.3':
+    resolution: {integrity: sha512-OL4OMk7UPXOeVGGd3qo5zJyPIljf4AFgk5QAkPPS+OoLuOOozhuaQGC18MxVTnw/06q93gShAJzlwnSCY9YtqA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
@@ -2575,6 +2688,9 @@ packages:
 
   '@tybys/wasm-util@0.10.2':
     resolution: {integrity: sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg==}
+
+  '@tybys/wasm-util@0.10.3':
+    resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
 
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
@@ -2833,8 +2949,8 @@ packages:
     resolution: {integrity: sha512-HEHNfbars9v4pgpW6SO1KSPkfoS0xVOM/9UzkJltjlsHZmJasxg8aXkuZa7SMf8vKGIBhpUsPluQSqhJFCqebw==}
     engines: {node: '>=0.4.0'}
 
-  acorn@8.16.0:
-    resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
+  acorn@8.17.0:
+    resolution: {integrity: sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
 
@@ -2901,6 +3017,10 @@ packages:
 
   better-sqlite3@12.10.0:
     resolution: {integrity: sha512-CyzaZRQKyHkB2ZInfTTl2nvT33EbDpjkLEbE8/Zck3Ll6O0qqvuGdrJ45HgtH+HykRg88ITY3AdreBGN70aBSQ==}
+    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
+
+  better-sqlite3@12.11.1:
+    resolution: {integrity: sha512-dq9AtApgg5PGFtBzPFSBl3HZQjHok5gaQCM6zh2Yk0aSmDCs1CbnVI8/HgASQkNKsWFpseIO9beg5xxpYhbIfA==}
     engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
 
   bidi-js@1.0.3:
@@ -3012,6 +3132,10 @@ packages:
     resolution: {integrity: sha512-3+YKIUFsohD9MIoOFPFBldjAlnfCmCDcqe6aYGFqlDTRKg80p4wg35L+j83QQ63iOlKRccEkbn8IuM++HsgEjA==}
     engines: {node: '>=22'}
 
+  cli-truncate@6.1.0:
+    resolution: {integrity: sha512-ofWtXdvPO1WepoE9Gn4dPdZw+ADud1Yz9K+xm9FjK5vvrs/D60vrlKIQeSw1wJX4cphW2bnWi8GZSKvf9T6shw==}
+    engines: {node: '>=22'}
+
   code-excerpt@4.0.0:
     resolution: {integrity: sha512-xxodCmBen3iy2i0WtAK8FlFNrRzjUqjRsMfho58xT/wvZU1YTM3fCnRjcy1gJPMepaRlgm/0e6w8SpWHpn3/cA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -3022,10 +3146,6 @@ packages:
 
   color-name@1.1.4:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
-
-  commander@14.0.3:
-    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
-    engines: {node: '>=20'}
 
   commander@15.0.0:
     resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
@@ -3139,9 +3259,9 @@ packages:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
 
-  dependency-cruiser@17.4.3:
-    resolution: {integrity: sha512-L4GLuAvmXevWnPCIaFfOz6eD92c+yY+pDgVqgufrLDnW3xYA799CSZQlly2r2N13nhAlnZY6VzY7Rx5pHNvk2w==}
-    engines: {node: ^20.12||^22||>=24}
+  dependency-cruiser@18.0.0:
+    resolution: {integrity: sha512-51Q7wbHoP3/GZrENpINnvKE/xfBsj41NVKarqu5Fff/kmqB/bg0GpiD5bOBwj0+CVunxPGzO80uTdYoy/d4Rsw==}
+    engines: {node: ^22||^24||>=26}
     hasBin: true
 
   detect-indent@7.0.2:
@@ -3281,8 +3401,8 @@ packages:
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
 
-  enhanced-resolve@5.22.1:
-    resolution: {integrity: sha512-6QEuw3zoX1SJQc7b87aBXke/no+mG2bTBgw29gWMQonLmpEkWoCAVkl+M49e48AZlWzxiDzDZzYdp6kobcyLww==}
+  enhanced-resolve@5.24.1:
+    resolution: {integrity: sha512-7DdUaTjmNwMcH2gLr1qycesKII3BK4RLy/mdAb7x10Lq7bR4aNKHt1BR1ZALSv0rPM/hF5wYF0PhGop/rJm8vw==}
     engines: {node: '>=10.13.0'}
 
   entities@8.0.0:
@@ -3310,6 +3430,9 @@ packages:
 
   es-toolkit@1.47.0:
     resolution: {integrity: sha512-n1GuoD0WEQZMBk5tttoZSqwgyLx01oqa5XsBmCHwPyNe1S9jPBEmtR2pSgp2kJuWE3ciFZ6yRHmY4pM4C3OOkw==}
+
+  es-toolkit@1.49.0:
+    resolution: {integrity: sha512-G5iZ6Pc/FNRY/soKZHC+TxGDD83rHUDXxzaWhGCX44vAv/tMs56WMusnm/KMNK+luUPsgA9U28cGr4RDlSzL2g==}
 
   esbuild@0.25.12:
     resolution: {integrity: sha512-bbPBYYrtZbkt6Os6FiTLCTFxvq4tt3JKall1vRwshA3fdVztsLAatFaZobhkBC8/BrPetoa0oksYoKXoG4ryJg==}
@@ -3605,8 +3728,8 @@ packages:
     resolution: {integrity: sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==}
     engines: {node: '>= 0.4'}
 
-  hasown@2.0.3:
-    resolution: {integrity: sha512-ej4AhfhfL2Q2zpMmLo7U1Uv9+PyhIZpgQLGT1F9miIGmiCJIoCgSmczFdrc97mWT4kVY72KA+WnnhJ5pghSvSg==}
+  hasown@2.0.4:
+    resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
   hono@4.12.27:
@@ -3668,6 +3791,19 @@ packages:
 
   ink@7.0.5:
     resolution: {integrity: sha512-zWNjGHQPxSeiSAmDUOq+QPQ6CfmMhmNi85vrJIuy4prafKKUSoZlXEy4wbM7LuLuF1pDURk7qvF4fxrQlLxv3w==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@types/react': '>=19.2.0'
+      react: '>=19.2.0'
+      react-devtools-core: '>=6.1.2'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      react-devtools-core:
+        optional: true
+
+  ink@7.1.0:
+    resolution: {integrity: sha512-VWE6/yeLtFCJBNLflyI2OSylyXK1Rc24LuXup8Qt+icwkmmycFNdbn8IkSp6Frc0h1iA0NOvvi1ajW44U/w3Qg==}
     engines: {node: '>=22'}
     peerDependencies:
       '@types/react': '>=19.2.0'
@@ -3791,6 +3927,10 @@ packages:
 
   js-yaml@4.2.0:
     resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
+    hasBin: true
+
+  js-yaml@4.3.0:
+    resolution: {integrity: sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==}
     hasBin: true
 
   jsdom@29.1.1:
@@ -4003,6 +4143,11 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  nanoid@3.3.15:
+    resolution: {integrity: sha512-y7Wygv/7mEOvxTuEQDB8StXdMRBWf1kR/tlhAzBRUFkB2jfcLOAxO/SHmOO2zgz1pVgK29/kyupn059/bCHdjA==}
+    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
   napi-build-utils@2.0.0:
     resolution: {integrity: sha512-GEbrYkbfF7MoNaoh2iGG84Mnf/WZfB0GdGEsM8wz7Expx/LlWf5U8t9nvJKXSp3qr5IsEbK04cBGhol/KwOsWA==}
 
@@ -4126,6 +4271,10 @@ packages:
     resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postcss@8.5.16:
+    resolution: {integrity: sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg==}
+    engines: {node: ^10 || ^12 || >=14}
+
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
     engines: {node: '>=20'}
@@ -4246,6 +4395,11 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
+  rolldown@1.1.3:
+    resolution: {integrity: sha512-1F1eEtUBtFvcGm1HQ9TiUIUHPQG7mSAODrhIzjxoUEFuo8OcbrGLiVLkevNgj84TE4lnHvnumwFjhJO5Eu135g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
     engines: {node: '>= 18'}
@@ -4286,6 +4440,11 @@ packages:
 
   semver@7.8.4:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -4538,6 +4697,10 @@ packages:
     resolution: {integrity: sha512-8ZiHFm91orbSAe2PSAiSVBVko18pbhbiB3U9GglSzF/zCGkR+rxpHx6sEMCUm4kxY4LjDIUGgCfUMtwfZfjfUA==}
     engines: {node: '>=20'}
 
+  type-fest@5.7.0:
+    resolution: {integrity: sha512-1URUxUqfHFM1c+zfSPsa3gnkO7Aq21qyH75SIduNYz4SzY964rn1X2vCMQaHSHhktiw+0kPa2iyb6PUpXqB6Vg==}
+    engines: {node: '>=20'}
+
   type-is@2.1.0:
     resolution: {integrity: sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA==}
     engines: {node: '>= 18'}
@@ -4639,6 +4802,49 @@ packages:
       yaml:
         optional: true
 
+  vite@8.1.0:
+    resolution: {integrity: sha512-BuJcQK/56NQTWDGn4ABea3q4SSBdNPWwNZKTkkUpcMPnLoquSYH8llRtSUIgoL1KSCpHt5eghLShn50mH36y7Q==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+    peerDependencies:
+      '@types/node': ^20.19.0 || >=22.12.0
+      '@vitejs/devtools': ^0.3.0
+      esbuild: ^0.27.0 || ^0.28.0
+      jiti: '>=1.21.0'
+      less: ^4.0.0
+      sass: ^1.70.0
+      sass-embedded: ^1.70.0
+      stylus: '>=0.54.8'
+      sugarss: ^5.0.0
+      terser: ^5.16.0
+      tsx: ^4.8.1
+      yaml: ^2.4.2
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+      '@vitejs/devtools':
+        optional: true
+      esbuild:
+        optional: true
+      jiti:
+        optional: true
+      less:
+        optional: true
+      sass:
+        optional: true
+      sass-embedded:
+        optional: true
+      stylus:
+        optional: true
+      sugarss:
+        optional: true
+      terser:
+        optional: true
+      tsx:
+        optional: true
+      yaml:
+        optional: true
+
   vitest@4.1.8:
     resolution: {integrity: sha512-flY6ScbCIt9HThs+C5HS7jvGOB560DJtk/Z15IQROTA6zEy49Nh8T/dofWTQL+n3vswqn87sbJNiuqw1SDp5Ig==}
     engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
@@ -4688,9 +4894,9 @@ packages:
     resolution: {integrity: sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A==}
     engines: {node: 20 || >=22}
 
-  watskeburt@5.0.3:
-    resolution: {integrity: sha512-g9CXukMjazlJJVQ3OHzXsnG25KFYgSgKMIyoJrD8ggr0DbS9UNF7OzIqWmmKKBMedkxj3T01uqEaGnn+y7QhMA==}
-    engines: {node: ^20.12||^22.13||>=24.0}
+  watskeburt@6.0.0:
+    resolution: {integrity: sha512-jfiuDABaxSkC71T6oZ3vCS99roYkSHm/+As+G0Dz8taAHQb+SJBvLEm5RlsgG71XdfAj3rv7eudUBTgwcQUPlQ==}
+    engines: {node: ^22.13||^24||>=26}
     hasBin: true
 
   web-tree-sitter@0.26.9:
@@ -4877,12 +5083,28 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@emnapi/core@1.11.1':
+    dependencies:
+      '@emnapi/wasi-threads': 1.2.2
+      tslib: 2.8.1
+    optional: true
+
   '@emnapi/runtime@1.10.0':
     dependencies:
       tslib: 2.8.1
     optional: true
 
+  '@emnapi/runtime@1.11.1':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
+
   '@emnapi/wasi-threads@1.2.1':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
+
+  '@emnapi/wasi-threads@1.2.2':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -5232,10 +5454,17 @@ snapshots:
       '@tybys/wasm-util': 0.10.2
     optional: true
 
-  '@opensip-cli/checks-cpp@file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+    dependencies:
+      '@emnapi/core': 1.11.1
+      '@emnapi/runtime': 1.11.1
+      '@tybys/wasm-util': 0.10.3
+    optional: true
+
+  '@opensip-cli/checks-cpp@file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -5270,9 +5499,9 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/checks-go@file:packages/fitness/checks-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/checks-go@file:packages/fitness/checks-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -5307,9 +5536,9 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/checks-java@file:packages/fitness/checks-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/checks-java@file:packages/fitness/checks-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -5344,9 +5573,9 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/checks-python@file:packages/fitness/checks-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/checks-python@file:packages/fitness/checks-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-python': file:packages/languages/lang-python
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
@@ -5382,9 +5611,9 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/checks-rust@file:packages/fitness/checks-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/checks-rust@file:packages/fitness/checks-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -5419,10 +5648,10 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/checks-typescript@file:packages/fitness/checks-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/checks-typescript@file:packages/fitness/checks-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-typescript': file:packages/languages/lang-typescript
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -5459,10 +5688,10 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/checks-universal@file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/checks-universal@file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -5502,7 +5731,7 @@ snapshots:
       '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
-      ink: 7.0.5(@types/react@19.2.17)(react@19.2.7)
+      ink: 7.1.0(@types/react@19.2.17)(react@19.2.7)
       react: 19.2.7
     transitivePeerDependencies:
       - '@types/react'
@@ -5513,7 +5742,7 @@ snapshots:
 
   '@opensip-cli/cli-ui@file:packages/cli-ui(@types/react@19.2.17)':
     dependencies:
-      ink: 7.0.5(@types/react@19.2.17)(react@19.2.7)
+      ink: 7.1.0(@types/react@19.2.17)(react@19.2.7)
       react: 19.2.7
     transitivePeerDependencies:
       - '@types/react'
@@ -5538,15 +5767,15 @@ snapshots:
   '@opensip-cli/core@file:packages/core':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      js-yaml: 4.2.0
+      js-yaml: 4.3.0
       ulid: 3.0.2
 
   '@opensip-cli/datastore@file:packages/datastore(@types/better-sqlite3@7.6.13)':
     dependencies:
       '@opensip-cli/core': file:packages/core
       '@opentelemetry/api': 1.9.1
-      better-sqlite3: 12.10.0
-      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+      better-sqlite3: 12.11.1
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -5576,7 +5805,7 @@ snapshots:
       - sql.js
       - sqlite3
 
-  '@opensip-cli/fitness@file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/fitness@file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/cli-live': file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
@@ -5584,11 +5813,11 @@ snapshots:
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
-      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)
+      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@opensip-cli/targeting': file:packages/targeting
       '@opentelemetry/api': 1.9.1
       commander: 15.0.0
-      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       glob: 13.0.6
       minimatch: 10.2.5
       react: 19.2.7
@@ -5628,10 +5857,10 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph-adapter-common@file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph-adapter-common@file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/tree-sitter': file:packages/tree-sitter
       glob: 13.0.6
     transitivePeerDependencies:
@@ -5668,11 +5897,11 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph-go@file:packages/graph/graph-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph-go@file:packages/graph/graph-go(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
-      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-go': file:packages/languages/lang-go
       '@opensip-cli/tree-sitter': file:packages/tree-sitter
     transitivePeerDependencies:
@@ -5709,11 +5938,11 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph-java@file:packages/graph/graph-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph-java@file:packages/graph/graph-java(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
-      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-java': file:packages/languages/lang-java
       '@opensip-cli/tree-sitter': file:packages/tree-sitter
     transitivePeerDependencies:
@@ -5750,11 +5979,11 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph-python@file:packages/graph/graph-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph-python@file:packages/graph/graph-python(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
-      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-python': file:packages/languages/lang-python
       '@opensip-cli/tree-sitter': file:packages/tree-sitter
     transitivePeerDependencies:
@@ -5791,11 +6020,11 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph-rust@file:packages/graph/graph-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph-rust@file:packages/graph/graph-rust(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
-      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
+      '@opensip-cli/graph-adapter-common': file:packages/graph/graph-adapter-common(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-rust': file:packages/languages/lang-rust
       '@opensip-cli/tree-sitter': file:packages/tree-sitter
     transitivePeerDependencies:
@@ -5832,10 +6061,10 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph-typescript@file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph-typescript@file:packages/graph/graph-typescript(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/lang-typescript': file:packages/languages/lang-typescript
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -5872,7 +6101,7 @@ snapshots:
       - sqlite3
       - utf-8-validate
 
-  '@opensip-cli/graph@file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)':
+  '@opensip-cli/graph@file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
       '@opensip-cli/cli-live': file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
@@ -5881,10 +6110,10 @@ snapshots:
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
-      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)
+      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)
       '@opentelemetry/api': 1.9.1
       commander: 15.0.0
-      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       glob: 13.0.6
       react: 19.2.7
       zod: 4.4.3
@@ -5947,14 +6176,14 @@ snapshots:
       '@opensip-cli/core': file:packages/core
       typescript: 6.0.3
 
-  '@opensip-cli/mcp@file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)':
+  '@opensip-cli/mcp@file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
-      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
-      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)
+      '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
+      '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)
       typescript: 6.0.3
       zod: 4.4.3
     transitivePeerDependencies:
@@ -5994,13 +6223,13 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@opensip-cli/session-store@file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)(commander@15.0.0)':
+  '@opensip-cli/session-store@file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)':
     dependencies:
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opentelemetry/api': 1.9.1
-      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.10.0)
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
       - '@cloudflare/workers-types'
@@ -6039,10 +6268,10 @@ snapshots:
       glob: 13.0.6
       minimatch: 10.2.5
 
-  '@opensip-cli/test-support@file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)(commander@15.0.0)':
+  '@opensip-cli/test-support@file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)':
     dependencies:
       '@opensip-cli/core': file:packages/core
-      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.10.0)
+      '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/tool-test-kit': file:packages/tool-test-kit(commander@15.0.0)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
@@ -6242,6 +6471,8 @@ snapshots:
 
   '@oxc-project/types@0.133.0': {}
 
+  '@oxc-project/types@0.137.0': {}
+
   '@oxc-resolver/binding-android-arm-eabi@11.20.0':
     optional: true
 
@@ -6320,37 +6551,73 @@ snapshots:
   '@rolldown/binding-android-arm64@1.0.3':
     optional: true
 
+  '@rolldown/binding-android-arm64@1.1.3':
+    optional: true
+
   '@rolldown/binding-darwin-arm64@1.0.3':
+    optional: true
+
+  '@rolldown/binding-darwin-arm64@1.1.3':
     optional: true
 
   '@rolldown/binding-darwin-x64@1.0.3':
     optional: true
 
+  '@rolldown/binding-darwin-x64@1.1.3':
+    optional: true
+
   '@rolldown/binding-freebsd-x64@1.0.3':
+    optional: true
+
+  '@rolldown/binding-freebsd-x64@1.1.3':
     optional: true
 
   '@rolldown/binding-linux-arm-gnueabihf@1.0.3':
     optional: true
 
+  '@rolldown/binding-linux-arm-gnueabihf@1.1.3':
+    optional: true
+
   '@rolldown/binding-linux-arm64-gnu@1.0.3':
+    optional: true
+
+  '@rolldown/binding-linux-arm64-gnu@1.1.3':
     optional: true
 
   '@rolldown/binding-linux-arm64-musl@1.0.3':
     optional: true
 
+  '@rolldown/binding-linux-arm64-musl@1.1.3':
+    optional: true
+
   '@rolldown/binding-linux-ppc64-gnu@1.0.3':
+    optional: true
+
+  '@rolldown/binding-linux-ppc64-gnu@1.1.3':
     optional: true
 
   '@rolldown/binding-linux-s390x-gnu@1.0.3':
     optional: true
 
+  '@rolldown/binding-linux-s390x-gnu@1.1.3':
+    optional: true
+
   '@rolldown/binding-linux-x64-gnu@1.0.3':
+    optional: true
+
+  '@rolldown/binding-linux-x64-gnu@1.1.3':
     optional: true
 
   '@rolldown/binding-linux-x64-musl@1.0.3':
     optional: true
 
+  '@rolldown/binding-linux-x64-musl@1.1.3':
+    optional: true
+
   '@rolldown/binding-openharmony-arm64@1.0.3':
+    optional: true
+
+  '@rolldown/binding-openharmony-arm64@1.1.3':
     optional: true
 
   '@rolldown/binding-wasm32-wasi@1.0.3':
@@ -6360,10 +6627,23 @@ snapshots:
       '@napi-rs/wasm-runtime': 1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optional: true
 
+  '@rolldown/binding-wasm32-wasi@1.1.3':
+    dependencies:
+      '@emnapi/core': 1.11.1
+      '@emnapi/runtime': 1.11.1
+      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+    optional: true
+
   '@rolldown/binding-win32-arm64-msvc@1.0.3':
     optional: true
 
+  '@rolldown/binding-win32-arm64-msvc@1.1.3':
+    optional: true
+
   '@rolldown/binding-win32-x64-msvc@1.0.3':
+    optional: true
+
+  '@rolldown/binding-win32-x64-msvc@1.1.3':
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
@@ -6389,6 +6669,11 @@ snapshots:
     optional: true
 
   '@tybys/wasm-util@0.10.2':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
+
+  '@tybys/wasm-util@0.10.3':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -6497,7 +6782,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.61.0
       debug: 4.4.3
       minimatch: 10.2.5
-      semver: 7.8.4
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -6610,6 +6895,14 @@ snapshots:
     optionalDependencies:
       vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
 
+  '@vitest/mocker@4.1.8(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))':
+    dependencies:
+      '@vitest/spy': 4.1.8
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+
   '@vitest/pretty-format@4.1.8':
     dependencies:
       tinyrainbow: 3.1.0
@@ -6641,19 +6934,19 @@ snapshots:
 
   acorn-jsx-walk@2.0.0: {}
 
-  acorn-jsx@5.3.2(acorn@8.16.0):
+  acorn-jsx@5.3.2(acorn@8.17.0):
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.17.0
 
   acorn-loose@8.5.2:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.17.0
 
   acorn-walk@8.3.5:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.17.0
 
-  acorn@8.16.0: {}
+  acorn@8.17.0: {}
 
   ajv-formats@3.0.1:
     dependencies:
@@ -6715,6 +7008,11 @@ snapshots:
   baseline-browser-mapping@2.10.35: {}
 
   better-sqlite3@12.10.0:
+    dependencies:
+      bindings: 1.5.0
+      prebuild-install: 7.1.3
+
+  better-sqlite3@12.11.1:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.3
@@ -6842,6 +7140,11 @@ snapshots:
       slice-ansi: 9.0.0
       string-width: 8.2.1
 
+  cli-truncate@6.1.0:
+    dependencies:
+      slice-ansi: 9.0.0
+      string-width: 8.2.1
+
   code-excerpt@4.0.0:
     dependencies:
       convert-to-spaces: 2.0.1
@@ -6851,8 +7154,6 @@ snapshots:
       color-name: 1.1.4
 
   color-name@1.1.4: {}
-
-  commander@14.0.3: {}
 
   commander@15.0.0: {}
 
@@ -6944,15 +7245,15 @@ snapshots:
 
   depd@2.0.0: {}
 
-  dependency-cruiser@17.4.3:
+  dependency-cruiser@18.0.0:
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.17.0
+      acorn-jsx: 5.3.2(acorn@8.17.0)
       acorn-jsx-walk: 2.0.0
       acorn-loose: 8.5.2
       acorn-walk: 8.3.5
-      commander: 14.0.3
-      enhanced-resolve: 5.22.1
+      commander: 15.0.0
+      enhanced-resolve: 5.24.1
       ignore: 7.0.5
       interpret: 3.1.1
       is-installed-globally: 1.0.0
@@ -6961,9 +7262,9 @@ snapshots:
       prompts: 2.4.2
       rechoir: 0.8.0
       safe-regex: 2.1.1
-      semver: 7.8.1
+      semver: 7.8.5
       tsconfig-paths-webpack-plugin: 4.2.0
-      watskeburt: 5.0.3
+      watskeburt: 6.0.0
 
   detect-indent@7.0.2: {}
 
@@ -6985,6 +7286,12 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@types/better-sqlite3': 7.6.13
       better-sqlite3: 12.10.0
+
+  drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1):
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+      '@types/better-sqlite3': 7.6.13
+      better-sqlite3: 12.11.1
 
   dunder-proto@1.0.1:
     dependencies:
@@ -7010,7 +7317,7 @@ snapshots:
     dependencies:
       once: 1.4.0
 
-  enhanced-resolve@5.22.1:
+  enhanced-resolve@5.24.1:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
@@ -7030,6 +7337,8 @@ snapshots:
       es-errors: 1.3.0
 
   es-toolkit@1.47.0: {}
+
+  es-toolkit@1.49.0: {}
 
   esbuild@0.25.12:
     optionalDependencies:
@@ -7257,8 +7566,8 @@ snapshots:
 
   espree@11.2.0:
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.17.0
+      acorn-jsx: 5.3.2(acorn@8.17.0)
       eslint-visitor-keys: 5.0.1
 
   esquery@1.7.0:
@@ -7405,7 +7714,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.3
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-proto@1.0.1:
@@ -7445,7 +7754,7 @@ snapshots:
 
   has-symbols@1.1.0: {}
 
-  hasown@2.0.3:
+  hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
 
@@ -7525,6 +7834,40 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  ink@7.1.0(@types/react@19.2.17)(react@19.2.7):
+    dependencies:
+      '@alcalzone/ansi-tokenize': 0.3.0
+      ansi-escapes: 7.3.0
+      ansi-styles: 6.2.3
+      auto-bind: 5.0.1
+      chalk: 5.6.2
+      cli-boxes: 4.0.1
+      cli-cursor: 4.0.0
+      cli-truncate: 6.1.0
+      code-excerpt: 4.0.0
+      es-toolkit: 1.49.0
+      indent-string: 5.0.0
+      is-in-ci: 2.0.0
+      patch-console: 2.0.0
+      react: 19.2.7
+      react-reconciler: 0.33.0(react@19.2.7)
+      scheduler: 0.27.0
+      signal-exit: 3.0.7
+      slice-ansi: 9.0.0
+      stack-utils: 2.0.6
+      string-width: 8.2.1
+      terminal-size: 4.0.1
+      type-fest: 5.7.0
+      widest-line: 6.0.0
+      wrap-ansi: 10.0.0
+      ws: 8.21.0
+      yoga-layout: 3.2.1
+    optionalDependencies:
+      '@types/react': 19.2.17
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   interpret@3.1.1: {}
 
   ip-address@10.2.0: {}
@@ -7537,11 +7880,11 @@ snapshots:
 
   is-bun-module@2.0.0:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.5
 
   is-core-module@2.16.2:
     dependencies:
-      hasown: 2.0.3
+      hasown: 2.0.4
 
   is-docker@3.0.0: {}
 
@@ -7606,6 +7949,10 @@ snapshots:
   js-tokens@10.0.0: {}
 
   js-yaml@4.2.0:
+    dependencies:
+      argparse: 2.0.1
+
+  js-yaml@4.3.0:
     dependencies:
       argparse: 2.0.1
 
@@ -7753,7 +8100,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
 
   math-intrinsics@1.1.0: {}
 
@@ -7787,6 +8134,8 @@ snapshots:
 
   nanoid@3.3.12: {}
 
+  nanoid@3.3.15: {}
+
   napi-build-utils@2.0.0: {}
 
   napi-postinstall@0.3.4: {}
@@ -7797,7 +8146,7 @@ snapshots:
 
   node-abi@3.92.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
 
   node-releases@2.0.47: {}
 
@@ -7897,7 +8246,7 @@ snapshots:
       ky: 1.14.3
       registry-auth-token: 5.1.1
       registry-url: 6.0.1
-      semver: 7.7.4
+      semver: 7.8.5
 
   parse5@8.0.1:
     dependencies:
@@ -7933,6 +8282,12 @@ snapshots:
   postcss@8.5.15:
     dependencies:
       nanoid: 3.3.12
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
+  postcss@8.5.16:
+    dependencies:
+      nanoid: 3.3.15
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -8078,6 +8433,27 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.0.3
       '@rolldown/binding-win32-x64-msvc': 1.0.3
 
+  rolldown@1.1.3:
+    dependencies:
+      '@oxc-project/types': 0.137.0
+      '@rolldown/pluginutils': 1.0.1
+    optionalDependencies:
+      '@rolldown/binding-android-arm64': 1.1.3
+      '@rolldown/binding-darwin-arm64': 1.1.3
+      '@rolldown/binding-darwin-x64': 1.1.3
+      '@rolldown/binding-freebsd-x64': 1.1.3
+      '@rolldown/binding-linux-arm-gnueabihf': 1.1.3
+      '@rolldown/binding-linux-arm64-gnu': 1.1.3
+      '@rolldown/binding-linux-arm64-musl': 1.1.3
+      '@rolldown/binding-linux-ppc64-gnu': 1.1.3
+      '@rolldown/binding-linux-s390x-gnu': 1.1.3
+      '@rolldown/binding-linux-x64-gnu': 1.1.3
+      '@rolldown/binding-linux-x64-musl': 1.1.3
+      '@rolldown/binding-openharmony-arm64': 1.1.3
+      '@rolldown/binding-wasm32-wasi': 1.1.3
+      '@rolldown/binding-win32-arm64-msvc': 1.1.3
+      '@rolldown/binding-win32-x64-msvc': 1.1.3
+
   router@2.2.0:
     dependencies:
       debug: 4.4.3
@@ -8115,6 +8491,8 @@ snapshots:
   semver@7.8.1: {}
 
   semver@7.8.4: {}
+
+  semver@7.8.5: {}
 
   send@1.2.1:
     dependencies:
@@ -8336,7 +8714,7 @@ snapshots:
   tsconfig-paths-webpack-plugin@4.2.0:
     dependencies:
       chalk: 4.1.2
-      enhanced-resolve: 5.22.1
+      enhanced-resolve: 5.24.1
       tapable: 2.3.3
       tsconfig-paths: 4.2.0
 
@@ -8377,6 +8755,10 @@ snapshots:
   type-fest@4.41.0: {}
 
   type-fest@5.6.0:
+    dependencies:
+      tagged-tag: 1.0.0
+
+  type-fest@5.7.0:
     dependencies:
       tagged-tag: 1.0.0
 
@@ -8475,6 +8857,21 @@ snapshots:
       tsx: 4.22.3
       yaml: 2.9.0
 
+  vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0):
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.4
+      postcss: 8.5.16
+      rolldown: 1.1.3
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      '@types/node': 24.13.2
+      esbuild: 0.28.1
+      fsevents: 2.3.3
+      jiti: 2.7.0
+      tsx: 4.22.3
+      yaml: 2.9.0
+
   vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.8
@@ -8505,13 +8902,43 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
+  vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1)(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)):
+    dependencies:
+      '@vitest/expect': 4.1.8
+      '@vitest/mocker': 4.1.8(vite@8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.8
+      '@vitest/runner': 4.1.8
+      '@vitest/snapshot': 4.1.8
+      '@vitest/spy': 4.1.8
+      '@vitest/utils': 4.1.8
+      es-module-lexer: 2.1.0
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.4
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.2.2
+      tinyglobby: 0.2.17
+      tinyrainbow: 3.1.0
+      vite: 8.1.0(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+      '@types/node': 24.13.2
+      '@vitest/coverage-v8': 4.1.8(vitest@4.1.8)
+      jsdom: 29.1.1
+    transitivePeerDependencies:
+      - msw
+
   w3c-xmlserializer@5.0.0:
     dependencies:
       xml-name-validator: 5.0.0
 
   walk-up-path@4.0.0: {}
 
-  watskeburt@5.0.3: {}
+  watskeburt@6.0.0: {}
 
   web-tree-sitter@0.26.9: {}
 
