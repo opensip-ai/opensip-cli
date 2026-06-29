@@ -112,6 +112,8 @@ export {
   resolveToolCommands,
   resolveToolCommandNames,
 } from './derive-commands-from-specs.js';
+export { renderGateCompareLines } from './gate-compare-render.js';
+export type { GateCompareRenderOptions } from './gate-compare-render.js';
 export { defineTool } from './define-tool.js';
 export type { DefineToolInput } from './define-tool.js';
 export { createTool } from './create-tool.js';

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.14
+release: v0.1.15
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -27,9 +27,9 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-cli/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `logger`, `ToolError`, `ValidationError` |
+| `@opensip-cli/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `renderGateCompareLines`, `projectJsonScalarMetadata`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — datastore, contracts, authoring helpers, tree-sitter, clone-detection, and cli-ui
+## Layer 2 — datastore, contracts, authoring helpers, tree-sitter, clone-detection, cli-ui, and cli-live
 
 `@opensip-cli/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
@@ -43,6 +43,8 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 
 `@opensip-cli/cli-ui` is the shared Ink/React presentational substrate (`Banner`, `Spinner`, `RunHeader`, `theme`). It is intentionally below tools so a tool with a live view can render with the common UI kit without depending on the CLI composition root.
 
+`@opensip-cli/cli-live` is the shared live-run shell: the state machine, `produce()` seam, host glue, and error scrubbing that let tools render through `cli-ui` without importing the CLI dispatcher.
+
 | Package | Path | Role | Key exports |
 |---|---|---|---|
 | `@opensip-cli/datastore` | `packages/datastore/` | SQLite + Drizzle persistence kernel — `DataStore` interface, factory, in-memory + on-disk backends, workspace migration store under `migrations/`, `user_version` schema-stamp guard | `DataStore`, `DataStoreFactory`, `DataStoreOpenOptions`, `DataStoreMigrationError`, `DataStoreVersionError` |
@@ -51,10 +53,11 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 | `@opensip-cli/tree-sitter` | `packages/tree-sitter/` | Grammar-agnostic `web-tree-sitter` substrate (ADR-0010) — WASM parser lifecycle + node accessors, shared by the fitness `lang-*` and graph tree-sitter adapters. Depends on `web-tree-sitter` (and `core`) only | `createParser`, `parseToTree`, `walkNodes`, `findEnclosing`, `nameOf`, `childrenOf`, `namedChildrenOf`, `nodeText` |
 | `@opensip-cli/clone-detection` | `packages/clone-detection/` | Shared function-body clone-detection substrate (ADR-0064) — body digest, MinHash/LSH signatures, tool-neutral clone candidate shape, exact and near-duplicate curation policy. Leaf package; no workspace imports. | `digestCanonicalBody`, `normalizeWhitespace`, `bodySignature`, `findDuplicateBodies`, `findNearDuplicates`, `isTestFilePath`, `CloneCandidate` |
 | `@opensip-cli/cli-ui` | `packages/cli-ui/` | Shared Ink/React presentational primitives — Banner, Spinner, RunHeader, theme. Extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher. | `Banner`, `Spinner`, `RunHeader`, `theme` |
+| `@opensip-cli/cli-live` | `packages/cli-live/` | Shared live-run runtime — host glue, `produce()` lifecycle, and error scrubbing over the `cli-ui` LiveRun shell. Extracted so tool packages can render live progress without depending on `opensip-cli`. | `runToolLiveView`, `HostGlue`, `LiveRunSpec`, `LiveRunOutcome` |
 
-## Layer 3 — config, session/output/dashboard libraries, and fitness language adapters
+## Layer 3 — config, session/output/dashboard libraries, external-tool substrate, and fitness language adapters
 
-Packages above the substrate, below tool engines. These are shared libraries consumed by the CLI and tools but not tools themselves; fitness language adapters implement `LanguageAdapter`.
+Packages above the substrate, below tool engines. These are shared libraries consumed by the CLI and tools but not tools themselves; the external-tool substrate turns local scanner descriptors into Tool implementations, and fitness language adapters implement `LanguageAdapter`.
 
 ### Shared libraries
 
@@ -65,6 +68,7 @@ Packages above the substrate, below tool engines. These are shared libraries con
 | `@opensip-cli/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_tool_payload` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-cli/output` | `packages/output/` | Machine output layer (renamed from `@opensip-cli/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
 | `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders fit/sim/graph/yagni sessions plus tool catalog data. Consumed by the CLI-owned `report` command and each tool's auto-open hook. | `generateDashboardHtml` |
+| `@opensip-cli/external-tool-adapter` | `packages/external-tool-adapter/` | External scanner substrate — wraps a user-installed CLI scanner as an OpenSIP Tool: binary resolution, run loop, SARIF/JSON ingest, severity mapping, doctor/version commands, provenance, and artifact handling. | `defineExternalToolAdapter`, `ingestSarif`, `resolveBinary`, `runAcceptanceCase` |
 
 ### Language adapters (fitness — six languages)
 
@@ -79,9 +83,9 @@ Implement `LanguageAdapter`. Used by fitness checks and any future tool that nee
 | `@opensip-cli/lang-go` | `packages/languages/lang-go/` | Go adapter — strip routines | `goAdapter` |
 | `@opensip-cli/lang-cpp` | `packages/languages/lang-cpp/` | C/C++ adapter — strip routines | `cppAdapter` |
 
-## Layer 4 — tools
+## Layer 4 — tools and tool adapters
 
-Tool engines implement the `Tool` contract. They are peer domains: none imports another tool or the CLI.
+Tool engines and opt-in tool adapters implement the `Tool` contract. They are peer domains: none imports another tool or the CLI.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
@@ -89,6 +93,10 @@ Tool engines implement the `Tool` contract. They are peer domains: none imports 
 | `@opensip-cli/simulation` | `packages/simulation/engine/` | Simulation engine, two scenario kinds (load, chaos). Public barrel is scenario/recipe authoring API plus `simulationTool`; registry/lifecycle/recipe execution internals live on `@opensip-cli/simulation/internal` for tests only. | `defineLoadScenario`, `defineChaosScenario`, `defineSimulationRecipe`, `simulationTool`, `SCENARIO_KINDS`, `ASSERTIONS`, `httpTarget`, `fault` |
 | `@opensip-cli/graph` | `packages/graph/engine/` | Static call-graph + dead-end analysis kernel. Seven-stage staged pipeline (discover → inventory → edges → indexes → features → rules → render). Language-agnostic — adapters live in their own publishable packages (see "Graph language adapters" below); the CLI discovers them at startup and discovers them per command through the generic capability loader (`loadCapabilityDomain`). Returns a `SignalEnvelope` (assembled in `cli/build-envelope.ts`); the shared `formatSignalSarif` formatter and all egress are owned by the composition root (ADR-0011). Depends on `@opensip-cli/contracts`, not fitness or `@opensip-cli/output` | `graphTool`, `GraphLanguageAdapter` (type), `pickAdapter`, `defineGraphRecipe`, `defineRule`, `Catalog`/`Rule` (types) |
 | `@opensip-cli/yagni` | `packages/yagni/engine/` | Advisory YAGNI reduction audit. Detector framework over TypeScript sources: config-surface reduction plus exact duplicate-body candidates. Duplicate detection builds yagni's own TypeScript inventory and consumes `@opensip-cli/clone-detection` (ADR-0064); no runtime `@opensip-cli/graph` dependency. Returns a `SignalEnvelope` with `metadata.yagni` on each finding. Advisory defaults (`failOnErrors: 0`). | `yagniTool`, `YAGNI_STABLE_ID`, `YAGNI_CONTRACT_VERSION` |
+| `@opensip-cli/mcp` | `packages/mcp/` | MCP stdio tool — exposes the OpenSIP graph catalog and stored session results to coding agents over Model Context Protocol. Loaded by the host like any other bundled Tool package. | `mcpTool`, `tool`, `MCP_IDENTITY`, `MCP_STABLE_ID` |
+| `@opensip-cli/tool-gitleaks` | `packages/tool-gitleaks/` | Opt-in external scanner adapter for Gitleaks — committed-secret scanning via a user-installed `gitleaks` binary, normalized into OpenSIP `Signal`s with doctor/version commands. | `tool`, `parseGitleaksJson`, `GITLEAKS_IDENTITY`, `GITLEAKS_STABLE_ID` |
+| `@opensip-cli/tool-osv-scanner` | `packages/tool-osv-scanner/` | Opt-in external scanner adapter for OSV-Scanner — dependency vulnerability scanning via a user-installed `osv-scanner` binary, normalized into OpenSIP `Signal`s with doctor/version commands. | `tool`, `parseOsvJson`, `OSV_SCANNER_IDENTITY`, `OSV_SCANNER_STABLE_ID` |
+| `@opensip-cli/tool-trivy` | `packages/tool-trivy/` | Opt-in external scanner adapter for Trivy — filesystem vulnerability and misconfiguration scanning via a user-installed `trivy` binary, normalized through the shared SARIF ingest path. | `tool`, `TRIVY_IDENTITY`, `TRIVY_STABLE_ID` |
 
 ## Layer 5 — fitness check packs and graph adapter packs
 
@@ -144,7 +152,7 @@ Imports every layer below. The published binary.
 ## Adding a new package
 
 1. **Decide the layer.** Apply the rules in [`../10-concepts/03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
-2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/.config/dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
+2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/.config/dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
 3. **Add a row** in the right table above with the canonical npm name, path, one-line role (concrete, not "fitness concerns"), and 1–3 key exports a reader would grep for.
 4. **Update the layer narrative** in `10-concepts/03-modular-monolith.md` if the new package changes what the layer *means*. Pure additions to an existing pattern don't need a narrative edit — just the row here.
 
@@ -152,24 +160,24 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v0.1.14 against `scripts/release-package-order.mjs` (the publishable
+Last verified at v0.1.15 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **37 publishable packages** total (all at `0.1.14`), plus one workspace-private
+- **42 publishable packages** total (all at `0.1.15`), plus one workspace-private
   `@opensip-cli/test-support` package and the private root `@opensip-cli/root`:
   - Layer 1 (kernel): 1 — `core`
-  - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + cli-ui): 6 —
-    `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `cli-ui`
-  - Layer 3 (config + targeting + session-store + output + dashboard + fitness language adapters): 11 —
+  - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + cli-ui + cli-live): 7 —
+    `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `cli-ui`, `cli-live`
+  - Layer 3 (config + targeting + session-store + output + dashboard + external-tool substrate + fitness language adapters): 12 —
     `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`,
-    `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`
-  - Layer 4 Tools: 4 — `fitness`, `simulation`, `graph`, `yagni`
+    `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`, `external-tool-adapter`
+  - Layer 4 Tools/tool adapters: 8 — `fitness`, `simulation`, `graph`, `yagni`,
+    `mcp`, `tool-gitleaks`, `tool-osv-scanner`, `tool-trivy`
   - Layer 5 (check packs + graph adapter packs/scaffolding): 13 —
     `checks-universal`, `checks-typescript`, `checks-python`,
     `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`,
     `graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`
   - Layer 6 (composition root): 1 — `cli`
-  - Publishable but cataloged separately: `@opensip-cli/cli-live` (shared live-run shell, ADR-0058)
 - The graph language adapters are publishable `@opensip-cli/graph-*` packages,
   backed by the shared `@opensip-cli/graph-adapter-common` scaffolding package
   and the `@opensip-cli/tree-sitter` substrate. The config composer

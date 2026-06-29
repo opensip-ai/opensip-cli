@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/external-tool-adapter",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "license": "Apache-2.0",
   "description": "Substrate for External Tool Adapters — wrap a CLI scanner (gitleaks/osv-scanner/trivy/…) as an opensip-cli Tool: binary resolution, run loop, SARIF/JSON ingest, severity mapping, exit modeling, doctor/version, provenance",
   "keywords": [

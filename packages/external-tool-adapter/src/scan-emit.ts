@@ -99,15 +99,18 @@ function summaryLines(tool: string, signalCount: number, score: number, passed: 
   ];
 }
 
+interface LogCompletedInput {
+  readonly cli: ToolCliContext;
+  readonly tool: string;
+  readonly signalCount: number;
+  readonly passed: boolean;
+  readonly gate?: 'save' | 'compare';
+  readonly degraded?: boolean;
+}
+
 /** One `adapter.scan.completed` log line, with the optional gate-mode annotations. */
-function logCompleted(
-  cli: ToolCliContext,
-  tool: string,
-  signalCount: number,
-  passed: boolean,
-  gate?: 'save' | 'compare',
-  degraded?: boolean,
-): void {
+function logCompleted(input: LogCompletedInput): void {
+  const { cli, tool, signalCount, passed, gate, degraded } = input;
   cli.logger.info({
     evt: 'adapter.scan.completed',
     module: MODULE,
@@ -117,6 +120,16 @@ function logCompleted(
     ...(gate === undefined ? {} : { gate }),
     ...(degraded === undefined ? {} : { degraded }),
   });
+}
+
+export interface EmitScanCompletionInput {
+  readonly cli: ToolCliContext;
+  readonly tool: string;
+  readonly opts: Record<string, unknown>;
+  readonly envelope: SignalEnvelope;
+  readonly signalCount: number;
+  readonly deliver: DeliverOpts;
+  readonly completion: ScanCompletion;
 }
 
 /**
@@ -134,20 +147,13 @@ function logCompleted(
  * Both gate paths still RETURN the session contribution, so a gate run persists a
  * session alongside a normal scan.
  */
-export async function emitScanCompletion(
-  cli: ToolCliContext,
-  tool: string,
-  opts: Record<string, unknown>,
-  envelope: SignalEnvelope,
-  signalCount: number,
-  deliver: DeliverOpts,
-  completion: ScanCompletion,
-): Promise<ScanCompletion> {
+export async function emitScanCompletion(input: EmitScanCompletionInput): Promise<ScanCompletion> {
+  const { cli, tool, opts, envelope, signalCount, deliver, completion } = input;
   if (opts.gateSave === true) {
     await cli.saveBaseline(tool, envelope);
     await cli.render({ type: 'gate-done', lines: renderGateSaveLines(tool, signalCount) });
     await cli.deliverSignals(envelope, deliver);
-    logCompleted(cli, tool, signalCount, envelope.verdict.passed, 'save');
+    logCompleted({ cli, tool, signalCount, passed: envelope.verdict.passed, gate: 'save' });
     return completion;
   }
   if (opts.gateCompare === true) {
@@ -157,7 +163,14 @@ export async function emitScanCompletion(
       ...deliver,
       runFailed: result.degraded && resolveFailOnDegraded(tool),
     });
-    logCompleted(cli, tool, signalCount, envelope.verdict.passed, 'compare', result.degraded);
+    logCompleted({
+      cli,
+      tool,
+      signalCount,
+      passed: envelope.verdict.passed,
+      gate: 'compare',
+      degraded: result.degraded,
+    });
     return completion;
   }
 
@@ -171,6 +184,6 @@ export async function emitScanCompletion(
     });
   }
   await cli.deliverSignals(envelope, deliver);
-  logCompleted(cli, tool, signalCount, envelope.verdict.passed);
+  logCompleted({ cli, tool, signalCount, passed: envelope.verdict.passed });
   return completion;
 }

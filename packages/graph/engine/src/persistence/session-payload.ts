@@ -24,13 +24,12 @@
  * envelope's Option-A remap).
  */
 
-import type { Signal, SignalRepair } from '@opensip-cli/core';
+import { projectJsonScalarMetadata } from '@opensip-cli/core';
+
+import type { JsonScalar, Signal, SignalRepair } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
 export type GraphFindingSeverity = 'error' | 'warning';
-
-/** JSON-safe scalar — the metadata-value subset the persisted shape permits. */
-export type JsonScalar = string | number | boolean;
 
 /** A persisted finding row — the structural subset the dashboard renders. */
 export interface GraphSessionFinding {
@@ -82,26 +81,6 @@ export interface GraphSessionPayload {
 }
 
 /**
- * Narrow a signal's open `metadata` bag to the JSON-safe scalar subset the
- * persisted shape permits (string | number | boolean). Returns undefined when
- * nothing survives, so findings without metric metadata stay clean.
- */
-function projectMetadata(
-  metadata: Record<string, unknown> | undefined,
-): Readonly<Record<string, JsonScalar>> | undefined {
-  if (!metadata) return undefined;
-  const out: Record<string, JsonScalar> = {};
-  let any = false;
-  for (const [k, v] of Object.entries(metadata)) {
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-      out[k] = v;
-      any = true;
-    }
-  }
-  return any ? out : undefined;
-}
-
-/**
  * Build the graph session payload directly from the run's `Signal[]`.
  *
  * Groups by ENGINE `ruleId` into the dashboard's rule-grouped detail
@@ -127,7 +106,7 @@ export function buildGraphSessionPayload(
 ): GraphSessionPayload {
   const byRule = new Map<string, GraphSessionFinding[]>();
   for (const s of signals) {
-    const metadata = projectMetadata(s.metadata);
+    const metadata = projectJsonScalarMetadata(s.metadata);
     const finding: GraphSessionFinding = {
       ruleId: s.ruleId,
       message: s.message,

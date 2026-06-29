@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/clone-detection",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "license": "Apache-2.0",
   "description": "Shared function-body clone-detection substrate for OpenSIP CLI — hash/MinHash primitives + duplicate/near-duplicate algorithms over a tool-neutral candidate type",
   "keywords": [

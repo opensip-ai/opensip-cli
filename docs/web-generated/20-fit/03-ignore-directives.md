@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.14
+release: v0.1.15
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."
@@ -37,7 +37,7 @@ Ignore directives are how you tell the framework "yes, I know — keep going." T
 
 Both expect a check slug as the second token (separated by space or tab). The slug must match the offending check's slug. Directives without a slug are ignored — there's no "ignore everything" form, by design.
 
-The parser recognizes the directive after any of four comment openers, so the same syntax works in TypeScript/JavaScript, Markdown/HTML, and shell/YAML/Python sources — see `COMMENT_OPENERS` in [`directive-parsing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/fitness/engine/src/framework/directive-parsing.ts):
+The parser recognizes the directive after any of four comment openers, so the same syntax works in TypeScript/JavaScript, Markdown/HTML, and shell/YAML/Python sources — see `COMMENT_OPENERS` in [`directive-parsing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/framework/directive-parsing.ts):
 
 | Opener | Languages |
 |---|---|
@@ -59,7 +59,7 @@ Suppresses violations of the named check on the line immediately following the d
 console.log(`[startup] PID ${process.pid}`);
 ```
 
-…and the fitness directive lands on the `console.log` call, even though two unrelated linter directives sit between it and the line. The recognized neighbors are listed in `KNOWN_DIRECTIVE_KEYWORDS` ([`packages/fitness/engine/src/framework/directive-parsing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/fitness/engine/src/framework/directive-parsing.ts)): `eslint-disable-next-line`, `eslint-disable-line`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `prettier-ignore`, `biome-ignore`, plus the fitness directives themselves.
+…and the fitness directive lands on the `console.log` call, even though two unrelated linter directives sit between it and the line. The recognized neighbors are listed in `KNOWN_DIRECTIVE_KEYWORDS` ([`packages/fitness/engine/src/framework/directive-parsing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/framework/directive-parsing.ts)): `eslint-disable-next-line`, `eslint-disable-line`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck`, `prettier-ignore`, `biome-ignore`, plus the fitness directives themselves.
 
 ### `@fitness-ignore-file`
 
@@ -104,7 +104,7 @@ Why after, not before? Two reasons:
 1. **Directives are accurate.** The check produced the violation by inspecting the line. The framework dropping it after the fact is cheap and side-effect-free; pre-filtering would require the check to know about directives, which couples every check author to the directive parser.
 2. **Counts are honest.** The dashboard and the CLI both show "found 5, ignored 2" rather than "found 3." Engineers can spot a file with too many suppressions even though they don't fail the build.
 
-The parser implementation lives in [`packages/fitness/engine/src/framework/directive-parsing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/fitness/engine/src/framework/directive-parsing.ts). The aggregation that produces the per-run `DirectiveEntry[]` lives in [`packages/fitness/engine/src/framework/ignore-processing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/fitness/engine/src/framework/ignore-processing.ts) and [`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/fitness/engine/src/framework/directive-inventory.ts).
+The parser implementation lives in [`packages/fitness/engine/src/framework/directive-parsing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/framework/directive-parsing.ts). The aggregation that produces the per-run `DirectiveEntry[]` lives in [`packages/fitness/engine/src/framework/ignore-processing.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/framework/ignore-processing.ts) and [`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/framework/directive-inventory.ts).
 
 ---
 
@@ -152,7 +152,7 @@ The dashboard's per-tool Catalog subtab and the CLI's `--verbose` detail view bo
 
 ## How directives appear in output
 
-The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/fitness/engine/src/framework/directive-inventory.ts)) carries:
+The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-inventory.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/framework/directive-inventory.ts)) carries:
 
 - The check slug being suppressed.
 - The file path.
@@ -160,7 +160,7 @@ The `DirectiveEntry` shape ([`packages/fitness/engine/src/framework/directive-in
 - The kind (`'next-line'` | `'file'`).
 - Whether the directive matched any actual violation (i.e. did this directive *do* anything?).
 
-The CLI's `--verbose` output groups violations by check and the table renderer surfaces an `ignored` count per row (`SignalTableRow.ignored` in [`packages/output/src/format/signal-table.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.14/packages/output/src/format/signal-table.ts), derived from `envelope.units[].ignoredCount`). The dashboard reads the same session record. The contract-stable JSON output (the `SignalEnvelope`) carries the per-unit suppression count as `units[].ignoredCount` (fitness-only), so a CI consumer can read it off `--json` directly; the full `appliedDirectives` detail (which directive matched which line) still lives only in the internal session record on disk.
+The CLI's `--verbose` output groups violations by check and the table renderer surfaces an `ignored` count per row (`SignalTableRow.ignored` in [`packages/output/src/format/signal-table.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/output/src/format/signal-table.ts), derived from `envelope.units[].ignoredCount`). The dashboard reads the same session record. The contract-stable JSON output (the `SignalEnvelope`) carries the per-unit suppression count as `units[].ignoredCount` (fitness-only), so a CI consumer can read it off `--json` directly; the full `appliedDirectives` detail (which directive matched which line) still lives only in the internal session record on disk.
 
 A directive that didn't match any violation (e.g. the targeted check no longer fires there) is *also* tracked internally. This is how you find stale suppressions: the directive exists in the source, and the framework reports zero violations matched it. A separate housekeeping pass can flag those for cleanup.
 

@@ -2,7 +2,7 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
-## [Unreleased]
+## [0.1.15] - 2026-06-29
 
 An external-scanner integration release. OpenSIP CLI can now wrap a
 user-installed CLI scanner — Gitleaks, OSV-Scanner, or Trivy — as a first-class

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-26
+last_verified: 2026-06-29
 release: v0.1.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -20,7 +20,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **158 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **160 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
@@ -158,11 +158,11 @@ Language-agnostic; runs against every project.
 
 ---
 
-## TypeScript  *(56 checks)*
+## TypeScript  *(58 checks)*
 
 TypeScript/JavaScript projects; uses TS-AST analysis.
 
-### Architecture  *(15)*
+### Architecture  *(17)*
 
 | Slug | Description |
 |---|---|
@@ -174,11 +174,13 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 | [`drizzle-orm-migration-guardrails`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/drizzle-orm-migration-guardrails.ts) | Detects dangerous patterns in Drizzle ORM migrations (raw SQL, DROP, TRUNCATE, type changes) |
 | [`host-tool-runtime-import-boundary`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/host-tool-runtime-import-boundary.ts) | External tool runtimes never import in the host: importToolRuntime stays in the admission/discovery boundary, host imports are bundled-only, and the external worker policy is confined to the worker plane (ADR-0054 M4-G capstone) |
 | [`live-view-through-cli-live`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/live-view-through-cli-live.ts) | Tool engine live views route through cli-live (no direct ink render imports) |
+| [`mcp-results-no-rerun`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/mcp-results-no-rerun.ts) | MCP tool handlers must replay/read through their injected port — never import a run-command entry point (runFit/runGraph/runSim/runYagni) to re-run the underlying tool (ADR-0084) |
 | [`missing-type-exports`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/missing-type-exports.ts) | Detects types imported via deep internal paths not declared in the package exports map or barrel |
 | [`module-coupling-fan-out`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/module-coupling-fan-out.ts) | Flags files with high outbound import fan-out (god-files) |
 | [`no-bootstrap-tool-import`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/no-bootstrap-tool-import.ts) | The CLI host must not statically import a tool runtime — bundled tools load via the dynamic plugin path (§1 install-source independence) |
 | [`package-json-exports-field`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/package-json-exports-field.ts) | *(no description; see source)* |
 | [`phantom-dependency-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/phantom-dependency-detection.ts) | Detect phantom dependencies (used but not declared in package.json) |
+| [`single-opts-assembly-seam`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/single-opts-assembly-seam.ts) | CommandSpec option defaults/parsers must be assembled through the single shared assembleOptsFromSpec seam |
 | [`subprocess-correlation-required`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/subprocess-correlation-required.ts) | CLI subprocess spawn/fork sites must forward the RunCorrelation bag (runId via env, other fields via env+spec) so child failures are attributable |
 | [`tsconfig-extends-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/architecture/tsconfig-extends-validation.ts) | Ensures all tsconfig.json files extend a shared base and the base file exists |
 

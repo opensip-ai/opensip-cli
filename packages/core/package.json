@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/core",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "license": "Apache-2.0",
   "description": "Core kernel for OpenSIP CLI — language adapters, plugin loader, errors, logger, IDs, retry, project config",
   "keywords": [

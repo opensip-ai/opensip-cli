@@ -23,15 +23,12 @@
  * Proven by the substrate unit suite and each adapter's worker E2E.
  */
 
-import { isErrorSignal } from '@opensip-cli/core';
+import { isErrorSignal, projectJsonScalarMetadata } from '@opensip-cli/core';
 
-import type { Signal, SignalRepair } from '@opensip-cli/core';
+import type { JsonScalar, Signal, SignalRepair } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
 export type AdapterFindingSeverity = 'error' | 'warning';
-
-/** JSON-safe scalar — the metadata-value subset the persisted shape permits. */
-export type JsonScalar = string | number | boolean;
 
 /** A persisted finding row — the structural subset the dashboard renders. */
 export interface AdapterSessionFinding {
@@ -80,29 +77,9 @@ export interface AdapterSessionPayload {
   readonly checks: readonly AdapterSessionCheck[];
 }
 
-/**
- * Narrow a signal's open `metadata` bag to the JSON-safe scalar subset the
- * persisted shape permits (string | number | boolean). Nested objects (e.g. the
- * stamped `provenance`) are dropped. Returns undefined when nothing survives.
- */
-function projectMetadata(
-  metadata: Record<string, unknown> | undefined,
-): Readonly<Record<string, JsonScalar>> | undefined {
-  if (!metadata) return undefined;
-  const out: Record<string, JsonScalar> = {};
-  let any = false;
-  for (const [k, v] of Object.entries(metadata)) {
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-      out[k] = v;
-      any = true;
-    }
-  }
-  return any ? out : undefined;
-}
-
 /** Map one redacted signal to its persisted finding row (2-level severity bucket). */
 function toSessionFinding(s: Signal): AdapterSessionFinding {
-  const metadata = projectMetadata(s.metadata);
+  const metadata = projectJsonScalarMetadata(s.metadata);
   return {
     ruleId: s.ruleId,
     message: s.message,

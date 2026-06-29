@@ -15,10 +15,8 @@
  * `setExitCode` via the forwarded-result record). So the substrate never imports
  * `cli` and the host stays the only privileged-effect process.
  *
- * This module is the IO orchestration the unit suite excludes from coverage; its
- * pure decision helpers (binary-resolver, exit-model, ingest, severity, provenance)
- * are covered directly, and the whole loop is exercised by each adapter's worker
- * E2E (ADR-0090 D6 Tier 2).
+ * This IO orchestration is excluded from unit coverage; pure helpers are covered
+ * directly and adapter worker E2Es exercise the whole loop.
  */
 
 import { readFileSync, statSync } from 'node:fs';
@@ -296,12 +294,9 @@ export async function runScanLoop(
   const artifactName = command.output.path ?? defaultArtifactName(tool, command.output.kind);
   const artifactFullPath = ctx.artifactPath(artifactName);
 
-  // A1/A7: create the per-run artifact dir (owner-only 0o700) through the HOST seam
-  // BEFORE the scan. The scanner gets `artifactFullPath` as its `--report-path`/
-  // `--output` and does a bare `open(path,'w')` with no `mkdir -p`, so a missing
-  // fresh per-run dir would ENOENT every run; `writeArtifact` also creates the dir
-  // but runs AFTER the scan. The substrate never `mkdir`s `.runtime` itself (layer
-  // rule) — the host owns the privileged FS effect, worker-side via host RPC.
+  // A1/A7: create the per-run artifact dir through the host seam before the
+  // scanner opens its report path. The substrate never mkdirs `.runtime` itself;
+  // host RPC owns the privileged FS effect.
   await cli.ensureArtifactDir(artifactFullPath);
 
   // A3: keep the scanner off opensip's own persisted reports under `.runtime/`
@@ -428,5 +423,13 @@ export async function runScanLoop(
 
   // Emit + deliver + return. The gate-ratchet branch (ADR-0036) and the normal
   // emit live in a sibling helper so this orchestration body stays flat.
-  return emitScanCompletion(cli, tool, input.opts, envelope, signals.length, deliver, completion);
+  return emitScanCompletion({
+    cli,
+    tool,
+    opts: input.opts,
+    envelope,
+    signalCount: signals.length,
+    deliver,
+    completion,
+  });
 }
