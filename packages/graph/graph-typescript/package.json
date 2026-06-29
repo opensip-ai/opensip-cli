@@ -54,6 +54,6 @@
     "@opensip-cli/graph-python": "workspace:*",
     "@opensip-cli/graph-rust": "workspace:*",
     "@types/node": "^24.13.2",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }

@@ -83,7 +83,7 @@
     "@opentelemetry/sdk-trace-node": "^2.8.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "commander": "^15.0.0",
-    "ink": "^7.0.5",
+    "ink": "^7.1.0",
     "open": "^11.0.0",
     "react": "^19.2.7",
     "update-notifier": "^7.3.1",
@@ -96,7 +96,7 @@
     "@types/update-notifier": "^6.0.8",
     "ink-testing-library": "^4.0.0",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.8",
+    "vitest": "^4.1.9",
     "zod": "^4.4.3"
   }
 }
