@@ -144,7 +144,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/dashboard':
         specifier: workspace:*
         version: link:../dashboard
@@ -289,7 +289,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       ink:
         specifier: ^7.1.0
         version: 7.1.0(@types/react@19.2.17)(react@19.2.7)
@@ -351,7 +351,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -373,7 +373,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -394,8 +394,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.1
       js-yaml:
-        specifier: ^4.2.0
-        version: 4.2.0
+        specifier: ^5.2.0
+        version: 5.2.0
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
@@ -445,7 +445,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -479,7 +479,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -501,7 +501,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -524,7 +524,7 @@ importers:
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/test-support':
         specifier: workspace:*
         version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
@@ -543,7 +543,7 @@ importers:
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/test-support':
         specifier: workspace:*
         version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
@@ -565,7 +565,7 @@ importers:
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/test-support':
         specifier: workspace:*
         version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
@@ -584,7 +584,7 @@ importers:
     devDependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/test-support':
         specifier: workspace:*
         version: file:packages/test-support(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)
@@ -599,7 +599,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -624,7 +624,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -655,7 +655,7 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/datastore':
         specifier: workspace:*
         version: link:../../datastore
@@ -722,7 +722,7 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/datastore':
         specifier: workspace:*
         version: link:../../datastore
@@ -768,7 +768,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -790,7 +790,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -815,7 +815,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -840,7 +840,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -865,7 +865,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -890,7 +890,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/graph':
         specifier: workspace:*
         version: file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -921,7 +921,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -934,7 +934,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -950,7 +950,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -966,7 +966,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -982,7 +982,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/tree-sitter':
         specifier: workspace:*
         version: link:../../tree-sitter
@@ -998,7 +998,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -1020,7 +1020,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/datastore':
         specifier: workspace:*
         version: link:../datastore
@@ -1057,7 +1057,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -1076,7 +1076,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/datastore':
         specifier: workspace:*
         version: link:../datastore
@@ -1113,7 +1113,7 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/datastore':
         specifier: workspace:*
         version: link:../../datastore
@@ -1150,7 +1150,7 @@ importers:
         version: link:../config
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       glob:
         specifier: ^13.0.0
         version: 13.0.6
@@ -1172,7 +1172,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -1194,7 +1194,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/external-tool-adapter':
         specifier: workspace:*
         version: link:../external-tool-adapter
@@ -1219,7 +1219,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/external-tool-adapter':
         specifier: workspace:*
         version: link:../external-tool-adapter
@@ -1244,7 +1244,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -1263,7 +1263,7 @@ importers:
         version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       '@opensip-cli/external-tool-adapter':
         specifier: workspace:*
         version: link:../external-tool-adapter
@@ -1285,7 +1285,7 @@ importers:
     dependencies:
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../core
       web-tree-sitter:
         specifier: 0.26.10
         version: 0.26.10
@@ -1316,7 +1316,7 @@ importers:
         version: link:../../contracts
       '@opensip-cli/core':
         specifier: workspace:*
-        version: file:packages/core
+        version: link:../../core
       '@opensip-cli/lang-typescript':
         specifier: workspace:*
         version: link:../../languages/lang-typescript
@@ -3913,12 +3913,8 @@ packages:
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
 
-  js-yaml@4.2.0:
-    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
-    hasBin: true
-
-  js-yaml@4.3.0:
-    resolution: {integrity: sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==}
+  js-yaml@5.2.0:
+    resolution: {integrity: sha512-YeLUMlvR4Ou1B119LIaM0r65JvbOBooJDc9yEu0dClb/uSC5P4FrLU8OCCz/HXWvtPoIrR0dRzABTjo1sTN9Bw==}
     hasBin: true
 
   jsdom@29.1.1:
@@ -5764,7 +5760,7 @@ snapshots:
   '@opensip-cli/core@file:packages/core':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      js-yaml: 4.3.0
+      js-yaml: 5.2.0
       ulid: 3.0.2
 
   '@opensip-cli/datastore@file:packages/datastore(@types/better-sqlite3@7.6.13)':
@@ -7890,11 +7886,7 @@ snapshots:
 
   js-tokens@10.0.0: {}
 
-  js-yaml@4.2.0:
-    dependencies:
-      argparse: 2.0.1
-
-  js-yaml@4.3.0:
+  js-yaml@5.2.0:
     dependencies:
       argparse: 2.0.1
 
