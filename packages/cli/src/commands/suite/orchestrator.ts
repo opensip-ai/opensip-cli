@@ -117,11 +117,20 @@ async function runStep(args: {
 }): Promise<SuiteStepSummary> {
   const started = performance.now();
   const bound = bindToolCliContext(args.step.tool, args.ctx);
-  const capture = createCapturingContext(
-    Object.assign(bound, {
-      maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, bound),
-    }),
-  );
+  const capture = createCapturingContext(bound);
+  // ADR-0054 out-of-process dispatch must run through the CAPTURING context, not
+  // the raw bound ctx. For an external-provenance step the worker replay
+  // (`replayResult`) calls `ctx.setExitCode` with the tool's verdict exit code;
+  // binding the hook to `capture.context` routes that into `capture.exitCodes` so
+  // the external step participates in the suite worst-of aggregation exactly like
+  // the in-process handler (which already runs against `capture.context`). Binding
+  // to `bound` instead dropped the external step's exit code (it never reached
+  // `capture.exitCodes`, so a findings/regression verdict silently aggregated to 0)
+  // AND leaked the code into the outer host context — the same isolation the
+  // bundled path preserves. (04↔05 regression: external adapter as a suite step.)
+  Object.assign(capture.context, {
+    maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, capture.context),
+  });
   const opts = stepOpts(args.step, args.suiteOpts);
   const hooks = capture.context as ToolCliContext & RunActionHooks;
   const diagnostics = currentScope()?.diagnostics;
