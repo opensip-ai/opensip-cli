@@ -221,6 +221,51 @@ describe('executeFit fail-closed (ADR-0060)', () => {
     );
   });
 
+  it('classifies required checkPackages discovery diagnostics as command-error', async () => {
+    await withFitScope(
+      () => {
+        const load = currentFitnessLoadState();
+        Object.assign(load, createFitnessLoadState());
+        load.loadedFor = projectDir;
+        load.checkPackErrors = [
+          'package @opensip/fit resolves a different @opensip-cli/core (0.1.14) than this runtime (0.1.15) — skipping to avoid a split run scope',
+          'configured package "@acme/missing" is not installed in node_modules — skipping',
+        ];
+        currentCheckRegistry().register(
+          {
+            config: {
+              id: '00000000-0000-4000-8000-000000000003',
+              slug: 'other-check',
+              description: 'other',
+              tags: [],
+              checkScope: 'file',
+            },
+            analyze: () => [],
+          } as never,
+          'test',
+        );
+        finalizeFitLoadOutcome(projectDir);
+        expect(load.commandError?.code).toBe(
+          CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
+        );
+        expect(load.commandError?.message).toContain('@opensip/fit');
+        expect(load.loadWarnings).not.toContain('Optional check pack "unknown" failed to load.');
+        return Promise.resolve();
+      },
+      {
+        plugins: { checkPackages: ['@opensip/fit', '@acme/missing'] },
+        targets: {
+          source: {
+            description: 'minimal',
+            languages: ['typescript'],
+            concerns: ['backend'],
+            include: ['src/**/*.ts'],
+          },
+        },
+      },
+    );
+  });
+
   it('marks optional plugin failure as degraded when built-in checks are registered', async () => {
     await withFitScope(() => {
       const load = currentFitnessLoadState();

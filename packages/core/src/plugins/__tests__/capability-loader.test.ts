@@ -175,6 +175,24 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     expect(registry.isDomainLoaded('items', testDir)).toBe(true);
   });
 
+  it('formats discovery diagnostics with package and domain for downstream classifiers', async () => {
+    const registrar = vi.fn();
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(itemsDomain(), registrar);
+
+    const errors = await loadCapabilityDomain({
+      registry,
+      domainId: 'items',
+      projectDir: testDir,
+      preferences: { packages: ['@acme/missing'] },
+    });
+
+    expect(registrar).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('@acme/missing → items:');
+    expect(errors[0]).toContain('configured package "@acme/missing" is not installed');
+  });
+
   it('captures incompatible package target metadata without routing', async () => {
     writeItemsPackage('@acme/items-old', "[{ id: 'old' }]", { apiVersion: 0 });
     const registrar = vi.fn();

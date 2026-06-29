@@ -2877,6 +2877,21 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "synopsis": "Run YAGNI reduction audit detectors",
       "usage": "[options] [paths...]",
     },
+    {
+      "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "name": "yagni-run-worker",
+      "options": [],
+      "subcommands": [],
+      "synopsis": "[internal] Run YAGNI headless and stream progress + result over IPC (forked by the live view)",
+      "usage": "[options] <specPath>",
+    },
   ],
   "synopsis": "Codebase intelligence from your terminal — pluggable tools for fitness, simulation, and more",
   "usage": "[options] [command]",

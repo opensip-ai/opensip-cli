@@ -12,10 +12,25 @@ import { renderYagniLive } from '../yagni-runner.js';
 import type { LiveRunSpec } from '@opensip-cli/cli-live';
 
 const runToolLiveView = vi.hoisted(() => vi.fn());
+const runOffThreadOrInProcess = vi.hoisted(() =>
+  vi.fn((opts: { inProcess: (emit: (event: unknown) => void) => Promise<unknown> }) => ({
+    onProgress: vi.fn(),
+    result: opts.inProcess(vi.fn()),
+  })),
+);
 
 vi.mock('@opensip-cli/cli-live', () => ({
   runToolLiveView,
 }));
+
+vi.mock('@opensip-cli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@opensip-cli/core')>();
+  return {
+    ...actual,
+    liveEngineCorrelation: vi.fn(() => undefined),
+    runOffThreadOrInProcess,
+  };
+});
 
 vi.mock('../yagni-config.js', () => ({
   loadYagniConfig: vi.fn(() => ({})),
@@ -84,6 +99,7 @@ beforeEach(() => {
   capturedSpec = undefined;
   capturedGlue = undefined;
   runToolLiveView.mockReset();
+  runOffThreadOrInProcess.mockClear();
   executeYagniMock.mockReset();
   executeYagniMock.mockResolvedValue(stubExecuteOutcome());
   runToolLiveView.mockImplementation((spec: LiveRunSpec, glue: unknown) => {
@@ -130,6 +146,7 @@ describe('renderYagniLive produce mapping', () => {
     });
     expect(outcome.session?.tool).toBe('yagni');
     expect(outcome.session?.passed).toBe(false);
+    expect(runOffThreadOrInProcess).toHaveBeenCalled();
   });
 
   it('includes verbose table and lines when --verbose is set', async () => {

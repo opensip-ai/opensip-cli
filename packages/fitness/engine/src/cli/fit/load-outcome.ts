@@ -28,9 +28,14 @@ function pluginErrorSource(error: string): string {
 
 /** Package name mentioned in a fit-pack domain load error string. */
 function checkPackErrorPackage(error: string): string | undefined {
-  const arrow = /^([^→]+)→/.exec(error.trim());
+  const trimmed = error.trim();
+  const arrow = /^([^→]+)→/.exec(trimmed);
   if (arrow !== null) return arrow[1].trim();
-  const colon = /^([^:]+):/.exec(error.trim());
+  const configured = /^configured package "([^"]+)"/.exec(trimmed);
+  if (configured !== null) return configured[1]?.trim();
+  const packageWord = /^(?:failed to load )?package\s+((?:@[^/\s]+\/)?[^:\s]+)\b/.exec(trimmed);
+  if (packageWord !== null) return packageWord[1]?.trim();
+  const colon = /^([^:]+):/.exec(trimmed);
   return colon?.[1]?.trim();
 }
 

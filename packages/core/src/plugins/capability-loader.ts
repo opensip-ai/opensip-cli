@@ -88,7 +88,7 @@ export async function loadCapabilityDomain(
     ...(preferences === undefined ? {} : { preferences }),
     ...(shouldLoadPackage === undefined ? {} : { shouldLoadPackage }),
     onDiagnostic: (diagnostic) => {
-      errors.push(diagnostic.message);
+      errors.push(formatDiscoveryError(domainId, diagnostic));
       onDiagnostic?.(diagnostic);
     },
   });
@@ -151,6 +151,12 @@ export async function loadCapabilityDomain(
   registry.markDomainLoaded(domainId, projectKey, errors);
   emitLoadedEvent(domainId, routed, errors);
   return errors;
+}
+
+function formatDiscoveryError(domainId: string, diagnostic: CapabilityDiscoveryDiagnostic): string {
+  const packageName = diagnostic.packageName?.trim();
+  if (packageName === undefined || packageName.length === 0) return diagnostic.message;
+  return `${packageName} → ${domainId}: ${diagnostic.message}`;
 }
 
 /**

@@ -46,6 +46,21 @@
           "yag"
         ],
         "description": "Run YAGNI reduction audit detectors"
+      },
+      {
+        "name": "yagni-run-worker",
+        "description": "[internal] Run YAGNI headless and stream progress + result over IPC (forked by the live view)",
+        "visibility": "internal",
+        "commonFlags": [],
+        "args": [
+          {
+            "name": "specPath",
+            "description": "Path to a JSON YAGNI run spec file"
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "worker-ipc"
       }
     ]
   },
