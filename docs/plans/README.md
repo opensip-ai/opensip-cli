@@ -4,50 +4,50 @@ Gitignored scratch space for implementation specs and execution plans. Durable
 decisions graduate to `docs/decisions/`; reader-facing facts to `docs/public/`;
 contributor-only context to `docs/internal/`.
 
-Last inventory: **2026-06-29** (dogfood pushback roadmap; specs consolidated under
+Last inventory: **2026-06-30** (customer extension trust UX added; specs consolidated under
 `specs/`).
 
 > **📍 Authoritative strategy & roadmap: [`00-master-plan.md`](00-master-plan.md).**
 > The master plan consolidates the four-agent review
 > ([`docs/internal/coop/agents-log.md`](../internal/coop/agents-log.md)) into the
-> distilled product/platform strategy, the full backlog (specs 01–22), the
-> floor-vs-GTM partition, the dependency-ordered build sequence, risks, and the two
-> open product decisions. **Where this inventory and the master plan differ, the
+> distilled product/platform strategy, the full backlog (specs 01–23), the
+> floor-vs-GTM partition, the dependency-ordered build sequence, risks, and the
+> product decision/access gates. **Where this inventory and the master plan differ, the
 > master plan wins** — in particular the spec-04 wedge is no longer "undecided"
-> (recommended: *local architecture-evidence plane*; security = acquisition only),
-> spec **05** is re-weighted **High** (moat centerpiece), and new specs **09–22**
-> are not yet reflected in the table below.
+> (recommended: *local architecture-evidence plane*; security = acquisition only)
+> and spec **05** is re-weighted **High** (moat centerpiece).
 
 ## Layout
 
 | Directory | Purpose | Current state |
 |-----------|---------|---------------|
-| `specs/` | Requirements — what to build, success criteria, promotion triggers | **8 active draft specs** (see below) |
+| `specs/` | Requirements — what to build, success criteria, promotion triggers | **19 local spec/proposal files** (see below); Cloud-owned spec 21 lives in the sibling `opensip` repo |
 | `ready/` | Execution plans — phased `plan.md` + `phase-N-*.md` derived from specs | Empty — populate when a spec is promoted |
 | `backlog/` | Optional staging for raw ideas before they become specs | Empty |
 | `completed/` | Archived shipped specs (optional) | Not created — shipped work is recorded in code + ADRs + git history |
 
 ## Active specs (`specs/`)
 
-Draft specs seeded from 2026-06-28 dogfood pushback. Promote to `ready/` only after
-each spec's promotion trigger is met: scope anchored to the live tree, config/CI key
-names identified, and test obligations made explicit.
+Draft specs seeded from dogfood, launch follow-up, and the four-agent platform
+review. Promote to `ready/` only after each spec's promotion trigger is met: scope
+anchored to the live tree, config/CI key names identified, and test obligations
+made explicit.
 
 | # | Spec | Priority | Notes |
 |---|------|----------|-------|
 | 01 | [`01-hidden-state-gate-hardening.md`](specs/01-hidden-state-gate-hardening.md) | P0 | **Build first.** Gate verdicts must be a pure function of repo snapshot + declared inputs — not warm caches, stale injected packages, formatter/linter drift, or datastore contents. Folds session/datastore lifecycle into the same invariant. |
 | 02 | [`02-precision-and-dedup-hardening.md`](specs/02-precision-and-dedup-hardening.md) | P0/P1 | Use `docs/internal/suppression-catalog.json` as a false-positive heatmap; fix top-waiver slugs (incl. `chunked-bulk-insert`); add identity/near-identity signal dedup as noise reduction. |
-| 03 | [`03-suite-plane-correctness-and-v2.md`](specs/03-suite-plane-correctness-and-v2.md) | P1 | Fix worst-of aggregation and grouped output semantics before v2 features (parallel, fail-fast, per-step cwd). Regression-test the step-findings-drop bug first. |
+| 03 | [`03-suite-plane-correctness-and-v2.md`](specs/03-suite-plane-correctness-and-v2.md) | P1 | Worst-of aggregation is already fixed; remaining work is suite matrix coverage and expanded grouped machine output before v2 features (parallel, fail-fast, per-step cwd). |
 | 04 | [`04-product-wedge-decision.md`](specs/04-product-wedge-decision.md) | P1 | **Decision memo** (rename: *Wedge **and Positioning** Decision*). **Recommendation no longer open** — wedge = *local architecture-evidence plane*; security = acquisition/orchestration only; agents = read substrate. Must reconcile `03-vs-other-tools.md` in the same PR. Product ratification owed. See master plan §1.2. |
 | 05 | [`05-correlation-v0-and-risk-layer.md`](specs/05-correlation-v0-and-risk-layer.md) | **High** (was P1/P2) | **Moat centerpiece** (re-weighted). Evidence/entity correlation over graph + tool signals (graph blast-radius, **identity stability tiers** incl. CLI↔Cloud divergence). Defer composite risk scoring. After 02. |
 | 06 | [`06-impact-analysis-trust-foundation.md`](specs/06-impact-analysis-trust-foundation.md) | P1/P2 | Fixture matrix for `fit --changed`, `graph impact`, `--include-impacted`; conservative fallback when graph is stale. Required before verified repair automation. Pull earlier if wedge = agent workflow. |
 | 07 | [`07-agent-apply-verify-loop.md`](specs/07-agent-apply-verify-loop.md) | P2 (P1 if agent wedge) | `signal.repair` apply + targeted verify loop; MCP write surfaces gated on impact trust and deterministic gates. |
 | 08 | [`08-sandboxed-extension-marketplace-rd.md`](specs/08-sandboxed-extension-marketplace-rd.md) | P2/P3 | **Strategic fork:** first-party/trusted extensions only vs fund sandbox R&D for a public marketplace. Promote only when marketplace is the chosen wedge. |
 
-### New specs (09–22) — from the four-agent review + v0.1.15 launch follow-up
+### New specs (09–23) — from the four-agent review + launch follow-up
 
-Defined in the [master plan](00-master-plan.md) §2.2. Two are drafted as spec files;
-the rest are scoped in the master plan and not yet drafted here.
+Defined in the [master plan](00-master-plan.md) §2.2. Specs 22–23 capture launch
+dogfood follow-up discovered after v0.1.15/v0.1.16 prep.
 
 | # | Spec | Priority | Tier | File? |
 |---|------|----------|------|-------|
@@ -59,8 +59,9 @@ the rest are scoped in the master plan and not yet drafted here.
 | 17 | [`17-detection-quality-measurement.md`](specs/17-detection-quality-measurement.md) — labeled multi-language precision/recall corpus | High | Quality | ✅ |
 | 18 | [`18-scale-and-performance-slos.md`](specs/18-scale-and-performance-slos.md) — repo-tier time/memory budgets + large-repo benchmark | High/Med | Quality | ✅ |
 | 20 | [`20-platform-evidence-authority-and-egress-contract.md`](specs/20-platform-evidence-authority-and-egress-contract.md) — implements [ADR-0094](../decisions/ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md) | **Critical** | Platform floor | ✅ |
-| 21 | [`21-enterprise-autonomy-approval-and-change-control.md`](specs/21-enterprise-autonomy-approval-and-change-control.md) — auditable approval/kill-switch/rollback for autonomous Cloud merge (**GTM-gated**) | GTM-gated | GTM | ✅ |
+| 21 | `opensip/docs/plans/specs/21-enterprise-autonomy-approval-and-change-control.md` — auditable approval/kill-switch/rollback for autonomous Cloud merge (**GTM-gated; Cloud-owned, sibling repo**) | GTM-gated | GTM | ↗ parent |
 | 22 | [`22-startup-observability-and-load-diagnostics.md`](specs/22-startup-observability-and-load-diagnostics.md) — structured capability-load diagnostics + startup/pre-action timing attribution | High | Operability floor | ✅ |
+| 23 | [`23-low-friction-customer-extension-trust.md`](specs/23-low-friction-customer-extension-trust.md) — explicit config/install/create actions become trust decisions so customer packs/tools work without env-var friction | High | Extension UX floor | ✅ |
 | 19? | [`19-human-triage-and-report-surface.md`](specs/19-human-triage-and-report-surface.md) — **PROPOSAL, not consensus**; may fold into 05/16 or be Cloud's job | Medium (proposed) | GTM | ⚠️ proposal |
 
 **Absorbed (not standalone):** 12 (org-config) → spec 09 PEP; 14 (MCP lifecycle) →
@@ -75,6 +76,7 @@ spec 07; 15 (audit trail) → spec 09 PEP; 16 (support bundle) → deferred.
 ├── 06 impact trust ──► 07 apply/verify
 ├── 09 trust-policy PDP ──► 10 capability isolation ; ──► 20
 └── 17 detection-quality ; 18 scale/perf SLOs ; 22 startup/load diagnostics (parallel)
+23 customer extension trust UX ──► aligns with 09 policy plane ; ──► 10 isolation ; ──► 11 compatibility
 
 13a verifiable distribution ──► 09 provenance PEP ; ──► 20
 11 compat/LTS ──► 13b ; ──► 20
@@ -86,8 +88,8 @@ spec 07; 15 (audit trail) → spec 09 PEP; 16 (support bundle) → deferred.
 **Suggested sequence (full 5-phase build order in [master plan](00-master-plan.md)
 §3.3):** promote **01** first (cold CI lane + datastore policy + non-TS repo + fix
 dangling ADR pointers). Run **04** as a positioning memo in parallel. Floor =
-01/09/10/13a/20 (+ 02/03/05/06). GTM = 13b/16/19/21 — demand-gate behind a design
-partner.
+01/09/10/13a/20 (+ 02/03/05/06) with operability/extension UX floor 22/23. GTM =
+13b/16/19/21 — demand-gate behind a design partner.
 
 Specs **04** and **08** are decision memos — they produce ADRs or a short positioning
 doc, not phased implementation plans.

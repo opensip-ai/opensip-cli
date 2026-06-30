@@ -1,11 +1,11 @@
 # OpenSIP CLI — Master Plan & Platform Roadmap
 
-> **Status:** Draft consensus (engineering + analysis). Product ratifications pending.
+> **Status:** Draft consensus (engineering + analysis). Product ratification pending.
 > **Scope:** `opensip-cli` (this repo) + its platform fit with the sibling `opensip` (Cloud) repo.
 > **Home:** `docs/plans/` is **gitignored / local-only** — this is in-progress strategy, not a published doc. Durable decisions graduate to `docs/decisions/` (ADRs); reader-facing facts to `docs/public/`.
 > **Provenance:** Distilled from a four-agent, 17-turn review recorded in
 > [`docs/internal/coop/agents-log.md`](../internal/coop/agents-log.md). That log is the *deliberation record* (chronological, with superseded positions); **this** document is the *authoritative output*. Where they differ, this document wins.
-> **Last updated:** 2026-06-29.
+> **Last updated:** 2026-06-30.
 > **Decision log (2026-06-29):** ADR-0095 ratified the CLI positioning posture ("AI-native guardrail platform, **not an AI runtime**") and the `what-is`/`03-vs`/`faq`/`system-context` docs were reconciled to match. ADR-0094 committed as the governing decision behind §1.3 + spec 20. Product decision **§1.5.2 resolved**: keep the **autonomous loop front-and-center as vision/direction** (access hard-gated — no GA), with the **evidence-authority plane (spec 20) as the durable technical moat**. Spec 21 reframed: it gates *opening access*, not *headlining*.
 
 ---
@@ -13,12 +13,16 @@
 ## 0. How to read this
 
 - **Part I** — product & platform strategy (the *why*).
-- **Part II** — the specification backlog (the *what*): existing specs 01–08 audited + new specs 09–22.
+- **Part II** — the specification backlog (the *what*): existing specs 01–08 audited + new specs 09–23.
 - **Part III** — roadmap, critical path, and the dependency-ordered build sequence (the *when*).
 - **Part IV–V** — risks, and cross-cutting requirements every spec must satisfy.
 - **Part VI** — methodology, confidence levels, and what to verify before locking.
 
-**What is decided vs. open.** Everything in Parts II–V is engineering/architecture consensus across all four reviewers. Two **product** decisions are explicitly *not* settled and gate the back half of the roadmap — see §1.5. Do not let this plan's coherence substitute for those decisions.
+**What is decided vs. open.** Everything in Parts II–V is engineering/architecture
+consensus across all four reviewers. One **product** decision remains open — spec-04
+wedge ratification. The autonomous-loop direction is decided, but access remains
+hard-gated by spec 21. Do not let this plan's coherence substitute for the remaining
+product decision.
 
 ---
 
@@ -90,7 +94,7 @@ This maps the *technical* boundary onto the *monetization* boundary, and matches
 
 **Mandatory spec field:** every enterprise/platform spec must declare its **open-core placement** (OSS-CLI / Cloud / both) + its embedded-vs-SaaS persistence story. Without it, specs 09/15/20 risk being built CLI-local with no SaaS path, violating the standing "works in both embedded and SaaS modes" constraint.
 
-## 1.5 Open product decisions (gate the back half — NOT engineering's call)
+## 1.5 Product decisions and access gates
 
 1. **Spec-04 wedge ratification.** *Positioning/anti-claim fork **resolved** (ADR-0095 + doc reconciliation, 2026-06-29).* Still open: the **wedge** — ratify the §1.2 hypothesis (architecture-evidence moat + security-orchestration acquisition) with owner + deadline + competitive inputs. Gates the sequencing of 05/07.
 2. **Is autonomous-merge the platform moat? — DECIDED 2026-06-29 (product/founder).** Both/and, not either/or: the **autonomous loop is the directional headline/vision**, kept front-and-center in marketing (the market conversation is moving to autonomous loops; it is authentic to the OpenSIP origin), while the **evidence-authority plane (spec 20) is the durable *technical* moat** it is built on. **Critical guardrail: access is hard-gated** — the autonomous loop runs today but is in controlled testing with *zero* external users and no general availability. That keeps the headline a *vision/direction* claim, not a *sellable-now* claim, satisfying §1.6's honest-conditional-headline rule. **Consequence:** spec 21 gates *opening access* to the autonomous loop (admitting the first company), **not** *headlining* it.
@@ -105,7 +109,7 @@ This maps the *technical* boundary onto the *monetization* boundary, and matches
 
 # Part II — Specification Backlog
 
-> **Spec layout (2026-06-29):** CLI-anchored specs live flat in `docs/plans/specs/`.
+> **Spec layout (2026-06-30):** CLI-anchored specs live flat in `docs/plans/specs/`.
 > The one Cloud-owned spec (**21**) was relocated to the **`opensip` platform repo**
 > (`docs/plans/specs/` there). The cross-repo contracts **09** and **20** stay in
 > this repo because the spec's CLI side lives here while the Cloud half is tracked
@@ -127,20 +131,21 @@ All eight were audited against code + 91 ADRs + `docs/internal/*`. Verdict: **ap
 | **07** | Agent apply/verify loop | **Approve, deferred** | Open with "**not shipped**"; re-anchor MCP dep to ADR-0084 (not the gone `ready/02-mcp-server/`); transactional apply semantics (preflight dirty-worktree, preview, conflict-safe, rollback, interruption-survivable record). **Not the wedge headline.** |
 | **08** | Sandboxed extension marketplace R&D | **Approve as dormant** | Re-anchor to **ADR-0087** as an *unshelving criteria / R&D trigger*, not active backlog. Add a "curated trusted registry" middle path. Does **not** cover in-process capability packs (that's spec 10). |
 
-## 2.2 New specs (09–22)
+## 2.2 New specs (09–23)
 
 | ID | Title | Priority | Tier | Why it exists / depends on |
 |----|-------|----------|------|----------------------------|
-| **09** | Enterprise **trust policy plane** (PDP kernel + PEP phases) | **Critical** | Floor | Re-homes ADR-0061's three-gate work (now orphaned). A single **Policy Decision Point** (schema + evaluation + audit-event emission) with thin **Policy Enforcement Point** *phases*: provenance enforcement, org-config hierarchy, audit/compliance export, gate-config governance. **Platform-shared** model (CLI *and* Cloud — both are greenfield on org policy). Deps: ADR-0023/0061/0068/0081, **13a**. |
-| **10** | Capability **resource isolation** + `requires` enforcement | High | Floor | Admission is landed (ADR-0081); the gap is that non-bundled capability packs still **import in-process at full host authority** (`capability-discovery.ts`). Strongest TCB-growth surface; outside spec 08's broker scope. Deps: 09, ADR-0081. |
+| **09** | Enterprise **trust policy plane** (PDP kernel + PEP phases) | **Critical** | Floor | Re-homes ADR-0061's three-gate work (now orphaned). A single **Policy Decision Point** (schema + evaluation + audit-event emission) with thin **Policy Enforcement Point** *phases*: provenance enforcement, org-config hierarchy, audit/compliance export, gate-config governance. **Platform-shared** model (CLI *and* Cloud — both are greenfield on org policy). Deps: ADR-0023/0061/0068/0081, **13a**, and compatibility with **23**'s near-term trust UX. |
+| **10** | Capability **resource isolation** + `requires` enforcement | High | Floor | Admission/trust UX is handled by ADR-0081 + spec 23; the remaining gap is that non-bundled capability packs still **import in-process at full host authority** (`capability-discovery.ts`). Strongest TCB-growth surface; outside spec 08's broker scope. Deps: 09, 23, ADR-0081. |
 | **11** | Platform compatibility / LTS / migration (+ machine-output compat window) | High | Floor↔GTM | Enterprise upgrade contracts: stable CLI/config/JSON/plugin surfaces, deprecation windows, migration commands, compat tests. Folds the **agent-facing JSON semver/deprecation window** (governed today by ADR-0050/0065). Deps: ADR-0023/0074. Gates 13/20. |
 | **13a** | **Verifiable self-distribution** (checksums, SBOM, signing) | High | Floor | Precondition for 09's provenance PEP — you cannot enforce *extension* provenance while your *own* distribution is unverifiable. The published GitHub Action already ships (`action.yml`) — 13a *specs* it (versioning, hashes, non-cloud variant). |
 | **13b** | Air-gap / mirrors / containers / rollback | Medium | GTM | Regulated/air-gapped deployment. Buyer-gated. Deps: 13a, 11. |
 | **17** | Detection-quality measurement (labeled **multi-language** corpus) | High | Product quality | SAST buyers demand measured FP/FN rates; spec 02 is reactive (waiver heatmap), the fixture harness is per-check. Add an **architecture-triage usefulness** metric (does graph context change a merge decision?). The corpus must be **multi-language** (counters R-1). Deps: 01, 02. |
 | **18** | Scale & performance SLOs (large-repo budgets) | High/Med (wedge-dep) | Product quality | CI wall-clock/memory are product features; the 264 MB datastore bug was a symptom. Primitives exist (ADR-0015/0028/0032) but no SLO/benchmark. **Same measurement harness as 17.** Deps: 01, 06. |
 | **20** | **Platform evidence authority & egress contract** | **Critical** | Platform floor | **Governing decision: ADR-0094** (committed 2026-06-29). Resolves the CLI↔Cloud dual-source-of-truth: hybrid authority tiers (§1.3), full-fidelity signed egress, **divergence-severity model**, SARIF `partialFingerprints`/`properties` round-trip. Deps: **05, 09, 11, 13a, 01-manifest**. *Not* a CLI-only blocker. |
-| **21** | Enterprise autonomy approval & change-control | **Access-gated** | GTM | Auditable human/team approval, separation of duties, kill switch, rollback, branch-protection integration, compliance export — the surface Cloud's autonomous pipeline lacks. **Precondition for opening autonomous-loop access** to the first external company (§1.5.2, decided 2026-06-29): headlining-as-vision does not require it; *admitting a user* does. Deps: 09, 20. |
-| **22** | Startup observability & load diagnostics | High | Operability floor | v0.1.15 dogfood exposed two attribution gaps: degraded fit-pack warnings can collapse to `Optional check pack "unknown" failed to load`, and pre-banner startup pauses are not broken down by phase. Preserve structured capability-load diagnostics and add startup/pre-action/time-to-first-render timing. Deps: 01, 10, 18, ADR-0052/0054/0060/0081/0084. |
+| **21** | Enterprise autonomy approval & change-control | **Access-gated** | GTM | Cloud-owned spec in the sibling `opensip` repo. Auditable human/team approval, separation of duties, kill switch, rollback, branch-protection integration, compliance export — the surface Cloud's autonomous pipeline lacks. **Precondition for opening autonomous-loop access** to the first external company (§1.5.2, decided 2026-06-29): headlining-as-vision does not require it; *admitting a user* does. Deps: 09, 20. |
+| **22** | Startup observability & load diagnostics | High | Operability floor | v0.1.15/v0.1.16 dogfood exposed attribution gaps: degraded fit-pack warnings can collapse to `Optional check pack "unknown" failed to load` or quote the raw cause in the wrong slot, and pre-banner startup pauses are not broken down by phase. Preserve structured capability-load diagnostics and add startup/pre-action/time-to-first-render timing. Deps: 01, 10, 18, ADR-0052/0054/0060/0081/0084. |
+| **23** | Low-friction customer extension trust | High | Extension UX floor | v0.1.16 prep exposed that secure deny-by-default trust gates make the intentional customer path feel broken: configured packs and installed/authored tools require hidden env-var allowlists. Target: explicit config/install/create actions are trust decisions; ambient discovery remains denied. Aligns with 09, 10, 11, ADR-0023/0054/0060/0074/0081. |
 
 **Proposed, not yet consensus:**
 
@@ -166,7 +171,7 @@ The "18-item" backlog spans IDs 01–18 but several mid-numbers were **absorbed*
 
 ## 3.1 Floor vs GTM partition
 
-- **Trust/security FLOOR — build regardless of demand** (not building it ships fault-isolation-as-security, a liability per ADR-0061): **01, 09, 10, 13a, 20.** Plus correctness/moat: **02, 03, 05, 06.** Operability floor: **22**.
+- **Trust/security FLOOR — build regardless of demand** (not building it ships fault-isolation-as-security, a liability per ADR-0061): **01, 09, 10, 13a, 20.** Plus correctness/moat: **02, 03, 05, 06.** Operability/extension UX floor: **22, 23**.
 - **GTM features — demand-gate behind a named design partner: 13b, 16, 19, 21**, and 09's audit/compliance PEP phases.
 
 ## 3.2 Critical path (the spine)
@@ -175,6 +180,7 @@ The "18-item" backlog spans IDs 01–18 but several mid-numbers were **absorbed*
 01 ─→ 09 (+13a) ─→ 05 ─→ 20          platform-evidence spine
   └─→ 06 ─→ 07                        agent-loop spine
   └─→ 02, 03 (parallel after 01)
+  └─→ 23 ──aligns with── 09/10/11      customer extension trust UX
 04 (positioning decision)  ‖ Phase 0–1
 17 + 18 + 22 (measurement/operability) ‖ throughout
 ```
@@ -195,6 +201,8 @@ The "18-item" backlog spans IDs 01–18 but several mid-numbers were **absorbed*
 - **13a** verifiable self-distribution → precondition for 09's provenance PEP
 - **10** capability resource isolation + `requires` enforcement *(after 09 kernel)*
 - **22** startup observability + load diagnostics *(can land in slices; feeds 18 perf attribution)*
+- **23** low-friction customer extension trust *(capability-pack slice can land for
+  v0.1.16; full tool workflow after spec review)*
 
 ### Phase 2 — Moat engineering *(after 02 + 06)*
 - **05** correlation v0 / architecture-evidence join *(the differentiator)* — after 02 + identity tiers
@@ -232,6 +240,9 @@ flowchart TD
   S04 -.reorders.-> S07
   S13a[13a Verifiable distribution] --> S09
   S09 --> S10[10 Capability isolation]
+  S23[23 Extension trust UX] -.aligns.-> S09
+  S23 -.feeds.-> S10
+  S23 -.feeds.-> S11
   S11[11 Compat/LTS] --> S13b[13b Air-gap/offline]
   S11 --> S20[20 Evidence authority + egress]
   S05 --> S20
@@ -288,7 +299,9 @@ flowchart TD
 3. Confirm parent `sarif-transform.ts` ignores `properties`/`partialFingerprints` (gates the "cheap egress win" scope).
 4. Re-verify GHAS/Copilot-Autofix/Sonar current state.
 
-**Two product decisions still owed (§1.5):** spec-04 wedge ratification; autonomous-merge-as-moat.
+**Product decision still owed (§1.5):** spec-04 wedge ratification. The
+autonomous-loop direction was resolved on 2026-06-29; spec 21 now gates opening
+external access.
 
 ---
 

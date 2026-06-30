@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-trivy",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "license": "Apache-2.0",
   "description": "External Tool Adapter for Trivy — wraps the trivy vulnerability + misconfiguration scanner as an opensip-cli tool (opensip trivy)",
   "keywords": [

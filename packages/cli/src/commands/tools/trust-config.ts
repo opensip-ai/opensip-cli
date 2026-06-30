@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+// @fitness-ignore-file dogfood-one-config-document-ratchet -- `tools create` is a host-owned config authoring command: it intentionally edits tools.trusted in opensip-cli.config.yml and does not participate in runtime config loading.
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
 import {
   parseDocument,
@@ -10,13 +11,26 @@ import {
   type YAMLSeq,
 } from 'yaml';
 
-/** Add a tool id to top-level `tools.trusted` in opensip-cli.config.yml. */
+const MAX_EDITABLE_CONFIG_BYTES = 1_000_000;
+
+/**
+ * Add a tool id to top-level `tools.trusted` in opensip-cli.config.yml.
+ *
+ * @throws {Error} When the config file is malformed, too large, or has an
+ * incompatible shape for `tools.trusted`.
+ */
 export function addTrustedToolToConfig(configPath: string, toolId: string): boolean {
   if (!existsSync(configPath)) {
     writeFileSync(configPath, `tools:\n  trusted:\n    - "${toolId}"\n`, 'utf8');
     return true;
   }
 
+  const stats = statSync(configPath);
+  if (stats.size > MAX_EDITABLE_CONFIG_BYTES) {
+    throw new Error(
+      `Cannot edit tools.trusted in ${configPath}: file is larger than ${MAX_EDITABLE_CONFIG_BYTES} bytes.`,
+    );
+  }
   const text = readFileSync(configPath, 'utf8');
   const doc: YAMLDocument = parseDocument(text);
   if (doc.errors.length > 0) {
@@ -58,11 +72,14 @@ export function addTrustedToolToConfig(configPath: string, toolId: string): bool
   }
   const seq = trusted as YAMLSeq;
 
-  for (const item of seq.items) {
+  const alreadyTrusted = seq.items.some((item) => {
     const value = isScalar(item) ? item.value : item;
-    if (value === toolId) return false;
+    return value === toolId;
+  });
+  const changed = !alreadyTrusted;
+  if (changed) {
+    seq.add(toolId);
+    writeFileSync(configPath, doc.toString(), 'utf8');
   }
-  seq.add(toolId);
-  writeFileSync(configPath, doc.toString(), 'utf8');
-  return true;
+  return changed;
 }

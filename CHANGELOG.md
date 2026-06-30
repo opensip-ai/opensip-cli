@@ -2,6 +2,39 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.17] - 2026-06-30
+
+A customer-extension trust and startup diagnostics release. It keeps ambient
+extension discovery deny-by-default, but makes explicit user actions such as
+configuring a capability pack or installing/creating a tool count as trust
+decisions. It also adds startup phase timing substrate and clearer degraded-load
+diagnostics so slow or partially degraded startup paths are easier to attribute.
+
+### Added
+
+- Trust config support for explicit tool and capability-pack trust decisions.
+- Startup timing instrumentation for pre-action/bootstrap phases.
+- Tools command result metadata for trust-aware install/list/create flows.
+- Planning updates for spec 23, low-friction customer extension trust.
+
+### Changed
+
+- `opensip tools install`, `tools create`, `tools list`, and `tools uninstall`
+  now surface and preserve trust posture more directly.
+- Configured capability packs and authored tools use explicit trust decisions
+  instead of relying on hidden environment-variable allowlists.
+- Public extension and tools documentation now describes the lower-friction trust
+  flow for customer-owned tools and packs.
+
+### Fixed
+
+- Optional check-pack load failures no longer collapse useful diagnostics into
+  misleading `"unknown"` or raw-cause package names.
+- `fit` continues to fail closed for degraded required loads while preserving
+  clearer optional-load warning text.
+- `tools create` now bounds `opensip-cli.config.yml` edits and keeps
+  `tools.trusted` updates compatible with the dogfood quality gates.
+
 ## [0.1.16] - 2026-06-29
 
 A small diagnostics, live-run, and product-framing release. It tightens `fit`

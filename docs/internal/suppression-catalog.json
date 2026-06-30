@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-29T04:31:15.367Z",
+  "generatedAt": "2026-06-30T03:20:39.606Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -11,13 +11,13 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 219,
+        "total": 220,
         "bySlug": {
           "no-markdown-references": 5,
           "silent-early-returns": 7,
           "exit-code-correctness": 1,
           "throws-documentation": 4,
-          "dogfood-one-config-document-ratchet": 1,
+          "dogfood-one-config-document-ratchet": 2,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 6,
@@ -87,7 +87,7 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "cli": 8,
+          "cli": 9,
           "cli-ui": 1,
           "core": 5,
           "dashboard": 1,
@@ -110,13 +110,13 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 45,
+        "total": 46,
         "bySlug": {
           "no-markdown-references": 3,
           "silent-early-returns": 5,
           "exit-code-correctness": 1,
           "throws-documentation": 1,
-          "dogfood-one-config-document-ratchet": 1,
+          "dogfood-one-config-document-ratchet": 2,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 2,
@@ -142,7 +142,7 @@
           "array-validation": 1
         },
         "byPackage": {
-          "cli": 8,
+          "cli": 9,
           "cli-ui": 1,
           "core": 5,
           "dashboard": 1,
@@ -374,13 +374,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 219,
+    "budgetGateFitness": 220,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 45,
+    "productRuntimeFitness": 46,
     "productRuntimeFitnessSlugs": 28,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 78,
+    "productRuntimeCombined": 79,
     "checkPackageFitness": 172,
     "testSupportFitness": 2,
     "testsFitness": 61,
@@ -400,10 +400,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -260,
+      "productRuntimeFitness": -259,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -234,
-      "budgetGateFitness": -323,
+      "productRuntimeCombined": -233,
+      "budgetGateFitness": -322,
       "checkPackageFitness": -62,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

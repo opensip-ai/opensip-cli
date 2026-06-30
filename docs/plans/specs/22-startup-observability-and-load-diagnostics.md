@@ -2,10 +2,11 @@
 
 ## Status
 
-> **Implementation status (2026-06-29):** not implemented — backlog draft (candidate for the next patch release). **Already shipped (substrate):** structured logging (`cli.run.start`, subprocess spawn/complete, `cli.checks.loading`, datastore lock waits) and a load substrate that knows package names. **Unbuilt by this spec:** a single startup phase-timing surface + a structured degraded-load cause (stop classifying pack failures by parsing human-readable strings → fixes the `"unknown"` pack warning).
+> **Implementation status (2026-06-30):** partially in-flight for v0.1.16 — backlog draft for the full observability surface. **Already shipped / in-flight substrate:** structured logging (`cli.run.start`, subprocess spawn/complete, `cli.checks.loading`, datastore lock waits), a load substrate that knows package names, and clearer optional check-pack warning wording. **Unbuilt by this spec:** a single startup phase-timing surface + a structured degraded-load cause path end to end (stop classifying pack failures by parsing human-readable strings).
 
-Backlog draft. Promote to `ready/` first. Candidate for the next patch release
-because it fixes diagnosability gaps found immediately after the v0.1.15 launch.
+Backlog draft. Promote to `ready/` before the full implementation. The v0.1.16
+slice may improve the warning text and configured-pack diagnostics, but the
+structured diagnostic/timing surface remains this spec's job.
 
 ## Priority
 
@@ -29,13 +30,19 @@ The CLI should be able to answer, from the run record or logs:
 
 ## Problem
 
-The v0.1.15 dogfood run exposed two observability gaps:
+The v0.1.15 launch and v0.1.16 prep exposed related observability gaps:
 
 - `fit` printed `Optional check pack "unknown" failed to load.` The load substrate
   normally knows the package name, but the fit finalizer classifies failures by
   parsing human-readable error strings. If a string shape does not match
   `package: detail` or `package -> domain: detail`, the display falls back to
   `"unknown"`.
+- After the first wording fix, the warning could still render the raw cause in the
+  quoted slot, e.g. `Optional check pack "package @opensip/fit denied by
+  capability-pack trust policy" failed to load.` The preferred shape is
+  `Optional check pack failed to load: package @opensip/fit denied by
+  capability-pack trust policy`, and the durable fix is typed diagnostics rather
+  than more string parsing.
 - A first post-upgrade `fit` invocation appeared to pause for several seconds
   before the banner/rendered output. Existing logs show useful clues
   (`cli.run.start`, subprocess spawn/complete, `cli.checks.loading`, datastore lock
@@ -115,8 +122,9 @@ session diagnostics later, but the source of truth is the local CLI run.
 
 - A fixture check pack with an import failure, bad export, compatibility rejection,
   and foreign-core skip produces a named diagnostic when package metadata exists.
-- No first-party path renders `Optional check pack "unknown" failed to load.` when a
-  package name was known by discovery.
+- No first-party path renders `Optional check pack "unknown" failed to load.` or
+  `Optional check pack "<raw cause>" failed to load.` when package/cause metadata
+  was known by discovery.
 - `fit --verbose` shows degraded load diagnostics with package/domain/detail.
 - `fit --json` and `sessions show --json --raw` preserve degraded load diagnostics
   as structured data.

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.16
+release: v0.1.17
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Inline source-level suppression — how `@fitness-ignore-next-line` and `@fitness-ignore-file` work, when to use them, and where they fit in the run."

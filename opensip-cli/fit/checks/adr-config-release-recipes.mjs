@@ -136,6 +136,10 @@ const CONFIG_READER_ALLOWLIST = new Set([
   'packages/core/src/lib/yaml.ts',
   'packages/core/src/plugins/discover.ts',
   'packages/cli/src/bootstrap/config-and-capabilities.ts',
+  // Pre-RunScope startup trust reader: reads only `tools.trusted` before the
+  // composed config document exists, then per-run scope uses the normal composed
+  // document. This is the trust gate's bootstrap bridge (ADR-0023/0054).
+  'packages/cli/src/bootstrap/tool-trust.ts',
   // Host-owned `opensip config validate|schema` — reads the project config
   // strictly for validation/schema export (ADR-0067), peer to bootstrap load.
   'packages/cli/src/commands/config.ts',

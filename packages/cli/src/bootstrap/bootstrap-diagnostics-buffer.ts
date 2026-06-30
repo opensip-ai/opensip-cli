@@ -8,6 +8,8 @@
 
 import { BootstrapDiagnosticsCollector, type CliDiagnostic } from '@opensip-cli/core';
 
+export { createStartupTimer, type StartupTimingEvent } from './startup-timing.js';
+
 let buffer: BootstrapDiagnosticsCollector | undefined;
 
 /** Reset and return a fresh bootstrap diagnostics buffer (call once per bootstrap). */

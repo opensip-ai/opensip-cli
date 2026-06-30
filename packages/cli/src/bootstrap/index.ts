@@ -28,21 +28,22 @@ import { hostEnv } from '../env/host-env-specs.js';
 import { initTelemetry } from '../telemetry/sdk-init.js';
 
 import {
+  createStartupTimer,
   getBootstrapDiagnosticsBuffer,
   resetBootstrapDiagnosticsBuffer,
+  type StartupTimingEvent,
   takeBootstrapDiagnostics,
 } from './bootstrap-diagnostics-buffer.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
   BUNDLED_TOOL_PACKAGES,
-  registerFirstPartyTools,
-  discoverAndRegisterToolPackages,
-  discoverAndRegisterAuthoredTools,
   buildToolDiscoverySources,
+  discoverAndRegisterAuthoredTools,
+  discoverAndRegisterToolPackages,
+  registerFirstPartyTools,
 } from './register-tools.js';
 import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
-import { createStartupTimer, type StartupTimingEvent } from './startup-timing.js';
 import { readProjectTrustedToolIds } from './tool-trust.js';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.

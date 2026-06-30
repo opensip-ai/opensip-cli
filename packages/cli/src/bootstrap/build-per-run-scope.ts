@@ -384,22 +384,7 @@ interface AssembleCorrelationInput {
   readonly cwd: string;
 }
 
-/**
- * Assemble the cloud-aware {@link RunCorrelation} bag (B2). Extracted from
- * {@link buildPerRunScope} so the builder stays under the cognitive-complexity
- * cap and the cloud-active gate + repo derivation read as one cohesive unit.
- *
- * `cloudActive` mirrors `resolveSignalSink`'s gate (a resolved key AND not
- * `--no-cloud` AND `sync !== false`): an API key resolves (flag → env → config),
- * egress is not opted out, and the user/project did not set `sync: false`.
- *
- * The free-form `repo` join key (project-root basename, or cwd basename when
- * there is no project — cwd is the floor, Assumption 2) is attached ONLY when
- * `cloudActive`; never an empty sentinel. `repoId`/`tenantId` are NOT locally
- * resolvable in the OSS CLI today, so they are omitted (the future
- * locally-cached surrogate slot). Returns `cloudActive`/`traceId` alongside the
- * bag for the assembly-step diagnostics.
- */
+/** Assemble the cloud-aware {@link RunCorrelation} bag and diagnostics facts. */
 function assembleCorrelation(input: AssembleCorrelationInput): {
   readonly correlation: RunCorrelation;
   readonly cloudActive: boolean;
@@ -426,7 +411,6 @@ function assembleCorrelation(input: AssembleCorrelationInput): {
   return { correlation, cloudActive, traceId };
 }
 
-// Helper duplicated from pre-action-hook for now (small, can be shared later if it grows).
 function configDocumentSlot(
   project: { readonly scope: string; readonly configPath: string | undefined },
   configDocument: unknown,
@@ -435,9 +419,3 @@ function configDocumentSlot(
     ? { configDocument: configDocument as Record<string, unknown> }
     : {};
 }
-
-// Note: resolveUserPaths is used above but was in the original hook import from core.
-// In real extraction we would import it here. For this focused GA step we keep the
-// construction close to original to minimize diff while still thinning the hook.
-// The important win is that pre-action-hook no longer contains the 60+ lines of
-// scope assembly + wiring.
