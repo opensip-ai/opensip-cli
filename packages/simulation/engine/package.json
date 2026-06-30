@@ -96,7 +96,8 @@
         ],
         "scope": "project",
         "output": "raw-stream",
-        "rawStreamReason": "runtime-render-dispatch"
+        "rawStreamReason": "runtime-render-dispatch",
+        "producesVerdict": true
       },
       {
         "name": "recipes",
