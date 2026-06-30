@@ -43,7 +43,9 @@ coverage/
 opensip-cli/.runtime/
 **/opensip-cli/.runtime/
 
-# Local-only implementation plans (kept out of the repo)
+# Local-only docs content (kept out of the repo)
+docs/ai-helpers/
+docs/examples/
 docs/plans/
 
 # Ephemeral remediation artifacts from the Correctness Remediation Process.
