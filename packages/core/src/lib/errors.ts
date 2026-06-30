@@ -272,6 +272,11 @@ export function toolErrorFromCanonicalCode(
   }
 }
 
+/** Extract a bounded display/log message from an unknown throwable. */
+export function formatUnknownErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // =============================================================================
 // RESULT PATTERN
 // =============================================================================
