@@ -46,6 +46,7 @@ opensip-cli/.runtime/
 # Local-only docs content (kept out of the repo)
 docs/ai-helpers/
 docs/examples/
+docs/internal/
 docs/plans/
 
 # Ephemeral remediation artifacts from the Correctness Remediation Process.
@@ -53,30 +54,6 @@ docs/plans/
 # They are created inside worktrees during remediation runs and are never
 # committed to the main repository.
 docs/remediation/
-
-# Internal contributor process and improvement docs (correctness remediation
-# process, per-domain quality improvement processes, etc.). These were
-# previously committed but are now treated as local-only (like plans/ and
-# remediation artifacts).
-# NOTE: ignore the directory *contents* (not the dir itself) so a specific
-# file can be re-included below — git cannot un-ignore a file whose parent
-# directory is excluded.
-docs/internal/*
-# Exception: the subprocess-correlation operator playbook is a committed
-# contributor deliverable (durable on-call runbook, not an ephemeral
-# improvement-process doc) — it is repo-only-but-committed per CLAUDE.md's
-# docs/internal charter. Negate the bulk ignore for just this file.
-!docs/internal/subprocess-correlation-playbook.md
-!docs/internal/plugin-isolation-surface.md
-!docs/internal/supply-chain-dependency-hygiene-improvement-process.md
-!docs/internal/enterprise-policy-governance.md
-!docs/internal/suppression-catalog.json
-!docs/internal/suppression-triage.md
-!docs/internal/state-observability-concurrency-inventory.md
-!docs/internal/tool-authoring-dx-inventory.md
-!docs/internal/state-observability-contract.md
-!docs/internal/specs/
-!docs/internal/specs/**
 
 # Claude Code session state
 .claude/scheduled_tasks.lock
