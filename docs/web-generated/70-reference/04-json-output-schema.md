@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.18
+release: v0.1.19
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
@@ -16,7 +16,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. This is the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. This is the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -28,9 +28,9 @@ related-docs:
 }
 ```
 
-`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
+`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
 
-The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope. Before JSON, terminal rendering, SARIF, cloud, or report egress, the host may normalize that envelope by collapsing exact identity duplicates and conservative near-identity duplicates ([ADR-0098](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md)).
+The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope. Before JSON, terminal rendering, SARIF, cloud, or report egress, the host may normalize that envelope by collapsing exact identity duplicates and conservative near-identity duplicates ([ADR-0098](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md)).
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
 
@@ -87,8 +87,8 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 | `verdict` | `RunVerdict` | yes | Run-level pass/fail header. See below. |
 | `units` | `UnitResult[]` | yes | Per-unit ran/errored/timing facts. May be `[]`. |
 | `signals` | `Signal[]` | yes | The flat list of findings the run produced. May be `[]`. |
-| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
-| `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0097-gate-verdict-determinism.md)). |
+| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
+| `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0097-gate-verdict-determinism.md)). |
 | `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
 
 ### Host signal normalization
@@ -199,7 +199,7 @@ A **unit** is the neutral umbrella over a fit check, a graph rule, and a sim sce
 
 ### `Signal`
 
-Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/types/signal.ts)).
+Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/types/signal.ts)).
 It carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a
 fix hint with confidence.
 
@@ -244,7 +244,7 @@ fix hint with confidence.
 | `strength` | number | no | Optional signal-strength weight. |
 | `fingerprint` | string | no | Stable de-dup fingerprint when the producer computes one. |
 | `createdAt` | string (ISO 8601) | yes | When the signal was created. |
-| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. Not exported to SARIF. |
+| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. Not exported to SARIF. |
 
 #### `SignalRepair` (optional)
 
@@ -268,7 +268,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 All three tools emit the **same envelope**; the differences are confined to a few fields:
 
 - **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`.
-- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/graph/engine/src/cli/build-envelope.ts).
+- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/graph/engine/src/cli/build-envelope.ts).
 - **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id,
   `error` set when a scenario errored).
 
@@ -337,7 +337,7 @@ For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The S
 
 When `fit`/`graph`/`sim` run with `--json` and any `--filter` token (or
 `sessions show` with filters), the payload includes filter metadata
-([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0085-change-detection-substrate.md)):
+([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0085-change-detection-substrate.md)):
 
 ```jsonc
 {

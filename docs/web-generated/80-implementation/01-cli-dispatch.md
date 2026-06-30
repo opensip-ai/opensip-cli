@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.18
+release: v0.1.19
 title: "CLI dispatch"
 audience: [contributors]
 purpose: "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."
@@ -108,14 +108,14 @@ sequenceDiagram
   CLI->>Output: render, deliver, persist, set exit code
 ```
 
-The entry point remains small ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/index.ts)
+The entry point remains small ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/index.ts)
 is ~190 lines) and delegates the phase-heavy work to named bootstrap modules
 such as `bootstrapCli`, `createPreActionHook`, and
 `executePostBailoutBootstrap` (ADR-0052). There is still no DI container, but
 startup now has explicit phase seams so scope construction, config validation,
 capability loading, and host start effects are testable independently.
 Bundled tools are **not** statically imported: the host lists their package names
-in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/bundled-manifest.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/bootstrap/bundled-manifest.ts), re-exported from [`bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/bootstrap/register-tools.ts))
+in `BUNDLED_TOOL_PACKAGES` ([`bootstrap/bundled-manifest.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/bootstrap/bundled-manifest.ts), re-exported from [`bootstrap/register-tools.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/bootstrap/register-tools.ts))
 and loads each through the same manifest → `admitTool` → dynamic-import →
 register path an installed or project-local tool travels. "Bundled" is a trust
 posture, not a privileged load path — a guardrail (`no-bootstrap-tool-import`)
@@ -127,7 +127,7 @@ A few of the constraints that pinned the order:
 
 - **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool is admitted and mounted.
 - **First-party tools before discovery.** `ToolRegistry.register()` is **first-writer-wins** (`warn-first-wins`). `bootstrapCli()` admits the bundled tools first, so a same-id third-party package can't clobber a built-in: the first-writer policy keeps the incumbent (and warns), and the discovery walk via `discoverToolPackages()` *also* explicitly skips packages whose `metadata.id` matches a bundled tool. Both guards point the same way — bundled `fit`/`sim`/`graph`/`yagni` win.
-- **Authored discovery is the third leg — bundled, then installed, then authored sidecars.** After the bundled + installed legs, `discoverAndRegisterAuthoredTools()` walks the two authored `tools/` roots and converges on the same `importToolRuntime` → `isValidTool` → `registry.register` path. It carries **two trust postures**: a global-authored tool (`~/.opensip-cli/tools/`) is trusted-by-default, while a project-authored tool (`<project>/opensip-cli/tools/`) is **deny-by-default** — admitted only when its id appears in `tools.trusted` or the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override. The **trust decision always precedes the dynamic import**: an untrusted project tool throws `PluginIncompatibleError` (exit 5) before its module is ever loaded, so a `git clone`-borne tool cannot run code by mere presence ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+- **Authored discovery is the third leg — bundled, then installed, then authored sidecars.** After the bundled + installed legs, `discoverAndRegisterAuthoredTools()` walks the two authored `tools/` roots and converges on the same `importToolRuntime` → `isValidTool` → `registry.register` path. It carries **two trust postures**: a global-authored tool (`~/.opensip-cli/tools/`) is trusted-by-default, while a project-authored tool (`<project>/opensip-cli/tools/`) is **deny-by-default** — admitted only when its id appears in `tools.trusted` or the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override. The **trust decision always precedes the dynamic import**: an untrusted project tool throws `PluginIncompatibleError` (exit 5) before its module is ever loaded, so a `git clone`-borne tool cannot run code by mere presence ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 - **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `yagni`, …) get mounted in `mountAllToolCommands()` first from each tool's `commandSpecs`. CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, `configure`, `agent-catalog`, `completion`, `uninstall`) are mounted afterwards in `mountHostCommands()`, also through `mountCommandSpec()` — which then hangs each per-tool `<tool> plugin` group under its tool primary via `mountToolPluginGroups()` (so there is no top-level `opensip plugin`). The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
 - **`parseAsync` last.** Commander parses argv synchronously but action handlers are async. `parseAsync` returns when the action handler resolves, which is what blocks Node's event loop until the run completes.
 
@@ -147,7 +147,7 @@ Per-run logs stay filterable for free on the same seam: each scope carries a dis
 
 ## CLI-owned commands
 
-Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/commands/) and are assembled by `mountHostCommands()` as host-owned `CommandSpec`s:
+Some commands belong to the CLI itself, not to any Tool. They live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/) and are assembled by `mountHostCommands()` as host-owned `CommandSpec`s:
 
 | Command | Owner | Why CLI-owned |
 |---|---|---|
@@ -182,12 +182,12 @@ The split is functional, not arbitrary. CLI-owned commands deal with concerns th
 ## Adding a host-owned command result
 
 `CommandResult` is a closed discriminated union, and
-[`resultToView`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/ui/result-to-view.ts) is exhaustively
+[`resultToView`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/ui/result-to-view.ts) is exhaustively
 checked. When a host-owned command needs a new result variant, update these
 surfaces in the same change:
 
 1. Add the result interface and union member in
-   [`packages/contracts/src/command-results.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/contracts/src/command-results.ts).
+   [`packages/contracts/src/command-results.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/command-results.ts).
 2. Return that variant from the command handler or action body.
 3. Add a `resultToView` switch case and a focused render test in
    `packages/cli/src/ui/__tests__/result-to-view.test.ts`.
@@ -215,11 +215,11 @@ The `--help` text for the program lists every registered Tool's `commands[]`. Th
 
 ## The welcome screen
 
-When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-cli` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/welcome.ts).
+When the binary is invoked without arguments (or with bare `--help`), the CLI prints a welcome banner: the version, a short description of what `opensip-cli` does, and a numbered list of common next-step commands. Source: [`packages/cli/src/welcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/welcome.ts).
 
 The update check runs in the **pre-action hook**, so it fires on every command invocation but **not** on bare `opensip-cli` (the hook only runs for an actual subcommand; a zero-arg invocation short-circuits to the welcome screen and never reaches it). The hook calls `checkForUpdate`, which returns the newer published version (if any). When the **default `mini` banner** is active, that version is surfaced inline on the banner's version line as `(<new-version> available)` (in `theme.success`); for the other banner sizes — and the banner-less `--json` path — `formatUpdateNag` prints a one-line "update available" message to stderr instead. The check is skipped when stdout isn't a TTY, when `CI` is set, or when `OPENSIP_NO_UPDATE` / `NO_UPDATE_NOTIFIER` is set.
 
-**Fetch vs. display are deliberately separated.** `update-notifier` is used only as the *fetcher*: it runs the rate-limited (once per 24 hours), detached, non-blocking network check and owns its own cache under `~/.config/configstore/`. But that package *deletes its cached result the moment it's read*, which would make the notice show at most once per daily cycle — easy to miss. So the newest known version is mirrored into a **sticky store** at `~/.opensip-cli/update-state.json` ([`packages/cli/src/update-state.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/update-state.ts)), which `checkForUpdate` reads on **every** run. The notice therefore persists until the running version catches up, at which point the store is cleared in place and the notice stops on its own. The sticky file is tool-generated cache, kept separate from the user-authored `~/.opensip-cli/config.yml`. See [`packages/cli/src/update-notifier.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/update-notifier.ts).
+**Fetch vs. display are deliberately separated.** `update-notifier` is used only as the *fetcher*: it runs the rate-limited (once per 24 hours), detached, non-blocking network check and owns its own cache under `~/.config/configstore/`. But that package *deletes its cached result the moment it's read*, which would make the notice show at most once per daily cycle — easy to miss. So the newest known version is mirrored into a **sticky store** at `~/.opensip-cli/update-state.json` ([`packages/cli/src/update-state.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/update-state.ts)), which `checkForUpdate` reads on **every** run. The notice therefore persists until the running version catches up, at which point the store is cleared in place and the notice stops on its own. The sticky file is tool-generated cache, kept separate from the user-authored `~/.opensip-cli/config.yml`. See [`packages/cli/src/update-notifier.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/update-notifier.ts).
 
 The banner does not appear when a command is invoked. It's strictly a no-argv affordance — running `opensip fit` skips the welcome and goes straight to the run.
 
@@ -241,7 +241,7 @@ catch (error) {
 }
 ```
 
-The suggestion is a one-line hint — "Run `opensip init` to create one." or "Check `opensip-cli.config.yml` for syntax errors." The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/contracts/src/exit-codes.ts) so the same error message surfaces the same suggestion regardless of which Tool threw it.
+The suggestion is a one-line hint — "Run `opensip init` to create one." or "Check `opensip-cli.config.yml` for syntax errors." The mapping is centralized in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/exit-codes.ts) so the same error message surfaces the same suggestion regardless of which Tool threw it.
 
 This is the polite way the CLI extends Tool errors. The Tool just throws; the CLI does the message-matching and rendering.
 

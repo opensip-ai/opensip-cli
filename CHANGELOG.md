@@ -2,6 +2,42 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.19] - 2026-06-30
+
+A precision and duplicate-signal hardening release. It moves duplicate finding
+collapse into the CLI host output plane, documents suppression catalogs as
+precision heatmaps rather than proof, and reduces false positives in the
+fitness checks that were generating noisy plan-02 signal clusters.
+
+### Added
+
+- ADR-0098, defining host-owned signal deduplication and suppression-catalog
+  precision heatmaps.
+- Host-side signal normalization for `SignalEnvelope` output before JSON,
+  terminal rendering, SARIF, cloud, report, and session delivery.
+- Focused regression coverage for exact and near-identity signal collapse,
+  envelope routing, and chunked bulk-insert analysis.
+
+### Changed
+
+- Output/schema docs now describe the host-normalized envelope contract,
+  including dedup identity order and the guarantee that `verdict.passed`
+  remains tool-owned.
+- Suppression catalog generation and triage docs now carry an explicit
+  `false-positive`, `accepted-risk`, and `design-mismatch` taxonomy.
+- The chunked bulk-insert check now understands formatted `.map(...)` windows
+  and bounded map sources.
+
+### Fixed
+
+- Duplicate findings from the same provider/source/rule/location/message are
+  collapsed once at the host output boundary instead of leaking through every
+  output sink.
+- Silent early-return checks now skip explicit boolean-return contracts where
+  `return false` is the expected result.
+- Several implementation paths now avoid unnecessary suppressed findings called
+  out by the refreshed precision heatmap.
+
 ## [0.1.18] - 2026-06-30
 
 A hidden-state hardening release. It makes host-owned datastore/session lifecycle
