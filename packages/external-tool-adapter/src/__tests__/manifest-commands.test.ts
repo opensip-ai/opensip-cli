@@ -51,6 +51,7 @@ describe('deriveAdapterManifestCommands', () => {
           default: false,
         },
       ],
+      producesVerdict: true,
       scope: 'project',
       output: 'raw-stream',
       rawStreamReason: 'runtime-render-dispatch',
