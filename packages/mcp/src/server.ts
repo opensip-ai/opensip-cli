@@ -30,7 +30,12 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { configureLogger, logger, runWithScope } from '@opensip-cli/core';
+import {
+  configureLogger,
+  formatUnknownErrorMessage,
+  logger,
+  runWithScope,
+} from '@opensip-cli/core';
 
 import type { GraphReadPort } from './graph-read-port.js';
 import type { ResultsReadPort } from './results-read-port.js';
@@ -129,7 +134,7 @@ export class McpStdioServer {
           evt: 'mcp.tool.dispatch.error',
           module: LOG_MODULE,
           tool: name,
-          error: errorMessage(error),
+          error: formatUnknownErrorMessage(error),
         });
         throw error;
       }
@@ -186,9 +191,4 @@ export class McpStdioServer {
       logger.info({ evt: 'mcp.server.stop', module: LOG_MODULE, server: SERVER_NAME });
     }
   }
-}
-
-/** Bounded, secret-free message extraction for the stderr error log. */
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
