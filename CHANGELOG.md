@@ -2,6 +2,140 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.19] - 2026-06-30
+
+A precision and duplicate-signal hardening release. It moves duplicate finding
+collapse into the CLI host output plane, documents suppression catalogs as
+precision heatmaps rather than proof, and reduces false positives in the
+fitness checks that were generating noisy plan-02 signal clusters.
+
+### Added
+
+- ADR-0098, defining host-owned signal deduplication and suppression-catalog
+  precision heatmaps.
+- Host-side signal normalization for `SignalEnvelope` output before JSON,
+  terminal rendering, SARIF, cloud, report, and session delivery.
+- Focused regression coverage for exact and near-identity signal collapse,
+  envelope routing, and chunked bulk-insert analysis.
+
+### Changed
+
+- Output/schema docs now describe the host-normalized envelope contract,
+  including dedup identity order and the guarantee that `verdict.passed`
+  remains tool-owned.
+- Suppression catalog generation and triage docs now carry an explicit
+  `false-positive`, `accepted-risk`, and `design-mismatch` taxonomy.
+- The chunked bulk-insert check now understands formatted `.map(...)` windows
+  and bounded map sources.
+
+### Fixed
+
+- Duplicate findings from the same provider/source/rule/location/message are
+  collapsed once at the host output boundary instead of leaking through every
+  output sink.
+- Silent early-return checks now skip explicit boolean-return contracts where
+  `return false` is the expected result.
+- Several implementation paths now avoid unnecessary suppressed findings called
+  out by the refreshed precision heatmap.
+
+## [0.1.18] - 2026-06-30
+
+A hidden-state hardening release. It makes host-owned datastore/session lifecycle
+explicit, stamps deterministic declared-input provenance onto emitted gate
+artifacts, and documents the resulting retention and verdict-diagnosis model for
+operators and agents.
+
+### Added
+
+- ADR-0096, defining host-owned datastore lifecycle and session-retention
+  ownership boundaries.
+- ADR-0097, defining the allowlisted `declaredInputs` manifest for gate verdict
+  determinism.
+- `cli.sessions` retention configuration for count, age, and SQLite size bounds.
+- Host-owned session pruning and datastore reclaim primitives, with tests for
+  count pruning, size reclaim, and non-fatal maintenance failures.
+
+### Changed
+
+- JSON outcomes, SARIF/cloud delivery, dashboard/report composition, and session
+  persistence now receive host-stamped declared-input metadata.
+- `fit` architecture checks now reject tool-owned session timing, retention, and
+  SQLite reclaim ownership.
+- Session cleanup now runs as best-effort host maintenance after successful
+  session writes without changing tool verdicts or exit codes.
+
+### Fixed
+
+- Gate outputs are easier to compare across runs because CLI, Node, package
+  manager, platform, tool, and baseline identity are captured in a compact
+  manifest instead of being inferred from ambient host state.
+- Project-local SQLite/session history growth is bounded by a documented default
+  host policy instead of relying on manual cleanup.
+
+## [0.1.17] - 2026-06-30
+
+A customer-extension trust and startup diagnostics release. It keeps ambient
+extension discovery deny-by-default, but makes explicit user actions such as
+configuring a capability pack or installing/creating a tool count as trust
+decisions. It also adds startup phase timing substrate and clearer degraded-load
+diagnostics so slow or partially degraded startup paths are easier to attribute.
+
+### Added
+
+- Trust config support for explicit tool and capability-pack trust decisions.
+- Startup timing instrumentation for pre-action/bootstrap phases.
+- Tools command result metadata for trust-aware install/list/create flows.
+- Planning updates for spec 23, low-friction customer extension trust.
+
+### Changed
+
+- `opensip tools install`, `tools create`, `tools list`, and `tools uninstall`
+  now surface and preserve trust posture more directly.
+- Configured capability packs and authored tools use explicit trust decisions
+  instead of relying on hidden environment-variable allowlists.
+- Public extension and tools documentation now describes the lower-friction trust
+  flow for customer-owned tools and packs.
+
+### Fixed
+
+- Optional check-pack load failures no longer collapse useful diagnostics into
+  misleading `"unknown"` or raw-cause package names.
+- `fit` continues to fail closed for degraded required loads while preserving
+  clearer optional-load warning text.
+- `tools create` now bounds `opensip-cli.config.yml` edits and keeps
+  `tools.trusted` updates compatible with the dogfood quality gates.
+
+## [0.1.16] - 2026-06-29
+
+A small diagnostics, live-run, and product-framing release. It tightens `fit`
+startup failure handling, moves the YAGNI live audit path onto the same
+worker-backed progress model as the other heavier tools, and publishes the
+OpenSIP CLI/OpenSIP platform evidence-authority and identity decisions. It also
+clarifies the no-project startup hint before the next npm publish.
+
+### Added
+
+- ADR-0094, documenting CLI-to-Cloud evidence authority, repository identity, and
+  fidelity-preserving egress expectations.
+- ADR-0095 and a canonical public guide explaining the relationship between
+  OpenSIP CLI and the broader OpenSIP platform, including updated agent scaffold
+  copy.
+- A local planning snapshot for startup observability and load diagnostics.
+
+### Changed
+
+- `opensip yagni` live runs now execute through an internal worker command while
+  streaming per-detector progress events back to the live UI.
+- The no-project startup message now tells users to change into their project
+  directory before running `opensip init`.
+
+### Fixed
+
+- `fit` now fails closed when required plugins or configured check packages fail
+  to load, and it redacts absolute module paths from load-error diagnostics.
+- Capability-pack loading now tolerates project-local package manifests that omit
+  optional fields used by generated command-surface metadata.
+
 ## [0.1.15] - 2026-06-29
 
 An external-scanner integration release. OpenSIP CLI can now wrap a

@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
-import { logger, PluginIncompatibleError } from '@opensip-cli/core';
+import { logger, PluginIncompatibleError, resolveProjectPaths } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
@@ -21,6 +21,10 @@ import {
   isInstalledToolTrusted,
   isProjectLocalToolTrusted,
   PROJECT_TOOL_ALLOWLIST_ENV,
+  removeInstalledToolTrust,
+  recordInstalledToolTrust,
+  resolveInstalledToolTrust,
+  trustedToolIdsFromConfigDocument,
 } from '../bootstrap/tool-trust.js';
 
 const SIDECAR = 'opensip-tool.manifest.json';
@@ -125,6 +129,152 @@ describe('wildcard allowlist broadening guard', () => {
     expect(isProjectLocalToolTrusted('denied', projectEnv)).toBe(false);
     expect(isInstalledToolTrusted('allowed-only', installedEnv)).toBe(true);
     expect(isInstalledToolTrusted('denied', installedEnv)).toBe(false);
+  });
+});
+
+describe('tools.trusted config parsing', () => {
+  it('reads only string tool ids from tools.trusted', () => {
+    expect([
+      ...trustedToolIdsFromConfigDocument({
+        tools: { trusted: ['audit-sec', 1, 'repo-doctor'] },
+      }),
+    ]).toEqual(['audit-sec', 'repo-doctor']);
+    expect([...trustedToolIdsFromConfigDocument({ tools: { trusted: 'audit-sec' } })]).toEqual([]);
+  });
+});
+
+describe('managed installed-tool trust records', () => {
+  const staged: string[] = [];
+  afterEach(() => {
+    for (const d of staged.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  it('admits a matching project managed-install record without env trust', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-managed-tool-'));
+    staged.push(root);
+    const packageDir = join(
+      resolveProjectPaths(root).pluginsDir('tool'),
+      'node_modules',
+      '@acme',
+      'audit-sec',
+    );
+    mkdirSync(packageDir, { recursive: true });
+
+    recordInstalledToolTrust({
+      scope: 'project',
+      cwd: root,
+      toolId: 'audit-sec',
+      packageName: '@acme/audit-sec',
+      version: '1.2.3',
+      manifestHash: 'hash-a',
+      installSourcePath: join(root, 'staged-audit-sec'),
+      installedAt: new Date('2026-06-30T12:00:00.000Z'),
+    });
+
+    expect(
+      resolveInstalledToolTrust({
+        toolId: 'audit-sec',
+        packageName: '@acme/audit-sec',
+        packageDir,
+        manifestHash: 'hash-a',
+        env: {},
+        projectRoot: root,
+      }),
+    ).toEqual({ trusted: true, reason: 'managed-install' });
+  });
+
+  it('denies managed-install records with a different manifest hash during admission', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-managed-tool-'));
+    staged.push(root);
+    const packageDir = join(
+      resolveProjectPaths(root).pluginsDir('tool'),
+      'node_modules',
+      '@acme',
+      'audit-sec',
+    );
+    mkdirSync(packageDir, { recursive: true });
+
+    recordInstalledToolTrust({
+      scope: 'project',
+      cwd: root,
+      toolId: 'audit-sec',
+      packageName: '@acme/audit-sec',
+      manifestHash: 'hash-a',
+      installSourcePath: join(root, 'staged-audit-sec'),
+    });
+
+    expect(
+      resolveInstalledToolTrust({
+        toolId: 'audit-sec',
+        packageName: '@acme/audit-sec',
+        packageDir,
+        manifestHash: 'hash-b',
+        env: {},
+        projectRoot: root,
+      }),
+    ).toEqual({ trusted: false, reason: 'denied' });
+  });
+
+  it('admits project-installed packages listed in tools.trusted when no managed record exists', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-config-trusted-tool-'));
+    staged.push(root);
+    const packageDir = join(
+      resolveProjectPaths(root).pluginsDir('tool'),
+      'node_modules',
+      '@acme',
+      'repo-doctor',
+    );
+    mkdirSync(packageDir, { recursive: true });
+
+    expect(
+      resolveInstalledToolTrust({
+        toolId: 'repo-doctor',
+        packageName: '@acme/repo-doctor',
+        packageDir,
+        manifestHash: 'hash-a',
+        env: {},
+        projectRoot: root,
+        projectTrustedTools: new Set(['repo-doctor']),
+      }),
+    ).toEqual({ trusted: true, reason: 'project-config' });
+  });
+
+  it('removes managed trust records by tool id and package name', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-managed-tool-remove-'));
+    staged.push(root);
+    const packageDir = join(
+      resolveProjectPaths(root).pluginsDir('tool'),
+      'node_modules',
+      '@acme',
+      'audit-sec',
+    );
+    mkdirSync(packageDir, { recursive: true });
+
+    recordInstalledToolTrust({
+      scope: 'project',
+      cwd: root,
+      toolId: 'audit-sec',
+      packageName: '@acme/audit-sec',
+      manifestHash: 'hash-a',
+      installSourcePath: join(root, 'staged-audit-sec'),
+    });
+    removeInstalledToolTrust({
+      scope: 'project',
+      cwd: root,
+      toolId: 'audit-sec',
+      packageName: '@acme/audit-sec',
+    });
+
+    expect(
+      resolveInstalledToolTrust({
+        toolId: 'audit-sec',
+        packageName: '@acme/audit-sec',
+        packageDir,
+        manifestHash: 'hash-a',
+        env: {},
+        projectRoot: root,
+      }),
+    ).toEqual({ trusted: false, reason: 'denied' });
   });
 });
 

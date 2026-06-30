@@ -2,11 +2,17 @@
  * yagni-runner — live-view entry for `opensip yagni` via @opensip-cli/cli-live.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { runToolLiveView } from '@opensip-cli/cli-live';
 import { groupSignalsBySource } from '@opensip-cli/contracts';
 import {
   isErrorSignal,
   currentScope,
+  liveEngineCorrelation,
+  runOffThreadOrInProcess,
   type LiveViewContext,
   type ToolCliContext,
 } from '@opensip-cli/core';
@@ -16,26 +22,14 @@ import { YAGNI_DETECTORS } from '../detectors/registry.js';
 import { executeYagni, type ExecuteYagniOptions } from './execute-yagni.js';
 import { loadYagniConfig } from './yagni-config.js';
 import { buildYagniPresentationLines } from './yagni-presentation.js';
+import { detectorDoneEvent, detectorLabel, detectorStartEvent } from './yagni-progress.js';
 
 import type { YagniConfidence } from '../types/yagni-metadata.js';
-import type { LiveRunTableRow, ProgressSurface } from '@opensip-cli/cli-ui';
+import type { LiveRunTableRow, ProgressEvent, ProgressSurface } from '@opensip-cli/cli-ui';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
 
 const YAGNI_TOOL_TITLE = 'YAGNI Audit';
 const YAGNI_TOOL_DESCRIPTION = 'Scanning for speculative surface to remove.';
-
-/**
- * Friendly checklist row label from a detector slug — drops the `yagni:`
- * namespace and title-cases the kebab tail (`yagni:unused-config-surface` →
- * `Unused Config Surface`).
- */
-function detectorLabel(slug: string): string {
-  const name = slug.slice(slug.indexOf(':') + 1);
-  return name
-    .split('-')
-    .map((w) => (w.length === 0 ? w : w[0].toUpperCase() + w.slice(1)))
-    .join(' ');
-}
 
 /**
  * Per-detector checklist (one phase per detector), mirroring graph's staged view.
@@ -90,6 +84,31 @@ function envelopeToLiveRunTableRows(envelope: SignalEnvelope): LiveRunTableRow[]
   });
 }
 
+function buildExecuteOptions(
+  args: YagniLiveArgs,
+  config: ReturnType<typeof loadYagniConfig>,
+  emit: (event: ProgressEvent) => void,
+): ExecuteYagniOptions {
+  return {
+    cwd: args.cwd,
+    config,
+    minConfidence: args.minConfidence,
+    detectors: args.detectors,
+    categories: args.categories,
+    includeTests: args.includeTests,
+    pathRoots: args.pathRoots,
+    onDetectorStart: (slug) => {
+      emit(detectorStartEvent(slug));
+    },
+    onDetectorDone: (slug, durationMs) => {
+      emit(detectorDoneEvent(slug, durationMs));
+    },
+    onDetectorsSkipped: (slugs) => {
+      for (const slug of slugs) emit(detectorDoneEvent(slug, 0, 'skipped'));
+    },
+  };
+}
+
 export async function renderYagniLive(
   args: YagniLiveArgs,
   cli: ToolCliContext,
@@ -108,34 +127,32 @@ export async function renderYagniLive(
       projectPath: args.cwd,
       walkedUp: currentScope()?.projectContext?.walkedUp,
       produce: async (emit, helpers) => {
-        helpers.setRunning(() => {
-          // In-process run — per-detector phase events flow through emit() directly.
+        const specDir = mkdtempSync(join(tmpdir(), 'yagni-worker-'));
+        const specPath = join(specDir, 'spec.json');
+        writeFileSync(specPath, JSON.stringify(args), 'utf8');
+        const correlation = liveEngineCorrelation(currentScope()?.correlation);
+        const run = runOffThreadOrInProcess<
+          ProgressEvent,
+          Awaited<ReturnType<typeof executeYagni>>
+        >({
+          preferWorker: true,
+          descriptor: {
+            command: process.argv[1] ?? '',
+            argv: ['yagni-run-worker', specPath],
+            ...(correlation ? { correlation } : {}),
+          },
+          inProcess: (workerEmit) =>
+            executeYagni(buildExecuteOptions(args, config, workerEmit), cli),
         });
 
-        const executeOpts: ExecuteYagniOptions = {
-          cwd: args.cwd,
-          config,
-          minConfidence: args.minConfidence,
-          detectors: args.detectors,
-          categories: args.categories,
-          includeTests: args.includeTests,
-          pathRoots: args.pathRoots,
-          // Phases live view: one checklist row per detector (declared in
-          // YAGNI_RUNNING_SURFACE), driven by the detector lifecycle.
-          onDetectorStart: (slug) => {
-            emit({ type: 'stage-start', stage: slug, label: detectorLabel(slug) });
-          },
-          onDetectorDone: (slug, durationMs) => {
-            emit({ type: 'stage-done', stage: slug, durationMs });
-          },
-          onDetectorsSkipped: (slugs) => {
-            for (const slug of slugs) {
-              emit({ type: 'stage-done', stage: slug, durationMs: 0, detail: 'skipped' });
-            }
-          },
-        };
+        helpers.setRunning(run.onProgress);
 
-        const outcome = await executeYagni(executeOpts, cli);
+        let outcome: Awaited<ReturnType<typeof executeYagni>>;
+        try {
+          outcome = await run.result;
+        } finally {
+          rmSync(specDir, { recursive: true, force: true });
+        }
         const skippedDetectors = outcome.session.payload.summary.skippedDetectors;
         const verboseLines = buildYagniPresentationLines(
           outcome.envelope,

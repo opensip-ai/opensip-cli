@@ -15,6 +15,7 @@
 import { execFileSync } from 'node:child_process';
 
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
+import { recordInstalledToolTrust } from '../../bootstrap/tool-trust.js';
 import { addToolPlugin } from '../plugin-host-ops.js';
 
 import { runToolValidation } from './validate.js';
@@ -44,10 +45,7 @@ function packStagedDir(stagedPkgDir: string): string {
 function installNextSteps(manifest: ToolPluginManifest | undefined): readonly string[] | undefined {
   if (manifest === undefined) return undefined;
   const commandName = manifest.commands[0]?.name;
-  return [
-    `export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='${manifest.id}'`,
-    ...(commandName === undefined ? [] : [`opensip ${commandName}`]),
-  ];
+  return commandName === undefined ? [] : [`opensip ${commandName}`];
 }
 
 /** Stage, validate, and (on a `passed` verdict only) activate one tool package. */
@@ -102,6 +100,17 @@ export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInst
       explicitlyRequested: true,
       staticOnly: true,
     });
+    if (report.manifest !== undefined && report.provenance !== undefined) {
+      recordInstalledToolTrust({
+        scope,
+        cwd: opts.cwd,
+        toolId: report.manifest.id,
+        packageName: activation.packageName,
+        version: report.manifest.version,
+        manifestHash: report.provenance.manifestHash,
+        installSourcePath: stagedPkgDir,
+      });
+    }
     return {
       type: 'tools-install',
       spec: opts.spec,
@@ -113,6 +122,7 @@ export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInst
         : {
             toolId: report.manifest.id,
             version: report.manifest.version,
+            trustReason: 'managed-install',
             nextSteps: installNextSteps(report.manifest),
           }),
     };

@@ -143,6 +143,8 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
     scope: 'project',
     output: 'raw-stream',
     rawStreamReason: 'runtime-render-dispatch',
+    // The scan dispatch emits a SignalEnvelope verdict (worker replay) → eligible as a suite step.
+    producesVerdict: true,
     handler: (rawOpts, cli) => dispatchScan(cli, spec, primary, rawOpts),
   });
 
@@ -155,6 +157,8 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
       scope: 'project',
       output: 'raw-stream',
       rawStreamReason: 'runtime-render-dispatch',
+      // The scan dispatch emits a SignalEnvelope verdict (worker replay) → eligible as a suite step.
+      producesVerdict: true,
       handler: (rawOpts, cli) => dispatchScan(cli, spec, command, rawOpts),
     }),
   );

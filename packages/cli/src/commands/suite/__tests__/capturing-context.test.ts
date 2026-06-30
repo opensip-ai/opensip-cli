@@ -1,4 +1,4 @@
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { DEFAULT_BASELINE_IDENTITY, EXIT_CODES, type SignalEnvelope } from '@opensip-cli/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCapturingContext } from '../capturing-context.js';
@@ -16,6 +16,48 @@ function captureWith(deliveryResult?: Partial<SignalDeliveryResult>) {
   const deliverSignals = vi.fn(() => Promise.resolve(result));
   const base = { deliverSignals, setExitCode: vi.fn() } as unknown as ToolCliContext;
   return createCapturingContext(base);
+}
+
+function envelope(input: {
+  readonly passed: boolean;
+  readonly errors?: number;
+  readonly warnings?: number;
+  readonly findings?: number;
+}): SignalEnvelope {
+  const errors = input.errors ?? 0;
+  const warnings = input.warnings ?? 0;
+  const findings = input.findings ?? errors + warnings;
+  return {
+    schemaVersion: 2,
+    tool: 'fit',
+    runId: 'run-fixture',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    verdict: {
+      score: input.passed ? 100 : 0,
+      passed: input.passed,
+      summary: {
+        total: 1,
+        passed: input.passed ? 1 : 0,
+        failed: input.passed ? 0 : 1,
+        errors,
+        warnings,
+      },
+    },
+    units: [],
+    signals: Array.from({ length: findings }, (_, index) => ({
+      id: `sig_${index}`,
+      source: 'fixture',
+      provider: 'fixture',
+      severity: index < errors ? 'high' : 'low',
+      category: 'quality',
+      ruleId: 'fixture-rule',
+      message: `fixture finding ${index}`,
+      filePath: 'src/fixture.ts',
+      metadata: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+    })),
+    baselineIdentity: DEFAULT_BASELINE_IDENTITY,
+  };
 }
 
 describe('createCapturingContext', () => {
@@ -108,5 +150,44 @@ describe('createCapturingContext', () => {
     const capture = captureWith();
     await capture.context.deliverSignals({ verdict: { passed: true } }, { cwd: '/x' });
     expect(capture.getExitCode()).toBeUndefined();
+  });
+
+  it('captures the last emitted envelope verdict and signal count', async () => {
+    const first = envelope({ passed: true, warnings: 1, findings: 1 });
+    const second = envelope({ passed: false, errors: 2, findings: 2 });
+    const deliverSignals = vi.fn(() => Promise.resolve({ cloudAccepted: 0 }));
+    const emitEnvelope = vi.fn();
+    const base = {
+      deliverSignals,
+      emitEnvelope,
+      setExitCode: vi.fn(),
+    } as unknown as ToolCliContext;
+    const capture = createCapturingContext(base);
+
+    expect(capture.getEnvelopeStats()).toBeUndefined();
+    await capture.context.deliverSignals(first, { cwd: '/x' });
+    expect(capture.getEnvelopeStats()).toEqual({
+      verdict: first.verdict,
+      findings: first.signals.length,
+    });
+
+    capture.context.emitEnvelope(second);
+    expect(emitEnvelope).toHaveBeenCalledWith(second);
+    expect(capture.getEnvelopeStats()).toEqual({
+      verdict: second.verdict,
+      findings: second.signals.length,
+    });
+  });
+
+  it('distinguishes an empty emitted envelope from no envelope output', async () => {
+    const capture = captureWith();
+    const empty = envelope({ passed: true, findings: 0 });
+
+    expect(capture.getEnvelopeStats()).toBeUndefined();
+    await capture.context.deliverSignals(empty, { cwd: '/x' });
+    expect(capture.getEnvelopeStats()).toEqual({
+      verdict: empty.verdict,
+      findings: 0,
+    });
   });
 });

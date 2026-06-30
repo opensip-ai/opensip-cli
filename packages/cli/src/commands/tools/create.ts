@@ -9,10 +9,12 @@ import {
   TOOLS_CREATE_TEMPLATE_RENDERERS,
   type ToolsCreateTemplate,
 } from './create-templates.js';
+import { addTrustedToolToConfig } from './trust-config.js';
 
 import type { ToolsCreateResult } from '@opensip-cli/contracts';
 
 export const TOOL_ID_PATTERN = /^[a-z][a-z0-9-]*$/;
+const TOOLS_CREATE = 'tools-create' as const;
 
 export interface ToolsCreateInput {
   readonly toolId: string;
@@ -30,7 +32,7 @@ export function toolsCreate(input: ToolsCreateInput): ToolsCreateResult {
 
   if (!TOOL_ID_PATTERN.test(toolId)) {
     return {
-      type: 'tools-create',
+      type: TOOLS_CREATE,
       toolId,
       dir: '',
       files: [],
@@ -41,7 +43,7 @@ export function toolsCreate(input: ToolsCreateInput): ToolsCreateResult {
 
   if (!isToolsCreateTemplate(template)) {
     return {
-      type: 'tools-create',
+      type: TOOLS_CREATE,
       toolId,
       template,
       dir: '',
@@ -52,7 +54,8 @@ export function toolsCreate(input: ToolsCreateInput): ToolsCreateResult {
   }
 
   const commandName = toolId;
-  const toolDir = join(resolveProjectPaths(input.projectRoot).authoredToolsDir, toolId);
+  const projectPaths = resolveProjectPaths(input.projectRoot);
+  const toolDir = join(projectPaths.authoredToolsDir, toolId);
   const stableId = randomUUID();
   const rendered = TOOLS_CREATE_TEMPLATE_RENDERERS[template]({
     toolId,
@@ -68,7 +71,7 @@ export function toolsCreate(input: ToolsCreateInput): ToolsCreateResult {
 
   if (!writeResult.success) {
     return {
-      type: 'tools-create',
+      type: TOOLS_CREATE,
       toolId,
       template,
       dir: toolDir,
@@ -78,14 +81,27 @@ export function toolsCreate(input: ToolsCreateInput): ToolsCreateResult {
     };
   }
 
+  try {
+    addTrustedToolToConfig(projectPaths.configFile, toolId);
+  } catch (error) {
+    return {
+      type: TOOLS_CREATE,
+      toolId,
+      template,
+      dir: toolDir,
+      files: writeResult.files,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
   return {
-    type: 'tools-create',
+    type: TOOLS_CREATE,
     toolId,
     template,
     dir: toolDir,
     files: writeResult.files,
     success: true,
-    hint: `export OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${toolId}'`,
     nextSteps: rendered.nextSteps,
   };
 }

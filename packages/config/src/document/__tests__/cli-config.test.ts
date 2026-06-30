@@ -139,6 +139,13 @@ describe('loadCliDefaults', () => {
     expect(loadCliDefaults(testDir).ui).toBeUndefined();
   });
 
+  it('drops removed wordmark ui.banner values', () => {
+    for (const banner of ['lg', 'md', 'sm']) {
+      writeConfig(`cli:\n  ui:\n    banner: ${banner}\n`);
+      expect(loadCliDefaults(testDir).ui).toBeUndefined();
+    }
+  });
+
   it('ignores a non-object ui block', () => {
     writeConfig('cli:\n  ui: "nope"\n');
     expect(loadCliDefaults(testDir).ui).toBeUndefined();
@@ -180,5 +187,36 @@ describe('loadCliDefaults', () => {
   it('leaves artifacts undefined when unset', () => {
     writeConfig('cli:\n  verbose: true\n');
     expect(loadCliDefaults(testDir).artifacts).toBeUndefined();
+  });
+
+  it('reads explicit sessions retention values', () => {
+    writeConfig(`cli:
+  sessions:
+    keep: 25
+    maxAgeDays: 14
+    maxSizeMb: 75
+`);
+    expect(loadCliDefaults(testDir).sessions).toEqual({
+      keep: 25,
+      maxAgeDays: 14,
+      maxSizeMb: 75,
+    });
+  });
+
+  it('defaults sessions values when the sessions block is present but empty', () => {
+    writeConfig('cli:\n  sessions: {}\n');
+    expect(loadCliDefaults(testDir).sessions).toEqual({
+      keep: 200,
+      maxAgeDays: 60,
+      maxSizeMb: 150,
+    });
+  });
+
+  it('drops a sessions block with invalid or unknown values', () => {
+    writeConfig('cli:\n  sessions:\n    keep: -1\n');
+    expect(loadCliDefaults(testDir).sessions).toBeUndefined();
+
+    writeConfig('cli:\n  sessions:\n    keep: 5\n    maxAgeDayz: 10\n');
+    expect(loadCliDefaults(testDir).sessions).toBeUndefined();
   });
 });

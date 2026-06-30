@@ -230,3 +230,48 @@ jobs:
       # edits not propagated, fails here.
       - name: Check per-package LICENSE/NOTICE in sync
         run: pnpm licenses:check
+
+  cold-gate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      TURBO_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies without package-manager cache
+        run: pnpm install --frozen-lockfile
+
+      - name: Start from empty runtime state
+        run: rm -rf opensip-cli/.runtime ~/.opensip-cli packages/cli/src/__tests__/fixtures/cold-gate-python/opensip-cli/.runtime
+
+      - name: Clean dist
+        run: pnpm -r run clean
+
+      - name: Build from cold install
+        run: node scripts/build-ci.mjs
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
+
+      - name: Fit cold dogfood gate
+        run: pnpm fit:ci
+
+      - name: Graph cold dogfood gate
+        run: node packages/cli/dist/index.js graph --gate-save
+
+      - name: Python fixture cold gate
+        working-directory: packages/cli/src/__tests__/fixtures/cold-gate-python
+        run: |
+          rm -rf opensip-cli/.runtime
+          node "$GITHUB_WORKSPACE/packages/cli/dist/index.js" fit --gate-save

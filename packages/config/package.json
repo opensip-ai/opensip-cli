@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/config",
-  "version": "0.1.15",
+  "version": "0.1.19",
   "license": "Apache-2.0",
   "description": "Configuration layer for OpenSIP CLI — the capability-configuration composer and schema registry",
   "keywords": [

@@ -90,7 +90,7 @@ export const cliConfigSchema = z.object({
   // rides on RunScope.ui and the render paths read it directly.
   ui: z
     .object({
-      banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
+      banner: z.literal('mini').optional(),
     })
     .optional(),
   // OpenSIP Cloud signal sync (ADR-0008): with an API key + entitlement, each run
@@ -111,6 +111,20 @@ export const cliConfigSchema = z.object({
     .object({
       keep: z.number().int().min(0).default(10),
     })
+    .optional(),
+  // Host-owned session/datastore retention. The host prunes the `sessions`
+  // table after each run, keeping the newest `keep` rows AND dropping anything
+  // older than `maxAgeDays`; `maxSizeMb` bounds the on-disk datastore file
+  // (warn -> reclaim -> last-resort prune). A row survives only if within ALL
+  // configured limits; `0` disables a dimension. Defaults MUST stay in sync with
+  // the DEFAULT_SESSION_RETENTION_* constants in the cli layer.
+  sessions: z
+    .object({
+      keep: z.number().int().min(0).default(200),
+      maxAgeDays: z.number().int().min(0).default(60),
+      maxSizeMb: z.number().int().min(0).default(150),
+    })
+    .strict()
     .optional(),
 });
 

@@ -60,6 +60,7 @@ function manifestCommandToSpec(cmd: ToolCommandManifest): CommandSpec<unknown, T
     scope: cmd.scope ?? 'project',
     output: cmd.output ?? 'command-result',
     ...(cmd.rawStreamReason === undefined ? {} : { rawStreamReason: cmd.rawStreamReason }),
+    ...(cmd.producesVerdict === undefined ? {} : { producesVerdict: cmd.producesVerdict }),
     handler: externalDispatchStub(cmd.name),
   };
   assertCommandSpec(spec);

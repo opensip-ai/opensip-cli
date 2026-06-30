@@ -14,9 +14,15 @@
  * uses `emitJson`, never this seam) stays React-free.
  */
 
+import { performance } from 'node:perf_hooks';
+
 import { currentScope } from '@opensip-cli/core';
 
 import type { CommandResult } from '@opensip-cli/contracts';
+
+function elapsedMsSince(startedAt: number): number {
+  return Math.round((performance.now() - startedAt) * 10) / 10;
+}
 
 /**
  * Render a `CommandResult` to the terminal, choosing Ink (TTY) or plain
@@ -28,7 +34,11 @@ import type { CommandResult } from '@opensip-cli/contracts';
  * path emits no banner or project line by design (clean pipes/CI logs).
  */
 export async function renderResult(result: CommandResult): Promise<void> {
+  const renderStartedAt = performance.now();
   const scope = currentScope();
+  scope?.diagnostics.event('render', 'debug', 'static render started', {
+    tty: process.stdout.isTTY === true,
+  });
   const project = scope?.projectContext;
   const projectHeader =
     project?.scope === 'project'
@@ -42,19 +52,33 @@ export async function renderResult(result: CommandResult): Promise<void> {
   // — CI output should still record which root was analyzed and how it was
   // found. `error` stays terse (no project line), matching the TTY shell.
   if (!process.stdout.isTTY) {
-    const [{ resultToView }, { renderToText, viewProjectHeader, group }] = await Promise.all([
-      import('../ui/result-to-view.js'),
-      import('@opensip-cli/cli-ui'),
-    ]);
-    const body = resultToView(result);
-    const node =
-      projectHeader !== undefined && result.type !== 'error'
-        ? group([viewProjectHeader(projectHeader), { kind: 'spacer' }, body])
-        : body;
-    process.stdout.write(`${renderToText(node)}\n`);
+    try {
+      const [{ resultToView }, { renderToText, viewProjectHeader, group }] = await Promise.all([
+        import('../ui/result-to-view.js'),
+        import('@opensip-cli/cli-ui'),
+      ]);
+      const body = resultToView(result);
+      const node =
+        projectHeader !== undefined && result.type !== 'error'
+          ? group([viewProjectHeader(projectHeader), { kind: 'spacer' }, body])
+          : body;
+      process.stdout.write(`${renderToText(node)}\n`);
+    } finally {
+      scope?.diagnostics.event('render', 'debug', 'static render completed', {
+        tty: false,
+        durationMs: elapsedMsSince(renderStartedAt),
+      });
+    }
     return;
   }
 
-  const { renderApp } = await import('../ui/render.js');
-  await renderApp(result, projectHeader, ui);
+  try {
+    const { renderApp } = await import('../ui/render.js');
+    await renderApp(result, projectHeader, ui);
+  } finally {
+    scope?.diagnostics.event('render', 'debug', 'static render completed', {
+      tty: true,
+      durationMs: elapsedMsSince(renderStartedAt),
+    });
+  }
 }

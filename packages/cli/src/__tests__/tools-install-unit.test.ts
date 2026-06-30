@@ -15,6 +15,7 @@ import type { ToolsValidateResult } from '@opensip-cli/contracts';
 const runToolValidation = vi.fn();
 const addToolPlugin = vi.fn();
 const admitToolPackage = vi.fn();
+const recordInstalledToolTrust = vi.fn();
 const execFileSync = vi.fn();
 const cleanup = vi.fn();
 
@@ -26,6 +27,9 @@ vi.mock('../commands/plugin-host-ops.js', () => ({
 }));
 vi.mock('../bootstrap/admit-tool-package.js', () => ({
   admitToolPackage: (...a: unknown[]) => admitToolPackage(...a),
+}));
+vi.mock('../bootstrap/tool-trust.js', () => ({
+  recordInstalledToolTrust: (...a: unknown[]) => recordInstalledToolTrust(...a),
 }));
 vi.mock('node:child_process', () => ({
   execFileSync: (...a: unknown[]) => execFileSync(...a),
@@ -47,7 +51,14 @@ function stageValidation(verdict: ToolsValidateResult['verdict'], stagedPkgDir =
 }
 
 beforeEach(() => {
-  for (const m of [runToolValidation, addToolPlugin, admitToolPackage, execFileSync, cleanup]) {
+  for (const m of [
+    runToolValidation,
+    addToolPlugin,
+    admitToolPackage,
+    recordInstalledToolTrust,
+    execFileSync,
+    cleanup,
+  ]) {
     m.mockReset();
   }
   // npm pack prints the tarball name on the last stdout line.
@@ -73,13 +84,18 @@ describe('toolsInstall — validation gate', () => {
 describe('toolsInstall — activation', () => {
   it('packs the staged dir, activates, and reports the admitted manifest on success', async () => {
     stageValidation('passed', '/staged/demo');
-    addToolPlugin.mockReturnValue({ type: 'plugin-add', success: true });
+    addToolPlugin.mockReturnValue({
+      type: 'plugin-add',
+      packageName: '@x/demo',
+      success: true,
+    });
     admitToolPackage.mockResolvedValue({
       manifest: {
         id: 'demo',
         version: '1.0.0',
         commands: [{ name: 'demo-run', description: 'run demo' }],
       },
+      provenance: { manifestHash: 'manifest-hash-demo' },
     });
 
     const result = await toolsInstall({
@@ -91,10 +107,8 @@ describe('toolsInstall — activation', () => {
     expect(result.scope).toBe('project');
     expect(result.toolId).toBe('demo');
     expect(result.version).toBe('1.0.0');
-    expect(result.nextSteps).toEqual([
-      "export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo'",
-      'opensip demo-run',
-    ]);
+    expect(result.trustReason).toBe('managed-install');
+    expect(result.nextSteps).toEqual(['opensip demo-run']);
     // npm pack runs FROM the staged dir, into the staged dir.
     expect(execFileSync).toHaveBeenCalledWith(
       'npm',
@@ -103,6 +117,15 @@ describe('toolsInstall — activation', () => {
     );
     // Activation installs the packed tarball, not a re-resolve of the spec.
     expect(addToolPlugin).toHaveBeenCalledWith('/staged/demo/demo-1.0.0.tgz', '/proj', true);
+    expect(recordInstalledToolTrust).toHaveBeenCalledWith({
+      scope: 'project',
+      cwd: '/proj',
+      toolId: 'demo',
+      packageName: '@x/demo',
+      version: '1.0.0',
+      manifestHash: 'manifest-hash-demo',
+      installSourcePath: '/staged/demo',
+    });
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 

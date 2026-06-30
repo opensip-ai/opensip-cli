@@ -61,6 +61,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     }),
   );
   const exitCode = Math.max(0, ...steps.map((step) => step.exitCode));
+  const aggregate = deriveSuiteAggregate(steps);
   const durationMs = Math.max(0, performance.now() - started);
 
   log.info?.({
@@ -69,6 +70,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     suiteRunId,
     exitCode,
     durationMs,
+    aggregate,
   });
 
   return {
@@ -77,7 +79,40 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     suiteRunId,
     exitCode,
     durationMs,
+    aggregate,
     steps,
+  };
+}
+
+export function deriveSuiteAggregate(
+  steps: readonly SuiteStepSummary[],
+): SuiteRunResult['aggregate'] {
+  let passed = 0;
+  let failed = 0;
+  let faulted = 0;
+  let errors = 0;
+  let warnings = 0;
+
+  for (const step of steps) {
+    const verdict = step.verdict;
+    if (step.error !== undefined) {
+      faulted += 1;
+    } else if (step.exitCode !== EXIT_CODES.SUCCESS || verdict?.passed === false) {
+      failed += 1;
+    } else if (verdict?.passed === true) {
+      passed += 1;
+    }
+    errors += verdict?.errors ?? 0;
+    warnings += verdict?.warnings ?? 0;
+  }
+
+  return {
+    steps: steps.length,
+    passed,
+    failed,
+    faulted,
+    errors,
+    warnings,
   };
 }
 
@@ -206,6 +241,16 @@ async function runStep(args: {
     });
   }
   const durationMs = Math.max(0, performance.now() - started);
+  const envelopeStats = capture.getEnvelopeStats();
+  const verdict =
+    envelopeStats === undefined
+      ? undefined
+      : {
+          passed: envelopeStats.verdict.passed,
+          errors: envelopeStats.verdict.summary.errors,
+          warnings: envelopeStats.verdict.summary.warnings,
+          findings: envelopeStats.findings,
+        };
 
   log.info?.({
     evt: 'cli.suite.run.step',
@@ -215,6 +260,14 @@ async function runStep(args: {
     command: args.step.spec.name,
     exitCode,
     durationMs,
+    ...(verdict === undefined
+      ? {}
+      : {
+          verdict: {
+            passed: verdict.passed,
+            findings: verdict.findings,
+          },
+        }),
   });
 
   return {
@@ -224,6 +277,7 @@ async function runStep(args: {
     exitCode,
     durationMs,
     ...(errorMessage === undefined ? {} : { error: errorMessage }),
+    ...(verdict === undefined ? {} : { verdict }),
   };
 }
 

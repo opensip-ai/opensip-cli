@@ -68,7 +68,7 @@ function minimalJsRuntime(ctx: TemplateRenderContext): string {
           return {
             type: 'text-lines',
             title: '${ctx.toolId}',
-            lines: ['Your project-local tool is ready — allowlist it, then run opensip ${ctx.commandName}.'],
+            lines: ['Your project-local tool is ready — validate it, then run opensip ${ctx.commandName}.'],
           };
         } catch (error) {
           // The host normalizes any caught value; return after reporting so this
@@ -86,7 +86,6 @@ function minimalJsRuntime(ctx: TemplateRenderContext): string {
 function minimalJsNextSteps(ctx: TemplateRenderContext): readonly string[] {
   const toolDir = `opensip-cli/tools/${ctx.toolId}`;
   return [
-    `export OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${ctx.toolId}'`,
     `opensip tools validate ${toolDir}`,
     `opensip ${ctx.commandName}`,
     'Run logs land under opensip-cli/.runtime/logs/ when the host configures logging.',
@@ -121,7 +120,7 @@ export const tool = createTool({
         return {
           type: 'text-lines',
           title: '${ctx.toolId}',
-          lines: ['Your typed project-local tool is ready — build, validate, allowlist, then run.'],
+          lines: ['Your typed project-local tool is ready — build, validate, then run.'],
         };
       } catch (error) {
         // The host normalizes any caught value; return after reporting so this
@@ -213,16 +212,17 @@ pnpm test
 opensip tools validate ${toolDir} --install-deps
 \`\`\`
 
-## Allowlist and run
+## Trust and run
 
-Project-local tools are executable code and deny-by-default until allowlisted:
+Project-local tools are executable code and deny-by-default until trusted. The
+scaffold command adds this tool id to \`tools.trusted\` in
+\`opensip-cli.config.yml\`.
 
 \`\`\`bash
-export OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${ctx.toolId}'
 opensip ${ctx.commandName}
 \`\`\`
 
-Do not use wildcard allowlists unless you trust every project-local tool in the repo.
+Use \`OPENSIP_CLI_ALLOW_PROJECT_TOOLS\` only as an incident-response override.
 Run logs land under \`opensip-cli/.runtime/logs/\` when the host configures logging.
 Validation executes candidate code in a child process; it is not a security sandbox.
 `;
@@ -235,7 +235,6 @@ function tsLocalNextSteps(ctx: TemplateRenderContext): readonly string[] {
     'pnpm run build',
     'pnpm test',
     `opensip tools validate ${toolDir} --install-deps`,
-    `export OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${ctx.toolId}'`,
     `opensip ${ctx.commandName}`,
     'Validation executes candidate code in a child process; it is not a security sandbox.',
   ];

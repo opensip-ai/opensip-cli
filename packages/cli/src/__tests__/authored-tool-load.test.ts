@@ -178,6 +178,29 @@ describe('authored-tool end-to-end load', () => {
     expect(provenance.find((p) => p.id === 'trusted-audit')?.source).toBe('project-local');
   });
 
+  it('admits a tools.trusted project tool without the env allowlist', async () => {
+    const projectRoot = tmp('opensip-project-tools-');
+    const globalRoot = tmp('opensip-global-empty-');
+    stageAuthoredTool(projectRoot, 'trusted-config-audit');
+    const registry = new ToolRegistry();
+    const provenance: ToolProvenance[] = [];
+
+    await discoverAndRegisterAuthoredTools(
+      registry,
+      {
+        projectAuthoredDir: projectRoot,
+        globalAuthoredDir: globalRoot,
+        env: {},
+        projectTrustedTools: new Set(['trusted-config-audit']),
+      },
+      new Set(),
+      provenance,
+    );
+
+    expect(registry.get('trusted-config-audit')).toBeDefined();
+    expect(provenance.find((p) => p.id === 'trusted-config-audit')?.source).toBe('project-local');
+  });
+
   it('skips an authored tool whose id collides with a bundled (built-in) id', async () => {
     const globalRoot = tmp('opensip-global-tools-');
     stageAuthoredTool(globalRoot, 'fitness'); // same id as a bundled tool

@@ -34,6 +34,7 @@ const TOOLS_LIST_COLUMNS: readonly (string | TableColumnSpec)[] = [
   'UUID',
   'Source',
   'Status',
+  'Trust',
   'Version',
   'Package',
   'Commands',
@@ -75,6 +76,7 @@ function toolsListRow(row: ToolsListRow): Span[] {
     { text: row.stableId ?? '-', dim: row.stableId === undefined },
     { text: row.shadowed === true ? `${row.source} (shadowed)` : row.source },
     { text: row.status, tone: row.status === 'loaded' ? 'success' : 'muted' },
+    { text: row.trustReason ?? '-', dim: row.trustReason === undefined },
     { text: row.version },
     { text: row.packageName ?? '-', dim: row.packageName === undefined },
     { text: row.commands.length === 0 ? '-' : row.commands.join(', ') },
@@ -218,9 +220,9 @@ export function viewToolsInstall(result: ToolsInstallResult): ViewNode {
   if (result.error !== undefined) {
     children.push(line([{ text: `  ${result.error}`, tone: 'error' }]));
   }
-  // Single source: the host renders the allowlist breadcrumb from `nextSteps`
-  // (the same data `--json` consumers read). `install` always populates
-  // `nextSteps` alongside `toolId` on success, so there is no separate hint path.
+  // Single source: the host renders `nextSteps` from the result (the same data
+  // `--json` consumers read). Managed install trust is recorded during install,
+  // so these steps focus on the first command to try.
   if (result.success && result.nextSteps !== undefined && result.nextSteps.length > 0) {
     children.push(
       SPACER,

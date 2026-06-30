@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-21
-release: v0.1.15
+release: v0.1.19
 title: "Command surface taxonomy"
 audience: [plugin-authors, contributors, ci-integrators]
 purpose: "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
@@ -31,8 +31,8 @@ plugins.
 | Extension | Discovery | Trust | Load boundary | Validation |
 |-----------|-----------|-------|---------------|------------|
 | Bundled whole tools | Shipped manifests | Trusted | In-process (host) | Startup admission |
-| Installed whole tools | `node_modules` marker | Allowlist opt-in | Forked dispatch worker (ADR-0054) | `tools validate` / install |
-| Project-local tools | `opensip-cli/tools/<id>/` sidecar | Deny-by-default | Forked dispatch worker (ADR-0054) | `tools validate` + allowlist |
+| Installed whole tools | `node_modules` marker | Managed install trust or override | Forked dispatch worker (ADR-0054) | `tools validate` / install |
+| Project-local tools | `opensip-cli/tools/<id>/` sidecar | `tools.trusted` or override | Forked dispatch worker (ADR-0054) | `tools validate` + config trust |
 | User-global tools | `~/.opensip-cli/tools/` | Trusted-by-default | Forked dispatch worker (ADR-0054) | `tools validate` |
 | Fit / sim packs & recipes | `plugins.<domain>` | In-process; epoch metadata | In-process (host) | Domain registrars |
 | Graph adapters & recipes | `plugins.graph` | In-process; epoch metadata | In-process (host) | Domain registrars |

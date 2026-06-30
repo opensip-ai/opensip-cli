@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v0.1.15
+release: v0.1.19
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
@@ -17,9 +17,9 @@ related-docs:
 # Environment variables
 
 Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
-through a single `EnvRegistry` ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
+through a single `EnvRegistry` ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
 so the surface is governed, coerced, and documented. The source of truth is
-`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/env/host-env-specs.ts);
+`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/env/host-env-specs.ts);
 the `env-via-registry` fitness check fails CI on any raw `process.env` read that
 bypasses the registry.
 
@@ -40,8 +40,8 @@ bypasses the registry.
 ## Update notifier
 
 Product update I/O (not telemetry — see
-[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0073-update-notification-policy.md) and
-[ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)).
+[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0073-update-notification-policy.md) and
+[ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)).
 Default-on for interactive TTY; hourly npm version fetch; update-state stores only
 `{ latest }`.
 
@@ -51,14 +51,14 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 | `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
 | `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`/`yagni`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead. Unset loads all bundled tools. |
 | `OPENSIP_CLI_SKIP_INSTALLED` | Set to any non-empty value to skip discovery and loading of installed npm tool packages (`opensipTools.kind === tool` in ancestor `node_modules`). Bundled and authored tools are unaffected. Equivalent to passing `--no-plugins`. Use for incident response when ambient plugins must not execute in the host process. |
-| `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` | Comma/whitespace-separated installed npm Tool ids to admit (deny-by-default); `*` admits all. Ambient `opensipTools.kind === tool` packages discovered in ancestor `node_modules` (including `opensip tools install` hosts) are NOT loaded unless their id (or `*`) appears here. Pair with `OPENSIP_CLI_SKIP_INSTALLED` for incident response (kill switch wins). |
-| `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` | Comma/whitespace-separated capability package names to admit for in-process fit-pack / graph-adapter loading. Bundled first-party packs are trusted automatically; non-bundled capability packs are NOT imported unless their exact package name appears here. `*` is ignored and warns because capability packs run in the host process. |
+| `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` | Override for comma/whitespace-separated installed npm Tool ids; `*` admits all. Normal `opensip tools install` writes managed trust state, so this is mainly for ambient `node_modules` packages, manual experiments, or incident response. Pair with `OPENSIP_CLI_SKIP_INSTALLED` for incident response (kill switch wins). |
+| `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` | Override for comma/whitespace-separated capability package names to admit for in-process fit-pack / graph-adapter loading. Bundled first-party packs and exact packages listed in `plugins.*` are trusted automatically; ambient marker-discovered non-bundled capability packs require this exact package-name override. `*` is ignored and warns because capability packs run in the host process. |
 
 ## Authored tools
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
+| `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Override for comma/whitespace-separated project-authored Tool ids; `*` admits all. The normal committed trust path is `tools.trusted` in `opensip-cli.config.yml`. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id appears in config or this override — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
 
 ## Command surface
 
@@ -84,13 +84,13 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
+| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
 | `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH` | Comma/whitespace-separated extra env var names to forward into external-tool dispatch worker children beyond the default allow-list. The default allow-list also forwards CLI tool admission controls (`OPENSIP_CLI_ALLOW_*_TOOLS` and `OPENSIP_CLI_SKIP_*`) so the worker sees the same explicit trust decisions as the supervising process. Does not affect bundled live-run worker forks. |
 
 ## State write locking
 
 Optional overrides for datastore-file and artifact-file write locks
-([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
+([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
 Local interactive runs wait longer by default; CI runs fail faster.
 
 | Variable | Default | Effect |

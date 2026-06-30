@@ -239,4 +239,5 @@ export interface ManifestCommandShell {
   readonly output: string;
   readonly parent?: string;
   readonly rawStreamReason?: string;
+  readonly producesVerdict?: boolean;
 }

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-28
-release: v0.1.15
+release: v0.1.19
 title: "External tool adapters"
 audience: [plugin-authors]
 purpose: "Wrap a local CLI scanner (gitleaks/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
@@ -442,22 +442,18 @@ Declare the posture honestly anyway.
 
 ## Trust and execution model
 
-Installed tools are **deny-by-default**. After
-`opensip tools install @opensip-cli/tool-gitleaks`, a bare `opensip gitleaks`
-errors *tool-not-found* until the user trusts it by adding its manifest `id` to
-`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`:
+Installed tools found ambiently in `node_modules` are **deny-by-default**.
+`opensip tools install @opensip-cli/tool-gitleaks` validates the package,
+installs the validated bytes, and records managed trust for the selected scope:
 
 ```bash
-export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='gitleaks'
 opensip gitleaks doctor
 ```
 
-The trust value is the **manifest `id`** (`opensipTools.id` — `gitleaks`,
-`osv-scanner`, `trivy`), not the UUID. `install` prints the exact export in its
-`nextSteps`. This is the same surface every installed Tool plugin mounts through
-([`tools` reference](../70-reference/12-tools-command.md)); adapters add no new
-trust path. Every automated test of an adapter must export the var, or it gets
-tool-not-found instead of a scan.
+This is the same surface every installed Tool plugin mounts through ([`tools`
+reference](../70-reference/12-tools-command.md)); adapters add no new trust path.
+`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` remains an exact-id override for manual
+experiments or incident response.
 
 ## Distribution
 

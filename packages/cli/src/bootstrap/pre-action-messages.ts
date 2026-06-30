@@ -51,7 +51,7 @@ export function formatNoProjectFoundMessage(cwd: string): string {
     '  Searched from: ' + cwd,
     '  Walked up to: /',
     '',
-    '  To get started:',
+    '  To get started, change to your projects directory and run:',
     '    opensip init',
   ].join('\n');
 }

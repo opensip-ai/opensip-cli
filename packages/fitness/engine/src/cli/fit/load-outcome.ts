@@ -28,9 +28,14 @@ function pluginErrorSource(error: string): string {
 
 /** Package name mentioned in a fit-pack domain load error string. */
 function checkPackErrorPackage(error: string): string | undefined {
-  const arrow = /^([^→]+)→/.exec(error.trim());
+  const trimmed = error.trim();
+  const arrow = /^([^→]+)→/.exec(trimmed);
   if (arrow !== null) return arrow[1].trim();
-  const colon = /^([^:]+):/.exec(error.trim());
+  const configured = /^configured package "([^"]+)"/.exec(trimmed);
+  if (configured !== null) return configured[1]?.trim();
+  const packageWord = /^(?:failed to load )?package\s+((?:@[^/\s]+\/)?[^:\s]+)\b/.exec(trimmed);
+  if (packageWord !== null) return packageWord[1]?.trim();
+  const colon = /^([^:]+):/.exec(trimmed);
   return colon?.[1]?.trim();
 }
 
@@ -82,13 +87,17 @@ function checkPackDiagnostic(
     packageName,
     capabilityDomain: 'fit-pack',
   };
-  const classified = classifiedLoaderDetail(detail, provenance);
+  const displayDetail = checkPackDisplayDetail(packageName, detail);
+  const classified = classifiedLoaderDetail(displayDetail, provenance);
   const required = mode === 'required';
+  const message = required
+    ? `Required check pack "${packageName}" failed to load.`
+    : `Optional check pack failed to load: ${displayDetail}`;
   return stampDiagnostic({
     severity: required ? 'error' : 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
     category: required ? 'runtime' : 'degraded',
-    message: `${required ? 'Required' : 'Optional'} check pack "${packageName}" failed to load.`,
+    message,
     impact: required
       ? 'A required fit-pack could not be loaded, so the run cannot proceed.'
       : 'Some optional check packs were skipped; required checks still ran.',
@@ -101,6 +110,20 @@ function checkPackDiagnostic(
     provenance,
     detail: classified.detail,
   });
+}
+
+function checkPackDisplayDetail(packageName: string, detail: string): string {
+  const trimmed = detail.trim();
+  if (!trimmed.startsWith(packageName)) return trimmed;
+
+  const afterPackage = trimmed.slice(packageName.length).trimStart();
+  if (!afterPackage.startsWith('→')) return trimmed;
+
+  const afterArrow = afterPackage.slice('→'.length).trimStart();
+  const separator = afterArrow.indexOf(':');
+  if (separator === -1) return trimmed;
+
+  return afterArrow.slice(separator + 1).trim() || trimmed;
 }
 
 function stampDiagnostic(diagnostic: CliDiagnostic): CliDiagnostic {

@@ -41,6 +41,7 @@ function fixtureTool(): Tool {
         commonFlags: [],
         scope: 'project',
         output: 'command-result',
+        producesVerdict: true,
         handler: () => ({ type: 'help' }),
       }),
     ],

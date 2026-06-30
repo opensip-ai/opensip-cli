@@ -36,7 +36,7 @@ import {
 } from './discovery-diagnostics.js';
 import { synthesizeExternalTool } from './synthesize-external-tool.js';
 import { isHostRuntimeImportForbidden } from './tool-provenance.js';
-import { isInstalledToolTrusted } from './tool-trust.js';
+import { resolveInstalledToolTrust, type ToolTrustReason } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
 
@@ -98,15 +98,17 @@ export function emitInstalledTrustDenied(
   toolId: string,
   packageName: string,
   packageDir: string,
+  reason: ToolTrustReason = 'denied',
   collector?: BootstrapDiagnosticsCollector,
 ): void {
-  recordInstalledTrustDenied(toolId, packageName, packageDir, collector);
+  recordInstalledTrustDenied(toolId, packageName, packageDir, reason, collector);
   logger.warn({
     evt: 'cli.tool.installed_trust_denied',
     module: BOOTSTRAP_MODULE,
     toolId,
     packageName,
     packageDir,
+    reason,
   });
 }
 
@@ -146,6 +148,10 @@ export interface DiscoveryOptions {
   readonly sources: readonly ToolDiscoverySource[];
   /** Injectable env for installed-tool trust (bootstrap-time; defaults to `process.env`). */
   readonly env?: NodeJS.ProcessEnv;
+  /** Project root for project-local managed-install trust checks. */
+  readonly projectRoot?: string;
+  /** Tool ids from project config `tools.trusted`. */
+  readonly projectTrustedTools?: ReadonlySet<string>;
   /** Optional bootstrap diagnostics sink (defaults to the process-wide buffer). */
   readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
 }
@@ -216,6 +222,8 @@ async function registerDiscoveredInstalledPackage(
     readonly registry: ToolRegistry;
     readonly builtInIds: ReadonlySet<string>;
     readonly env: NodeJS.ProcessEnv;
+    readonly projectRoot?: string;
+    readonly projectTrustedTools?: ReadonlySet<string>;
     readonly registeredStableIds: Set<string>;
     readonly provenance: ToolProvenance[];
     readonly manifests: ToolPluginManifest[];
@@ -225,11 +233,21 @@ async function registerDiscoveredInstalledPackage(
   const admission = admitInstalledTool(pkg, args.builtInIds, args.bootstrapDiagnostics);
   if (admission === undefined) return;
 
-  if (!isInstalledToolTrusted(admission.manifest.id, args.env)) {
+  const trust = resolveInstalledToolTrust({
+    toolId: admission.manifest.id,
+    packageName: pkg.name,
+    packageDir: pkg.packageDir,
+    manifestHash: admission.provenance.manifestHash,
+    env: args.env,
+    projectRoot: args.projectRoot,
+    projectTrustedTools: args.projectTrustedTools,
+  });
+  if (!trust.trusted) {
     emitInstalledTrustDenied(
       admission.manifest.id,
       pkg.name,
       pkg.packageDir,
+      trust.reason,
       args.bootstrapDiagnostics,
     );
     return;
@@ -322,6 +340,8 @@ export async function discoverAndRegisterToolPackages(
         registry,
         builtInIds,
         env,
+        projectRoot: opts.projectRoot,
+        projectTrustedTools: opts.projectTrustedTools,
         registeredStableIds,
         provenance,
         manifests,

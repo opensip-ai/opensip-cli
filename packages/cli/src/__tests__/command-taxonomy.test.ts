@@ -21,6 +21,7 @@ import {
 import { fitnessTool } from '@opensip-cli/fitness';
 import { graphTool } from '@opensip-cli/graph';
 import { simulationTool } from '@opensip-cli/simulation';
+import { yagniTool } from '@opensip-cli/yagni';
 import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -165,6 +166,7 @@ describe('command taxonomy — internal descriptors carry visibility:internal (S
     { tool: graphTool, name: 'graph-shard-worker' },
     { tool: graphTool, name: 'graph-equivalence-check' },
     { tool: simulationTool, name: 'sim-run-worker' },
+    { tool: yagniTool, name: 'yagni-run-worker' },
   ];
 
   it.each(INTERNAL)('descriptor for $name declares visibility: internal', ({ tool, name }) => {
@@ -175,7 +177,7 @@ describe('command taxonomy — internal descriptors carry visibility:internal (S
 
   it('no PUBLIC tool command descriptor is marked visibility: internal', () => {
     const internalNames = new Set(INTERNAL.map((i) => i.name));
-    for (const tool of [fitnessTool, simulationTool, graphTool]) {
+    for (const tool of [fitnessTool, simulationTool, graphTool, yagniTool]) {
       for (const descriptor of tool.commands) {
         if (internalNames.has(descriptor.name)) continue;
         expect(

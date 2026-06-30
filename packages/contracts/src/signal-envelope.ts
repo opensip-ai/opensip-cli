@@ -90,6 +90,17 @@ export interface UnitResult {
   readonly ignoredCount?: number;
 }
 
+/** Host-stamped provenance describing the declared inputs that produced a run. */
+export interface DeclaredInputs {
+  readonly cliVersion: string;
+  readonly nodeVersion: string;
+  readonly packageManager?: string;
+  readonly platform: string;
+  readonly tool: ToolShortId;
+  readonly engineVersion?: string;
+  readonly baselineIdentity?: BaselineIdentity;
+}
+
 /** The one tool-run output envelope. The `CommandResult` payload every tool returns. */
 export interface SignalEnvelope {
   readonly schemaVersion: 2;
@@ -106,6 +117,11 @@ export interface SignalEnvelope {
    * `--gate-compare`.
    */
   readonly baselineIdentity: BaselineIdentity;
+  /**
+   * Host-stamped provenance for verdict diagnostics. Optional for additive
+   * output compatibility: absence means an older/no-manifest producer.
+   */
+  readonly declaredInputs?: DeclaredInputs;
   /** Graph-only edge-fidelity marker, carried over from CliOutput.resolutionMode. */
   readonly resolutionMode?: 'exact' | 'fast';
 }

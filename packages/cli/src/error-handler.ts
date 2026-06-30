@@ -90,7 +90,7 @@ const ACTION_HINTS: readonly {
   {
     is: (e) => e instanceof PluginIncompatibleError,
     action:
-      'Upgrade OpenSIP CLI (or the tool), or allowlist a project-local tool via OPENSIP_CLI_ALLOW_PROJECT_TOOLS.',
+      'Upgrade OpenSIP CLI (or the tool), or trust a project-local tool via tools.trusted / OPENSIP_CLI_ALLOW_PROJECT_TOOLS.',
   },
 ];
 

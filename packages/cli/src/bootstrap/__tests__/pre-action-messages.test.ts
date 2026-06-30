@@ -35,6 +35,7 @@ describe('formatNoProjectFoundMessage', () => {
     expect(out).toContain('No OpenSIP CLI project found');
     expect(out).toContain('Searched from: /some/dir');
     expect(out).toContain('Walked up to: /');
+    expect(out).toContain('To get started, change to your projects directory and run:');
     expect(out).toContain('opensip init');
     // Human path is not JSON.
     expect(() => JSON.parse(out)).toThrow();

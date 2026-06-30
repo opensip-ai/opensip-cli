@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-08
-release: v0.1.15
+release: v0.1.19
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
@@ -51,14 +51,14 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 | `NO_UPDATE_NOTIFIER` | npm-convention update-notifier opt-out; honoured as an equivalent of `OPENSIP_NO_UPDATE`. |
 | `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`/`yagni`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead. Unset loads all bundled tools. |
 | `OPENSIP_CLI_SKIP_INSTALLED` | Set to any non-empty value to skip discovery and loading of installed npm tool packages (`opensipTools.kind === tool` in ancestor `node_modules`). Bundled and authored tools are unaffected. Equivalent to passing `--no-plugins`. Use for incident response when ambient plugins must not execute in the host process. |
-| `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` | Comma/whitespace-separated installed npm Tool ids to admit (deny-by-default); `*` admits all. Ambient `opensipTools.kind === tool` packages discovered in ancestor `node_modules` (including `opensip tools install` hosts) are NOT loaded unless their id (or `*`) appears here. Pair with `OPENSIP_CLI_SKIP_INSTALLED` for incident response (kill switch wins). |
-| `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` | Comma/whitespace-separated capability package names to admit for in-process fit-pack / graph-adapter loading. Bundled first-party packs are trusted automatically; non-bundled capability packs are NOT imported unless their exact package name appears here. `*` is ignored and warns because capability packs run in the host process. |
+| `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` | Override for comma/whitespace-separated installed npm Tool ids; `*` admits all. Normal `opensip tools install` writes managed trust state, so this is mainly for ambient `node_modules` packages, manual experiments, or incident response. Pair with `OPENSIP_CLI_SKIP_INSTALLED` for incident response (kill switch wins). |
+| `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` | Override for comma/whitespace-separated capability package names to admit for in-process fit-pack / graph-adapter loading. Bundled first-party packs and exact packages listed in `plugins.*` are trusted automatically; ambient marker-discovered non-bundled capability packs require this exact package-name override. `*` is ignored and warns because capability packs run in the host process. |
 
 ## Authored tools
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default); `*` admits all. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id (or `*`) appears here — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
+| `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` | Override for comma/whitespace-separated project-authored Tool ids; `*` admits all. The normal committed trust path is `tools.trusted` in `opensip-cli.config.yml`. A project-authored sidecar Tool under `<project>/opensip-cli/tools/` is NOT loaded unless its id appears in config or this override — it rides in with `git clone`, so loading it runs untrusted code (fail-closed, exit 5, before any import). Global-authored Tools under `~/.opensip-cli/tools/` are trusted-by-default and ignore this list. |
 
 ## Command surface
 

@@ -107,7 +107,7 @@ async function main(): Promise<void> {
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
   const userArgv = process.argv.slice(2);
-  const { provenance, manifests, bootstrapDiagnostics } = await bootstrapCli({
+  const { provenance, manifests, bootstrapDiagnostics, startupTimings } = await bootstrapCli({
     langRegistry,
     toolRegistry,
     projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
@@ -164,6 +164,7 @@ async function main(): Promise<void> {
       manifests,
       provenance,
       bootstrapDiagnostics,
+      startupTimings,
     },
     commandScopes,
   );

@@ -23,7 +23,10 @@ import type { PluginConfigKeyDeclaration } from '../targeting.js';
 // Stand-in tool declarations (config cannot import the real tools — upward edge).
 const fakeFitness: ToolConfigDeclaration = {
   namespace: 'fitness',
-  schema: z.object({ failOnErrors: z.number().int().optional(), recipe: z.string().optional() }),
+  schema: z.object({
+    failOnErrors: z.number().int().optional(),
+    recipe: z.string().optional(),
+  }),
 };
 const fakeGraph: ToolConfigDeclaration = {
   namespace: 'graph',
@@ -53,6 +56,7 @@ const WHOLE_DOCUMENT = {
   checkOverrides: { 'some-check': 'backend' },
   cli: { reportTo: 'https://cloud.test/api' },
   dashboard: { editor: 'vscode' },
+  tools: { trusted: ['audit-sec'] },
   plugins: {
     fit: ['@acme/fit-pack'],
     checkPackages: ['@acme/checks'],
@@ -72,10 +76,19 @@ describe('composed whole-document validation', () => {
   });
 
   it.each([
-    ['cli', { ...WHOLE_DOCUMENT, cli: { reportTo: 'https://cloud.test/api', reprtTo: 'oops' } }],
+    [
+      'cli',
+      {
+        ...WHOLE_DOCUMENT,
+        cli: { reportTo: 'https://cloud.test/api', reprtTo: 'oops' },
+      },
+    ],
     [
       'targets (non-kebab key)',
-      { ...WHOLE_DOCUMENT, targets: { Backend: { description: 'x', include: ['a'] } } },
+      {
+        ...WHOLE_DOCUMENT,
+        targets: { Backend: { description: 'x', include: ['a'] } },
+      },
     ],
     [
       'targets (missing description)',
@@ -85,6 +98,12 @@ describe('composed whole-document validation', () => {
     [
       'plugins (wrong auto-discovery type)',
       { ...WHOLE_DOCUMENT, plugins: { autoDiscoverGraphAdapters: 'false' } },
+    ],
+    ['tools (wrong trusted type)', { ...WHOLE_DOCUMENT, tools: { trusted: 'audit-sec' } }],
+    ['tools (unknown key)', { ...WHOLE_DOCUMENT, tools: { trustd: ['audit-sec'] } }],
+    [
+      'cli.sessions (unknown key)',
+      { ...WHOLE_DOCUMENT, cli: { sessions: { keep: 5, maxAgeDayz: 1 } } },
     ],
     ['fitness', { ...WHOLE_DOCUMENT, fitness: { faliOnErrors: 1 } }],
     ['graph', { ...WHOLE_DOCUMENT, graph: { minDuplicateBodyLine: 10 } }],
@@ -165,7 +184,10 @@ describe('composed whole-document validation', () => {
 
   it('still tolerates a genuinely-unknown top-level key (forward-compat catchall)', () => {
     expect(() =>
-      validateConfigDocument(schema(), { ...WHOLE_DOCUMENT, someFutureBlock: { x: 1 } }),
+      validateConfigDocument(schema(), {
+        ...WHOLE_DOCUMENT,
+        someFutureBlock: { x: 1 },
+      }),
     ).not.toThrow();
   });
 });

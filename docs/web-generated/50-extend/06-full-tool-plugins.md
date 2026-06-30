@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.15
+release: v0.1.19
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph/yagni aren't the right shape and you want something fundamentally different."
@@ -35,7 +35,7 @@ This is the heaviest extension shape. Most teams never need it. If you just want
 `createTool()` is the ergonomic entry point for typed local tools; `defineTool()`
 remains the explicit low-level contract. Neither helper synthesizes lifecycle
 `extensionPoints` — absence is the safe default
-([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.
 
@@ -76,8 +76,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
 	    ]
 	  },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^0.1.15",
-    "@opensip-cli/core": "^0.1.15"
+    "@opensip-cli/contracts": "^0.1.19",
+    "@opensip-cli/core": "^0.1.19"
   }
 }
 ```
@@ -255,7 +255,7 @@ handler: async (opts, cli) => {
 };
 ```
 
-See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
+See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
 
 `defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
 nested children). The manifest lists every command by **short name** — `list`,
@@ -273,17 +273,18 @@ That's the whole tool. Install it either way and `opensip audit-sec` works on th
 - **`opensip tools install @my-co/audit-sec`** — validates the package against the Tool contract, then installs it **user-global** into `~/.opensip-cli/plugins/tool/` by default, so the subcommand is available in **every** project — the cross-project analogue of `npm i -g`. Add `--project` to install it project-local under `<project>/opensip-cli/.runtime/plugins/tool/` instead (that copy is **gitignored and not shared** with teammates, and keeps provenance `installed` — it is still an npm install, not authored content). Unlike fit/sim packs, a tool needs **no** `plugins.<domain>` config entry — it auto-discovers by its `opensipTools.kind: "tool"` marker. (Whole Tool plugins are managed ONLY by `opensip tools …`; the per-tool `plugin` group manages a pack-supporting tool's extension packs, not whole tools.)
 - **`npm install @my-co/audit-sec`** in your project — discovery walks the project tree's `node_modules`, so a plain install is picked up too. A global `npm i -g @my-co/audit-sec` next to a global `opensip-cli` is found via the CLI's own install tree.
 
-Installed npm tools are deny-by-default even after a successful install. The
-`tools install` result includes `nextSteps`; the important one is to admit the
-tool id explicitly before running it:
+Installed npm tools found ambiently in `node_modules` are deny-by-default. The
+managed path is `opensip tools install`: it validates the package, installs the
+validated bytes, and records trust for the selected scope. The `tools install`
+result includes `nextSteps` with the first command to try:
 
 ```bash
-export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='audit-sec'
 opensip audit-sec
 ```
 
-Use exact ids for CI. The `*` wildcard is still accepted for local incident
-response/testing but warns because it admits every discovered installed Tool.
+`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` still accepts exact ids for manual
+experiments or incident response. The `*` wildcard is accepted but warns because
+it admits every discovered installed Tool.
 
 ## Authored Tool sidecars (tracked, no npm install)
 
@@ -298,9 +299,10 @@ whole-subcommand analogue of the `opensip-cli/fit/checks/` and
 - `<project>/opensip-cli/tools/<name>/opensip-tool.manifest.json` — **TRACKED**,
   committed alongside `opensip-cli/fit/` and `opensip-cli/sim/`. It is
   **deny-by-default**: it rides in with a `git clone` before you've read it, so
-  loading it would run untrusted code. It is admitted **only** when its `id` (or
-  `*`) appears in `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`; otherwise the CLI
-  **fail-closes (exit 5) before importing it**. Provenance is `project-local`.
+  loading it would run untrusted code. It is admitted **only** when its `id`
+  appears in committed project config under `tools.trusted` or in the
+  `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override; otherwise the CLI **fail-closes
+  (exit 5) before importing it**. Provenance is `project-local`.
 - `~/.opensip-cli/tools/<name>/opensip-tool.manifest.json` — **trusted-by-default**:
   you placed it in your own home dir (the `npm i -g` analogue for authored code),
   so it loads without an allowlist. Provenance is `user-global`.
@@ -332,7 +334,7 @@ main entry:
 The runtime contract is unchanged — the directory's resolved main must export
 `tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
 Authored discovery, admission, dynamic import, and registration travel the exact
-same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
 > **Sidecar vs `tools install --project`.** `tools install --project` *installs an
 > npm package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
@@ -437,9 +439,9 @@ host process with import-error isolation only — no worker boundary. The extern
 worker fork does **not** cover them.
 
 For the full extension trust-tier matrix, see
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
 (canonical) and the contributor reference
-[`docs/internal/plugin-isolation-surface.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/internal/plugin-isolation-surface.md).
+[`docs/internal/plugin-isolation-surface.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/internal/plugin-isolation-surface.md).
 
 What is enforced at admission:
 
@@ -449,15 +451,19 @@ What is enforced at admission:
   `output: "raw-stream"`; `output: "live-view"` is rejected by admission and by
   `tools validate`. A live-view renderer is executable UI code and cannot be
   mounted from a manifest-only external tool shell.
-- Deny-by-default allowlists for project-local and installed tools
-  (`OPENSIP_CLI_ALLOW_PROJECT_TOOLS`, `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`).
-  The `*` wildcard admits all and emits a per-invocation `cli.trust.wildcard_allowlist`
-  deprecation warning (DEPRECATED — every matching tool runs at full user privilege).
-- Deny-by-default capability packs for marker-discovered in-process extensions
-  (`OPENSIP_CLI_ALLOW_CAPABILITY_PACKS`). Bundled first-party packs are trusted;
-  non-bundled fit packs and graph adapters must be allowlisted by exact package
-  name before their module is imported. Wildcard allowlisting is ignored for
-  capability packs.
+- Deny-by-default trust gates for project-local and installed tools. Project-local
+  authored tools are admitted by `tools.trusted` (or the
+  `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override). Installed tools are admitted by a
+  managed `tools install` trust record (or the `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`
+  override). The `*` wildcard admits all and emits a per-invocation
+  `cli.trust.wildcard_allowlist` deprecation warning (DEPRECATED — every matching
+  tool runs at full user privilege).
+- Deny-by-default capability packs for marker-discovered in-process extensions.
+  Bundled first-party packs are trusted, and exact packages listed in
+  `plugins.checkPackages`, `plugins.scenarioPackages`, or `plugins.graphAdapters`
+  are explicit project trust decisions. Ambient marker-discovered packs require
+  `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` by exact package name before import.
+  Wildcard allowlisting is ignored for capability packs.
 - **Mount isolation** — a broken external `commandSpecs` declaration warns and
   continues; bundled mount failures abort startup (exit 5).
 - **`tools validate`** — probes a not-yet-trusted package in a child process
@@ -476,7 +482,7 @@ before enabling a new tool in CI.
 - **Use `--debug` aggressively while authoring.** Your check's log lines (`ctx.log(...)`) appear in stderr; the day-level log file under `<project>/opensip-cli/.runtime/logs/<YYYY-MM-DD>.jsonl` archives them. Filter by `runId` with `jq` if multiple runs landed in the same file.
 - **For pre-1.0 peer dependencies, pin to the current minor line.** A caret range such as `^0.1.0` allows patch updates but not `0.2.0`; revisit the range when you adopt a new `0.y` line.
 - **Use the right discovery shape for the right export.** A package marked `opensipTools.kind: 'tool'` is treated as a Tool by the discovery walker — it must export `tool: Tool`. A check pack uses `kind: 'fit-pack'` and exports `checks` / `recipes`; simulation scenario packs use the `scenarios-*` package-name convention or an explicit `plugins.scenarioPackages:` list. Mismatching these shapes leads to a load failure that's logged but not fatal.
-- **An authored sidecar tool is discovered by file presence, not a marker.** A tool under a `tools/` root (`<project>/opensip-cli/tools/` or `~/.opensip-cli/tools/`) is found by the presence of `opensip-tool.manifest.json`, not by a `node_modules` `opensipTools.kind` marker. Remember the project (`project-local`) location is deny-by-default — allowlist its `id` in `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` or it fail-closes before import.
+- **An authored sidecar tool is discovered by file presence, not a marker.** A tool under a `tools/` root (`<project>/opensip-cli/tools/` or `~/.opensip-cli/tools/`) is found by the presence of `opensip-tool.manifest.json`, not by a `node_modules` `opensipTools.kind` marker. Remember the project (`project-local`) location is deny-by-default — list its `id` in `tools.trusted` or use the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override, otherwise it fail-closes before import.
 
 ## Where to go next
 

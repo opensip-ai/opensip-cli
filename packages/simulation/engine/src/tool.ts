@@ -345,6 +345,8 @@ const simCommand = definePrimaryCommand<unknown, ToolCliContext>({
   scope: 'project',
   output: 'raw-stream',
   rawStreamReason: 'runtime-render-dispatch',
+  // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
+  producesVerdict: true,
   handler: runSim,
 });
 

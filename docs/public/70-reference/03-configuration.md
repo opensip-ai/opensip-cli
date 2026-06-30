@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.15
+release: v0.1.19
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
@@ -55,6 +55,7 @@ fitness: {}               # FitnessConfig
 simulation: {}            # SimulationConfig
 cli: {}                   # CliDefaults
 plugins: {}               # per-domain pin lists
+tools: {}                 # host-owned whole-Tool trust
 suites: {}                # host-owned multi-tool suites
 dashboard: {}             # dashboard.editor
 graph: {}                 # graph rule knobs (tool-contributed namespace)
@@ -63,7 +64,7 @@ yagni: {}                 # YAGNI reduction audit knobs (tool-contributed namesp
 
 Every section is optional; a missing section becomes `{}`.
 
-The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `tools`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
 
@@ -172,17 +173,24 @@ config fields are rejected.
 | `apiKey` | — | **Not allowed** in project config (ADR-0071). Use `--api-key`, `OPENSIP_API_KEY`, or `~/.opensip-cli/config.yml#apiKey`. |
 | `fileTypes` | string[] | Restrict the run to these extensions. |
 | `ignore` | string[] | Additional exclude patterns. |
-| `ui.banner` | `'mini' \| 'lg' \| 'md' \| 'sm'` | Banner art above each command. Default `mini` — a compact boxed card (amber cup + version + tagline + `www.opensip.ai` + project path). Set `lg`/`md`/`sm` for the full ASCII wordmark. **No CLI flag** — persistent preference. |
+| `ui.banner` | `'mini'` | Banner art above each command. Default and only supported value: `mini` — a compact boxed card using the canonical coffee cup mark, version, tagline, `www.opensip.ai`, and project path. **No CLI flag** — persistent preference. |
 | `cloud.sync` | bool | Project-level opt-out for automatic OpenSIP Cloud signal sync. `false` disables sync even when a user-level config enables it. |
 | `cloud.endpoint` | URL | HTTPS override for the built-in OpenSIP Cloud endpoint. User-level endpoint takes precedence when both are set. |
+| `sessions.keep` | int >= 0 | Keep the newest N persisted run sessions. Default `200`; `0` disables count pruning. |
+| `sessions.maxAgeDays` | int >= 0 | Drop persisted run sessions older than this many days. Default `60`; `0` disables age pruning. |
+| `sessions.maxSizeMb` | int >= 0 | Warn/reclaim if the project SQLite store exceeds this size. Default `150`; `0` disables the size guard. |
 
 ```yaml
 cli:
   reportTo: 'https://opensip.ai/api'
   ui:
-    banner: mini   # mini | lg | md | sm
+    banner: mini   # canonical coffee-cup card
   cloud:
     sync: false    # optional project-level cloud signal-sync opt-out
+  sessions:
+    keep: 200
+    maxAgeDays: 60
+    maxSizeMb: 150
 # Recipe defaults are tool-scoped (ADR-0022) — set them per tool:
 fitness:
   recipe: backend
@@ -196,6 +204,12 @@ strict validation to avoid committing secrets. User config is written with mode
 `0o600` (ADR-0071).
 
 CLI flags always override config — `--no-json` overrides a `cli.json: true` setting.
+
+Session retention is host-owned. After a run writes its session row, the host
+applies `cli.sessions` as best-effort maintenance: count pruning, age pruning,
+then SQLite reclaim/size guard. A retention or vacuum failure is logged but does
+not change the tool verdict or exit code. See
+[Session and persistence](../80-implementation/03-session-and-persistence.md).
 
 ## `plugins`
 
@@ -220,6 +234,18 @@ plugins:
 ```
 
 **Sim-pack discovery is by name-pattern** (ADR-0029): the simulation tool's manifest declares a `name-pattern` discovery mode (`prefix: "scenarios-"`, default scope `@opensip-cli`), so any installed `<scope>/scenarios-*` package is discovered automatically. There is **no** `opensipTools.kind: "sim-pack"` marker — sim marker discovery was retired in ADR-0029. The three layers that contribute scenario packs are: the `<scope>/scenarios-*` name-pattern scan (governed by `packageScopes` / `autoDiscoverScenarios`), explicit `scenarioPackages` pins, and project-local scenario files under `opensip-cli/sim/scenarios/`. See [plugin loader](../80-implementation/02-plugin-loader.md).
+
+## `tools`
+
+Whole-Tool project trust declarations. Values are Tool manifest ids, not npm
+package names. `opensip tools create <id>` adds the scaffolded id here so the
+tracked project-local tool can load intentionally for teammates and CI.
+
+```yaml
+tools:
+  trusted:
+    - audit-sec
+```
 
 ## `suites`
 

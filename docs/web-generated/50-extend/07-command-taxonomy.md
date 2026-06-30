@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-21
-release: v0.1.15
+release: v0.1.19
 title: "Command surface taxonomy"
 audience: [plugin-authors, contributors, ci-integrators]
 purpose: "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
@@ -31,8 +31,8 @@ plugins.
 | Extension | Discovery | Trust | Load boundary | Validation |
 |-----------|-----------|-------|---------------|------------|
 | Bundled whole tools | Shipped manifests | Trusted | In-process (host) | Startup admission |
-| Installed whole tools | `node_modules` marker | Allowlist opt-in | Forked dispatch worker (ADR-0054) | `tools validate` / install |
-| Project-local tools | `opensip-cli/tools/<id>/` sidecar | Deny-by-default | Forked dispatch worker (ADR-0054) | `tools validate` + allowlist |
+| Installed whole tools | `node_modules` marker | Managed install trust or override | Forked dispatch worker (ADR-0054) | `tools validate` / install |
+| Project-local tools | `opensip-cli/tools/<id>/` sidecar | `tools.trusted` or override | Forked dispatch worker (ADR-0054) | `tools validate` + config trust |
 | User-global tools | `~/.opensip-cli/tools/` | Trusted-by-default | Forked dispatch worker (ADR-0054) | `tools validate` |
 | Fit / sim packs & recipes | `plugins.<domain>` | In-process; epoch metadata | In-process (host) | Domain registrars |
 | Graph adapters & recipes | `plugins.graph` | In-process; epoch metadata | In-process (host) | Domain registrars |
@@ -40,8 +40,8 @@ plugins.
 
 Authoring on-ramps: `opensip tools create` (`minimal-js`, `ts-local`). See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/),
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## The three tiers
 
@@ -161,7 +161,7 @@ the serve lifetime. There is no run verdict to render, so the command emits no
 the documented escape hatch from the `SignalEnvelope`/`CommandResult` currency,
 recorded in `raw-stream-parity` and justified in-file for
 `command-handler-host-owned-output`. See
-[ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0084-mcp-server-surface.md).
+[ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0084-mcp-server-surface.md).
 
 ## Tier 3 — Internal commands
 

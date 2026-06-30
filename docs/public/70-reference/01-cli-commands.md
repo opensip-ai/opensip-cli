@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-28
-release: v0.1.15
+release: v0.1.19
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
@@ -131,6 +131,21 @@ setting wins. Or opt out per-run with `--no-cloud`.
 This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
 **any** receiver (and can fail a CI build via exit 4), whereas cloud sync emits
 **native signals** to **OpenSIP Cloud** automatically and best-effort.
+
+### JSON run provenance
+
+Run commands that emit a `SignalEnvelope` also carry host-stamped
+`declaredInputs` metadata in JSON/SARIF/report delivery paths. It records a small
+allowlist of verdict-relevant runtime facts: CLI version, Node version, package
+manager, platform, tool id, available engine/tool version, and baseline
+fingerprint identity. It does not include environment dumps, absolute paths, or
+secrets.
+
+Use it when comparing CI or agent runs:
+
+```bash
+opensip fit --json | jq '.envelope.declaredInputs'
+```
 
 ---
 
@@ -890,7 +905,7 @@ opensip suite add security --tool fitness --command fit --arg recipe=security
 |---|---|---|
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
-| `run` | `--json` | Emit the suite summary as JSON. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts and per-step verdict counts when a step emitted an envelope. Step output still flows through each step's own output seams. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -902,7 +917,16 @@ Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
 
-**See also:** [`03-configuration.md#suites`](./03-configuration.md#suites).
+`suite run --json` keeps the original step fields (`tool`, `stableId`,
+`command`, `exitCode`, `durationMs`, `error`) and additively includes
+`data.aggregate` (`steps`, `passed`, `failed`, `faulted`, `errors`, `warnings`).
+Each `data.steps[].verdict` is present only when that step emitted a
+`SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
+`findings`) so suite summaries do not leak signal messages, file paths, symbols,
+or match content. See [ADR-0100](../../decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md).
+
+**See also:** [`03-configuration.md#suites`](./03-configuration.md#suites),
+[`04-json-output-schema.md#suite-run-results`](./04-json-output-schema.md#suite-run-results).
 
 ---
 
@@ -959,19 +983,18 @@ opensip tools data-purge <tool-id>
 
 Tool-owned: [`@opensip-cli/external-tool-adapter`](../../../packages/external-tool-adapter) + the three MVP adapter packages ([ADR-0090](../../decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)).
 
-An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want, then trust it. To author your own, see [External tool adapters](../50-extend/08-external-tool-adapters.md).
+An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want. To author your own, see [External tool adapters](../50-extend/08-external-tool-adapters.md).
 
 The full user flow:
 
 ```
 opensip tools install @opensip-cli/tool-gitleaks   # opt-in, not bundled
-export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='gitleaks' # trust it (deny-by-default)
 opensip gitleaks doctor                            # binary found? version? posture? ready?
 opensip gitleaks                                   # scan → normalize → store → signals
 opensip gitleaks --json --gate-compare             # envelope + net-new ratchet
 ```
 
-> **You must trust the tool after installing it.** Installed tools are **deny-by-default**: a bare `opensip gitleaks` errors *tool-not-found* until you add the adapter's manifest `id` to `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` (comma/whitespace-separated; `*` admits all). The trust value is the manifest **`id`** — `gitleaks`, `osv-scanner`, `trivy` — **not** the UUID. `opensip tools install` prints the exact export in its `nextSteps`. This is the headline gotcha: install alone is not enough. The same trust surface and `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) apply to all three.
+`opensip tools install` validates the package, installs the validated bytes, and records a managed trust entry for the selected scope. Ambient `node_modules` Tool packages remain deny-by-default; `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` is an override for incident response/manual experiments. The same `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) applies to all three adapters.
 
 ### The three MVP adapters
 
@@ -1126,8 +1149,8 @@ persists on **every** run until you upgrade — so it's never lost if you miss i
 once — and disappears on its own the run after you update. When an update is
 available it surfaces without nagging:
 
-- On the default `mini` banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
-- On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
+- On the coffee-cup banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
+- On the `--json` path, which renders no banner, the same upgrade command is printed as a one-line note on stderr.
 
 Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip --version`.
 

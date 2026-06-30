@@ -1,7 +1,12 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 
-import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { RunVerdict, SignalEnvelope } from '@opensip-cli/contracts';
 import type { SignalDeliveryResult, ToolCliContext } from '@opensip-cli/core';
+
+export interface StepEnvelopeStats {
+  readonly verdict: RunVerdict;
+  readonly findings: number;
+}
 
 export interface StepCapture {
   /**
@@ -16,8 +21,24 @@ export interface StepCapture {
    * to `EXIT_CODES.SUCCESS`).
    */
   readonly getExitCode: () => number | undefined;
+  /**
+   * Last emitted envelope stats for the step. `undefined` means the step did not
+   * emit an envelope, which is distinct from an envelope with zero findings.
+   */
+  readonly getEnvelopeStats: () => StepEnvelopeStats | undefined;
   readonly signalDeliveries: readonly SignalDeliveryResult[];
   readonly context: ToolCliContext;
+}
+
+function captureEnvelopeStats(envelope: unknown): StepEnvelopeStats | undefined {
+  const maybeEnvelope = envelope as Partial<SignalEnvelope> | undefined;
+  const verdict = maybeEnvelope?.verdict;
+  if (verdict?.summary === undefined) return undefined;
+  const signals = maybeEnvelope?.signals;
+  return {
+    verdict,
+    findings: Array.isArray(signals) ? signals.length : 0,
+  };
 }
 
 export function createCapturingContext(base: ToolCliContext): StepCapture {
@@ -27,6 +48,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
   // routed in by `withProcessExitGuard`) write THIS slot, so `getExitCode()` is the
   // single source of truth for the step's verdict.
   let exitCode: number | undefined;
+  let lastEnvelopeStats: StepEnvelopeStats | undefined;
   const signalDeliveries: SignalDeliveryResult[] = [];
   const context = Object.defineProperties(
     {},
@@ -59,6 +81,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
       ) => {
         const result = await base.deliverSignals(envelope, opts);
         signalDeliveries.push(result);
+        lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
         // Mirror the host's `deliverEnvelope` exit precedence
         // (`bootstrap/deliver-envelope.ts` → `deriveReportExitDecision`). The host
         // applies the findings/report exit through ITS OWN `outputPlane.setExitCode`,
@@ -84,7 +107,18 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
         return result;
       },
     },
+    emitEnvelope: {
+      value: (envelope: Parameters<ToolCliContext['emitEnvelope']>[0]) => {
+        lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
+        base.emitEnvelope(envelope);
+      },
+    },
   });
 
-  return { getExitCode: () => exitCode, signalDeliveries, context };
+  return {
+    getExitCode: () => exitCode,
+    getEnvelopeStats: () => lastEnvelopeStats,
+    signalDeliveries,
+    context,
+  };
 }

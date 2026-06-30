@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { recordInstalledToolTrust } from '../bootstrap/tool-trust.js';
 import { TOOL_DOMAIN } from '../commands/plugin/domain-resolution.js';
 import { toolsList } from '../commands/tools/list.js';
 
@@ -104,9 +105,15 @@ describe('toolsList — loaded (admitted) set', () => {
     });
     // No packageName on a bundled tool → the field is omitted, not null.
     expect(result.tools[0]).not.toHaveProperty('packageName');
+    expect(result.tools[0]?.trustReason).toBe('bundled');
   });
 
   it('labels provenance by its declared project-local / user-global source', () => {
+    writeFileSync(
+      join(projectDir, 'opensip-cli.config.yml'),
+      'schemaVersion: 1\ntools:\n  trusted:\n    - pl\n',
+      'utf8',
+    );
     const result = toolsList({
       cwd: projectDir,
       provenance: [
@@ -118,6 +125,9 @@ describe('toolsList — loaded (admitted) set', () => {
     const byId = Object.fromEntries(result.tools.map((t) => [t.id, t.source]));
     expect(byId.pl).toBe('project');
     expect(byId.ug).toBe('global');
+    const trustById = Object.fromEntries(result.tools.map((t) => [t.id, t.trustReason]));
+    expect(trustById.pl).toBe('project-config');
+    expect(trustById.ug).toBe('user-global');
   });
 
   it('falls back to empty commands when a loaded tool has no paired manifest', () => {
@@ -175,6 +185,26 @@ describe('toolsList — installed-but-not-loaded marker scan', () => {
       version: '4.5.6',
     });
     expect(glob).toMatchObject({ source: 'global', status: 'manifest-only' });
+  });
+
+  it('reports managed-install trust for manifest-only rows with trust records', () => {
+    writeFileSync(join(projectDir, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n');
+    const projectHost = resolveProjectPaths(projectDir).pluginsDir(TOOL_DOMAIN);
+    writeToolPackage(projectHost, '@x/managed-proj', 'managed-proj');
+    recordInstalledToolTrust({
+      scope: 'project',
+      cwd: projectDir,
+      toolId: 'managed-proj',
+      packageName: '@x/managed-proj',
+      manifestHash: 'manifest-hash-for-list-display',
+      installSourcePath: join(projectDir, 'managed-proj'),
+    });
+
+    const result = toolsList({ cwd: projectDir });
+    expect(result.tools.find((t) => t.id === 'managed-proj')).toMatchObject({
+      status: 'manifest-only',
+      trustReason: 'managed-install',
+    });
   });
 
   it('skips a host package that is already in the loaded set (no duplicate row)', () => {
