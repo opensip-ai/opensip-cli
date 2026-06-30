@@ -21,6 +21,14 @@ export interface ToolsListRow {
    * never dynamic-imports a runtime, so this is as much as a listing can know.
    */
   readonly status: 'loaded' | 'manifest-only';
+  /** Why the host trusted or denied this tool. */
+  readonly trustReason?:
+    | 'bundled'
+    | 'managed-install'
+    | 'project-config'
+    | 'env'
+    | 'user-global'
+    | 'denied';
   /** True on a GLOBAL row whose tool id is shadowed by a project-local install. */
   readonly shadowed?: boolean;
 }
@@ -84,6 +92,7 @@ export interface ToolsInstallResult {
   readonly validation: ToolsValidateResult;
   readonly toolId?: string;
   readonly version?: string;
+  readonly trustReason?: 'managed-install' | 'project-config' | 'env';
   readonly nextSteps?: readonly string[];
   /** Activation-step failure detail (validation failures live in `validation`). */
   readonly error?: string;

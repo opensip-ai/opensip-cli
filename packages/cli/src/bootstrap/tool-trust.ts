@@ -1,4 +1,14 @@
-import { logger } from '@opensip-cli/core';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+import {
+  isPathInside,
+  isPlainRecord,
+  logger,
+  readYamlFile,
+  resolveProjectPaths,
+  resolveUserPaths,
+} from '@opensip-cli/core';
 
 /**
  * tool-trust — executable-tool trust policies for project-local and installed
@@ -10,13 +20,13 @@ import { logger } from '@opensip-cli/core';
  * rather than load-by-presence.
  *
  * Policy for launch (signed off): **deny-by-default for non-interactive
- * runs; admit-with-allowlist when configured.** No interactive prompt UX
- * in this release. The allowlist is a comma/whitespace-separated list of
- * tool ids in the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` environment variable
- * — a minimal, documented opt-in:
+ * runs; admit when an explicit project/user action recorded trust.** Project
+ * authored tools use committed `tools.trusted`; managed npm installs use a
+ * per-host trust record; env allowlists remain override/incident-response
+ * mechanisms:
  *
- *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="my-audit, my-lint"   # admit by id
- *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="*"                    # admit all
+ *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="my-audit, my-lint"    # override by id
+ *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="*"                    # override all
  *
  * The decision is made BEFORE the tool's module is imported: a disallowed
  * project-local tool is fail-closed (exit 5) without its code ever running.
@@ -42,6 +52,36 @@ export const INSTALLED_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS';
  * honored.
  */
 export const CAPABILITY_PACK_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS';
+
+const TOOL_TRUST_FILE = 'tool-trust.json';
+const TOOL_TRUST_SCHEMA_VERSION = 1;
+
+export type ToolTrustReason =
+  | 'bundled'
+  | 'managed-install'
+  | 'project-config'
+  | 'env'
+  | 'user-global'
+  | 'denied';
+
+export interface InstalledToolTrustRecord {
+  readonly toolId: string;
+  readonly packageName: string;
+  readonly version?: string;
+  readonly manifestHash: string;
+  readonly installSourcePath: string;
+  readonly installedAt: string;
+}
+
+interface InstalledToolTrustFile {
+  readonly schemaVersion: number;
+  readonly installedTools: readonly InstalledToolTrustRecord[];
+}
+
+export interface InstalledToolTrustDecision {
+  readonly trusted: boolean;
+  readonly reason: ToolTrustReason;
+}
 
 /**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
@@ -78,6 +118,207 @@ function warnIgnoredCapabilityWildcard(allow: ReadonlySet<string>): void {
     detail:
       'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS requires exact package names; wildcard * is ignored',
   });
+}
+
+function stringArrayAt(record: Record<string, unknown>, key: string): readonly string[] {
+  const value = record[key];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+export function trustedToolIdsFromConfigDocument(document: unknown): ReadonlySet<string> {
+  if (!isPlainRecord(document)) return new Set();
+  const tools = document.tools;
+  if (!isPlainRecord(tools)) return new Set();
+  return new Set(stringArrayAt(tools, 'trusted'));
+}
+
+export function readProjectTrustedToolIds(configPath: string | undefined): ReadonlySet<string> {
+  if (configPath === undefined) return new Set();
+  return trustedToolIdsFromConfigDocument(readYamlFile(configPath));
+}
+
+function installedTrustFileForScope(scope: 'global' | 'project', cwd: string): string {
+  const hostDir =
+    scope === 'project'
+      ? resolveProjectPaths(cwd).pluginsDir('tool')
+      : resolveUserPaths().pluginsDir('tool');
+  return join(hostDir, TOOL_TRUST_FILE);
+}
+
+function readInstalledTrustFile(path: string): InstalledToolTrustFile {
+  if (!existsSync(path)) return { schemaVersion: TOOL_TRUST_SCHEMA_VERSION, installedTools: [] };
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    if (!isPlainRecord(parsed)) {
+      return { schemaVersion: TOOL_TRUST_SCHEMA_VERSION, installedTools: [] };
+    }
+    const records = Array.isArray(parsed.installedTools) ? parsed.installedTools : [];
+    return {
+      schemaVersion: TOOL_TRUST_SCHEMA_VERSION,
+      installedTools: records.filter(isInstalledToolTrustRecord),
+    };
+  } catch {
+    return { schemaVersion: TOOL_TRUST_SCHEMA_VERSION, installedTools: [] };
+  }
+}
+
+function isInstalledToolTrustRecord(value: unknown): value is InstalledToolTrustRecord {
+  if (!isPlainRecord(value)) return false;
+  return (
+    typeof value.toolId === 'string' &&
+    typeof value.packageName === 'string' &&
+    (value.version === undefined || typeof value.version === 'string') &&
+    typeof value.manifestHash === 'string' &&
+    typeof value.installSourcePath === 'string' &&
+    typeof value.installedAt === 'string'
+  );
+}
+
+function writeInstalledTrustFile(path: string, file: InstalledToolTrustFile): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`, 'utf8');
+}
+
+export function recordInstalledToolTrust(args: {
+  readonly scope: 'global' | 'project';
+  readonly cwd: string;
+  readonly toolId: string;
+  readonly packageName: string;
+  readonly version?: string;
+  readonly manifestHash: string;
+  readonly installSourcePath: string;
+  readonly installedAt?: Date;
+}): void {
+  const path = installedTrustFileForScope(args.scope, args.cwd);
+  const existing = readInstalledTrustFile(path).installedTools.filter(
+    (record) => !(record.toolId === args.toolId && record.packageName === args.packageName),
+  );
+  const record: InstalledToolTrustRecord = {
+    toolId: args.toolId,
+    packageName: args.packageName,
+    ...(args.version === undefined ? {} : { version: args.version }),
+    manifestHash: args.manifestHash,
+    installSourcePath: args.installSourcePath,
+    installedAt: (args.installedAt ?? new Date()).toISOString(),
+  };
+  writeInstalledTrustFile(path, {
+    schemaVersion: TOOL_TRUST_SCHEMA_VERSION,
+    installedTools: [...existing, record],
+  });
+}
+
+export function removeInstalledToolTrust(args: {
+  readonly scope: 'global' | 'project';
+  readonly cwd: string;
+  readonly toolId: string;
+  readonly packageName: string;
+}): void {
+  const path = installedTrustFileForScope(args.scope, args.cwd);
+  const existing = readInstalledTrustFile(path).installedTools;
+  const retained = existing.filter(
+    (record) => !(record.toolId === args.toolId && record.packageName === args.packageName),
+  );
+  if (retained.length === existing.length) return;
+  writeInstalledTrustFile(path, {
+    schemaVersion: TOOL_TRUST_SCHEMA_VERSION,
+    installedTools: retained,
+  });
+}
+
+function recordMatchesInstalledTool(
+  record: InstalledToolTrustRecord,
+  args: {
+    readonly toolId: string;
+    readonly packageName: string;
+    readonly manifestHash?: string;
+  },
+): boolean {
+  return (
+    record.toolId === args.toolId &&
+    record.packageName === args.packageName &&
+    (args.manifestHash === undefined || record.manifestHash === args.manifestHash)
+  );
+}
+
+function hasMatchingManagedInstallTrust(args: {
+  readonly scope: 'global' | 'project';
+  readonly cwd: string;
+  readonly toolId: string;
+  readonly packageName: string;
+  readonly manifestHash?: string;
+}): boolean {
+  const path = installedTrustFileForScope(args.scope, args.cwd);
+  return readInstalledTrustFile(path).installedTools.some((record) =>
+    recordMatchesInstalledTool(record, args),
+  );
+}
+
+function isPackageUnderManagedHost(args: {
+  readonly packageDir: string;
+  readonly scope: 'global' | 'project';
+  readonly cwd: string;
+}): boolean {
+  const hostDir =
+    args.scope === 'project'
+      ? resolveProjectPaths(args.cwd).pluginsDir('tool')
+      : resolveUserPaths().pluginsDir('tool');
+  return isPathInside(args.packageDir, hostDir);
+}
+
+export function resolveInstalledToolTrust(args: {
+  readonly toolId: string;
+  readonly packageName: string;
+  readonly packageDir: string;
+  readonly manifestHash?: string;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly projectRoot?: string;
+  readonly projectTrustedTools?: ReadonlySet<string>;
+}): InstalledToolTrustDecision {
+  if (isInstalledToolTrusted(args.toolId, args.env)) {
+    return { trusted: true, reason: 'env' };
+  }
+  if (
+    args.projectRoot !== undefined &&
+    isPackageUnderManagedHost({
+      packageDir: args.packageDir,
+      scope: 'project',
+      cwd: args.projectRoot,
+    })
+  ) {
+    if (
+      hasMatchingManagedInstallTrust({
+        scope: 'project',
+        cwd: args.projectRoot,
+        toolId: args.toolId,
+        packageName: args.packageName,
+        manifestHash: args.manifestHash,
+      })
+    ) {
+      return { trusted: true, reason: 'managed-install' };
+    }
+    if (args.projectTrustedTools?.has(args.toolId) === true) {
+      return { trusted: true, reason: 'project-config' };
+    }
+  }
+  if (
+    isPackageUnderManagedHost({
+      packageDir: args.packageDir,
+      scope: 'global',
+      cwd: process.cwd(),
+    }) &&
+    hasMatchingManagedInstallTrust({
+      scope: 'global',
+      cwd: process.cwd(),
+      toolId: args.toolId,
+      packageName: args.packageName,
+      manifestHash: args.manifestHash,
+    })
+  ) {
+    return { trusted: true, reason: 'managed-install' };
+  }
+  return { trusted: false, reason: 'denied' };
 }
 
 /**

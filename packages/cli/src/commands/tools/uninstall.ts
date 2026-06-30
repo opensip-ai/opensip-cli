@@ -19,6 +19,7 @@ import {
   type ToolProvenance,
 } from '@opensip-cli/core';
 
+import { removeInstalledToolTrust } from '../../bootstrap/tool-trust.js';
 import { TOOL_DOMAIN } from '../plugin/domain-resolution.js';
 import { removeToolPlugin } from '../plugin-host-ops.js';
 
@@ -124,6 +125,12 @@ export function toolsUninstall(opts: ToolsUninstallOptions): ToolsUninstallResul
     const error = 'error' in removal ? (removal.error ?? 'removal failed') : 'removal failed';
     return failed(opts.target, error);
   }
+  removeInstalledToolTrust({
+    scope: chosen.scope,
+    cwd: opts.cwd,
+    toolId: chosen.id,
+    packageName: chosen.packageName,
+  });
   return {
     type: 'tools-uninstall',
     target: opts.target,

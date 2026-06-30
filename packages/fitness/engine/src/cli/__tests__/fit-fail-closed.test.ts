@@ -298,6 +298,39 @@ describe('executeFit fail-closed (ADR-0060)', () => {
     });
   });
 
+  it('strips loader route prefixes from optional check-pack warning details', async () => {
+    await withFitScope(() => {
+      const load = currentFitnessLoadState();
+      Object.assign(load, createFitnessLoadState());
+      load.loadedFor = projectDir;
+      load.pluginLoadErrors = [];
+      load.checkPackErrors = [
+        '@opensip/fit → fit-pack: package @opensip/fit denied by capability-pack trust policy',
+      ];
+      currentCheckRegistry().register(
+        {
+          config: {
+            id: '00000000-0000-4000-8000-000000000005',
+            slug: 'other-check',
+            description: 'other',
+            tags: [],
+            checkScope: 'file',
+          },
+          analyze: () => [],
+        } as never,
+        'test',
+      );
+
+      finalizeFitLoadOutcome(projectDir);
+
+      expect(load.loadWarnings).toContain(
+        'Optional check pack failed to load: package @opensip/fit denied by capability-pack trust policy',
+      );
+      expect(load.loadWarnings.join('\n')).not.toContain('@opensip/fit → fit-pack');
+      return Promise.resolve();
+    });
+  });
+
   it('marks optional plugin failure as degraded when built-in checks are registered', async () => {
     await withFitScope(() => {
       const load = currentFitnessLoadState();

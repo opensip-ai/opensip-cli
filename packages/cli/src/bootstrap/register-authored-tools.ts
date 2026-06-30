@@ -5,9 +5,9 @@
  * file-length soft limit.
  *
  * Authored tools are authored CONTENT (a JSON sidecar, not an installed npm
- * package): project-local is deny-by-default (allowlisted via
- * `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`), user-global is trusted-by-default. Both are
- * EXTERNAL provenance, so ADR-0054 M4-G applies: in the HOST the registration
+ * package): project-local is deny-by-default (trusted through `tools.trusted`
+ * or the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override), user-global is
+ * trusted-by-default. Both are EXTERNAL provenance, so ADR-0054 M4-G applies: in the HOST the registration
  * registers a manifest-derived synthetic `Tool` (no runtime import); the dispatch
  * WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`) imports the real runtime.
  */
@@ -72,15 +72,16 @@ function admitAuthoredTool(
 
 /**
  * Admit or reject a PROJECT-LOCAL authored tool under the deny-by-default trust
- * policy. The trust decision always precedes module import; a non-allowlisted
+ * policy. The trust decision always precedes module import; an untrusted
  * tool fails closed before any authored code can run.
  *
  * @throws {PluginIncompatibleError} When the sidecar manifest is missing,
- * malformed, incompatible, or not trusted by the project-tool allowlist.
+ * malformed, incompatible, or not trusted by project config / override.
  */
 export function admitProjectLocalTool(args: {
   readonly dir: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly projectTrustedTools?: ReadonlySet<string>;
 }): AuthoredAdmission {
   const manifest = loadToolManifest('project-local', args.dir);
   if (manifest === undefined) {
@@ -89,11 +90,12 @@ export function admitProjectLocalTool(args: {
       { diagnostic: 'manifest missing or malformed' },
     );
   }
-  if (!isProjectLocalToolTrusted(manifest.id, args.env)) {
+  const trustedByConfig = args.projectTrustedTools?.has(manifest.id) === true;
+  if (!trustedByConfig && !isProjectLocalToolTrusted(manifest.id, args.env)) {
     throw new PluginIncompatibleError(
       `project-local tool '${manifest.id}' is not trusted to load (deny-by-default). ` +
-        `Allowlist it via OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
-      { diagnostic: 'project-local tool not allowlisted (deny-by-default)' },
+        `List it in tools.trusted or use OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
+      { diagnostic: 'project-local tool not trusted (deny-by-default)' },
     );
   }
   return admitAuthoredTool('project-local', args.dir, manifest);
@@ -121,6 +123,7 @@ export async function discoverAndRegisterAuthoredTools(
     readonly projectAuthoredDir?: string;
     readonly globalAuthoredDir: string;
     readonly env?: NodeJS.ProcessEnv;
+    readonly projectTrustedTools?: ReadonlySet<string>;
   },
   builtInIds: ReadonlySet<string>,
   provenance: ToolProvenance[] = [],
@@ -142,7 +145,11 @@ export async function discoverAndRegisterAuthoredTools(
     for (const candidate of discoverAuthoredToolSidecars(opts.projectAuthoredDir)) {
       await admitAndRegisterAuthored({
         registry,
-        admission: admitProjectLocalTool({ dir: candidate.dir, env: opts.env }),
+        admission: admitProjectLocalTool({
+          dir: candidate.dir,
+          env: opts.env,
+          projectTrustedTools: opts.projectTrustedTools,
+        }),
         dir: candidate.dir,
         builtInIds,
         provenance,
@@ -173,7 +180,7 @@ async function admitAndRegisterAuthored(args: AuthoredRegisterArgs): Promise<voi
   // a manifest-derived synthetic Tool — never import the untrusted runtime. The
   // dispatch WORKER imports the real runtime (the isolation boundary). The trust
   // gate already ran in `admitProjectLocalTool` (deny-by-default), so a
-  // non-allowlisted tool never reaches here.
+  // untrusted tool never reaches here.
   if (isHostRuntimeImportForbidden(env)) {
     const tool = synthesizeExternalTool(manifest);
     registry.register(tool);

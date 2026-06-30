@@ -13,7 +13,7 @@ import {
 } from '@opensip-cli/core';
 
 import { getBootstrapDiagnosticsBuffer } from './bootstrap-diagnostics-buffer.js';
-import { INSTALLED_TOOL_ALLOWLIST_ENV } from './tool-trust.js';
+import { INSTALLED_TOOL_ALLOWLIST_ENV, type ToolTrustReason } from './tool-trust.js';
 
 import type { ToolRuntimeLoad } from './admit-tool-package.js';
 
@@ -47,6 +47,7 @@ export function recordInstalledTrustDenied(
   toolId: string,
   packageName: string,
   packageDir: string,
+  reason: ToolTrustReason = 'denied',
   collector?: BootstrapDiagnosticsCollector,
 ): CliDiagnostic {
   return record(collector, {
@@ -55,13 +56,13 @@ export function recordInstalledTrustDenied(
     category: 'discovery',
     message:
       `Installed tool ${packageName} (${toolId}) is not trusted to load (deny-by-default). ` +
-      `Allowlist it via ${INSTALLED_TOOL_ALLOWLIST_ENV}='${toolId}' to admit it ` +
-      `(or ${INSTALLED_TOOL_ALLOWLIST_ENV}='*' for all).`,
+      `Install it with \`opensip tools install\`, list project-local installs in tools.trusted, ` +
+      `or use ${INSTALLED_TOOL_ALLOWLIST_ENV}='${toolId}' as an override.`,
     impact: INSTALLED_TOOL_SKIPPED_IMPACT,
     action:
-      'See opensip.ai/docs/opensip-cli/70-reference/10-environment-variables/ for trust configuration.',
+      'Use opensip tools install for managed trust, tools.trusted for project-local trust, or the env var for incident response.',
     provenance: { toolId, packageName, discoverySource: 'installed' },
-    detail: packageDir,
+    detail: `${reason}: ${packageDir}`,
   });
 }
 

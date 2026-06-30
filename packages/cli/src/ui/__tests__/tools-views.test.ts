@@ -34,6 +34,7 @@ function row(over: Partial<ToolsListRow> = {}): ToolsListRow {
     source: 'bundled',
     commands: ['demo-cmd'],
     status: 'loaded',
+    trustReason: 'bundled',
     ...over,
   };
 }
@@ -74,6 +75,7 @@ describe('viewToolsList', () => {
           status: 'manifest-only',
           packageName: '@x/shadow',
           commands: [],
+          trustReason: 'denied',
         }),
       ],
       totalCount: 2,
@@ -83,6 +85,8 @@ describe('viewToolsList', () => {
     expect(out).toContain('(2)');
     expect(out).toContain('fitness');
     expect(out).toContain('global (shadowed)');
+    expect(out).toContain('bundled');
+    expect(out).toContain('denied');
     // commands.length === 0 renders a dash, not an empty cell.
     expect(out).toContain('-');
   });
@@ -119,9 +123,7 @@ describe('viewToolsInstall', () => {
       scope: 'global',
       toolId: 'demo-tool',
       version: '1.2.3',
-      // The host renders the allowlist breadcrumb from `nextSteps` (the same
-      // data `--json` consumers read); `install` always populates it on success.
-      nextSteps: ["export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo-tool'", 'opensip demo-tool'],
+      nextSteps: ['opensip demo-tool'],
       validation: validation(),
     };
     const out = renderToText(viewToolsInstall(result));
@@ -130,7 +132,8 @@ describe('viewToolsInstall', () => {
     expect(out).toContain('global');
     expect(out).toContain('Validation');
     expect(out).toContain('Next steps:');
-    expect(out).toContain("OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='demo-tool'");
+    expect(out).toContain('opensip demo-tool');
+    expect(out).not.toContain('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS');
   });
 
   it('renders a failed install with the error line', () => {

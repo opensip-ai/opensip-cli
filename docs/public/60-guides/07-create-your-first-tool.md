@@ -28,14 +28,14 @@ This guide scaffolds a tracked project-local Tool under `opensip-cli/tools/` usi
 package a Tool for npm.
 
 Project-local tools are **executable code**, **deny-by-default**, and **not
-sandboxed** after you allowlist them. Do not use wildcard trust unless you trust
-every project-local tool in the repo.
+sandboxed** after you trust them in project config. Do not use wildcard env
+overrides unless you trust every project-local tool in the repo.
 
 ## 1. Scaffold the tool
 
 ### Minimal JS (default smoke path)
 
-Zero npm dependencies — ideal for a quick allowlist/run check:
+Zero npm dependencies — ideal for a quick trust/run check:
 
 ```bash
 opensip tools create hello-tools
@@ -130,14 +130,20 @@ opensip tools validate opensip-cli/tools/hello-tools --install-deps
 Validation executes candidate code in a child process. It is a coherence check,
 not a security sandbox.
 
-## 5. Allowlist the project-local Tool
+## 5. Trust the project-local Tool
 
-```bash
-export OPENSIP_CLI_ALLOW_PROJECT_TOOLS=hello-tools
+`opensip tools create` adds the new tool id to `tools.trusted` in
+`opensip-cli.config.yml`:
+
+```yaml
+tools:
+  trusted:
+    - hello-tools
 ```
 
-Use a comma-separated list for more than one Tool. Avoid `'*'` unless you trust
-every project-local tool in the repo.
+Commit that config entry with the tool so teammates and CI load the same
+intentional project-local Tool. `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` remains
+available as an override, but it is not the normal scaffold path.
 
 ## 6. Run it
 
@@ -197,5 +203,5 @@ trust enforcement mature (see [ADR-0076](../../decisions/ADR-0076-tool-authoring
 | Learn the full Tool contract | [Full Tool plugins](../50-extend/06-full-tool-plugins.md) |
 | Read the command grammar | [Command surface taxonomy](../50-extend/07-command-taxonomy.md) |
 | Manage installed Tools | [`tools` command](../70-reference/12-tools-command.md) |
-| See the allowlist environment variable | [Environment variables](../70-reference/10-environment-variables.md) |
+| See trust override environment variables | [Environment variables](../70-reference/10-environment-variables.md) |
 | Understand Tool architecture | [The tool-plugin model](../10-concepts/02-tool-plugin-model.md) |

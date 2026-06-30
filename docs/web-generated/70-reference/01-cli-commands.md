@@ -959,19 +959,18 @@ opensip tools data-purge <tool-id>
 
 Tool-owned: [`@opensip-cli/external-tool-adapter`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/external-tool-adapter) + the three MVP adapter packages ([ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md)).
 
-An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want, then trust it. To author your own, see [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/).
+An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want. To author your own, see [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/).
 
 The full user flow:
 
 ```
 opensip tools install @opensip-cli/tool-gitleaks   # opt-in, not bundled
-export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='gitleaks' # trust it (deny-by-default)
 opensip gitleaks doctor                            # binary found? version? posture? ready?
 opensip gitleaks                                   # scan → normalize → store → signals
 opensip gitleaks --json --gate-compare             # envelope + net-new ratchet
 ```
 
-> **You must trust the tool after installing it.** Installed tools are **deny-by-default**: a bare `opensip gitleaks` errors *tool-not-found* until you add the adapter's manifest `id` to `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` (comma/whitespace-separated; `*` admits all). The trust value is the manifest **`id`** — `gitleaks`, `osv-scanner`, `trivy` — **not** the UUID. `opensip tools install` prints the exact export in its `nextSteps`. This is the headline gotcha: install alone is not enough. The same trust surface and `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) apply to all three.
+`opensip tools install` validates the package, installs the validated bytes, and records a managed trust entry for the selected scope. Ambient `node_modules` Tool packages remain deny-by-default; `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` is an override for incident response/manual experiments. The same `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) applies to all three adapters.
 
 ### The three MVP adapters
 

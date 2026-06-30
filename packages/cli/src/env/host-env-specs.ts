@@ -100,11 +100,11 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Comma/whitespace-separated installed npm Tool ids to admit (deny-by-default). ' +
-      "Use '*' to admit all ambient opensipTools.kind === tool packages discovered in " +
-      'ancestor node_modules. Unset = skip installed tools unless explicitly allowlisted. ' +
-      'Does not affect bundled or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for ' +
-      'incident response (kill switch wins).',
+      'Override for comma/whitespace-separated installed npm Tool ids. Normal opensip tools ' +
+      "install writes managed trust state; use '*' only to admit all ambient " +
+      'opensipTools.kind === tool packages discovered in ancestor node_modules. Does not ' +
+      'affect bundled or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for incident ' +
+      'response (kill switch wins).',
   },
   {
     canonical: 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
@@ -115,10 +115,10 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Comma/whitespace-separated third-party capability-pack package names to admit ' +
-      '(deny-by-default). Names must match exactly, e.g. @scope/opensip-fit-rules. ' +
-      "The '*' wildcard is intentionally not honored for capability packs. First-party " +
-      'bundled capability packs are trusted by shipping and ignore this list.',
+      'Override for comma/whitespace-separated third-party capability-pack package names. ' +
+      'Names must match exactly, e.g. @scope/opensip-fit-rules. First-party bundled packs ' +
+      'and packages listed in plugins.* are trusted by explicit config. The * wildcard is ' +
+      'intentionally not honored for capability packs.',
   },
   // ADR-0054 M4-E: `OPENSIP_CLI_EXTERNAL_WORKER` (the opt-in gate for the
   // out-of-process dispatch plane) was RETIRED. External (installed /
@@ -138,10 +138,10 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Comma/whitespace-separated project-authored Tool ids to admit (deny-by-default). ' +
-      "Use '*' to admit all project-authored tools. A project-authored sidecar tool under " +
-      '<project>/opensip-cli/tools/ is NOT loaded unless its id (or *) appears here — it ' +
-      'rides in with git clone, so loading it runs untrusted code. Global-authored tools ' +
+      'Override for comma/whitespace-separated project-authored Tool ids. The normal ' +
+      "committed trust path is tools.trusted. Use '*' only to admit all project-authored " +
+      'tools. A project-authored sidecar tool under <project>/opensip-cli/tools/ is NOT ' +
+      'loaded unless its id appears in config or this override. Global-authored tools ' +
       '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
   },
   {

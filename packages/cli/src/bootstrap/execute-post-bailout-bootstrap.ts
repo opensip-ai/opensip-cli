@@ -27,6 +27,7 @@ import {
   isDedicatedBootstrapDiagnosticCommand,
   renderRelevantBootstrapDiagnostics,
 } from './render-bootstrap-diagnostics.js';
+import { createStartupTimer, type StartupTimingEvent } from './startup-timing.js';
 
 import type { PreActionBootstrapPlan } from './plan-pre-action-bootstrap.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';
@@ -104,16 +105,27 @@ export async function executePostBailoutBootstrap(
   const record = deps.recordPhase ?? noopPhaseRecord;
   const { plan, runtime, version, noCloud, apiKey } = input;
   const { languages, tools, manifests, provenance, bootstrapDiagnostics } = runtime;
+  const preActionTimer = createStartupTimer();
+  let emittedTimingCount = 0;
+  const emitNewTimings = (scope: RunScope): void => {
+    const events = preActionTimer.events();
+    emitPreActionTimingEvents(scope, events.slice(emittedTimingCount));
+    emittedTimingCount = events.length;
+  };
 
   record(PRE_ACTION_PHASES.projectSideEffects);
 
-  const runLogger = d.createRunLogger(plan.runLoggerOptions);
-
-  const bannerSize = plan.cliDefaults.ui?.banner ?? 'mini';
-  const update = d.checkForUpdate({ name: CLI_PACKAGE_NAME, version });
-  if (update && (bannerSize !== 'mini' || plan.jsonOutput)) {
-    process.stderr.write(formatUpdateNag(version, update));
-  }
+  const { runLogger, update } = preActionTimer.measure(PRE_ACTION_PHASES.projectSideEffects, () => {
+    const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
+    const bannerSize = plan.cliDefaults.ui?.banner ?? 'mini';
+    const checkedUpdate = preActionTimer.measure('update-check', () =>
+      d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
+    );
+    if (checkedUpdate && (bannerSize !== 'mini' || plan.jsonOutput)) {
+      process.stderr.write(formatUpdateNag(version, checkedUpdate));
+    }
+    return { runLogger: createdRunLogger, update: checkedUpdate };
+  });
 
   record(PRE_ACTION_PHASES.buildScope);
 
@@ -123,99 +135,130 @@ export async function executePostBailoutBootstrap(
   // owning-tool resolution the preflight uses); fall back to parentCommand when
   // the command belongs to no tool (CLI-only commands have a 1:1 name).
   const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
-  const owningTool = d.resolveOwningTool(tools, plan.commandName);
+  const { owningTool, scope } = preActionTimer.measure(PRE_ACTION_PHASES.buildScope, () => {
+    const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandName);
+    const toolName = resolvedOwningTool?.metadata.id ?? parentCommand;
+    return {
+      owningTool: resolvedOwningTool,
+      scope: d.buildPerRunScope({
+        project: plan.project,
+        runId: plan.runId,
+        cwd: plan.cwd,
+        parentCommand,
+        toolName,
+        cliDefaults: plan.cliDefaults,
+        registries: { languages, tools },
+        manifests,
+        provenance,
+        bootstrapDiagnostics,
+        startupTimings: runtime.startupTimings,
+        apiKey,
+        noCloud,
+        logger: runLogger,
+        ui: { version, update },
+      }),
+    };
+  });
   const toolName = owningTool?.metadata.id ?? parentCommand;
 
-  const scope = d.buildPerRunScope({
-    project: plan.project,
-    runId: plan.runId,
-    cwd: plan.cwd,
-    parentCommand,
-    toolName,
-    cliDefaults: plan.cliDefaults,
-    registries: { languages, tools },
-    manifests,
-    provenance,
-    bootstrapDiagnostics,
-    apiKey,
-    noCloud,
-    logger: runLogger,
-    ui: { version, update },
-  });
-
   record(PRE_ACTION_PHASES.enterScope);
-  d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
+  preActionTimer.measure(PRE_ACTION_PHASES.enterScope, () => {
+    d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
 
-  if (
-    !isDedicatedBootstrapDiagnosticCommand(plan.commandPath) &&
-    plan.jsonOutput !== true &&
-    plan.opts.help !== true
-  ) {
-    renderRelevantBootstrapDiagnostics(scope.bootstrapDiagnostics, toolName);
-  }
+    if (
+      !isDedicatedBootstrapDiagnosticCommand(plan.commandPath) &&
+      plan.jsonOutput !== true &&
+      plan.opts.help !== true
+    ) {
+      renderRelevantBootstrapDiagnostics(scope.bootstrapDiagnostics, toolName);
+    }
 
-  if (!d.isScopeEntered()) {
-    throw new SystemError('Scope was not entered before command dispatch', {
-      code: 'SYSTEM.SCOPE.NOT_ENTERED',
-    });
-  }
+    if (!d.isScopeEntered()) {
+      throw new SystemError('Scope was not entered before command dispatch', {
+        code: 'SYSTEM.SCOPE.NOT_ENTERED',
+      });
+    }
+  });
+  emitNewTimings(scope);
 
   record(PRE_ACTION_PHASES.hostStartEffects);
 
-  scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
-  scope.diagnostics.counter('tools.loaded', tools.list().length);
+  preActionTimer.measure(PRE_ACTION_PHASES.hostStartEffects, () => {
+    scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
+    scope.diagnostics.counter('tools.loaded', tools.list().length);
 
-  getMeter('opensip-cli').createCounter('opensip_cli.commands.started').add(1, {
-    command: plan.commandName,
-  });
-  scope.diagnostics.event(
-    'validate',
-    'debug',
-    `project config resolved (scope: ${plan.project.scope})`,
-  );
+    getMeter('opensip-cli').createCounter('opensip_cli.commands.started').add(1, {
+      command: plan.commandName,
+    });
+    scope.diagnostics.event(
+      'validate',
+      'debug',
+      `project config resolved (scope: ${plan.project.scope})`,
+    );
 
-  runLogger.info({
-    evt: 'cli.run.start',
-    module: MODULE_TAG,
-    runId: plan.runId,
-    command: plan.commandName,
-    cwd: plan.cwd,
-    projectRoot: plan.project.projectRoot,
-    scope: plan.project.scope,
-  });
-
-  if (plan.project.walkedUp > 0) {
     runLogger.info({
-      evt: 'cli.project.discovered',
+      evt: 'cli.run.start',
       module: MODULE_TAG,
       runId: plan.runId,
+      command: plan.commandName,
       cwd: plan.cwd,
       projectRoot: plan.project.projectRoot,
-      walkedUp: plan.project.walkedUp,
+      scope: plan.project.scope,
     });
-  }
 
-  d.startProfiling(scope, plan.commandName);
+    if (plan.project.walkedUp > 0) {
+      runLogger.info({
+        evt: 'cli.project.discovered',
+        module: MODULE_TAG,
+        runId: plan.runId,
+        cwd: plan.cwd,
+        projectRoot: plan.project.projectRoot,
+        walkedUp: plan.project.walkedUp,
+      });
+    }
+
+    d.startProfiling(scope, plan.commandName);
+  });
+  emitNewTimings(scope);
 
   record(PRE_ACTION_PHASES.toolPreflight);
 
-  // ADR-0054 M4-F: pass provenance so an EXTERNAL owning tool's initialize is
-  // skipped in-host (it runs worker-side under dispatch); bundled runs in-host.
-  await d.maybeInitializeOwningTool(tools, plan.commandName, plan.runId, provenance);
-
-  const driven = await d.loadOwningToolCapabilities({
-    owningTool: d.resolveOwningTool(tools, plan.commandName),
-    projectDir: plan.project.projectRoot,
-    pluginsConfig: scope.configDocument?.plugins ?? {},
-  });
-  if (driven > 0) {
-    scope.diagnostics.event(
-      'load',
-      'debug',
-      `drove ${String(driven)} owning-tool capability domain(s) (see per-domain 'capability ... loaded' events for contribution counts + errors)`,
+  await preActionTimer.measureAsync(PRE_ACTION_PHASES.toolPreflight, async () => {
+    // ADR-0054 M4-F: pass provenance so an EXTERNAL owning tool's initialize is
+    // skipped in-host (it runs worker-side under dispatch); bundled runs in-host.
+    await preActionTimer.measureAsync('owning-tool-initialize', () =>
+      d.maybeInitializeOwningTool(tools, plan.commandName, plan.runId, provenance),
     );
-    scope.diagnostics.counter('capabilities.driven', driven);
-  }
+
+    const driven = await preActionTimer.measureAsync('owning-capability-load', () =>
+      d.loadOwningToolCapabilities({
+        owningTool,
+        projectDir: plan.project.projectRoot,
+        pluginsConfig: scope.configDocument?.plugins ?? {},
+      }),
+    );
+    if (driven > 0) {
+      scope.diagnostics.event(
+        'load',
+        'debug',
+        `drove ${String(driven)} owning-tool capability domain(s) (see per-domain 'capability ... loaded' events for contribution counts + errors)`,
+      );
+      scope.diagnostics.counter('capabilities.driven', driven);
+    }
+  });
+  emitNewTimings(scope);
 
   return { scope, runLogger };
+}
+
+function emitPreActionTimingEvents(scope: RunScope, timings: readonly StartupTimingEvent[]): void {
+  for (const timing of timings) {
+    scope.diagnostics.event('load', 'debug', `pre-action phase '${timing.name}' completed`, {
+      source: 'pre-action',
+      phase: timing.name,
+      durationMs: timing.durationMs,
+      sinceStartMs: timing.sinceStartMs,
+      ...(timing.skipped === true ? { skipped: true } : {}),
+    });
+  }
 }

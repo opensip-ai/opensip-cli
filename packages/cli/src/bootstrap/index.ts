@@ -42,6 +42,8 @@ import {
   buildToolDiscoverySources,
 } from './register-tools.js';
 import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
+import { createStartupTimer, type StartupTimingEvent } from './startup-timing.js';
+import { readProjectTrustedToolIds } from './tool-trust.js';
 
 // Re-export only the symbols the CLI composition root (`index.ts`) consumes.
 export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
@@ -107,13 +109,14 @@ export interface BootstrapOptions {
  * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
  */
 export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapResult> {
+  const startupTimer = createStartupTimer();
   // Telemetry first — before any tool runs — so provider registration happens
   // once per process ahead of the first stage span. Hard no-op unless the OTLP
   // endpoint env var is set (see telemetry/sdk-init.ts), so standalone startup
   // is byte-for-byte unaffected.
-  initTelemetry(opts.cliEntryUrl);
-  resetBootstrapDiagnosticsBuffer();
-  registerLanguageAdapters(opts.langRegistry);
+  startupTimer.measure('telemetry-init', () => initTelemetry(opts.cliEntryUrl));
+  startupTimer.measure('bootstrap-diagnostics-reset', () => resetBootstrapDiagnosticsBuffer());
+  startupTimer.measure('language-adapters', () => registerLanguageAdapters(opts.langRegistry));
 
   // Launch: bundled + installed tools both flow through the shared
   // `admitTool` gate (register-tools.ts) and contribute a `ToolProvenance`
@@ -138,28 +141,55 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   const bundledPackages = BUNDLED_TOOL_PACKAGES.filter(
     (pkg) => !skipBundled.has(pkg.replace('@opensip-cli/', '')),
   );
-  await registerFirstPartyTools(opts.toolRegistry, provenance, manifests, bundledPackages);
+  await startupTimer.measureAsync('first-party-tools', () =>
+    registerFirstPartyTools(opts.toolRegistry, provenance, manifests, bundledPackages),
+  );
   // The bundled-tool ids discovery must skip on a name collision, derived from
   // the manifests just loaded (not from an imported tool runtime — the host
   // holds none in the launch contract).
   const builtInIds = new Set(manifests.map((m) => m.id));
+  let projectRoot: string | undefined;
+  let projectAuthoredDir: string | undefined;
+  let projectTrustedTools: ReadonlySet<string> = new Set();
+  startupTimer.measure('project-trust-context', () => {
+    try {
+      const project = resolveProjectContext({
+        cwd: opts.cwd,
+        cwdExplicit: false,
+      });
+      if (project.scope === 'project') {
+        projectRoot = project.projectRoot;
+        projectAuthoredDir = resolveProjectPaths(project.projectRoot).authoredToolsDir;
+        projectTrustedTools = readProjectTrustedToolIds(project.configPath);
+      }
+    } catch {
+      // @swallow-ok no resolvable project context → no project-local trust state
+      // during startup discovery. The strict project-config read still happens
+      // later in per-run bootstrap for commands that enter a project scope.
+    }
+  });
   const argv = opts.argv ?? [];
   if (shouldSkipInstalledToolDiscovery(argv)) {
+    startupTimer.mark('installed-tool-discovery', { skipped: true });
     logger.info({
       evt: 'cli.tool.installed_discovery_skipped',
       module: BOOTSTRAP_MODULE,
       reason: argv.includes('--no-plugins') ? 'argv-no-plugins' : 'env-skip-installed',
     });
   } else {
-    await discoverAndRegisterToolPackages(
-      opts.toolRegistry,
-      {
-        sources: buildToolDiscoverySources(opts.cwd, opts.projectDir),
-        bootstrapDiagnostics: getBootstrapDiagnosticsBuffer(),
-      },
-      builtInIds,
-      provenance,
-      manifests,
+    await startupTimer.measureAsync('installed-tool-discovery', () =>
+      discoverAndRegisterToolPackages(
+        opts.toolRegistry,
+        {
+          sources: buildToolDiscoverySources(opts.cwd, opts.projectDir),
+          projectRoot,
+          projectTrustedTools,
+          bootstrapDiagnostics: getBootstrapDiagnosticsBuffer(),
+        },
+        builtInIds,
+        provenance,
+        manifests,
+      ),
     );
   }
   // Authored Tool sidecars (ADR-0027 realization): global trusted-by-default +
@@ -170,25 +200,19 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // the installed leg's contract); the registry's first-writer-wins dedupes an
   // authored-vs-installed same-id collision with a structured warning.
   const globalAuthoredDir = resolveUserPaths().authoredToolsDir;
-  let projectAuthoredDir: string | undefined;
-  try {
-    const project = resolveProjectContext({
-      cwd: opts.cwd,
-      cwdExplicit: false,
-    });
-    if (project.scope === 'project') {
-      projectAuthoredDir = resolveProjectPaths(project.projectRoot).authoredToolsDir;
-    }
-  } catch {
-    // @swallow-ok no resolvable project context → no project authored leg
-    // (best-effort, same contract as buildToolDiscoverySources).
-  }
-  await discoverAndRegisterAuthoredTools(
-    opts.toolRegistry,
-    { projectAuthoredDir, globalAuthoredDir, env: process.env },
-    builtInIds,
-    provenance,
-    manifests,
+  await startupTimer.measureAsync('authored-tool-discovery', () =>
+    discoverAndRegisterAuthoredTools(
+      opts.toolRegistry,
+      {
+        projectAuthoredDir,
+        globalAuthoredDir,
+        env: process.env,
+        projectTrustedTools,
+      },
+      builtInIds,
+      provenance,
+      manifests,
+    ),
   );
   // Graph adapters (and every other tool's capability domains) are no longer
   // discovered here. The pre-action hook drives the generic capability loader
@@ -198,6 +222,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
     provenance,
     manifests,
     bootstrapDiagnostics: takeBootstrapDiagnostics(),
+    startupTimings: startupTimer.events(),
   };
 }
 
@@ -221,4 +246,6 @@ export interface BootstrapResult {
    * Transferred onto the per-run {@link RunScope} by the composition root.
    */
   readonly bootstrapDiagnostics: readonly CliDiagnostic[];
+  /** Startup phase timings captured before Commander preAction enters the run scope. */
+  readonly startupTimings: readonly StartupTimingEvent[];
 }

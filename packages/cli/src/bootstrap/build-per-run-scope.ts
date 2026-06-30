@@ -50,6 +50,7 @@ import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-a
 import { shouldRunHookInHost } from './tool-provenance.js';
 
 import type { loadCliDefaults } from './cli-defaults.js';
+import type { StartupTimingEvent } from './startup-timing.js';
 
 const FORBIDDEN_SCOPE_CONTRIBUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
@@ -134,6 +135,12 @@ export interface BuildPerRunScopeInput {
    * Startup bootstrap diagnostics gathered before this scope was built (ADR-0060).
    */
   readonly bootstrapDiagnostics?: readonly CliDiagnostic[];
+  /**
+   * Process-startup phase timings gathered before Commander preAction entered
+   * this run scope. Re-emitted here so normal CommandOutcome diagnostics carry
+   * the same local timing facts as logs.
+   */
+  readonly startupTimings?: readonly StartupTimingEvent[];
   readonly apiKey?: string;
   readonly noCloud?: boolean;
   readonly logger: Logger;
@@ -166,6 +173,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     manifests,
     provenance,
     bootstrapDiagnostics,
+    startupTimings,
     apiKey,
     noCloud,
     logger,
@@ -267,6 +275,16 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // Close the datastore on scope teardown — the "consumer responsibility"
   // RunScope.dispose() documents. No-op when no command opened it.
   scope.onDispose(datastoreThunk.dispose);
+
+  for (const timing of startupTimings ?? []) {
+    scope.diagnostics.event('load', 'debug', `startup phase '${timing.name}' completed`, {
+      source: 'startup',
+      phase: timing.name,
+      durationMs: timing.durationMs,
+      sinceStartMs: timing.sinceStartMs,
+      ...(timing.skipped === true ? { skipped: true } : {}),
+    });
+  }
 
   // Observability of the assembly step (consistent with the contributeScope /
   // capabilities diagnostics below). Do NOT log the `repo` VALUE at debug — it

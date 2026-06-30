@@ -29,6 +29,7 @@ import {
   targetsRecordSchema,
   type PluginConfigKeyDeclaration,
 } from './targeting.js';
+import { toolsConfigSchema } from './tools-config.js';
 
 import type { ToolConfigDeclaration } from '../declaration.js';
 
@@ -71,6 +72,7 @@ export function hostConfigDeclarations(
     { namespace: 'globalExcludes', schema: globalExcludesSchema },
     { namespace: 'checkOverrides', schema: checkOverridesSchema },
     { namespace: 'suites', schema: suitesConfigSchema },
+    { namespace: 'tools', schema: toolsConfigSchema },
     {
       namespace: 'plugins',
       schema: createPluginsConfigSchema(options.pluginConfigKeys),

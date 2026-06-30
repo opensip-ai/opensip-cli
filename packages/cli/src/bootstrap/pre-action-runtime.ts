@@ -1,3 +1,4 @@
+import type { StartupTimingEvent } from './startup-timing.js';
 import type {
   CliDiagnostic,
   LanguageRegistry,
@@ -13,4 +14,5 @@ export interface PreActionRuntime {
   readonly manifests: readonly ToolPluginManifest[];
   readonly provenance: readonly ToolProvenance[];
   readonly bootstrapDiagnostics: readonly CliDiagnostic[];
+  readonly startupTimings?: readonly StartupTimingEvent[];
 }
