@@ -28,6 +28,15 @@ import * as yaml from 'js-yaml';
 import { SystemError, ValidationError } from './errors.js';
 import { logger } from './logger.js';
 
+function isEmptyYamlDocument(raw: string): boolean {
+  return raw.split(/\r?\n/).every((line) => {
+    const trimmed = line.trim();
+    return (
+      trimmed.length === 0 || trimmed.startsWith('#') || trimmed === '---' || trimmed === '...'
+    );
+  });
+}
+
 /**
  * Read a YAML file and return the parsed document. Returns `undefined`
  * on any failure (missing, unreadable, or malformed). Callers that
@@ -50,7 +59,7 @@ export function readYamlFile(filePath: string): unknown {
   if (!existsSync(filePath)) return undefined;
   try {
     const raw = readFileSync(filePath, 'utf8');
-    if (raw.trim().length === 0) return undefined;
+    if (isEmptyYamlDocument(raw)) return undefined;
     return yaml.load(raw);
   } catch (error) {
     logger.debug({
@@ -126,7 +135,7 @@ export function readYamlFileOrThrow(
   }
 
   try {
-    if (raw.trim().length === 0) return {};
+    if (isEmptyYamlDocument(raw)) return {};
     return yaml.load(raw) ?? {};
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
