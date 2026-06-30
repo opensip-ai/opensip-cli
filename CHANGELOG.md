@@ -2,6 +2,40 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.18] - 2026-06-30
+
+A hidden-state hardening release. It makes host-owned datastore/session lifecycle
+explicit, stamps deterministic declared-input provenance onto emitted gate
+artifacts, and documents the resulting retention and verdict-diagnosis model for
+operators and agents.
+
+### Added
+
+- ADR-0096, defining host-owned datastore lifecycle and session-retention
+  ownership boundaries.
+- ADR-0097, defining the allowlisted `declaredInputs` manifest for gate verdict
+  determinism.
+- `cli.sessions` retention configuration for count, age, and SQLite size bounds.
+- Host-owned session pruning and datastore reclaim primitives, with tests for
+  count pruning, size reclaim, and non-fatal maintenance failures.
+
+### Changed
+
+- JSON outcomes, SARIF/cloud delivery, dashboard/report composition, and session
+  persistence now receive host-stamped declared-input metadata.
+- `fit` architecture checks now reject tool-owned session timing, retention, and
+  SQLite reclaim ownership.
+- Session cleanup now runs as best-effort host maintenance after successful
+  session writes without changing tool verdicts or exit codes.
+
+### Fixed
+
+- Gate outputs are easier to compare across runs because CLI, Node, package
+  manager, platform, tool, and baseline identity are captured in a compact
+  manifest instead of being inferred from ambient host state.
+- Project-local SQLite/session history growth is bounded by a documented default
+  host policy instead of relying on manual cleanup.
+
 ## [0.1.17] - 2026-06-30
 
 A customer-extension trust and startup diagnostics release. It keeps ambient

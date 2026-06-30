@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.17
+release: v0.1.18
 title: "Plugin loader"
 audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
@@ -85,7 +85,7 @@ flowchart TB
 
 ## Tool discovery (`opensipTools.kind === 'tool'`)
 
-[`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `opensip-cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-cli/`), inspect the `package.json`:
+[`packages/core/src/plugins/tool-package-discovery.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/plugins/tool-package-discovery.ts) implements the walk. The CLI passes its own install directory as the `projectDir` argument (`packages/cli/src/index.ts` — `cliInstallDir = dirname(__dirname)` inside `loadDiscoveredTools()`); the function then walks upward through that directory's ancestors, looking at each `node_modules/`. Anchoring discovery at the CLI's install location (rather than the user's cwd) is deliberate — third-party tool packages installed alongside `opensip-cli` are picked up regardless of where the user runs the binary from. For each `node_modules` entry (and one level into scoped directories like `@opensip-cli/`), inspect the `package.json`:
 
 ```ts
 const isToolPackage = (pkgDir: string): boolean => {
@@ -114,9 +114,9 @@ skipped with a warning.
 
 ## Fit / sim plugin discovery
 
-The fitness and simulation engines each have their own discovery, layered over the project paths defined in [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/core/src/lib/paths.ts). The shape is the same for both; the difference is the subdirectory names (`fit/checks`, `fit/recipes` vs. `sim/scenarios`, `sim/recipes`).
+The fitness and simulation engines each have their own discovery, layered over the project paths defined in [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/lib/paths.ts). The shape is the same for both; the difference is the subdirectory names (`fit/checks`, `fit/recipes` vs. `sim/scenarios`, `sim/recipes`).
 
-[`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/core/src/plugins/discover.ts) walks two sources:
+[`packages/core/src/plugins/discover.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/plugins/discover.ts) walks two sources:
 
 ### 1. User-source files (always auto-loaded)
 
@@ -161,9 +161,9 @@ The explicit list is the contract for arbitrary-scope packs. A transitive devDep
 
 Beyond the project-pinned form, fitness runs marker discovery on every fit invocation and merges in any exact `plugins.checkPackages:` entries, deduplicating by package name (explicit config wins on collision):
 
-**Pass A — marker scan, canonical path** ([`packages/core/src/plugins/marker-discovery.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/core/src/plugins/marker-discovery.ts)). The `node_modules` walker scans every installed package for `package.json` declaring the `fit-pack` marker plus target-domain epoch. Discovery is publication-scope-independent — a pack can use any npm name (`@acme/fit`, `@my-internal-org/checks-platform`, anything) and still be discovered.
+**Pass A — marker scan, canonical path** ([`packages/core/src/plugins/marker-discovery.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/plugins/marker-discovery.ts)). The `node_modules` walker scans every installed package for `package.json` declaring the `fit-pack` marker plus target-domain epoch. Discovery is publication-scope-independent — a pack can use any npm name (`@acme/fit`, `@my-internal-org/checks-platform`, anything) and still be discovered.
 
-**Pass B — exact package list** ([`packages/config/src/capability-preferences.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/config/src/capability-preferences.ts), driven by [`packages/fitness/engine/src/cli/fit/check-loader.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/fitness/engine/src/cli/fit/check-loader.ts)). `plugins.checkPackages:` names additional packages to resolve from project `node_modules`. This is the compatibility path for packages that do not declare the marker yet:
+**Pass B — exact package list** ([`packages/config/src/capability-preferences.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/config/src/capability-preferences.ts), driven by [`packages/fitness/engine/src/cli/fit/check-loader.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/fitness/engine/src/cli/fit/check-loader.ts)). `plugins.checkPackages:` names additional packages to resolve from project `node_modules`. This is the compatibility path for packages that do not declare the marker yet:
 
 ```yaml
 plugins:
@@ -178,7 +178,7 @@ No package is privileged — the bundled packs (`@opensip-cli/checks-universal`,
 First-party OpenSIP packages are published with npm **producer provenance**
 (OIDC + `--provenance`). **Consumption-side** verification — checking provenance
 when a project installs or loads a third-party pack — is a documented trust gate
-([ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0068-consumption-side-verification-policy.md)) that
+([ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0068-consumption-side-verification-policy.md)) that
 is **not implemented** in the loader yet. Until spec 03 lands enforcement, admission
 remains trust-tier + allowlist policy only.
 
@@ -188,7 +188,7 @@ The marker shape is what makes "install and use" frictionless without constraini
 
 ## 4. Language adapter "discovery" — actually direct imports
 
-[`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/cli/src/bootstrap/register-language-adapters.ts) registers the six bundled language adapters into the per-invocation `LanguageRegistry`:
+[`packages/cli/src/bootstrap/register-language-adapters.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/bootstrap/register-language-adapters.ts) registers the six bundled language adapters into the per-invocation `LanguageRegistry`:
 
 ```ts
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
@@ -207,13 +207,13 @@ This isn't discovery. It's an explicit static call from `bootstrapCli()`. Why?
 
 - Language adapters are needed *before* any Tool runs. A check that runs against a language with no registered adapter would treat every file as raw text — silent miss.
 - The six bundled adapters are part of the CLI's contract. A project that needs Rust support gets it without installing anything; same for the others.
-- A custom language adapter (say, `@my-co/lang-erlang`) would need a future plugin path to be added — today's CLI registers only the six bundled adapters. The `LangPluginExports` shape ([`packages/core/src/plugins/types.ts:29`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/core/src/plugins/types.ts)) exists as a forward-compatible export shape, but no discovery walker reads it yet.
+- A custom language adapter (say, `@my-co/lang-erlang`) would need a future plugin path to be added — today's CLI registers only the six bundled adapters. The `LangPluginExports` shape ([`packages/core/src/plugins/types.ts:29`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/core/src/plugins/types.ts)) exists as a forward-compatible export shape, but no discovery walker reads it yet.
 
 ---
 
 ## The `<tool> plugin` command surface
 
-CLI-owned commands for managing the npm-package extension-pack layout. Source: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/cli/src/commands/plugin.ts).
+CLI-owned commands for managing the npm-package extension-pack layout. Source: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/cli/src/commands/plugin.ts).
 
 The `plugin` group is mounted **under each pack-supporting tool primary** — the domain is bound from the tool, so there is **no top-level `opensip plugin`** and **no `--domain` flag**. `fit` and `sim` support packs; `graph` does not, so it has no `plugin` group. Whole Tool plugins (a `kind: "tool"` package contributing a whole subcommand) are NOT managed here — they install/uninstall with `opensip tools …` (see [`70-reference/12-tools-command.md`](/docs/opensip-cli/70-reference/12-tools-command/)).
 

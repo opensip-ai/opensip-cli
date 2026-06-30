@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/mcp",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "license": "Apache-2.0",
   "description": "MCP server exposing the OpenSIP call graph and stored results to coding agents over stdio",
   "keywords": [

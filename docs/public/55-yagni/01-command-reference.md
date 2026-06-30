@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-25
-release: v0.1.17
+release: v0.1.18
 title: "YAGNI command reference"
 audience: [contributors, ci-integrators]
 purpose: "How to run the advisory YAGNI reduction audit and interpret its output."
