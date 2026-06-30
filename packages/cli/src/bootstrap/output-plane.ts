@@ -91,13 +91,11 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
       });
     },
     emitEnvelope: (envelope) => {
-      renderOutcome(
-        outcomeFromEnvelope(stampDeclaredInputs(envelope as SignalEnvelope), exitCode ?? 0),
-        {
-          jsonRequested: true,
-          render: deps.render,
-        },
-      ).catch((error) => {
+      const outputEnvelope = stampDeclaredInputs(envelope as SignalEnvelope);
+      renderOutcome(outcomeFromEnvelope(outputEnvelope, exitCode ?? 0), {
+        jsonRequested: true,
+        render: deps.render,
+      }).catch((error) => {
         if ((exitCode ?? 0) === 0) {
           setExitCode(1);
         }

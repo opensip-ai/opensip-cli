@@ -28,7 +28,6 @@ const MODULE_NAME = 'session-store:session-repo';
 
 const RUN_OUTCOMES = new Set<ToolRunOutcome>(['passed', 'failed', 'degraded', 'error']);
 
-/** Hydrate runOutcome from the column; legacy NULL rows omit the field on read. */
 function normalizeRunOutcome(stored: string | null | undefined): ToolRunOutcome | undefined {
   if (stored !== null && stored !== undefined && RUN_OUTCOMES.has(stored as ToolRunOutcome)) {
     return stored as ToolRunOutcome;
@@ -36,7 +35,6 @@ function normalizeRunOutcome(stored: string | null | undefined): ToolRunOutcome 
   return undefined;
 }
 
-/** The stored tool-payload projection (opaque blob + its outer schema version). */
 interface StoredPayloadRow {
   readonly payload: unknown;
   readonly payload_version: number | null;
@@ -73,8 +71,6 @@ export class SessionRepo {
    */
   save(session: StoredSession): void {
     try {
-      // Validate timing eagerly: a bad value becomes a clear ValidationError
-      // instead of silent NaN/"Invalid Date" corruption in the durable log.
       const startedMs = new Date(session.startedAt).getTime();
       const completedMs = new Date(session.completedAt).getTime();
       if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
@@ -104,11 +100,9 @@ export class SessionRepo {
               durationMs: session.durationMs,
             })
             .run();
-          // Tool-owned opaque detail (contracts never inspects the shape).
           if (session.payload !== undefined) {
             const hasInnerVersion = extractPayloadVersion(session.payload) !== undefined;
             if (!hasInnerVersion) {
-              // Encourage tools to adopt the __version convention on new writes.
               logger.warn({
                 evt: 'session.payload.missing_version',
                 module: MODULE_NAME,
@@ -165,8 +159,6 @@ export class SessionRepo {
       const ordered = baseQuery.orderBy(desc(sessions.timestamp));
       const sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
 
-      // Batch-load payload + host-metrics for the page in two `IN (...)` queries
-      // (was two point queries per row — a 1 + 2N N+1).
       const ids = sessionRows.map((row) => row.id);
       const payloadsById = this.payloadsBySessionId(ids);
       const metricsById = hostMetricsBySessionId(this.datastore, ids);

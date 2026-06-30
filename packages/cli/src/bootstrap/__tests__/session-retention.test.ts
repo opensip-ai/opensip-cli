@@ -59,6 +59,17 @@ function withMaintenance(datastore: DataStore, maintenance: DatastoreMaintenance
   return datastore;
 }
 
+function failWriteLock(datastore: DataStore, operation: string, error: unknown): void {
+  const original = datastore.withWriteLock.bind(datastore);
+  Object.defineProperty(datastore, 'withWriteLock', {
+    value: <T>(op: string, fn: () => T): T => {
+      if (op === operation) throw error;
+      return original(op, fn);
+    },
+    configurable: true,
+  });
+}
+
 describe('session retention defaults', () => {
   it('keeps CLI constants in sync with the config schema defaults', () => {
     const parsed = cliConfigSchema.shape.sessions.safeParse({});
@@ -70,6 +81,20 @@ describe('session retention defaults', () => {
       maxSizeMb: DEFAULT_SESSION_RETENTION_MAX_SIZE_MB,
     });
     expect(resolveSessionRetentionPolicy()).toEqual(parsed.data);
+  });
+
+  it('normalizes configured values before enforcing retention', () => {
+    expect(
+      resolveSessionRetentionPolicy({
+        keep: 3.8,
+        maxAgeDays: -1,
+        maxSizeMb: Number.POSITIVE_INFINITY,
+      }),
+    ).toEqual({
+      keep: 3,
+      maxAgeDays: DEFAULT_SESSION_RETENTION_MAX_AGE_DAYS,
+      maxSizeMb: DEFAULT_SESSION_RETENTION_MAX_SIZE_MB,
+    });
   });
 });
 
@@ -135,6 +160,137 @@ describe('enforceSessionRetention', () => {
       expect(repo.count()).toBe(2);
       expect(warn).toHaveBeenCalledWith(
         expect.objectContaining({ evt: 'session.retention.oversize.warn' }),
+      );
+    });
+  });
+
+  it('logs retention failures when maintenance size probes fail', () => {
+    withRepo((repo, datastore) => {
+      repo.save(makeSession('a', 1));
+      const warn = vi.fn();
+      const info = vi.fn();
+      const log: Logger = { ...logger(), info, warn };
+      const fullVacuum = vi.fn();
+      let sizeCalls = 0;
+      const statError: unknown = 'stat unavailable';
+      withMaintenance(datastore, {
+        incrementalVacuum: vi.fn(),
+        fullVacuum,
+        fileSizeBytes: vi.fn(() => {
+          sizeCalls += 1;
+          if (sizeCalls === 1) return 3 * 1024 * 1024;
+          throw statError;
+        }),
+      });
+
+      expect(() =>
+        enforceSessionRetention(
+          datastore,
+          { keep: 5, maxAgeDays: 0, maxSizeMb: 1 },
+          { now: Date.parse('2026-01-02T00:00:00.000Z'), logger: log },
+        ),
+      ).not.toThrow();
+
+      expect(fullVacuum).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'session.retention.failed',
+          operation: 'session.retention.file_size',
+          error: 'stat unavailable',
+        }),
+      );
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'session.retention.vacuumed',
+          beforeBytes: null,
+          afterBytes: null,
+        }),
+      );
+    });
+  });
+
+  it('does not aggressively prune when full VACUUM brings size under the limit', () => {
+    withRepo((repo, datastore) => {
+      for (let i = 0; i < 3; i += 1) {
+        repo.save(makeSession(`s${i}`, i + 1));
+      }
+      const fullVacuum = vi.fn();
+      const fileSizeBytes = vi
+        .fn()
+        .mockReturnValueOnce(3 * 1024 * 1024)
+        .mockReturnValueOnce(3 * 1024 * 1024)
+        .mockReturnValueOnce(1024)
+        .mockReturnValueOnce(1024);
+      withMaintenance(datastore, {
+        incrementalVacuum: vi.fn(),
+        fullVacuum,
+        fileSizeBytes,
+      });
+
+      enforceSessionRetention(
+        datastore,
+        { keep: 4, maxAgeDays: 0, maxSizeMb: 1 },
+        { now: Date.parse('2026-01-08T00:00:00.000Z'), logger: logger() },
+      );
+
+      expect(fullVacuum).toHaveBeenCalledTimes(1);
+      expect(repo.count()).toBe(3);
+    });
+  });
+
+  it('skips aggressive size pruning when already at the aggressive keep count', () => {
+    withRepo((repo, datastore) => {
+      repo.save(makeSession('a', 1));
+      repo.save(makeSession('b', 2));
+      const fullVacuum = vi.fn();
+      withMaintenance(datastore, {
+        incrementalVacuum: vi.fn(),
+        fullVacuum,
+        fileSizeBytes: vi.fn(() => 3 * 1024 * 1024),
+      });
+
+      enforceSessionRetention(
+        datastore,
+        { keep: 4, maxAgeDays: 0, maxSizeMb: 1 },
+        { now: Date.parse('2026-01-08T00:00:00.000Z'), logger: logger() },
+      );
+
+      expect(fullVacuum).toHaveBeenCalledTimes(1);
+      expect(repo.count()).toBe(2);
+    });
+  });
+
+  it('swallows incremental reclaim lock failures after pruning', () => {
+    withRepo((repo, datastore) => {
+      for (let i = 0; i < 3; i += 1) {
+        repo.save(makeSession(`s${i}`, i + 1));
+      }
+      const warn = vi.fn();
+      const log: Logger = { ...logger(), warn };
+      const incrementalVacuum = vi.fn();
+      withMaintenance(datastore, {
+        incrementalVacuum,
+        fullVacuum: vi.fn(),
+        fileSizeBytes: vi.fn(() => 1),
+      });
+      failWriteLock(datastore, 'session.retention.incremental_vacuum', 'lock denied');
+
+      expect(() =>
+        enforceSessionRetention(
+          datastore,
+          { keep: 1, maxAgeDays: 0, maxSizeMb: 1 },
+          { now: Date.parse('2026-01-08T00:00:00.000Z'), logger: log },
+        ),
+      ).not.toThrow();
+
+      expect(repo.count()).toBe(1);
+      expect(incrementalVacuum).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'session.retention.failed',
+          operation: 'session.retention.incremental_vacuum',
+          error: 'lock denied',
+        }),
       );
     });
   });

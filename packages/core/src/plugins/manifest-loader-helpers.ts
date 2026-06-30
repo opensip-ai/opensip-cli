@@ -330,6 +330,7 @@ const COMMAND_SHELL_VALIDATORS: Readonly<Record<string, (v: unknown) => boolean>
   scope: (v) => typeof v === 'string' && COMMAND_SCOPE_REQUIREMENTS.has(v),
   output: (v) => typeof v === 'string' && COMMAND_OUTPUT_MODES.has(v),
   rawStreamReason: (v) => typeof v === 'string',
+  producesVerdict: (v) => typeof v === 'boolean',
 };
 
 function normalizeCommandShell(

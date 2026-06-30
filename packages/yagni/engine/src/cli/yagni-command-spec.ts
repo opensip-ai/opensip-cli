@@ -212,6 +212,8 @@ export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => vo
     scope: 'project',
     output: 'raw-stream',
     rawStreamReason: 'runtime-render-dispatch',
+    // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
+    producesVerdict: true,
     handler: (rawOpts, cli) => runYagniCommand(rawOpts, cli, setUpLiveView),
   });
 }

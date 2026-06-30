@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.17
+release: v0.1.19
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -160,10 +160,10 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v0.1.17 against `scripts/release-package-order.mjs` (the publishable
+Last verified at v0.1.19 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **42 publishable packages** total (all at `0.1.17`), plus one workspace-private
+- **42 publishable packages** total (all at `0.1.19`), plus one workspace-private
   `@opensip-cli/test-support` package and the private root `@opensip-cli/root`:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + cli-ui + cli-live): 7 —

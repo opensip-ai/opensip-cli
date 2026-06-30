@@ -101,6 +101,12 @@ const TRIAGE_DISPOSITION = {
   'zod-schema-strictness': 'b',
 };
 
+const DISPOSITION_LABELS = {
+  a: 'design-mismatch',
+  b: 'accepted-risk',
+  c: 'false-positive',
+};
+
 const PHASE4_REOPEN_THRESHOLD = 5;
 
 const log = (msg) => console.error(`[catalog-suppressions] ${msg}`);
@@ -266,6 +272,21 @@ function buildCatalog({ collectRecords = false } = {}) {
       testSupport: 'packages/test-support/src',
       tests: '__tests__/, *.test.ts, __fixtures__/',
     },
+    dispositionTaxonomy: {
+      a: {
+        label: DISPOSITION_LABELS.a,
+        meaning:
+          'Code or docs should change; the waiver points at a real mismatch between implementation and intended design.',
+      },
+      b: {
+        label: DISPOSITION_LABELS.b,
+        meaning: 'Waiver is correct and should remain documented.',
+      },
+      c: {
+        label: DISPOSITION_LABELS.c,
+        meaning: 'Improve check logic; the implementation is acceptable.',
+      },
+    },
     layers: {
       'budget-gate': emptyLayer(),
       'product-runtime': emptyLayer(),
@@ -322,6 +343,14 @@ function sortedEntries(obj) {
 
 function dispositionForSlug(slug) {
   return TRIAGE_DISPOSITION[slug] ?? 'TBD';
+}
+
+function expandDisposition(disposition) {
+  if (disposition === 'TBD') return 'TBD';
+  return disposition
+    .split('/')
+    .map((part) => DISPOSITION_LABELS[part] ?? part)
+    .join(' / ');
 }
 
 function isPureAcceptedDisposition(disp) {
@@ -427,24 +456,24 @@ function renderTriageMarkdown(catalog) {
     '',
     '## Product-runtime fitness slugs',
     '',
-    '| Slug | Count | Budgeted | Disposition |',
-    '|------|------:|:--------:|:-----------:|',
+    '| Slug | Count | Budgeted | Disposition | Taxonomy |',
+    '|------|------:|:--------:|:-----------:|----------|',
   );
   for (const [slug, count] of sortedEntries(pr.fitness.bySlug)) {
     const budgeted = BUDGETED_SLUGS.has(slug) ? 'yes' : 'no';
     const disp = dispositionForSlug(slug);
-    lines.push(`| \`${slug}\` | ${count} | ${budgeted} | ${disp} |`);
+    lines.push(`| \`${slug}\` | ${count} | ${budgeted} | ${disp} | ${expandDisposition(disp)} |`);
   }
   lines.push(
     '',
     '## Product-runtime graph rule ids',
     '',
-    '| Rule id | Count | Disposition |',
-    '|---------|------:|:-----------:|',
+    '| Rule id | Count | Disposition | Taxonomy |',
+    '|---------|------:|:-----------:|----------|',
   );
   for (const [ruleId, count] of sortedEntries(pr.graph.byRuleId)) {
     const disp = TRIAGE_DISPOSITION[ruleId] ?? 'b';
-    lines.push(`| \`${ruleId}\` | ${count} | ${disp} |`);
+    lines.push(`| \`${ruleId}\` | ${count} | ${disp} | ${expandDisposition(disp)} |`);
   }
   lines.push(
     '',
@@ -512,11 +541,11 @@ function renderTriageMarkdown(catalog) {
     '',
     '## Disposition key',
     '',
-    '| Code | Meaning |',
-    '|------|---------|',
-    '| **a** | Fix — code or docs should change |',
-    '| **b** | Accept — waiver is correct; document |',
-    '| **c** | Heuristic — improve check logic |',
+    '| Code | Taxonomy | Meaning |',
+    '|------|----------|---------|',
+    '| **a** | `design-mismatch` | Code or docs should change; the waiver points at a real mismatch between implementation and intended design. |',
+    '| **b** | `accepted-risk` | Waiver is correct and should remain documented. |',
+    '| **c** | `false-positive` | Improve check logic; the implementation is acceptable. |',
     '',
     'Full program spec: `docs/plans/specs/suppression-triage-and-reduction.md` (local).',
     '',

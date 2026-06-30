@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 
 describe('Banner', () => {
-  it('renders the ASCII art banner with block characters', () => {
+  it('renders the boxed coffee-cup identity card', () => {
     const { lastFrame } = render(
       <ThemeProvider>
         <Banner />
@@ -13,13 +13,15 @@ describe('Banner', () => {
     );
 
     const output = lastFrame()!;
-    // Banner uses block characters like U+2588 (full block)
-    expect(output).toContain('\u2588');
-    // Banner saucer line is present
-    expect(output).toContain('\u2591');
+    expect(output).toContain('OpenSIP CLI');
+    expect(output).toContain('www.opensip.ai');
+    expect(output).toContain('╭');
+    expect(output).toContain('╯');
+    expect(output).toContain('███');
+    expect(output).not.toContain('\u2591');
   });
 
-  it('renders multiple lines of banner art', () => {
+  it('renders the fixed-height identity card', () => {
     const { lastFrame } = render(
       <ThemeProvider>
         <Banner />
@@ -28,7 +30,6 @@ describe('Banner', () => {
 
     const output = lastFrame()!;
     const lines = output.split('\n');
-    // Banner has 8 art lines + 1 saucer line = 9 minimum
-    expect(lines.length).toBeGreaterThanOrEqual(9);
+    expect(lines).toHaveLength(6);
   });
 });

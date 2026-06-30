@@ -117,11 +117,10 @@ export async function executePostBailoutBootstrap(
 
   const { runLogger, update } = preActionTimer.measure(PRE_ACTION_PHASES.projectSideEffects, () => {
     const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
-    const bannerSize = plan.cliDefaults.ui?.banner ?? 'mini';
     const checkedUpdate = preActionTimer.measure('update-check', () =>
       d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
     );
-    if (checkedUpdate && (bannerSize !== 'mini' || plan.jsonOutput)) {
+    if (checkedUpdate && plan.jsonOutput) {
       process.stderr.write(formatUpdateNag(version, checkedUpdate));
     }
     return { runLogger: createdRunLogger, update: checkedUpdate };

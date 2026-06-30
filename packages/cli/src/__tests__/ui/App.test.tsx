@@ -39,8 +39,7 @@ describe('App.tsx — clear-done branch', () => {
     };
     const output = renderApp(result);
     expect(output).toContain('No session data to clear.');
-    // Banner block characters confirm the Ink banner rendered.
-    expect(output).toContain('█');
+    expect(output).toContain('www.opensip.ai');
   });
 
   it('renders the cancelled-state message', () => {
@@ -102,8 +101,7 @@ describe('App.tsx — configure-done branch', () => {
 });
 
 describe('App.tsx — banner shell (single source of truth)', () => {
-  // Banner block characters confirm the Ink banner rendered.
-  const BANNER_GLYPH = '█';
+  const BANNER_MARKER = 'www.opensip.ai';
 
   it('renders the banner for report output (regression: the HTML report had no banner)', () => {
     const result: ReportResult = {
@@ -113,7 +111,7 @@ describe('App.tsx — banner shell (single source of truth)', () => {
     };
     const output = renderApp(result);
     expect(output).toContain('Report written to');
-    expect(output).toContain(BANNER_GLYPH);
+    expect(output).toContain(BANNER_MARKER);
   });
 
   it('renders the banner for configure-done (gained via the shell)', () => {
@@ -123,12 +121,12 @@ describe('App.tsx — banner shell (single source of truth)', () => {
       configPath: '/Users/test/.opensip-cli/config.yml',
       maskedKey: 'abcd...wxyz',
     };
-    expect(renderApp(result)).toContain(BANNER_GLYPH);
+    expect(renderApp(result)).toContain(BANNER_MARKER);
   });
 
   it('renders the banner for help (D1: help is bannered)', () => {
     const result: HelpResult = { type: 'help' };
-    expect(renderApp(result)).toContain(BANNER_GLYPH);
+    expect(renderApp(result)).toContain(BANNER_MARKER);
   });
 
   it('does NOT render the banner for error (D1: errors stay terse)', () => {
@@ -139,21 +137,22 @@ describe('App.tsx — banner shell (single source of truth)', () => {
     };
     const output = renderApp(result);
     expect(output).toContain('Something went wrong');
-    expect(output).not.toContain(BANNER_GLYPH);
+    expect(output).not.toContain(BANNER_MARKER);
   });
 });
 
-describe('App.tsx — project header (single renderer, under the banner)', () => {
-  it('renders the project line when project context is supplied', () => {
+describe('App.tsx — project path in the banner', () => {
+  it('renders the project path when project context is supplied', () => {
     const result: ReportResult = { type: 'report', path: '/repo/r.html', opened: false };
-    const output = renderApp(result, { root: '/repo', walkedUp: 0 });
-    expect(output).toContain('ℹ Project: /repo');
+    const output = renderApp(result, { root: '/workspace/project', walkedUp: 0 });
+    expect(output).toContain('/workspace/project');
+    expect(output).not.toContain('ℹ Project:');
   });
 
   it('includes the walked-up suffix', () => {
     const result: ReportResult = { type: 'report', path: '/repo/r.html', opened: false };
     const output = renderApp(result, { root: '/repo', walkedUp: 2 });
-    expect(output).toContain('ℹ Project: /repo  (found 2 levels up)');
+    expect(output).toContain('/repo  (found 2 levels up)');
   });
 
   it('omits the project line for bannerless results (error), even with context', () => {

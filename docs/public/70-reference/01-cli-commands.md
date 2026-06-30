@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-28
-release: v0.1.17
+release: v0.1.19
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
@@ -905,7 +905,7 @@ opensip suite add security --tool fitness --command fit --arg recipe=security
 |---|---|---|
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
-| `run` | `--json` | Emit the suite summary as JSON. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts and per-step verdict counts when a step emitted an envelope. Step output still flows through each step's own output seams. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -917,7 +917,16 @@ Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
 
-**See also:** [`03-configuration.md#suites`](./03-configuration.md#suites).
+`suite run --json` keeps the original step fields (`tool`, `stableId`,
+`command`, `exitCode`, `durationMs`, `error`) and additively includes
+`data.aggregate` (`steps`, `passed`, `failed`, `faulted`, `errors`, `warnings`).
+Each `data.steps[].verdict` is present only when that step emitted a
+`SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
+`findings`) so suite summaries do not leak signal messages, file paths, symbols,
+or match content. See [ADR-0100](../../decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md).
+
+**See also:** [`03-configuration.md#suites`](./03-configuration.md#suites),
+[`04-json-output-schema.md#suite-run-results`](./04-json-output-schema.md#suite-run-results).
 
 ---
 
@@ -1140,8 +1149,8 @@ persists on **every** run until you upgrade — so it's never lost if you miss i
 once — and disappears on its own the run after you update. When an update is
 available it surfaces without nagging:
 
-- On the default `mini` banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
-- On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
+- On the coffee-cup banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
+- On the `--json` path, which renders no banner, the same upgrade command is printed as a one-line note on stderr.
 
 Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip --version`.
 

@@ -139,6 +139,13 @@ describe('loadCliDefaults', () => {
     expect(loadCliDefaults(testDir).ui).toBeUndefined();
   });
 
+  it('drops removed wordmark ui.banner values', () => {
+    for (const banner of ['lg', 'md', 'sm']) {
+      writeConfig(`cli:\n  ui:\n    banner: ${banner}\n`);
+      expect(loadCliDefaults(testDir).ui).toBeUndefined();
+    }
+  });
+
   it('ignores a non-object ui block', () => {
     writeConfig('cli:\n  ui: "nope"\n');
     expect(loadCliDefaults(testDir).ui).toBeUndefined();

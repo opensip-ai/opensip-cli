@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/test-support",
-  "version": "0.1.17",
+  "version": "0.1.19",
   "private": true,
   "license": "Apache-2.0",
   "description": "Cross-package test scaffolding for opensip-cli (unpublished; never a runtime dependency)",

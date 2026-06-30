@@ -1,4 +1,5 @@
 import {
+  commandProducesVerdict,
   ConfigurationError,
   type CommandSpec,
   type Tool,
@@ -91,6 +92,19 @@ function validateStep(
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} command '${step.command}' is a live-view command; suites require non-interactive commands in v1.`,
       { code: 'CONFIG.SUITE.LIVE_VIEW_UNSUPPORTED' },
+    );
+  }
+  // A suite composes gate VERDICTS, so every step must be a verdict-producing run
+  // command (fit/graph/sim/yagni or an external scanner). A non-verdict command
+  // (list/report/info/raw) would run but contribute nothing to the aggregate
+  // verdict — reject it fail-closed before any step executes, rather than
+  // silently producing an unaccounted step at runtime. (ADR-0093.)
+  if (!commandProducesVerdict(spec)) {
+    throw new ConfigurationError(
+      `Suite '${suiteName}' step ${index + 1} command '${step.command}' does not produce a gate verdict. ` +
+        `Suite steps must be verdict-producing run commands (e.g. fit, graph, sim, yagni, or an external ` +
+        `scanner). Remove this step or point it at a run command.`,
+      { code: 'CONFIG.SUITE.NOT_A_RUN_COMMAND' },
     );
   }
   if (step.cwd !== undefined) {

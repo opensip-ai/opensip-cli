@@ -2,25 +2,11 @@
  * Banner — the OpenSIP CLI ASCII art banner. Used as the header for every
  * live-view tool runner and for App.tsx's static-render path.
  *
- * Four sizes are available via the `size` prop:
- *   - `lg` (default) — the full 8-row 3-D banner with shaded depth.
- *   - `md` — half-height. The OPENSIP wordmark is a mechanical half-block
- *     downscale of the `lg` art; the coffee cup + steam is hand-authored
- *     block art (a downscale smears away the handle-hole and saucer that
- *     make it read as a mug).
- *   - `sm` — half-height AND half-width (quarter-block wordmark, smaller mug).
- *   - `mini` — a compact, boxed identity card: a small amber coffee cup on
- *     the left and four info lines on the right (`opensip-cli v1.0.0`,
- *     the tagline, the `www.opensip.ai` URL, and the project path), framed in
- *     a rounded amber border. Modeled on the Claude Code session card. Unlike
- *     the wordmark sizes it carries the version + project path inline, so
- *     callers SUPPRESS the separate `ProjectHeader` line when `mini` is
- *     selected (the path would otherwise render twice).
- *
- * In the wordmark sizes (`lg`/`md`/`sm`) OPEN is brand-coloured and SIP is
- * bold, matching `lg`; the cup column and wordmark column are bottom-aligned
- * so the steam rises above the letters exactly as it does at full size. The
- * `mini` size colours the whole cup + frame in `theme.brand` (amber).
+ * The coffee cup is the canonical logo mark (ADR-0102), so the banner is the
+ * compact boxed identity card: a small amber coffee cup on the left and four
+ * info lines on the right (`opensip-cli v1.0.0`, the tagline, the
+ * `www.opensip.ai` URL, and the project path), framed in a rounded amber
+ * border.
  */
 
 import { Text, Box } from 'ink';
@@ -28,10 +14,10 @@ import React from 'react';
 
 import { useTheme } from './theme.js';
 
-export type BannerSize = 'lg' | 'md' | 'sm' | 'mini';
+export type BannerSize = 'mini';
 
-/** The valid banner sizes, as a runtime set for {@link normalizeBannerSize}. */
-const BANNER_SIZES: ReadonlySet<string> = new Set<BannerSize>(['lg', 'md', 'sm', 'mini']);
+/** The valid banner size, as a runtime set for {@link normalizeBannerSize}. */
+const BANNER_SIZES: ReadonlySet<string> = new Set<BannerSize>(['mini']);
 
 /** Product tagline shown in the `mini` banner — mirrors the welcome screen. */
 const MINI_TAGLINE = 'codebase intelligence from your terminal';
@@ -40,12 +26,10 @@ const MINI_TAGLINE = 'codebase intelligence from your terminal';
 const UPGRADE_COMMAND = 'curl -fsSL https://opensip.ai/cli/install.sh | bash';
 
 /**
- * UpdateHint — a single dim line printed UNDER the `mini` banner box when an
- * update is available, giving the actionable upgrade command. The `mini`
- * card's version-line flag (`(<new-version> available)`) announces the update but
- * isn't actionable on its own; this line closes that gap without growing the
- * fixed-height box. The other banner sizes get the same command via the
- * stderr update nag, so callers render this only for `mini`.
+ * UpdateHint — a single dim line printed UNDER the banner box when an update is
+ * available, giving the actionable upgrade command. The banner's version-line
+ * flag (`(<new-version> available)`) announces the update but isn't actionable
+ * on its own; this line closes that gap without growing the fixed-height box.
  */
 export function UpdateHint(): React.ReactElement {
   return (
@@ -58,100 +42,14 @@ export function UpdateHint(): React.ReactElement {
 /**
  * Narrow an untyped banner-size string (e.g. from `ui.banner` in
  * `opensip-cli.config.yml`, which reaches the kernel as a plain `string`)
- * to a {@link BannerSize}. Unknown / undefined values fall back to `lg`, the
- * documented default. Centralised here so `cli-ui` stays the single owner of
- * the `BannerSize` union and the layers below it (core, contracts) need only
- * pass a string.
+ * to a {@link BannerSize}. Unknown / undefined values fall back to `mini`, the
+ * only supported banner size. Centralised here so `cli-ui` stays the single
+ * owner of the `BannerSize` union and the layers below it (core, contracts)
+ * need only pass a string.
  */
 export function normalizeBannerSize(value: string | undefined): BannerSize {
-  return value !== undefined && BANNER_SIZES.has(value) ? (value as BannerSize) : 'lg';
+  return value !== undefined && BANNER_SIZES.has(value) ? (value as BannerSize) : 'mini';
 }
-
-// --- lg: full 3-D banner. Each entry: [cup, openPart, sipPart] ---
-const BANNER_LG: readonly [string, string, string][] = [
-  [
-    '   ░       ░             ',
-    '  ██████   ████████  █████████ ████  ███',
-    ' ███████   █████ ████████ ',
-  ],
-  [
-    '    ░     ░              ',
-    ' ███░░░███░███░░░░██░███░░░░░░░░███  ███',
-    '███░░░░███░░███ ░███░░░░██',
-  ],
-  [
-    '   ░       ░             ',
-    '███   ░███░███   ░██░███       ░████ ███',
-    '░███   ░░░ ░███ ░███   ░██',
-  ],
-  [
-    '███████████████          ',
-    '███   ░███░████████░░██████    ░██░█████',
-    '░░███████  ░███ ░████████░',
-  ],
-  [
-    '███████████████  █████   ',
-    '███   ░███░███░░░░  ░███░░░    ░██ ░████',
-    ' ░░░░░░███ ░███ ░███░░░░  ',
-  ],
-  [
-    '███████████████ ░░░░███  ',
-    '░███  ████░███      ░███       ░██  ░███',
-    ' ███   ███ ░███ ░███      ',
-  ],
-  [
-    '███████████████  █████   ',
-    ' ░██████░  ████      █████████ ████  ███',
-    '░░███████  █████ ████     ',
-  ],
-  [
-    '░█████████████░ ░░░      ',
-    '  ░░░░░░  ░░░░░     ░░░░░░░░░░░░░░  ░░░',
-    ' ░░░░░░░  ░░░░░ ░░░░░     ',
-  ],
-];
-
-const BANNER_SAUCER = ' ░███████████░';
-
-/**
- * A compact (md/sm) banner. `cup` includes the steam rows and is bottom-aligned
- * with the wordmark — steam rows poke above the letters. `open`/`sip` are the
- * OPENSIP wordmark split at the OPEN│SIP boundary so each can be coloured
- * independently. `open` lines carry significant trailing spaces that position
- * the `sip` segment — do not trim them.
- */
-interface CompactBanner {
-  readonly cup: readonly string[];
-  readonly open: readonly string[];
-  readonly sip: readonly string[];
-}
-
-const BANNER_MD: CompactBanner = {
-  cup: [' ░    ░', '  ░  ░', '▟████████▙', '█████████▐▀▙', '█████████▐▄▟', '▝▀▀█████▀▀▘'],
-  open: [
-    '██▀▀█▄▄███▀▀▀█ ██▀▀▀▀▀ ▀██  ██ ',
-    '█   ██████▄▄▄█ ██▄▄▄    █▀█▄██ ',
-    '█▄ ▄██████     ██       █  ▀██ ',
-    '▀▀▀▀▀  ▀▀▀     ▀▀▀▀▀▀▀ ▀▀▀  ▀▀ ',
-  ],
-  sip: [
-    '██▀▀▀█▄▄▀██▀ ██▀▀▀█▄',
-    '▀██▄▄▄▄  ██  ██▄▄▄█▀',
-    '▄▄▄  ███ ██  ██     ',
-    ' ▀▀▀▀▀▀ ▀▀▀▀ ▀▀▀    ',
-  ],
-};
-
-const BANNER_SM: CompactBanner = {
-  cup: [' ░  ░', '  ░', '▟████▙', '█████▐▌', '▝▀██▀▀'],
-  open: [
-    '▗█▀▜▄▐█▀▀▙▐█▀▀▀▝█▌▐█▗',
-    '█▌ ▐█▐█▄▄▛▐█▄▖  █▜▟█ ',
-    '▜▙ ▟█▐█   ▐█    █ ▜█ ',
-    ' ▀▀▀ ▝▀▘  ▝▀▀▀▀▝▀▘▝▀ ',
-  ],
-  sip: ['█▀▀▙▖▜█▘█▛▀▜▖', '▜▙▄▄ ▐█ █▙▄▟▘', '▄▖ █▌▐█ █▌   ', '▝▀▀▀ ▀▀▘▀▀   '],
-};
 
 /**
  * `mini` cup art — four rows (steam, lid, cup body, saucer), one per info
@@ -179,10 +77,9 @@ const MINI_URL = 'www.opensip.ai';
 
 /**
  * The walk-up suffix shown after the project path, e.g. `(found 2 levels up)`.
- * Mirrors {@link formatProjectHeader} so `mini` carries the same discovery
- * hint the standalone `ℹ Project:` line shows for the other banner sizes —
- * `mini` suppresses that line (its box owns the path), so the suffix has to
- * live here or the hint is lost. Returns `''` when cwd IS the project root.
+ * Mirrors {@link formatProjectHeader} so the banner carries the same discovery
+ * hint the plain-text `ℹ Project:` line shows. Returns `''` when cwd IS the
+ * project root.
  */
 function walkedUpSuffix(walkedUp: number | undefined): string {
   if (walkedUp === undefined || walkedUp === 0) return '';
@@ -249,46 +146,9 @@ function MiniBanner({
   );
 }
 
-function LargeBanner(): React.ReactElement {
-  const theme = useTheme();
-  return (
-    <Box flexDirection="column">
-      {BANNER_LG.map(([cup, openPart, sipPart], i) => (
-        <Text key={i}>
-          {cup}
-          <Text color={theme.brand}>{openPart}</Text> <Text bold>{sipPart}</Text>
-        </Text>
-      ))}
-      <Text>{BANNER_SAUCER}</Text>
-    </Box>
-  );
-}
-
-function CompactBannerView({ art }: { readonly art: CompactBanner }): React.ReactElement {
-  const theme = useTheme();
-  return (
-    <Box flexDirection="row" alignItems="flex-end">
-      <Box flexDirection="column" marginRight={2}>
-        {art.cup.map((line, i) => (
-          <Text key={i}>{line}</Text>
-        ))}
-      </Box>
-      <Box flexDirection="column">
-        {art.open.map((openLine, i) => (
-          <Text key={i}>
-            <Text color={theme.brand}>{openLine}</Text>
-            <Text bold>{art.sip[i]}</Text>
-          </Text>
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
 /**
- * Banner props. `version` / `projectPath` are only consumed by the `mini`
- * size (the wordmark sizes ignore them); they're optional so existing
- * `<Banner />` and `<Banner size="md" />` call sites stay valid.
+ * Banner props. `version` / `projectPath` are optional so existing `<Banner />`
+ * call sites stay valid.
  */
 export interface BannerProps {
   readonly size?: BannerSize;
@@ -298,44 +158,25 @@ export interface BannerProps {
   readonly projectPath?: string;
   /**
    * Ancestor steps walked from cwd to the project root. When > 0, the `mini`
-   * card appends `(found N levels up)` to the path line — the discovery hint
-   * the separate `ℹ Project:` line carries for the other sizes.
+   * card appends `(found N levels up)` to the path line.
    */
   readonly walkedUp?: number;
   /**
    * Newer published version (e.g. `1.0.1`) when an update is available. The
-   * `mini` card appends `(<new-version> available)` to the version line; other sizes
-   * ignore it (they rely on the stderr update nag).
+   * banner appends `(<new-version> available)` to the version line.
    */
   readonly update?: string;
 }
 
 export function Banner({
-  size = 'lg',
+  size = 'mini',
   version = '',
   projectPath,
   walkedUp,
   update,
 }: BannerProps = {}): React.ReactElement {
-  switch (size) {
-    case 'md': {
-      return <CompactBannerView art={BANNER_MD} />;
-    }
-    case 'sm': {
-      return <CompactBannerView art={BANNER_SM} />;
-    }
-    case 'mini': {
-      return (
-        <MiniBanner
-          version={version}
-          projectPath={projectPath}
-          walkedUp={walkedUp}
-          update={update}
-        />
-      );
-    }
-    default: {
-      return <LargeBanner />;
-    }
-  }
+  normalizeBannerSize(size);
+  return (
+    <MiniBanner version={version} projectPath={projectPath} walkedUp={walkedUp} update={update} />
+  );
 }

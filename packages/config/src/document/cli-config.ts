@@ -90,7 +90,7 @@ export const cliConfigSchema = z.object({
   // rides on RunScope.ui and the render paths read it directly.
   ui: z
     .object({
-      banner: z.enum(['lg', 'md', 'sm', 'mini']).optional(),
+      banner: z.literal('mini').optional(),
     })
     .optional(),
   // OpenSIP Cloud signal sync (ADR-0008): with an API key + entitlement, each run

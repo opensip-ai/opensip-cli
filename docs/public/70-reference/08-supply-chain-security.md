@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.17
+release: v0.1.19
 title: "Supply-chain security"
 audience: [getting-started, ci-integrators, plugin-authors, contributors]
 purpose: "How opensip-cli reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
@@ -119,7 +119,7 @@ For highly sensitive environments, prefer a pinned version and install through
 an internal mirror or vetted cache:
 
 ```bash
-curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=0.1.17 bash
+curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=0.1.19 bash
 ```
 
 Customers who globally disable npm lifecycle scripts should test the CLI in

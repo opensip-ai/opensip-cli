@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.17
+release: v0.1.19
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
@@ -173,7 +173,7 @@ config fields are rejected.
 | `apiKey` | — | **Not allowed** in project config (ADR-0071). Use `--api-key`, `OPENSIP_API_KEY`, or `~/.opensip-cli/config.yml#apiKey`. |
 | `fileTypes` | string[] | Restrict the run to these extensions. |
 | `ignore` | string[] | Additional exclude patterns. |
-| `ui.banner` | `'mini' \| 'lg' \| 'md' \| 'sm'` | Banner art above each command. Default `mini` — a compact boxed card (amber cup + version + tagline + `www.opensip.ai` + project path). Set `lg`/`md`/`sm` for the full ASCII wordmark. **No CLI flag** — persistent preference. |
+| `ui.banner` | `'mini'` | Banner art above each command. Default and only supported value: `mini` — a compact boxed card using the canonical coffee cup mark, version, tagline, `www.opensip.ai`, and project path. **No CLI flag** — persistent preference. |
 | `cloud.sync` | bool | Project-level opt-out for automatic OpenSIP Cloud signal sync. `false` disables sync even when a user-level config enables it. |
 | `cloud.endpoint` | URL | HTTPS override for the built-in OpenSIP Cloud endpoint. User-level endpoint takes precedence when both are set. |
 | `sessions.keep` | int >= 0 | Keep the newest N persisted run sessions. Default `200`; `0` disables count pruning. |
@@ -184,7 +184,7 @@ config fields are rejected.
 cli:
   reportTo: 'https://opensip.ai/api'
   ui:
-    banner: mini   # mini | lg | md | sm
+    banner: mini   # canonical coffee-cup card
   cloud:
     sync: false    # optional project-level cloud signal-sync opt-out
   sessions:

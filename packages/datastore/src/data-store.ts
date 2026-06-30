@@ -20,6 +20,11 @@ export interface DatastoreMaintenance {
   fileSizeBytes(): number;
 }
 
+/**
+ * Host-owned persistence handle used by repositories and CLI bootstrap code.
+ * It exposes lifecycle, transaction, and serialized write-lock primitives while
+ * keeping raw database access behind narrower datastore-owned interfaces.
+ */
 export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
   readonly maintenance?: DatastoreMaintenance;
   close(): void;

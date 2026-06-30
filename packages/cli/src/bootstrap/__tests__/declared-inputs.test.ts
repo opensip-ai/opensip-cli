@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { PLUGIN_API_VERSION, RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +12,7 @@ import {
 } from '../declared-inputs.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { ToolPluginManifest } from '@opensip-cli/core';
 
 function envelope(): SignalEnvelope {
   return {
@@ -30,6 +32,19 @@ function envelope(): SignalEnvelope {
       fingerprintStrategyVersion: 1,
     },
   };
+}
+
+function manifest(overrides: Partial<ToolPluginManifest>): ToolPluginManifest {
+  return {
+    kind: 'tool',
+    apiVersion: PLUGIN_API_VERSION,
+    id: 'demo',
+    identity: { name: 'demo' },
+    name: 'Demo',
+    version: '1.0.0',
+    commands: [],
+    ...overrides,
+  } as unknown as ToolPluginManifest;
 }
 
 describe('declared inputs', () => {
@@ -77,6 +92,73 @@ describe('declared inputs', () => {
       env: { npm_config_user_agent: 'pnpm/11.2.3 npm/? node/v24' },
     });
     expect(manifest.packageManager).toBe('pnpm@11.2.3');
+  });
+
+  it('returns undefined when no package-manager source is available', () => {
+    const previousUserAgent = process.env.npm_config_user_agent;
+    try {
+      delete process.env.npm_config_user_agent;
+      const manifest = collectDeclaredInputsForTool('graph', {
+        cwd: '/definitely/missing',
+        cliVersion: '0.1.16',
+        nodeVersion: '24.0.0',
+        platform: 'test/arch',
+      });
+      expect(manifest.packageManager).toBeUndefined();
+    } finally {
+      if (previousUserAgent === undefined) {
+        delete process.env.npm_config_user_agent;
+      } else {
+        process.env.npm_config_user_agent = previousUserAgent;
+      }
+    }
+  });
+
+  it('preserves an unparseable package-manager user-agent token', () => {
+    const manifest = collectDeclaredInputsForTool('graph', {
+      cwd: '/definitely/missing',
+      cliVersion: '0.1.16',
+      nodeVersion: '24.0.0',
+      platform: 'test/arch',
+      env: { npm_config_user_agent: 'custom-agent node/v24' },
+    });
+    expect(manifest.packageManager).toBe('custom-agent');
+  });
+
+  it('reads engine version from the current scope manifest by id or identity name', () => {
+    const scope = new RunScope({
+      toolManifests: [
+        manifest({
+          id: 'fit-plugin',
+          identity: { name: 'fit' },
+          version: '9.8.7',
+        }),
+        manifest({
+          id: 'graph',
+          identity: { name: 'graph-plugin' },
+          version: '1.2.3',
+        }),
+      ],
+    });
+
+    runWithScopeSync(scope, () => {
+      expect(
+        collectDeclaredInputsForTool('fit', {
+          cliVersion: '0.1.16',
+          nodeVersion: '24.0.0',
+          packageManager: 'pnpm@11',
+          platform: 'test/arch',
+        }).engineVersion,
+      ).toBe('9.8.7');
+      expect(
+        collectDeclaredInputsForTool('graph', {
+          cliVersion: '0.1.16',
+          nodeVersion: '24.0.0',
+          packageManager: 'pnpm@11',
+          platform: 'test/arch',
+        }).engineVersion,
+      ).toBe('1.2.3');
+    });
   });
 
   it('attaches baseline identity when collecting from an envelope', () => {

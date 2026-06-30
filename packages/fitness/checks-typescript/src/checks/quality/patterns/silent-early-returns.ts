@@ -85,6 +85,21 @@ function isTypeGuard(fn: FunctionLikeNode, sourceFile: ts.SourceFile): boolean {
   return false;
 }
 
+function returnsBoolean(fn: FunctionLikeNode, sourceFile: ts.SourceFile): boolean {
+  const returnType = fn.type?.getText(sourceFile).replace(/\s+/g, ' ').trim();
+  return returnType === 'boolean' || returnType === 'Promise<boolean>';
+}
+
+function isBooleanContractReturn(
+  fn: FunctionLikeNode,
+  returnStatement: SentinelReturnStatement,
+  sourceFile: ts.SourceFile,
+): boolean {
+  return (
+    returnStatement.expression.kind === ts.SyntaxKind.FalseKeyword && returnsBoolean(fn, sourceFile)
+  );
+}
+
 /**
  * Check if a function is a validation/parsing function where silent returns are expected.
  * These functions legitimately return null/false for invalid input.
@@ -199,12 +214,17 @@ function isSentinelReturn(
   );
 }
 
-function shouldSkipForFunction(node: ts.IfStatement, sourceFile: ts.SourceFile): boolean {
+function shouldSkipForFunction(
+  node: ts.IfStatement,
+  returnStatement: SentinelReturnStatement,
+  sourceFile: ts.SourceFile,
+): boolean {
   const fn = findFunction(node);
   /* v8 ignore next -- defensive AST/type guard */
   if (!fn) return false;
 
   return (
+    isBooleanContractReturn(fn, returnStatement, sourceFile) ||
     isTypeGuard(fn, sourceFile) ||
     isPredicateCallback(fn) ||
     isValidationOrParserFunction(fn, sourceFile) ||
@@ -253,7 +273,7 @@ function checkSilentReturn(
     return null;
   }
 
-  if (shouldSkipForFunction(node, sourceFile)) {
+  if (shouldSkipForFunction(node, returnStatement, sourceFile)) {
     return null;
   }
 
@@ -276,6 +296,7 @@ function checkSilentReturn(
  *
  * Exceptions:
  * - Type guards (functions that return `x is T`)
+ * - Explicit boolean-return contracts where `return false` is a normal outcome
  * - Boolean predicate functions (isXxx, hasXxx, canXxx, shouldXxx)
  * - Predicate callbacks (filter, find, some, every, map, etc.) where false/null means "skip item"
  * - Validation/utility functions (validate, verify, parse, check, get, test, compare, supports, etc.)
@@ -291,7 +312,7 @@ export const silentEarlyReturns = defineCheck({
   description: 'Detect single-line early returns without logging',
   longDescription: `**Purpose:** Detects validation/guard paths that return sentinel values (\`null\` or \`false\`) without logging, making debugging difficult.
 
-**Detects:** Analyzes each file individually using TypeScript AST. Finds \`if\` statements (without \`else\`) whose then-branch is a single \`return null\` or \`return false\` with no nearby logging (\`logger.\`, \`console.\`) or \`@silent-ok\` marker. Excludes type guards (\`is/has/can/should\` prefixes), predicate callbacks (\`filter\`, \`find\`, \`some\`, \`every\`, \`map\`), validation/parser/utility functions (validate, verify, parse, check, extract, try, attempt, find, get, lookup, resolve, match, unregister, acquire, release, test, compare, supports), early guard clauses (first 3 statements), and fitness check/framework source files.
+**Detects:** Analyzes each file individually using TypeScript AST. Finds \`if\` statements (without \`else\`) whose then-branch is a single \`return null\` or \`return false\` with no nearby logging (\`logger.\`, \`console.\`) or \`@silent-ok\` marker. Excludes type guards (\`is/has/can/should\` prefixes), explicit boolean-return contracts where \`false\` is a normal outcome, predicate callbacks (\`filter\`, \`find\`, \`some\`, \`every\`, \`map\`), validation/parser/utility functions (validate, verify, parse, check, extract, try, attempt, find, get, lookup, resolve, match, unregister, acquire, release, test, compare, supports), early guard clauses (first 3 statements), and fitness check/framework source files.
 
 **Why it matters:** Silent early returns make it impossible to diagnose why a code path was not executed, turning simple issues into hours-long debugging sessions.
 
