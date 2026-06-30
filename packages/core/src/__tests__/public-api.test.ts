@@ -161,6 +161,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'fitnessPluginLoadFailedDiagnostic',
   'forkAndSettle',
   'formatDuration',
+  'formatUnknownErrorMessage',
   'getWorkerLimits',
   'generateId',
   'generatePrefixedId',
