@@ -5,6 +5,13 @@ export interface SuiteStepSummary {
   readonly exitCode: number;
   readonly durationMs: number;
   readonly error?: string;
+  /** Present iff the step emitted a SignalEnvelope; absent means no envelope output. */
+  readonly verdict?: {
+    readonly passed: boolean;
+    readonly errors: number;
+    readonly warnings: number;
+    readonly findings: number;
+  };
 }
 
 export interface SuiteRunResult {
@@ -13,6 +20,17 @@ export interface SuiteRunResult {
   readonly suiteRunId: string;
   readonly exitCode: number;
   readonly durationMs: number;
+  readonly aggregate?: {
+    readonly steps: number;
+    /** Steps with a passing emitted verdict and a successful step exit. */
+    readonly passed: number;
+    /** Non-faulted steps with a failing emitted verdict or non-zero step exit. */
+    readonly failed: number;
+    /** Steps that threw or faulted before completing normally. */
+    readonly faulted: number;
+    readonly errors: number;
+    readonly warnings: number;
+  };
   readonly steps: readonly SuiteStepSummary[];
 }
 

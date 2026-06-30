@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-06-28
+last_verified: 2026-06-30
 owner: opensip-cli
 ---
 
@@ -13,7 +13,7 @@ date: 2026-06-28
 status: active
 supersedes: []
 superseded_by: null
-related: [ADR-0023, ADR-0036, ADR-0048, ADR-0054, ADR-0051]
+related: [ADR-0023, ADR-0036, ADR-0048, ADR-0054, ADR-0051, ADR-0100]
 tags: [cli, host-planes, composition, sessions, config]
 enforcement: mechanizable
 enforcement-reason: >
@@ -66,3 +66,4 @@ UUID, and `suite add` resolves a name or UUID into the canonical YAML shape.
 **Fitness check:** `single-opts-assembly-seam` (path-gated to `packages/cli/src/commands/`).
 
 **Related specs / ADRs:** Implements local plan `docs/plans/ready/05-tool-suites/`.
+Extended by ADR-0100 for suite per-step verdict and aggregate output.

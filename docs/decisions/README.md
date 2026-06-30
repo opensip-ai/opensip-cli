@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md) — Suite run results add additive per-step counts-only verdict projections and a suite aggregate while keeping worst-step exit semantics and avoiding signal-content egress in summaries.
 - [ADR-0098](ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md) — Duplicate signal reduction is host-owned output-plane normalization before JSON, terminal rendering, SARIF, cloud, and report egress; suppression catalogs are heatmaps classified as `false-positive`, `accepted-risk`, or `design-mismatch`.
 - [ADR-0097](ADR-0097-gate-verdict-determinism.md) — Gate verdicts carry a host-stamped, allowlisted `declaredInputs` manifest so CI, dashboards, and agents can diagnose runtime/version/baseline skew without reading hidden host state.
 - [ADR-0096](ADR-0096-host-owned-datastore-lifecycle.md) — The CLI host owns generic session retention and SQLite reclaim; tools contribute session payloads but never prune shared sessions or run datastore vacuum lifecycle.

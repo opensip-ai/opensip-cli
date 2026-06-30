@@ -477,12 +477,15 @@ describe('suite views', () => {
       steps: [
         {
           tool: 'fitness',
+          stableId: 'uuid-1',
           command: 'fit',
           exitCode: 0,
           durationMs: 400,
+          verdict: { passed: true, errors: 0, warnings: 0, findings: 0 },
         },
         {
           tool: 'graph',
+          stableId: 'uuid-2',
           command: 'graph',
           exitCode: 1,
           durationMs: 500,
