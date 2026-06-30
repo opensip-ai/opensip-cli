@@ -6,7 +6,7 @@
  * layer (budget-gate, product-runtime, check-package, test-support, tests).
  *
  * Usage:
- *   node scripts/catalog-suppressions.mjs              # write docs/internal outputs
+ *   node scripts/catalog-suppressions.mjs              # write .config suppression outputs
  *   node scripts/catalog-suppressions.mjs --check        # exit 1 if committed output is stale
  *   node scripts/catalog-suppressions.mjs --stdout-json  # JSON to stdout (no write)
  */
@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BUDGET_PATH = join(REPO_ROOT, '.config/waiver-budget.json');
-const CATALOG_JSON_PATH = join(REPO_ROOT, 'docs/internal/suppression-catalog.json');
-const TRIAGE_MD_PATH = join(REPO_ROOT, 'docs/internal/suppression-triage.md');
+const CATALOG_JSON_PATH = join(REPO_ROOT, '.config/suppression-catalog.json');
+const TRIAGE_MD_PATH = join(REPO_ROOT, '.config/suppression-triage.md');
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'coverage', '.git']);
 
@@ -635,7 +635,7 @@ function main() {
   );
   if (catalog.phase4Audit.reopenCandidates.length > 0) {
     log(
-      `phase-4 reopen: ${catalog.phase4Audit.reopenCandidates.length} slug(s) >${PHASE4_REOPEN_THRESHOLD} without pure (b) — see docs/internal/suppression-triage.md`,
+      `phase-4 reopen: ${catalog.phase4Audit.reopenCandidates.length} slug(s) >${PHASE4_REOPEN_THRESHOLD} without pure (b) — see .config/suppression-triage.md`,
     );
     for (const row of catalog.phase4Audit.reopenCandidates) {
       log(`  ${row.slug}: ${row.count} (${row.disposition})`);

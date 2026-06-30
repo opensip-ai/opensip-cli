@@ -49,10 +49,14 @@ test('public docs state core enterprise posture without overclaiming enforcement
 
 test('dependency hygiene process doc exists when dependabot is configured', () => {
   const dependabot = existsSync(join(REPO_ROOT, '.github/dependabot.yml'));
-  const processDoc = read('docs/internal/supply-chain-dependency-hygiene-improvement-process.md');
   if (dependabot) {
-    assert.match(processDoc, /Dependabot/i);
-    assert.match(processDoc, /Owner:/i);
-    assert.match(processDoc, /Cadence:/i);
+    const dependabotConfig = read('.github/dependabot.yml');
+    const supplyChain = read('docs/public/70-reference/08-supply-chain-security.md');
+    const adr = read('docs/decisions/ADR-0069-dependency-hygiene-automation-policy.md');
+
+    assert.match(dependabotConfig, /interval:\s*weekly/i);
+    assert.match(supplyChain, /Dependabot/i);
+    assert.match(supplyChain, /weekly cadence/i);
+    assert.match(adr, /Dependabot/i);
   }
 });

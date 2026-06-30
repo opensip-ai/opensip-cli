@@ -235,7 +235,7 @@ still right — but they are **ratcheted**: net-new budgeted suppressions fail
 `.config/waiver-budget.json`. When you remove a waiver, lower the budget in the
 **same PR**. Unbudgeted slugs still require triage — see the matrix below.
 
-**Inventory:** `docs/internal/suppression-triage.md` (generated;
+**Inventory:** `.config/suppression-triage.md` (generated;
 `node scripts/catalog-suppressions.mjs`). Public syntax:
 [Ignore directives](docs/public/20-fit/03-ignore-directives.md).
 

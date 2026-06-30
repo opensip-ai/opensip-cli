@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BUDGET_PATH = join(REPO_ROOT, '.config/waiver-budget.json');
-const CATALOG_JSON_PATH = join(REPO_ROOT, 'docs/internal/suppression-catalog.json');
+const CATALOG_JSON_PATH = join(REPO_ROOT, '.config/suppression-catalog.json');
 
 const SAFETY_SLUGS = new Set([
   'error-handling-quality',
@@ -98,7 +98,7 @@ function main() {
   }
 
   log('safety waiver budget OK (no net-new)');
-  log('suppression triage matrix: docs/internal/suppression-triage.md');
+  log('suppression triage matrix: .config/suppression-triage.md');
 
   try {
     const catalog = JSON.parse(readFileSync(CATALOG_JSON_PATH, 'utf8'));
