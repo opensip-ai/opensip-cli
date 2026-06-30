@@ -45,6 +45,12 @@ describe('readYamlFile', () => {
     // js-yaml returns undefined for completely empty input
     expect(readYamlFile(path)).toBeUndefined();
   });
+
+  it('returns undefined for a comment-only YAML document', () => {
+    const path = join(testDir, 'comment-only.yml');
+    writeFileSync(path, '# project marker\n');
+    expect(readYamlFile(path)).toBeUndefined();
+  });
 });
 
 describe('readYamlFileOrThrow (audit-round-2 Finding F)', () => {
@@ -57,6 +63,12 @@ describe('readYamlFileOrThrow (audit-round-2 Finding F)', () => {
   it('returns {} for empty YAML rather than undefined', () => {
     const path = join(testDir, 'empty.yml');
     writeFileSync(path, '');
+    expect(readYamlFileOrThrow(path)).toEqual({});
+  });
+
+  it('returns {} for comment-only YAML rather than throwing', () => {
+    const path = join(testDir, 'comment-only.yml');
+    writeFileSync(path, '---\n# project marker\n');
     expect(readYamlFileOrThrow(path)).toEqual({});
   });
 
