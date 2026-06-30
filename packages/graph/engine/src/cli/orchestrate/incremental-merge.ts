@@ -97,10 +97,8 @@ function expandClosureOnce(walked: WalkOutput, ctx: ClosureExpansionContext): bo
   const { cachedCatalog, closureRel, closureAbs, cachedHashesByFile, projectDirAbs } = ctx;
   const newHashes = collectHashesFromOccurrences(walked.occurrences);
   const staleHashes = collectStaleHashes(closureRel, cachedHashesByFile, newHashes);
-  // @fitness-ignore-next-line silent-early-returns -- `expandClosureOnce` returns boolean as its documented "did the closure grow this iteration?" contract; `false` is the fixed-point signal driving the outer expansion loop, not a hidden failure.
   if (staleHashes.size === 0) return false;
   const newDependents = findEdgeDependents(cachedCatalog, staleHashes, closureRel);
-  // @fitness-ignore-next-line silent-early-returns -- same boolean "did closure grow?" contract as above; no new dependents means "fixed point reached".
   if (newDependents.length === 0) return false;
 
   /* v8 ignore start */

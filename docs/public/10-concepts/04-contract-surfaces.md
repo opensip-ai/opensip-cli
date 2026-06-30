@@ -11,6 +11,7 @@ source-files:
   - packages/core/src/tools/types.ts
   - packages/core/src/plugins/types.ts
   - packages/core/src/languages/adapter.ts
+  - packages/cli/src/bootstrap/signal-dedup.ts
   - packages/output/src/format/signal-sarif.ts
 related-docs:
   - ./01-fitness-loop.md
@@ -133,8 +134,8 @@ CI integrations are the primary consumer. `opensip fit && deploy` is an idiom; s
 
 The structured stdout when `--json` is set is a host-stamped outer
 `CommandOutcome`. For signal-producing tool runs (`fit`, `sim`, `graph`, `yagni`)
-the unchanged `SignalEnvelope` sits under `.envelope`; command-result data sits
-under `.data`; setup and command failures use `.errors`. This is the
+the host-normalized `SignalEnvelope` sits under `.envelope`; command-result data
+sits under `.data`; setup and command failures use `.errors`. This is the
 one-machine-output shape from [ADR-0065](../../decisions/ADR-0065-public-json-output-and-raw-stream-policy.md), layered on top of the signal currency from
 [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md).
 Shapes live at [`packages/contracts/src/command-outcome.ts`](../../../packages/contracts/src/command-outcome.ts) and
@@ -202,6 +203,11 @@ interface SignalEnvelope {
 `fingerprint`, fix hint. The `schemaVersion: 2` discriminator is part of the
 contract. A future minor can add fields; a major can change `schemaVersion` and
 break old consumers.
+
+Before JSON, terminal rendering, SARIF, cloud, or report egress, the host may
+collapse duplicate signals by same-source fingerprint, exact identity, or
+conservative near-identity (same provider/rule/source/file/line/message,
+ignoring only column drift). See [ADR-0098](../../decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md).
 
 The full per-field reference (when each field is present, what each value can
 be) is in [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).

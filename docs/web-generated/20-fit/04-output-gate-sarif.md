@@ -13,6 +13,7 @@ source-files:
   - packages/cli/src/bootstrap/baseline-seams.ts
   - packages/output/src/format/baseline-diff.ts
   - packages/cli/src/bootstrap/deliver-envelope.ts
+  - packages/cli/src/bootstrap/signal-dedup.ts
   - packages/cli/src/ui/
 related-docs:
   - ./01-recipes-and-checks.md
@@ -58,7 +59,7 @@ The paths are mutually exclusive in their effect on stdout, but composable in th
 
 ## The `SignalEnvelope`
 
-Every output path starts from the same shape — a `SignalEnvelope` produced after the recipe runs ([ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md)). Defined at [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/contracts/src/signal-envelope.ts):
+Every output path starts from the same shape — a `SignalEnvelope` produced after the recipe runs ([ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md)). Before rendering or egress, the CLI host may normalize that envelope by collapsing exact identity duplicates and conservative near-identity duplicates ([ADR-0098](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md)). Defined at [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/contracts/src/signal-envelope.ts):
 
 ```ts
 interface SignalEnvelope {
@@ -130,7 +131,7 @@ The findings exit code is host-derived (ADR-0035): fitness declares its verdict 
 opensip fit --json
 ```
 
-Bypasses the Ink renderer entirely. Calls `executeFit(args)`, then the host wraps the returned envelope in a `CommandOutcome` and serializes the whole outcome through the single `renderOutcome` seam (`cli.emitEnvelope`). The tool never stringifies its own output. The byte-identical `SignalEnvelope` rides under `.envelope`; the outcome adds `kind`, `status`, and `exitCode` at the top level. See [`70-reference/04-json-output-schema.md`](/docs/opensip-cli/70-reference/04-json-output-schema/) for the full wrapper shape.
+Bypasses the Ink renderer entirely. Calls `executeFit(args)`, then the host normalizes duplicate signals, wraps the envelope in a `CommandOutcome`, and serializes the whole outcome through the single `renderOutcome` seam (`cli.emitEnvelope`). The tool never stringifies its own output. The `SignalEnvelope` rides under `.envelope`; the outcome adds `kind`, `status`, and `exitCode` at the top level. See [`70-reference/04-json-output-schema.md`](/docs/opensip-cli/70-reference/04-json-output-schema/) for the full wrapper shape.
 
 This is the path CI integrations should use. Stdout is the JSON; stderr carries logs (also JSON-lines, on a separate stream); the exit code is the gate.
 

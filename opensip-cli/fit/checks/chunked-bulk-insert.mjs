@@ -42,6 +42,26 @@ function valuesOfVarRe(varName) {
   return new RegExp(String.raw`\.values\s*\(\s*${varName}\s*\)`);
 }
 
+function collectWindow(lines, startIndex, startColumn = 0) {
+  const parts = [];
+  for (let i = startIndex; i < Math.min(lines.length, startIndex + 12); i++) {
+    parts.push(i === startIndex ? lines[i].slice(startColumn) : lines[i]);
+    if (/[;)]\s*$/.test(lines[i])) break;
+  }
+  return parts.join('\n');
+}
+
+function mapSourceLooksBounded(text) {
+  const map = MAP_CALL_RE.exec(text);
+  if (!map) return false;
+  const beforeMap = text.slice(0, map.index);
+  return (
+    /\[[\s\S]*\]\s*$/.test(beforeMap) ||
+    /\.slice\s*\(\s*0\s*,\s*\d+(?:_\d+)*\s*\)/.test(beforeMap) ||
+    /Array\.from\s*\(\s*\{\s*length\s*:\s*\d+(?:_\d+)*/.test(beforeMap)
+  );
+}
+
 /** Pure analysis. Exported for direct exercise if this check grows a test harness. */
 export function analyzeChunkedBulkInsert(content, filePath) {
   const normalized = filePath.replaceAll('\\', '/');
@@ -50,12 +70,17 @@ export function analyzeChunkedBulkInsert(content, filePath) {
 
   const lines = content.split('\n');
 
-  // Pass 1: collect mapped-array variable names (a declaration whose line also
-  // contains a `.map(` call). A var may be declared above the insert that uses it.
-  const mappedVars = new Set();
-  for (const line of lines) {
+  // Pass 1: collect mapped-array variable names. The `.map(` call may be on a
+  // following line in a formatted expression, so scan the declaration window.
+  // A var may be declared above the insert that uses it.
+  const mappedVars = new Map();
+  for (const [i, line] of lines.entries()) {
     const decl = DECL_RE.exec(line);
-    if (decl?.[1] && MAP_CALL_RE.test(line)) mappedVars.add(decl[1]);
+    if (!decl?.[1]) continue;
+    const window = collectWindow(lines, i, decl.index);
+    if (MAP_CALL_RE.test(window)) {
+      mappedVars.set(decl[1], { bounded: mapSourceLooksBounded(window) });
+    }
   }
 
   // Pass 2: flag a `.values(...)` whose argument is a mapped-array variable or an
@@ -64,9 +89,12 @@ export function analyzeChunkedBulkInsert(content, filePath) {
   for (const [i, line] of lines.entries()) {
     const valuesCall = VALUES_CALL_RE.exec(line);
     if (!valuesCall) continue;
-    const afterValues = line.slice(valuesCall.index + valuesCall[0].length);
-    const inlineMapped = MAP_CALL_RE.test(afterValues);
-    const mappedVarValues = [...mappedVars].some((v) => valuesOfVarRe(v).test(line));
+    const valuesWindow = collectWindow(lines, i, valuesCall.index);
+    const afterValues = collectWindow(lines, i, valuesCall.index + valuesCall[0].length);
+    const inlineMapped = MAP_CALL_RE.test(afterValues) && !mapSourceLooksBounded(afterValues);
+    const mappedVarValues = [...mappedVars].some(
+      ([v, meta]) => meta.bounded !== true && valuesOfVarRe(v).test(valuesWindow),
+    );
     if (!inlineMapped && !mappedVarValues) continue;
     violations.push({
       line: i + 1,

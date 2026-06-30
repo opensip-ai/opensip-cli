@@ -141,6 +141,10 @@ manager, platform, tool id, available engine/tool version, and baseline
 fingerprint identity. It does not include environment dumps, absolute paths, or
 secrets.
 
+The envelope reaching JSON/SARIF/report delivery is also host-normalized for
+duplicate signals: exact identity duplicates and conservative near-identity
+duplicates are collapsed before output ([ADR-0098](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md)).
+
 Use it when comparing CI or agent runs:
 
 ```bash
