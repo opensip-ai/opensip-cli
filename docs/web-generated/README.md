@@ -187,7 +187,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 This v0.1.19 doc set was rechecked against the source on 2026-06-27:
 
 - 151 built-in fitness checks across seven packs.
-- 37 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- 42 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
 - Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.

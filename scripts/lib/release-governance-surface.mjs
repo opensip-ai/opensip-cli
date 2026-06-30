@@ -39,6 +39,9 @@ function readRepoFile(relPath) {
 export function collectGovernanceDriftProblems() {
   const problems = [];
   const publishableCount = RELEASE_PACKAGE_ORDER.length;
+  const scopedPublishableCount = RELEASE_PACKAGE_ORDER.filter((p) =>
+    p.name.startsWith('@opensip-cli/'),
+  ).length;
   const versionedPackageJsonCount = publishableCount + PRIVATE_VERSIONED_PACKAGE_JSON_COUNT;
 
   const releasingMd = readRepoFile('RELEASING.md');
@@ -74,6 +77,15 @@ export function collectGovernanceDriftProblems() {
   if (!publishableProse.test(releasingMd)) {
     problems.push(
       `RELEASING.md version-surfaces prose must say "All ${publishableCount} publishable packages".`,
+    );
+  }
+
+  const readmeSurfaceProse = new RegExp(
+    `Per-package\\s+\`README\\.md\`\\s+\\(×${scopedPublishableCount}\\s+scoped\\)`,
+  );
+  if (!readmeSurfaceProse.test(releasingMd)) {
+    problems.push(
+      `RELEASING.md derived-surfaces table must say "Per-package \`README.md\` (×${scopedPublishableCount} scoped)".`,
     );
   }
 
