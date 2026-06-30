@@ -5,48 +5,22 @@ import { describe, it, expect } from 'vitest';
 import { Banner, UpdateHint, normalizeBannerSize } from '../banner.js';
 import { ThemeProvider } from '../theme.js';
 
-const widestLine = (frame: string): number =>
-  Math.max(...frame.split('\n').map((line) => line.length));
-
 describe('Banner', () => {
-  it('renders 8 banner rows plus a saucer line', () => {
+  it('renders the boxed coffee-cup identity card by default', () => {
     const { lastFrame } = render(<Banner />);
     const output = lastFrame() ?? '';
-    expect(output.split('\n').length).toBeGreaterThanOrEqual(9);
-    expect(output).toContain('░███████████░');
+    expect(output).toContain('OpenSIP CLI');
+    expect(output).toContain('codebase intelligence from your terminal');
+    expect(output).toContain('www.opensip.ai');
+    expect(output).toContain('╭');
+    expect(output).toContain('╯');
+    expect(output).toContain('███');
   });
 
-  it('includes the ASCII art glyphs for the cup and the OPENSIP letters', () => {
-    const { lastFrame } = render(<Banner />);
-    const output = lastFrame() ?? '';
-    // First banner row's cup column starts with diamond glyphs.
-    expect(output).toContain('░');
-    // OPENSIP body uses block glyphs.
-    expect(output).toContain('████');
-  });
-
-  it('defaults to the lg size when no size prop is given', () => {
+  it('defaults to the mini size when no size prop is given', () => {
     const fromDefault = render(<Banner />).lastFrame() ?? '';
-    const fromExplicit = render(<Banner size="lg" />).lastFrame() ?? '';
+    const fromExplicit = render(<Banner size="mini" />).lastFrame() ?? '';
     expect(fromDefault).toBe(fromExplicit);
-    // lg is the only size that carries the saucer line.
-    expect(fromDefault).toContain('░███████████░');
-  });
-
-  it('renders a compact md banner: shorter than lg, keeps steam and block glyphs', () => {
-    const lg = render(<Banner size="lg" />).lastFrame() ?? '';
-    const md = render(<Banner size="md" />).lastFrame() ?? '';
-    expect(md.split('\n').length).toBeLessThan(lg.split('\n').length);
-    expect(md).toContain('░'); // steam survives
-    expect(md).toContain('█'); // mug + wordmark glyphs
-    expect(md).not.toContain('░███████████░'); // no full-size saucer line
-  });
-
-  it('renders an sm banner narrower than md', () => {
-    const md = render(<Banner size="md" />).lastFrame() ?? '';
-    const sm = render(<Banner size="sm" />).lastFrame() ?? '';
-    expect(widestLine(sm)).toBeLessThan(widestLine(md));
-    expect(sm).toContain('░'); // steam survives
   });
 
   describe('mini', () => {
@@ -65,7 +39,7 @@ describe('Banner', () => {
       expect(frame).toContain('╯');
       // Cup body present.
       expect(frame).toContain('███');
-      // No full-size saucer line — this is not the lg banner.
+      // No legacy wordmark saucer line — the coffee cup card is canonical.
       expect(frame).not.toContain('░███████████░');
     });
 
@@ -119,17 +93,17 @@ describe('Banner', () => {
 });
 
 describe('normalizeBannerSize', () => {
-  it('passes through every valid size', () => {
-    expect(normalizeBannerSize('lg')).toBe('lg');
-    expect(normalizeBannerSize('md')).toBe('md');
-    expect(normalizeBannerSize('sm')).toBe('sm');
+  it('passes through the only valid size', () => {
     expect(normalizeBannerSize('mini')).toBe('mini');
   });
 
-  it('falls back to lg for unknown or undefined values', () => {
-    expect(normalizeBannerSize('enormous')).toBe('lg');
-    expect(normalizeBannerSize('')).toBe('lg');
-    expect(normalizeBannerSize(undefined)).toBe('lg');
+  it('falls back to mini for unknown, legacy, or undefined values', () => {
+    expect(normalizeBannerSize('lg')).toBe('mini');
+    expect(normalizeBannerSize('md')).toBe('mini');
+    expect(normalizeBannerSize('sm')).toBe('mini');
+    expect(normalizeBannerSize('enormous')).toBe('mini');
+    expect(normalizeBannerSize('')).toBe('mini');
+    expect(normalizeBannerSize(undefined)).toBe('mini');
   });
 });
 
