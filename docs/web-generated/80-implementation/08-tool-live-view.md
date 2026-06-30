@@ -108,4 +108,4 @@ from `ink`. The `live-view-through-cli-live` fitness check enforces this.
 | tool engines | 4 | `cli-live`, `cli-ui`, `core`, `contracts` |
 
 See [architecture-map.md](/docs/opensip-cli/80-implementation/architecture-map/) and
-[ADR-0058](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0058-shared-live-run-shell.md).
+[ADR-0058](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0058-shared-live-run-shell.md).

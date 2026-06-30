@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.19
+release: v0.1.18
 title: "Suppressing findings (graph)"
 audience: [contributors, ci-integrators]
 purpose: "Inline source-level waivers — how `@graph-ignore-next-line` and `@graph-ignore-file` work, the any-member rule for cycles, and how a waiver relates to the gate baseline."
@@ -38,7 +38,7 @@ Sometimes a graph rule is right that *a thing exists* — there really is a cycl
 
 The second token is a graph **rule id** — the namespaced form like `graph:cycle`, `graph:large-function`, `graph:wide-function` (the same ids listed in [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/)). A directive naming one rule never waives another. There is no "ignore everything" form, by design.
 
-These keywords are deliberately distinct from fitness's [`@fitness-ignore-*`](/docs/opensip-cli/20-fit/03-ignore-directives/): a reader at the suppression site should see *which tool* is being silenced without decoding the id. The shared machinery is the same (both run through the kernel's suppression primitive, [ADR-0014](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0014-shared-inline-signal-suppression.md)); only the vocabulary differs.
+These keywords are deliberately distinct from fitness's [`@fitness-ignore-*`](/docs/opensip-cli/20-fit/03-ignore-directives/): a reader at the suppression site should see *which tool* is being silenced without decoding the id. The shared machinery is the same (both run through the kernel's suppression primitive, [ADR-0014](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/docs/decisions/ADR-0014-shared-inline-signal-suppression.md)); only the vocabulary differs.
 
 ```ts
 // @graph-ignore-next-line graph:large-function -- emits one cohesive browser-JS bundle as a template; the line count is embedded data, not splittable logic
@@ -60,7 +60,7 @@ function visit(node: Node, ctx: WalkCtx): void {
 }
 ```
 
-The rule attaches every member's location to the finding (`memberLocations` in [`cycle.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/graph/engine/src/rules/cycle.ts)); graph's suppression pass treats all of them as candidate sites. You annotate the member that reads best.
+The rule attaches every member's location to the finding (`memberLocations` in [`cycle.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.18/packages/graph/engine/src/rules/cycle.ts)); graph's suppression pass treats all of them as candidate sites. You annotate the member that reads best.
 
 ---
 

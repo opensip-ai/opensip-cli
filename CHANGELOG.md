@@ -2,17 +2,26 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
-## [0.1.19] - 2026-06-30
+## [0.1.18] - 2026-06-30
 
-A precision and duplicate-signal hardening release. It moves duplicate finding
-collapse into the CLI host output plane, documents suppression catalogs as
-precision heatmaps rather than proof, and reduces false positives in the
-fitness checks that were generating noisy plan-02 signal clusters.
+A hidden-state, deterministic-gate, precision, and duplicate-signal hardening
+release. It makes host-owned datastore/session lifecycle explicit, stamps
+declared-input provenance onto emitted gate artifacts, moves duplicate finding
+collapse into the CLI host output plane, and documents the resulting
+retention, verdict-diagnosis, and precision-heatmap model for operators and
+agents.
 
 ### Added
 
+- ADR-0096, defining host-owned datastore lifecycle and session-retention
+  ownership boundaries.
+- ADR-0097, defining the allowlisted `declaredInputs` manifest for gate verdict
+  determinism.
 - ADR-0098, defining host-owned signal deduplication and suppression-catalog
   precision heatmaps.
+- `cli.sessions` retention configuration for count, age, and SQLite size bounds.
+- Host-owned session pruning and datastore reclaim primitives, with tests for
+  count pruning, size reclaim, and non-fatal maintenance failures.
 - Host-side signal normalization for `SignalEnvelope` output before JSON,
   terminal rendering, SARIF, cloud, report, and session delivery.
 - Focused regression coverage for exact and near-identity signal collapse,
@@ -20,6 +29,12 @@ fitness checks that were generating noisy plan-02 signal clusters.
 
 ### Changed
 
+- JSON outcomes, SARIF/cloud delivery, dashboard/report composition, and session
+  persistence now receive host-stamped declared-input metadata.
+- `fit` architecture checks now reject tool-owned session timing, retention, and
+  SQLite reclaim ownership.
+- Session cleanup now runs as best-effort host maintenance after successful
+  session writes without changing tool verdicts or exit codes.
 - Output/schema docs now describe the host-normalized envelope contract,
   including dedup identity order and the guarantee that `verdict.passed`
   remains tool-owned.
@@ -30,6 +45,11 @@ fitness checks that were generating noisy plan-02 signal clusters.
 
 ### Fixed
 
+- Gate outputs are easier to compare across runs because CLI, Node, package
+  manager, platform, tool, and baseline identity are captured in a compact
+  manifest instead of being inferred from ambient host state.
+- Project-local SQLite/session history growth is bounded by a documented default
+  host policy instead of relying on manual cleanup.
 - Duplicate findings from the same provider/source/rule/location/message are
   collapsed once at the host output boundary instead of leaking through every
   output sink.
@@ -37,40 +57,6 @@ fitness checks that were generating noisy plan-02 signal clusters.
   `return false` is the expected result.
 - Several implementation paths now avoid unnecessary suppressed findings called
   out by the refreshed precision heatmap.
-
-## [0.1.18] - 2026-06-30
-
-A hidden-state hardening release. It makes host-owned datastore/session lifecycle
-explicit, stamps deterministic declared-input provenance onto emitted gate
-artifacts, and documents the resulting retention and verdict-diagnosis model for
-operators and agents.
-
-### Added
-
-- ADR-0096, defining host-owned datastore lifecycle and session-retention
-  ownership boundaries.
-- ADR-0097, defining the allowlisted `declaredInputs` manifest for gate verdict
-  determinism.
-- `cli.sessions` retention configuration for count, age, and SQLite size bounds.
-- Host-owned session pruning and datastore reclaim primitives, with tests for
-  count pruning, size reclaim, and non-fatal maintenance failures.
-
-### Changed
-
-- JSON outcomes, SARIF/cloud delivery, dashboard/report composition, and session
-  persistence now receive host-stamped declared-input metadata.
-- `fit` architecture checks now reject tool-owned session timing, retention, and
-  SQLite reclaim ownership.
-- Session cleanup now runs as best-effort host maintenance after successful
-  session writes without changing tool verdicts or exit codes.
-
-### Fixed
-
-- Gate outputs are easier to compare across runs because CLI, Node, package
-  manager, platform, tool, and baseline identity are captured in a compact
-  manifest instead of being inferred from ambient host state.
-- Project-local SQLite/session history growth is bounded by a documented default
-  host policy instead of relying on manual cleanup.
 
 ## [0.1.17] - 2026-06-30
 

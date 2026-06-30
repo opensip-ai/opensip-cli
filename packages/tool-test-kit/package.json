@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-test-kit",
-  "version": "0.1.19",
+  "version": "0.1.18",
   "license": "Apache-2.0",
   "description": "Public test helpers for OpenSIP CLI tool authors — ToolCliContext double, scope helpers, and command-spec assertions",
   "keywords": [
