@@ -1,4 +1,3 @@
-// @fitness-ignore-file silent-early-returns -- config-edit helpers (editPluginList/appendToPluginList/removeFromPluginList) return boolean as their documented "did I modify?" contract: false means "no-op / idempotent (already present, already absent, nothing to remove)"; explicit idempotency signals, not silent failures.
 /**
  * @fileoverview YAML-driven edits to `plugins.<domain>` in
  * `opensip-cli.config.yml`.
