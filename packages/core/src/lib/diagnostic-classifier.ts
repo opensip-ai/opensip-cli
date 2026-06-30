@@ -12,6 +12,7 @@ import {
   type CliDiagnostic,
   type CliDiagnosticProvenance,
 } from './cli-diagnostic.js';
+import { formatUnknownErrorMessage } from './errors.js';
 
 /** Input for an integrity failure the host already diagnosed structurally. */
 export interface IntegrityFailureInput {
@@ -65,10 +66,6 @@ export function scrubModuleNotFoundMessage(message: string): string {
   });
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function isModuleNotFound(error: unknown, message: string): boolean {
   if (error instanceof Error && 'code' in error) {
     return (error as NodeJS.ErrnoException).code === 'ERR_MODULE_NOT_FOUND';
@@ -84,7 +81,7 @@ export function classifyModuleError(
   error: unknown,
   provenance?: CliDiagnosticProvenance,
 ): CliDiagnostic {
-  const rawMessage = errorMessage(error);
+  const rawMessage = formatUnknownErrorMessage(error);
   const scrubbed = scrubModuleNotFoundMessage(rawMessage);
 
   if (isModuleNotFound(error, rawMessage)) {
@@ -177,7 +174,7 @@ export function detectIntegrityFailure(
   error: unknown,
   provenance?: CliDiagnosticProvenance,
 ): IntegrityFailureInput | undefined {
-  const message = errorMessage(error);
+  const message = formatUnknownErrorMessage(error);
   if (!isModuleNotFound(error, message) || !INJECTED_COPY_HINT.test(message)) {
     return undefined;
   }

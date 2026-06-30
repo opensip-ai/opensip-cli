@@ -1,4 +1,4 @@
-import { logger as defaultLogger, type Logger } from '@opensip-cli/core';
+import { formatUnknownErrorMessage, logger as defaultLogger, type Logger } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
 import type { DataStore, DatastoreMaintenance } from '@opensip-cli/datastore';
@@ -45,16 +45,12 @@ function normalizedNonNegativeInt(value: number | undefined, fallback: number): 
   return Math.trunc(value);
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function logFailure(log: Logger, operation: string, error: unknown): void {
   log.warn({
     evt: 'session.retention.failed',
     module: MODULE_TAG,
     operation,
-    error: errorMessage(error),
+    error: formatUnknownErrorMessage(error),
   });
 }
 
