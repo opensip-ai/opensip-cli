@@ -37,6 +37,26 @@ const MAP_CALL_RE = /\.map\s*\(/;
 /** A `.values(` bulk-insert call. */
 const VALUES_CALL_RE = /\.values\s*\(/;
 
+/** A Drizzle `.insert(` call — the chain a flagged `.values(` MUST belong to. */
+const INSERT_CALL_RE = /\.insert\s*\(/;
+
+/**
+ * Root-cause guard (ADR-0098 / Plan 02): only a `.values(` that is part of a
+ * Drizzle `.insert(...)….values(rows)` chain is a bulk insert. The chain puts
+ * `.insert(` on the same line as `.values(` or a few lines above in a formatted
+ * expression — so scan a small backward window. A bare collection `.values()`
+ * (e.g. `[...map.values()].map(...)`, `Map.prototype.values()`) has no enclosing
+ * `.insert(` and is never flagged, killing the non-Drizzle false positive at the
+ * source instead of guessing at boundedness.
+ */
+function valuesIsInsertChain(lines, valuesLineIndex) {
+  const start = Math.max(0, valuesLineIndex - 8);
+  for (let i = start; i <= valuesLineIndex; i++) {
+    if (INSERT_CALL_RE.test(lines[i])) return true;
+  }
+  return false;
+}
+
 /** `.values(<varName>)` — the bulk insert consumes exactly this variable. */
 function valuesOfVarRe(varName) {
   return new RegExp(String.raw`\.values\s*\(\s*${varName}\s*\)`);
@@ -56,7 +76,11 @@ function mapSourceLooksBounded(text) {
   if (!map) return false;
   const beforeMap = text.slice(0, map.index);
   return (
-    /\[[\s\S]*\]\s*$/.test(beforeMap) ||
+    // A LITERAL array `[ {...}, {...} ]` is bounded; a spread `[ ...iterable ]`
+    // is exactly as unbounded as its source, so the negative lookahead excludes
+    // it (otherwise a real `.values([...unboundedSet].map(...))` insert would be
+    // silently waived — a false negative).
+    /\[\s*(?!\.\.\.)[\s\S]*\]\s*$/.test(beforeMap) ||
     /\.slice\s*\(\s*0\s*,\s*\d+(?:_\d+)*\s*\)/.test(beforeMap) ||
     /Array\.from\s*\(\s*\{\s*length\s*:\s*\d+(?:_\d+)*/.test(beforeMap)
   );
@@ -89,6 +113,10 @@ export function analyzeChunkedBulkInsert(content, filePath) {
   for (const [i, line] of lines.entries()) {
     const valuesCall = VALUES_CALL_RE.exec(line);
     if (!valuesCall) continue;
+    // Root cause: a `.values(` is only a bulk insert when it belongs to a Drizzle
+    // `.insert(...)` chain. Non-Drizzle `.values()` (e.g. `[...map.values()].map`)
+    // is skipped here, not via a boundedness guess.
+    if (!valuesIsInsertChain(lines, i)) continue;
     const valuesWindow = collectWindow(lines, i, valuesCall.index);
     const afterValues = collectWindow(lines, i, valuesCall.index + valuesCall[0].length);
     const inlineMapped = MAP_CALL_RE.test(afterValues) && !mapSourceLooksBounded(afterValues);

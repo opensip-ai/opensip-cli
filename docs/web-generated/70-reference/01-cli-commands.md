@@ -141,10 +141,6 @@ manager, platform, tool id, available engine/tool version, and baseline
 fingerprint identity. It does not include environment dumps, absolute paths, or
 secrets.
 
-The envelope reaching JSON/SARIF/report delivery is also host-normalized for
-duplicate signals: exact identity duplicates and conservative near-identity
-duplicates are collapsed before output ([ADR-0098](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md)).
-
 Use it when comparing CI or agent runs:
 
 ```bash
@@ -1153,8 +1149,8 @@ persists on **every** run until you upgrade — so it's never lost if you miss i
 once — and disappears on its own the run after you update. When an update is
 available it surfaces without nagging:
 
-- On the default `mini` banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
-- On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
+- On the coffee-cup banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
+- On the `--json` path, which renders no banner, the same upgrade command is printed as a one-line note on stderr.
 
 Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip --version`.
 

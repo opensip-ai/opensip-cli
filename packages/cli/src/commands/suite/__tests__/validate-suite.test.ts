@@ -39,6 +39,7 @@ function fixtureTool(): Tool {
         ],
         scope: 'project',
         output: 'command-result',
+        producesVerdict: true,
         handler: () => ({ type: 'help' }),
       }),
       defineCommand<unknown, ToolCliContext>({
@@ -48,6 +49,15 @@ function fixtureTool(): Tool {
         scope: 'project',
         output: 'live-view',
         handler: () => undefined,
+      }),
+      // A non-verdict info command: valid command, but not a gate step.
+      defineCommand<unknown, ToolCliContext>({
+        name: 'list',
+        description: 'fixture',
+        commonFlags: ['cwd', 'json'],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => ({ type: 'help' }),
       }),
     ],
   };
@@ -100,6 +110,19 @@ describe('validateSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'live' }] },
       }),
     ).toThrow(/live-view command/);
+  });
+
+  it('rejects a non-verdict command as a suite step', () => {
+    // A valid, resolvable command that simply is not a gate step. validateSuite
+    // aggregates per-step failures into one CONFIG.SUITE.INVALID error (the
+    // per-step NOT_A_RUN_COMMAND code is folded into the message, like live-view).
+    expect(() =>
+      validateSuite({
+        name: 'bad',
+        tools: [fixtureTool()],
+        suite: { steps: [{ tool: TOOL_ID, command: 'list' }] },
+      }),
+    ).toThrow(/does not produce a gate verdict[\s\S]*verdict-producing run commands/);
   });
 
   it('rejects run-scope flags, reserved deferred fields, unknown args, and parser failures', () => {

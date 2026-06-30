@@ -23,6 +23,16 @@ enforcement-reason: >
   generation carries the disposition taxonomy used for precision heatmaps.
 ```
 
+> **Amendment (2026-06-30, [ADR-0101](ADR-0101-cli-emits-full-fidelity-consumers-dedup.md)):**
+> The **signal-deduplication** decision below is **REVERSED**. The CLI no longer
+> deduplicates signals on any path — it emits the tool's full, unmodified set to
+> render and egress, and deduplication is the consumer's responsibility (this
+> restores [ADR-0094](ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md)
+> egress fidelity, which host-side dedup violated by dropping distinct fingerprints
+> from the wire). The **precision-heatmap / suppression-taxonomy** decision in this
+> ADR is **unaffected and remains active**. Read the dedup portions below as
+> historical context only.
+
 **Decision:** Duplicate signal reduction is a host-owned output-plane
 normalization step over `SignalEnvelope`, not a per-tool formatter or rule
 responsibility. The host collapses exact identity duplicates and conservative

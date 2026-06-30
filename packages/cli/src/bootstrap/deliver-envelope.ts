@@ -37,7 +37,6 @@ import {
 
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { stampDeclaredInputs } from './declared-inputs.js';
-import { normalizeSignalEnvelope } from './signal-dedup.js';
 import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 import type { ArtifactWriteContext } from './atomic-artifact-write.js';
@@ -219,7 +218,7 @@ export async function deliverEnvelope(
   opts: DeliverEnvelopeOptions,
 ): Promise<DeliverEnvelopeResult> {
   const log = opts.logger ?? defaultLogger;
-  const stampedEnvelope = stampDeclaredInputs(normalizeSignalEnvelope(envelope));
+  const stampedEnvelope = stampDeclaredInputs(envelope);
   const repo = opts.repo ?? resolveRepoIdentity(opts.cwd);
 
   const scope = currentScope();
@@ -328,7 +327,7 @@ export function writeEnvelopeSarif(
     readonly logger?: ArtifactWriteContext['logger'];
   },
 ): Promise<void> {
-  const sarif = formatSignalSarif(normalizeSignalEnvelope(envelope));
+  const sarif = formatSignalSarif(envelope);
   const ctx: ArtifactWriteContext = {
     policy: artifactCtx?.policy ?? resolveStateLockPolicy(),
     logger: artifactCtx?.logger ?? defaultLogger,

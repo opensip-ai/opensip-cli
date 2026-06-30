@@ -145,6 +145,13 @@ export interface ToolCommandManifest {
   readonly output?: CommandOutputMode;
   /** Required when `output` is `raw-stream` (mirrors {@link CommandSpec.rawStreamReason}). */
   readonly rawStreamReason?: RawStreamReason;
+  /**
+   * Whether this command produces a run gate verdict (mirrors
+   * {@link CommandSpec.producesVerdict}). Carried through the manifest so the host
+   * — which synthesizes external/installed tools from their manifest without
+   * importing the runtime — knows an external scan command is suite-eligible.
+   */
+  readonly producesVerdict?: boolean;
 }
 
 /**

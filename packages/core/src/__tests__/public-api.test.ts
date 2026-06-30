@@ -108,6 +108,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'buildToolIdentityIndex',
   'checkCapabilityContributionCompatibility',
   'checkCompatibility',
+  'commandProducesVerdict',
   'checkSchemaCompat',
   'classifyIntegrityFailure',
   'classifyModuleError',

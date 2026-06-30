@@ -271,47 +271,6 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     expect(out.cloudAccepted).toBe(2);
   });
 
-  it('dedupes signals before cloud egress', async () => {
-    const seen: SignalBatch[] = [];
-    const sink: SignalSink = {
-      emit: (batch: SignalBatch): Promise<EmitResult> => {
-        seen.push(batch);
-        return Promise.resolve({
-          accepted: batch.signals.length,
-          authRejected: false,
-        });
-      },
-    };
-    const duplicateEnvelope: SignalEnvelope = {
-      ...ENVELOPE,
-      verdict: {
-        ...ENVELOPE.verdict,
-        summary: { total: 2, passed: 1, failed: 1, errors: 2, warnings: 1 },
-      },
-      units: [
-        { slug: 'no-console', passed: false, violationCount: 2, durationMs: 5 },
-        ENVELOPE.units[1],
-      ],
-      signals: [
-        ...ENVELOPE.signals,
-        {
-          ...ENVELOPE.signals[0],
-          id: 'sig_routing0001_duplicate',
-          column: 99,
-          code: { file: 'src/a.ts', line: 1, column: 99 },
-        },
-      ],
-    };
-
-    const out = await runWithScope(makeScope(sink), () =>
-      deliverEnvelope(duplicateEnvelope, { cwd: process.cwd(), repo: {} }),
-    );
-
-    expect(seen).toHaveLength(1);
-    expect(seen[0].signals).toHaveLength(2);
-    expect(out.cloudAccepted).toBe(2);
-  });
-
   it('never throws and reports 0 accepted when the sink reports zero', async () => {
     const sink: SignalSink = {
       emit: () => Promise.resolve({ accepted: 0, authRejected: false }),

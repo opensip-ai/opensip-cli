@@ -8,7 +8,6 @@ purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --jso
 source-files:
   - packages/contracts/src/signal-envelope.ts
   - packages/core/src/types/signal.ts
-  - packages/cli/src/bootstrap/signal-dedup.ts
 related-docs:
   - ../10-concepts/04-contract-surfaces.md
   - ../20-fit/04-output-gate-sarif.md
@@ -23,14 +22,14 @@ related-docs:
   "kind": "fit.run",          // '<tool>.run' (envelope) | '<result.type>' (data) | 'bootstrap.error'
   "status": "ok",             // 'ok' | 'error' | 'partial'
   "exitCode": 0,
-  "envelope": { /* the host-normalized SignalEnvelope — see below */ },
+  "envelope": { /* the SignalEnvelope, unchanged — see below */ },
   "diagnostics": { /* RunDiagnostics — lifecycle events, JSON-emittable */ }
 }
 ```
 
 `CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
 
-The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope. Before JSON, terminal rendering, SARIF, cloud, or report egress, the host may normalize that envelope by collapsing exact identity duplicates and conservative near-identity duplicates ([ADR-0098](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0098-host-owned-signal-dedup-and-precision-heatmaps.md)).
+The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
 
@@ -196,25 +195,6 @@ file paths, symbols, match snippets, and raw scanner output.
 | `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
 | `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0097-gate-verdict-determinism.md)). |
 | `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
-
-### Host signal normalization
-
-Run commands emit a `SignalEnvelope`; the CLI host owns the final output planes.
-Before an envelope reaches `--json`, the table renderer, SARIF, cloud sync, or
-`--report-to`, the host collapses duplicate signals using the following
-conservative identity order:
-
-- A non-empty `signal.fingerprint`, when present, scoped to the same provider,
-  source, and rule id.
-- Exact identity over provider, rule id, source, file, line, column, and
-  normalized message.
-- Near identity over provider, rule id, source, file, line, and normalized
-  message, ignoring only column drift.
-
-When duplicates collapse, `signals[]`, `units[].violationCount`, and
-`verdict.summary` reflect the normalized output. `verdict.passed` remains the
-tool-computed verdict; host normalization is noise reduction, not a second gate
-policy engine.
 
 ### `DeclaredInputs`
 

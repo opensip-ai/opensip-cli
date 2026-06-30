@@ -249,6 +249,35 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly output: CommandOutputMode;
   /** Required when `output` is `raw-stream`, forbidden otherwise. */
   readonly rawStreamReason?: RawStreamReason;
+  /**
+   * Declares that this command produces a run **gate verdict** — it emits a
+   * `SignalEnvelope` (via `deliverSignals` / `emitEnvelope`, possibly through a
+   * runtime-render or out-of-process dispatch) and so contributes a pass/fail
+   * verdict + signal counts. This is a CAPABILITY declaration, intentionally
+   * independent of {@link output} (the run commands `fit`/`graph`/`sim`/`yagni`
+   * and the external scanner adapters all declare `output: 'raw-stream'` with a
+   * runtime-render dispatch, yet produce verdicts) — so verdict-ness cannot be
+   * inferred from the rendering mode and must be declared here.
+   *
+   * The suite plane keys on this: a suite composes gate verdicts, so a suite step
+   * MUST be a verdict-producing command (enforced in `validateSuite`). Omitted ⇒
+   * not a verdict command (list/report/info/raw commands).
+   */
+  readonly producesVerdict?: boolean;
   /** The business-logic handler the host invokes after parse. */
   readonly handler: CommandHandler<TOpts, TCtx>;
+}
+
+/**
+ * Whether a command produces a run gate verdict — the single source of truth for
+ * "is this a verdict/run command" (e.g. eligible as a suite step). Reads the
+ * declared {@link CommandSpec.producesVerdict} capability; verdict-ness is NOT
+ * inferred from {@link CommandSpec.output} because verdict commands span multiple
+ * output modes (raw-stream runtime-render dispatch for the bundled tools and
+ * external scanners, signal-envelope for direct emitters).
+ */
+export function commandProducesVerdict(
+  spec: Pick<CommandSpec, 'producesVerdict' | 'output'>,
+): boolean {
+  return spec.producesVerdict === true || spec.output === 'signal-envelope';
 }

@@ -27,7 +27,6 @@ import {
 import { renderOutcome, renderRaw } from '../commands/render-outcome.js';
 
 import { stampDeclaredInputs } from './declared-inputs.js';
-import { normalizeSignalEnvelope } from './signal-dedup.js';
 
 import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 
@@ -92,9 +91,7 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
       });
     },
     emitEnvelope: (envelope) => {
-      const outputEnvelope = stampDeclaredInputs(
-        normalizeSignalEnvelope(envelope as SignalEnvelope),
-      );
+      const outputEnvelope = stampDeclaredInputs(envelope as SignalEnvelope);
       renderOutcome(outcomeFromEnvelope(outputEnvelope, exitCode ?? 0), {
         jsonRequested: true,
         render: deps.render,

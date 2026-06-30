@@ -44,7 +44,6 @@ import {
 } from './bootstrap/run-plane.js';
 import { createDatastoreResolver, readScope } from './bootstrap/scope-access.js';
 import { resolveSessionRetentionPolicy } from './bootstrap/session-retention.js';
-import { normalizeCommandResultForRender } from './bootstrap/signal-dedup.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
@@ -180,7 +179,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
       // After Phase 3, readScope() no longer has holder fallbacks.
       return readScope();
     },
-    render: (result) => opts.render(normalizeCommandResultForRender(result as CommandResult)),
+    render: (result) => opts.render(result as CommandResult),
     registerLiveView: ioPlane.register,
     renderLive: ioPlane.renderLive,
     maybeOpenReport: opts.maybeOpenReport,

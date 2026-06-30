@@ -49,6 +49,7 @@ function helpCommand(
     commonFlags: [],
     scope: 'project',
     output: 'command-result',
+    producesVerdict: true,
     handler,
   });
 }
@@ -136,6 +137,7 @@ describe('runSuite', () => {
       ],
       scope: 'project',
       output: 'command-result',
+      producesVerdict: true,
       handler: (opts) => {
         seen.push(opts);
         return { type: 'help' };
@@ -177,6 +179,7 @@ describe('runSuite', () => {
       commonFlags: [],
       scope: 'project',
       output: 'command-result',
+      producesVerdict: true,
       handler: (_opts, cli) => {
         cli.setExitCode(EXIT_CODES.REPORT_FAILED);
         return { type: 'help' };
@@ -207,6 +210,7 @@ describe('runSuite', () => {
       commonFlags: [],
       scope: 'project',
       output: 'command-result',
+      producesVerdict: true,
       handler: () => process.exit(2),
     });
     const next = defineCommand<unknown, ToolCliContext>({
@@ -215,6 +219,7 @@ describe('runSuite', () => {
       commonFlags: [],
       scope: 'project',
       output: 'command-result',
+      producesVerdict: true,
       handler: after,
     });
 
@@ -246,6 +251,7 @@ describe('runSuite', () => {
       commonFlags: [],
       scope: 'project',
       output: 'command-result',
+      producesVerdict: true,
       handler: () => {
         calls.push('throws');
         throw new Error('step exploded');
@@ -257,6 +263,7 @@ describe('runSuite', () => {
       commonFlags: [],
       scope: 'project',
       output: 'command-result',
+      producesVerdict: true,
       handler: () => {
         calls.push('after');
         return { type: 'help' };

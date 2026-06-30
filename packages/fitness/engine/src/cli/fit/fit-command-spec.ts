@@ -165,6 +165,8 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
     scope: 'project',
     output: 'raw-stream',
     rawStreamReason: 'runtime-render-dispatch',
+    // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
+    producesVerdict: true,
     handler: (opts, cli) => runFit(opts, cli, setUpLiveView),
   });
 }

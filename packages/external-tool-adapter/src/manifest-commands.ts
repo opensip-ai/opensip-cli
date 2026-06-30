@@ -50,5 +50,6 @@ export function deriveAdapterManifestCommands(tool: Tool): readonly ManifestComm
     output: spec.output,
     ...(spec.parent === undefined ? {} : { parent: spec.parent }),
     ...(spec.rawStreamReason === undefined ? {} : { rawStreamReason: spec.rawStreamReason }),
+    ...(spec.producesVerdict === undefined ? {} : { producesVerdict: spec.producesVerdict }),
   }));
 }

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createOutputPlane } from '../output-plane.js';
 
-import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
+import type { CommandResult } from '@opensip-cli/contracts';
 
 function captureStdout(): { out: string[]; restore: () => void } {
   const out: string[] = [];
@@ -112,68 +112,5 @@ describe('createOutputPlane — emit seams', () => {
     expect(rendered).toHaveLength(0);
     const parsed = JSON.parse(out[0]) as { envelope?: { tool?: string } };
     expect(parsed.envelope?.tool).toBe('fit');
-  });
-
-  it('emitEnvelope normalizes duplicate signals before serializing the outcome', () => {
-    const plane = createOutputPlane({ render: () => Promise.resolve() });
-    const envelope: SignalEnvelope = {
-      schemaVersion: 2,
-      tool: 'graph',
-      runId: 'run-output-dedup',
-      createdAt: '2026-06-04T00:00:00.000Z',
-      verdict: {
-        score: 0,
-        passed: false,
-        summary: { total: 1, passed: 0, failed: 1, errors: 2, warnings: 0 },
-      },
-      units: [{ slug: 'graph:near-duplicate-function-body', passed: false, durationMs: 1 }],
-      signals: [
-        {
-          id: 'sig-a',
-          source: 'graph:near-duplicate-function-body',
-          provider: 'opensip-cli',
-          severity: 'high',
-          category: 'quality',
-          ruleId: 'graph:near-duplicate-function-body',
-          message: 'same duplicate body',
-          filePath: 'src/a.ts',
-          line: 8,
-          column: 1,
-          code: { file: 'src/a.ts', line: 8, column: 1 },
-          metadata: {},
-          createdAt: '2026-06-04T00:00:00.000Z',
-        },
-        {
-          id: 'sig-b',
-          source: 'graph:near-duplicate-function-body',
-          provider: 'opensip-cli',
-          severity: 'high',
-          category: 'quality',
-          ruleId: 'graph:near-duplicate-function-body',
-          message: 'same duplicate body',
-          filePath: 'src/a.ts',
-          line: 8,
-          column: 12,
-          code: { file: 'src/a.ts', line: 8, column: 12 },
-          metadata: {},
-          createdAt: '2026-06-04T00:00:00.000Z',
-        },
-      ],
-      baselineIdentity: {
-        fingerprintStrategyId: 'test',
-        fingerprintStrategyVersion: 1,
-      },
-    };
-    const { out, restore } = captureStdout();
-    try {
-      plane.emits.emitEnvelope(envelope);
-    } finally {
-      restore();
-    }
-
-    const parsed = JSON.parse(out[0]) as { envelope?: SignalEnvelope };
-    expect(parsed.envelope?.signals).toHaveLength(1);
-    expect(parsed.envelope?.verdict.summary.errors).toBe(1);
-    expect(parsed.envelope?.units[0]?.violationCount).toBe(1);
   });
 });

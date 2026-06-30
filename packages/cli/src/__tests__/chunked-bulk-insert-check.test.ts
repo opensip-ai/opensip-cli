@@ -48,4 +48,22 @@ describe('chunked-bulk-insert local check', () => {
 
     expect(analyzeChunkedBulkInsert(source, PERSISTENCE_PATH)).toHaveLength(0);
   });
+
+  it('does not flag a non-Drizzle collection .values().map() (the original false positive)', () => {
+    const source = [
+      'const ids = [...this.byId.values()].map((entry) => entry.id)',
+      'const summary = new Map(rows.map((r) => [r.id, r]))',
+      'return [...summary.values()].map((r) => r.id)',
+    ].join('\n');
+
+    expect(analyzeChunkedBulkInsert(source, PERSISTENCE_PATH)).toHaveLength(0);
+  });
+
+  it('still flags an unbounded SPREAD row set in a real insert (no false negative)', () => {
+    const source = [
+      'await db.insert(table).values([...rowSet.values()].map((r) => ({ id: r.id })))',
+    ].join('\n');
+
+    expect(analyzeChunkedBulkInsert(source, PERSISTENCE_PATH)).toHaveLength(1);
+  });
 });
