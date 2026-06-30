@@ -176,6 +176,9 @@ config fields are rejected.
 | `ui.banner` | `'mini' \| 'lg' \| 'md' \| 'sm'` | Banner art above each command. Default `mini` — a compact boxed card (amber cup + version + tagline + `www.opensip.ai` + project path). Set `lg`/`md`/`sm` for the full ASCII wordmark. **No CLI flag** — persistent preference. |
 | `cloud.sync` | bool | Project-level opt-out for automatic OpenSIP Cloud signal sync. `false` disables sync even when a user-level config enables it. |
 | `cloud.endpoint` | URL | HTTPS override for the built-in OpenSIP Cloud endpoint. User-level endpoint takes precedence when both are set. |
+| `sessions.keep` | int >= 0 | Keep the newest N persisted run sessions. Default `200`; `0` disables count pruning. |
+| `sessions.maxAgeDays` | int >= 0 | Drop persisted run sessions older than this many days. Default `60`; `0` disables age pruning. |
+| `sessions.maxSizeMb` | int >= 0 | Warn/reclaim if the project SQLite store exceeds this size. Default `150`; `0` disables the size guard. |
 
 ```yaml
 cli:
@@ -184,6 +187,10 @@ cli:
     banner: mini   # mini | lg | md | sm
   cloud:
     sync: false    # optional project-level cloud signal-sync opt-out
+  sessions:
+    keep: 200
+    maxAgeDays: 60
+    maxSizeMb: 150
 # Recipe defaults are tool-scoped (ADR-0022) — set them per tool:
 fitness:
   recipe: backend
@@ -197,6 +204,12 @@ strict validation to avoid committing secrets. User config is written with mode
 `0o600` (ADR-0071).
 
 CLI flags always override config — `--no-json` overrides a `cli.json: true` setting.
+
+Session retention is host-owned. After a run writes its session row, the host
+applies `cli.sessions` as best-effort maintenance: count pruning, age pruning,
+then SQLite reclaim/size guard. A retention or vacuum failure is logged but does
+not change the tool verdict or exit code. See
+[Session and persistence](../80-implementation/03-session-and-persistence.md).
 
 ## `plugins`
 

@@ -37,6 +37,7 @@ export type { FitOptions, InitOptions, ToolOptions } from './types.js';
 // `CliOutput`/`CheckOutput`/`FindingOutput` husk, which was retired in Phase 7.
 export type {
   BaselineIdentity,
+  DeclaredInputs,
   SignalEnvelope,
   RunVerdict,
   UnitResult,

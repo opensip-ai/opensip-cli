@@ -36,6 +36,12 @@ import {
 } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
+import {
+  enforceSessionRetention,
+  resolveSessionRetentionPolicy,
+  type SessionRetentionPolicy,
+} from './session-retention.js';
+
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -60,6 +66,7 @@ export function runWithSuiteRunContext<T>(ctx: SuiteRunContext, fn: () => T): T 
 export interface RunPlaneDeps {
   /** Resolve the project datastore, or undefined when none is in scope. Must not throw. */
   readonly getDatastore: () => DataStore | undefined;
+  readonly sessionRetentionPolicy?: SessionRetentionPolicy;
   readonly logger?: Logger;
 }
 
@@ -210,6 +217,20 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           sessionId: id,
           durationMs: snapshot.durationMs,
         });
+        try {
+          enforceSessionRetention(
+            datastore,
+            deps.sessionRetentionPolicy ?? resolveSessionRetentionPolicy(),
+            { logger: log },
+          );
+        } catch (error) {
+          log.warn?.({
+            evt: 'cli.run-session.retention_failed',
+            module: MODULE_TAG,
+            tool: contribution.tool,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       } catch (error) {
         // @swallow-ok best-effort session persistence already warned; degrade to undefined
         log.warn?.({

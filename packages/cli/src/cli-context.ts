@@ -43,6 +43,7 @@ import {
   type RunActionHooks,
 } from './bootstrap/run-plane.js';
 import { createDatastoreResolver, readScope } from './bootstrap/scope-access.js';
+import { resolveSessionRetentionPolicy } from './bootstrap/session-retention.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
@@ -101,6 +102,11 @@ function resolveArtifactRetentionKeep(): number | undefined {
   return loadCliDefaults(projectRoot ?? process.cwd()).artifacts?.keep;
 }
 
+function resolveSessionRetentionDefaults() {
+  const projectRoot = currentScope()?.projectContext?.projectRoot;
+  return resolveSessionRetentionPolicy(loadCliDefaults(projectRoot ?? process.cwd()).sessions);
+}
+
 export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliContextHandle {
   const log = opts.logger ?? defaultLogger;
 
@@ -135,6 +141,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // after RunScope entry, before the handler) or lazily on first `timing` read.
   const runPlane = createRunPlaneFactory({
     getDatastore: createDatastoreResolver('best-effort', log),
+    sessionRetentionPolicy: resolveSessionRetentionDefaults(),
     logger: log,
   });
 
