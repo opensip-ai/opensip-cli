@@ -49,6 +49,6 @@
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.2",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }
