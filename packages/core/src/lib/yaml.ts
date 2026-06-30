@@ -23,7 +23,7 @@
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
 
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 import { SystemError, ValidationError } from './errors.js';
 import { logger } from './logger.js';
@@ -50,6 +50,7 @@ export function readYamlFile(filePath: string): unknown {
   if (!existsSync(filePath)) return undefined;
   try {
     const raw = readFileSync(filePath, 'utf8');
+    if (raw.trim().length === 0) return undefined;
     return yaml.load(raw);
   } catch (error) {
     logger.debug({
@@ -125,6 +126,7 @@ export function readYamlFileOrThrow(
   }
 
   try {
+    if (raw.trim().length === 0) return {};
     return yaml.load(raw) ?? {};
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
