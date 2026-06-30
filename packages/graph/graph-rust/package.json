@@ -50,7 +50,7 @@
     "@opensip-cli/tree-sitter": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
+    "@types/node": "^26.0.1",
     "vitest": "^4.1.8"
   }
 }

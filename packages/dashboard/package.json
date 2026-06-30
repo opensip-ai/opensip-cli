@@ -42,7 +42,7 @@
     "@opensip-cli/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
+    "@types/node": "^26.0.1",
     "cytoscape": "3.34.0",
     "cytoscape-dagre": "4.0.0",
     "esbuild": "^0.28.1",
