@@ -103,7 +103,7 @@ Each reads `packages/core/package.json#version`:
 | Surface                                   | Regenerate with                                                               | Pins                                                  |
 | ----------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
 | CLI `--version`                           | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version                                 |
-| Per-package `README.md` (×36 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
+| Per-package `README.md` (×41 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
 | `docs/web-generated/**` + `manifest.json` | `pnpm docs:build`                                                             | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
 
 CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
@@ -269,7 +269,7 @@ in `release.yml` or `bootstrap-publish.sh`.
    and `filter`.
 3. **Update this file (`RELEASING.md`)** — CI's release-package-order contract
    test enforces the prose:
-   - Add a row to [The 38 packages](#the-38-packages) (update the section title
+   - Add a row to [The 42 packages](#the-42-packages) (update the section title
      count when the set size changes).
    - Add the unscoped name to the [npm verify loop](#cutting-a-release) `for p in …`
      block (scoped packages only; `opensip-cli` stays on its own line).

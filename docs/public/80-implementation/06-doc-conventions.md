@@ -156,7 +156,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 
 Last verified at v0.1.19 against:
 
-- `packages/` directory listing (37 publishable packages plus workspace-private support packages ...).
+- `packages/` directory listing (42 publishable packages plus workspace-private support packages ...).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```
