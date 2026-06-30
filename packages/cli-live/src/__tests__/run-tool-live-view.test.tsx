@@ -40,6 +40,15 @@ function stderrEvents(calls: readonly string[]): Record<string, unknown>[] {
     .filter((row): row is Record<string, unknown> => row !== undefined);
 }
 
+async function waitForOutput(read: () => string, substr: string): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    if (read().includes(substr)) return;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
+  }
+}
+
 describe('runToolLiveView', () => {
   const stderrCalls: string[] = [];
 
@@ -255,9 +264,7 @@ describe('runToolLiveView', () => {
           helpers.setRunning(() => {
             // In-process direct-emitter path.
           });
-          await new Promise((resolve) => {
-            setTimeout(resolve, 10);
-          });
+          await waitForOutput(() => stdoutCalls.join(''), '2/4 (50%)');
           return {
             kind: 'done',
             done: { summary: { passed: true, errors: 0, warnings: 0 } },
@@ -300,6 +307,7 @@ describe('runToolLiveView', () => {
             resolveSubscriberAttached();
           });
           await subscriberAttached;
+          await waitForOutput(() => stdoutCalls.join(''), '42 file(s) (1.2s)');
           return {
             kind: 'done',
             done: { summary: { passed: true, errors: 0, warnings: 0 } },
