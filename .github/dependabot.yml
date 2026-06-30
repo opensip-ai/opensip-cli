@@ -19,6 +19,20 @@ updates:
         update-types:
           - patch
           - minor
+    ignore:
+      # Deferred until the repo's supported Node runtime floor moves past 24.x.
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
+      # Major lint-rule migrations need dedicated policy/fix work.
+      - dependency-name: eslint-plugin-unicorn
+        update-types:
+          - version-update:semver-major
+      # sonarjs 4.1 currently creates broad lint churn; keep patch updates flowing.
+      - dependency-name: eslint-plugin-sonarjs
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
