@@ -909,7 +909,7 @@ opensip suite add security --tool fitness --command fit --arg recipe=security
 |---|---|---|
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
-| `run` | `--json` | Emit the suite summary as JSON. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts and per-step verdict counts when a step emitted an envelope. Step output still flows through each step's own output seams. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -921,7 +921,16 @@ Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
 
-**See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites).
+`suite run --json` keeps the original step fields (`tool`, `stableId`,
+`command`, `exitCode`, `durationMs`, `error`) and additively includes
+`data.aggregate` (`steps`, `passed`, `failed`, `faulted`, `errors`, `warnings`).
+Each `data.steps[].verdict` is present only when that step emitted a
+`SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
+`findings`) so suite summaries do not leak signal messages, file paths, symbols,
+or match content. See [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md).
+
+**See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites),
+[`04-json-output-schema.md#suite-run-results`](/docs/opensip-cli/70-reference/04-json-output-schema/#suite-run-results).
 
 ---
 
