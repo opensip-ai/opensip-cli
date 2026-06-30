@@ -13,7 +13,7 @@ import {
   type DataStore,
   type DrizzleDataStore,
 } from '@opensip-cli/datastore';
-import { count, desc, eq, inArray, lt } from 'drizzle-orm';
+import { count, desc, eq, inArray, lt, notInArray } from 'drizzle-orm';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 import {
@@ -204,6 +204,49 @@ export class SessionRepo {
   count(): number {
     const row = this.datastore.db.select({ value: count() }).from(sessions).get();
     return row?.value ?? 0;
+  }
+
+  /**
+   * Keep the newest `keep` sessions by start time and delete the rest.
+   * `keep <= 0` disables count pruning. Foreign-key cascades remove sibling
+   * host-metrics and payload rows.
+   */
+  pruneToCount(keep: number): number {
+    if (!Number.isFinite(keep) || keep <= 0) return 0;
+    const limit = Math.trunc(keep);
+    return this.datastore.withWriteLock('session.prune_to_count', () => {
+      try {
+        const keepIds = this.datastore.db
+          .select({ id: sessions.id })
+          .from(sessions)
+          .orderBy(desc(sessions.timestamp))
+          .limit(limit)
+          .all()
+          .map((row) => row.id);
+        if (keepIds.length === 0) return 0;
+        const removed = this.datastore.db
+          .delete(sessions)
+          .where(notInArray(sessions.id, keepIds))
+          .run();
+        logger.info({
+          evt: 'session.prune_to_count.complete',
+          module: MODULE_NAME,
+          msg: 'Pruned sessions to newest count',
+          kept: keepIds.length,
+          deleted: removed.changes,
+        });
+        return removed.changes;
+      } catch (error) {
+        logger.error({
+          evt: 'session.prune_to_count.error',
+          module: MODULE_NAME,
+          msg: 'Failed to prune sessions to count',
+          keep: limit,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    });
   }
 
   /** Delete sessions older than the given Date. Returns affected rowcount. */

@@ -1,0 +1,22 @@
+globalExcludes:
+  - 'node_modules/**'
+  - 'opensip-cli/.runtime/**'
+
+targets:
+  py-source:
+    description: 'Python cold gate source'
+    languages: [python]
+    concerns: [backend]
+    include:
+      - 'src/**/*.py'
+
+fitness:
+  failOnErrors: 0
+  failOnWarnings: 0
+  disabledChecks: []
+
+cli:
+  sessions:
+    keep: 5
+    maxAgeDays: 30
+    maxSizeMb: 25

@@ -26,6 +26,8 @@ import {
 } from '../commands/assemble-outcome.js';
 import { renderOutcome, renderRaw } from '../commands/render-outcome.js';
 
+import { stampDeclaredInputs } from './declared-inputs.js';
+
 import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 
 /** Structured-log `module` tag for the output plane. */
@@ -89,10 +91,13 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
       });
     },
     emitEnvelope: (envelope) => {
-      renderOutcome(outcomeFromEnvelope(envelope as SignalEnvelope, exitCode ?? 0), {
-        jsonRequested: true,
-        render: deps.render,
-      }).catch((error) => {
+      renderOutcome(
+        outcomeFromEnvelope(stampDeclaredInputs(envelope as SignalEnvelope), exitCode ?? 0),
+        {
+          jsonRequested: true,
+          render: deps.render,
+        },
+      ).catch((error) => {
         if ((exitCode ?? 0) === 0) {
           setExitCode(1);
         }

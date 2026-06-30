@@ -9,6 +9,7 @@ source-files:
   - packages/core/src/lib/paths.ts
   - packages/core/src/lib/logger.ts
   - packages/datastore/src/data-store.ts
+  - packages/datastore/src/backends/shared.ts
   - packages/datastore/src/factory.ts
   - packages/contracts/src/session-types.ts
   - packages/contracts/src/graph-catalog.ts
@@ -20,12 +21,16 @@ source-files:
   - packages/graph/engine/src/persistence/schema.ts
   - packages/datastore/src/baseline-repo.ts
   - packages/datastore/src/schema/baseline.ts
+  - packages/cli/src/bootstrap/session-retention.ts
+  - packages/cli/src/bootstrap/declared-inputs.ts
 related-docs:
   - ../00-start/06-system-context.md
   - ./01-cli-dispatch.md
   - ./02-plugin-loader.md
   - ../80-implementation/05-layer-policy.md
   - ../decisions/ADR-0051-host-owned-run-lifecycle-timing.md (host-owned run lifecycle, timing, and persistence)
+  - ../decisions/ADR-0096-host-owned-datastore-lifecycle.md (host-owned datastore lifecycle)
+  - ../decisions/ADR-0097-gate-verdict-determinism.md (gate verdict determinism)
 ---
 # Session and persistence
 
@@ -103,6 +108,12 @@ flowchart TB
 
 SQLite + Drizzle were chosen because the runtime store is local, project-scoped, transactional, and small enough to rebuild if a user needs to delete it. A remote database, JSON-as-backend, or a broader persistence abstraction would add operational weight without improving the CLI's local-first behavior.
 
+File-backed SQLite stores are opened with `auto_vacuum=INCREMENTAL` and expose a
+host-only maintenance seam for `incrementalVacuum`, bounded full `VACUUM`, and
+file-size measurement. The in-memory test store does not expose maintenance.
+Existing file stores are converted on open with a one-time `VACUUM`; conversion
+failure is logged and non-fatal.
+
 ---
 
 ## Sessions
@@ -147,6 +158,32 @@ opensip sessions purge -y                   # skip the confirmation prompt
 
 `purge` is **row-level data deletion**, not file removal. The FK cascade from `sessions` → `session_tool_payload` (`onDelete: 'cascade'`) ensures that purging a session drops its opaque payload row in one shot.
 
+### Automatic retention
+
+The host applies automatic session/datastore retention after it records a run
+session. This is controlled by `cli.sessions` in
+`opensip-cli.config.yml`:
+
+```yaml
+cli:
+  sessions:
+    keep: 200        # newest sessions to keep; 0 disables count pruning
+    maxAgeDays: 60   # oldest allowed age; 0 disables age pruning
+    maxSizeMb: 150   # SQLite size guard; 0 disables size guard
+```
+
+The policy is conjunctive: a session can be dropped because it is outside the
+newest `keep` rows or older than `maxAgeDays`. After deletes, the host runs
+incremental SQLite reclaim when the backend supports it. If the database remains
+larger than `maxSizeMb`, the host logs a warning, runs one full vacuum, and may
+prune to a smaller bounded keep count before a final full vacuum. It does not
+loop.
+
+Retention is best-effort. A prune, file-lock, size-check, or vacuum failure is
+logged under `session.retention.*`, but it never changes the primary tool
+verdict, session write result, or process exit code. Tools do not call this
+maintenance path directly; the host owns it per ADR-0096.
+
 The dashboard reads the same store to populate its run-history view. For programmatic discovery of these surfaces (especially the new agent ergonomics around filtering and raw output), see `agent-catalog` in the [CLI commands reference](/docs/opensip-cli/70-reference/01-cli-commands/).
 
 **Session replay.** `sessions show` (and the per-run `--show <session>`
@@ -173,6 +210,14 @@ The `--filter` (errors-only / warnings-only / top:<n>) and `--raw` options on `s
 
 The persisted catalog document carries an optional **`features`** layer — derived columns the engine computes from the raw catalog: per-function `bodyLines` / `blast` (direct + transitive blast radius) / reachability flags, per-package coupling degrees, SCC membership, and directed package-coupling edges. The contract shape is [`GraphFeatures`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/packages/contracts/src/graph-catalog.ts) (structurally mirrored from the engine's `PersistedFeatures` so the decoupled dashboard reads features without importing `@opensip-cli/graph`).
 
+The persistence policy is **materialize only when forced** (ADR-0006): features are a *plain view* recomputed on demand for in-engine rules, and **materialized into the catalog JSON only for the columns the decoupled dashboard renders** (blast, SCC, package coupling). The `features` field is therefore present only on catalogs produced by a dashboard-bound run; the dashboard falls back to a no-data state when it's absent. Everything else (callers/callees indexes) is recomputed cheaply on every load and never stored.
+
+The `--workspace` runner spawns one child process per workspace unit (per adapter `discoverWorkspaceUnits`). Each child opens its own `DataStore` against the shared `datastore.sqlite` file. WAL mode permits concurrent readers + one writer, so the parallelism is safe but serialized at the catalog write boundary — per-unit incremental writes are deferred to a follow-up `graph-catalog-perf` plan.
+
+The `--no-cache` flag forces a cache miss; the existing fingerprint-based invalidation path runs even when `datastore.sqlite` is present and current.
+
+---
+
 ## Host-owned run timing (ADR-0051 / host-owned-run-timing plan)
 
 `StoredSession.startedAt`, `completedAt`, and `durationMs` are produced exclusively by the host from a single `RunTimer` (a.k.a. `RunLifecycle`). The host run plane (`packages/cli/src/bootstrap/run-plane.ts`) creates the lifecycle inside the command action — after `RunScope` entry, before any tool handler or `renderLive` — and freezes it (`complete()`, idempotent) once the tool returns. Tools read the timer only for a **display clock** via `ToolCliContext.runSession.timing` (also passed as the optional second `LiveViewContext` arg to live renderers registered with `cli.registerLiveView`). There is **no** generic-session writer on the context.
@@ -196,11 +241,18 @@ The live and static render paths (via `RunTimingProvider` in cli-ui + `RunSummar
 
 See [ADR-0051](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0051-host-owned-run-lifecycle-timing.md) and the cross-cutting contracts in the host-owned-run-timing plan for the full seam, logging, and hardening details.
 
-The persistence policy is **materialize only when forced** (ADR-0006): features are a *plain view* recomputed on demand for in-engine rules, and **materialized into the catalog JSON only for the columns the decoupled dashboard renders** (blast, SCC, package coupling). The `features` field is therefore present only on catalogs produced by a dashboard-bound run; the dashboard falls back to a no-data state when it's absent. Everything else (callers/callees indexes) is recomputed cheaply on every load and never stored.
+## Declared inputs manifest
 
-The `--workspace` runner spawns one child process per workspace unit (per adapter `discoverWorkspaceUnits`). Each child opens its own `DataStore` against the shared `datastore.sqlite` file. WAL mode permits concurrent readers + one writer, so the parallelism is safe but serialized at the catalog write boundary — per-unit incremental writes are deferred to a follow-up `graph-catalog-perf` plan.
+Every new host-emitted run envelope is stamped with a compact
+`declaredInputs` manifest before JSON outcome rendering, delivery, SARIF
+reporting, and report composition. The manifest records only allowlisted
+runtime facts: CLI version, Node version, package-manager identity, platform,
+tool id, available engine/tool version, and baseline fingerprint identity.
 
-The `--no-cache` flag forces a cache miss; the existing fingerprint-based invalidation path runs even when `datastore.sqlite` is present and current.
+This is verdict provenance for CI and AI agents. It explains common "same code,
+different result" skew without dumping environment variables, absolute paths, or
+secrets. Older/no-manifest producers may omit the field; absence means
+"unknown", not "defaults". See [ADR-0097](https://github.com/opensip-ai/opensip-cli/blob/v0.1.17/docs/decisions/ADR-0097-gate-verdict-determinism.md).
 
 ---
 

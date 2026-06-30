@@ -36,6 +36,7 @@ import {
 } from '@opensip-cli/output';
 
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
+import { stampDeclaredInputs } from './declared-inputs.js';
 import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 import type { ArtifactWriteContext } from './atomic-artifact-write.js';
@@ -217,6 +218,7 @@ export async function deliverEnvelope(
   opts: DeliverEnvelopeOptions,
 ): Promise<DeliverEnvelopeResult> {
   const log = opts.logger ?? defaultLogger;
+  const stampedEnvelope = stampDeclaredInputs(envelope);
   const repo = opts.repo ?? resolveRepoIdentity(opts.cwd);
 
   const scope = currentScope();
@@ -230,10 +232,10 @@ export async function deliverEnvelope(
   // Record delivery start on the scope diagnostics (if any) so the 'deliver' phase
   // of the uniform lifecycle is visible in CommandOutcome for --json consumers.
   // This improves observability of the root-owned egress path (architecture review).
-  void scope?.diagnostics.event('deliver', 'debug', `deliver start for ${envelope.tool}`, {
-    tool: envelope.tool,
-    recipe: envelope.recipe,
-    signalCount: envelope.signals.length,
+  void scope?.diagnostics.event('deliver', 'debug', `deliver start for ${stampedEnvelope.tool}`, {
+    tool: stampedEnvelope.tool,
+    recipe: stampedEnvelope.recipe,
+    signalCount: stampedEnvelope.signals.length,
     reportTo: !!opts.reportTo,
   });
 
@@ -242,10 +244,10 @@ export async function deliverEnvelope(
   // computes its own exit; gate-compare overrides with its baseline-diff verdict.
   // Set RUNTIME_ERROR first; the `--report-to` exit-4 below only applies when the
   // run otherwise passed, so a real failure always dominates (last-write-wins).
-  const runFailed = opts.runFailed ?? !envelope.verdict.passed;
+  const runFailed = opts.runFailed ?? !stampedEnvelope.verdict.passed;
   if (runFailed) opts.setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
 
-  const cloud = await emitToCloud(envelope, repo, log);
+  const cloud = await emitToCloud(stampedEnvelope, repo, log);
   const cloudAccepted = cloud.accepted;
   const cloudLeg = {
     cloudAccepted,
@@ -264,7 +266,13 @@ export async function deliverEnvelope(
   }
 
   const repoSlug = repoSlugFromIdentity(repo);
-  const result = await reportSarif(envelope, opts.reportTo, opts.apiKey, opts.fetchImpl, repoSlug);
+  const result = await reportSarif(
+    stampedEnvelope,
+    opts.reportTo,
+    opts.apiKey,
+    opts.fetchImpl,
+    repoSlug,
+  );
   const reportSuccess = result.outcome === 'ok';
   if (!reportSuccess) {
     // Branch on the typed auth-status discriminator (never string-sniff

@@ -14,7 +14,14 @@ export interface DataStoreLockContext {
 }
 
 /** Public persistence handle: lifecycle plus transaction, but no raw query escape hatch. */
+export interface DatastoreMaintenance {
+  incrementalVacuum(): void;
+  fullVacuum(): void;
+  fileSizeBytes(): number;
+}
+
 export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
+  readonly maintenance?: DatastoreMaintenance;
   close(): void;
   transaction<T>(fn: (tx: DrizzleHandle<TSchema>) => T): T;
   /** Serialize datastore-file writes (no-op for in-memory backends). */

@@ -132,6 +132,21 @@ This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
 **any** receiver (and can fail a CI build via exit 4), whereas cloud sync emits
 **native signals** to **OpenSIP Cloud** automatically and best-effort.
 
+### JSON run provenance
+
+Run commands that emit a `SignalEnvelope` also carry host-stamped
+`declaredInputs` metadata in JSON/SARIF/report delivery paths. It records a small
+allowlist of verdict-relevant runtime facts: CLI version, Node version, package
+manager, platform, tool id, available engine/tool version, and baseline
+fingerprint identity. It does not include environment dumps, absolute paths, or
+secrets.
+
+Use it when comparing CI or agent runs:
+
+```bash
+opensip fit --json | jq '.envelope.declaredInputs'
+```
+
 ---
 
 ## `fit` — run fitness checks

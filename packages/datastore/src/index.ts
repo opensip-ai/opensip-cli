@@ -2,6 +2,7 @@ export type {
   DataStore,
   DataStoreOpenOptions,
   DataStoreVersionMismatch,
+  DatastoreMaintenance,
   DrizzleDataStore,
   DrizzleHandle,
   SqliteBackendHandle,

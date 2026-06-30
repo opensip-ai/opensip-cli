@@ -101,6 +101,10 @@ describe('composed whole-document validation', () => {
     ],
     ['tools (wrong trusted type)', { ...WHOLE_DOCUMENT, tools: { trusted: 'audit-sec' } }],
     ['tools (unknown key)', { ...WHOLE_DOCUMENT, tools: { trustd: ['audit-sec'] } }],
+    [
+      'cli.sessions (unknown key)',
+      { ...WHOLE_DOCUMENT, cli: { sessions: { keep: 5, maxAgeDayz: 1 } } },
+    ],
     ['fitness', { ...WHOLE_DOCUMENT, fitness: { faliOnErrors: 1 } }],
     ['graph', { ...WHOLE_DOCUMENT, graph: { minDuplicateBodyLine: 10 } }],
   ])('throws one ConfigurationError on a typo in the %s block', (_label, doc) => {

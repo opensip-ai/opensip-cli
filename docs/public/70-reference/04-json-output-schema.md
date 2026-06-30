@@ -58,6 +58,18 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
   "baselineIdentity": {
     "fingerprintStrategyId": "opensip.default.rule-file-line-col",
     "fingerprintStrategyVersion": 1
+  },
+  "declaredInputs": {
+    "cliVersion": "0.1.16",
+    "nodeVersion": "24.16.0",
+    "packageManager": "pnpm@11.5.1",
+    "platform": "darwin/arm64",
+    "tool": "fit",
+    "engineVersion": "0.1.16",
+    "baselineIdentity": {
+      "fingerprintStrategyId": "opensip.default.rule-file-line-col",
+      "fingerprintStrategyVersion": 1
+    }
   }
 }
 ```
@@ -75,7 +87,42 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 | `units` | `UnitResult[]` | yes | Per-unit ran/errored/timing facts. May be `[]`. |
 | `signals` | `Signal[]` | yes | The flat list of findings the run produced. May be `[]`. |
 | `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](../../decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
+| `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](../../decisions/ADR-0097-gate-verdict-determinism.md)). |
 | `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
+
+### `DeclaredInputs`
+
+`declaredInputs` is added by the host before JSON outcome rendering, delivery,
+SARIF reporting, and dashboard/report composition. It is an allowlist, not an
+environment dump.
+
+```jsonc
+{
+  "cliVersion": "0.1.16",
+  "nodeVersion": "24.16.0",
+  "packageManager": "pnpm@11.5.1",
+  "platform": "darwin/arm64",
+  "tool": "fit",
+  "engineVersion": "0.1.16",
+  "baselineIdentity": {
+    "fingerprintStrategyId": "opensip.default.rule-file-line-col",
+    "fingerprintStrategyVersion": 1
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `cliVersion` | string | yes | Installed opensip-cli package version that emitted the envelope. |
+| `nodeVersion` | string | yes | `process.versions.node` from the host process. |
+| `packageManager` | string | no | Nearest `package.json#packageManager`, falling back to the first package token in `npm_config_user_agent`. |
+| `platform` | string | yes | Host platform/architecture, e.g. `darwin/arm64`. |
+| `tool` | string | yes | Tool id for the run envelope. |
+| `engineVersion` | string | no | Tool/engine package version when available from the active tool manifest. |
+| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | no | Baseline fingerprint identity copied from the envelope. |
+
+The manifest intentionally excludes absolute paths, full environment variables,
+credentials, and config payloads.
 
 ### `RunVerdict`
 

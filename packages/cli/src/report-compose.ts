@@ -39,6 +39,7 @@ import {
 } from '@opensip-cli/dashboard';
 import { orderSessionsForSuiteGrouping, SessionRepo } from '@opensip-cli/session-store';
 
+import { collectDeclaredInputsForTool } from './bootstrap/declared-inputs.js';
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
 import { type DispatchHostCtx } from './bootstrap/dispatch-replay-result.js';
 import {
@@ -89,7 +90,10 @@ async function composeReportInput(): Promise<HtmlReportInput> {
   const repo = datastore ? new SessionRepo(datastore) : undefined;
   const sessions = repo ? orderSessionsForSuiteGrouping([...repo.list({ limit: 20 })]) : [];
 
-  const input: HtmlReportInput = { sessions };
+  const input: HtmlReportInput = {
+    sessions,
+    declaredInputs: collectDeclaredInputsForTool('report'),
+  };
   const claimedKeys = new Map<string, string>();
 
   const provenance = scope.toolProvenance;
