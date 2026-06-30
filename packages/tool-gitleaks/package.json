@@ -137,6 +137,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
+    "opensip-cli": "workspace:*",
     "vitest": "^4.1.8"
   }
 }
