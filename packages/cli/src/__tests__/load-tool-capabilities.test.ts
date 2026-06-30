@@ -70,8 +70,12 @@ function writeExplicitAdapterPackage(
   writeFileSync(join(dir, 'index.mjs'), `export const adapter = ${exportSource};\n`);
 }
 
-/** Write an explicit capability package whose module would throw if imported. */
-function writeThrowingExplicitAdapterPackage(name: string, targetDomain = 'mine'): void {
+/** Write a marker-discovered package whose module would throw if imported. */
+function writeThrowingMarkedAdapterPackage(
+  name: string,
+  markerKind: string,
+  targetDomain = 'mine',
+): void {
   const dir = join(testDir, 'node_modules', name);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -81,6 +85,7 @@ function writeThrowingExplicitAdapterPackage(name: string, targetDomain = 'mine'
       type: 'module',
       main: './index.mjs',
       opensipTools: {
+        kind: markerKind,
         targetDomain,
         targetDomainApiVersion: 1,
       },
@@ -129,12 +134,11 @@ describe('loadOwningToolCapabilities', () => {
     });
   });
 
-  it('uses pluginsConfig to resolve explicit package preferences for the owning domain', async () => {
+  it('uses pluginsConfig explicit packages as a trust decision for the owning domain', async () => {
     const registry = new CapabilityRegistry();
     const registrar = vi.fn();
     registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
     writeExplicitAdapterPackage('@acme/configured-adapter', "{ id: 'from-config' }");
-    process.env[CAPABILITY_PACK_ALLOWLIST_ENV] = '@acme/configured-adapter';
 
     await withCapabilities(registry, async () => {
       const driven = await loadOwningToolCapabilities({
@@ -149,18 +153,18 @@ describe('loadOwningToolCapabilities', () => {
     });
   });
 
-  it('denies a non-bundled capability pack before import unless exact-name allowlisted', async () => {
+  it('denies an unlisted marker-discovered capability pack before import unless exact-name allowlisted', async () => {
     const registry = new CapabilityRegistry();
     const registrar = vi.fn();
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
-    writeThrowingExplicitAdapterPackage('@acme/denied-adapter');
+    writeThrowingMarkedAdapterPackage('@acme/denied-adapter', 'mine-pack');
 
     await withCapabilities(registry, async () => {
       const driven = await loadOwningToolCapabilities({
         owningTool: makeTool('mytool'),
         projectDir: testDir,
-        pluginsConfig: { pkgs: ['@acme/denied-adapter'] },
+        pluginsConfig: {},
       });
 
       expect(driven).toBe(1);

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.15
+release: v0.1.16
 title: "FAQ"
 audience: [getting-started]
 purpose: "Common questions about adoption, edge cases, and what opensip-cli does or doesn't do."
@@ -25,13 +25,13 @@ Common questions. If yours isn't here, the answer probably lives somewhere in th
 **No — English only today.** Programming-language adapters (`lang-typescript`,
 `lang-rust`, …) are for parsing source code, not UI localization. Localization
 extraction is deferred unless an enterprise contract requires it — see
-[ADR-0072](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0072-i18n-posture.md).
+[ADR-0072](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0072-i18n-posture.md).
 
 ---
 
 ### Does opensip-cli "phone home"?
 
-**Not for telemetry.** Summary by surface ([ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)):
+**Not for telemetry.** Summary by surface ([ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)):
 
 - **OpenTelemetry:** off unless you set `OTEL_EXPORTER_OTLP_ENDPOINT`.
 - **OpenSIP Cloud sync:** off without an API key and entitlement; disable with

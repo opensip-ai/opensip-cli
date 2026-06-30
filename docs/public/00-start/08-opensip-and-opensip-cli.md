@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-29
-release: v0.1.15
+release: v0.1.16
 title: "OpenSIP and OpenSIP CLI"
 audience: [getting-started, contributors, ci-integrators]
 purpose: "The product family — what OpenSIP (the autonomous platform) and opensip-cli (the open-source guardrail layer) each are, how they fit together, and the shared origin that explains why both exist."

@@ -2,6 +2,37 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.16] - 2026-06-29
+
+A small diagnostics, live-run, and product-framing release. It tightens `fit`
+startup failure handling, moves the YAGNI live audit path onto the same
+worker-backed progress model as the other heavier tools, and publishes the
+OpenSIP CLI/OpenSIP platform evidence-authority and identity decisions. It also
+clarifies the no-project startup hint before the next npm publish.
+
+### Added
+
+- ADR-0094, documenting CLI-to-Cloud evidence authority, repository identity, and
+  fidelity-preserving egress expectations.
+- ADR-0095 and a canonical public guide explaining the relationship between
+  OpenSIP CLI and the broader OpenSIP platform, including updated agent scaffold
+  copy.
+- A local planning snapshot for startup observability and load diagnostics.
+
+### Changed
+
+- `opensip yagni` live runs now execute through an internal worker command while
+  streaming per-detector progress events back to the live UI.
+- The no-project startup message now tells users to change into their project
+  directory before running `opensip init`.
+
+### Fixed
+
+- `fit` now fails closed when required plugins or configured check packages fail
+  to load, and it redacts absolute module paths from load-error diagnostics.
+- Capability-pack loading now tolerates project-local package manifests that omit
+  optional fields used by generated command-surface metadata.
+
 ## [0.1.15] - 2026-06-29
 
 An external-scanner integration release. OpenSIP CLI can now wrap a

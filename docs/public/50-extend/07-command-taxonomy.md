@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-21
-release: v0.1.15
+release: v0.1.16
 title: "Command surface taxonomy"
 audience: [plugin-authors, contributors, ci-integrators]
 purpose: "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."

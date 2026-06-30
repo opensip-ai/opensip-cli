@@ -89,11 +89,14 @@ function checkPackDiagnostic(
   };
   const classified = classifiedLoaderDetail(detail, provenance);
   const required = mode === 'required';
+  const message = required
+    ? `Required check pack "${packageName}" failed to load.`
+    : `Optional check pack failed to load: ${detail}`;
   return stampDiagnostic({
     severity: required ? 'error' : 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
     category: required ? 'runtime' : 'degraded',
-    message: `${required ? 'Required' : 'Optional'} check pack "${packageName}" failed to load.`,
+    message,
     impact: required
       ? 'A required fit-pack could not be loaded, so the run cannot proceed.'
       : 'Some optional check packs were skipped; required checks still ran.',

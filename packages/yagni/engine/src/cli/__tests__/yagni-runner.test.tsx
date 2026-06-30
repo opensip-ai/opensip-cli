@@ -3,13 +3,14 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK, type ToolCliContext } from '@opensip-cli/core';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK, type ToolCliContext } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { executeYagni } from '../execute-yagni.js';
+import { executeYagni, type ExecuteYagniOptions } from '../execute-yagni.js';
 import { renderYagniLive } from '../yagni-runner.js';
 
 import type { LiveRunSpec } from '@opensip-cli/cli-live';
+import type * as CoreModule from '@opensip-cli/core';
 
 const runToolLiveView = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() =>
@@ -24,7 +25,7 @@ vi.mock('@opensip-cli/cli-live', () => ({
 }));
 
 vi.mock('@opensip-cli/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@opensip-cli/core')>();
+  const actual = await importOriginal<typeof CoreModule>();
   return {
     ...actual,
     liveEngineCorrelation: vi.fn(() => undefined),
@@ -62,9 +63,40 @@ function yagniEnvelope(): ReturnType<typeof buildSignalEnvelope> {
   });
 }
 
-function stubExecuteOutcome() {
+function yagniEnvelopeWithSignals(): ReturnType<typeof buildSignalEnvelope> {
+  return buildSignalEnvelope({
+    tool: 'yagni',
+    runId: 'run-yagni-signals',
+    createdAt: '2026-06-04T00:00:00.000Z',
+    units: [
+      { slug: 'yagni:unused-config-surface', passed: false, durationMs: 12 },
+      { slug: 'yagni:passing-detector', passed: true, durationMs: 4 },
+      { slug: 'yagni:errored-detector', passed: false, durationMs: 2, error: 'boom' },
+    ],
+    signals: [
+      createSignal({
+        source: 'yagni:unused-config-surface',
+        severity: 'high',
+        ruleId: 'yagni:unused-config-surface',
+        message: 'Remove speculative config.',
+        code: { file: 'src/a.ts', line: 1 },
+      }),
+      createSignal({
+        source: 'yagni:unused-config-surface',
+        severity: 'medium',
+        ruleId: 'yagni:unused-config-surface',
+        message: 'Review speculative config.',
+        code: { file: 'src/b.ts', line: 2 },
+      }),
+    ],
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
+  });
+}
+
+function stubExecuteOutcome(envelope = yagniEnvelope()) {
   return {
-    envelope: yagniEnvelope(),
+    envelope,
     session: {
       tool: 'yagni' as const,
       cwd: '/proj',
@@ -150,6 +182,13 @@ describe('renderYagniLive produce mapping', () => {
   });
 
   it('includes verbose table and lines when --verbose is set', async () => {
+    executeYagniMock.mockImplementation((options: ExecuteYagniOptions) => {
+      options.onDetectorStart?.('yagni:unused-config-surface');
+      options.onDetectorDone?.('yagni:unused-config-surface', 12);
+      options.onDetectorsSkipped?.(['yagni:disabled-stub']);
+      return stubExecuteOutcome(yagniEnvelopeWithSignals());
+    });
+
     await renderYagniLive({ cwd: '/proj', verbose: true }, stubCli());
     const outcome = await capturedSpec!.produce(vi.fn(), {
       setRunning: vi.fn(),
@@ -159,6 +198,29 @@ describe('renderYagniLive produce mapping', () => {
     expect(outcome.kind).toBe('done');
     if (outcome.kind !== 'done') return;
     expect(outcome.done.verboseLines?.length).toBeGreaterThan(0);
-    expect(outcome.done.table?.length).toBe(1);
+    expect(outcome.done.summary).toMatchObject({ passed: false, errors: 1, warnings: 1 });
+    expect(outcome.done.table).toEqual([
+      {
+        unit: 'yagni:unused-config-surface',
+        status: 'FAIL',
+        errors: 1,
+        warnings: 1,
+        durationMs: 12,
+      },
+      {
+        unit: 'yagni:passing-detector',
+        status: 'PASS',
+        errors: 0,
+        warnings: 0,
+        durationMs: 4,
+      },
+      {
+        unit: 'yagni:errored-detector',
+        status: 'ERROR',
+        errors: 0,
+        warnings: 0,
+        durationMs: 2,
+      },
+    ]);
   });
 });

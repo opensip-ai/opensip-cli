@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-osv-scanner",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "license": "Apache-2.0",
   "description": "External Tool Adapter for OSV-Scanner — wraps the osv-scanner dependency vulnerability scanner as an opensip-cli tool (opensip osv-scanner / opensip osv)",
   "keywords": [

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-26
-release: v0.1.15
+release: v0.1.16
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-cli makes with the outside world, and what changing each one would cost."
@@ -104,7 +104,7 @@ opensip
 └── uninstall              (remove ~/.opensip-cli/)
 ```
 
-Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/graph/engine/src/tool.ts); top-level commands like `init` and `configure` live in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/). The pack-management `plugin` group is mounted under each pack-supporting tool (`opensip fit plugin …`, `opensip sim plugin …`) — there is no top-level `opensip plugin`.
+Each command's flag list is owned by the Tool that registers it. `fit` flags live in [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/fitness/engine/src/tool.ts); `sim` flags in [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/simulation/engine/src/tool.ts); `graph` flags in [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/graph/engine/src/tool.ts); top-level commands like `init` and `configure` live in [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/cli/src/commands/). The pack-management `plugin` group is mounted under each pack-supporting tool (`opensip fit plugin …`, `opensip sim plugin …`) — there is no top-level `opensip plugin`.
 
 **Stability rule.** Removing a flag, removing a command, or changing a default value is a major-version change. Adding a flag with a safe default is a minor. Adding a command alias is also a minor when it is additive and documented; renaming without an alias is a major.
 
@@ -112,7 +112,7 @@ Each command's flag list is owned by the Tool that registers it. `fit` flags liv
 
 ## 2. Exit codes
 
-The integer the binary returns when it ends. Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/contracts/src/exit-codes.ts):
+The integer the binary returns when it ends. Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/contracts/src/exit-codes.ts):
 
 | Code | Constant | Meaning |
 |---|---|---|
@@ -135,10 +135,10 @@ The structured stdout when `--json` is set is a host-stamped outer
 `CommandOutcome`. For signal-producing tool runs (`fit`, `sim`, `graph`, `yagni`)
 the unchanged `SignalEnvelope` sits under `.envelope`; command-result data sits
 under `.data`; setup and command failures use `.errors`. This is the
-one-machine-output shape from [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md), layered on top of the signal currency from
-[ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md).
-Shapes live at [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/contracts/src/command-outcome.ts) and
-[`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/contracts/src/signal-envelope.ts):
+one-machine-output shape from [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md), layered on top of the signal currency from
+[ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md).
+Shapes live at [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/contracts/src/command-outcome.ts) and
+[`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/contracts/src/signal-envelope.ts):
 
 ```mermaid
 flowchart LR
@@ -216,21 +216,21 @@ renderer emits keys in declared order.
 
 ## 4. SARIF output
 
-SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/output/src/format/signal-sarif.ts)) — reached via the `cli.writeSarif` seam by `--report-to`, by `fit export --format baseline`, and by `graph --sarif <path>` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). Note `graph export --format baseline` is *not* a SARIF producer — it exports the graph gate **fingerprint** baseline as JSON for git-trackable enforcement; graph's SARIF comes from `graph --sarif`. The shape is the SARIF spec's, not ours — opensip-cli commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
+SARIF 2.1.0 is produced by the single shared `formatSignalSarif` formatter ([`packages/output/src/format/signal-sarif.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/output/src/format/signal-sarif.ts)) — reached via the `cli.writeSarif` seam by `--report-to`, by `fit export --format baseline`, and by `graph --sarif <path>` (the gate baselines themselves are stored as signals in SQLite, not SARIF; see surface 3 and the gate doc). Note `graph export --format baseline` is *not* a SARIF producer — it exports the graph gate **fingerprint** baseline as JSON for git-trackable enforcement; graph's SARIF comes from `graph --sarif`. The shape is the SARIF spec's, not ours — opensip-cli commits to producing valid SARIF 2.1.0, not to a custom shape. Consumers (GitHub Code Scanning, VS Code SARIF Viewer, custom CI tooling) can read these files with any SARIF parser.
 
 **Stability rule.** The fields opensip-cli fills in are: `runs[0].tool.driver.name = 'opensip-cli-<tool>'`, `runs[0].results[]` carrying `ruleId`, `message.text`, `level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`), and `locations[].physicalLocation.{artifactLocation, region}`. Future versions may fill in more SARIF fields; we won't stop filling in those.
 
-The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-cli internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/baseline-strategy.ts) and [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
+The gate's identity hash for diff matching is **not** SARIF-spec — it's an opensip-cli internal: `sha256(filePath + '\n' + ruleId + '\n' + message)`, deliberately excluding line numbers so unrelated line shifts don't register as added/resolved. See [`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/fitness/engine/src/baseline-strategy.ts) and [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
 
 **Baseline identity (ADR-0075).** Every `SignalEnvelope` carries `baselineIdentity: { fingerprintStrategyId, fingerprintStrategyVersion }` — the fingerprint strategy that stamped each signal's `fingerprint`. On `--gate-save`, the host persists this metadata in `tool_baseline_meta` alongside the captured rows. On `--gate-compare` and `export --format baseline`, the host checks that stored metadata matches the current strategy before diffing fingerprints. A mismatch (missing metadata, strategy id change, or version bump) is a configuration error with recapture guidance: re-run `--gate-save`. This is separate from ADR-0050 session/`tool_state` payload `__version` — baseline identity governs the ratchet plane only.
 
-Concurrent CLI invocations that share one project datastore coordinate writes with datastore-file and per-artifact locks ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). Optional env overrides are documented in [`70-reference/10-environment-variables.md`](/docs/opensip-cli/70-reference/10-environment-variables/#state-write-locking).
+Concurrent CLI invocations that share one project datastore coordinate writes with datastore-file and per-artifact locks ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). Optional env overrides are documented in [`70-reference/10-environment-variables.md`](/docs/opensip-cli/70-reference/10-environment-variables/#state-write-locking).
 
 ---
 
 ## 5. The Tool plugin contract
 
-Discussed at length in [`02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/). The interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/core/src/tools/types.ts):
+Discussed at length in [`02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/). The interface lives at [`packages/core/src/tools/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/core/src/tools/types.ts):
 
 ```ts
 interface Tool {
@@ -247,7 +247,7 @@ Plus the `ToolCliContext` injected into each command handler the host mounts
 from `commandSpecs`. A tool declares `commandSpecs` and the host mounts them;
 artifact exports go through `cli.writeArtifact(path, bytes)` or a narrower
 host-owned seam such as `cli.writeSarif`. See
-[ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0027-ga-parity-cutover.md).
+[ADR-0027](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0027-ga-parity-cutover.md).
 
 **Stability rule.** Adding optional fields to `Tool` (like `initialize?`) is a minor change. Adding required fields is a major. Adding methods to `ToolCliContext` is a minor (existing tools won't call them); removing or renaming methods is a major.
 
@@ -275,7 +275,7 @@ opensip-cli discovers third-party packages two different ways depending on what 
 }
 ```
 
-The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. Tool packages also carry the static identity manifest shown above, and the package's main entry must export a `tool: Tool` symbol with the same identity.
+The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/core/src/plugins/tool-package-discovery.ts) walks `node_modules` looking for the `opensipTools.kind === 'tool'` marker. Tool packages also carry the static identity manifest shown above, and the package's main entry must export a `tool: Tool` symbol with the same identity.
 
 ### Check packs — `opensipTools.kind` marker
 
@@ -292,7 +292,7 @@ The kernel's [`discoverToolPackages`](https://github.com/opensip-ai/opensip-cli/
 ```
 
 Graph adapters use `targetDomain: "graph-adapter"` with the same epoch fields.
-The canonical contract is the `opensipTools.kind: "fit-pack"` marker plus target-domain epoch ([ADR-0007](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0007-marker-canonical-plugin-discovery.md), ADR-0074). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. All first-party `@opensip-cli/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
+The canonical contract is the `opensipTools.kind: "fit-pack"` marker plus target-domain epoch ([ADR-0007](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/docs/decisions/ADR-0007-marker-canonical-plugin-discovery.md), ADR-0074). The fitness engine discovers marker-declared packs from project `node_modules`; `plugins.checkPackages:` can additionally name exact packages that do not declare the marker yet. All first-party `@opensip-cli/checks-*` packs carry the marker. A pack's main entry must export `checks: Check[]` (each carrying its own `config.icon`/`config.displayName`) and optionally `recipes: FitnessRecipe[]`. There is no separate `checkDisplay` export — display travels on the check (§5.3).
 
 For packs published under your own scope, declare the marker or pin the package explicitly in the project config:
 
@@ -314,7 +314,7 @@ Sim packs are discovered by **name-pattern**, not by a marker (ADR-0029): any in
 - **Changing what an existing shape requires is a major change.** A pack declaring the current `fit-pack` marker/epoch shape that exports `checks: Check[]` should keep working across minors.
 - **The Tool marker (`opensipTools.kind: 'tool'`) is a stable surface.** A future fifth kind would be a deliberate addition, not an accident.
 
-A tool's project-local plugin layout is described by a `PluginLayout` descriptor (`{ domain, userSubdirs }` — [`packages/core/src/plugins/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/core/src/plugins/types.ts)) that the tool declares on its `Tool.pluginLayout` and the kernel consumes. The `domain` is a plain string segment used for path resolution (`<project>/opensip-cli/<domain>/<kind>/` and `.runtime/plugins/<domain>/`), not a `package.json` `kind` value. The kernel deliberately does **not** enumerate the first-party domains — there is no `'fit' | 'sim' | 'lang'` union in core (ADR-0009 corollary 1).
+A tool's project-local plugin layout is described by a `PluginLayout` descriptor (`{ domain, userSubdirs }` — [`packages/core/src/plugins/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.16/packages/core/src/plugins/types.ts)) that the tool declares on its `Tool.pluginLayout` and the kernel consumes. The `domain` is a plain string segment used for path resolution (`<project>/opensip-cli/<domain>/<kind>/` and `.runtime/plugins/<domain>/`), not a `package.json` `kind` value. The kernel deliberately does **not** enumerate the first-party domains — there is no `'fit' | 'sim' | 'lang'` union in core (ADR-0009 corollary 1).
 
 ---
 
@@ -336,7 +336,7 @@ If you write a tool, a check pack, or a CI integration:
 
 - **Lean on the six surfaces above.** Anything in this doc is safe to depend on. Read the linked source files for the precise shape.
 - **Don't import internal types.** If you find yourself wanting `import { CheckConfig } from '@opensip-cli/fitness'`, take a step back — that import will move under your feet. Use `defineCheck()` instead, or open an issue to expose what you need as a stable surface.
-- **Pin to the current 0.x line.** `peerDependencies: { "@opensip-cli/core": "^0.1.15" }` is the right shape today. While opensip-cli is pre-1.0, a caret range on a `0.x` version locks to the *minor* (`^0.1.0` resolves to `>=0.1.0 <0.2.0`), so each **minor** (`0.y`) bump may carry breaking changes — treat `0.1 → 0.2` as a deliberate migration, not a safe upgrade. Once opensip-cli reaches `1.0.0`, this becomes the usual "pin to majors; patch and minor are safe."
+- **Pin to the current 0.x line.** `peerDependencies: { "@opensip-cli/core": "^0.1.16" }` is the right shape today. While opensip-cli is pre-1.0, a caret range on a `0.x` version locks to the *minor* (`^0.1.0` resolves to `>=0.1.0 <0.2.0`), so each **minor** (`0.y`) bump may carry breaking changes — treat `0.1 → 0.2` as a deliberate migration, not a safe upgrade. Once opensip-cli reaches `1.0.0`, this becomes the usual "pin to majors; patch and minor are safe."
 - **Test against `--json`, not against the table renderer.** The table renderer is for humans; the JSON output is the contract. Your CI integration parses JSON.
 
 ---

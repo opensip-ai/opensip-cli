@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/checks-cpp",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "license": "Apache-2.0",
   "description": "C/C++ fitness checks (clang-tidy backed)",
   "keywords": [

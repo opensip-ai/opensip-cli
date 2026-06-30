@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.1.15
+release: v0.1.16
 title: "The tool-plugin model"
 audience: [contributors, plugin-authors]
 purpose: "How the CLI doesn't know what a tool does. The Tool contract, the manifest, the unified loader, and what it takes to add a Tool."
@@ -327,8 +327,8 @@ export const tool = defineTool({
     "commands": [{ "name": "audit-sec", "description": "Run the audit" }]
   },
   "peerDependencies": {
-    "opensip-cli": "^0.1.15",
-    "@opensip-cli/core": "^0.1.15"
+    "opensip-cli": "^0.1.16",
+    "@opensip-cli/core": "^0.1.16"
   }
 }
 ```
@@ -362,7 +362,7 @@ If your tool also wants to ship checks (the way `@opensip-cli/checks-typescript`
 Three things, in order of importance:
 
 1. **A stable kernel.** `@opensip-cli/core` does not import any tool. The layer policy ([dependency-cruiser config](../../../.config/dependency-cruiser.cjs)) enforces this — the build fails if `core` ever reached up. A kernel bump can't break a tool, because the kernel can't see the tool.
-2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to compatible first-party tool releases, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec` release while staying on `opensip-cli@0.1.15`.
+2. **Independent tool versioning.** Each Tool package has its own version. The CLI is pinned to compatible first-party tool releases, but third-party tools release on their own cadence. A user can pin a third-party `@yourorg/audit-sec` release while staying on `opensip-cli@0.1.16`.
 3. **A future where `fit` is just one of many tools.** The platform was designed for `audit-*`, `lint-*`, `report-*`, `bench-*`, and similar Tools to slot in by shipping a manifest + `commandSpecs`, inheriting every host-owned plane (output, progress, config, sessions, dashboard). Today there are four first-party tools (`fit`, `sim`, `graph`, `yagni`); the CLI grows by zero lines for the next one.
 
 ---

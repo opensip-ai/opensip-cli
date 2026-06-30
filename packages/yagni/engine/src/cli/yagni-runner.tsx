@@ -59,8 +59,6 @@ export interface YagniLiveArgs {
   readonly pathRoots?: readonly string[];
 }
 
-export type YagniWorkerSpec = YagniLiveArgs;
-
 function rowStatus(unit: UnitResult): LiveRunTableRow['status'] {
   if (unit.error !== undefined) return 'ERROR';
   return unit.passed ? 'PASS' : 'FAIL';
