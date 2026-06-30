@@ -120,6 +120,9 @@ function deriveCommandShell(spec) {
   shell.scope = spec.scope;
   shell.output = spec.output;
   if (spec.rawStreamReason !== undefined) shell.rawStreamReason = spec.rawStreamReason;
+  // Carry the verdict-capability so the host (which synthesizes external tools
+  // from the manifest, no runtime import) knows a scan command is suite-eligible.
+  if (spec.producesVerdict !== undefined) shell.producesVerdict = spec.producesVerdict;
   return shell;
 }
 

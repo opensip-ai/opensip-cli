@@ -9,6 +9,7 @@ import { collectYagniReportData } from './cli/report-data.js';
 import { buildYagniCommandSpec } from './cli/yagni-command-spec.js';
 import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 import { renderYagniLive, type YagniLiveArgs } from './cli/yagni-runner.js';
+import { yagniRunWorkerCommandSpec } from './cli/yagni-worker.js';
 import { YAGNI_IDENTITY, YAGNI_LIVE_VIEW_KEY } from './identity.js';
 
 /**
@@ -31,7 +32,7 @@ export const yagniTool: Tool = defineTool({
     version: readPackageVersion(import.meta.url),
     description: 'YAGNI reduction audit — find speculative surface to remove',
   },
-  commandSpecs: [buildYagniCommandSpec(setUpYagniLiveView)],
+  commandSpecs: [buildYagniCommandSpec(setUpYagniLiveView), yagniRunWorkerCommandSpec],
   extensionPoints: {
     contractVersions: {
       yagni: YAGNI_CONTRACT_VERSION,

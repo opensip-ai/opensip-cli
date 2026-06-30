@@ -1,5 +1,4 @@
 // @fitness-ignore-file unused-config-options -- Config options reserved for future use or environment-specific
-// @fitness-ignore-file silent-early-returns -- Guard clauses in pattern matching function return false for non-matching patterns
 /**
  * @fileoverview Context mutation safety check — flags direct mutation of
  * request/execution context objects, which causes side effects across

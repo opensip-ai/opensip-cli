@@ -9,7 +9,6 @@ import { Banner, UpdateHint, normalizeBannerSize } from './banner.js';
 import { ErrorMessage } from './error-message.js';
 import { LiveProgress } from './live-progress.js';
 import { liveRunTable } from './live-run-table.js';
-import { ProjectHeader } from './project-header.js';
 import { renderToInk } from './render-to-ink.js';
 import { RunFooterHints } from './run-footer-hints.js';
 import { RunHeader } from './run-header.js';
@@ -32,7 +31,6 @@ const NO_PROGRESS: (cb: ProgressCallback) => void = () => {
 function liveRunHeader(props: LiveRunProps): React.ReactElement | null {
   if (props.quiet) return null;
   const bannerSize = normalizeBannerSize(props.ui?.bannerSize);
-  const showProjectHeader = bannerSize !== 'mini';
   const showHeader = props.showRunHeader !== false;
 
   const bannerBlock = (
@@ -44,10 +42,7 @@ function liveRunHeader(props: LiveRunProps): React.ReactElement | null {
         walkedUp={props.walkedUp}
         update={props.ui?.update}
       />
-      {bannerSize === 'mini' && props.ui?.update !== undefined && <UpdateHint />}
-      {showProjectHeader && props.projectPath !== undefined && (
-        <ProjectHeader root={props.projectPath} walkedUp={props.walkedUp} />
-      )}
+      {props.ui?.update !== undefined && <UpdateHint />}
     </>
   );
 

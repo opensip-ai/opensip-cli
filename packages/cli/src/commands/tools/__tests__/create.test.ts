@@ -169,6 +169,11 @@ describe('toolsCreate', () => {
     expect(runtime).toContain(`id: '${manifest.stableId}'`);
     expect(runtime).toContain('cli.logger.info');
     expect(runtime).toContain('cli.reportFailure');
+    const config = readFileSync(join(tmp, 'opensip-cli.config.yml'), 'utf8');
+    expect(config).toContain('tools:');
+    expect(config).toContain('trusted:');
+    expect(config).toContain('"hello-tools"');
+    expect(result.nextSteps?.join('\n')).not.toContain('OPENSIP_CLI_ALLOW_PROJECT_TOOLS');
   });
 
   it('scaffolds ts-local package files', () => {
@@ -209,6 +214,18 @@ describe('toolsCreate', () => {
     expect(source).toContain('createToolLogger');
     expect(source).toContain('reportFailure');
     expect(result.nextSteps?.some((step) => step.includes('pnpm install'))).toBe(true);
+    expect(readFileSync(join(tmp, 'opensip-cli.config.yml'), 'utf8')).toContain('typed-tool');
+    expect(result.nextSteps?.join('\n')).not.toContain('OPENSIP_CLI_ALLOW_PROJECT_TOOLS');
+  });
+
+  it('refuses to overwrite malformed tools.trusted config', () => {
+    tmp = mkdtempSync(join(tmpdir(), 'ost-tools-create-'));
+    writeFileSync(join(tmp, 'opensip-cli.config.yml'), 'tools:\n  trusted: audit-sec\n');
+
+    const result = toolsCreate({ toolId: 'audit-sec', projectRoot: tmp });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('tools.trusted must be a sequence');
   });
 
   it('a scaffolded tool passes `tools validate` static sections (create→validate loop)', async () => {

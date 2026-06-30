@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
+import { detectorDoneEvent, detectorLabel, detectorStartEvent } from '../cli/yagni-progress.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
 import type { YagniDetector } from '../detectors/types.js';
@@ -31,6 +32,27 @@ const throwingStub: YagniDetector = {
 };
 
 describe('executeYagni detector progress callbacks (phases live view)', () => {
+  it('formats detector labels and progress events', () => {
+    expect(detectorLabel('yagni:unused-config-surface')).toBe('Unused Config Surface');
+    expect(detectorLabel('yagni:multi--dash')).toBe('Multi  Dash');
+    expect(detectorStartEvent('yagni:unused-config-surface')).toEqual({
+      type: 'stage-start',
+      stage: 'yagni:unused-config-surface',
+      label: 'Unused Config Surface',
+    });
+    expect(detectorDoneEvent('yagni:unused-config-surface', 12)).toEqual({
+      type: 'stage-done',
+      stage: 'yagni:unused-config-surface',
+      durationMs: 12,
+    });
+    expect(detectorDoneEvent('yagni:unused-config-surface', 0, 'skipped')).toEqual({
+      type: 'stage-done',
+      stage: 'yagni:unused-config-surface',
+      durationMs: 0,
+      detail: 'skipped',
+    });
+  });
+
   it('reports start/done per detector that runs, and skips disabled detectors', async () => {
     const started: string[] = [];
     const done: { slug: string; durationMs: number }[] = [];

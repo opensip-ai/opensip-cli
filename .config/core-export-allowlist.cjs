@@ -297,6 +297,7 @@ const EXPORT_ALLOWLIST = {
   UnknownLiveViewError: 'tool-plugin-contract',
   assertCommandSpec: 'tool-plugin-contract',
   assertManifestMatchesTool: 'tool-plugin-contract',
+  commandProducesVerdict: 'tool-plugin-contract',
   applyToolContributeScope: 'tool-plugin-contract',
   buildToolIdentityIndex: 'tool-plugin-contract',
   checkCompatibility: 'tool-plugin-contract',

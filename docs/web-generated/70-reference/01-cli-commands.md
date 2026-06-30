@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-28
-release: v0.1.15
+release: v0.1.19
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
@@ -32,7 +32,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
 
 ---
 
@@ -132,11 +132,26 @@ This is distinct from `--report-to`: that path explicitly POSTs **SARIF** to
 **any** receiver (and can fail a CI build via exit 4), whereas cloud sync emits
 **native signals** to **OpenSIP Cloud** automatically and best-effort.
 
+### JSON run provenance
+
+Run commands that emit a `SignalEnvelope` also carry host-stamped
+`declaredInputs` metadata in JSON/SARIF/report delivery paths. It records a small
+allowlist of verdict-relevant runtime facts: CLI version, Node version, package
+manager, platform, tool id, available engine/tool version, and baseline
+fingerprint identity. It does not include environment dumps, absolute paths, or
+secrets.
+
+Use it when comparing CI or agent runs:
+
+```bash
+opensip fit --json | jq '.envelope.declaredInputs'
+```
+
 ---
 
 ## `fit` — run fitness checks
 
-Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/fitness/engine/src/tool.ts).
+Tool-owned: [`packages/fitness/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/fitness/engine/src/tool.ts).
 
 ```
 opensip fit
@@ -186,7 +201,7 @@ opensip fit --gate-compare
 
 ## `sim` — run simulation scenarios
 
-Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/simulation/engine/src/tool.ts).
+Tool-owned: [`packages/simulation/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/simulation/engine/src/tool.ts).
 
 ```
 opensip sim
@@ -217,7 +232,7 @@ opensip sim --recipe <name>
 
 ## `graph` — static call-graph + dead-end analysis
 
-Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-cli/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
+Tool-owned: [`packages/graph/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/graph/engine/src/tool.ts). The pipeline architecture and cache invalidation are documented in [`40-graph/01-stages-and-catalog.md`](/docs/opensip-cli/40-graph/01-stages-and-catalog/); perf-plan history is recoverable from `git -P log -- packages/graph`.
 
 ```
 # Whole project (language auto-detected)
@@ -335,7 +350,7 @@ indexes, and report views consume.
 
 ## `yagni` — advisory reduction audit
 
-Tool-owned: [`packages/yagni/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/yagni/engine/src/tool.ts).
+Tool-owned: [`packages/yagni/engine/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/yagni/engine/src/tool.ts).
 
 `opensip yagni` surfaces evidence-backed opportunities to reduce code while preserving behavior. Findings are **advisory** by default (`failOnErrors: 0`, `failOnWarnings: 0` in config) — the run exits 0 unless you raise those thresholds. Each signal carries `metadata.yagni` (confidence, preservation argument, validation steps, evidence). Deeper narrative: [`55-yagni/01-command-reference.md`](/docs/opensip-cli/55-yagni/01-command-reference/).
 
@@ -371,7 +386,7 @@ opensip yagni packages/cli/src
 
 ## `mcp` — serve the call graph + results to agents over stdio
 
-Tool-owned: [`packages/mcp/src/command.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/mcp/src/command.ts) (the bundled `@opensip-cli/mcp` tool, [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0084-mcp-server-surface.md)).
+Tool-owned: [`packages/mcp/src/command.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/mcp/src/command.ts) (the bundled `@opensip-cli/mcp` tool, [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0084-mcp-server-surface.md)).
 
 `opensip mcp` is a **long-lived, blocking [Model Context Protocol](https://modelcontextprotocol.io) server**. Unlike every other command, it does not run an analysis and exit — an MCP-capable coding agent (Claude Code, Codex, …) spawns it as a child process and speaks **JSON-RPC over stdio** for the whole session. **stdout carries only JSON-RPC frames**; every log line and diagnostic goes to **stderr**. The server blocks until stdin reaches EOF (or a graceful SIGINT), then exits 0. Because the protocol genuinely owns stdout, the command is declared `output: 'raw-stream'` with `rawStreamReason: 'mcp-stdio'` (see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/)); it emits no `SignalEnvelope`, persists no session, and renders no banner.
 
@@ -462,7 +477,7 @@ The command reads from the catalog stored in `<project>/opensip-cli/.runtime/dat
 
 ## `graph impact` — changed→impact analysis
 
-Tool-owned (graph Tool). Read-only analysis of what changed and what depends on it — combining git change detection (or explicit files) with the persisted graph catalog. Rebuilds the catalog when missing ([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0085-change-detection-substrate.md)).
+Tool-owned (graph Tool). Read-only analysis of what changed and what depends on it — combining git change detection (or explicit files) with the persisted graph catalog. Rebuilds the catalog when missing ([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0085-change-detection-substrate.md)).
 
 ```
 opensip graph impact --changed --json
@@ -660,7 +675,7 @@ The dogfood CI uses this command to write `fit.sarif` after a `fit --gate-save` 
 
 ## `init` — scaffold the project layout
 
-CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/init.ts).
+CLI-owned: [`packages/cli/src/commands/init.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/init.ts).
 
 ```
 opensip init
@@ -747,7 +762,7 @@ Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to
 
 ## `config` — validate project config and export JSON Schema
 
-CLI-owned: [`packages/cli/src/commands/host-subcommand-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/host-subcommand-config.ts). Operator workflows over the **project** `opensip-cli.config.yml` using the same composed schema the dispatcher validates at pre-action time. Distinct from `opensip configure`, which manages the user-global OpenSIP Cloud API key.
+CLI-owned: [`packages/cli/src/commands/host-subcommand-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/host-subcommand-config.ts). Operator workflows over the **project** `opensip-cli.config.yml` using the same composed schema the dispatcher validates at pre-action time. Distinct from `opensip configure`, which manages the user-global OpenSIP Cloud API key.
 
 ```
 opensip config validate [--config <path>] [--json] [--cwd <path>]
@@ -759,13 +774,13 @@ opensip config schema [--json] [--out <path>] [--cwd <path>]
 | `validate` | `--json` | Validate the effective project config; on success emit `data.type: "config-validate"`; invalid config exits **2** (`CONFIGURATION_ERROR`). |
 | `schema` | `--json`, `--out <path>` | Export the composed JSON Schema (`data.type: "config-schema"`); `--out` writes the schema file (rejects directory targets). |
 
-Both subcommands compose declarations from the live tool registry and admitted manifests — the same source as [`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/bootstrap/config-and-capabilities.ts). They do not open the SQLite datastore.
+Both subcommands compose declarations from the live tool registry and admitted manifests — the same source as [`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/bootstrap/config-and-capabilities.ts). They do not open the SQLite datastore.
 
 ---
 
 ## `configure` — manage user-level settings
 
-CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/configure.ts). Interactive — writes the OpenSIP Cloud API key to `~/.opensip-cli/config.yml` and verifies it best-effort against the cloud entitlement endpoint.
+CLI-owned: [`packages/cli/src/commands/configure.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/configure.ts). Interactive — writes the OpenSIP Cloud API key to `~/.opensip-cli/config.yml` and verifies it best-effort against the cloud entitlement endpoint.
 
 ```
 opensip configure
@@ -787,7 +802,7 @@ The user-level config is shared across every project on the machine. `opensip fi
 `fit`, `graph`, and `sim` primary runs support the same agent filter flags on
 `--json` (and `sessions show` replay uses the same engine). Filters are a
 **presentation concern only** — gate, egress, and session persistence use the
-unfiltered envelope ([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0085-change-detection-substrate.md)).
+unfiltered envelope ([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0085-change-detection-substrate.md)).
 
 | Token | Effect |
 |---|---|
@@ -890,7 +905,7 @@ opensip suite add security --tool fitness --command fit --arg recipe=security
 |---|---|---|
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
-| `run` | `--json` | Emit the suite summary as JSON. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts and per-step verdict counts when a step emitted an envelope. Step output still flows through each step's own output seams. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -902,13 +917,22 @@ Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
 
-**See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites).
+`suite run --json` keeps the original step fields (`tool`, `stableId`,
+`command`, `exitCode`, `durationMs`, `error`) and additively includes
+`data.aggregate` (`steps`, `passed`, `failed`, `faulted`, `errors`, `warnings`).
+Each `data.steps[].verdict` is present only when that step emitted a
+`SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
+`findings`) so suite summaries do not leak signal messages, file paths, symbols,
+or match content. See [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md).
+
+**See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites),
+[`04-json-output-schema.md#suite-run-results`](/docs/opensip-cli/70-reference/04-json-output-schema/#suite-run-results).
 
 ---
 
 ## `<tool> plugin add/remove/list/sync` — manage a tool's extension packs
 
-CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/plugin.ts).
+CLI-owned: [`packages/cli/src/commands/plugin.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/plugin.ts).
 
 The pack-management `plugin` group is mounted **under each pack-supporting tool primary** — the domain is bound from the tool, so there is **no top-level `opensip plugin`** and **no `--domain` flag**. `fit` and `sim` support packs; `graph` does not (its extensibility is language adapters), so it has no `plugin` group.
 
@@ -957,21 +981,20 @@ opensip tools data-purge <tool-id>
 
 ## External tool adapters (opt-in)
 
-Tool-owned: [`@opensip-cli/external-tool-adapter`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/external-tool-adapter) + the three MVP adapter packages ([ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md)).
+Tool-owned: [`@opensip-cli/external-tool-adapter`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/external-tool-adapter) + the three MVP adapter packages ([ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md)).
 
-An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want, then trust it. To author your own, see [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/).
+An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want. To author your own, see [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/).
 
 The full user flow:
 
 ```
 opensip tools install @opensip-cli/tool-gitleaks   # opt-in, not bundled
-export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='gitleaks' # trust it (deny-by-default)
 opensip gitleaks doctor                            # binary found? version? posture? ready?
 opensip gitleaks                                   # scan → normalize → store → signals
 opensip gitleaks --json --gate-compare             # envelope + net-new ratchet
 ```
 
-> **You must trust the tool after installing it.** Installed tools are **deny-by-default**: a bare `opensip gitleaks` errors *tool-not-found* until you add the adapter's manifest `id` to `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` (comma/whitespace-separated; `*` admits all). The trust value is the manifest **`id`** — `gitleaks`, `osv-scanner`, `trivy` — **not** the UUID. `opensip tools install` prints the exact export in its `nextSteps`. This is the headline gotcha: install alone is not enough. The same trust surface and `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) apply to all three.
+`opensip tools install` validates the package, installs the validated bytes, and records a managed trust entry for the selected scope. Ambient `node_modules` Tool packages remain deny-by-default; `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` is an override for incident response/manual experiments. The same `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) applies to all three adapters.
 
 ### The three MVP adapters
 
@@ -995,13 +1018,13 @@ Each adapter mounts three commands — the primary `scan` (`opensip <tool>`), pl
 
 ### The gate ratchet, JSON, and the artifact store
 
-Adapters inherit the host-owned baseline ratchet ([ADR-0036](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0036-host-owned-baseline-ratchet-plane.md)) verbatim, the same as `fit`/`graph`:
+Adapters inherit the host-owned baseline ratchet ([ADR-0036](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0036-host-owned-baseline-ratchet-plane.md)) verbatim, the same as `fit`/`graph`:
 
 - **`--gate-save`** — capture the current findings as the project baseline in the SQLite store (mutually exclusive with `--gate-compare`).
 - **`--gate-compare`** — diff against the saved baseline; exit non-zero on a net-new finding (the `failOnDegraded` reserved key). Findings are fingerprinted with the line-shift-tolerant `message-hash` strategy.
 - **`--json`** — emit the `SignalEnvelope` for machine consumption (the same envelope the gate and egress read).
 
-The scanner's **raw native report** persists under `<project>/opensip-cli/.runtime/artifacts/<tool>/<runId>/` (host-owned, [ADR-0080](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0080-host-owned-artifact-write-seam.md)/[ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md)): **`0600`** (owner-only), **gitignored**, and **never egressed** — only normalized, redacted `Signal`s leave the process. The host keeps the most-recent run-dirs per tool and prunes the rest after each write, governed by **`cli.artifacts.keep`** in `opensip-cli.config.yml` (default **10**; `0` disables pruning). Secret-scanner findings are **redacted** — only a short non-reversible preview reaches the signal, never the matched credential.
+The scanner's **raw native report** persists under `<project>/opensip-cli/.runtime/artifacts/<tool>/<runId>/` (host-owned, [ADR-0080](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0080-host-owned-artifact-write-seam.md)/[ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md)): **`0600`** (owner-only), **gitignored**, and **never egressed** — only normalized, redacted `Signal`s leave the process. The host keeps the most-recent run-dirs per tool and prunes the rest after each write, governed by **`cli.artifacts.keep`** in `opensip-cli.config.yml` (default **10**; `0` disables pruning). Secret-scanner findings are **redacted** — only a short non-reversible preview reaches the signal, never the matched credential.
 
 ### Binary resolution
 
@@ -1044,7 +1067,7 @@ The worker commands are not the public authoring surface; they exist so parent c
 
 ## `completion` — print shell completion script
 
-CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/completion.ts).
+CLI-owned: [`packages/cli/src/commands/completion.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/completion.ts).
 
 ```
 opensip completion bash
@@ -1067,7 +1090,7 @@ The emitted script is static (your shell sources it once), but its contents are 
 
 ## `uninstall` — remove opensip-cli state
 
-CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/cli/src/commands/uninstall.ts).
+CLI-owned: [`packages/cli/src/commands/uninstall.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/cli/src/commands/uninstall.ts).
 
 ```
 opensip uninstall                       # remove ~/.opensip-cli/
@@ -1103,8 +1126,8 @@ Both modes:
 
 State contract enforced by code: `~/.opensip-cli/` holds `config.yml` only.
 Persistence and logging modules throw when asked to write there (see
-[`paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/core/src/lib/paths.ts),
-[`logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/packages/core/src/lib/logger.ts)). Anything else in that
+[`paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/lib/paths.ts),
+[`logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/lib/logger.ts)). Anything else in that
 directory is considered extra user-level state and is swept up by the default
 `uninstall`.
 
@@ -1120,14 +1143,14 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 
 The CLI checks npm for a newer version at most once an hour on TTY sessions
 (non-blocking product update I/O, not telemetry — see
-[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0073-update-notification-policy.md)). The *fetch*
+[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0073-update-notification-policy.md)). The *fetch*
 is rate-limited to that interval, but once a newer version is found the *notice*
 persists on **every** run until you upgrade — so it's never lost if you miss it
 once — and disappears on its own the run after you update. When an update is
 available it surfaces without nagging:
 
-- On the default `mini` banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
-- On the `lg`/`md`/`sm` banners (and the `--json` path, which renders no banner), the same upgrade command is printed as a one-line note on stderr.
+- On the coffee-cup banner, the version line shows `(<new-version> available)` and a dim `↑ Update: curl -fsSL https://opensip.ai/cli/install.sh | bash` line prints just below the banner.
+- On the `--json` path, which renders no banner, the same upgrade command is printed as a one-line note on stderr.
 
 Silence the check entirely with `OPENSIP_NO_UPDATE=1` (or the conventional `NO_UPDATE_NOTIFIER=1`). It's also skipped automatically when `CI` is set or stdout isn't a TTY. Check your installed version any time with `opensip --version`.
 

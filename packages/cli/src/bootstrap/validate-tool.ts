@@ -15,8 +15,8 @@
  * tool's module is imported. The compatibility gate (`admitTool`) and the
  * project-local TRUST gate (`admitProjectLocalTool`, deny-by-default) run
  * on the STATIC manifest *before* import — so a project-local executable
- * tool that is not allowlisted is fail-closed without its code ever running,
- * and never reaches `isValidTool`.
+ * tool that is not trusted is fail-closed without its code ever running, and
+ * never reaches `isValidTool`.
  */
 
 import { validateCommandSpec, validateToolIdentity, type Tool } from '@opensip-cli/core';

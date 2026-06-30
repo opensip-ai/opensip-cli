@@ -47,13 +47,13 @@
       "entry": ["src/sqlite-graph-read-port.ts", "src/session-results-read-port.ts"]
     },
     "packages/tool-gitleaks": {
-      "ignoreDependencies": ["@opensip-cli/contracts"]
+      "ignoreDependencies": ["@opensip-cli/contracts", "opensip-cli"]
     },
     "packages/tool-osv-scanner": {
-      "ignoreDependencies": ["@opensip-cli/contracts"]
+      "ignoreDependencies": ["@opensip-cli/contracts", "opensip-cli"]
     },
     "packages/tool-trivy": {
-      "ignoreDependencies": ["@opensip-cli/contracts"]
+      "ignoreDependencies": ["@opensip-cli/contracts", "opensip-cli"]
     },
     "packages/dashboard": {
       "entry": ["src/client/index.ts", "src/client/globals.ts", "scripts/*.mjs"],

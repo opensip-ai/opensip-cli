@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.1.15
+release: v0.1.19
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
@@ -33,6 +33,112 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
 
+## Suite Run Results
+
+`opensip suite run <name> --json` emits a `CommandOutcome` whose `.data` is a
+`SuiteRunResult` ([ADR-0093](../../decisions/ADR-0093-host-owned-suite-plane.md),
+[ADR-0100](../../decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md)).
+The suite exit code remains the worst step exit code. The aggregate and
+per-step verdict fields are additive; older fields keep their names and types.
+
+```jsonc
+{
+  "kind": "suite-run",
+  "status": "ok",
+  "exitCode": 1,
+  "data": {
+    "type": "suite-run",
+    "suite": "security",
+    "suiteRunId": "suite_3c4e8a1b9d21",
+    "exitCode": 1,
+    "durationMs": 1842,
+    "aggregate": {
+      "steps": 3,
+      "passed": 1,
+      "failed": 1,
+      "faulted": 1,
+      "errors": 2,
+      "warnings": 4
+    },
+    "steps": [
+      {
+        "tool": "fitness",
+        "stableId": "00000000-0000-4000-8000-000000000111",
+        "command": "fit",
+        "exitCode": 0,
+        "durationMs": 612,
+        "verdict": {
+          "passed": true,
+          "errors": 0,
+          "warnings": 4,
+          "findings": 4
+        }
+      },
+      {
+        "tool": "graph",
+        "stableId": "00000000-0000-4000-8000-000000000222",
+        "command": "graph",
+        "exitCode": 1,
+        "durationMs": 740,
+        "verdict": {
+          "passed": false,
+          "errors": 2,
+          "warnings": 0,
+          "findings": 2
+        }
+      },
+      {
+        "tool": "sim",
+        "stableId": "00000000-0000-4000-8000-000000000333",
+        "command": "sim",
+        "exitCode": 1,
+        "durationMs": 490,
+        "error": "scenario faulted"
+      }
+    ]
+  }
+}
+```
+
+### `SuiteRunResult`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | `"suite-run"` | yes | Discriminant for suite run command results. |
+| `suite` | string | yes | Suite name from `suites.<name>`. |
+| `suiteRunId` | string | yes | Host-generated id shared by the step sessions produced in the run. |
+| `exitCode` | number | yes | Worst step exit code. |
+| `durationMs` | number | yes | Host-measured suite duration. |
+| `aggregate` | object | no | Additive roll-up over step summaries. Present on current CLI output; optional for compatibility. |
+| `steps` | `SuiteStepSummary[]` | yes | One summary per configured step, in execution order. |
+
+### `SuiteAggregate`
+
+| Field | Type | Description |
+|---|---|---|
+| `steps` | number | Total configured steps that ran. |
+| `passed` | number | Steps with a passing emitted verdict and successful step exit. |
+| `failed` | number | Non-faulted steps with a failing emitted verdict or non-zero step exit. |
+| `faulted` | number | Steps that threw or faulted before completing normally. |
+| `errors` | number | Sum of `steps[].verdict.errors` across envelope-emitting steps. |
+| `warnings` | number | Sum of `steps[].verdict.warnings` across envelope-emitting steps. |
+
+### `SuiteStepSummary`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `tool` | string | yes | Tool display name. |
+| `stableId` | string | yes | Stable tool UUID used by suite config. |
+| `command` | string | yes | Command run for this step. |
+| `exitCode` | number | yes | Captured step exit code. |
+| `durationMs` | number | yes | Host-measured step duration. |
+| `error` | string | no | Error message when the step faulted. |
+| `verdict` | object | no | Counts-only projection of the step's last emitted `SignalEnvelope`. Absent means the step emitted no envelope. |
+
+`steps[].verdict` contains only `passed`, `errors`, `warnings`, and `findings`
+(`SignalEnvelope.signals.length`). It intentionally excludes signal messages,
+file paths, symbols, match snippets, and raw scanner output.
+
 ## The `SignalEnvelope`
 
 ```jsonc
@@ -58,6 +164,18 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
   "baselineIdentity": {
     "fingerprintStrategyId": "opensip.default.rule-file-line-col",
     "fingerprintStrategyVersion": 1
+  },
+  "declaredInputs": {
+    "cliVersion": "0.1.16",
+    "nodeVersion": "24.16.0",
+    "packageManager": "pnpm@11.5.1",
+    "platform": "darwin/arm64",
+    "tool": "fit",
+    "engineVersion": "0.1.16",
+    "baselineIdentity": {
+      "fingerprintStrategyId": "opensip.default.rule-file-line-col",
+      "fingerprintStrategyVersion": 1
+    }
   }
 }
 ```
@@ -75,7 +193,42 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 | `units` | `UnitResult[]` | yes | Per-unit ran/errored/timing facts. May be `[]`. |
 | `signals` | `Signal[]` | yes | The flat list of findings the run produced. May be `[]`. |
 | `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](../../decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
+| `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](../../decisions/ADR-0097-gate-verdict-determinism.md)). |
 | `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
+
+### `DeclaredInputs`
+
+`declaredInputs` is added by the host before JSON outcome rendering, delivery,
+SARIF reporting, and dashboard/report composition. It is an allowlist, not an
+environment dump.
+
+```jsonc
+{
+  "cliVersion": "0.1.16",
+  "nodeVersion": "24.16.0",
+  "packageManager": "pnpm@11.5.1",
+  "platform": "darwin/arm64",
+  "tool": "fit",
+  "engineVersion": "0.1.16",
+  "baselineIdentity": {
+    "fingerprintStrategyId": "opensip.default.rule-file-line-col",
+    "fingerprintStrategyVersion": 1
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `cliVersion` | string | yes | Installed opensip-cli package version that emitted the envelope. |
+| `nodeVersion` | string | yes | `process.versions.node` from the host process. |
+| `packageManager` | string | no | Nearest `package.json#packageManager`, falling back to the first package token in `npm_config_user_agent`. |
+| `platform` | string | yes | Host platform/architecture, e.g. `darwin/arm64`. |
+| `tool` | string | yes | Tool id for the run envelope. |
+| `engineVersion` | string | no | Tool/engine package version when available from the active tool manifest. |
+| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | no | Baseline fingerprint identity copied from the envelope. |
+
+The manifest intentionally excludes absolute paths, full environment variables,
+credentials, and config payloads.
 
 ### `RunVerdict`
 

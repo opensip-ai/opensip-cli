@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.1.15
+release: v0.1.19
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
@@ -64,6 +64,7 @@ The effective tool inventory: bundled tools, user-global installs
 | `tool` | The tool's stable id (from its manifest). |
 | `version` | Manifest version. |
 | `source` | `bundled`, `global`, or `project`. |
+| `trust` | Why the row is admitted or denied: `bundled`, `managed-install`, `project-config`, `env`, `user-global`, or `denied`. |
 | `commands` | Command names the manifest declares. |
 | `[manifest-only]` | Present on disk but not loaded by this run (e.g. a broken runtime — listing never imports, so it still lists). |
 | `[shadowed]` | A global row whose tool id is overridden by a project-local install (project wins, matching discovery order). |
@@ -110,9 +111,9 @@ kebab-case and becomes the primary subcommand name. Generated sidecars include
 | `ts-local` | `--template ts-local` | Typed package (`src/`, `package.json`, tests) |
 
 Pass `--force` to overwrite scaffold files when the directory already exists.
-`tools create` writes files only — it does not install dependencies, build, or
-allowlist the tool. Structured `nextSteps` in `--json` output point at
-`tools validate` and the project-local allowlist.
+`tools create` writes the scaffold and adds the tool id to `tools.trusted`; it
+does not install dependencies or build. Structured `nextSteps` in `--json`
+output point at validation and the first run command.
 
 ```bash
 opensip tools create my-audit
@@ -120,10 +121,11 @@ opensip tools create my-audit --template ts-local
 opensip tools create my-audit --force
 ```
 
-Project-local tools remain deny-by-default until
-`OPENSIP_CLI_ALLOW_PROJECT_TOOLS` includes the tool id. See
+Project-local tools remain deny-by-default unless the project config lists their
+tool id under `tools.trusted`. `tools create` adds that entry for the scaffolded
+tool. See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/) and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## `tools install <spec>`
 
@@ -139,14 +141,17 @@ A failed install leaves no discoverable tool behind. Default scope is
 **global** (available in every project for this user); `--project` installs
 into this project's runtime tool host instead.
 
-Installed npm tools are deny-by-default. A successful install returns structured
-`nextSteps` (and renders them in text mode), including the exact allowlist export
-and first command to try, for example:
+Installed npm tools are deny-by-default when found ambiently in `node_modules`.
+A successful `tools install` persists a managed trust record for the selected
+scope and returns structured `nextSteps` (and renders them in text mode) with
+the first command to try, for example:
 
 ```bash
-export OPENSIP_CLI_ALLOW_INSTALLED_TOOLS='audit-sec'
 opensip audit-sec
 ```
+
+`OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` remains available as an override for manual
+experiments or incident response, but it is not part of the normal install path.
 
 ## `tools uninstall <name-or-id>`
 
@@ -160,6 +165,9 @@ manifest scans and shows what it resolved before removing. Rules:
 
 `--purge-data` (project scope only — runtime data lives per project) also
 runs the data purge below after a successful uninstall.
+
+Successful uninstall removes the matching managed trust record. It does not edit
+committed `tools.trusted`; that field is for tracked project-local authored tools.
 
 ## `tools data-purge <tool-id>`
 
@@ -183,7 +191,7 @@ group level deep).
 `tools list` and `tools validate` surface trust tier and install provenance
 metadata where available. **Enforcement** of consumption-side provenance
 (install/load verification for non-bundled npm packages) is defined in
-[ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0068-consumption-side-verification-policy.md) but
+[ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0068-consumption-side-verification-policy.md) but
 **not active** in the loader yet — enterprise strict mode will deny missing or
 mismatched provenance unless an approved exception exists. Bundled first-party
 tools remain trusted TCB verified by the release provenance lane.

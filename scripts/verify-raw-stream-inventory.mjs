@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const BUDGET = 12;
+const BUDGET = 13;
 
 const BUNDLED_TOOL_DIRS = [
   'packages/fitness/engine',

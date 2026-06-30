@@ -236,7 +236,16 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         contributeScope: () => ({ scopedTool: { ready: true } }),
       },
     } satisfies Tool;
-    const runtime = runtimeWith([tool]);
+    const runtime = {
+      ...runtimeWith([tool]),
+      startupTimings: [
+        {
+          name: 'installed-tool-discovery',
+          durationMs: 4.2,
+          sinceStartMs: 5.1,
+        },
+      ],
+    };
     const plan = planPreActionBootstrap({
       opts: {},
       cwd: tmp,
@@ -269,6 +278,27 @@ describe('executePostBailoutBootstrap phase ordering', () => {
     expect(result.scope.configDocument).toBeDefined();
     expect((result.scope as unknown as { scopedTool?: { ready: boolean } }).scopedTool?.ready).toBe(
       true,
+    );
+    const events = result.scope.diagnostics.snapshot().events;
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        message: "startup phase 'installed-tool-discovery' completed",
+        data: expect.objectContaining({
+          source: 'startup',
+          phase: 'installed-tool-discovery',
+          durationMs: 4.2,
+        }),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        message: "pre-action phase 'build-scope' completed",
+        data: expect.objectContaining({
+          source: 'pre-action',
+          phase: PRE_ACTION_PHASES.buildScope,
+          durationMs: expect.any(Number),
+        }),
+      }),
     );
     rmSync(tmp, { recursive: true, force: true });
   });

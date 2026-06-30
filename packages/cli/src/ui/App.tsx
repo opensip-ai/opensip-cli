@@ -9,13 +9,7 @@
  * banner and the `ℹ Project:` line.
  */
 
-import {
-  Banner,
-  UpdateHint,
-  normalizeBannerSize,
-  ProjectHeader,
-  renderToInk,
-} from '@opensip-cli/cli-ui';
+import { Banner, UpdateHint, normalizeBannerSize, renderToInk } from '@opensip-cli/cli-ui';
 import { Box } from 'ink';
 import React from 'react';
 
@@ -54,9 +48,6 @@ const BANNERLESS_RESULT_TYPES: ReadonlySet<CommandResult['type']> = new Set(['er
 export function App({ result, projectHeader, ui }: AppProps): React.ReactElement {
   const showBanner = !BANNERLESS_RESULT_TYPES.has(result.type);
   const bannerSize = normalizeBannerSize(ui?.bannerSize);
-  // `mini` carries the project path inside its boxed card, so the separate
-  // `ℹ Project:` line would duplicate it — suppress ProjectHeader for mini.
-  const showProjectHeader = bannerSize !== 'mini' && projectHeader !== undefined;
   return (
     <Box flexDirection="column">
       {showBanner && (
@@ -68,10 +59,7 @@ export function App({ result, projectHeader, ui }: AppProps): React.ReactElement
           update={ui?.update}
         />
       )}
-      {showBanner && bannerSize === 'mini' && ui?.update !== undefined && <UpdateHint />}
-      {showBanner && showProjectHeader && (
-        <ProjectHeader root={projectHeader.root} walkedUp={projectHeader.walkedUp} />
-      )}
+      {showBanner && ui?.update !== undefined && <UpdateHint />}
       {renderToInk(resultToView(result))}
     </Box>
   );

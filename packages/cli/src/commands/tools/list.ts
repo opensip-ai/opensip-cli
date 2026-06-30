@@ -25,12 +25,17 @@ import { join } from 'node:path';
 import {
   discoverPackagesInNodeModules,
   loadToolManifest,
+  resolveProjectContext,
   resolveProjectPaths,
   resolveUserPaths,
   type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
 
+import {
+  readProjectTrustedToolIds,
+  resolveInstalledToolTrust,
+} from '../../bootstrap/tool-trust.js';
 import { TOOL_DOMAIN } from '../plugin/domain-resolution.js';
 
 import type { ToolsListResult, ToolsListRow } from '@opensip-cli/contracts';
@@ -52,6 +57,12 @@ export interface ToolsListOptions {
    */
   readonly provenance?: readonly ToolProvenance[];
   readonly manifests?: readonly ToolPluginManifest[];
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+interface ProjectTrustContext {
+  readonly projectRoot?: string;
+  readonly projectTrustedTools: ReadonlySet<string>;
 }
 
 /**
@@ -81,6 +92,7 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
   const projectHostDir = resolveProjectPaths(opts.cwd).pluginsDir(TOOL_DOMAIN);
   const globalHostDir = resolveUserPaths().pluginsDir(TOOL_DOMAIN);
   const loadedPackageNames = new Set<string>();
+  const trustContext = projectTrustContext(opts.cwd);
 
   // Installed-but-not-loaded set — marker scan + manifest file read per host.
   const hosts: readonly { dir: string; source: ListSource }[] = [
@@ -88,8 +100,8 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
     { dir: globalHostDir, source: 'global' },
   ];
   const rows = [
-    ...loadedRows(opts, projectHostDir, globalHostDir, loadedPackageNames),
-    ...manifestOnlyRows(hosts, loadedPackageNames),
+    ...loadedRows(opts, projectHostDir, globalHostDir, loadedPackageNames, trustContext),
+    ...manifestOnlyRows(hosts, loadedPackageNames, opts.env ?? process.env, trustContext),
   ];
 
   // Shadow-marking: a project row shadows a global row with the same tool id
@@ -105,11 +117,25 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
   return { type: 'tools-list', tools: filtered, totalCount: filtered.length };
 }
 
+function projectTrustContext(cwd: string): ProjectTrustContext {
+  try {
+    const project = resolveProjectContext({ cwd, cwdExplicit: false });
+    if (project.scope !== 'project') return { projectTrustedTools: new Set() };
+    return {
+      projectRoot: project.projectRoot,
+      projectTrustedTools: readProjectTrustedToolIds(project.configPath),
+    };
+  } catch {
+    return { projectTrustedTools: new Set() };
+  }
+}
+
 function loadedRows(
   opts: ToolsListOptions,
   projectHostDir: string,
   globalHostDir: string,
   loadedPackageNames: Set<string>,
+  trustContext: ProjectTrustContext,
 ): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   const provenance = opts.provenance ?? [];
@@ -128,18 +154,33 @@ function loadedRows(
       source: sourceLabelFor(prov, projectHostDir, globalHostDir),
       commands: manifest?.commands.map((c) => c.name) ?? [],
       status: 'loaded',
+      trustReason: loadedTrustReason(prov, trustContext),
     });
   }
   return rows;
 }
 
+function loadedTrustReason(
+  provenance: ToolProvenance,
+  trustContext: ProjectTrustContext,
+): NonNullable<ToolsListRow['trustReason']> {
+  if (provenance.source === 'bundled') return 'bundled';
+  if (provenance.source === 'user-global') return 'user-global';
+  if (provenance.source === 'project-local') {
+    return trustContext.projectTrustedTools.has(provenance.id) ? 'project-config' : 'env';
+  }
+  return 'managed-install';
+}
+
 function manifestOnlyRows(
   hosts: readonly { dir: string; source: ListSource }[],
   loadedPackageNames: ReadonlySet<string>,
+  env: NodeJS.ProcessEnv,
+  trustContext: ProjectTrustContext,
 ): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   for (const host of hosts) {
-    rows.push(...manifestRowsForHost(host, loadedPackageNames));
+    rows.push(...manifestRowsForHost(host, loadedPackageNames, env, trustContext));
   }
   return rows;
 }
@@ -147,6 +188,8 @@ function manifestOnlyRows(
 function manifestRowsForHost(
   host: { dir: string; source: ListSource },
   loadedPackageNames: ReadonlySet<string>,
+  env: NodeJS.ProcessEnv,
+  trustContext: ProjectTrustContext,
 ): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   for (const pkg of discoverPackagesInNodeModules(join(host.dir, 'node_modules'), 'tool')) {
@@ -162,6 +205,17 @@ function manifestRowsForHost(
       source: host.source,
       commands: manifest?.commands.map((c) => c.name) ?? [],
       status: 'manifest-only',
+      trustReason:
+        manifest === undefined
+          ? 'denied'
+          : resolveInstalledToolTrust({
+              toolId: manifest.id,
+              packageName: pkg.name,
+              packageDir: pkg.packageDir,
+              env,
+              projectRoot: trustContext.projectRoot,
+              projectTrustedTools: trustContext.projectTrustedTools,
+            }).reason,
     });
   }
   return rows;

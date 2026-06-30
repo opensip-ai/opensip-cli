@@ -90,17 +90,17 @@ export async function loadOwningToolCapabilities(
   for (const domain of ownedDomains) {
     const descriptor = domain.discovery;
     if (descriptor === undefined) continue;
-    const preferences = augmentBundledCapabilityPreferences(
-      descriptor,
-      resolveCapabilityPreferences(descriptor, pluginsConfig),
-    );
+    const configuredPreferences = resolveCapabilityPreferences(descriptor, pluginsConfig);
+    const explicitlyConfiguredPackages = new Set(configuredPreferences.packages);
+    const preferences = augmentBundledCapabilityPreferences(descriptor, configuredPreferences);
     await loadCapabilityDomain({
       registry,
       domainId: domain.id,
       projectDir,
       cliDir,
       preferences,
-      shouldLoadPackage: (pkg) => admitCapabilityPackage(descriptor, pkg),
+      shouldLoadPackage: (pkg) =>
+        admitCapabilityPackage(descriptor, pkg, explicitlyConfiguredPackages),
       onDiagnostic: (diagnostic) => {
         currentScope()?.bootstrapDiagnostics.record(
           capabilityDiscoveryToCliDiagnostic(diagnostic, domain.id, {
@@ -118,14 +118,21 @@ export async function loadOwningToolCapabilities(
 function admitCapabilityPackage(
   descriptor: CapabilityDiscoveryDescriptor,
   pkg: SelectedCapabilityPackage,
+  explicitlyConfiguredPackages: ReadonlySet<string>,
 ): CapabilityPackageAdmission {
   if (isBundledCapabilityPack(descriptor, pkg.name)) {
+    return capabilityPackProvenancePassthrough(pkg, { admit: true });
+  }
+  if (explicitlyConfiguredPackages.has(pkg.name)) {
     return capabilityPackProvenancePassthrough(pkg, { admit: true });
   }
   if (isCapabilityPackTrusted(pkg.name)) {
     return capabilityPackProvenancePassthrough(pkg, { admit: true });
   }
-  const reason = `set ${CAPABILITY_PACK_ALLOWLIST_ENV} to '${pkg.name}'`;
+  const configuredPackageKey = descriptor.configKeys.packages;
+  const configuredPackageHint =
+    configuredPackageKey === undefined ? '' : ` or list it in plugins.${configuredPackageKey}`;
+  const reason = `set ${CAPABILITY_PACK_ALLOWLIST_ENV} to '${pkg.name}'${configuredPackageHint}`;
   logger.warn({
     evt: 'cli.capability.trust_denied',
     module: 'cli:capability',

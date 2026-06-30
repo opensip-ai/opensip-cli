@@ -13,7 +13,7 @@ import {
   type DataStore,
   type DrizzleDataStore,
 } from '@opensip-cli/datastore';
-import { count, desc, eq, inArray, lt } from 'drizzle-orm';
+import { count, desc, eq, inArray, lt, notInArray } from 'drizzle-orm';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 import {
@@ -28,7 +28,6 @@ const MODULE_NAME = 'session-store:session-repo';
 
 const RUN_OUTCOMES = new Set<ToolRunOutcome>(['passed', 'failed', 'degraded', 'error']);
 
-/** Hydrate runOutcome from the column; legacy NULL rows omit the field on read. */
 function normalizeRunOutcome(stored: string | null | undefined): ToolRunOutcome | undefined {
   if (stored !== null && stored !== undefined && RUN_OUTCOMES.has(stored as ToolRunOutcome)) {
     return stored as ToolRunOutcome;
@@ -36,7 +35,6 @@ function normalizeRunOutcome(stored: string | null | undefined): ToolRunOutcome 
   return undefined;
 }
 
-/** The stored tool-payload projection (opaque blob + its outer schema version). */
 interface StoredPayloadRow {
   readonly payload: unknown;
   readonly payload_version: number | null;
@@ -73,8 +71,6 @@ export class SessionRepo {
    */
   save(session: StoredSession): void {
     try {
-      // Validate timing eagerly: a bad value becomes a clear ValidationError
-      // instead of silent NaN/"Invalid Date" corruption in the durable log.
       const startedMs = new Date(session.startedAt).getTime();
       const completedMs = new Date(session.completedAt).getTime();
       if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
@@ -104,11 +100,9 @@ export class SessionRepo {
               durationMs: session.durationMs,
             })
             .run();
-          // Tool-owned opaque detail (contracts never inspects the shape).
           if (session.payload !== undefined) {
             const hasInnerVersion = extractPayloadVersion(session.payload) !== undefined;
             if (!hasInnerVersion) {
-              // Encourage tools to adopt the __version convention on new writes.
               logger.warn({
                 evt: 'session.payload.missing_version',
                 module: MODULE_NAME,
@@ -165,8 +159,6 @@ export class SessionRepo {
       const ordered = baseQuery.orderBy(desc(sessions.timestamp));
       const sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
 
-      // Batch-load payload + host-metrics for the page in two `IN (...)` queries
-      // (was two point queries per row — a 1 + 2N N+1).
       const ids = sessionRows.map((row) => row.id);
       const payloadsById = this.payloadsBySessionId(ids);
       const metricsById = hostMetricsBySessionId(this.datastore, ids);
@@ -204,6 +196,49 @@ export class SessionRepo {
   count(): number {
     const row = this.datastore.db.select({ value: count() }).from(sessions).get();
     return row?.value ?? 0;
+  }
+
+  /**
+   * Keep the newest `keep` sessions by start time and delete the rest.
+   * `keep <= 0` disables count pruning. Foreign-key cascades remove sibling
+   * host-metrics and payload rows.
+   */
+  pruneToCount(keep: number): number {
+    if (!Number.isFinite(keep) || keep <= 0) return 0;
+    const limit = Math.trunc(keep);
+    return this.datastore.withWriteLock('session.prune_to_count', () => {
+      try {
+        const keepIds = this.datastore.db
+          .select({ id: sessions.id })
+          .from(sessions)
+          .orderBy(desc(sessions.timestamp))
+          .limit(limit)
+          .all()
+          .map((row) => row.id);
+        if (keepIds.length === 0) return 0;
+        const removed = this.datastore.db
+          .delete(sessions)
+          .where(notInArray(sessions.id, keepIds))
+          .run();
+        logger.info({
+          evt: 'session.prune_to_count.complete',
+          module: MODULE_NAME,
+          msg: 'Pruned sessions to newest count',
+          kept: keepIds.length,
+          deleted: removed.changes,
+        });
+        return removed.changes;
+      } catch (error) {
+        logger.error({
+          evt: 'session.prune_to_count.error',
+          module: MODULE_NAME,
+          msg: 'Failed to prune sessions to count',
+          keep: limit,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    });
   }
 
   /** Delete sessions older than the given Date. Returns affected rowcount. */

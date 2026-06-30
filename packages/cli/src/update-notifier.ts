@@ -13,9 +13,9 @@
  *
  * Two consumers, one resolved result:
  *   - {@link checkForUpdate} returns the newer version string (if any) so
- *     the `mini` banner can surface it inline as `(<new-version> available)`.
- *   - {@link formatUpdateNag} builds the stderr one-liner shown for the
- *     other banner sizes (which have no version line to annotate).
+ *     the banner can surface it inline as `(<new-version> available)`.
+ *   - {@link formatUpdateNag} builds the stderr one-liner shown for
+ *     bannerless JSON output.
  * The bootstrap calls `checkForUpdate` once and decides which surface to use.
  *
  * Outbound policy (ADR-0073): default-on TTY product update I/O — not
@@ -132,8 +132,9 @@ function shouldSkip(): boolean {
  * the notice stops on its own.
  *
  * Never throws: a malformed cache or notifier failure degrades to "no update
- * known" rather than breaking the command. Callers decide how to surface it
- * (the `mini` banner inline, or {@link formatUpdateNag} on stderr).
+ * known" rather than breaking the command. Callers decide how to surface it:
+ * the banner inline for human output, or {@link formatUpdateNag} on stderr for
+ * bannerless JSON output.
  */
 export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined {
   if (shouldSkip()) return undefined;
@@ -169,10 +170,8 @@ export function checkForUpdate(opts: CheckForUpdateOptions): string | undefined 
 }
 
 /**
- * Build the stderr update-nag line for the non-`mini` banner sizes (which
- * have no version line to annotate inline) and the banner-less `--json` path.
- * The `mini` banner surfaces the same information in-box, so the bootstrap
- * skips this for `mini`.
+ * Build the stderr update-nag line for the bannerless `--json` path. Human TTY
+ * output surfaces the same information in the banner box.
  */
 export function formatUpdateNag(current: string, latest: string): string {
   return (

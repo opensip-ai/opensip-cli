@@ -246,7 +246,6 @@ describe('full Tool-plugin install path (audit P1b)', () => {
       env: {
         HOME: home,
         USERPROFILE: home,
-        OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'audit-demo-tool',
       },
     };
   }
@@ -322,6 +321,7 @@ describe('full Tool-plugin install path (audit P1b)', () => {
       expect(list.exitCode).toBe(0);
       // The installed fixture tool surfaces in the effective tool set.
       expect(list.stdout).toContain('tool-demo');
+      expect(list.stdout).toContain('managed-install');
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

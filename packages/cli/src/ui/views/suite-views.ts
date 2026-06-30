@@ -11,11 +11,39 @@ import type {
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
+function verdictText(step: SuiteStepSummary): Span {
+  const verdict = step.verdict;
+  if (verdict === undefined) return { text: '-', dim: true };
+  return {
+    text: verdict.passed ? 'pass' : 'fail',
+    tone: verdict.passed ? 'success' : 'error',
+  };
+}
+
+function countsText(step: SuiteStepSummary): Span {
+  const verdict = step.verdict;
+  if (verdict === undefined) return { text: '-', dim: true };
+  const text = `E:${verdict.errors} W:${verdict.warnings} F:${verdict.findings}`;
+  let tone: Span['tone'];
+  if (verdict.errors > 0) {
+    tone = 'error';
+  } else if (verdict.warnings > 0) {
+    tone = 'warning';
+  }
+  return {
+    text,
+    tone,
+    dim: verdict.errors === 0 && verdict.warnings === 0 && verdict.findings === 0,
+  };
+}
+
 function stepSummaryRow(step: SuiteStepSummary): Span[] {
   return [
     { text: step.tool, tone: 'brand' },
     { text: step.command },
     { text: String(step.exitCode), tone: step.exitCode === 0 ? 'success' : 'error' },
+    verdictText(step),
+    countsText(step),
     { text: `${Math.round(step.durationMs)}ms`, dim: true },
     {
       text: step.error ?? '-',
@@ -39,7 +67,7 @@ function suiteStepRow(suite: SuiteListEntry, step: SuiteListStep): Span[] {
 }
 
 export function viewSuiteRun(result: SuiteRunResult): ViewNode {
-  return group([
+  const children: ViewNode[] = [
     line([
       { text: 'Suite ', bold: true },
       { text: result.suite, tone: 'brand', bold: true },
@@ -50,9 +78,31 @@ export function viewSuiteRun(result: SuiteRunResult): ViewNode {
       { text: String(result.exitCode), tone: result.exitCode === 0 ? 'success' : 'error' },
       { text: `  Run: ${result.suiteRunId}`, dim: true },
     ]),
+  ];
+
+  if (result.aggregate !== undefined) {
+    const a = result.aggregate;
+    children.push(
+      line([
+        { text: 'Aggregate: ', dim: true },
+        { text: `${a.steps} steps`, dim: true },
+        { text: `  ${a.passed} passed`, tone: a.passed > 0 ? 'success' : undefined },
+        { text: `  ${a.failed} failed`, tone: a.failed > 0 ? 'error' : undefined },
+        { text: `  ${a.faulted} faulted`, tone: a.faulted > 0 ? 'error' : undefined },
+        { text: `  E:${a.errors} W:${a.warnings}`, dim: a.errors === 0 && a.warnings === 0 },
+      ]),
+    );
+  }
+
+  children.push(
     SPACER,
-    viewTable(['Tool', 'Command', 'Exit', 'Duration', 'Error'], result.steps.map(stepSummaryRow)),
-  ]);
+    viewTable(
+      ['Tool', 'Command', 'Exit', 'Verdict', 'Counts', 'Duration', 'Error'],
+      result.steps.map(stepSummaryRow),
+    ),
+  );
+
+  return group(children);
 }
 
 export function viewSuiteList(result: SuiteListResult): ViewNode {

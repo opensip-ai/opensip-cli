@@ -1362,6 +1362,28 @@ describe('silent-early-returns — analyze branches', () => {
     expect(result.signals).toHaveLength(0);
   });
 
+  it('does NOT flag explicit boolean contracts where false is the outcome', async () => {
+    const src = [
+      'export function appendOnce(items: string[], name: string): boolean {',
+      '  doA()',
+      '  doB()',
+      '  doC()',
+      '  if (items.includes(name)) return false',
+      '  items.push(name)',
+      '  return true',
+      '}',
+      'export async function grewClosure(size: number): Promise<boolean> {',
+      '  doA()',
+      '  doB()',
+      '  doC()',
+      '  if (size === 0) return false',
+      '  return true',
+      '}',
+    ].join('\n');
+    const result = await run(src);
+    expect(result.signals).toHaveLength(0);
+  });
+
   it('does NOT flag a function whose return type is T | null', async () => {
     const src =
       'export function lookupRow(x: any): Row | null { doA(); doB(); if (!x) return null; return x }';

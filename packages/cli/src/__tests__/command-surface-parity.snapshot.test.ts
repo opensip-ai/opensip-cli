@@ -307,6 +307,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'graph-shard-worker',
       'graph-equivalence-check',
       'sim-run-worker',
+      'yagni-run-worker',
       '__tool-command-worker',
     ];
     for (const name of TIER_3_INTERNAL) {

@@ -1,6 +1,6 @@
 {
   "name": "opensip-cli",
-  "version": "0.1.15",
+  "version": "0.1.19",
   "license": "Apache-2.0",
   "description": "OpenSIP CLI — codebase analysis from the command line (the CLI; `npm i -g opensip-cli`)",
   "keywords": [

@@ -90,6 +90,7 @@ export {
   defineNestedCommand,
   definePrimaryCommand,
   validateCommandSpec,
+  commandProducesVerdict,
   COMMON_FLAG_KEYS,
   RAW_STREAM_REASONS,
 } from './tools/index.js';

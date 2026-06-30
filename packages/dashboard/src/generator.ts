@@ -19,7 +19,7 @@ import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cu
 import { listToolTabs } from './tool-tab-registry.js';
 import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
 
-import type { StoredSession, GraphCatalog } from '@opensip-cli/contracts';
+import type { StoredSession, GraphCatalog, DeclaredInputs } from '@opensip-cli/contracts';
 
 /**
  * Inputs to the dashboard HTML generator.
@@ -36,6 +36,7 @@ import type { StoredSession, GraphCatalog } from '@opensip-cli/contracts';
  */
 export interface DashboardInput {
   sessions: StoredSession[];
+  declaredInputs?: DeclaredInputs;
   // Tool-owned catalog data, consumed structurally by the dashboard's
   // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry
   // shapes (fitness's CheckCatalogEntry / RecipeCatalogEntry) are tool
@@ -91,6 +92,39 @@ function coerceScoreForTitle(score: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
+  if (input === undefined) return '';
+  const pairs = [
+    ['CLI', input.cliVersion],
+    ['Node', input.nodeVersion],
+    ['Package manager', input.packageManager ?? 'unknown'],
+    ['Platform', input.platform],
+    ['Tool', input.tool],
+    ['Engine', input.engineVersion ?? 'unknown'],
+    [
+      'Baseline',
+      input.baselineIdentity === undefined
+        ? 'unknown'
+        : `${input.baselineIdentity.fingerprintStrategyId}@${input.baselineIdentity.fingerprintStrategyVersion}`,
+    ],
+  ];
+  const chips = pairs
+    .map(
+      ([label, value]) =>
+        `<span class="badge" title="${escapeHtml(label)}">${escapeHtml(label)}: ${escapeHtml(value)}</span>`,
+    )
+    .join(' ');
+  return `<div class="card" style="margin:16px 24px 0;padding:12px 16px"><strong>Run environment</strong><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${chips}</div></div>`;
+}
+
 /**
  * Serialize an optional value into either a `<script type="application/json">`
  * blob (kind `'json'`) or a JS `const X = …;` literal (kind `'literal'`).
@@ -138,6 +172,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
     yagniSummary = null,
     yagniCatalog = [],
     editorProtocol = null,
+    declaredInputs,
   } = input;
 
   const latest = sessions[0];
@@ -222,6 +257,8 @@ ${dashboardCss()}
   <span class="header-icon">${REPORT_CUP_HEADER_HTML}</span>
   <div><h1><span class="brand-open">Open</span>SIP Report</h1></div>
 </div>
+
+${renderDeclaredInputs(declaredInputs)}
 
 <div class="tab-bar" id="tab-bar">
   <div class="tab active" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</div>

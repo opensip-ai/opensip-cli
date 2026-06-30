@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-26
-release: v0.1.15
+release: v0.1.19
 title: "Create your first Tool"
 audience: [plugin-authors, contributors]
 purpose: "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-cli subcommand."
@@ -28,14 +28,14 @@ This guide scaffolds a tracked project-local Tool under `opensip-cli/tools/` usi
 package a Tool for npm.
 
 Project-local tools are **executable code**, **deny-by-default**, and **not
-sandboxed** after you allowlist them. Do not use wildcard trust unless you trust
-every project-local tool in the repo.
+sandboxed** after you trust them in project config. Do not use wildcard env
+overrides unless you trust every project-local tool in the repo.
 
 ## 1. Scaffold the tool
 
 ### Minimal JS (default smoke path)
 
-Zero npm dependencies — ideal for a quick allowlist/run check:
+Zero npm dependencies — ideal for a quick trust/run check:
 
 ```bash
 opensip tools create hello-tools
@@ -130,14 +130,20 @@ opensip tools validate opensip-cli/tools/hello-tools --install-deps
 Validation executes candidate code in a child process. It is a coherence check,
 not a security sandbox.
 
-## 5. Allowlist the project-local Tool
+## 5. Trust the project-local Tool
 
-```bash
-export OPENSIP_CLI_ALLOW_PROJECT_TOOLS=hello-tools
+`opensip tools create` adds the new tool id to `tools.trusted` in
+`opensip-cli.config.yml`:
+
+```yaml
+tools:
+  trusted:
+    - hello-tools
 ```
 
-Use a comma-separated list for more than one Tool. Avoid `'*'` unless you trust
-every project-local tool in the repo.
+Commit that config entry with the tool so teammates and CI load the same
+intentional project-local Tool. `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` remains
+available as an override, but it is not the normal scaffold path.
 
 ## 6. Run it
 
@@ -186,7 +192,7 @@ The tracked sidecar layout is ideal while authoring inside one repo. To distribu
 5. Install with `opensip tools install <spec>`.
 
 A publishable npm scaffold is deferred until consumption-side verification and
-trust enforcement mature (see [ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.15/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+trust enforcement mature (see [ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 `tools validate` and `tools install` execute the candidate package module as part of validation. Install scripts are blocked and runtime probing has a timeout, but this is still code execution with your user privileges.
 
@@ -197,5 +203,5 @@ trust enforcement mature (see [ADR-0076](https://github.com/opensip-ai/opensip-c
 | Learn the full Tool contract | [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) |
 | Read the command grammar | [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/) |
 | Manage installed Tools | [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/) |
-| See the allowlist environment variable | [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/) |
+| See trust override environment variables | [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/) |
 | Understand Tool architecture | [The tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) |

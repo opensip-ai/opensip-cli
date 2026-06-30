@@ -1,4 +1,4 @@
-import { withFileLock } from '@opensip-cli/core';
+import { logger, withFileLock } from '@opensip-cli/core';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 
@@ -14,10 +14,32 @@ export function buildSqliteDataStore(
   // Single connection per process, but two concurrent `opensip` invocations can
   // contend on the same project DB. Wait briefly instead of throwing SQLITE_BUSY.
   sqlite.pragma('busy_timeout = 5000');
+  const isMemory = dbPath === ':memory:';
+  if (!isMemory) {
+    try {
+      const autoVacuum = Number(sqlite.pragma('auto_vacuum', { simple: true }));
+      if (autoVacuum !== 2) {
+        sqlite.pragma('auto_vacuum = INCREMENTAL');
+        sqlite.exec('VACUUM');
+        logger.info({
+          evt: 'datastore.autovacuum.converted',
+          module: 'datastore:sqlite',
+          path: dbPath,
+          previousMode: autoVacuum,
+        });
+      }
+    } catch (error) {
+      logger.warn({
+        evt: 'datastore.autovacuum.conversion_failed',
+        module: 'datastore:sqlite',
+        path: dbPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
   const db: DrizzleHandle = drizzle(sqlite);
   let closed = false;
 
-  const isMemory = dbPath === ':memory:';
   const lockPath = isMemory ? undefined : `${dbPath}.write.lock`;
 
   const withWriteLock = <T>(operation: string, fn: () => T): T => {
@@ -61,5 +83,22 @@ export function buildSqliteDataStore(
       // so interpolating it is safe (and `Number(...)`-guarded by the type).
       sqlite.pragma(`user_version = ${version}`);
     },
+    ...(isMemory
+      ? {}
+      : {
+          maintenance: {
+            incrementalVacuum(): void {
+              sqlite.pragma('incremental_vacuum');
+            },
+            fullVacuum(): void {
+              sqlite.exec('VACUUM');
+            },
+            fileSizeBytes(): number {
+              const pages = Number(sqlite.pragma('page_count', { simple: true }));
+              const pageSize = Number(sqlite.pragma('page_size', { simple: true }));
+              return pages * pageSize;
+            },
+          },
+        }),
   };
 }
