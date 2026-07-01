@@ -132,6 +132,7 @@ export type { JsonScalar } from './lib/json-scalars.js';
 
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';
+export { namespacedRuleId } from './lib/rule-id.js';
 
 // Lib — payload version extraction (inner __version convention for
 // tool-owned opaque session payloads and toolState). Pure function with

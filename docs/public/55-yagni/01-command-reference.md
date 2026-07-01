@@ -30,6 +30,7 @@ related-docs:
 ```bash
 opensip yagni
 opensip yagni --json
+opensip yagni --json --filter errors-only --top 10
 opensip yagni --min-confidence high
 opensip yagni packages/cli/src
 ```
@@ -42,6 +43,9 @@ Exit code is **0 by default** (`failOnErrors: 0`, `failOnWarnings: 0`). Findings
 |---|---|
 | `[paths...]` | Limit analysis to one or more directory subtrees |
 | `--json` | Emit the canonical `SignalEnvelope` |
+| `--filter <filter>` | Agent JSON filter (repeatable): `errors-only`, `warnings-only`, `category:<name>`, `source:<slug>`, `file:<path>`, `high-impact`, `top:<n>` |
+| `--top <n>` | Limit JSON signals (sugar for `--filter top:<n>`) |
+| `--raw` | With filtered JSON, emit the raw `agent-filtered` payload |
 | `--min-confidence <level>` | Filter to `low`, `medium`, or `high` (default `medium`) |
 | `--detector <slug>` | Run only named detectors (repeatable) |
 | `--category <name>` | Filter by `metadata.yagni.reductionCategory` (repeatable) |

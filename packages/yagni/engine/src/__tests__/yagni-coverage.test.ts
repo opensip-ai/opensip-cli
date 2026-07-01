@@ -16,6 +16,7 @@ import {
   buildYagniPresentationLines,
 } from '../cli/yagni-presentation.js';
 import { createYagniSignal } from '../detectors/create-yagni-signal.js';
+import { defineDetector } from '../detectors/define-detector.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 import { resolveYagniPositionalPaths } from '../lib/resolve-positional-paths.js';
 import { buildYagniSessionPayload } from '../persistence/session-payload.js';
@@ -49,6 +50,7 @@ function makeCli(): ToolCliContext & { _state: { code?: number } } {
     scope: { datastore: () => undefined },
     emitEnvelope: vi.fn(),
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitError: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     renderLive: vi.fn(() => Promise.resolve()),
@@ -227,6 +229,7 @@ describe('yagni config, tool metadata, and command handler', () => {
     });
     expect(yagniTool.commandSpecs?.[0]?.name).toBe('yagni');
     expect(yagniTool.commandSpecs?.[0]?.aliases).toEqual(['yag']);
+    expect(yagniTool.extensionPoints?.contractVersions?.yagni).toBe(YAGNI_CONTRACT_VERSION);
     expect(yagniTool.extensionPoints?.collectReportData).toBe(collectYagniReportData);
     expect(resolveToolHooks(yagniTool).sessionReplay?.tool).toBe('yagni');
   });
@@ -277,9 +280,62 @@ describe('yagni config, tool metadata, and command handler', () => {
       jsonOutput: false,
     });
   });
+
+  it('supports shared agent JSON filters', async () => {
+    const cli = makeCli();
+    const scope = new RunScope();
+    Object.assign(scope, {
+      toolConfig: { yagni: { defaultMinConfidence: 'low' } },
+    });
+
+    await runCommandInScope(
+      scope,
+      {
+        cwd: FIXTURE_ROOT,
+        json: true,
+        raw: true,
+        filter: ['source:yagni:unused-config-surface'],
+        top: '1',
+        minConfidence: 'low',
+        includeTests: true,
+        detector: ['unused-config-surface'],
+        _args: [[join(FIXTURE_ROOT, 'src')]],
+      },
+      cli,
+    );
+
+    expect(cli.emitEnvelope).not.toHaveBeenCalled();
+    expect(cli.emitJson).not.toHaveBeenCalled();
+    expect(cli.emitRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'agent-filtered',
+        filtersApplied: ['source:yagni:unused-config-surface', 'top:1'],
+        returnedSignalCount: 1,
+      }),
+    );
+  });
 });
 
 describe('yagni detectors and scoring helpers', () => {
+  it('validates detector identity through defineDetector', () => {
+    expect(() =>
+      defineDetector({
+        id: 'bad id',
+        slug: 'yagni:bad-id',
+        description: 'invalid',
+        run: () => Promise.resolve({ signals: [], durationMs: 0 }),
+      }),
+    ).toThrow(/expected kebab-case/);
+    expect(() =>
+      defineDetector({
+        id: 'valid-id',
+        slug: 'valid-id',
+        description: 'invalid',
+        run: () => Promise.resolve({ signals: [], durationMs: 0 }),
+      }),
+    ).toThrow(/expected 'yagni:valid-id'/);
+  });
+
   it('sorts, filters, summarizes, and persists YAGNI signal metadata', () => {
     const high = signal('high', 'high', 5, 'exact', 'config');
     const medium = signal('medium', 'medium', 8, 'heuristic', 'dedupe');

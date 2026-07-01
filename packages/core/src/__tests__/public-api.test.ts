@@ -202,6 +202,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'logger',
   'makeStripper',
   'measureIpcPayloadBytes',
+  'namespacedRuleId',
   'noopSignalSink',
   'ok',
   'readConfigSchemaVersion',

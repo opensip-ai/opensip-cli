@@ -57,4 +57,14 @@ describe('ADR-0064 architectural invariants', () => {
     expect(execute).not.toContain('requiresGraph');
     expect(execute).not.toContain('graph-unavailable');
   });
+
+  it('bundled detector modules use the validating defineDetector factory', () => {
+    for (const fileName of ['unused-config-surface.ts', 'duplicate-body-candidate.ts']) {
+      const content = readFileSync(
+        fileURLToPath(new URL(`../detectors/${fileName}`, import.meta.url)),
+        'utf8',
+      );
+      expect(content).toContain('defineDetector({');
+    }
+  });
 });

@@ -9,7 +9,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import { isInPublicApiSurface, withSpan } from '@opensip-cli/core';
+import { isInPublicApiSurface, namespacedRuleId, withSpan } from '@opensip-cli/core';
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
@@ -17,11 +17,12 @@ import { walkTypeScriptFiles } from '../lib/walk-typescript-files.js';
 import { severityForConfidence } from '../scoring/confidence.js';
 
 import { createYagniSignal } from './create-yagni-signal.js';
+import { defineDetector } from './define-detector.js';
 
-import type { YagniDetector, YagniDetectorContext, YagniDetectorResult } from './types.js';
+import type { YagniDetectorContext, YagniDetectorResult } from './types.js';
 
 const DETECTOR_ID = 'unused-config-surface';
-const SLUG = 'yagni:unused-config-surface';
+const SLUG = namespacedRuleId('yagni', DETECTOR_ID);
 const MAX_SOURCE_FILE_BYTES = 1_000_000;
 
 const COMMON_PROPERTY_NAMES = new Set([
@@ -230,9 +231,9 @@ function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetecto
   return Promise.resolve(result);
 }
 
-export const unusedConfigSurfaceDetector: YagniDetector = {
+export const unusedConfigSurfaceDetector = defineDetector({
   id: DETECTOR_ID,
   slug: SLUG,
   description: 'Unused required config properties on the public API surface',
   run: runUnusedConfigSurface,
-};
+});

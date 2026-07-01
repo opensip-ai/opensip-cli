@@ -53,6 +53,7 @@ const EXPORT_ALLOWLIST = {
   isPlainRecord: 'shared-data-contracts',
   JsonScalar: 'shared-data-contracts',
   _resetPublicApiGraphCache: 'shared-data-contracts',
+  namespacedRuleId: 'shared-data-contracts',
   noopSignalSink: 'shared-data-contracts',
   policyPasses: 'shared-data-contracts',
   projectJsonScalarMetadata: 'shared-data-contracts',

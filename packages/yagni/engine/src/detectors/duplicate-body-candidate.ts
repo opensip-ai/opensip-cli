@@ -11,14 +11,15 @@
  */
 
 import { findDuplicateBodies } from '@opensip-cli/clone-detection';
-import { currentScope, withSpan } from '@opensip-cli/core';
+import { currentScope, namespacedRuleId, withSpan } from '@opensip-cli/core';
 
 import { buildTsInventory } from '../lib/build-ts-inventory.js';
 import { severityForConfidence } from '../scoring/confidence.js';
 
 import { createYagniSignal } from './create-yagni-signal.js';
+import { defineDetector } from './define-detector.js';
 
-import type { YagniDetector, YagniDetectorContext, YagniDetectorResult } from './types.js';
+import type { YagniDetectorContext, YagniDetectorResult } from './types.js';
 import type {
   CloneCandidate,
   CrossPackageAggregate,
@@ -27,7 +28,7 @@ import type {
 import type { Signal } from '@opensip-cli/core';
 
 const DETECTOR_ID = 'duplicate-body-candidate';
-const SLUG = 'yagni:duplicate-body-candidate';
+const SLUG = namespacedRuleId('yagni', DETECTOR_ID);
 const CONFIDENCE = 'medium' as const;
 
 function span(occ: CloneCandidate): number {
@@ -170,9 +171,9 @@ function runDuplicateBodyCandidate(ctx: YagniDetectorContext): Promise<YagniDete
   return Promise.resolve(result);
 }
 
-export const duplicateBodyCandidateDetector: YagniDetector = {
+export const duplicateBodyCandidateDetector = defineDetector({
   id: DETECTOR_ID,
   slug: SLUG,
   description: 'Function bodies duplicated across two or more sites (consolidation candidates)',
   run: runDuplicateBodyCandidate,
-};
+});
