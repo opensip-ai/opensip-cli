@@ -7,7 +7,7 @@ import {
   type ToolRunOutcome,
 } from '@opensip-cli/core';
 
-import { sessions } from './schema/sessions.js';
+import { type sessions } from './schema/sessions.js';
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
 

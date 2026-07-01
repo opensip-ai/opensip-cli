@@ -1,4 +1,3 @@
-import type { DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 
 import { SessionMaintenanceRepo } from './session-maintenance-repo.js';
@@ -6,8 +5,9 @@ import { SessionReadRepo, type SessionListOptions } from './session-read-repo.js
 import { SessionWriteRepo } from './session-write-repo.js';
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
-export type { SessionListOptions };
+
 
 /**
  * Persistence layer for tool-run sessions. Stores generic session columns plus
@@ -68,3 +68,5 @@ export class SessionRepo {
     this.write.upsertHostMetrics(sessionId, metrics);
   }
 }
+
+export {type SessionListOptions} from './session-read-repo.js';

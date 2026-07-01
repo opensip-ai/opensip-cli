@@ -1,5 +1,4 @@
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -7,6 +6,7 @@ import { sessionHostMetrics, sessions, sessionToolPayload } from '../schema/sess
 import { SessionRepo } from '../session-repo.js';
 
 import type { StoredSession } from '@opensip-cli/contracts';
+import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 
 // A representative opaque payload. `contracts` never inspects the shape;
 // these tests exercise verbatim round-tripping of whatever a tool writes.

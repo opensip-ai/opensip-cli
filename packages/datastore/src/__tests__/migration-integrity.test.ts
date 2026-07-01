@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
-import { DataStoreFactory } from '../index.js';
 import { requireDrizzleHandle } from '../data-store.js';
+import { DataStoreFactory } from '../index.js';
 
 /**
  * Migration-integrity guardrail.

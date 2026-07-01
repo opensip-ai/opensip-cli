@@ -138,14 +138,15 @@ plugins:
 `,
     );
     const { config } = loadTargetsConfig(testDir);
-    expect(config.plugins?.fit).toEqual(['@a/b']);
-    expect(config.plugins?.sim).toEqual(['@c/d']);
-    expect(config.plugins?.checkPackages).toEqual(['@e/f']);
-    expect(config.plugins?.scenarioPackages).toEqual(['@g/h']);
-    expect(config.plugins?.autoDiscoverScenarios).toBe(false);
-    expect(config.plugins?.packageScopes).toEqual(['@acme']);
-    expect(config.plugins?.graphAdapters).toEqual(['@i/j']);
-    expect(config.plugins?.autoDiscoverGraphAdapters).toBe(false);
+    const plugins = config.plugins as Record<string, readonly string[] | boolean | undefined>;
+    expect(plugins.fit).toEqual(['@a/b']);
+    expect(plugins.sim).toEqual(['@c/d']);
+    expect(plugins.checkPackages).toEqual(['@e/f']);
+    expect(plugins.scenarioPackages).toEqual(['@g/h']);
+    expect(plugins.autoDiscoverScenarios).toBe(false);
+    expect(plugins.packageScopes).toEqual(['@acme']);
+    expect(plugins.graphAdapters).toEqual(['@i/j']);
+    expect(plugins.autoDiscoverGraphAdapters).toBe(false);
   });
 
   it.each([

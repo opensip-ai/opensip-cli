@@ -12,7 +12,6 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import type { DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle, type DrizzleDataStore } from '@opensip-cli/datastore/internal';
 import { sql } from 'drizzle-orm';
 
@@ -21,6 +20,7 @@ import { graphCatalog, graphShardFragment } from './schema.js';
 import type { ShardBuildResult } from '../cli/orchestrate/shard-model.js';
 import type { Catalog, PersistedFeatures, ResolutionMode } from '../types.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
+import type { DataStore } from '@opensip-cli/datastore';
 
 const MODULE_NAME = 'graph:catalog-repo';
 

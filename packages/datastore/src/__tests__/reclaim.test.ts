@@ -6,8 +6,8 @@ import Database from 'better-sqlite3';
 import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DataStoreFactory } from '../index.js';
 import { requireDrizzleHandle } from '../data-store.js';
+import { DataStoreFactory } from '../index.js';
 
 let tmp: string;
 

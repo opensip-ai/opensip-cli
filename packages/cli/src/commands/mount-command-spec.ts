@@ -27,7 +27,6 @@ import {
   type CommandMountContext,
   type LiveViewContext,
   type ReportFailureDetail,
-  type ToolRunCompletion,
   type CommandSpec,
   type ToolCliContext,
 } from '@opensip-cli/core';
@@ -40,6 +39,7 @@ import { showInternalCommands } from './internal-command-visibility.js';
 import { splitActionArgs } from './mount-command-action.js';
 import { buildOption, formatArgUsage } from './mount-command-spec-wiring.js';
 import { emitCommandResult } from './mount-result-command.js';
+
 import type { CliCommandsContext } from './shared.js';
 
 /**
@@ -271,7 +271,7 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
         }
         ctx.emitEnvelope(result);
       } else {
-        await ctx.render(result as CommandResult);
+        await ctx.render(result);
       }
       return;
     }

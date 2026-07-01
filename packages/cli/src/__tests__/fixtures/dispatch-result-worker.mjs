@@ -20,15 +20,15 @@
 import { readFileSync } from 'node:fs';
 
 const WORKER_SUBCOMMAND = '__tool-command-worker';
-const args = process.argv.slice(2);
-const subIdx = args.indexOf(WORKER_SUBCOMMAND);
+const arguments_ = process.argv.slice(2);
+const subIndex = arguments_.indexOf(WORKER_SUBCOMMAND);
 const specPath =
-  subIdx >= 0 ? args[subIdx + 1] : (args.find((a) => a.endsWith('.json')) ?? args[0]);
+  subIndex === -1 ? (arguments_.find((a) => a.endsWith('.json')) ?? arguments_[0]) : arguments_[subIndex + 1];
 const spec = JSON.parse(readFileSync(specPath, 'utf8'));
 // A hook-mode spec (M4-F) carries `hook` instead of a command `mode`; route it to
 // the `hook-result` shape so the hook supervisor's hookResult extraction is covered.
-const mode = spec.hook !== undefined ? 'hook-result' : (spec.opts?.mode ?? 'envelope');
-const send = (msg) => process.send?.(msg);
+const mode = spec.hook === undefined ? (spec.opts?.mode ?? 'envelope') : 'hook-result';
+const send = (message) => process.send?.(message);
 
 switch (mode) {
   case 'all-frr': {

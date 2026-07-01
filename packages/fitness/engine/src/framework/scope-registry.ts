@@ -24,7 +24,7 @@ import { currentScope } from '@opensip-cli/core';
 
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
-import { MemoryProfiler, memoryProfiler } from './memory-profiler.js';
+import { type MemoryProfiler, memoryProfiler } from './memory-profiler.js';
 import { CheckRegistry } from './registry.js';
 
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';

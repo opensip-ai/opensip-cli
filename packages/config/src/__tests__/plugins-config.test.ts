@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
+import { type z } from 'zod';
 
 import { composeConfigSchema } from '../composer.js';
 import { hostConfigDeclarations } from '../document/host-declarations.js';

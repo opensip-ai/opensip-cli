@@ -89,9 +89,9 @@ if (!(await waitFor(() => existsSync(profilesDir) && hasArtifact('.labels.json')
 }
 
 // A little CPU work so the profiler captures samples before we stop.
-let acc = 0;
-for (let i = 0; i < 1e6; i++) acc += Math.sqrt(i);
-if (!(acc > 0)) {
+let accumulator = 0;
+for (let index = 0; index < 1e6; index++) accumulator += Math.sqrt(index);
+if (!(accumulator > 0)) {
   process.stderr.write('cpu work produced no accumulation\n');
   process.exit(4);
 }

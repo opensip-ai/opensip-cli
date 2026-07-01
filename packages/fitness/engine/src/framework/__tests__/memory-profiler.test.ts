@@ -131,12 +131,12 @@ describe('memoryProfiler — RunScope isolation', () => {
     applyToolContributeScope(scopeB, fitnessTool);
 
     const [summaryA, summaryB] = await Promise.all([
-      runWithScope(scopeA, async () => {
+      runWithScope(scopeA, () => {
         const profiler = scopeA.fitness!.memoryProfiler;
         profiler.recordCheckComplete('scope-a-check', 0, 0, 1);
         return profiler.getSummary();
       }),
-      runWithScope(scopeB, async () => {
+      runWithScope(scopeB, () => {
         const profiler = scopeB.fitness!.memoryProfiler;
         profiler.recordCheckComplete('scope-b-one', 0, 0, 1);
         profiler.recordCheckComplete('scope-b-two', 0, 0, 1);

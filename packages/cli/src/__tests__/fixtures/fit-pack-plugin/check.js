@@ -19,13 +19,13 @@ export const fitPackFixtureCheck = defineCheck({
   analyze: (content, filePath) => {
     const violations = [];
     const lines = content.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('FIT_PACK_FIXTURE')) {
+    for (const [index, line] of lines.entries()) {
+      if (line.includes('FIT_PACK_FIXTURE')) {
         violations.push({
           message: 'FIT_PACK_FIXTURE marker detected',
           severity: 'error',
           filePath,
-          line: i + 1,
+          line: index + 1,
           column: 0,
           suggestion: 'Remove the fixture marker',
         });

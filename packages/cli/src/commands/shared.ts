@@ -10,8 +10,8 @@
  * the shared context type.
  */
 
-import type { RunActionHooks } from '../bootstrap/run-plane.js';
 import type { SpecLike } from './completion.js';
+import type { RunActionHooks } from '../bootstrap/run-plane.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-cli/contracts';
 import type {

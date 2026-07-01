@@ -13,10 +13,10 @@ import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import { buildMaybeDispatchExternal } from './bind-external-dispatch.js';
 import { bindToolCliContext } from './bind-tool-context.js';
-import { type RunActionHooks } from './run-plane.js';
 import { getBootstrapDiagnosticsBuffer } from './bootstrap-diagnostics-buffer.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { decorateToolPrimary } from './decorate-tool-primary.js';
+import { type RunActionHooks } from './run-plane.js';
 import { provenanceSourceFor } from './tool-provenance.js';
 
 /**
