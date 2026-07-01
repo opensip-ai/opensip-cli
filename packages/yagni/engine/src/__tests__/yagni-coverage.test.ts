@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import { resolveToolHooks, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { collectYagniReportData } from '../cli/report-data.js';
@@ -223,6 +223,7 @@ describe('yagni config, tool metadata, and command handler', () => {
     expect(yagniTool.commandSpecs?.[0]?.name).toBe('yagni');
     expect(yagniTool.commandSpecs?.[0]?.aliases).toEqual(['yag']);
     expect(yagniTool.extensionPoints?.collectReportData).toBe(collectYagniReportData);
+    expect(resolveToolHooks(yagniTool).sessionReplay?.tool).toBe('yagni');
   });
 
   it('runs the command handler in JSON and human modes', async () => {

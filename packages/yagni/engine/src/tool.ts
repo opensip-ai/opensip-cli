@@ -11,6 +11,7 @@ import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 import { renderYagniLive, type YagniLiveArgs } from './cli/yagni-runner.js';
 import { yagniRunWorkerCommandSpec } from './cli/yagni-worker.js';
 import { YAGNI_IDENTITY, YAGNI_LIVE_VIEW_KEY } from './identity.js';
+import { yagniReplayFromSession } from './persistence/session-replay.js';
 
 /**
  * Per-tool contract version (ADR-0047).
@@ -43,6 +44,9 @@ export const yagniTool: Tool = defineTool({
       env: yagniConfigDeclaration.env,
     },
     collectReportData: collectYagniReportData,
+    sessionReplay: {
+      replaySession: yagniReplayFromSession,
+    },
     fingerprintStrategy: yagniFingerprintStrategy,
   },
 });
