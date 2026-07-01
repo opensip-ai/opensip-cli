@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-06-30
 release: v0.1.19
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
@@ -10,9 +10,12 @@ source-files:
   - packages/contracts/src/agent-filters.ts
   - packages/core/src/lib/git-changed-files.ts
   - packages/graph/engine/src/cli/impact.ts
+  - packages/mcp/src/command.ts
 related-docs:
   - ../70-reference/01-cli-commands.md
   - ../70-reference/04-json-output-schema.md
+  - ./08-connect-mcp-clients.md
+  - ../../decisions/ADR-0084-mcp-server-surface.md
   - ../../decisions/ADR-0085-change-detection-substrate.md
   - ../../decisions/ADR-0086-signal-repair-metadata.md
 ---
@@ -95,3 +98,14 @@ verdicts (live runs deliver the unfiltered envelope for egress and sessions).
 | `agent-final` | fit, graph | Full verification (CI-equivalent) |
 
 Projects can override built-in recipes in `opensip-cli.config.yml`.
+
+## MCP (Cursor, Claude Code, Codex)
+
+For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
+register `opensip mcp` as a stdio server instead of shelling out for every graph or
+findings query. The server exposes 13 tools: graph traversal (`who_calls`,
+`blast_radius`, …) and result replay (`get_latest_findings`, `show_run`, …).
+
+Setup is client-specific (JSON vs TOML, config file locations, approval flows).
+See **[Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)** for copy-paste config for
+Cursor, Claude Code, and Codex.

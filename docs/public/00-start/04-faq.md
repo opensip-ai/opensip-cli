@@ -144,7 +144,8 @@ MCP, agent filters, and agent recipes let external coding agents inspect prior
 runs, understand blast radius, and verify their work. The product boundary is:
 agents may consume OpenSIP's guardrails; OpenSIP itself is not the agent.
 
-See [Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md) and
+See [Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md),
+[Connect MCP clients](../60-guides/08-connect-mcp-clients.md), and
 [plugin authoring](../50-extend/01-plugin-authoring.md).
 
 ---

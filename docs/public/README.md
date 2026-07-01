@@ -48,6 +48,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | Use graph on a real project | [Use graph](./60-guides/06-use-graph.md) |
 | Create your own CLI subcommand | [Create your first Tool](./60-guides/07-create-your-first-tool.md) |
 | Wire the release gate into CI | [Wire into CI](./60-guides/03-wire-into-ci.md) |
+| Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 
 ## Command Map
 
@@ -91,6 +92,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
 | Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) -> [External tool adapters](./50-extend/08-external-tool-adapters.md) |
 | Graph adopter | [Use graph](./60-guides/06-use-graph.md) -> [Stages and catalog](./40-graph/01-stages-and-catalog.md) -> [Rules and gating](./40-graph/02-rules-and-gating.md) |
+| AI agent (CLI + MCP) | [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md) -> [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 | Contributor | [Architecture overview](./00-start/07-architecture-overview.md) -> [Layered package graph](./10-concepts/03-modular-monolith.md) -> [Layer policy](./80-implementation/05-layer-policy.md) |
 
 ## Full Docs Map
@@ -159,28 +161,30 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 37. [Migrate from ESLint](./60-guides/05-migrate-from-eslint.md)
 38. [Use graph](./60-guides/06-use-graph.md)
 39. [Create your first Tool](./60-guides/07-create-your-first-tool.md)
+40. [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md)
+41. [Connect MCP clients](./60-guides/08-connect-mcp-clients.md)
 
 ### 70 - Reference
 
-40. [CLI commands](./70-reference/01-cli-commands.md)
-41. [Package catalog](./70-reference/02-package-catalog.md)
-42. [Configuration](./70-reference/03-configuration.md)
-43. [JSON output schema](./70-reference/04-json-output-schema.md)
-44. [Checks reference](./70-reference/05-checks-index.md)
-45. [Report](./70-reference/06-dashboard.md)
-46. [Supply-chain security](./70-reference/08-supply-chain-security.md)
-47. [Environment variables](./70-reference/10-environment-variables.md)
-48. [`tools` command](./70-reference/12-tools-command.md)
+42. [CLI commands](./70-reference/01-cli-commands.md)
+43. [Package catalog](./70-reference/02-package-catalog.md)
+44. [Configuration](./70-reference/03-configuration.md)
+45. [JSON output schema](./70-reference/04-json-output-schema.md)
+46. [Checks reference](./70-reference/05-checks-index.md)
+47. [Report](./70-reference/06-dashboard.md)
+48. [Supply-chain security](./70-reference/08-supply-chain-security.md)
+49. [Environment variables](./70-reference/10-environment-variables.md)
+50. [`tools` command](./70-reference/12-tools-command.md)
 
 ### 80 - Internals
 
-49. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-50. [Plugin loader](./80-implementation/02-plugin-loader.md)
-51. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-52. [Coding standards](./80-implementation/04-coding-standards.md)
-53. [Layer policy](./80-implementation/05-layer-policy.md)
-54. [Doc conventions](./80-implementation/06-doc-conventions.md)
-55. [Website integration](./80-implementation/07-website-integration.md)
+51. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+52. [Plugin loader](./80-implementation/02-plugin-loader.md)
+53. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+54. [Coding standards](./80-implementation/04-coding-standards.md)
+55. [Layer policy](./80-implementation/05-layer-policy.md)
+56. [Doc conventions](./80-implementation/06-doc-conventions.md)
+57. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 

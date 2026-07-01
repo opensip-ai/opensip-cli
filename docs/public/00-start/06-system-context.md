@@ -85,7 +85,9 @@ no daemon, no project-external database, no message queue, and no scheduled job;
 opensip-cli runs to completion and exits. The explicit exception is
 [`opensip mcp`](../70-reference/01-cli-commands.md#mcp--serve-the-call-graph--results-to-agents-over-stdio):
 an external coding agent may spawn the CLI as a stdio MCP server to read the
-project's persisted graph and sessions.
+project's persisted graph and sessions. See
+[Connect MCP clients](../60-guides/08-connect-mcp-clients.md) for Cursor, Claude
+Code, and Codex setup.
 
 ---
 

@@ -25,6 +25,7 @@ source-files:
   - packages/tool-osv-scanner/src/tool.ts
   - packages/tool-trivy/src/tool.ts
 related-docs:
+  - ../60-guides/08-connect-mcp-clients.md
   - ../80-implementation/01-cli-dispatch.md
   - ../70-reference/03-configuration.md
 ---
@@ -436,22 +437,15 @@ Every graph result carries a `freshness` verdict. A **stale or missing catalog i
 
 When the user references **existing** findings ("what were the fit errors?", "show the last graph run"), an agent should call `get_latest_findings` (or `show_run` / `list_runs`) to replay the stored result **before** re-running a tool. Re-running is expensive and usually unnecessary; the result tools exist precisely to steer the agent to the persisted result first.
 
-### Example MCP client config
+### MCP client setup
 
-Register `opensip mcp` as a stdio server in your agent's MCP config (the shape below is the common `mcpServers` form used by Claude Code, Codex, and similar clients):
+Register `opensip mcp` as a stdio server in your coding agent's MCP config. The
+client spawns the process, exchanges JSON-RPC over stdin/stdout for the session,
+and closes stdin to shut the server down cleanly.
 
-```json
-{
-  "mcpServers": {
-    "opensip": {
-      "command": "opensip",
-      "args": ["mcp", "--cwd", "/absolute/path/to/your/project"]
-    }
-  }
-}
-```
-
-The client owns the process lifetime: it spawns `opensip mcp`, exchanges JSON-RPC over the pipe, and closes stdin to shut the server down cleanly.
+Setup is **client-specific** (JSON vs TOML, config paths, approval flows). See
+**[Connect MCP clients (Cursor, Claude Code, Codex)](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)**
+for copy-paste configuration for each client.
 
 **Limitations (v1):** no cloud egress / no `SignalEnvelope` delivery; no live render; `refresh_graph` builds the single project program (no `--workspace` fan-out). `impact_of_diff` is not in the v1 tool surface.
 
