@@ -23,17 +23,20 @@ import { shouldRunHookInHost } from './tool-provenance.js';
 const MODULE_TAG = 'cli:bootstrap';
 
 /**
- * Find the registered tool that owns the invoked subcommand, matching the
- * descriptor's canonical name or any alias. Returns undefined for
+ * Find the registered tool that owns the invoked command path, matching the
+ * first path segment against a descriptor's canonical name or alias. Nested
+ * commands such as `graph list` are owned by `graph`, never by the leaf
+ * `list`. Returns undefined for
  * CLI-only commands (init/sessions/configure/plugin/...) — they belong to
  * no tool, so no `initialize()` runs for them.
  */
-export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | undefined {
+export function resolveOwningTool(tools: ToolRegistry, commandPath: string): Tool | undefined {
+  const ownerCommand = commandPath.split(' ')[0] ?? commandPath;
   return tools
     .list()
     .find((tool) =>
       resolveToolCommands(tool).some(
-        (c) => c.name === cmdName || (c.aliases?.includes(cmdName) ?? false),
+        (c) => c.name === ownerCommand || (c.aliases?.includes(ownerCommand) ?? false),
       ),
     );
 }
@@ -60,11 +63,11 @@ export function resolveOwningTool(tools: ToolRegistry, cmdName: string): Tool | 
  */
 export async function maybeInitializeOwningTool(
   tools: ToolRegistry,
-  cmdName: string,
+  commandPath: string,
   runId: string,
   provenance: readonly ToolProvenance[] = [],
 ): Promise<void> {
-  const owningTool = resolveOwningTool(tools, cmdName);
+  const owningTool = resolveOwningTool(tools, commandPath);
   if (!owningTool) return;
   // M4-F: skip an external owning tool host-side — its initialize runs worker-side.
   if (!shouldRunHookInHost(owningTool, provenance)) return;

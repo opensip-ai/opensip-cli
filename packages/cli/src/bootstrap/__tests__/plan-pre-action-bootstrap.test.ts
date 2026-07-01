@@ -16,7 +16,7 @@ import {
   type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
 import { BootstrapError } from '../bootstrap-error.js';
@@ -32,6 +32,22 @@ function scopeSpec(name: string, scope: CommandScopeRequirement): CommandSpec {
     description: `${name} command`,
     commonFlags: [],
     scope,
+    output: 'command-result',
+    handler: () => undefined,
+  });
+}
+
+function toolCommandSpec(
+  name: string,
+  scope: CommandScopeRequirement,
+  parent?: string,
+): CommandSpec {
+  return defineCommand({
+    name,
+    description: `${name} command`,
+    commonFlags: [],
+    scope,
+    ...(parent === undefined ? {} : { parent }),
     output: 'command-result',
     handler: () => undefined,
   });
@@ -61,6 +77,19 @@ const noopTool = (name: string): Tool => ({
   commands: [{ name, description: name }],
   commandSpecs: [],
 });
+
+const nestedTool = (id: string, primary: string): Tool => {
+  const primarySpec = toolCommandSpec(primary, 'project');
+  const listSpec = toolCommandSpec('list', 'project', primary);
+  return {
+    metadata: { id, name: primary, version: '0', description: primary },
+    commands: [
+      { name: primary, description: primary, scope: 'project' },
+      { name: 'list', description: 'list', parent: primary, scope: 'project' },
+    ],
+    commandSpecs: [primarySpec, listSpec],
+  };
+};
 
 function runtimeWith(tools: Tool[]): PreActionRuntime {
   const registry = new ToolRegistry();
@@ -300,6 +329,75 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         }),
       }),
     );
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('drives capabilities for the owner named by commandPath, not a shared leaf', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-post-owner-'));
+    writeFileSync(join(tmp, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
+    const fitTool = nestedTool('fit-tool-id', 'fit');
+    const graphTool = nestedTool('graph-tool-id', 'graph');
+    const commandScopes = buildCommandScopeIndex({
+      hostSpecs: [],
+      hostGroups: [
+        {
+          name: 'tools',
+          description: 'Tools group',
+          leaves: [scopeSpec('list', 'none')],
+        },
+      ],
+      toolSpecs: [...(fitTool.commandSpecs ?? []), ...(graphTool.commandSpecs ?? [])],
+    });
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: tmp,
+      cwdExplicit: false,
+      runId: 'RUN_owner',
+      commandName: 'list',
+      commandPath: 'graph list',
+      commandScopes,
+    });
+    const maybeInitializeOwningTool = vi.fn(() => Promise.resolve());
+    const loadOwningToolCapabilities = vi.fn(() => Promise.resolve(0));
+
+    await executePostBailoutBootstrap(
+      {
+        plan,
+        runtime: runtimeWith([fitTool, graphTool]),
+        version: '0.0.0-test',
+        noCloud: true,
+      },
+      {
+        enterScope: () => undefined,
+        isScopeEntered: () => true,
+        checkForUpdate: () => undefined,
+        startProfiling: () => undefined,
+        maybeInitializeOwningTool,
+        loadOwningToolCapabilities,
+      },
+    );
+
+    expect(maybeInitializeOwningTool).toHaveBeenCalledWith(
+      expect.any(ToolRegistry),
+      'graph list',
+      'RUN_owner',
+      [],
+    );
+    expect(loadOwningToolCapabilities).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owningTool: expect.objectContaining({
+          metadata: expect.objectContaining({ id: 'graph-tool-id' }),
+        }),
+      }),
+    );
+    expect(loadOwningToolCapabilities).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        owningTool: expect.objectContaining({
+          metadata: expect.objectContaining({ id: 'fit-tool-id' }),
+        }),
+      }),
+    );
+
     rmSync(tmp, { recursive: true, force: true });
   });
 

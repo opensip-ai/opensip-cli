@@ -135,7 +135,7 @@ export async function executePostBailoutBootstrap(
   // the command belongs to no tool (CLI-only commands have a 1:1 name).
   const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
   const { owningTool, scope } = preActionTimer.measure(PRE_ACTION_PHASES.buildScope, () => {
-    const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandName);
+    const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandPath);
     const toolName = resolvedOwningTool?.metadata.id ?? parentCommand;
     return {
       owningTool: resolvedOwningTool,
@@ -226,7 +226,7 @@ export async function executePostBailoutBootstrap(
     // ADR-0054 M4-F: pass provenance so an EXTERNAL owning tool's initialize is
     // skipped in-host (it runs worker-side under dispatch); bundled runs in-host.
     await preActionTimer.measureAsync('owning-tool-initialize', () =>
-      d.maybeInitializeOwningTool(tools, plan.commandName, plan.runId, provenance),
+      d.maybeInitializeOwningTool(tools, plan.commandPath, plan.runId, provenance),
     );
 
     const driven = await preActionTimer.measureAsync('owning-capability-load', () =>

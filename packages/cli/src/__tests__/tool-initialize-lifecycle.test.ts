@@ -100,6 +100,35 @@ function makeFixtureTool(
   };
 }
 
+function makeToolWithCommandSpecs(
+  id: string,
+  specs: readonly {
+    readonly name: string;
+    readonly parent?: string;
+    readonly aliases?: readonly string[];
+  }[],
+): Tool {
+  return {
+    metadata: { id, version: '0.0.0', description: `${id} fixture` },
+    commands: specs.map((spec) => ({
+      name: spec.name,
+      description: `${spec.name} command`,
+      ...(spec.parent === undefined ? {} : { parent: spec.parent }),
+      ...(spec.aliases === undefined ? {} : { aliases: spec.aliases }),
+    })),
+    commandSpecs: specs.map((spec) => ({
+      name: spec.name,
+      description: `${spec.name} command`,
+      ...(spec.parent === undefined ? {} : { parent: spec.parent }),
+      ...(spec.aliases === undefined ? {} : { aliases: spec.aliases }),
+      commonFlags: ['cwd'],
+      scope: 'project',
+      output: 'command-result',
+      handler: () => ({ type: 'ok' }),
+    })) as never,
+  };
+}
+
 /** Wire a program with the preAction hook + the fixture tool's mounted command. */
 function buildProgram(tool: Tool): Command {
   const tools = new ToolRegistry();
@@ -149,6 +178,36 @@ describe('resolveOwningTool', () => {
     const tools = new ToolRegistry();
     tools.register(makeFixtureTool('t2', 'cmd-b', events, { aliases: ['cb'] }));
     expect(resolveOwningTool(tools, 'cb')?.metadata.id).toBe('t2');
+  });
+
+  it('matches a nested command by the first command-path segment, not the leaf', () => {
+    const tools = new ToolRegistry();
+    tools.register(
+      makeToolWithCommandSpecs('fit-tool', [
+        { name: 'fit' },
+        { name: 'list', parent: 'fit' },
+      ]),
+    );
+    tools.register(
+      makeToolWithCommandSpecs('graph-tool', [
+        { name: 'graph' },
+        { name: 'list', parent: 'graph' },
+      ]),
+    );
+
+    expect(resolveOwningTool(tools, 'graph list')?.metadata.id).toBe('graph-tool');
+  });
+
+  it('returns undefined for host command groups that share tool leaf names', () => {
+    const tools = new ToolRegistry();
+    tools.register(
+      makeToolWithCommandSpecs('fit-tool', [
+        { name: 'fit' },
+        { name: 'list', parent: 'fit' },
+      ]),
+    );
+
+    expect(resolveOwningTool(tools, 'tools list')).toBeUndefined();
   });
 
   it('returns undefined for a command owned by no tool (CLI-only)', () => {
