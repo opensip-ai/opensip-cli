@@ -2,6 +2,19 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.1.19] - 2026-07-01
+
+A release-bookkeeping maintenance release. It advances the published package
+set and generated documentation surfaces after v0.1.18, without introducing
+new runtime behavior.
+
+### Changed
+
+- Package versions, public documentation release markers, generated package
+  README links, and website documentation links now point at v0.1.19.
+- The supported-release metadata now tracks v0.1.19 as the currently supported
+  release line.
+
 ## [0.1.18] - 2026-06-30
 
 A hidden-state, deterministic-gate, precision, and duplicate-signal hardening
