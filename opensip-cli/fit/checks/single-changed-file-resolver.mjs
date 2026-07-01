@@ -65,7 +65,7 @@ export function analyzeSingleChangedFileResolver(content, filePath) {
 
 export const checks = [
   defineCheck({
-    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    id: 'efa30470-12ef-4255-a56d-df54d3432697',
     slug: 'single-changed-file-resolver',
     description:
       'Only the core git changed-file resolver may shell out for changed-file derivation (ADR-0085)',

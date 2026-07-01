@@ -51,7 +51,7 @@ export function analyzeSingleAgentFilterEngine(content, filePath) {
 
 export const checks = [
   defineCheck({
-    id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+    id: '8b9a143c-9b5c-4f2d-9b8c-8feea69001b0',
     slug: 'single-agent-filter-engine',
     description: 'Only the contracts agent-filter engine may implement agent filtering (ADR-0085)',
     scope: { languages: ['typescript'], concerns: ['backend', 'server'] },

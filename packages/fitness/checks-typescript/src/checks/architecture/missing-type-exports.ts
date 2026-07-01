@@ -145,7 +145,7 @@ function splitImportPath(importPath: string): { pkg: string; subpath: string } |
 }
 
 export const missingTypeExports = defineCheck({
-  id: '8d36209b-5aeb-4ab0-8255-3134a20fdfd5',
+  id: '486e522b-d996-42ca-ad94-c7dceb9efbf3',
   slug: 'missing-type-exports',
   scope: { languages: ['typescript'], concerns: ['backend', 'frontend'] },
   confidence: 'medium',

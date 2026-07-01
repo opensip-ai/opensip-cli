@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 export const tsconfigExtendsValidation = defineCheck({
-  id: '842e7d00-c8e8-4a57-873a-c03caec7e603',
+  id: '4a62d660-9d44-4877-94f8-2c4dc7f3aa40',
   slug: 'tsconfig-extends-validation',
   scope: {
     languages: ['typescript'],
