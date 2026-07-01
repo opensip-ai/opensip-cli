@@ -16,7 +16,6 @@ import {
   definePrimaryRunCommand,
   emitAgentFilteredJsonOutput,
   EXIT_CODES,
-  type SignalEnvelope,
   type StoredSession,
   type ToolOptions,
 } from '@opensip-cli/contracts';

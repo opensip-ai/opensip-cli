@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-gitleaks",
-  "version": "0.1.19",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "description": "External Tool Adapter for Gitleaks — wraps the gitleaks secret scanner as an opensip-cli tool (opensip gitleaks / opensip secrets)",
   "keywords": [

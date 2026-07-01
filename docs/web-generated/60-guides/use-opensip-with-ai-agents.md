@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-30
-release: v0.1.19
+release: v0.2.0
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
@@ -46,7 +46,7 @@ stored result before re-running:
 opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
 ```
 
-See [ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0085-change-detection-substrate.md) for how
+See [ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/docs/decisions/ADR-0085-change-detection-substrate.md) for how
 change detection and filtering share one substrate.
 
 ## Edit loop
@@ -73,7 +73,7 @@ opensip fit --json --raw --filter errors-only
 ```
 
 Signals may carry structured repair guidance under `signal.repair` — see
-[ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0086-signal-repair-metadata.md).
+[ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/docs/decisions/ADR-0086-signal-repair-metadata.md).
 
 ## Final handoff
 

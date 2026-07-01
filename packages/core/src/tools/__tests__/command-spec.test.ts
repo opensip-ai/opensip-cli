@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineCommand, validateCommandSpec } from '../command-spec-validate.js';
 import {
   COMMON_FLAG_KEYS,
+  commandProducesVerdict,
   type ArgSpec,
   type CommandSpec,
   type CommonFlagKey,
@@ -286,5 +287,19 @@ describe('CommandSpec shape', () => {
     expect(spec.args).toHaveLength(1);
     expect(spec.output).toBe('live-view');
     expect(spec.scope).toBe('none');
+  });
+});
+
+describe('commandProducesVerdict', () => {
+  it('returns true when producesVerdict is set', () => {
+    expect(commandProducesVerdict({ producesVerdict: true, output: 'command-result' })).toBe(true);
+  });
+
+  it('returns true for signal-envelope output', () => {
+    expect(commandProducesVerdict({ output: 'signal-envelope' })).toBe(true);
+  });
+
+  it('returns false for non-verdict output modes', () => {
+    expect(commandProducesVerdict({ output: 'raw-stream' })).toBe(false);
   });
 });

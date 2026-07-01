@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.19
+release: v0.2.0
 title: "Recipes and checks"
 audience: [contributors, plugin-authors]
 purpose: "What a recipe is, what a check is, and how they compose. The two primary author-facing primitives in fit."
@@ -34,7 +34,7 @@ Two primitives. A **check** is the rule. A **recipe** is the lineup. Authors wri
 
 ## Anatomy of a check
 
-A check is the result of `defineCheck()`. The configuration shape is in [`packages/fitness/engine/src/framework/check-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/fitness/engine/src/framework/check-config.ts); the validator is Zod-driven, so misconfigured checks throw at definition time, not at run time.
+A check is the result of `defineCheck()`. The configuration shape is in [`packages/fitness/engine/src/framework/check-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/fitness/engine/src/framework/check-config.ts); the validator is Zod-driven, so misconfigured checks throw at definition time, not at run time.
 
 ### Required fields
 
@@ -167,7 +167,7 @@ defineCheck({
 
 ### What `defineCheck` returns
 
-A `Check` object ([`packages/fitness/engine/src/framework/check-types.ts:45`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/fitness/engine/src/framework/check-types.ts)):
+A `Check` object ([`packages/fitness/engine/src/framework/check-types.ts:45`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/fitness/engine/src/framework/check-types.ts)):
 
 ```ts
 interface Check {
@@ -201,7 +201,7 @@ export default defineRecipe({
 });
 ```
 
-The full input shape is in [`packages/fitness/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/fitness/engine/src/recipes/types.ts):
+The full input shape is in [`packages/fitness/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/fitness/engine/src/recipes/types.ts):
 
 ```ts
 interface FitnessRecipeDefinition {
@@ -255,7 +255,7 @@ defineRecipe({
 });
 ```
 
-Inside the check, read your slice via `getCheckConfig<T>(slug)` ([`packages/fitness/engine/src/recipes/check-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/fitness/engine/src/recipes/check-config.ts)):
+Inside the check, read your slice via `getCheckConfig<T>(slug)` ([`packages/fitness/engine/src/recipes/check-config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/fitness/engine/src/recipes/check-config.ts)):
 
 ```ts
 import { getCheckConfig } from '@opensip-cli/fitness';
@@ -313,7 +313,7 @@ Recipe-owned file paths are not part of the supported reporting contract. If a r
 
 Three sources, loaded in order:
 
-1. **Built-in.** [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/fitness/engine/src/recipes/built-in-recipes.ts) defines `default` (every enabled check, parallel, table output) and a small handful of canonical recipes. These ship with `@opensip-cli/fitness` and are always available.
+1. **Built-in.** [`packages/fitness/engine/src/recipes/built-in-recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/fitness/engine/src/recipes/built-in-recipes.ts) defines `default` (every enabled check, parallel, table output) and a small handful of canonical recipes. These ship with `@opensip-cli/fitness` and are always available.
 2. **Project-local.** `.js`/`.mjs` files recursively under `<project>/opensip-cli/fit/recipes/` are loaded by the plugin discoverer. Each module exports a `recipes` array. This is where most teams put their `quick-smoke`, `pre-merge`, and `nightly` recipes.
 3. **npm-package.** Check packs (any package declaring the `fit-pack` marker plus target-domain epoch or listed in `plugins.checkPackages:`) can export recipes alongside checks, by declaring `recipes:` in their entry. A pack-shipped recipe is registered the same way a project-local one is.
 

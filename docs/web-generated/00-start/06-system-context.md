@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.1.19
+release: v0.2.0
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-cli sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
@@ -93,7 +93,7 @@ Code, and Codex setup.
 
 ## The on-disk layout
 
-The layout is set by [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/core/src/lib/paths.ts) and is the single source of truth for every consumer (logger, gate, plugin loader, dashboard, sessions store).
+The layout is set by [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/core/src/lib/paths.ts) and is the single source of truth for every consumer (logger, gate, plugin loader, dashboard, sessions store).
 
 ### Project-level (`<project>/`)
 
@@ -153,7 +153,7 @@ The user-level dir is intentionally small. Anything project-specific (checks, re
 
 ## Exit codes
 
-opensip-cli follows the conventional Unix exit-code shape, defined in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/packages/contracts/src/exit-codes.ts):
+opensip-cli follows the conventional Unix exit-code shape, defined in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/packages/contracts/src/exit-codes.ts):
 
 | Code | Meaning |
 |---|---|

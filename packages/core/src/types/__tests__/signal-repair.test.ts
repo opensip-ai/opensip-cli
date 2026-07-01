@@ -48,4 +48,34 @@ describe('Signal.repair', () => {
       patchHint: { kind: 'text', summary: 'Extract the helper' },
     });
   });
+
+  it.each([
+    ['add-test', 'add-test'],
+    ['fix-import', 'fix-import'],
+    ['split-function', 'split-function'],
+    ['extract-module', 'extract-module'],
+  ] as const)('maps fix action %s to repairKind %s', (action, repairKind) => {
+    const signal = createSignal({
+      source: 'fit',
+      ruleId: 'fit:example',
+      severity: 'medium',
+      message: 'fix',
+      fix: { action },
+    });
+    expect(signal.repair?.repairKind).toBe(repairKind);
+  });
+
+  it('synthesizes patch summary from fix action when description is absent', () => {
+    const signal = createSignal({
+      source: 'fit',
+      ruleId: 'fit:example',
+      severity: 'medium',
+      message: 'fix',
+      fix: { action: 'add-test' },
+    });
+    expect(signal.repair?.patchHint).toEqual({
+      kind: 'text',
+      summary: 'Apply add-test remediation',
+    });
+  });
 });

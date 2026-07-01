@@ -1,15 +1,18 @@
 import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   AgentFilterParseError,
   agentRunFlagSpecs,
   applyAgentFilters,
   buildAgentFilteredResult,
+  emitAgentFilteredJsonOutput,
   normalizeAgentRunFilters,
 } from '../agent-filters.js';
 import { EXIT_CODES, mapToolErrorToExitCode } from '../exit-codes.js';
 import { buildSignalEnvelope } from '../signal-envelope.js';
+
+import type { ToolCliContext } from '@opensip-cli/core';
 
 function envelope(signals: ReturnType<typeof createSignal>[]) {
   return buildSignalEnvelope({
@@ -161,6 +164,57 @@ describe('applyAgentFilters', () => {
     expect(spec?.arrayDefault).toEqual([]);
     expect(spec?.parse?.('errors-only', [])).toEqual(['errors-only']);
     expect(spec?.parse?.('top:5', ['errors-only'])).toEqual(['errors-only', 'top:5']);
+  });
+
+  it('emitAgentFilteredJsonOutput emits the envelope when no filters are active', () => {
+    const emitEnvelope = vi.fn();
+    const emitJson = vi.fn();
+    const emitRaw = vi.fn();
+    const cli = { emitEnvelope, emitJson, emitRaw } as unknown as ToolCliContext;
+    const env = envelope([]);
+
+    emitAgentFilteredJsonOutput(cli, env, {});
+
+    expect(emitEnvelope).toHaveBeenCalledWith(env);
+    expect(emitJson).not.toHaveBeenCalled();
+    expect(emitRaw).not.toHaveBeenCalled();
+  });
+
+  it('emitAgentFilteredJsonOutput emits filtered JSON when filters are active', () => {
+    const emitEnvelope = vi.fn();
+    const emitJson = vi.fn();
+    const emitRaw = vi.fn();
+    const cli = { emitEnvelope, emitJson, emitRaw } as unknown as ToolCliContext;
+    const env = envelope([
+      createSignal({
+        source: 'fit',
+        ruleId: 'a',
+        severity: 'critical',
+        message: 'crit',
+        code: { file: 'src/a.ts' },
+        category: 'security',
+      }),
+    ]);
+
+    emitAgentFilteredJsonOutput(cli, env, { filter: ['category:security'] });
+
+    expect(emitEnvelope).not.toHaveBeenCalled();
+    expect(emitJson).toHaveBeenCalledWith(buildAgentFilteredResult(env, ['category:security']));
+    expect(emitRaw).not.toHaveBeenCalled();
+  });
+
+  it('emitAgentFilteredJsonOutput emits raw filtered output when --raw is set', () => {
+    const emitEnvelope = vi.fn();
+    const emitJson = vi.fn();
+    const emitRaw = vi.fn();
+    const cli = { emitEnvelope, emitJson, emitRaw } as unknown as ToolCliContext;
+    const env = envelope([]);
+
+    emitAgentFilteredJsonOutput(cli, env, { raw: true, filter: ['errors-only'] });
+
+    expect(emitEnvelope).not.toHaveBeenCalled();
+    expect(emitJson).not.toHaveBeenCalled();
+    expect(emitRaw).toHaveBeenCalledWith(buildAgentFilteredResult(env, ['errors-only']));
   });
 
   it('maps a bad live-run filter to the CONFIGURATION_ERROR exit code', () => {

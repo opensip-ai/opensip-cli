@@ -25,6 +25,7 @@ export default mergeConfig(
           'src/languages/workspace-unit.ts',
           // Contract hub modules split from types.ts (M6) — interfaces only.
           'src/tools/cli-context.ts',
+          'src/tools/mount-context.ts',
           'src/tools/host-planes.ts',
           'src/tools/scaffold.ts',
           'src/tools/tool-results.ts',

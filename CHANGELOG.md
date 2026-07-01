@@ -2,6 +2,48 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.2.0] - 2026-07-01
+
+An architecture-audit remediation and agent-ergonomics release. It hardens
+host-owned guardrails across fit, graph, sim, and yagni; centralizes shared
+JSON filter emission and validated-cell formatting; and documents MCP client
+setup for Cursor, Claude Code, and Codex.
+
+### Added
+
+- Architecture audit P1 remediation (phases 0–7), including ADRs 0105–0108 for
+  host run-pipeline deferral, primary-run presets, shared gate dispatch, and
+  signal-repair routing.
+- YAGNI session replay for dashboard history and agent consumption.
+- MCP client setup guide for Cursor, Claude Code, and Codex.
+- `graph --report-open` flag to open the HTML report after a run.
+- `defineTool` scaffolding templates for third-party tool authors.
+- Shared `emitAgentFilteredJsonOutput` in contracts so fit/graph/sim/yagni JSON
+  filter dispatch cannot drift.
+- Shared validated-cell formatting in cli-ui for live-run and fitness tables.
+
+### Changed
+
+- Primary run commands now enforce declarative presets; raw-stream command shells
+  and baseline status writers are standardized across tools.
+- Host gate dispatch is shared across tools instead of reimplemented per engine.
+- Fitness authoring guardrails are strengthened, including unique check-id
+  enforcement and preset-aware flag/report/raw-stream guards.
+- Agent catalog avoids JSON examples for raw-stream commands; suite command is
+  documented in the README.
+- Report environment details move into header disclosure instead of a separate
+  block.
+- Near-duplicate function bodies flagged by graph are consolidated into shared
+  helpers.
+
+### Fixed
+
+- P1-remediation review regressions, including fit run-pipeline boundary guards,
+  cli-live semantic alias allowance, and yagni JSON filter/detector alignment.
+- Graph async-waterfall in the run command tail.
+- CLI hygiene guardrail cleanup and owning-tool resolution from command paths.
+- YAGNI `defineDetector` throw contract is documented.
+
 ## [0.1.19] - 2026-07-01
 
 A release-bookkeeping maintenance release. It advances the published package

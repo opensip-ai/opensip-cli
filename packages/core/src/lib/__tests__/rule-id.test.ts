@@ -12,4 +12,14 @@ describe('namespacedRuleId', () => {
       'yagni:unused-config-surface',
     );
   });
+
+  it('trims redundant colons from namespace and slug', () => {
+    expect(namespacedRuleId('yagni::', '::unused-config-surface')).toBe(
+      'yagni:unused-config-surface',
+    );
+  });
+
+  it('returns the namespace unchanged when the slug equals the namespace', () => {
+    expect(namespacedRuleId('yagni', 'yagni')).toBe('yagni');
+  });
 });
