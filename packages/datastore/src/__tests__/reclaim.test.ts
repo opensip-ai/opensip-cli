@@ -6,7 +6,8 @@ import Database from 'better-sqlite3';
 import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DataStoreFactory, requireDrizzleDataStore } from '../index.js';
+import { DataStoreFactory } from '../index.js';
+import { requireDrizzleHandle } from '../data-store.js';
 
 let tmp: string;
 
@@ -54,7 +55,7 @@ describe('SQLite reclaim primitives', () => {
     expect(maintenance).toBeDefined();
     if (maintenance === undefined) throw new Error('expected sqlite maintenance capability');
 
-    const db = requireDrizzleDataStore(datastore).db;
+    const db = requireDrizzleHandle(datastore).db;
     const initialSize = maintenance.fileSizeBytes();
     db.run(sql`CREATE TABLE reclaim_probe (payload TEXT NOT NULL)`);
     const payload = 'x'.repeat(4096);

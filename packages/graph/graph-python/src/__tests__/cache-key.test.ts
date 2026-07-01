@@ -25,12 +25,14 @@ describe('lang-python cacheKey — branches', () => {
   });
 
   it('returns py-unknown-no-config when configPathAbs is undefined', () => {
-    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('py-unknown-no-config');
+    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe(
+      'py-unknown-no-config-exact',
+    );
   });
 
   it('returns py-unknown-no-config when configPathAbs is empty', () => {
     expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
-      'py-unknown-no-config',
+      'py-unknown-no-config-exact',
     );
   });
 
@@ -55,7 +57,15 @@ describe('lang-python cacheKey — branches', () => {
     writeFileSync(file, '[project]\nname = "p"\n', 'utf8');
     const out = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(out.startsWith('py-unknown-')).toBe(true);
-    expect(out).not.toBe('py-unknown-no-config');
+    expect(out).not.toBe('py-unknown-no-config-exact');
+  });
+
+  it('distinguishes resolution modes for the same config content', () => {
+    const file = join(dir, 'pyproject.toml');
+    writeFileSync(file, '[project]\n', 'utf8');
+    const exact = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+    const fast = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'fast' });
+    expect(exact).not.toBe(fast);
   });
 
   it('produces a stable hash across repeated calls', () => {

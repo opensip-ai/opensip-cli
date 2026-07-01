@@ -159,7 +159,7 @@ describe('hashConfig', () => {
 describe('makeConfigCacheKey', () => {
   it('prefixes the hashConfig output', () => {
     const cacheKey = makeConfigCacheKey({ prefix: 'go' });
-    expect(cacheKey({ projectDirAbs: '/p', resolutionMode: 'exact' })).toBe('go-no-config');
+    expect(cacheKey({ projectDirAbs: '/p', resolutionMode: 'exact' })).toBe('go-no-config-exact');
   });
 });
 

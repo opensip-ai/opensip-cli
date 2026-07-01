@@ -1,7 +1,7 @@
 /**
  * Go cacheKey implementation.
  *
- * Produces `go-${goSumHash || goModHash || 'no-config'}`.
+ * Produces `go-${goSumHash || goModHash || 'no-config'}-${resolutionMode}`.
  *
  * Prefers go.sum over go.mod when both are present — go.sum holds the
  * resolved dependency tree (with hashes), so changing a dep version

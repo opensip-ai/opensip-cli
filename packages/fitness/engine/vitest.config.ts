@@ -5,7 +5,7 @@ export default mergeConfig(
   vitestBase,
   defineConfig({
     test: {
-      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/__fixtures__/**/*.test.ts'],
       // Loader tests dynamic-import .mjs fixtures that themselves import
       // @opensip-cli/fitness — a chain that resolves quickly on a warm
       // cache (~1s) but can hit 5s+ on cold CI runners. 30s is generous

@@ -61,7 +61,7 @@ function buildFullProgram(): Command {
     const program = new Command('opensip');
     const registry = new ToolRegistry();
     for (const tool of BUNDLED_TOOLS) registry.register(tool);
-    mountAllToolCommands(registry, program, makeStubToolContext(), []);
+    mountAllToolCommands(registry, program, makeStubToolContext(), [], {});
     registerCliCommands(program, {
       setExitCode: vi.fn(),
       render: vi.fn(() => Promise.resolve()),

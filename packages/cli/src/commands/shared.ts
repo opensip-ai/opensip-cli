@@ -10,6 +10,7 @@
  * the shared context type.
  */
 
+import type { RunActionHooks } from '../bootstrap/run-plane.js';
 import type { SpecLike } from './completion.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
 import type { CommandResult } from '@opensip-cli/contracts';
@@ -114,6 +115,8 @@ export interface CliCommandsContext {
   readonly tools?: ToolRegistry;
   /** Full tool context for host commands that re-dispatch tool specs (suite run). */
   readonly toolContext?: ToolCliContext;
+  /** Host run-lifecycle hooks paired with {@link toolContext} (suite run). */
+  readonly toolRunActionHooks?: RunActionHooks;
   /** Admitted tool manifests for config declaration composition (optional in tests). */
   readonly manifests?: readonly ToolPluginManifest[];
   /** Per-run tool provenance for config declaration composition (optional in tests). */

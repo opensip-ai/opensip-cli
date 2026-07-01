@@ -1,4 +1,5 @@
-import { DataStoreFactory, type DataStore, type DrizzleDataStore } from '@opensip-cli/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

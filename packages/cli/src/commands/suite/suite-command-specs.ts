@@ -58,11 +58,20 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
           exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         };
       }
+      if (ctx.toolRunActionHooks === undefined) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return {
+          type: 'error',
+          message: 'suite run requires the host run-action hooks handle.',
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+        };
+      }
       const result = await runSuite({
         name,
         suite,
         tools: currentScope()?.tools.list() ?? [],
         ctx: ctx.toolContext,
+        runActionHooks: ctx.toolRunActionHooks,
         suiteOpts: opts,
       });
       ctx.setExitCode(result.exitCode);

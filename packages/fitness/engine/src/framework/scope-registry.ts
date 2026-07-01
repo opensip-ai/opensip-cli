@@ -24,6 +24,7 @@ import { currentScope } from '@opensip-cli/core';
 
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
+import { MemoryProfiler, memoryProfiler } from './memory-profiler.js';
 import { CheckRegistry } from './registry.js';
 
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';
@@ -96,4 +97,17 @@ export function currentRecipeRegistry(): FitnessRecipeRegistry {
 /** Read the current scope's `ensureChecksLoaded` lifecycle state. */
 export function currentFitnessLoadState(): FitnessLoadState {
   return currentFitnessSubscope().load;
+}
+
+/** Read the current scope's per-run memory profiler. */
+export function currentMemoryProfiler(): MemoryProfiler {
+  return currentFitnessSubscope().memoryProfiler;
+}
+
+/**
+ * Resolve the active memory profiler: scope-bound in production, falling back
+ * to the test-only module singleton when no fitness subscope is present.
+ */
+export function resolveMemoryProfiler(): MemoryProfiler {
+  return currentScope()?.fitness?.memoryProfiler ?? memoryProfiler;
 }

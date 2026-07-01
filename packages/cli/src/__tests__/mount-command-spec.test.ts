@@ -762,7 +762,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
 
 // ---------------------------------------------------------------------------
 // Host run-lifecycle hooks (host-owned-run-timing Phase 8). The mount dispatch
-// reads beginRun/completeRun off the ctx via cast (RunActionHooks). These prove
+// reads beginRun/completeRun from the host hooks parameter (RunActionHooks). These prove
 // the wiring the run-plane unit tests exercise in isolation actually fires
 // through the real command action, in the right order, exactly once.
 // ---------------------------------------------------------------------------
@@ -786,10 +786,6 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
       order.push('handler');
       return result;
     });
-    const hookedCtx = Object.assign({}, ctx, {
-      beginRun,
-      completeRun,
-    }) as ToolCliContext;
     const program = new Command();
     const spec: HostCommandSpec = defineCommand({
       name: 'lc',
@@ -799,7 +795,7 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
       output: 'command-result',
       handler,
     });
-    mountCommandSpec(program, spec, hookedCtx);
+    mountCommandSpec(program, spec, ctx, { beginRun, completeRun });
 
     await program.parseAsync(['lc'], { from: 'user' });
 
@@ -817,10 +813,6 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
     const handler = vi.fn(() => {
       throw new ConfigurationError('bad', { code: 'CONFIGURATION_ERROR' });
     });
-    const hookedCtx = Object.assign({}, ctx, {
-      beginRun,
-      completeRun,
-    }) as ToolCliContext;
     const program = new Command();
     const spec: HostCommandSpec = defineCommand({
       name: 'boom',
@@ -830,7 +822,7 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
       output: 'command-result',
       handler,
     });
-    mountCommandSpec(program, spec, hookedCtx);
+    mountCommandSpec(program, spec, ctx, { beginRun, completeRun });
 
     await program.parseAsync(['boom'], { from: 'user' });
 
@@ -846,21 +838,26 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
     datastore?.close();
   });
 
-  /** Build a ctx whose run seam + action hooks are backed by a REAL run plane. */
-  function ctxWithRealRunPlane(ds: DataStore): ToolCliContext {
+  /** Build a ctx + hooks whose run seam is backed by a REAL run plane. */
+  function ctxWithRealRunPlane(ds: DataStore): {
+    ctx: ToolCliContext;
+    hooks: ReturnType<typeof createRunActionHooks>;
+  } {
     const factory = createRunPlaneFactory({
       getDatastore: () => ds,
       logger: SILENT_LOG,
     });
-    return Object.assign({}, makeCtx().ctx, {
-      runSession: createRunSessionSeam(factory),
-      ...createRunActionHooks(factory),
-    });
+    return {
+      ctx: Object.assign({}, makeCtx().ctx, {
+        runSession: createRunSessionSeam(factory),
+      }),
+      hooks: createRunActionHooks(factory),
+    };
   }
 
   it('writes exactly one host-stamped StoredSession (+ persistMs) for a returned ToolRunCompletion', async () => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    const ctx = ctxWithRealRunPlane(datastore);
+    const { ctx, hooks } = ctxWithRealRunPlane(datastore);
     const handler = vi.fn(() => ({
       session: {
         tool: 'fit',
@@ -880,7 +877,7 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
       output: 'command-result',
       handler,
     });
-    mountCommandSpec(program, spec, ctx);
+    mountCommandSpec(program, spec, ctx, hooks);
 
     await program.parseAsync(['persisted'], { from: 'user' });
 
@@ -903,7 +900,7 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
 
   it('persists no row when the handler returns a plain CommandResult (no session)', async () => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    const ctx = ctxWithRealRunPlane(datastore);
+    const { ctx, hooks } = ctxWithRealRunPlane(datastore);
     const handler = vi.fn(() => ({ type: 'help' as const }));
     const program = new Command();
     const spec: HostCommandSpec = defineCommand({
@@ -914,7 +911,7 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
       output: 'command-result',
       handler,
     });
-    mountCommandSpec(program, spec, ctx);
+    mountCommandSpec(program, spec, ctx, hooks);
 
     await program.parseAsync(['nopersist'], { from: 'user' });
 

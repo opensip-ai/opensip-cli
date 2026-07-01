@@ -9,7 +9,7 @@
  * contract invariant I-6 it is a pure function of the config content.
  *
  * `makeConfigCacheKey({ prefix })` returns the trivial
- * `cacheKey(input) => `${prefix}-${hashConfig(...)}`` used by go/java/rust
+ * `cacheKey(input) => `${prefix}-${hashConfig(...)}-${resolutionMode}`` used by go/java/rust
  * (with prefixes `go-` / `java-` / `rs-`). Python keeps its own
  * `cache-key.ts` but imports `hashConfig` from here and layers its
  * `requires-python` extraction on top (DEC-4).
@@ -45,7 +45,8 @@ export function hashConfig(configPathAbs: string | undefined): string {
 }
 
 /**
- * Builds a `cacheKey` that emits `${prefix}-${hashConfig(configPathAbs)}`.
+ * Builds a `cacheKey` that emits
+ * `${prefix}-${hashConfig(configPathAbs)}-${resolutionMode}`.
  * Per I-8 the prefix must be distinct per adapter (`go-`, `java-`, `rs-`).
  */
 export function makeConfigCacheKey(options: {
@@ -53,6 +54,6 @@ export function makeConfigCacheKey(options: {
 }): (input: CacheKeyInput) => string {
   const { prefix } = options;
   return function cacheKey(input: CacheKeyInput): string {
-    return `${prefix}-${hashConfig(input.configPathAbs)}`;
+    return `${prefix}-${hashConfig(input.configPathAbs)}-${input.resolutionMode}`;
   };
 }

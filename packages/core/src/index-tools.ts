@@ -32,6 +32,8 @@ export type {
   ToolCommandDescriptor,
   ToolConfigContribution,
   ToolCliContext,
+  CommandMountContext,
+  LiveViewMountContext,
   GateCompareResult,
   GateCompareRenderOptions,
   SignalDeliveryResult,

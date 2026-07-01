@@ -1,12 +1,11 @@
 /**
  * Shared, renderer-agnostic helpers for the fitness results table.
  *
- * Used by BOTH the cli static view-model builder (`fit-done-view.ts`) and the
- * shared live-run table (`live-run-table.tsx`), which previously each kept a
- * byte-identical copy (flagged by graph:duplicated-function-body). Pure
- * functions with structural parameter types so cli-ui stays free of any
- * @opensip-cli dependency — contracts' `TableRow` structurally satisfies
- * `FitRowSortKey`, so callers pass a `TableRow` directly.
+ * Used by the fitness live view (`fit-runner.tsx`) and static envelope
+ * derivations (`envelope-view.ts`). Pure functions with structural parameter
+ * types so fitness stays free of presentation-layer imports — contracts'
+ * `TableRow` structurally satisfies `FitRowSortKey`, so callers pass a
+ * `TableRow` directly.
  */
 
 /** The fields {@link sortFitRowPriority} reads off a fit results row. */

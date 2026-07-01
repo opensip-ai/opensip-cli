@@ -9,7 +9,7 @@ import { openSqliteBackend } from './backends/sqlite.js';
 import { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
 import { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 
-import type { DataStoreOpenOptions, DrizzleDataStore } from './data-store.js';
+import type { DataStore, DataStoreOpenOptions, DrizzleDataStore } from './data-store.js';
 
 function defaultMigrationsFolder(): string {
   return join(fileURLToPath(new URL('.', import.meta.url)), '..', 'migrations');
@@ -35,7 +35,7 @@ export const DataStoreFactory = {
    *   the `cause` field; the message distinguishes the binding case so callers
    *   are not told to delete a healthy data store.
    */
-  open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DrizzleDataStore {
+  open(opts: DataStoreOpenOptions & { migrationsFolder?: string }): DataStore {
     const migrationsFolder = opts.migrationsFolder ?? defaultMigrationsFolder();
 
     if (opts.backend === 'memory') {

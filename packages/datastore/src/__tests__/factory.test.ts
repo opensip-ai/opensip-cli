@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { requireDrizzleHandle } from '../data-store.js';
 import { isNativeBindingError, openFailureMessage } from '../factory.js';
 import { DataStoreFactory, DataStoreMigrationError } from '../index.js';
 
@@ -20,7 +21,7 @@ afterEach(() => {
 describe('DataStoreFactory.open — backends', () => {
   it('opens an in-memory store and closes cleanly', () => {
     const ds = DataStoreFactory.open({ backend: 'memory' });
-    expect(ds.db).toBeDefined();
+    expect(requireDrizzleHandle(ds).db).toBeDefined();
     ds.close();
   });
 
@@ -29,7 +30,7 @@ describe('DataStoreFactory.open — backends', () => {
     const b = DataStoreFactory.open({ backend: 'memory' });
     // Can't easily query without a schema; the structural separation
     // (different `db` handles) is sufficient evidence.
-    expect(a.db).not.toBe(b.db);
+    expect(requireDrizzleHandle(a).db).not.toBe(requireDrizzleHandle(b).db);
     a.close();
     b.close();
   });
@@ -39,7 +40,7 @@ describe('DataStoreFactory.open — backends', () => {
     const a = DataStoreFactory.open({ backend: 'sqlite', path });
     a.close();
     const b = DataStoreFactory.open({ backend: 'sqlite', path });
-    expect(b.db).toBeDefined();
+    expect(requireDrizzleHandle(b).db).toBeDefined();
     b.close();
   });
 

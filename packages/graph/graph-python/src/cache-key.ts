@@ -1,7 +1,7 @@
 /**
  * Python cacheKey implementation.
  *
- * Produces `py-${pythonVersion}-${pyprojectContentHash || 'no-config'}`.
+ * Produces `py-${pythonVersion}-${pyprojectContentHash || 'no-config'}-${resolutionMode}`.
  *
  * The content-fingerprint half (`no-config` / `missing:` / `unreadable:` /
  * sha256-prefix) is the byte-identical `hashConfig` contract shared with
@@ -32,7 +32,7 @@ const REQUIRES_PYTHON_RE = /^[\t ]*requires-python[\t ]*=[\t ]*["']([^"'\n]+)["'
 export function cacheKey(input: CacheKeyInput): string {
   const configHash = hashConfig(input.configPathAbs);
   const pythonVersion = readPythonVersion(input.configPathAbs);
-  return `py-${pythonVersion}-${configHash}`;
+  return `py-${pythonVersion}-${configHash}-${input.resolutionMode}`;
 }
 
 function readPythonVersion(configPathAbs: string | undefined): string {

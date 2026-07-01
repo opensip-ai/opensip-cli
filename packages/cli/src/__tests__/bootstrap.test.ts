@@ -133,7 +133,7 @@ describe('mountAllToolCommands', () => {
     registry.register(specTool('fake-2', 'fake2'));
     const program = new Command('opensip');
 
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     const names = program.commands.map((c) => c.name());
     expect(names).toContain('fake1');
@@ -175,7 +175,7 @@ describe('mountAllToolCommands', () => {
     const program = new Command('opensip');
 
     const diagnostics = resetBootstrapDiagnosticsBuffer();
-    expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
+    expect(() => mountAllToolCommands(registry, program, makeStubContext(), [], {})).toThrow(
       PluginIncompatibleError,
     );
     expect(program.commands.map((c) => c.name())).not.toContain('works');

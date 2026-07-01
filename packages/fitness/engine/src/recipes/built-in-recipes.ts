@@ -7,6 +7,15 @@
 
 import { DEFAULT_MAX_PARALLEL, defineRecipe, type FitnessRecipe } from './types.js';
 
+/** First-party check-pack namespaces for namespaced recipe selectors (ADR-0106). */
+const CHECKS_UNIVERSAL = '@opensip-cli/checks-universal';
+const CHECKS_TYPESCRIPT = '@opensip-cli/checks-typescript';
+
+/** Build a namespaced check key (`pack:slug`) for built-in recipe explicit lists. */
+function checkKey(pack: string, slug: string): string {
+  return `${pack}:${slug}`;
+}
+
 // =============================================================================
 // DEFAULT RECIPE
 // =============================================================================
@@ -34,18 +43,18 @@ const quickSmokeRecipe: FitnessRecipe = defineRecipe({
   checks: {
     type: 'explicit',
     checkIds: [
-      'no-console-log',
-      'no-any-types',
-      'null-safety',
-      'detached-promises',
-      'catch-clause-safety',
-      'error-handling-quality',
-      'no-hardcoded-secrets',
-      'no-eval',
-      'sql-injection',
-      'env-secret-exposure',
-      'input-sanitization',
-      'no-skipped-tests',
+      checkKey(CHECKS_UNIVERSAL, 'no-console-log'),
+      checkKey(CHECKS_TYPESCRIPT, 'no-any-types'),
+      checkKey(CHECKS_TYPESCRIPT, 'null-safety'),
+      checkKey(CHECKS_TYPESCRIPT, 'detached-promises'),
+      checkKey(CHECKS_UNIVERSAL, 'catch-clause-safety'),
+      checkKey(CHECKS_TYPESCRIPT, 'error-handling-quality'),
+      checkKey(CHECKS_UNIVERSAL, 'no-hardcoded-secrets'),
+      checkKey(CHECKS_UNIVERSAL, 'no-eval'),
+      checkKey(CHECKS_TYPESCRIPT, 'sql-injection'),
+      checkKey(CHECKS_UNIVERSAL, 'env-secret-exposure'),
+      checkKey(CHECKS_TYPESCRIPT, 'input-sanitization'),
+      checkKey(CHECKS_UNIVERSAL, 'no-skipped-tests'),
     ],
   },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 15_000 },
@@ -160,11 +169,11 @@ const preCommitRecipe: FitnessRecipe = defineRecipe({
   checks: {
     type: 'explicit',
     checkIds: [
-      'no-console-log',
-      'no-any-types',
-      'no-hardcoded-secrets',
-      'detached-promises',
-      'no-skipped-tests',
+      checkKey(CHECKS_UNIVERSAL, 'no-console-log'),
+      checkKey(CHECKS_TYPESCRIPT, 'no-any-types'),
+      checkKey(CHECKS_UNIVERSAL, 'no-hardcoded-secrets'),
+      checkKey(CHECKS_TYPESCRIPT, 'detached-promises'),
+      checkKey(CHECKS_UNIVERSAL, 'no-skipped-tests'),
     ],
   },
   execution: { mode: 'parallel', stopOnFirstFailure: true, timeout: 10_000 },
@@ -242,12 +251,12 @@ const agentFastRecipe: FitnessRecipe = defineRecipe({
   checks: {
     type: 'explicit',
     checkIds: [
-      'no-console-log',
-      'no-any-types',
-      'null-safety',
-      'detached-promises',
-      'no-hardcoded-secrets',
-      'no-skipped-tests',
+      checkKey(CHECKS_UNIVERSAL, 'no-console-log'),
+      checkKey(CHECKS_TYPESCRIPT, 'no-any-types'),
+      checkKey(CHECKS_TYPESCRIPT, 'null-safety'),
+      checkKey(CHECKS_TYPESCRIPT, 'detached-promises'),
+      checkKey(CHECKS_UNIVERSAL, 'no-hardcoded-secrets'),
+      checkKey(CHECKS_UNIVERSAL, 'no-skipped-tests'),
     ],
   },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 15_000 },

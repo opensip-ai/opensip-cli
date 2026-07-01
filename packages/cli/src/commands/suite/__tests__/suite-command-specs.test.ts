@@ -67,7 +67,7 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-function hostCtx(toolContext?: ToolCliContext) {
+function hostCtx(toolContext?: ToolCliContext, toolRunActionHooks = {}) {
   const exitCodes: number[] = [];
   return {
     setExitCode: (code: number) => {
@@ -83,6 +83,7 @@ function hostCtx(toolContext?: ToolCliContext) {
       throw new Error('not used');
     },
     toolContext,
+    toolRunActionHooks,
     exitCodes,
   };
 }
@@ -130,7 +131,11 @@ describe('buildSuiteGroupLeaves', () => {
     await withSuiteScope(() => runSpec.handler?.({ _args: ['security'] }, ctx));
 
     expect(runSuiteMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'security', ctx: host.ctx }),
+      expect.objectContaining({
+        name: 'security',
+        ctx: host.ctx,
+        runActionHooks: {},
+      }),
     );
     expect(ctx.exitCodes).toContain(0);
   });

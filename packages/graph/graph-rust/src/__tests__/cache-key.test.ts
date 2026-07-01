@@ -26,12 +26,12 @@ describe('lang-rust cacheKey — branches', () => {
   });
 
   it('returns rs-no-config when configPathAbs is undefined', () => {
-    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('rs-no-config');
+    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('rs-no-config-exact');
   });
 
   it('returns rs-no-config when configPathAbs is empty string', () => {
     expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
-      'rs-no-config',
+      'rs-no-config-exact',
     );
   });
 
@@ -49,7 +49,15 @@ describe('lang-rust cacheKey — branches', () => {
     const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).toBe(b);
     expect(a.startsWith('rs-')).toBe(true);
-    expect(a).not.toBe('rs-no-config');
+    expect(a).not.toBe('rs-no-config-exact');
+  });
+
+  it('distinguishes resolution modes for the same config content', () => {
+    const file = join(dir, 'Cargo.toml');
+    writeFileSync(file, '[package]\nname = "x"\n', 'utf8');
+    const exact = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+    const fast = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'fast' });
+    expect(exact).not.toBe(fast);
   });
 
   it('changes when the config file content changes', () => {

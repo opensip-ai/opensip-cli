@@ -125,30 +125,14 @@ function buildFromParsed(
   }
 
   const plugins = rawPlugins
-    ? Object.freeze({
-        ...(rawPlugins.fit && { fit: Object.freeze([...rawPlugins.fit]) }),
-        ...(rawPlugins.sim && { sim: Object.freeze([...rawPlugins.sim]) }),
-        ...(rawPlugins.checkPackages && {
-          checkPackages: Object.freeze([...rawPlugins.checkPackages]),
-        }),
-        ...(rawPlugins.scenarioPackages && {
-          scenarioPackages: Object.freeze([...rawPlugins.scenarioPackages]),
-        }),
-        ...(rawPlugins.autoDiscoverScenarios === undefined
-          ? {}
-          : { autoDiscoverScenarios: rawPlugins.autoDiscoverScenarios }),
-        ...(rawPlugins.packageScopes && {
-          packageScopes: Object.freeze([...rawPlugins.packageScopes]),
-        }),
-        ...(rawPlugins.graphAdapters && {
-          graphAdapters: Object.freeze([...rawPlugins.graphAdapters]),
-        }),
-        ...(rawPlugins.autoDiscoverGraphAdapters === undefined
-          ? {}
-          : {
-              autoDiscoverGraphAdapters: rawPlugins.autoDiscoverGraphAdapters,
-            }),
-      })
+    ? Object.freeze(
+        Object.fromEntries(
+          Object.entries(rawPlugins).flatMap(([key, value]) => {
+            if (value === undefined) return [];
+            return [[key, typeof value === 'boolean' ? value : Object.freeze([...value])] as const];
+          }),
+        ) as PluginsConfig,
+      )
     : undefined;
 
   const config: TargetsConfig = Object.freeze({
@@ -190,7 +174,7 @@ function projectTargetsConfig(
     result.data.globalExcludes,
     result.data.checkOverrides,
     sourceLabel,
-    result.data.plugins,
+    result.data.plugins as PluginsConfig | undefined,
   );
 }
 

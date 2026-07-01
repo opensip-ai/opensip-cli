@@ -12,11 +12,8 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import {
-  requireDrizzleDataStore,
-  type DataStore,
-  type DrizzleDataStore,
-} from '@opensip-cli/datastore';
+import type { DataStore } from '@opensip-cli/datastore';
+import { requireDrizzleHandle, type DrizzleDataStore } from '@opensip-cli/datastore/internal';
 import { sql } from 'drizzle-orm';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
@@ -69,7 +66,7 @@ export class CatalogRepo {
 
   // @yagni-ignore-next-line duplicate-body-candidate -- repository constructors intentionally share the same datastore narrowing idiom; a base class would add indirection without reducing behavior.
   constructor(datastore: DataStore) {
-    this.datastore = requireDrizzleDataStore(datastore);
+    this.datastore = requireDrizzleHandle(datastore);
   }
 
   /**

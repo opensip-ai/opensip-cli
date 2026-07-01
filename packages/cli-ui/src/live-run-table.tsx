@@ -10,11 +10,6 @@
  * @opensip-cli/output.
  */
 
-import {
-  formatValidatedColumn,
-  parseValidatedCount,
-  sortFitRowPriority,
-} from './fit-table-format.js';
 import { formatDuration } from './format-duration.js';
 import {
   viewTable,
@@ -52,6 +47,26 @@ const COL = {
   duration: 10,
 } as const;
 
+/** Generic live-run row sort: hard failures first, then warned passes, then clean. */
+function liveRunRowPriority(r: LiveRunTableRow): number {
+  if (r.status === 'ERROR') return 0;
+  if (r.status === 'FAIL') return 1;
+  if (r.warnings > 0) return 2;
+  return 3;
+}
+
+function formatValidatedCell(totalItems: number | undefined, itemType = 'items'): string {
+  if (!totalItems) return '—';
+  const singular = itemType.endsWith('s') ? itemType.slice(0, -1) : itemType;
+  return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${itemType}`;
+}
+
+function parseValidatedCellCount(validated: string): number {
+  if (validated === '—') return 0;
+  const match = /^(\d+)/.exec(validated);
+  return match ? Number.parseInt(match[1], 10) : 0;
+}
+
 function statusTone(status: LiveRunTableRow['status']): Tone {
   if (status === 'FAIL') return 'error';
   if (status === 'ERROR') return 'warning';
@@ -65,7 +80,7 @@ function durationTone(ms: number): Tone {
 }
 
 function ignoredTone(ignored: number, validatedCell: string): Tone {
-  const total = parseValidatedCount(validatedCell);
+  const total = parseValidatedCellCount(validatedCell);
   if (total === 0 || ignored === 0) return 'muted';
   const pct = (ignored / total) * 100;
   if (pct > 10) return 'error';
@@ -76,7 +91,7 @@ function ignoredTone(ignored: number, validatedCell: string): Tone {
 /** Fixed-width per-unit table from plain row data, or null when empty. */
 export function liveRunTable(rows: readonly LiveRunTableRow[]): ViewNode | null {
   if (rows.length === 0) return null;
-  const sorted = [...rows].sort((a, b) => sortFitRowPriority(a) - sortFitRowPriority(b));
+  const sorted = [...rows].sort((a, b) => liveRunRowPriority(a) - liveRunRowPriority(b));
   const showValidated = sorted.some((r) => r.validated !== undefined);
 
   const columns: TableColumnSpec[] = [
@@ -94,7 +109,7 @@ export function liveRunTable(rows: readonly LiveRunTableRow[]): ViewNode | null 
   ];
 
   const rowSpans: Span[][] = sorted.map((r) => {
-    const validatedCell = formatValidatedColumn(r.validated, r.itemType);
+    const validatedCell = formatValidatedCell(r.validated, r.itemType);
     const cells: Span[] = [
       { text: r.unit },
       { text: r.status, tone: statusTone(r.status) },

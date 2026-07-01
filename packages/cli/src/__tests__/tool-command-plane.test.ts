@@ -123,7 +123,7 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
     registry.register(specTool('spec-tool', 'speccmd'));
 
     const program = new Command('opensip');
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     expect(program.commands.map((c) => c.name())).toContain('speccmd');
   });
@@ -138,7 +138,7 @@ describe('mountAllToolCommands — declarative commandSpecs path (the one surfac
 
     const program = new Command('opensip');
     const warnSpy = vi.spyOn(logger, 'warn');
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -156,7 +156,7 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
     registry.register(nestedTool('nested-tool'));
 
     const program = new Command('opensip');
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     // The primary verb is a top-level command; the child is NOT at root.
     const topLevel = program.commands.map((c) => c.name());
@@ -180,7 +180,7 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
 
     const program = new Command('opensip');
     const warnSpy = vi.spyOn(logger, 'warn');
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     // No matching parent → mounted flat at root, and the mis-declaration is loud.
     expect(program.commands.map((c) => c.name())).toContain('lonely');
@@ -218,7 +218,7 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
     const program = new Command('opensip');
     const restore = silenceStderr();
     try {
-      expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
+      expect(() => mountAllToolCommands(registry, program, makeStubContext(), [], {})).toThrow(
         PluginIncompatibleError,
       );
     } finally {
@@ -254,15 +254,21 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
     const restore = silenceStderr();
     try {
       expect(() =>
-        mountAllToolCommands(registry, program, makeStubContext(), [
-          {
-            id: 'bad-tool',
-            stableId: 'bad-tool',
-            source: 'installed',
-            version: '0.0.0',
-            manifestHash: 'test',
-          },
-        ]),
+        mountAllToolCommands(
+          registry,
+          program,
+          makeStubContext(),
+          [
+            {
+              id: 'bad-tool',
+              stableId: 'bad-tool',
+              source: 'installed',
+              version: '0.0.0',
+              manifestHash: 'test',
+            },
+          ],
+          {},
+        ),
       ).not.toThrow();
     } finally {
       restore();
@@ -306,7 +312,7 @@ describe('tool lifecycle — canonical 10-step ordering', () => {
     registry.register(specTool('second', 'secondcmd'));
 
     const program = new Command('opensip');
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     // Step 8 mounts every registered tool's command, in registration (== help/
     // listing) order — provenance no longer matters at this step.

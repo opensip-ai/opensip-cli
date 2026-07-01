@@ -84,6 +84,8 @@ export interface BuildToolCliContextOptions {
 
 export interface ToolCliContextHandle {
   readonly ctx: ToolCliContext;
+  /** Host-only run-lifecycle hooks — consumed by mount dispatch, not tool handlers. */
+  readonly runActionHooks: RunActionHooks;
   readonly getExitCode: () => number | undefined;
 }
 
@@ -171,7 +173,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     getDiagnostics: () => currentScope()?.diagnostics,
   });
 
-  const ctx: ToolCliContext & RunActionHooks = {
+  const ctx: ToolCliContext = {
     get scope(): RunScope {
       // The pre-action-hook (or explicit runWithScope in tests) enters the
       // RunScope via AsyncLocalStorage before the action body or any reader runs.
@@ -201,14 +203,11 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     toolState: stateSeams, // ADR-0042: durable per-tool keyed JSON state
     runSession, // host-owned; shared with the live plane
     hostPlanes, // Host-owned governance / entitlements / audit plane (H1-H3)
-    // Internal run-lifecycle hooks (not public ToolCliContext members; the mount
-    // dispatch reads them via cast). beginRun marks the lifecycle start at the
-    // command-action boundary; completeRun persists a returned contribution.
-    ...runActionHooks,
   };
 
   return {
     ctx,
+    runActionHooks,
     getExitCode: outputPlane.getExitCode,
   };
 }

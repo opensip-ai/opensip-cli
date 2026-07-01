@@ -208,8 +208,8 @@ describe('buildToolCliContext', () => {
 
 // ---------------------------------------------------------------------------
 // The run-plane datastore resolver the factory hands to createRunPlaneFactory.
-// It is exercised through `ctx.completeRun` (an internal hook the mount dispatch
-// reads via cast): completeRun → completeAndPersist → the run plane's
+// It is exercised through `runActionHooks.completeRun` (host-only hooks the mount
+// dispatch consumes): completeRun → completeAndPersist → the run plane's
 // safeDatastore → THIS resolver. It must degrade to "no datastore" for every
 // scope condition (best-effort) — never propagate.
 // ---------------------------------------------------------------------------
@@ -230,11 +230,11 @@ function buildCtxWithDebug(debug: ReturnType<typeof vi.fn>) {
     warn: vi.fn(),
     error: vi.fn(),
   };
-  return buildToolCliContext({ ...base, logger }).ctx;
+  return buildToolCliContext({ ...base, logger });
 }
 
-const completeRunOf = (ctx: unknown): ((r: unknown) => void) =>
-  (ctx as { completeRun: (r: unknown) => void }).completeRun;
+const completeRunOf = (handle: ReturnType<typeof buildCtxWithDebug>): ((r: unknown) => void) =>
+  handle.runActionHooks.completeRun ?? (() => {});
 
 describe('buildToolCliContext — run-plane datastore resolver', () => {
   let savedExit: number | undefined;
@@ -248,26 +248,26 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
 
   it('swallows a NOT_ENTERED scope and debug-logs datastore_unavailable', () => {
     const debug = vi.fn();
-    const ctx = buildCtxWithDebug(debug);
+    const handle = buildCtxWithDebug(debug);
     // No entered scope → readScope() throws → resolver catch → undefined → no-op.
-    expect(() => completeRunOf(ctx)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
+    expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
     expect(debug).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'cli.context.datastore_unavailable' }),
     );
   });
 
   it('returns undefined when the entered scope carries no datastore thunk', async () => {
-    const ctx = buildCtxWithDebug(vi.fn());
+    const handle = buildCtxWithDebug(vi.fn());
     await withScope(makeTestScope({}), () => {
-      expect(() => completeRunOf(ctx)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
+      expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
     });
   });
 
   it('reads through the scope datastore thunk when one is present', async () => {
-    const ctx = buildCtxWithDebug(vi.fn());
+    const handle = buildCtxWithDebug(vi.fn());
     const ds = DataStoreFactory.open({ backend: 'memory' });
     await withScope(makeTestScope({ datastore: () => ds }), () => {
-      expect(() => completeRunOf(ctx)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
+      expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
     });
     ds.close();
   });

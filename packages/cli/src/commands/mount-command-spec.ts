@@ -24,20 +24,23 @@ import {
   SystemError,
   ToolError,
   currentScope,
+  type CommandMountContext,
   type LiveViewContext,
   type ReportFailureDetail,
   type ToolRunCompletion,
-  type ToolRunSessions,
   type CommandSpec,
   type ToolCliContext,
 } from '@opensip-cli/core';
 
 import { type RunActionHooks } from '../bootstrap/run-plane.js';
 
+export type { CommandMountContext } from '@opensip-cli/core';
+
 import { showInternalCommands } from './internal-command-visibility.js';
 import { splitActionArgs } from './mount-command-action.js';
 import { buildOption, formatArgUsage } from './mount-command-spec-wiring.js';
 import { emitCommandResult } from './mount-result-command.js';
+import type { CliCommandsContext } from './shared.js';
 
 /**
  * A {@link CommandSpec} whose handler receives the concrete host
@@ -47,45 +50,6 @@ import { emitCommandResult } from './mount-result-command.js';
  * here. Tools author specs with `defineCommand<TOpts, ToolCliContext>(...)`.
  */
 export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts, ToolCliContext>;
-
-/**
- * The minimal context surface {@link mountCommandSpec} / {@link dispatchOutput}
- * actually touch — the mount layer's structural dependency, decoupled from the
- * full handler-facing context.
- *
- * `render` + `setExitCode` are used by EVERY command (the `command-result`
- * dispatch arm and the thrown-`ToolError` exit-code path). `emitEnvelope` /
- * `renderLive` are used ONLY by the `signal-envelope` / `live-view` arms, so
- * they are optional here: a context that mounts only `command-result` /
- * `raw-stream` commands (the CLI-owned HOST commands) need not provide them.
- * `dispatchOutput` guards those arms and throws if the mode is requested without
- * the corresponding emitter — a mis-declared host spec fails loudly rather than
- * silently no-op'ing.
- *
- * `ToolCliContext` (which provides all four as required members) is structurally
- * assignable to this — so the existing tool-mount call sites pass unchanged. The
- * generic `mountCommandSpec` lets host commands mount with a leaner context
- * (`CliCommandsContext`) through the SAME plane, satisfying the launch "one
- * command surface" invariant (no two-tier privilege).
- */
-export interface CommandMountContext extends RunActionHooks {
-  readonly render: (result: CommandResult) => Promise<void>;
-  readonly setExitCode: (code: number) => void;
-  /** Host-owned command-failure fan-out (Plan 06). Optional on lean host contexts. */
-  readonly reportFailure?: (detail: ReportFailureDetail) => Promise<void>;
-  readonly emitEnvelope?: (envelope: unknown) => void;
-  /**
-   * Optional live view dispatch. When the command declares output:'live-view',
-   * the host calls this with an optional third argument carrying the LiveViewContext
-   * (with the host runSession). The impl (registry) forwards it as the second
-   * arg to the registered renderer fn.
-   */
-  readonly renderLive?: (
-    key: string,
-    args: unknown,
-    liveContext?: LiveViewContext,
-  ) => Promise<ToolRunCompletion | void>;
-}
 
 /**
  * Mount a declarative {@link CommandSpec} onto `program` as a fully wired
@@ -110,15 +74,31 @@ export interface CommandMountContext extends RunActionHooks {
  *                whatever object it is called on, so nesting is purely a matter
  *                of which program is passed.
  * @param spec    The declarative command surface the tool/host exported.
- * @param ctx     The per-invocation host context (render/envelope/live-view
- *                emitters, exit-code setter) — today's `ToolCliContext`.
+ * @param ctx     The per-invocation mount context (render/envelope/live-view
+ *                emitters, exit-code setter). Tool handlers may receive a wider
+ *                `ToolCliContext`; this is the mount plane's structural subset.
+ * @param hooks   Host-only run-lifecycle hooks (`beginRun`, `completeRun`, …).
+ *                Omitted for lean host-command contexts that carry no run plane.
  * @returns       The mounted Commander command, so a caller nesting children
  *                (e.g. `mountOneTool`) can mount sub-subcommands onto it.
  */
+export function mountCommandSpec(
+  program: CliProgram,
+  spec: CommandSpec<unknown, CliCommandsContext>,
+  ctx: CliCommandsContext,
+  hooks?: RunActionHooks,
+): CliProgram;
+export function mountCommandSpec(
+  program: CliProgram,
+  spec: CommandSpec<unknown, ToolCliContext>,
+  ctx: ToolCliContext,
+  hooks?: RunActionHooks,
+): CliProgram;
 export function mountCommandSpec<TCtx extends CommandMountContext>(
   program: CliProgram,
   spec: CommandSpec<unknown, TCtx>,
   ctx: TCtx,
+  hooks: RunActionHooks = {},
 ): CliProgram {
   const cmd = program.command(spec.name).description(spec.description);
   if (spec.aliases !== undefined && spec.aliases.length > 0) {
@@ -188,7 +168,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
     // Host run lifecycle (host-owned-run-timing): mark the start boundary at the
     // command-action entry — after RunScope is entered, before the tool handler
     // runs. No-op for host commands whose leaner context carries no run plane.
-    ctx.beginRun?.();
+    hooks.beginRun?.();
     try {
       // ADR-0054 out-of-process dispatch: for an EXTERNAL-provenance tool the
       // host forks a worker that imports the untrusted runtime and runs the
@@ -198,7 +178,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
       // hook already replayed the worker's result through the host seams).
       // Bundled tools (and host commands with no hook) fall through to the
       // in-process path below, byte-identical to before.
-      const dispatched = await ctx.maybeDispatchExternal?.(spec.name, optsWithArgs, positionals);
+      const dispatched = await hooks.maybeDispatchExternal?.(spec.name, optsWithArgs, positionals);
       if (dispatched === true) {
         diagnostics?.event('execute', 'debug', `command '${spec.name}' dispatched out-of-process`);
         return;
@@ -209,7 +189,7 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
       // a session contribution, the host freezes the lifecycle and persists it.
       // A plain CommandResult (no session) is a no-op — there is no tool-side
       // generic-session writer. The live-view path persists after renderLive.
-      ctx.completeRun?.(result);
+      hooks.completeRun?.(result);
       if (failureReported && result === undefined) {
         return;
       }
@@ -318,12 +298,8 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       // renderer receives the *same* timer the static path used. Only full
       // ToolCliContext (tool live-view commands) will have runSession; lean
       // host contexts won't reach here.
-      const liveContext: LiveViewContext | undefined = (
-        ctx as unknown as { runSession?: ToolRunSessions }
-      ).runSession
-        ? {
-            runSession: (ctx as unknown as { runSession: ToolRunSessions }).runSession,
-          }
+      const liveContext: LiveViewContext | undefined = ctx.runSession
+        ? { runSession: ctx.runSession }
         : undefined;
       await ctx.renderLive(spec.name, { ...opts, _args: positionals }, liveContext);
       return;

@@ -29,6 +29,7 @@
  */
 
 import type { FileCache } from './framework/file-cache.js';
+import type { MemoryProfiler } from './framework/memory-profiler.js';
 import type { CheckRegistry } from './framework/registry.js';
 import type { FitnessRecipeRegistry } from './recipes/registry.js';
 import type { CliDiagnostic } from '@opensip-cli/core';
@@ -96,6 +97,10 @@ export interface FitnessSubscope {
    *  cleared on scope dispose via the disposer `contributeScope` returns.
    *  Replaces the module singleton on every production path. */
   readonly fileCache: FileCache;
+  /** Per-run memory profiler — records per-check heap deltas for the run.
+   *  Replaces the module singleton so concurrent scopes cannot cross-contaminate
+   *  peak-memory counters. Reset on scope dispose. */
+  readonly memoryProfiler: MemoryProfiler;
   /** Lazily-built shared type-checked TS Program for this run (D2). Built by
    *  checks-typescript's `getSharedTypeCheckedProgram` on the first type-aware
    *  check, reused by all, and cleared by the dispose hook. */
