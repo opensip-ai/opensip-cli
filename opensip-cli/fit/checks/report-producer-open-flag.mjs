@@ -10,6 +10,10 @@ import { toolEnginePathRe, toolPackageSegmentForPath } from './tool-engine-paths
 const TOOL_ENGINE_PATH = toolEnginePathRe();
 const COLLECT_REPORT_RE = /\bcollectReportData\b\s*[:,}]/;
 const OPEN_COMMON_FLAG_RE = /commonFlags\s*:\s*\[[\s\S]*?['"]open['"][\s\S]*?\]/;
+// The shared `definePrimaryRunCommand` preset (and the REPORTING_RUN_COMMON_FLAGS
+// constant it spreads) include `open` by construction, so a command built on the
+// preset exposes --open without a literal `commonFlags: [... 'open' ...]` array.
+const PRESET_OPEN_RE = /\bdefinePrimaryRunCommand\b|\bREPORTING_RUN_COMMON_FLAGS\b/;
 const OPT_OUT_RE = /\breport-open-opt-out\b/;
 
 function relPath(filePath) {
@@ -53,7 +57,7 @@ export async function analyzeAllReportProducerOpenFlag(files) {
     if (rel.endsWith('/tool.ts') && COLLECT_REPORT_RE.test(content)) {
       producers.set(segment, { filePath, content });
     }
-    if (OPEN_COMMON_FLAG_RE.test(content)) {
+    if (OPEN_COMMON_FLAG_RE.test(content) || PRESET_OPEN_RE.test(content)) {
       openFlagSegments.add(segment);
     }
     if (OPT_OUT_RE.test(content)) {

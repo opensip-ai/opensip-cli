@@ -230,6 +230,12 @@ async function analyzeCrossToolFlagParity(files) {
       );
       continue;
     }
+    // A primary run command built via the shared `definePrimaryRunCommand`
+    // preset (@opensip-cli/contracts) inherits REPORTING_RUN_COMMON_FLAGS
+    // (⊇ MANDATORY_COMMON_FLAGS + open) by construction, so it need not repeat a
+    // literal `commonFlags: [...]` array in the tool file. The preset's flag set
+    // is verified centrally by command-presets + command-surface-parity tests.
+    if (/\bdefinePrimaryRunCommand\b/.test(file[1])) continue;
     const flags = extractCommonFlags(file[1]);
     if (flags === undefined) {
       violations.push(
@@ -238,7 +244,7 @@ async function analyzeCrossToolFlagParity(files) {
           1,
           'common-flags-missing',
           `${tool} primary command does not declare a commonFlags array (ADR-0021).`,
-          'Declare commonFlags from the registry on the primary run command spec.',
+          'Declare commonFlags from the registry on the primary run command spec, or use definePrimaryRunCommand from @opensip-cli/contracts.',
         ),
       );
       continue;

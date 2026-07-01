@@ -13,6 +13,7 @@ export interface HostGateDeliveryOptions {
   readonly apiKey?: string | undefined;
 }
 
+/** Inputs for rendering the human `gate-done` lines after a baseline save. */
 export interface HostGateSaveRenderInput {
   readonly envelope: SignalEnvelope;
   /**
@@ -23,12 +24,14 @@ export interface HostGateSaveRenderInput {
   readonly runFailed: boolean;
 }
 
+/** Inputs for rendering the human `gate-done` lines after a baseline compare. */
 export interface HostGateCompareRenderInput {
   readonly envelope: SignalEnvelope;
   readonly result: GateCompareResult;
   readonly runFailed: boolean;
 }
 
+/** Outcome of a gate dispatch: the mode run plus the derived gate verdict. */
 export type HostGateDispatchResult =
   | {
       readonly mode: 'save';
@@ -40,6 +43,7 @@ export type HostGateDispatchResult =
       readonly runFailed: boolean;
     };
 
+/** Inputs to {@link runHostGateDispatch} — the shared `--gate-save`/`--gate-compare` tail. */
 export interface RunHostGateDispatchInput {
   /** Tool CLI context exposing the documented host seams. */
   readonly cli: ToolCliContext;

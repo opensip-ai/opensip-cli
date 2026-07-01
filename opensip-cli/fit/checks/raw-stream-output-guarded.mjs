@@ -23,6 +23,12 @@ const REASON_CATEGORY =
 const DOCUMENTED =
   /raw-stream|RAW_STREAM|handler owns|owns its (entire )?output|documented.*exception|reason category/i;
 
+// Commands built on the shared presets get their reason category from the preset
+// itself (`definePrimaryRunCommand` → 'runtime-render-dispatch';
+// `defineAuxExportCommand` → 'file-export'), so the tool file need not repeat the
+// literal token. Treat preset usage as a satisfied reason category.
+const PRESET_RAW_STREAM = /\bdefinePrimaryRunCommand\b|\bdefineAuxExportCommand\b/;
+
 export const rawStreamOutputGuarded = defineCheck({
   id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   slug: 'raw-stream-output-guarded',
@@ -33,7 +39,8 @@ export const rawStreamOutputGuarded = defineCheck({
   analyze: (content, filePath) => {
     if (!TOOL_COMMAND_SPEC.test(filePath)) return [];
     if (!RAW_STREAM.test(content)) return [];
-    if (!DOCUMENTED.test(content) || !REASON_CATEGORY.test(content)) {
+    const reasonOk = REASON_CATEGORY.test(content) || PRESET_RAW_STREAM.test(content);
+    if (!DOCUMENTED.test(content) || !reasonOk) {
       return [
         {
           message:

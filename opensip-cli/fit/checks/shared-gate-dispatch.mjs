@@ -48,7 +48,9 @@ export const checks = [
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture'],
     fileTypes: ['ts'],
-    contentFilter: 'raw',
+    // Match real `cli.saveBaseline(` / `cli.compareBaseline(` call sites only; a
+    // comment or string referencing the seam names must not fail the gate.
+    contentFilter: 'strip-strings-and-comments',
     analyze: (content, filePath) => analyzeSharedGateDispatch(content, filePath),
   }),
 ];
