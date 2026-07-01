@@ -150,8 +150,8 @@ export const tool = {
       commonFlags: [],
       scope: 'project',
       output: 'signal-envelope',
-      handler: async (opts, cli) => {
-        const mode = opts.mode ?? 'ok';
+      handler: async (options, cli) => {
+        const mode = options.mode ?? 'ok';
         if (mode === 'exit') {
           process.exit(1);
         }
@@ -160,7 +160,7 @@ export const tool = {
         }
         if (mode === 'hang') {
           // Busy-spin so the supervisor's wall-clock timeout must SIGKILL us.
-          // eslint-disable-next-line no-constant-condition
+           
           for (;;) {
             /* never returns */
           }
@@ -169,7 +169,7 @@ export const tool = {
           // Calls a host-only live-view seam — the worker shim throws
           // UnsupportedSeamError; surfaces as a structured `unsupported-seam`
           // failure (Ink/TTY rendering cannot leave the host).
-          cli.registerLiveView('k', () => undefined);
+          cli.registerLiveView('k', () => {});
         }
         let rpcEcho = null;
         if (mode === 'rpc') {
@@ -178,7 +178,7 @@ export const tool = {
           //  - saveBaseline (BaselineRepo write, host-side);
           //  - deliverSignals (egress, host-side; returns SignalDeliveryResult).
           await cli.toolState.put('external-dispatch-tool', 'k', {
-            v: opts.echo ?? null,
+            v: options.echo ?? null,
           });
           const got = await cli.toolState.get('external-dispatch-tool', 'k');
           await cli.saveBaseline('external-dispatch-tool', {
@@ -202,7 +202,7 @@ export const tool = {
             message: 'fixture command failed',
             exitCode: 3,
             code: 'FIXTURE.FAIL',
-            jsonRequested: opts.json === true,
+            jsonRequested: options.json === true,
           });
           return;
         }
@@ -285,7 +285,7 @@ export const tool = {
             summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
           },
           units: [],
-          signals: [{ marker: 'ext-ran', echoedOpt: opts.echo ?? null, rpcEcho }],
+          signals: [{ marker: 'ext-ran', echoedOpt: options.echo ?? null, rpcEcho }],
         });
         cli.setExitCode(0);
       },

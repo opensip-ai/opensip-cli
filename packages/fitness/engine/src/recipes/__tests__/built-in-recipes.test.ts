@@ -60,6 +60,15 @@ describe('built-in recipes', () => {
     }
   });
 
+  it('explicit recipes use namespaced check slugs (ADR-0106)', () => {
+    for (const recipe of builtInRecipes) {
+      if (recipe.checks.type !== 'explicit') continue;
+      for (const checkId of recipe.checks.checkIds) {
+        expect(checkId).toMatch(/^@opensip-cli\/checks-(?:universal|typescript):/);
+      }
+    }
+  });
+
   it('backend recipe uses pattern selector', () => {
     const backend = builtInRecipesByName.get('backend');
     expect(backend?.checks.type).toBe('pattern');

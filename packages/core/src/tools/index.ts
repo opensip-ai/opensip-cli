@@ -15,6 +15,8 @@ export type {
   ToolMetadata,
   ToolCommandDescriptor,
   ToolCliContext,
+  CommandMountContext,
+  LiveViewMountContext,
   GateCompareResult,
   SignalDeliveryResult,
   ToolPluginExports,

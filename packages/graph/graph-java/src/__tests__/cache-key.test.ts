@@ -22,12 +22,12 @@ describe('graph-java cacheKey — branches', () => {
   });
 
   it('returns java-no-config when configPathAbs is undefined', () => {
-    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('java-no-config');
+    expect(cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' })).toBe('java-no-config-exact');
   });
 
   it('returns java-no-config when configPathAbs is empty string', () => {
     expect(cacheKey({ projectDirAbs: dir, configPathAbs: '', resolutionMode: 'exact' })).toBe(
-      'java-no-config',
+      'java-no-config-exact',
     );
   });
 
@@ -45,7 +45,15 @@ describe('graph-java cacheKey — branches', () => {
     const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).toBe(b);
     expect(a.startsWith('java-')).toBe(true);
-    expect(a).not.toBe('java-no-config');
+    expect(a).not.toBe('java-no-config-exact');
+  });
+
+  it('distinguishes resolution modes for the same config content', () => {
+    const file = join(dir, 'pom.xml');
+    writeFileSync(file, '<project><groupId>x</groupId></project>\n', 'utf8');
+    const exact = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+    const fast = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'fast' });
+    expect(exact).not.toBe(fast);
   });
 
   it('changes when the config file content changes', () => {

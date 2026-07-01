@@ -442,4 +442,24 @@ describe('runToolLiveView', () => {
     expect(writes.includes('\n')).toBe(true);
     stdoutSpy.mockRestore();
   }, 10_000);
+
+  it('accepts a third-party tool id (LiveRunTool is open string)', async () => {
+    const scope = makeScope({ logger: createRunLogger() });
+    await expect(
+      runWithScope(scope, () =>
+        runToolLiveView({
+          tool: 'custom-third-party-tool',
+          meta: { title: 'Custom', description: 'Running' },
+          surface: { shape: 'pool', label: 'Working...' },
+          verbose: false,
+          quiet: true,
+          produce: () =>
+            Promise.resolve({
+              kind: 'done',
+              done: { summary: { passed: true, errors: 0, warnings: 0 } },
+            }),
+        }),
+      ),
+    ).resolves.toBeDefined();
+  }, 10_000);
 });

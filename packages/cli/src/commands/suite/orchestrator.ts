@@ -32,6 +32,7 @@ export interface RunSuiteInput {
   readonly suite: SuiteDefinition;
   readonly tools: readonly Tool[];
   readonly ctx: ToolCliContext;
+  readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
 }
 
@@ -57,6 +58,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
       suite,
       suiteRunId,
       ctx: input.ctx,
+      runActionHooks: input.runActionHooks,
       suiteOpts: input.suiteOpts,
     }),
   );
@@ -120,6 +122,7 @@ async function runStepsSerially(args: {
   readonly suite: ValidatedSuite;
   readonly suiteRunId: string;
   readonly ctx: ToolCliContext;
+  readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
 }): Promise<SuiteStepSummary[]> {
   const summaries: SuiteStepSummary[] = [];
@@ -133,6 +136,7 @@ async function runStepsSerially(args: {
           suiteRunId: args.suiteRunId,
           step,
           ctx: args.ctx,
+          runActionHooks: args.runActionHooks,
           suiteOpts: args.suiteOpts,
         }),
       );
@@ -148,6 +152,7 @@ async function runStep(args: {
   readonly suiteRunId: string;
   readonly step: ValidatedSuiteStep;
   readonly ctx: ToolCliContext;
+  readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
 }): Promise<SuiteStepSummary> {
   const started = performance.now();
@@ -164,11 +169,11 @@ async function runStep(args: {
   // silently aggregated to 0) AND leaked the code into the outer host context — the
   // same isolation the bundled path preserves. (04↔05 regression: external adapter
   // as a suite step.)
-  Object.assign(capture.context, {
-    maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, capture.context),
-  });
   const opts = stepOpts(args.step, args.suiteOpts);
-  const hooks = capture.context as ToolCliContext & RunActionHooks;
+  const hooks: RunActionHooks = {
+    ...args.runActionHooks,
+    maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, capture.context),
+  };
   const diagnostics = currentScope()?.diagnostics;
   const log = currentLogger();
   let errorMessage: string | undefined;

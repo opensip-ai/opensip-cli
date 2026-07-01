@@ -6,8 +6,10 @@
  * the threshold-tracking, summary, and reset paths.
  */
 
+import { RunScope, applyToolContributeScope, runWithScope } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { fitnessTool } from '../../tool.js';
 import { memoryProfiler } from '../memory-profiler.js';
 
 afterEach(() => {
@@ -118,5 +120,42 @@ describe('memoryProfiler — reset', () => {
     expect(summary.allProfiles).toEqual([]);
     expect(summary.prewarmMemoryMB).toBe(0);
     expect(summary.peakMemoryMB).toBe(0);
+  });
+});
+
+describe('memoryProfiler — RunScope isolation', () => {
+  it('concurrent scopes carry independent profiler instances', async () => {
+    const scopeA = new RunScope();
+    const scopeB = new RunScope();
+    applyToolContributeScope(scopeA, fitnessTool);
+    applyToolContributeScope(scopeB, fitnessTool);
+
+    const [summaryA, summaryB] = await Promise.all([
+      runWithScope(scopeA, () => {
+        const profiler = scopeA.fitness!.memoryProfiler;
+        profiler.recordCheckComplete('scope-a-check', 0, 0, 1);
+        return profiler.getSummary();
+      }),
+      runWithScope(scopeB, () => {
+        const profiler = scopeB.fitness!.memoryProfiler;
+        profiler.recordCheckComplete('scope-b-one', 0, 0, 1);
+        profiler.recordCheckComplete('scope-b-two', 0, 0, 1);
+        return profiler.getSummary();
+      }),
+    ]);
+
+    expect(summaryA.allProfiles).toHaveLength(1);
+    expect(summaryA.allProfiles[0]?.checkId).toBe('scope-a-check');
+    expect(summaryB.allProfiles).toHaveLength(2);
+    expect(scopeA.fitness!.memoryProfiler).not.toBe(scopeB.fitness!.memoryProfiler);
+  });
+
+  it('scope dispose resets the contributed profiler', () => {
+    const scope = new RunScope();
+    applyToolContributeScope(scope, fitnessTool);
+    const profiler = scope.fitness!.memoryProfiler;
+    profiler.recordCheckComplete('disposed-check', 0, 0, 1);
+    scope.dispose();
+    expect(profiler.getSummary().allProfiles).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Java cacheKey implementation.
  *
- * Produces `java-${buildFileHash || 'no-config'}`.
+ * Produces `java-${buildFileHash || 'no-config'}-${resolutionMode}`.
  *
  * Java has no canonical resolved-dependency lock file like Cargo.lock
  * or go.sum. Maven's `pom.xml` and Gradle's `build.gradle` /

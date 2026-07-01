@@ -16,6 +16,7 @@ import { bindToolCliContext } from './bind-tool-context.js';
 import { getBootstrapDiagnosticsBuffer } from './bootstrap-diagnostics-buffer.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { decorateToolPrimary } from './decorate-tool-primary.js';
+import { type RunActionHooks } from './run-plane.js';
 import { provenanceSourceFor } from './tool-provenance.js';
 
 /**
@@ -47,10 +48,11 @@ export function mountAllToolCommands(
   program: CliProgram,
   ctx: ToolCliContext,
   provenance: readonly ToolProvenance[],
+  runActionHooks: RunActionHooks,
 ): void {
   for (const tool of registry.list()) {
     try {
-      mountOneTool(program, tool, ctx);
+      mountOneTool(program, tool, ctx, runActionHooks);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const human = tool.metadata.name ?? tool.metadata.id;
@@ -118,7 +120,12 @@ export function mountAllToolCommands(
  * `mountCommandSpec(primaryCmd, child, ctx)`. No per-tool special case. Specs
  * with no `parent` mount flat onto the root program exactly as before.
  */
-export function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContext): void {
+export function mountOneTool(
+  program: CliProgram,
+  tool: Tool,
+  ctx: ToolCliContext,
+  runActionHooks: RunActionHooks,
+): void {
   if (tool.commandSpecs === undefined || tool.commandSpecs.length === 0) {
     // No declarative command surface — a mis-declared tool contributes no
     // commands. Surface it rather than silently mounting nothing.
@@ -140,10 +147,11 @@ export function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContex
   // the in-process path. Merged here so host commands (lean context) never
   // carry it.
   const boundCtx = bindToolCliContext(tool, ctx);
-  const toolCtx: ToolCliContext = Object.assign(boundCtx, {
+  const toolHooks: RunActionHooks = {
+    ...runActionHooks,
     maybeDispatchExternal: buildMaybeDispatchExternal(tool, boundCtx),
-  });
-  const mountedByName = mountFlatSpecs(program, tool, toolCtx);
+  };
+  const mountedByName = mountFlatSpecs(program, tool, boundCtx, toolHooks);
 
   // Host-owned uniform decoration of the tool PRIMARY (the flat run command
   // whose name === metadata.name): per-tool `--version`, guaranteed
@@ -155,7 +163,7 @@ export function mountOneTool(program: CliProgram, tool: Tool, ctx: ToolCliContex
   const primaryCmd = mountedByName.get(tool.metadata.name);
   if (primaryCmd !== undefined) decorateToolPrimary(primaryCmd, tool);
 
-  mountNestedSpecs(program, tool, toolCtx, mountedByName);
+  mountNestedSpecs(program, tool, boundCtx, toolHooks, mountedByName);
 }
 
 /**
@@ -168,11 +176,12 @@ function mountFlatSpecs(
   program: CliProgram,
   tool: Tool,
   toolCtx: ToolCliContext,
+  hooks: RunActionHooks,
 ): Map<string, CliProgram> {
   const mountedByName = new Map<string, CliProgram>();
   for (const spec of tool.commandSpecs ?? []) {
     if (spec.parent !== undefined) continue;
-    mountedByName.set(spec.name, mountCommandSpec(program, spec, toolCtx));
+    mountedByName.set(spec.name, mountCommandSpec(program, spec, toolCtx, hooks));
   }
   return mountedByName;
 }
@@ -187,6 +196,7 @@ function mountNestedSpecs(
   program: CliProgram,
   tool: Tool,
   toolCtx: ToolCliContext,
+  hooks: RunActionHooks,
   mountedByName: ReadonlyMap<string, CliProgram>,
 ): void {
   for (const spec of tool.commandSpecs ?? []) {
@@ -200,10 +210,10 @@ function mountNestedSpecs(
         toolName: tool.metadata.name ?? tool.metadata.id,
         detail: `command '${spec.name}' declares parent '${spec.parent}', which is not a flat command on this tool; mounting flat at root instead`,
       });
-      mountCommandSpec(program, spec, toolCtx);
+      mountCommandSpec(program, spec, toolCtx, hooks);
       continue;
     }
-    mountCommandSpec(parentCmd, spec, toolCtx);
+    mountCommandSpec(parentCmd, spec, toolCtx, hooks);
   }
 }
 

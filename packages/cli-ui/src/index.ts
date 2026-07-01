@@ -41,12 +41,6 @@ export {
   type RunFooterHint,
   type RunFooterHintsProps,
 } from './run-footer-hints.js';
-export {
-  sortFitRowPriority,
-  parseValidatedCount,
-  formatValidatedColumn,
-  type FitRowSortKey,
-} from './fit-table-format.js';
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
 export { formatDuration } from './format-duration.js';

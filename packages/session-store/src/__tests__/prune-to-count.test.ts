@@ -1,4 +1,5 @@
-import { DataStoreFactory, type DataStore, requireDrizzleDataStore } from '@opensip-cli/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { describe, expect, it } from 'vitest';
 
 import { sessionHostMetrics, sessionToolPayload } from '../schema/sessions.js';
@@ -34,7 +35,7 @@ function tableCount(
   datastore: DataStore,
   table: typeof sessionToolPayload | typeof sessionHostMetrics,
 ): number {
-  return requireDrizzleDataStore(datastore).db.select().from(table).all().length;
+  return requireDrizzleHandle(datastore).db.select().from(table).all().length;
 }
 
 describe('SessionRepo.pruneToCount', () => {

@@ -22,7 +22,7 @@
 import { TimeoutError, logger, runWithTimeout, withSpanAsync } from '@opensip-cli/core';
 
 import { CheckAbortedError } from '../framework/execution-context.js';
-import { memoryProfiler } from '../framework/memory-profiler.js';
+import { resolveMemoryProfiler } from '../framework/scope-registry.js';
 
 import {
   processSuccessResult,
@@ -90,7 +90,7 @@ export async function runOneCheck(
   const checkSlug = check.config.slug;
   const checkTimeout = check.config.timeout ?? opts.recipeTimeoutMs;
 
-  const memoryBeforeMB = memoryProfiler.recordCheckStart();
+  const memoryBeforeMB = resolveMemoryProfiler().recordCheckStart();
   ctx.callbacks.onCheckStart?.(checkSlug, opts.checkIndex, opts.totalChecks);
   logger.info({
     evt: 'fitness.check.start',

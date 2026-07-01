@@ -73,11 +73,11 @@ const PERSISTENCE_BOUNDARY = [
 const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
 
 /**
- * Import or call of `requireDrizzleDataStore` outside the persistence boundary.
+ * Import or call of `requireDrizzleHandle` outside the persistence boundary.
  * Complements the `.db.<method>(` call-shape rule — catches modules that peel
  * the Drizzle handle via the narrow-or-throw accessor before querying.
  */
-const REQUIRE_DRIZZLE = /\brequireDrizzleDataStore\s*\(/;
+const REQUIRE_DRIZZLE = /\brequireDrizzleHandle\s*\(/;
 
 /**
  * Drizzle query/builder methods. A `.db` access is only flagged when its
@@ -155,7 +155,7 @@ export function analyzeRawDbAccess(content, filePath) {
     if (REQUIRE_DRIZZLE.test(line)) {
       violations.push({
         message:
-          '`requireDrizzleDataStore` used outside the persistence boundary. ' +
+          '`requireDrizzleHandle` used outside the persistence boundary. ' +
           'Narrowing to the raw Drizzle handle belongs in owner repositories ' +
           '(ADR-0009, `tables-only-in-persistence`).',
         severity: 'error',

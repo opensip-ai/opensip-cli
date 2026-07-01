@@ -116,6 +116,35 @@ export class CheckRegistry {
     return keys.map((k) => this.inner.getById(k)?.check).filter((c): c is Check => c !== undefined);
   }
 
+  /**
+   * Resolve a slug to its canonical registry key (fail-closed on ambiguity).
+   *
+   * - Exact registry keys (namespaced or bare) are returned unchanged.
+   * - Bare slugs resolve via the reverse index; multiple matches return
+   *   `undefined` and emit `check.registry.ambiguous` (mirrors {@link resolve}).
+   * - Unknown slugs return `undefined`.
+   */
+  resolveBareSlug(slug: string): string | undefined {
+    if (this.inner.has(slug)) return slug;
+    if (slug.includes(':')) return undefined;
+
+    const candidates = this.bareSlugIndex.get(slug);
+    if (!candidates || candidates.length === 0) return undefined;
+
+    if (candidates.length > 1) {
+      logger.warn({
+        evt: 'check.registry.ambiguous',
+        module: 'fitness:checks',
+        bareSlug: slug,
+        candidates,
+        msg: `Ambiguous bare slug '${slug}' matches ${candidates.length} checks (namespaced); refusing bare lookup`,
+      });
+      return undefined;
+    }
+
+    return candidates[0];
+  }
+
   get size(): number {
     return this.inner.size;
   }

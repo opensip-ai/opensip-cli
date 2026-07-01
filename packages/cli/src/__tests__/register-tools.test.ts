@@ -245,7 +245,7 @@ describe('mountAllToolCommands', () => {
     registry.register(specTool('tool-b', 'b'));
     const program = new Command('opensip');
 
-    mountAllToolCommands(registry, program, makeStubContext(), []);
+    mountAllToolCommands(registry, program, makeStubContext(), [], {});
 
     const names = program.commands.map((c) => c.name());
     expect(names).toContain('a');
@@ -271,7 +271,7 @@ describe('mountAllToolCommands', () => {
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
     try {
-      mountAllToolCommands(registry, program, makeStubContext(), []);
+      mountAllToolCommands(registry, program, makeStubContext(), [], {});
     } finally {
       process.stderr.write = origWrite;
     }
@@ -316,7 +316,7 @@ describe('mountAllToolCommands', () => {
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
     try {
-      expect(() => mountAllToolCommands(registry, program, makeStubContext(), [])).toThrow(
+      expect(() => mountAllToolCommands(registry, program, makeStubContext(), [], {})).toThrow(
         PluginIncompatibleError,
       );
     } finally {
@@ -361,14 +361,20 @@ describe('mountAllToolCommands', () => {
     process.stderr.write = () => true;
     try {
       expect(() =>
-        mountAllToolCommands(registry, program, makeStubContext(), [
-          {
-            id: 'bad',
-            source: 'installed',
-            version: '0.0.0',
-            manifestHash: 'test',
-          },
-        ]),
+        mountAllToolCommands(
+          registry,
+          program,
+          makeStubContext(),
+          [
+            {
+              id: 'bad',
+              source: 'installed',
+              version: '0.0.0',
+              manifestHash: 'test',
+            },
+          ],
+          {},
+        ),
       ).not.toThrow();
     } finally {
       process.stderr.write = origWrite;

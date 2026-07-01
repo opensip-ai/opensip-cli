@@ -2,11 +2,11 @@ import { createSignal, type Signal } from '@opensip-cli/core';
 import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { requireDrizzleHandle } from '../data-store.js';
 import {
   BaselineRepo,
   DataStoreFactory,
   DEFAULT_TEST_BASELINE_IDENTITY,
-  requireDrizzleDataStore,
   type DataStore,
 } from '../index.js';
 
@@ -36,7 +36,7 @@ afterEach(() => {
 
 describe('BaselineRepo', () => {
   it('migrations dropped the old per-tool baseline tables, kept the generic pair (0006+0007)', () => {
-    const rows = requireDrizzleDataStore(ds).db.all<{ name: string }>(
+    const rows = requireDrizzleHandle(ds).db.all<{ name: string }>(
       sql`SELECT name FROM sqlite_master WHERE type='table'`,
     );
     const names = new Set(rows.map((r) => r.name));
@@ -115,7 +115,7 @@ describe('BaselineRepo', () => {
 
   it('loadMeta returns undefined for legacy rows without identity columns populated', () => {
     repo.save('graph', [{ fingerprint: 'fp', payload: sig('r', 'f') }], ID);
-    requireDrizzleDataStore(ds).db.run(
+    requireDrizzleHandle(ds).db.run(
       sql`UPDATE tool_baseline_meta SET baseline_format_version = NULL, fingerprint_strategy_id = NULL, fingerprint_strategy_version = NULL WHERE tool = 'graph'`,
     );
     expect(repo.loadMeta('graph')).toBeUndefined();

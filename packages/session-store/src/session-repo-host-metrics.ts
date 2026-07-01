@@ -4,7 +4,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { sessionHostMetrics } from './schema/sessions.js';
 
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
-import type { DrizzleDataStore } from '@opensip-cli/datastore';
+import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 
 const MODULE_NAME = 'session-store:session-repo';
 

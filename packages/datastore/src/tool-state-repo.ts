@@ -1,7 +1,7 @@
 import { logger, ValidationError } from '@opensip-cli/core';
 import { and, asc, eq } from 'drizzle-orm';
 
-import { requireDrizzleDataStore, type DataStore, type DrizzleDataStore } from './data-store.js';
+import { requireDrizzleHandle, type DataStore, type DrizzleDataStore } from './data-store.js';
 import { toolState } from './schema/tool-state.js';
 
 const MODULE_NAME = 'datastore:tool-state-repo';
@@ -37,7 +37,7 @@ export class ToolStateRepo {
 
   // @yagni-ignore-next-line duplicate-body-candidate -- repository constructors intentionally share the same datastore narrowing idiom; a base class would add indirection without reducing behavior.
   constructor(datastore: DataStore) {
-    this.datastore = requireDrizzleDataStore(datastore);
+    this.datastore = requireDrizzleHandle(datastore);
   }
 
   /** Read one payload, or undefined when the key has never been put. */

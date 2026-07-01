@@ -158,6 +158,7 @@ describe('runSuite', () => {
       },
       tools: [tool(TOOL_ID, 'fitness', [spec])],
       ctx: host.ctx,
+      runActionHooks: {},
       suiteOpts: { cwd: '/repo', json: false },
     });
 
@@ -192,6 +193,7 @@ describe('runSuite', () => {
       suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
       tools: [tool(TOOL_ID, 'fitness', [spec])],
       ctx: host.ctx,
+      runActionHooks: {},
       suiteOpts: {},
     });
 
@@ -233,6 +235,7 @@ describe('runSuite', () => {
       },
       tools: [tool(TOOL_ID, 'fitness', [exiting, next])],
       ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: {},
       suiteOpts: {},
     });
 
@@ -280,6 +283,7 @@ describe('runSuite', () => {
       },
       tools: [tool(TOOL_ID, 'fitness', [throws]), tool(OTHER_TOOL_ID, 'graph', [after])],
       ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: {},
       suiteOpts: {},
     });
 
@@ -318,6 +322,7 @@ describe('runSuite', () => {
           tool(TOOL_ID, 'fitness', [bundled]),
         ],
         ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
         suiteOpts: {},
       }),
     );
@@ -380,6 +385,7 @@ describe('runSuite', () => {
           tool(EXTERNAL_TOOL_ID, 'external-fixture', [externalWarning]),
         ],
         ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
         suiteOpts: {},
       }),
     );
@@ -462,6 +468,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'secret-finding' }] },
         tools: [tool(TOOL_ID, 'fitness', [spec])],
         ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
         suiteOpts: {},
       });
 

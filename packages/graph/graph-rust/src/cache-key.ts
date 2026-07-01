@@ -1,7 +1,7 @@
 /**
  * Rust cacheKey implementation.
  *
- * Produces `rs-${cargoLockHash || cargoTomlHash || 'no-config'}`.
+ * Produces `rs-${cargoLockHash || cargoTomlHash || 'no-config'}-${resolutionMode}`.
  *
  * Prefers Cargo.lock over Cargo.toml when both are present —
  * Cargo.lock holds the resolved dependency graph, so changing a dep

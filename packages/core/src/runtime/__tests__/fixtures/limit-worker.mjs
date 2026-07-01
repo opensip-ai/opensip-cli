@@ -4,7 +4,7 @@
 import { fork } from 'node:child_process';
 
 const mode = process.argv[2];
-const send = (msg) => process.send?.(msg);
+const send = (message) => process.send?.(message);
 
 switch (mode) {
   case 'env-report': {
@@ -16,8 +16,8 @@ switch (mode) {
     break;
   }
   case 'echo': {
-    process.on('message', (msg) => {
-      send({ kind: 'echo', msg });
+    process.on('message', (message) => {
+      send({ kind: 'echo', msg: message });
     });
     send({ kind: 'ready' });
     setInterval(() => {}, 60_000).unref?.();
@@ -61,8 +61,8 @@ switch (mode) {
     break;
   }
   case 'stderr-flood': {
-    for (let i = 0; i < 5000; i += 1) {
-      process.stderr.write(`line-${String(i)}\n`);
+    for (let index = 0; index < 5000; index += 1) {
+      process.stderr.write(`line-${String(index)}\n`);
     }
     send({ kind: 'error', message: 'failed after stderr flood' });
     break;

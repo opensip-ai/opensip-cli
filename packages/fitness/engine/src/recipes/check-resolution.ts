@@ -58,11 +58,8 @@ export function resolveChecks(selector: CheckSelector, registry: CheckRegistry):
     keysOf: (item) => buildMatchTargets(item.id, registry),
     tagsOf: (item) => registry.getBySlug(item.id)?.config.tags ?? [],
     match: (target, pattern) => minimatch(target, pattern, { nocase: false }),
-    // Bare slug → namespaced-key reverse lookup; otherwise no resolution.
-    resolveExplicit: (id) =>
-      !id.includes(':') && registry.getBySlug(id)
-        ? (registry.listSlugs().find((s) => s.endsWith(`:${id}`)) ?? id)
-        : undefined,
+    // Bare slug → namespaced-key reverse lookup (fail-closed on ambiguity).
+    resolveExplicit: (id) => registry.resolveBareSlug(id),
   };
 
   // The core resolver reads the `explicit` arm's request list from `ids`;

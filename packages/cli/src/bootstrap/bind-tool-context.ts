@@ -16,9 +16,7 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
-import type { RunActionHooks } from './run-plane.js';
-
-type BoundToolCliContext = ToolCliContext & RunActionHooks;
+type BoundToolCliContext = ToolCliContext;
 
 function primaryCommandName(tool: Tool): string | undefined {
   const commands = resolveToolCommands(tool);

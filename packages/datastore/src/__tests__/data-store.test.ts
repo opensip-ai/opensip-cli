@@ -2,7 +2,7 @@
  * data-store — the public persistence handle boundary helpers.
  *
  * Covers the `isDrizzleDataStore` type guard (every shape branch), the
- * `requireDrizzleDataStore` narrow-or-throw, and the `DataStoreMigrationError`
+ * `requireDrizzleHandle` narrow-or-throw, and the `DataStoreMigrationError`
  * carrier. These guard the raw-Drizzle boundary (`restrict-raw-db-access`), so
  * each rejection branch must stay pinned.
  */
@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DataStoreMigrationError,
   isDrizzleDataStore,
-  requireDrizzleDataStore,
+  requireDrizzleHandle,
 } from '../data-store.js';
 
 import type { DataStore } from '../data-store.js';
@@ -56,10 +56,10 @@ describe('isDrizzleDataStore', () => {
   });
 });
 
-describe('requireDrizzleDataStore', () => {
+describe('requireDrizzleHandle', () => {
   it('returns the store unchanged when it is Drizzle-backed', () => {
     const store = drizzleLike();
-    expect(requireDrizzleDataStore(store as DataStore)).toBe(store);
+    expect(requireDrizzleHandle(store as DataStore)).toBe(store);
   });
 
   it('throws when the store is not Drizzle-backed', () => {
@@ -67,7 +67,7 @@ describe('requireDrizzleDataStore', () => {
       transaction: () => undefined,
       close: () => undefined,
     } as unknown as DataStore;
-    expect(() => requireDrizzleDataStore(plain)).toThrow(/Drizzle-backed DataStore is required/);
+    expect(() => requireDrizzleHandle(plain)).toThrow(/Drizzle-backed DataStore is required/);
   });
 });
 

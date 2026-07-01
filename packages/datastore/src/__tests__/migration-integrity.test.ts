@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
-import { DataStoreFactory, requireDrizzleDataStore } from '../index.js';
+import { requireDrizzleHandle } from '../data-store.js';
+import { DataStoreFactory } from '../index.js';
 
 /**
  * Migration-integrity guardrail.
@@ -89,7 +90,7 @@ describe('fresh database fully realizes the ORM schema', () => {
     try {
       const cols = (table: string): Set<string> =>
         new Set(
-          requireDrizzleDataStore(ds)
+          requireDrizzleHandle(ds)
             .db.all<{ name: string }>(sql.raw(`PRAGMA table_info(${table})`))
             .map((r) => r.name),
         );

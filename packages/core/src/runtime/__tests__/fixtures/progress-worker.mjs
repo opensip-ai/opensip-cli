@@ -20,15 +20,15 @@
  *                     silent. If present, it inherits that runId.
  */
 const mode = process.argv[2];
-const send = (msg) => process.send?.(msg);
+const send = (message) => process.send?.(message);
 
 /** Collect the child's OPENSIP_* env (correlation proof) — never the rest of env. */
-function collectOpensipEnv() {
-  const opensipEnv = {};
+function collectOpensipEnvironment() {
+  const opensipEnvironment = {};
   for (const [k, v] of Object.entries(process.env)) {
-    if (k.startsWith('OPENSIP_') && v !== undefined) opensipEnv[k] = v;
+    if (k.startsWith('OPENSIP_') && v !== undefined) opensipEnvironment[k] = v;
   }
-  return opensipEnv;
+  return opensipEnvironment;
 }
 
 switch (mode) {
@@ -63,7 +63,7 @@ switch (mode) {
     // Echo only the OPENSIP_* env back to the parent so the fork-path correlation
     // test can assert OPENSIP_RUN_ID / OPENSIP_WORKER_KIND were injected — without
     // leaking the rest of the parent env into the assertion.
-    send({ kind: 'result', value: collectOpensipEnv() });
+    send({ kind: 'result', value: collectOpensipEnvironment() });
     break;
   }
   case 'env-echo-full': {
@@ -73,7 +73,7 @@ switch (mode) {
     send({
       kind: 'result',
       value: {
-        opensip: collectOpensipEnv(),
+        opensip: collectOpensipEnvironment(),
         hasPath: process.env.PATH !== undefined,
         hasHome: process.env.HOME !== undefined,
       },

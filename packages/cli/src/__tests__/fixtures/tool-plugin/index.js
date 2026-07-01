@@ -37,7 +37,7 @@ export const tool = {
       scope: 'project',
       output: 'raw-stream',
       rawStreamReason: 'diagnostic-gate',
-      handler(_opts, cli) {
+      handler(_options, cli) {
         cli.emitRaw('audit-demo ran');
         return {};
       },

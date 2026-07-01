@@ -7,7 +7,8 @@
 
 import { logger, SeverityPolicy, SystemError } from '@opensip-cli/core';
 
-import { memoryProfiler, type CheckMemoryProfile } from '../framework/memory-profiler.js';
+import { type CheckMemoryProfile } from '../framework/memory-profiler.js';
+import { resolveMemoryProfiler } from '../framework/scope-registry.js';
 import { countErrors, countWarnings } from '../types/severity.js';
 
 import type {
@@ -180,6 +181,7 @@ export function processSuccessResult(
   const ignoredCount = result.ignoredCount ?? 0;
   const passed = recipe.fileFilter ? errorCount === 0 : result.passed;
 
+  const memoryProfiler = resolveMemoryProfiler();
   const memoryProfile = memoryProfiler.recordCheckComplete(
     checkId,
     memoryBeforeMB,
@@ -292,7 +294,12 @@ export function processErrorResult(
     errMsg = error instanceof Error ? error.message : String(error);
   }
 
-  const memoryProfile = memoryProfiler.recordCheckComplete(checkId, memoryBeforeMB, 0, durationMs);
+  const memoryProfile = resolveMemoryProfiler().recordCheckComplete(
+    checkId,
+    memoryBeforeMB,
+    0,
+    durationMs,
+  );
 
   const checkResult: RecipeCheckResult = {
     checkId,

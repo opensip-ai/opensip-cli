@@ -6,7 +6,7 @@ import {
 } from '@opensip-cli/core';
 import { eq, sql } from 'drizzle-orm';
 
-import { requireDrizzleDataStore, type DataStore, type DrizzleDataStore } from './data-store.js';
+import { requireDrizzleHandle, type DataStore, type DrizzleDataStore } from './data-store.js';
 import { toolBaselineEntries, toolBaselineMeta } from './schema/baseline.js';
 
 const MODULE_NAME = 'datastore:baseline-repo';
@@ -39,7 +39,7 @@ export class BaselineRepo {
 
   // @yagni-ignore-next-line duplicate-body-candidate -- repository constructors intentionally share the same datastore narrowing idiom; a base class would add indirection without reducing behavior.
   constructor(datastore: DataStore) {
-    this.datastore = requireDrizzleDataStore(datastore);
+    this.datastore = requireDrizzleHandle(datastore);
   }
 
   /**

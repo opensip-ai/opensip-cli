@@ -3,16 +3,8 @@ export type {
   DataStoreOpenOptions,
   DataStoreVersionMismatch,
   DatastoreMaintenance,
-  DrizzleDataStore,
-  DrizzleHandle,
-  SqliteBackendHandle,
 } from './data-store.js';
-export {
-  DataStoreMigrationError,
-  DataStoreVersionError,
-  isDrizzleDataStore,
-  requireDrizzleDataStore,
-} from './data-store.js';
+export { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
 export { DataStoreFactory } from './factory.js';
 export { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 // Generic host-owned baseline/ratchet plane (ADR-0036): the shared table pair
