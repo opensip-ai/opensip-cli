@@ -289,11 +289,12 @@ export type {
 export {
   applyAgentFilters,
   buildAgentFilteredResult,
+  emitAgentFilteredJsonOutput,
   normalizeAgentRunFilters,
   agentRunFlagSpecs,
   AgentFilterParseError,
 } from './agent-filters.js';
-export type { AgentFilteredResult } from './agent-filters.js';
+export type { AgentFilteredResult, AgentRunFilterOpts } from './agent-filters.js';
 
 // Agent command catalog (ADR-0084) — the self-describing entry-point surface
 // the host `agent-catalog` command renders and `@opensip-cli/mcp` serves.

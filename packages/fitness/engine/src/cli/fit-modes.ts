@@ -12,9 +12,8 @@
  */
 
 import {
-  buildAgentFilteredResult,
+  emitAgentFilteredJsonOutput,
   EXIT_CODES,
-  normalizeAgentRunFilters,
   runHostGateDispatch,
   type FitOptions,
   type SignalEnvelope,
@@ -97,25 +96,6 @@ function fitRunCompletion(
  * the screen there. The live renderer surfaces these through Ink in the
  * summary block instead.
  */
-/** Emit fit JSON output — unfiltered envelope or agent-filtered result (ADR-0085). */
-function emitFitJsonOutput(
-  cli: ToolCliContext,
-  envelope: SignalEnvelope,
-  args: Pick<FitOptions, 'filter' | 'top' | 'raw'>,
-): void {
-  const tokens = normalizeAgentRunFilters(args.filter, args.top);
-  if (tokens.length === 0 && args.raw !== true) {
-    cli.emitEnvelope(envelope);
-    return;
-  }
-  const result = buildAgentFilteredResult(envelope, tokens);
-  if (args.raw === true) {
-    cli.emitRaw(result);
-  } else {
-    cli.emitJson(result);
-  }
-}
-
 function emitWarningsToStderr(result: { warnings?: readonly string[] }): void {
   if (!result.warnings || result.warnings.length === 0) return;
   for (const msg of result.warnings) {
@@ -218,7 +198,7 @@ export async function runJsonMode(
   }
   // ADR-0085: agent filters are presentation-only — egress/session use the
   // unfiltered envelope; filtered output goes through emitJson/emitRaw.
-  emitFitJsonOutput(cli, fitResult.envelope, args);
+  emitAgentFilteredJsonOutput(cli, fitResult.envelope, args);
   // Warnings collected during the run go to stderr so JSON consumers still
   // see them without contaminating the structured stdout payload. They ride on
   // the executeFit result bundle now (a sibling field), not on the render-only

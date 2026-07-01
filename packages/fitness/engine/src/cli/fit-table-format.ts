@@ -27,24 +27,7 @@ export function sortFitRowPriority(r: FitRowSortKey): number {
   return 3;
 }
 
-/**
- * Parse the leading integer out of a "Validated" cell — e.g. `"171 files"` →
- * `171`, `"—"` → `0`. Used to compute the ignored-ratio tone/colour.
- */
-export function parseValidatedCount(validated: string): number {
-  if (validated === '—') return 0;
-  const match = /^(\d+)/.exec(validated);
-  return match ? Number.parseInt(match[1], 10) : 0;
-}
-
-/**
- * Render a "Validated" table cell: item count with a singular/plural noun
- * (e.g. `450 → "450 files"`, `1 → "1 file"`, `0`/undefined → `"—"`). Shared by
- * the fit static view-model and live Ink view so both render the column
- * identically. `itemType` defaults to `"items"`.
- */
-export function formatValidatedColumn(totalItems: number | undefined, itemType = 'items'): string {
-  if (!totalItems) return '—';
-  const singular = itemType.endsWith('s') ? itemType.slice(0, -1) : itemType;
-  return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${itemType}`;
-}
+export {
+  formatValidatedCell as formatValidatedColumn,
+  parseValidatedCellCount as parseValidatedCount,
+} from '@opensip-cli/cli-ui';

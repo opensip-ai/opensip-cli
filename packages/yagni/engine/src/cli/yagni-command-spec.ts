@@ -4,10 +4,9 @@
 
 import {
   agentRunFlagSpecs,
-  buildAgentFilteredResult,
   definePrimaryRunCommand,
+  emitAgentFilteredJsonOutput,
   gateRunFlagSpecs,
-  normalizeAgentRunFilters,
   sarifRunFlagSpec,
 } from '@opensip-cli/contracts';
 
@@ -141,7 +140,7 @@ async function runYagniCommand(
   applyAdvisoryExitCode(cli, config);
 
   if (opts.json === true) {
-    emitYagniJsonOutput(cli, outcome.envelope, opts);
+    emitAgentFilteredJsonOutput(cli, outcome.envelope, opts);
   } else {
     const durationMs = Math.max(0, Date.now() - startedAt);
     const presentation = buildYagniRunPresentation({
@@ -161,25 +160,6 @@ async function runYagniCommand(
   }
 
   return { session: outcome.session };
-}
-
-/** Emit YAGNI JSON — unfiltered envelope or agent-filtered result (ADR-0085). */
-function emitYagniJsonOutput(
-  cli: ToolCliContext,
-  envelope: SignalEnvelope,
-  opts: Pick<YagniCommandOptions, 'filter' | 'top' | 'raw'>,
-): void {
-  const tokens = normalizeAgentRunFilters(opts.filter, opts.top);
-  if (tokens.length === 0 && opts.raw !== true) {
-    cli.emitEnvelope(envelope);
-    return;
-  }
-  const result = buildAgentFilteredResult(envelope, tokens);
-  if (opts.raw === true) {
-    cli.emitRaw(result);
-  } else {
-    cli.emitJson(result);
-  }
 }
 
 export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {

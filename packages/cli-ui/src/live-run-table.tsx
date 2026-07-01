@@ -11,6 +11,7 @@
  */
 
 import { formatDuration } from './format-duration.js';
+import { formatValidatedCell, parseValidatedCellCount } from './format-validated-cell.js';
 import {
   viewTable,
   type Span,
@@ -53,18 +54,6 @@ function liveRunRowPriority(r: LiveRunTableRow): number {
   if (r.status === 'FAIL') return 1;
   if (r.warnings > 0) return 2;
   return 3;
-}
-
-function formatValidatedCell(totalItems: number | undefined, itemType = 'items'): string {
-  if (!totalItems) return '—';
-  const singular = itemType.endsWith('s') ? itemType.slice(0, -1) : itemType;
-  return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${itemType}`;
-}
-
-function parseValidatedCellCount(validated: string): number {
-  if (validated === '—') return 0;
-  const match = /^(\d+)/.exec(validated);
-  return match ? Number.parseInt(match[1], 10) : 0;
 }
 
 function statusTone(status: LiveRunTableRow['status']): Tone {

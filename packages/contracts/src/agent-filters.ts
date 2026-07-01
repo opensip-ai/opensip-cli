@@ -7,7 +7,7 @@
 import { ConfigurationError, isErrorSeverity } from '@opensip-cli/core';
 
 import type { SignalEnvelope } from './signal-envelope.js';
-import type { OptionSpec, Signal, SignalSeverity } from '@opensip-cli/core';
+import type { OptionSpec, Signal, SignalSeverity, ToolCliContext } from '@opensip-cli/core';
 
 /** Closed vocabulary of agent filter tokens (spec §5.2). */
 const KNOWN_FILTER_TOKENS = new Set(['errors-only', 'warnings-only', 'high-impact']);
@@ -205,6 +205,35 @@ export function buildAgentFilteredResult(
     originalSignalCount: result.originalSignalCount,
     returnedSignalCount: result.returnedSignalCount,
   };
+}
+
+/** Agent-run filter flags shared by fit/graph/sim/yagni JSON emission. */
+export interface AgentRunFilterOpts {
+  readonly filter?: readonly string[];
+  readonly top?: string;
+  readonly raw?: boolean;
+}
+
+/**
+ * Emit tool JSON — unfiltered envelope or agent-filtered result (ADR-0085).
+ * Shared by fit/graph/sim/yagni so the filter/raw dispatch cannot drift.
+ */
+export function emitAgentFilteredJsonOutput(
+  cli: ToolCliContext,
+  envelope: SignalEnvelope,
+  opts: AgentRunFilterOpts,
+): void {
+  const tokens = normalizeAgentRunFilters(opts.filter, opts.top);
+  if (tokens.length === 0 && opts.raw !== true) {
+    cli.emitEnvelope(envelope);
+    return;
+  }
+  const result = buildAgentFilteredResult(envelope, tokens);
+  if (opts.raw === true) {
+    cli.emitRaw(result);
+  } else {
+    cli.emitJson(result);
+  }
 }
 
 /** Shared run-flag specs for fit/graph/sim agent ergonomics. */

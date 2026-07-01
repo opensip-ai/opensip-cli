@@ -13,10 +13,9 @@
 
 import {
   agentRunFlagSpecs,
-  buildAgentFilteredResult,
   definePrimaryRunCommand,
+  emitAgentFilteredJsonOutput,
   EXIT_CODES,
-  normalizeAgentRunFilters,
   type SignalEnvelope,
   type StoredSession,
   type ToolOptions,
@@ -81,25 +80,6 @@ type SimOptions = ToolOptions & {
  * doing this once per run — only on the interactive path that needs it — is
  * equivalent to the old mount-time registration.
  */
-/** Emit sim JSON — unfiltered envelope or agent-filtered result (ADR-0085). */
-function emitSimJsonOutput(
-  cli: ToolCliContext,
-  envelope: SignalEnvelope,
-  opts: Pick<SimOptions, 'filter' | 'top' | 'raw'>,
-): void {
-  const tokens = normalizeAgentRunFilters(opts.filter, opts.top);
-  if (tokens.length === 0 && opts.raw !== true) {
-    cli.emitEnvelope(envelope);
-    return;
-  }
-  const filtered = buildAgentFilteredResult(envelope, tokens);
-  if (opts.raw === true) {
-    cli.emitRaw(filtered);
-  } else {
-    cli.emitJson(filtered);
-  }
-}
-
 function setUpSimLiveView(cli: ToolCliContext): void {
   cli.registerLiveView(SIMULATION_LIVE_VIEW_KEY, async (args, liveContext) => {
     const simArgs = args as ToolOptions;
@@ -163,7 +143,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
   // through the shared formatSignalJson; default renders the envelope-
   // derived per-scenario table.
   if (opts.json === true) {
-    emitSimJsonOutput(cli, result.envelope, opts);
+    emitAgentFilteredJsonOutput(cli, result.envelope, opts);
   } else {
     await cli.render(result);
   }
