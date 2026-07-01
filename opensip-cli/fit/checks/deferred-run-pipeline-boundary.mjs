@@ -35,6 +35,10 @@ export const deferredRunPipelineBoundary = defineCheck({
   scope: { languages: ['typescript'], concerns: ['architecture'] },
   tags: ['architecture'],
   fileTypes: ['ts'],
+  // Match reserved API *symbols* in code only; a comment or string mentioning
+  // the deferred names (e.g. a migration TODO or an ADR-0104 reference) is not a
+  // premature implementation and must not fail the gate.
+  contentFilter: 'strip-strings-and-comments',
   analyze: (content, filePath) => {
     const normalized = filePath.replaceAll('\\', '/');
     if (!PRODUCTION_TS.test(normalized)) return [];
