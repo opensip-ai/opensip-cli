@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
-import type { StoredSession } from '@opensip-cli/contracts';
+import type { DeclaredInputs, StoredSession } from '@opensip-cli/contracts';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -46,6 +46,15 @@ const recipeCatalog = [
   },
 ];
 
+const declaredInputs: DeclaredInputs = {
+  cliVersion: '0.1.19',
+  nodeVersion: '24.16.0',
+  packageManager: 'pnpm@10.0.0+sha512.deadbeef',
+  platform: 'darwin/arm64',
+  tool: 'report',
+  engineVersion: 'unknown',
+};
+
 describe('generateDashboardHtml', () => {
   it('produces a complete HTML5 document', () => {
     const html = generateDashboardHtml({ sessions: [makeSession()] });
@@ -72,6 +81,21 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain('special-session-id');
     expect(html).toContain('no-console-log');
     expect(html).toContain('default');
+  });
+
+  it('keeps declared input metadata behind the header report details disclosure', () => {
+    const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
+    const headerStart = html.indexOf('<div class="header">');
+    const detailsStart = html.indexOf('<details class="report-details">');
+    const tabStart = html.indexOf('<div class="tab-bar"');
+
+    expect(headerStart).toBeGreaterThan(-1);
+    expect(detailsStart).toBeGreaterThan(headerStart);
+    expect(detailsStart).toBeLessThan(tabStart);
+    expect(html).toContain('<span class="report-details-label">Report details</span>');
+    expect(html).toContain('<div class="report-details-title">Run environment</div>');
+    expect(html).toContain('<dt>Package manager</dt><dd>pnpm@10.0.0+sha512.deadbeef</dd>');
+    expect(html).not.toContain('<div class="card" style="margin:16px 24px 0;padding:12px 16px">');
   });
 
   it('escapes < and > in inlined JSON to prevent script injection', () => {

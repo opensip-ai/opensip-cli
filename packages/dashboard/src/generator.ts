@@ -102,7 +102,7 @@ function escapeHtml(value: unknown): string {
 
 function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
   if (input === undefined) return '';
-  const pairs = [
+  const pairs: readonly (readonly [string, string])[] = [
     ['CLI', input.cliVersion],
     ['Node', input.nodeVersion],
     ['Package manager', input.packageManager ?? 'unknown'],
@@ -116,13 +116,10 @@ function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
         : `${input.baselineIdentity.fingerprintStrategyId}@${input.baselineIdentity.fingerprintStrategyVersion}`,
     ],
   ];
-  const chips = pairs
-    .map(
-      ([label, value]) =>
-        `<span class="badge" title="${escapeHtml(label)}">${escapeHtml(label)}: ${escapeHtml(value)}</span>`,
-    )
-    .join(' ');
-  return `<div class="card" style="margin:16px 24px 0;padding:12px 16px"><strong>Run environment</strong><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${chips}</div></div>`;
+  const rows = pairs
+    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+    .join('');
+  return `<details class="report-details"><summary><span class="report-details-version">CLI ${escapeHtml(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
 }
 
 /**
@@ -255,10 +252,9 @@ ${dashboardCss()}
 
 <div class="header">
   <span class="header-icon">${REPORT_CUP_HEADER_HTML}</span>
-  <div><h1><span class="brand-open">Open</span>SIP Report</h1></div>
+  <div class="header-title"><h1><span class="brand-open">Open</span>SIP Report</h1></div>
+  ${renderDeclaredInputs(declaredInputs)}
 </div>
-
-${renderDeclaredInputs(declaredInputs)}
 
 <div class="tab-bar" id="tab-bar">
   <div class="tab active" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</div>
