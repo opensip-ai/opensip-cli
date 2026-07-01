@@ -141,6 +141,20 @@ build artifact, or used as a lightweight review companion.
 opensip report
 ```
 
+### Suites
+
+Run several tool commands in one shared project scope — for example, a security
+recipe followed by graph gate comparison — without scripting separate
+invocations. Suites are configured in `opensip-cli.config.yml` and stamped with a
+shared `suiteRunId` on stored sessions.
+
+```bash
+opensip suite list
+opensip suite run security
+opensip suite add security --tool fitness --command fit --arg recipe=security
+opensip suite run security --json
+```
+
 ### Extensible Tools
 
 OpenSIP ships with `fit`, `graph`, `sim`, and `yagni`, but the CLI is a
@@ -153,14 +167,17 @@ graph rules, or entire tools that mount as first-class `opensip` subcommands. Us
 
 ```text
 init -> analyze -> baseline -> gate -> report
+                 \-> suite (multi-tool)
 ```
 
 1. `opensip init` detects your project and writes a local OpenSIP layout.
 2. `opensip fit`, `opensip graph`, `opensip sim`, and `opensip yagni` run local analysis.
-3. Gate commands compare against saved baselines so existing debt does not
+3. `opensip suite run` chains configured tool steps in one shared scope when you
+   need a repeatable multi-tool workflow.
+4. Gate commands compare against saved baselines so existing debt does not
    block every pull request.
-4. `opensip report` creates local HTML output for review and sharing.
-5. OpenSIP Cloud sync is coming soon for teams that want centralized
+5. `opensip report` creates local HTML output for review and sharing.
+6. OpenSIP Cloud sync is coming soon for teams that want centralized
    visibility.
 
 ## Commands
@@ -217,6 +234,16 @@ opensip sessions show latest --tool fit
 opensip configure  # stores an API key for future/private Cloud-compatible endpoints
 ```
 
+### Suites
+
+```bash
+opensip suite list                              # list configured suites
+opensip suite run <name>                        # run every step; exit = worst step code
+opensip suite run <name> --json                 # machine-readable summary + per-step verdict counts
+opensip suite add <name> --tool <tool> \
+  --command <cmd> --arg <key=value>             # append a step to opensip-cli.config.yml
+```
+
 ### Plugins
 
 Extension packs are managed under each pack-supporting tool (`fit` and `sim`) —
@@ -249,7 +276,7 @@ opensip tools uninstall <name-or-id> [--global|--project]
 
 ```text
 your-project/
-  opensip-cli.config.yml
+  opensip-cli.config.yml   # targets, suites, tool config namespaces
   opensip-cli/
     fit/
       checks/
