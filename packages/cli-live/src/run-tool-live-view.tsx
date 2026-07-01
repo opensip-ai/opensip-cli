@@ -33,6 +33,7 @@ import { scrubErrorMessage } from './scrub-error-message.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 /** Open string so new tools can contribute live views without editing cli-live. */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic boundary name (P1-F7)
 export type LiveRunTool = string;
 
 export type LiveRunOutcome =
