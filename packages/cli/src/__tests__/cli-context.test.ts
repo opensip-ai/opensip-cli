@@ -234,7 +234,7 @@ function buildCtxWithDebug(debug: ReturnType<typeof vi.fn>) {
 }
 
 const completeRunOf = (handle: ReturnType<typeof buildCtxWithDebug>): ((r: unknown) => void) =>
-  handle.runActionHooks.completeRun ?? (() => {});
+  handle.runActionHooks.completeRun ?? vi.fn();
 
 describe('buildToolCliContext — run-plane datastore resolver', () => {
   let savedExit: number | undefined;
