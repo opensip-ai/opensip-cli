@@ -37,6 +37,10 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0108](ADR-0108-graph-cache-key-includes-resolution-mode.md) — Graph adapter cache keys must include `resolutionMode` (the `CacheKeyInput` MUST-fold contract; not invariant I-8, which is per-adapter prefix uniqueness); `makeConfigCacheKey` in graph-adapter-common appends or hashes mode alongside config-path hash.
+- [ADR-0107](ADR-0107-datastore-repository-only-boundary.md) — DataStore public barrel is repository-only; `DrizzleDataStore.db` moves behind `@internal` subpath for sibling persistence packages; extends ADR-0056 R18.
+- [ADR-0106](ADR-0106-fitness-bare-slug-fail-closed.md) — Fitness bare-slug resolution fails closed on ambiguity; built-in recipes use namespaced slugs (`pack:slug`).
+- [ADR-0105](ADR-0105-architecture-audit-2026-07-remediation-scope.md) — July 2026 architecture audit P1 remediation scope: preserve layered DAG; fix concurrency, determinism, persistence boundary, and extensibility gaps per `docs/plans/architecture-audit-p1-remediation/`.
 - [ADR-0104](ADR-0104-defer-host-owned-run-pipeline.md) — Defer the host-owned run pipeline behind the assessment contract-conformance fixes; reserve `RunCommandPipeline`, `defineAnalysisRunCommand`, production `readToolConfig`, and typed lifecycle event APIs until a promoted implementation spec names the package boundary and migrates `yagni` first.
 - [ADR-0103](ADR-0103-scope-abi-compatibility-guard.md) — The single-core guard decides pack/core compatibility by a scope ABI version (declared in core's `package.json` as `opensipScopeAbiVersion`), not the npm version; cores ≥ v0.1.11 without the field are inferred as ABI 1. Fixes the "one global CLI, many consumer repos" workflow and emits a targeted diagnostic naming both core versions on a mismatch.
 - [ADR-0102](ADR-0102-coffee-cup-canonical-logo-and-live-activity-mark.md) — The OpenSIP coffee cup is the canonical CLI logo; legacy OPENSIP wordmark banners are removed, and live activity may use shared steam-animation cup variants in a fixed left column.
