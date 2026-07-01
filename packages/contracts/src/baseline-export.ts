@@ -2,19 +2,31 @@ import { ConfigurationError, type ToolCliContext } from '@opensip-cli/core';
 
 import { EXIT_CODES } from './exit-codes.js';
 
+/** Normalized failure detail surfaced when a baseline export artifact write fails. */
 export interface BaselineExportFailure {
+  /** Human-readable failure message (the underlying error's message). */
   readonly message: string;
+  /** Process exit code the host should apply for this failure. */
   readonly exitCode: number;
+  /** The original thrown value, preserved for logging/diagnostics. */
   readonly error: unknown;
 }
 
+/** Inputs describing a single raw-stream baseline export command run. */
 export interface BaselineExportOptions<TResult> {
+  /** The tool CLI context providing the documented output/delivery seams. */
   readonly cli: ToolCliContext;
+  /** Destination path the baseline artifact is written to. */
   readonly outPath: string;
+  /** Whether the caller requested machine (`--json`) output. */
   readonly jsonRequested: boolean;
+  /** The structured result emitted on the `--json` success path. */
   readonly result: TResult;
+  /** Performs the host-owned artifact write; may reject to signal failure. */
   readonly exportArtifact: () => Promise<void>;
-  readonly writeText: (outPath: string) => void;
+  /** Synchronously writes the human-readable confirmation status line. */
+  readonly writeTextSync: (outPath: string) => void;
+  /** Optional hook invoked with normalized detail before the failure is reported. */
   readonly onFailure?: (failure: BaselineExportFailure) => void;
 }
 
@@ -50,5 +62,5 @@ export async function runBaselineExport<TResult>(
     return;
   }
 
-  options.writeText(options.outPath);
+  options.writeTextSync(options.outPath);
 }

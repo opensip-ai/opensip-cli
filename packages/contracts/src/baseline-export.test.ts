@@ -17,7 +17,7 @@ describe('runBaselineExport', () => {
   it('emits the command result on the json path after writing the artifact', async () => {
     const { cli, emitJson } = cliStub();
     const exportArtifact = vi.fn(() => Promise.resolve());
-    const writeText = vi.fn();
+    const writeTextSync = vi.fn();
     const result = { type: 'baseline-export', outPath: 'out.json' };
 
     await runBaselineExport({
@@ -26,17 +26,17 @@ describe('runBaselineExport', () => {
       jsonRequested: true,
       result,
       exportArtifact,
-      writeText,
+      writeTextSync,
     });
 
     expect(exportArtifact).toHaveBeenCalledOnce();
     expect(emitJson).toHaveBeenCalledWith(result);
-    expect(writeText).not.toHaveBeenCalled();
+    expect(writeTextSync).not.toHaveBeenCalled();
   });
 
   it('writes the plain status line on the non-json path', async () => {
     const { cli, emitJson } = cliStub();
-    const writeText = vi.fn();
+    const writeTextSync = vi.fn();
 
     await runBaselineExport({
       cli,
@@ -44,10 +44,10 @@ describe('runBaselineExport', () => {
       jsonRequested: false,
       result: { type: 'fit-baseline-export', outPath: 'baseline.sarif' },
       exportArtifact: () => Promise.resolve(),
-      writeText,
+      writeTextSync,
     });
 
-    expect(writeText).toHaveBeenCalledWith('baseline.sarif');
+    expect(writeTextSync).toHaveBeenCalledWith('baseline.sarif');
     expect(emitJson).not.toHaveBeenCalled();
   });
 
@@ -61,7 +61,7 @@ describe('runBaselineExport', () => {
       jsonRequested: true,
       result: { type: 'graph-baseline-export', outPath: 'baseline.json' },
       exportArtifact: () => Promise.reject(new ConfigurationError('No baseline captured')),
-      writeText: vi.fn(),
+      writeTextSync: vi.fn(),
       onFailure,
     });
 

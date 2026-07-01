@@ -104,7 +104,7 @@ async function runFitBaselineExport(
     jsonRequested: opts.json === true,
     result: { type: 'fit-baseline-export' as const, outPath: opts.out },
     exportArtifact: () => cli.exportBaselineSarif('fitness', opts.out),
-    writeText: (outPath) => process.stdout.write(`Exported fit baseline to ${outPath}\n`),
+    writeTextSync: (outPath) => process.stdout.write(`Exported fit baseline to ${outPath}\n`),
     onFailure: ({ message, exitCode }) => {
       log.warn({
         evt: 'cli.fit.baseline_export.failed',

@@ -280,7 +280,7 @@ async function runGraphBaselineExport(
     jsonRequested: opts.json === true,
     result: { type: 'graph-baseline-export' as const, outPath: opts.out },
     exportArtifact: () => cli.exportBaselineFingerprints('graph', opts.out),
-    writeText: (outPath) => process.stdout.write(`Exported graph baseline to ${outPath}\n`),
+    writeTextSync: (outPath) => process.stdout.write(`Exported graph baseline to ${outPath}\n`),
     onFailure: ({ message, exitCode }) => {
       log.warn({
         evt: 'cli.graph.baseline_export.failed',
