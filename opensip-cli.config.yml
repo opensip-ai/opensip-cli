@@ -159,6 +159,10 @@ checkOverrides:
   # the index barrel / tests, and strips strings, so host code and tests are
   # inert (parallel-tool-invocations Phase 3 / ADR-0052).
   no-module-level-run-state: [all-ts]
+  # The host-owned run pipeline is a deferred ADR, not an opportunistic API.
+  # Pin to all-ts so nested tool engines are covered if a partial implementation
+  # starts before the decision is promoted into an implementation spec.
+  deferred-run-pipeline-boundary: [all-ts]
 
 # =============================================================================
 # Graph Configuration
