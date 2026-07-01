@@ -15,6 +15,7 @@ import {
   buildAgentFilteredResult,
   EXIT_CODES,
   normalizeAgentRunFilters,
+  runHostGateDispatch,
   type FitOptions,
   type SignalEnvelope,
   type StoredSession,
@@ -22,7 +23,6 @@ import {
 import {
   ConfigurationError,
   deriveRunOutcome,
-  resolveFailOnDegraded,
   SystemError,
   type ToolCliContext,
   type ToolRunCompletion,
@@ -325,45 +325,22 @@ export async function runGateMode(
   // ride on the result bundle now (sibling field), not the RunPresentation.
   emitWarningsToStderr(fitResult);
   try {
-    if (args.gateSave === true) {
-      await cli.saveBaseline('fitness', envelope);
-      await cli.render({
-        type: 'gate-done',
-        lines: [
-          'Baseline saved (project SQLite store)',
-          `  ${envelope.units.length} check(s), ${envelope.signals.length} finding(s)`,
-        ],
-      });
-      // ADR-0020: gate-save records the baseline AND hard-fails the step on a
-      // fail-threshold breach (`failOnErrors`/`failOnWarnings`), mirroring live
-      // and JSON mode. The CI step is therefore the honest pass/fail signal —
-      // it no longer exits 0 while error-level findings exist, so enforcement
-      // does not rely solely on the downstream Code Scanning net-new ratchet +
-      // branch protection (external config the release-gate ADR-0017 explicitly
-      // declined to trust). The SARIF export runs in a separate `if: always()`
-      // CI step, so the baseline + net-new PR annotations survive a failed gate.
-      // ADR-0035: gate-save's findings gate IS the host verdict (fit's resolved
-      // failOnErrors/failOnWarnings), so the host sets the exit from the envelope
-      // verdict in deliverFitSignals — no per-path setExitCode needed.
-      await deliverFitSignals(cli, envelope, args);
-      return completion;
-    }
-    const result = await cli.compareBaseline('fitness', envelope);
-    await cli.render({
-      type: 'gate-done',
-      lines: renderGateCompareOutput(result).split('\n'),
-    });
-    // gate-compare's verdict is the baseline-diff `degraded` predicate, NOT the
-    // findings policy — pass it as the host runFailed override (ADR-0035), gated by
-    // the reserved `failOnDegraded` key (ADR-0036, default true → ratchet-as-report
-    // when false). The host sets the exit (degraded → RUNTIME_ERROR, else SUCCESS)
-    // and a `--report-to` upload failure never masks the gate verdict.
-    await deliverFitSignals(
+    await runHostGateDispatch({
       cli,
+      tool: 'fitness',
       envelope,
-      args,
-      result.degraded && resolveFailOnDegraded('fitness'),
-    );
+      mode: args.gateSave === true ? 'save' : 'compare',
+      deliver: {
+        cwd: args.cwd,
+        reportTo: args.reportTo,
+        apiKey: args.apiKey,
+      },
+      renderSaveLines: ({ envelope }) => [
+        'Baseline saved (project SQLite store)',
+        `  ${envelope.units.length} check(s), ${envelope.signals.length} finding(s)`,
+      ],
+      renderCompareLines: ({ result }) => renderGateCompareOutput(result).split('\n'),
+    });
     return completion;
   } catch (error) {
     // Gate mode is plain-text (not Ink), so we render the error

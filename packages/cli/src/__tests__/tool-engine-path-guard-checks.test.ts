@@ -5,6 +5,7 @@ import { analyzeDirectStdoutInToolEngine } from '../../../../opensip-cli/fit/che
 import { analyzeNoRawFsArtifactWrite } from '../../../../opensip-cli/fit/checks/no-raw-fs-artifact-write-in-tool-engine.mjs';
 import { analyzeAllReportProducerOpenFlag } from '../../../../opensip-cli/fit/checks/report-producer-open-flag.mjs';
 import { analyzeAllSessionPersistRequiresReplay } from '../../../../opensip-cli/fit/checks/session-persist-requires-replay.mjs';
+import { analyzeSharedGateDispatch } from '../../../../opensip-cli/fit/checks/shared-gate-dispatch.mjs';
 import {
   bundledToolPackageSegments,
   toolEnginePathRe,
@@ -172,6 +173,44 @@ describe('derived first-party tool-engine path gates', () => {
           handler,
         });
       `),
+    ).toEqual([]);
+  });
+
+  it('requires the shared host gate-dispatch helper in production tool gate code', () => {
+    const findings = analyzeSharedGateDispatch(
+      `
+        await cli.saveBaseline('graph', envelope);
+        const result = await cli.compareBaseline('graph', envelope);
+      `,
+      '/repo/packages/graph/engine/src/cli/graph-modes.ts',
+    );
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('runHostGateDispatch'),
+      }),
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('runHostGateDispatch'),
+      }),
+    ]);
+  });
+
+  it('allows the shared host gate-dispatch helper and skips test files', () => {
+    expect(
+      analyzeSharedGateDispatch(
+        `
+          await runHostGateDispatch({ cli, tool, envelope, mode: 'save' });
+        `,
+        '/repo/packages/external-tool-adapter/src/scan-emit.ts',
+      ),
+    ).toEqual([]);
+    expect(
+      analyzeSharedGateDispatch(
+        "await cli.saveBaseline('graph', envelope);",
+        '/repo/packages/graph/engine/src/cli/__tests__/graph-gate-mode.test.ts',
+      ),
     ).toEqual([]);
   });
 });

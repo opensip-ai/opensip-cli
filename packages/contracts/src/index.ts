@@ -202,9 +202,17 @@ export {
   gateRunFlagSpecs,
   sarifRunFlagSpec,
 } from './command-presets.js';
+export { runHostGateDispatch } from './gate-dispatch.js';
 export { runBaselineExport } from './baseline-export.js';
 export type { DefineToolInput, ResolvedToolHooks } from '@opensip-cli/core';
 export type { BaselineExportFailure, BaselineExportOptions } from './baseline-export.js';
+export type {
+  HostGateCompareRenderInput,
+  HostGateDeliveryOptions,
+  HostGateDispatchResult,
+  HostGateSaveRenderInput,
+  RunHostGateDispatchInput,
+} from './gate-dispatch.js';
 export type {
   CommandSpec,
   OptionSpec,

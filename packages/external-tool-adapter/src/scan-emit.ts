@@ -9,7 +9,7 @@
  * RPC for `saveBaseline`/`compareBaseline`/`deliverSignals`).
  */
 
-import { resolveFailOnDegraded } from '@opensip-cli/core';
+import { runHostGateDispatch } from '@opensip-cli/contracts';
 
 import { renderGateCompareLines, renderGateSaveLines } from './gate-render.js';
 import { buildAdapterSessionPayload } from './session-payload.js';
@@ -150,18 +150,27 @@ export interface EmitScanCompletionInput {
 export async function emitScanCompletion(input: EmitScanCompletionInput): Promise<ScanCompletion> {
   const { cli, tool, opts, envelope, signalCount, deliver, completion } = input;
   if (opts.gateSave === true) {
-    await cli.saveBaseline(tool, envelope);
-    await cli.render({ type: 'gate-done', lines: renderGateSaveLines(tool, signalCount) });
-    await cli.deliverSignals(envelope, deliver);
+    await runHostGateDispatch({
+      cli,
+      tool,
+      envelope,
+      mode: 'save',
+      deliver,
+      renderSaveLines: () => renderGateSaveLines(tool, signalCount),
+      renderCompareLines: ({ result }) => renderGateCompareLines(tool, result),
+    });
     logCompleted({ cli, tool, signalCount, passed: envelope.verdict.passed, gate: 'save' });
     return completion;
   }
   if (opts.gateCompare === true) {
-    const result = await cli.compareBaseline(tool, envelope);
-    await cli.render({ type: 'gate-done', lines: renderGateCompareLines(tool, result) });
-    await cli.deliverSignals(envelope, {
-      ...deliver,
-      runFailed: result.degraded && resolveFailOnDegraded(tool),
+    const gate = await runHostGateDispatch({
+      cli,
+      tool,
+      envelope,
+      mode: 'compare',
+      deliver,
+      renderSaveLines: () => renderGateSaveLines(tool, signalCount),
+      renderCompareLines: ({ result }) => renderGateCompareLines(tool, result),
     });
     logCompleted({
       cli,
@@ -169,7 +178,7 @@ export async function emitScanCompletion(input: EmitScanCompletionInput): Promis
       signalCount,
       passed: envelope.verdict.passed,
       gate: 'compare',
-      degraded: result.degraded,
+      degraded: gate.mode === 'compare' ? gate.result.degraded : undefined,
     });
     return completion;
   }
