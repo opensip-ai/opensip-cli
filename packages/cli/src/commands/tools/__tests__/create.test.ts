@@ -210,8 +210,10 @@ describe('toolsCreate', () => {
     expect(pkg.scripts.build).toBe('tsc');
     expect(pkg.dependencies['@opensip-cli/core']).toBeDefined();
     const source = readFileSync(join(toolDir, 'src/index.ts'), 'utf8');
-    expect(source).toContain('createTool');
+    expect(source).toContain('defineTool');
+    expect(source).toContain('definePrimaryCommand');
     expect(source).toContain('createToolLogger');
+    expect(source).not.toContain('createTool({');
     expect(source).toContain('reportFailure');
     expect(result.nextSteps?.some((step) => step.includes('pnpm install'))).toBe(true);
     expect(readFileSync(join(tmp, 'opensip-cli.config.yml'), 'utf8')).toContain('typed-tool');
@@ -314,23 +316,25 @@ describe('toolsCreate', () => {
 
   it('template typecheck harness rejects the pre-fix unknown opts access', () => {
     const result = typecheckRenderedTemplate({
-      'src/index.ts': `import { createTool } from '@opensip-cli/core';
+      'src/index.ts': `import { definePrimaryCommand, defineTool } from '@opensip-cli/core';
 
-export const tool = createTool({
+const primaryCommand = definePrimaryCommand({
+  description: 'bad',
+  output: 'command-result',
+  handler: async (opts, cli) => {
+    try {
+      return { type: 'text-lines', lines: ['done'] };
+    } catch (error) {
+      await cli.reportFailure({ error, jsonRequested: opts.json === true });
+      return;
+    }
+  },
+});
+
+export const tool = defineTool({
   identity: { name: 'bad-template' },
   metadata: { id: 'bad-template', version: '0.1.0', description: 'bad' },
-  primaryCommand: {
-    description: 'bad',
-    output: 'command-result',
-    handler: async (opts, cli) => {
-      try {
-        return { type: 'text-lines', lines: ['done'] };
-      } catch (error) {
-        await cli.reportFailure({ error, jsonRequested: opts.json === true });
-        return;
-      }
-    },
-  },
+  commandSpecs: [primaryCommand],
 });
 `,
     });

@@ -46,7 +46,7 @@ This writes `opensip-cli/tools/hello-tools/opensip-tool.manifest.json` and
 
 ### Typed local package (`ts-local`)
 
-For TypeScript authoring with `createTool()` from `@opensip-cli/core`:
+For TypeScript authoring with `defineTool()` from `@opensip-cli/core`:
 
 ```bash
 opensip tools create hello-tools --template ts-local
@@ -91,31 +91,34 @@ match `stableId`; `metadata.name` and command names must match the manifest.
 `minimal-js` emits a dependency-free plain object. `ts-local` emits:
 
 ```ts
-import { createTool } from '@opensip-cli/core';
+import { definePrimaryCommand, defineTool } from '@opensip-cli/core';
 
-export const tool = createTool({
+const primaryCommand = definePrimaryCommand({
+  description: 'Run hello-tools',
+  commonFlags: ['json'],
+  scope: 'none',
+  output: 'command-result',
+  handler: async () => ({
+    type: 'text-lines',
+    title: 'hello-tools',
+    lines: ['Your project-local tool is ready.'],
+  }),
+});
+
+export const tool = defineTool({
   identity: { name: 'hello-tools' },
   metadata: {
     id: '<stableId-from-manifest>',
     version: '0.1.0',
     description: 'Project-local typed tool',
   },
-  primaryCommand: {
-    description: 'Run hello-tools',
-    commonFlags: ['json'],
-    scope: 'none',
-    output: 'command-result',
-    handler: async () => ({
-      type: 'text-lines',
-      title: 'hello-tools',
-      lines: ['Your project-local tool is ready.'],
-    }),
-  },
+  commandSpecs: [primaryCommand],
 });
 ```
 
-`createTool()` wraps `defineTool()` and does not add hidden lifecycle hooks.
-Advanced tools can still use `defineTool()` directly.
+`createTool()` remains as a compatibility wrapper over `defineTool()`, but new
+templates teach the explicit command-spec path directly. Neither path adds
+hidden lifecycle hooks.
 
 ## 4. Validate
 

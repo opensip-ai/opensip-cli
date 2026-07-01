@@ -29,12 +29,13 @@ This is the heaviest extension shape. Most teams never need it. If you just want
 | Path | Command | When to use |
 |------|---------|-------------|
 | `minimal-js` | `opensip tools create <id>` | Zero-dependency smoke tests inside a repo |
-| `ts-local` | `opensip tools create <id> --template ts-local` | Typed authoring with `createTool()` before packaging |
+| `ts-local` | `opensip tools create <id> --template ts-local` | Typed authoring with `defineTool()` before packaging |
 | Publishable npm | `opensip tools install <spec>` | Distribution to other repos (deferred scaffold — see ADR-0076) |
 
-`createTool()` is the ergonomic entry point for typed local tools; `defineTool()`
-remains the explicit low-level contract. Neither helper synthesizes lifecycle
-`extensionPoints` — absence is the safe default
+`defineTool()` is the canonical typed local tool contract. `createTool()` remains
+a compatibility wrapper for older authored tools, but new scaffolds use
+`defineTool()` plus command-spec drafts directly. Neither path synthesizes
+lifecycle `extensionPoints` — absence is the safe default
 ([ADR-0076](../../decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](../70-reference/12-tools-command.md): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.

@@ -53,6 +53,9 @@ emit conformant sidecars immediately. Typed local packages can depend on
 - Generated manifests include `identity` and `stableId`.
 - Recipe listing uses shared display helpers; execution stays tool-owned.
 - Fitness check `dogfood-no-implicit-tool-extension-defaults` guards helper changes.
+- 2026-07-01 note: `createTool()` remains exported as a compatibility wrapper
+  for older authored tools, but `opensip tools create --template ts-local` now
+  teaches `defineTool()` plus command-spec drafts directly.
 
 **Related specs / ADRs:**
 

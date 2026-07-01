@@ -335,9 +335,10 @@ export const tool = defineTool({
 
 For project-local authoring inside a repo, `opensip tools create` scaffolds
 conformant sidecars (`minimal-js` or `ts-local`). The typed template uses
-`createTool()` — a thin wrapper over `defineTool()` that accepts a
-`primaryCommand` plus optional nested subcommands without synthesizing lifecycle
-hooks ([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+`defineTool()` plus command-spec drafts directly. `createTool()` remains a
+compatibility wrapper for older authored tools, but new scaffolds teach the
+canonical `defineTool` path without synthesizing lifecycle hooks
+([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.1.19/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 Recipe-capable tools share listing helpers in core (`recipeDisplayInfo`, neutral
 `selectionLabel` on `ListRecipesResult`) but keep execution domain-owned — fitness

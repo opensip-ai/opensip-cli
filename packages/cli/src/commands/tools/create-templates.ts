@@ -94,7 +94,12 @@ function minimalJsNextSteps(ctx: TemplateRenderContext): readonly string[] {
 }
 
 function tsLocalIndexTs(ctx: TemplateRenderContext): string {
-  return `import { createTool, createToolLogger } from '@opensip-cli/core';
+  return `import {
+  createToolLogger,
+  definePrimaryCommand,
+  defineTool,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 
 const log = createToolLogger('${ctx.toolId}:cli');
 
@@ -102,34 +107,36 @@ function isJsonRequested(opts: unknown): boolean {
   return typeof opts === 'object' && opts !== null && 'json' in opts && opts.json === true;
 }
 
-export const tool = createTool({
+const primaryCommand = definePrimaryCommand<unknown, ToolCliContext>({
+  description: 'Run ${ctx.toolId}',
+  commonFlags: ['json'],
+  scope: 'none',
+  output: 'command-result',
+  handler: async (opts, cli) => {
+    log.info({ evt: '${ctx.toolId}.run.start' });
+    try {
+      return {
+        type: 'text-lines',
+        title: '${ctx.toolId}',
+        lines: ['Your typed project-local tool is ready — build, validate, then run.'],
+      };
+    } catch (error) {
+      // The host normalizes any caught value; return after reporting so this
+      // command-result handler does not fall through to an undefined result.
+      await cli.reportFailure({ error, jsonRequested: isJsonRequested(opts) });
+      return;
+    }
+  },
+});
+
+export const tool = defineTool({
   identity: { name: '${ctx.toolId}' },
   metadata: {
     id: '${ctx.stableId}',
     version: '0.1.0',
     description: 'Project-local typed tool scaffolded by opensip tools create',
   },
-  primaryCommand: {
-    description: 'Run ${ctx.toolId}',
-    commonFlags: ['json'],
-    scope: 'none',
-    output: 'command-result',
-    handler: async (opts, cli) => {
-      log.info({ evt: '${ctx.toolId}.run.start' });
-      try {
-        return {
-          type: 'text-lines',
-          title: '${ctx.toolId}',
-          lines: ['Your typed project-local tool is ready — build, validate, then run.'],
-        };
-      } catch (error) {
-        // The host normalizes any caught value; return after reporting so this
-        // command-result handler does not fall through to an undefined result.
-        await cli.reportFailure({ error, jsonRequested: isJsonRequested(opts) });
-        return;
-      }
-    },
-  },
+  commandSpecs: [primaryCommand],
 });
 `;
 }
