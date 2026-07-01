@@ -79,5 +79,67 @@
       "category": "diagnostic-gate",
       "reason": "Internal CI equivalence gate owns stdout report and exit code."
     }
+  ],
+  "localAllowlists": [
+    {
+      "file": "opensip-cli/fit/checks/adr-config-release-recipes.mjs",
+      "name": "CONFIG_READER_ALLOWLIST",
+      "reason": "One-config-document ratchet must explicitly name sanctioned YAML reader bridge files."
+    },
+    {
+      "file": "opensip-cli/fit/checks/adr-runtime-boundaries.mjs",
+      "name": "DIRECT_JSON_STDOUT_ALLOWLIST",
+      "reason": "Runtime-boundary check must name worker/transport JSON stdout exceptions."
+    },
+    {
+      "file": "opensip-cli/fit/checks/configure-logger-scope.mjs",
+      "name": "EXEMPT",
+      "reason": "Pre-action hook is the documented pre-scope logger bridge."
+    },
+    {
+      "file": "opensip-cli/fit/checks/env-via-registry.mjs",
+      "name": "ALLOWLISTED_BASENAMES",
+      "reason": "Environment governance needs explicit pre-scope and registry primitive readers."
+    },
+    {
+      "file": "opensip-cli/fit/checks/graph-signal-stamped.mjs",
+      "name": "EXEMPT_BASENAMES",
+      "reason": "Graph signal identity guard excludes the factory and rule infrastructure files it validates."
+    },
+    {
+      "file": "opensip-cli/fit/checks/no-local-exit-or-stdout.mjs",
+      "name": "ALLOWLISTED_BASENAMES",
+      "reason": "Heap preflight may own early process diagnostics before command seams are available."
+    },
+    {
+      "file": "opensip-cli/fit/checks/no-module-level-run-state.mjs",
+      "name": "EXEMPT_PATH",
+      "reason": "Module-level run-state guard excludes documented infrastructure containers, not run values."
+    },
+    {
+      "file": "opensip-cli/fit/checks/no-module-singleton.mjs",
+      "name": "EXEMPT_BY_FILE",
+      "reason": "Module singleton guard has documented ADR-0023 registry/container exemptions."
+    },
+    {
+      "file": "opensip-cli/fit/checks/no-raw-fs-artifact-write-in-tool-engine.mjs",
+      "name": "EPHEMERAL_OR_DIAGNOSTIC_ALLOWLIST",
+      "reason": "Raw fs artifact guard excludes live/diagnostic/transport paths that are not durable artifacts."
+    },
+    {
+      "file": "opensip-cli/fit/checks/only-documented-toolcli-seams.mjs",
+      "name": "BOOTSTRAP_EXEMPT",
+      "reason": "ToolCliContext seam guard excludes the host composition root that implements the seams."
+    },
+    {
+      "file": "opensip-cli/fit/checks/single-changed-file-resolver.mjs",
+      "name": "ALLOWED_GIT_PATTERNS",
+      "reason": "Changed-file resolver guard permits unrelated git metadata probes."
+    },
+    {
+      "file": "opensip-cli/fit/checks/tool-engine-no-direct-stderr-command-errors.mjs",
+      "name": "ALLOWLIST",
+      "reason": "stderr command-error guard excludes progress, warning, and worker transport channels."
+    }
   ]
 }

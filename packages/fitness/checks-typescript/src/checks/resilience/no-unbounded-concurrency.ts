@@ -43,6 +43,7 @@ function hasBoundedConcurrencyPattern(content: string): boolean {
 export const noUnboundedConcurrency = defineCheck({
   id: 'fc2a0fee-8374-432b-a7ef-763aea867855',
   slug: 'no-unbounded-concurrency',
+  scope: { languages: ['typescript'], concerns: [] },
   contentFilter: 'strip-strings',
   description: 'Detect Promise.all with unbounded concurrency',
   longDescription: `**Purpose:** Prevents unbounded parallel execution that can overwhelm downstream services or exhaust system resources.

@@ -14,17 +14,17 @@
  *
  *   - A package under a first-party plugin naming prefix MUST either declare
  *     the matching marker, or be on an explicit allowlist of "intentionally not
- *     a plugin". A new `graph-*` / `checks-*` package that is neither fails
- *     here, at PR time, instead of drifting away from the marker contract.
+ *     a plugin". A new `graph-*` / `checks-*` / `tool-*` / `sim-*` package
+ *     that is neither fails here, at PR time, instead of drifting away from the
+ *     marker contract.
  *   - A package on an allowlist MUST NOT declare the plugin marker — so the
  *     allowlist can never silently mask a real plugin.
  *   - Every declared `kind` must be in the closed `MARKER_KINDS` vocabulary
  *     (catches typos like `graph_adapter`).
  *   - The first-party tool engines must keep their `tool` marker.
  *
- * The allowlists are the deliberate-intent mechanism: adding a `graph-*` or
- * `checks-*` package that is NOT a plugin forces a conscious one-line edit
- * here, with a reason.
+ * The allowlists are the deliberate-intent mechanism: adding a prefixed package
+ * that is NOT a plugin forces a conscious one-line edit here, with a reason.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -71,11 +71,24 @@ const NON_ADAPTER_GRAPH_PACKAGES = new Set<string>([
  */
 const NON_PACK_CHECKS_PACKAGES = new Set<string>();
 
+/** `tool-*` packages that intentionally are NOT whole Tool plugins. */
+const NON_TOOL_TOOL_PREFIX_PACKAGES = new Set<string>([
+  `${SCOPE}/tool-test-kit`, // shared test harness for external scanner tools
+]);
+
+/**
+ * `sim-*` packages that intentionally are NOT simulation packs.
+ * None today — a future shared sim support lib would be added here.
+ */
+const NON_PACK_SIM_PACKAGES = new Set<string>();
+
 /** First-party tool engines that must carry the `tool` marker. */
 const TOOL_PACKAGES = new Set<string>([
   `${SCOPE}/fitness`,
   `${SCOPE}/simulation`,
   `${SCOPE}/graph`,
+  `${SCOPE}/yagni`,
+  `${SCOPE}/mcp`,
 ]);
 
 interface WorkspacePackage {
@@ -187,6 +200,35 @@ describe('plugin-kind contract (workspace invariant)', () => {
     ).toEqual([]);
   });
 
+  it('every @opensip-cli/tool-* package is a declared whole Tool plugin or explicitly allowlisted', () => {
+    const toolPrefixed = PACKAGES.filter((p) => p.name.startsWith(`${SCOPE}/tool-`));
+    const offenders = toolPrefixed.filter(
+      (p) => p.kind !== 'tool' && !NON_TOOL_TOOL_PREFIX_PACKAGES.has(p.name),
+    );
+    expect(
+      offenders,
+      'package(s) under the `tool-*` prefix are neither declared Tool plugins nor allowlisted.\n' +
+        'Declare `"opensipTools": { "kind": "tool" }` in package.json, or — if this is\n' +
+        'NOT a Tool plugin (e.g. shared test support) — add it to NON_TOOL_TOOL_PREFIX_PACKAGES in this test:\n' +
+        offenders.map((p) => `  ${p.name} → kind=${p.kind ?? 'none'} (${p.relPath})`).join('\n'),
+    ).toEqual([]);
+  });
+
+  it('every @opensip-cli/sim-* package is a declared sim-pack or explicitly allowlisted', () => {
+    const simPrefixed = PACKAGES.filter((p) => p.name.startsWith(`${SCOPE}/sim-`));
+    const offenders = simPrefixed.filter(
+      // eslint-disable-next-line sonarjs/no-empty-collection -- NON_PACK_SIM_PACKAGES is a deliberate, currently-empty extension seam, symmetric with the graph/checks allowlists.
+      (p) => p.kind !== 'sim-pack' && !NON_PACK_SIM_PACKAGES.has(p.name),
+    );
+    expect(
+      offenders,
+      'package(s) under the `sim-*` prefix are neither declared simulation packs nor allowlisted.\n' +
+        'Declare `"opensipTools": { "kind": "sim-pack" }` in package.json, or — if this is\n' +
+        'NOT a simulation pack (e.g. shared support) — add it to NON_PACK_SIM_PACKAGES in this test:\n' +
+        offenders.map((p) => `  ${p.name} → kind=${p.kind ?? 'none'} (${p.relPath})`).join('\n'),
+    ).toEqual([]);
+  });
+
   it('allowlisted non-plugin packages do NOT declare the plugin marker', () => {
     // A package on a "not a plugin" allowlist must not also claim to be one,
     // or the allowlist would silently mask a real plugin.
@@ -194,7 +236,10 @@ describe('plugin-kind contract (workspace invariant)', () => {
       (p) =>
         (NON_ADAPTER_GRAPH_PACKAGES.has(p.name) && p.kind === 'graph-adapter') ||
         // eslint-disable-next-line sonarjs/no-empty-collection -- see note above: empty-today extension seam, not dead code.
-        (NON_PACK_CHECKS_PACKAGES.has(p.name) && p.kind === 'fit-pack'),
+        (NON_PACK_CHECKS_PACKAGES.has(p.name) && p.kind === 'fit-pack') ||
+        (NON_TOOL_TOOL_PREFIX_PACKAGES.has(p.name) && p.kind === 'tool') ||
+        // eslint-disable-next-line sonarjs/no-empty-collection -- see note above: empty-today extension seam, not dead code.
+        (NON_PACK_SIM_PACKAGES.has(p.name) && p.kind === 'sim-pack'),
     );
     expect(
       masked,
