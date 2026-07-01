@@ -74,7 +74,41 @@ function emptyRegistryDiagnostic(): CliDiagnostic {
 }
 
 function checkPackLoadDiagnostic(packageName: string, detail: string): CliDiagnostic {
+  // A required pack refused by the single-core guard (scope ABI mismatch) has a
+  // precise, structured cause already recorded during discovery. Prefer it over
+  // the generic "verify it's installed" message, which is actively misleading
+  // here — the pack IS installed, built, and listed; the cores just disagree.
+  const abiMismatch = scopeAbiMismatchDiagnostic(packageName);
+  if (abiMismatch !== undefined) return abiMismatch;
   return checkPackDiagnostic(packageName, detail, 'required');
+}
+
+/**
+ * The targeted scope-ABI-mismatch diagnostic for a required check pack, promoted
+ * to a fail-closed error, or undefined when the pack failed for another reason.
+ * Reads the STRUCTURED discovery diagnostic (by code + package) recorded on the
+ * scope during load, rather than re-parsing the flattened error string.
+ */
+function scopeAbiMismatchDiagnostic(packageName: string): CliDiagnostic | undefined {
+  const recorded = currentScope()
+    ?.bootstrapDiagnostics.list()
+    .find(
+      (d) =>
+        d.code === CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_SCOPE_ABI_MISMATCH &&
+        d.provenance?.packageName === packageName,
+    );
+  if (recorded === undefined) return undefined;
+  return stampDiagnostic({
+    severity: 'error',
+    code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_SCOPE_ABI_MISMATCH,
+    category: 'integrity',
+    message: recorded.message,
+    impact:
+      'A required check pack was built against a different @opensip-cli/core scope ABI than ' +
+      'the running CLI, so it cannot be loaded.',
+    ...(recorded.action === undefined ? {} : { action: recorded.action }),
+    provenance: { toolId: 'fit', packageName, capabilityDomain: 'fit-pack' },
+  });
 }
 
 function checkPackDiagnostic(

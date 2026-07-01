@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0103](ADR-0103-scope-abi-compatibility-guard.md) — The single-core guard decides pack/core compatibility by a scope ABI version (declared in core's `package.json` as `opensipScopeAbiVersion`), not the npm version; cores ≥ v0.1.11 without the field are inferred as ABI 1. Fixes the "one global CLI, many consumer repos" workflow and emits a targeted diagnostic naming both core versions on a mismatch.
 - [ADR-0102](ADR-0102-coffee-cup-canonical-logo-and-live-activity-mark.md) — The OpenSIP coffee cup is the canonical CLI logo; legacy OPENSIP wordmark banners are removed, and live activity may use shared steam-animation cup variants in a fixed left column.
 - [ADR-0101](ADR-0101-cli-emits-full-fidelity-consumers-dedup.md) — The CLI emits the tool's full, unmodified signal set to every render and egress path; deduplication is the consumer's responsibility (Cloud dedups server-side). Reverses the dedup half of ADR-0098; restores ADR-0094 egress fidelity.
 - [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md) — Suite run results add additive per-step counts-only verdict projections and a suite aggregate while keeping worst-step exit semantics and avoiding signal-content egress in summaries.

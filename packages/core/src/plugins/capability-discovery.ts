@@ -27,7 +27,12 @@ import {
 } from './marker-discovery.js';
 import { discoverScopedPackages, resolvePackageDir } from './node-modules-walk.js';
 import { resolvePackageEntryPoint } from './package-entry.js';
-import { filterSameCorePackages, selfCore } from './single-core-guard.js';
+import {
+  coreDescriptionAt,
+  filterSameCorePackages,
+  selfCoreVersionString,
+  selfScopeAbiVersion,
+} from './single-core-guard.js';
 
 import type {
   CapabilityDiscoveryDiagnostic,
@@ -229,12 +234,20 @@ function applySingleCoreGuard(
   onDiagnostic?: (d: CapabilityDiscoveryDiagnostic) => void,
 ): SelectedCapabilityPackage[] {
   return filterSameCorePackages(packages, (pkg, foreignCore) => {
+    const foreign = coreDescriptionAt(foreignCore);
+    const foreignVer = foreign.version ?? '<unknown version>';
+    const selfVer = selfCoreVersionString() ?? '<unknown version>';
+    const foreignAbi =
+      foreign.scopeAbi === undefined ? 'pre-shared-scope' : `scope ABI ${foreign.scopeAbi}`;
     onDiagnostic?.({
       evt: 'capability.discovery.foreign_core',
       packageName: pkg.name,
       message:
-        `package ${pkg.name} resolves a different @opensip-cli/core (${foreignCore}) than this ` +
-        `runtime (${selfCore() ?? '<unknown>'}) — skipping to avoid a split run scope`,
+        `package ${pkg.name} was built against @opensip-cli/core ${foreignVer} (${foreignAbi}), ` +
+        `but this CLI uses ${selfVer} (scope ABI ${selfScopeAbiVersion()}) — skipping the pack ` +
+        `because mismatched core scope ABIs cannot share run scope. ` +
+        `Align the CLI and the pack's @opensip-cli/core to the same scope ABI ` +
+        `(matching versions, or rebuild the pack against this CLI's @opensip-cli/* line).`,
     });
   });
 }

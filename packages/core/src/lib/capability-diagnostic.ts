@@ -17,6 +17,26 @@ export function capabilityDiscoveryToCliDiagnostic(
   domainId: string,
   provenance?: CliDiagnosticProvenance,
 ): CliDiagnostic {
+  if (diagnostic.evt === 'capability.discovery.foreign_core') {
+    return {
+      severity: 'warning',
+      code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_SCOPE_ABI_MISMATCH,
+      category: 'integrity',
+      message: diagnostic.message,
+      impact: `Capability domain '${domainId}' skipped a pack whose @opensip-cli/core scope ABI differs from this CLI's — loading it would split the run scope.`,
+      action:
+        "Align the pack's @opensip-cli/core with the running CLI: run a CLI matching the " +
+        "project's @opensip-cli/* versions, or update the project (e.g. `pnpm update '@opensip-cli/*'`) " +
+        'and rebuild the pack so both sides share one scope ABI.',
+      provenance: {
+        packageName: diagnostic.packageName,
+        capabilityDomain: domainId,
+        ...provenance,
+      },
+      logRef: diagnostic.evt,
+    };
+  }
+
   if (diagnostic.evt === 'capability.discovery.package_denied') {
     return {
       severity: 'warning',

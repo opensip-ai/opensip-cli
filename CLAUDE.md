@@ -381,6 +381,15 @@ fn)`, every async descendant of `fn` sees the same scope. The
   per-async-context through `runWithScope`/`enterScope`, so this does NOT
   reintroduce module-level mutable run state. See `run-scope.ts` (ALS seam)
   and the fitness-transitive probe in `single-core-guard.ts`.
+  - The single-core guard keys pack/core compatibility on a **scope ABI**
+    (`SCOPE_ABI_VERSION` in `lib/scope-abi.ts`, mirrored by
+    `opensipScopeAbiVersion` in `packages/core/package.json`), NOT the npm
+    version (ADR-0103). Same scope ABI ⇒ same shared scope store ⇒ a pack built
+    against a different `@opensip-cli/core` npm version still loads (fixes the
+    "one global CLI, many consumer repos" workflow). Cores that predate the
+    field but are ≥ v0.1.11 (the shared-ALS floor) are inferred as ABI 1; older
+    cores fall back to exact-version identity. Bump `SCOPE_ABI_VERSION` + the
+    manifest field together ONLY on a breaking RunScope read-surface change.
 - Registration of tools, languages, scenarios, recipes, and checks is
   ALWAYS explicit. `defineX(...)` returns a value; the caller
   registers it via the plugin loader or by passing it into a

@@ -14,6 +14,7 @@ import {
   LanguageRegistry,
   RunScope,
   applyToolContributeScope,
+  currentScope,
   runWithScope,
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -254,6 +255,65 @@ describe('executeFit fail-closed (ADR-0060)', () => {
       },
       {
         plugins: { checkPackages: ['@opensip/fit', '@acme/missing'] },
+        targets: {
+          source: {
+            description: 'minimal',
+            languages: ['typescript'],
+            concerns: ['backend'],
+            include: ['src/**/*.ts'],
+          },
+        },
+      },
+    );
+  });
+
+  it('promotes a required pack refused for scope-ABI mismatch to a targeted diagnostic', async () => {
+    await withFitScope(
+      () => {
+        const load = currentFitnessLoadState();
+        Object.assign(load, createFitnessLoadState());
+        load.loadedFor = projectDir;
+        // The flattened error string classifies the pack as required (generic path)...
+        load.checkPackErrors = ['@opensip/fit → fit-pack: skipping — scope ABI mismatch'];
+        // ...while the STRUCTURED discovery diagnostic (recorded on the scope during
+        // load) carries the real cause + code, which the outcome must prefer.
+        currentScope()?.bootstrapDiagnostics.record({
+          severity: 'warning',
+          code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_SCOPE_ABI_MISMATCH,
+          category: 'integrity',
+          message:
+            'package @opensip/fit was built against @opensip-cli/core 0.1.15 (scope ABI 1), ' +
+            'but this CLI uses 0.1.18 (scope ABI 1) — skipping the pack',
+          impact: 'split scope',
+          action: 'Align the pack and CLI to the same scope ABI.',
+          provenance: { packageName: '@opensip/fit', capabilityDomain: 'fit-pack' },
+        });
+        currentCheckRegistry().register(
+          {
+            config: {
+              id: '00000000-0000-4000-8000-000000000005',
+              slug: 'other-check',
+              description: 'other',
+              tags: [],
+              checkScope: 'file',
+            },
+            analyze: () => [],
+          } as never,
+          'test',
+        );
+        finalizeFitLoadOutcome(projectDir);
+        expect(load.commandError?.code).toBe(
+          CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_SCOPE_ABI_MISMATCH,
+        );
+        expect(load.commandError?.message).toContain('0.1.15');
+        expect(load.commandError?.message).toContain('0.1.18');
+        // The misleading generic "verify it's installed" action must NOT appear.
+        expect(load.commandError?.action ?? '').not.toContain('installed, built, and listed');
+        expect(load.commandError?.action ?? '').toMatch(/scope ABI/i);
+        return Promise.resolve();
+      },
+      {
+        plugins: { checkPackages: ['@opensip/fit'] },
         targets: {
           source: {
             description: 'minimal',

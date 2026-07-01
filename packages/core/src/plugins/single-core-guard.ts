@@ -5,15 +5,26 @@
  * core whose `currentScope()` is always `undefined` here registers its
  * contributions against a dead `AsyncLocalStorage` and silently degrades the
  * run — the failure mode seen when a globally-installed CLI discovers packs in
- * a project that vendors a DIFFERENT `@opensip-cli/core`. Such packs are refused
- * at discovery time.
+ * a project that vendors an INCOMPATIBLE `@opensip-cli/core`. Such packs are
+ * refused at discovery time.
  *
- * Identity is by core VERSION, not file path. `runWithScope` pins its
- * `AsyncLocalStorage` on `globalThis` (see run-scope.ts), so every
- * SAME-VERSION copy of core — including pnpm's hard-copied injected duplicates
- * under `.pnpm/...`, which resolve a different PATH than the workspace copy —
- * shares one scope store and is safe. Only a DIFFERENT-version core is a
- * genuine split-scope risk and is refused. (A path comparison would wrongly
+ * Identity is by SCOPE ABI, not npm version and not file path (ADR-0103).
+ * `runWithScope` pins its `AsyncLocalStorage` on `globalThis` under the
+ * version-independent key `Symbol.for('@opensip-cli/core/scopeStorage')` (see
+ * run-scope.ts), so every core that participates in that protocol AND agrees on
+ * the RunScope read-surface — regardless of npm version, including pnpm's
+ * hard-copied injected duplicates under `.pnpm/...` at a different PATH — shares
+ * one scope store and is safe. The shared identity is therefore the scope ABI
+ * ({@link SCOPE_ABI_VERSION}); a core with a DIFFERENT scope ABI is the genuine
+ * split-scope risk and is refused.
+ *
+ * A core is assigned a scope ABI by, in order: (1) its explicit
+ * `opensipScopeAbiVersion` manifest field; (2) if absent but its version is at
+ * or above {@link SCOPE_ABI_MIN_CORE_VERSION} (the release that introduced the
+ * shared-ALS pin), the inferred ABI 1; (3) otherwise none — a pre-pin core that
+ * cannot share scope, for which the guard falls back to exact-version identity.
+ * (A version comparison alone would wrongly reject same-ABI cross-version cores
+ * and re-couple interop to release cadence; a path comparison would wrongly
  * reject the injected duplicates and load zero packs.)
  *
  * Packs that don't depend on core at all resolve nothing and pass. The guard is
@@ -25,6 +36,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+import {
+  coreVersionImplementsScopeAbi1,
+  SCOPE_ABI_MANIFEST_FIELD,
+  SCOPE_ABI_VERSION,
+} from '../lib/scope-abi.js';
 
 /**
  * The `@opensip-cli/core` THIS module resolves — the canonical core whose
@@ -63,50 +80,105 @@ function resolveFitnessFromAnchor(anchor: string): string | undefined {
   }
 }
 
-/** Version from a `package.json` iff it is `@opensip-cli/core`; else undefined. */
-function coreVersionFromManifest(manifestPath: string): string | undefined {
+/** The `version` + scope-ABI fields of a `@opensip-cli/core` manifest. */
+interface CoreManifestFields {
+  readonly version?: string;
+  readonly scopeAbi?: number;
+}
+
+/** Read `version` + `opensipScopeAbiVersion` from a `package.json` iff it is `@opensip-cli/core`. */
+function coreFieldsFromManifest(manifestPath: string): CoreManifestFields | undefined {
   if (!existsSync(manifestPath)) return undefined;
   try {
     const json: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const record = (typeof json === 'object' && json !== null ? json : {}) as {
       name?: unknown;
       version?: unknown;
+      [SCOPE_ABI_MANIFEST_FIELD]?: unknown;
     };
-    if (record.name !== '@opensip-cli/core' || typeof record.version !== 'string') return undefined;
-    return record.version;
+    if (record.name !== '@opensip-cli/core') return undefined;
+    const version = typeof record.version === 'string' ? record.version : undefined;
+    const rawAbi = record[SCOPE_ABI_MANIFEST_FIELD];
+    const scopeAbi = typeof rawAbi === 'number' ? rawAbi : undefined;
+    return { version, scopeAbi };
   } catch {
     return undefined;
   }
 }
 
-/** Read the `@opensip-cli/core` version that owns a resolved entry path. */
-function coreVersionAt(coreEntry: string): string | undefined {
+/** The `@opensip-cli/core` manifest fields that own a resolved entry path. */
+function coreManifestAt(coreEntry: string): CoreManifestFields {
   // Walk up from the resolved entry (.../core/dist/index.js) to the package root.
   let dir = dirname(coreEntry);
   for (let depth = 0; depth < 6; depth += 1) {
-    const version = coreVersionFromManifest(join(dir, 'package.json'));
-    if (version !== undefined) return version;
+    const fields = coreFieldsFromManifest(join(dir, 'package.json'));
+    if (fields !== undefined) return fields;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
+  return {};
+}
+
+/**
+ * The scope ABI a resolved core implements, or undefined when it cannot share
+ * scope with this runtime (a pre-{@link SCOPE_ABI_MIN_CORE_VERSION} core with no
+ * shared-ALS pin). Explicit `opensipScopeAbiVersion` wins; otherwise a core at or
+ * above the floor is inferred as ABI 1 (the pin has existed since that release).
+ */
+function scopeAbiAt(coreEntry: string): number | undefined {
+  const { version, scopeAbi } = coreManifestAt(coreEntry);
+  if (scopeAbi !== undefined) return scopeAbi;
+  if (version !== undefined && coreVersionImplementsScopeAbi1(version)) return 1;
   return undefined;
+}
+
+/** A resolved core's version + effective scope ABI, for guard diagnostics. */
+export interface CoreDescription {
+  readonly path: string;
+  readonly version?: string;
+  readonly scopeAbi?: number;
+}
+
+/** Describe a resolved core entry (version + effective scope ABI) for diagnostics. */
+export function coreDescriptionAt(coreEntry: string): CoreDescription {
+  return {
+    path: coreEntry,
+    version: coreManifestAt(coreEntry).version,
+    scopeAbi: scopeAbiAt(coreEntry),
+  };
 }
 
 /** This runtime's core version, captured once (paired with {@link selfCorePath}). */
 const selfCoreVersion: string | undefined =
-  selfCorePath === undefined ? undefined : coreVersionAt(selfCorePath);
+  selfCorePath === undefined ? undefined : coreManifestAt(selfCorePath).version;
+
+/** This runtime's scope ABI (the code constant — the running core always knows its own). */
+export function selfScopeAbiVersion(): number {
+  return SCOPE_ABI_VERSION;
+}
+
+/** This runtime's resolved core version string, for diagnostics (undefined if unresolved). */
+export function selfCoreVersionString(): string | undefined {
+  return selfCoreVersion;
+}
 
 /**
  * Whether a resolved core entry is THE SAME core as this runtime's: the same
- * physical path, or a same-version duplicate (pnpm's injected hard-copy under
- * `.pnpm/...`) that shares the globalThis-pinned scope ALS. A different version
- * — or an unreadable one — is foreign.
+ * physical path, or a core sharing this runtime's scope ABI (pnpm's injected
+ * hard-copy under `.pnpm/...`, or a different npm version that still implements
+ * {@link SCOPE_ABI_VERSION}) — both share the globalThis-pinned scope ALS. A core
+ * whose ABI cannot be resolved (pre-pin, unreadable) falls back to exact-version
+ * identity; a resolvable DIFFERENT ABI is foreign.
  */
 function isSameCore(coreEntry: string): boolean {
   if (coreEntry === selfCorePath) return true;
+  const foreignAbi = scopeAbiAt(coreEntry);
+  if (foreignAbi !== undefined) return foreignAbi === SCOPE_ABI_VERSION;
+  // No resolvable scope ABI (a pre-pin or unreadable core) → conservative
+  // exact-version identity, matching the pre-ADR-0103 behaviour for such cores.
   if (selfCoreVersion === undefined) return false;
-  return coreVersionAt(coreEntry) === selfCoreVersion;
+  return coreManifestAt(coreEntry).version === selfCoreVersion;
 }
 
 /**
