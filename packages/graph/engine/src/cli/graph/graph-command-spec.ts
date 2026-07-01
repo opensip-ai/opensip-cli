@@ -332,11 +332,14 @@ async function runGraphCommand(
   }
 
   await deliverNonGateEgress(opts, outcome?.envelope, cli);
-  await maybeOpenGraphReport(opts, outcome?.envelope, cli);
 
-  // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
-  // host run plane persists it after this handler resolves (no tool-side write).
-  return graphRunCompletion(outcome);
+  // host-owned-run-timing Phase 3: build the generic-session contribution the
+  // host run plane persists after this handler resolves (no tool-side write).
+  // Computed before the report-open side effect so the two ordered egress/open
+  // effects are not a single await waterfall (mirrors fit-modes' structure).
+  const completion = graphRunCompletion(outcome);
+  await maybeOpenGraphReport(opts, outcome?.envelope, cli);
+  return completion;
 }
 
 /**
