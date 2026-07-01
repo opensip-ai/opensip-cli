@@ -7,13 +7,16 @@ import type { ToolCliContext } from '@opensip-cli/core';
 
 const h = vi.hoisted(() => ({
   executeGraph: vi.fn(),
-  runHeapPreflight: vi.fn(async () => false),
+  runHeapPreflight: vi.fn(() => Promise.resolve(false)),
 }));
 
-vi.mock('../graph.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../graph.js')>()),
-  executeGraph: h.executeGraph,
-}));
+vi.mock('../graph.js', async (importOriginal) => {
+  const original = await importOriginal<Record<string, unknown>>();
+  return {
+    ...original,
+    executeGraph: h.executeGraph,
+  };
+});
 
 vi.mock('../heap-preflight.js', () => ({
   runHeapPreflight: h.runHeapPreflight,

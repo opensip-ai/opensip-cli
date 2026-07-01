@@ -9,6 +9,7 @@
 
 import { existsSync } from 'node:fs';
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   resolveProjectContext,
   resolveProjectPaths,
@@ -89,7 +90,7 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
       message: msg,
       humanMessage: `✗ ${msg}`,
       suggestion: 'Check opensip-cli.config.yml (or your --config path).',
-      exitCode: 2,
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     });
   }
 

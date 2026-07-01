@@ -10,6 +10,7 @@
  * orchestration sequence and the per-tool `initialize()` lifecycle.
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   checkSchemaCompat,
   detectPhantomRuntimes,
@@ -58,7 +59,7 @@ export function checkSchemaVersionAndBailout(project: ProjectContext, runId: str
       message: `This project's opensip-cli.config.yml uses a newer schema (v${compat.configVersion}) than this CLI supports (v${compat.cliVersion}).`,
       humanMessage: msg,
       suggestion: 'Update your CLI: curl -fsSL https://opensip.ai/cli/install.sh | bash',
-      exitCode: 2,
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     });
   }
   if (compat.kind === 'older') {
@@ -102,7 +103,7 @@ export function checkNoProjectAndBailout(
     message: `No opensip-cli.config.yml found. Searched from ${cwd} upward.`,
     humanMessage: formatNoProjectFoundMessage(cwd),
     suggestion: 'Run opensip init to get started.',
-    exitCode: 2,
+    exitCode: EXIT_CODES.CONFIGURATION_ERROR,
   });
 }
 

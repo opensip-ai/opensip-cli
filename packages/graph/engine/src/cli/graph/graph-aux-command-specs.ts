@@ -27,13 +27,8 @@
  *    branch) — the documented non-Ink exception. The host renders nothing.
  */
 
-import { commonFlags, EXIT_CODES } from '@opensip-cli/contracts';
-import {
-  createToolLogger,
-  ConfigurationError,
-  defineCommand,
-  defineNestedCommand,
-} from '@opensip-cli/core';
+import { commonFlags, EXIT_CODES, runBaselineExport } from '@opensip-cli/contracts';
+import { createToolLogger, defineCommand, defineNestedCommand } from '@opensip-cli/core';
 
 import { executeEquivalenceCheck } from '../equivalence-check-command.js';
 import { listGraphRules } from '../graph-list.js';
@@ -279,33 +274,22 @@ async function runGraphBaselineExport(
   opts: { cwd: string; out: string; json?: boolean },
   cli: ToolCliContext,
 ): Promise<void> {
-  try {
-    await cli.exportBaselineFingerprints('graph', opts.out);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const exitCode =
-      error instanceof ConfigurationError
-        ? EXIT_CODES.CONFIGURATION_ERROR
-        : EXIT_CODES.RUNTIME_ERROR;
-    log.warn({
-      evt: 'cli.graph.baseline_export.failed',
-      module: 'graph:cli',
-      message,
-      exitCode,
-    });
-    await cli.reportFailure({
-      message,
-      exitCode,
-      jsonRequested: opts.json === true,
-    });
-    return;
-  }
-  const result = { type: 'graph-baseline-export' as const, outPath: opts.out };
-  if (opts.json === true) {
-    cli.emitJson(result);
-    return;
-  }
-  process.stdout.write(`Exported graph baseline to ${opts.out}\n`);
+  await runBaselineExport({
+    cli,
+    outPath: opts.out,
+    jsonRequested: opts.json === true,
+    result: { type: 'graph-baseline-export' as const, outPath: opts.out },
+    exportArtifact: () => cli.exportBaselineFingerprints('graph', opts.out),
+    writeText: (outPath) => process.stdout.write(`Exported graph baseline to ${outPath}\n`),
+    onFailure: ({ message, exitCode }) => {
+      log.warn({
+        evt: 'cli.graph.baseline_export.failed',
+        module: 'graph:cli',
+        message,
+        exitCode,
+      });
+    },
+  });
 }
 
 /** `graph-shard-worker` — [internal] build one shard from a spec file. */
@@ -592,7 +576,7 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
     output: 'command-result',
     handler: (rawOpts, cli) => {
       const opts = rawOpts as { json?: boolean } & Record<string, unknown>;
-      return executeLookup({ name: firstArg(opts), json: opts.json }, cli);
+      return executeLookup({ name: firstArg(opts), json: opts.json === true }, cli);
     },
   });
 
@@ -718,8 +702,8 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
     await executeImpact(
       {
         cwd: opts.cwd,
-        json: opts.json,
-        raw: opts.raw,
+        json: opts.json === true,
+        raw: opts.raw === true,
         changed: opts.changed,
         since: opts.since,
         files: (opts as { files?: string[] }).files,

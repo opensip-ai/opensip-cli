@@ -47,6 +47,16 @@
     },
     "stableId": "3873f1c2-02a9-4719-930a-bca74b62b706",
     "apiVersion": 1,
+    "requires": [
+      {
+        "resource": "filesystem",
+        "reason": "Reads source/config files and writes graph cache, baselines, reports, profiles, and worker specs"
+      },
+      {
+        "resource": "subprocess",
+        "reason": "Runs live-build and sharded-build worker subprocesses for graph analysis"
+      }
+    ],
     "commands": [
       {
         "name": "graph",
@@ -59,7 +69,8 @@
           "verbose",
           "debug",
           "reportTo",
-          "apiKey"
+          "apiKey",
+          "open"
         ],
         "options": [
           {

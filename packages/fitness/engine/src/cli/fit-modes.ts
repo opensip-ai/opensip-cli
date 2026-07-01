@@ -150,7 +150,7 @@ async function deliverFitSignals(
 
 export async function runListMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const result = await listChecks(args.cwd);
-  if (args.json) {
+  if (args.json === true) {
     cli.emitJson(result);
     return;
   }
@@ -159,7 +159,7 @@ export async function runListMode(args: FitOptions, cli: ToolCliContext): Promis
 
 export async function runRecipesMode(args: FitOptions, cli: ToolCliContext): Promise<void> {
   const result = await listRecipes(args.cwd);
-  if (args.json) {
+  if (args.json === true) {
     cli.emitJson(result);
     return;
   }
@@ -183,7 +183,7 @@ export async function runShowMode(args: FitOptions, cli: ToolCliContext): Promis
 
   try {
     const replay = fitReplayFromSession(resolved.session);
-    if (args.json) {
+    if (args.json === true) {
       cli.emitJson(sessionShowJson(resolved.session, replay));
       return;
     }
@@ -275,7 +275,7 @@ export async function runLiveMode(
   }
   await cli.maybeOpenReport({
     openRequested,
-    jsonOutput: Boolean(args.json),
+    jsonOutput: args.json === true,
   });
   return completion;
 }

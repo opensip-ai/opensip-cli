@@ -17,6 +17,7 @@
  * module just gives the concern its own home and a narrow, testable surface.
  */
 
+import { EXIT_CODES, type CommandResult, type SignalEnvelope } from '@opensip-cli/contracts';
 import { logger as defaultLogger, type Logger, type ToolCliContext } from '@opensip-cli/core';
 
 import {
@@ -27,8 +28,6 @@ import {
 import { renderOutcome, renderRaw } from '../commands/render-outcome.js';
 
 import { stampDeclaredInputs } from './declared-inputs.js';
-
-import type { CommandResult, SignalEnvelope } from '@opensip-cli/contracts';
 
 /** Structured-log `module` tag for the output plane. */
 const MODULE_TAG = 'cli:output-plane';
@@ -72,7 +71,7 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
     // completely swallowed by the `void` (they surface in logs and as
     // unhandled-rejection diagnostics instead of silent loss).
     emitJson: (value) => {
-      renderOutcome(outcomeFromResult(value, exitCode ?? 0), {
+      renderOutcome(outcomeFromResult(value, exitCode ?? EXIT_CODES.SUCCESS), {
         jsonRequested: true,
         render: deps.render,
       }).catch((error) => {
@@ -80,8 +79,8 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
         // Only force a non-success exit if the primary run had not already
         // decided on a failure code (preserve specific codes like REPORT_FAILED,
         // RUNTIME_ERROR, etc.). Render failure of the outcome is secondary.
-        if ((exitCode ?? 0) === 0) {
-          setExitCode(1);
+        if ((exitCode ?? EXIT_CODES.SUCCESS) === EXIT_CODES.SUCCESS) {
+          setExitCode(EXIT_CODES.RUNTIME_ERROR);
         }
         log.error({
           evt: 'cli.emit_json.render_failed',
@@ -92,12 +91,12 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
     },
     emitEnvelope: (envelope) => {
       const outputEnvelope = stampDeclaredInputs(envelope as SignalEnvelope);
-      renderOutcome(outcomeFromEnvelope(outputEnvelope, exitCode ?? 0), {
+      renderOutcome(outcomeFromEnvelope(outputEnvelope, exitCode ?? EXIT_CODES.SUCCESS), {
         jsonRequested: true,
         render: deps.render,
       }).catch((error) => {
-        if ((exitCode ?? 0) === 0) {
-          setExitCode(1);
+        if ((exitCode ?? EXIT_CODES.SUCCESS) === EXIT_CODES.SUCCESS) {
+          setExitCode(EXIT_CODES.RUNTIME_ERROR);
         }
         log.error({
           evt: 'cli.emit_envelope.render_failed',
@@ -125,8 +124,8 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
       ).catch((error) => {
         // Even error emission failing is fatal for the json contract.
         // Only force 1 if the error detail itself indicated success (edge).
-        if ((exitCode ?? 0) === 0) {
-          setExitCode(1);
+        if ((exitCode ?? EXIT_CODES.SUCCESS) === EXIT_CODES.SUCCESS) {
+          setExitCode(EXIT_CODES.RUNTIME_ERROR);
         }
         log.error({
           evt: 'cli.emit_error.render_failed',

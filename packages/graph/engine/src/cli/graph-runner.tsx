@@ -12,6 +12,7 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   runOffThreadOrInProcess,
   currentScope,
@@ -212,7 +213,7 @@ export async function renderGraphLive(
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { kind: 'error', message, exitCode: 1 };
+          return { kind: 'error', message, exitCode: EXIT_CODES.RUNTIME_ERROR };
         }
       },
     },

@@ -18,6 +18,7 @@
 
 import { readFileSync } from 'node:fs';
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   correlationFromEnv,
   currentLogger,
@@ -155,7 +156,7 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
       ...workerLogFields(correlation),
       durationMs: Date.now() - startedAt,
     });
-    cli.setExitCode(0);
+    cli.setExitCode(EXIT_CODES.SUCCESS);
   } catch (error) {
     workerLogger.error({
       evt: 'graph.shard.worker.error',
@@ -172,7 +173,7 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
     process.stderr.write(
       `graph-shard-worker [${shardId}]: ${error instanceof Error ? error.message : String(error)}\n`,
     );
-    cli.setExitCode(1);
+    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
   }
 }
 

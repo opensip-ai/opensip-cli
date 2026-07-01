@@ -39,6 +39,12 @@
     },
     "stableId": "f313c020-5b48-4e17-a579-e303907b6392",
     "apiVersion": 1,
+    "requires": [
+      {
+        "resource": "filesystem",
+        "reason": "Reads project config, SQLite datastore, graph catalog, and session evidence while serving MCP over stdio"
+      }
+    ],
     "commands": [
       {
         "name": "mcp",

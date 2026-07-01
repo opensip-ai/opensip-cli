@@ -109,7 +109,27 @@ function makeFakeContext(): {
       exitCodes.push(detail.exitCode);
       emitted.push(detail);
     },
-    reportFailure: vi.fn(() => Promise.resolve()),
+    reportFailure: vi.fn(
+      (detail: {
+        message?: string;
+        error?: unknown;
+        exitCode?: number;
+        jsonRequested?: boolean;
+      }) => {
+        const exitCode = detail.exitCode ?? 1;
+        const message =
+          detail.message ??
+          (detail.error instanceof Error ? detail.error.message : String(detail.error));
+        exitCodes.push(exitCode);
+        const result = { type: 'error' as const, message, exitCode };
+        if (detail.jsonRequested === true) {
+          emitted.push(result);
+        } else {
+          rendered.push(result);
+        }
+        return Promise.resolve();
+      },
+    ),
     deliverSignals: (_envelope: unknown, opts: unknown) => {
       delivered.push(opts);
       return Promise.resolve({ cloudAccepted: 0 });

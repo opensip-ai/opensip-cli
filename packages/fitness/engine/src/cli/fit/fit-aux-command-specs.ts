@@ -22,8 +22,8 @@
  *    documented non-Ink exception. The host renders nothing.
  */
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
-import { createToolLogger, ConfigurationError, defineNestedCommand } from '@opensip-cli/core';
+import { runBaselineExport } from '@opensip-cli/contracts';
+import { createToolLogger, defineNestedCommand } from '@opensip-cli/core';
 
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';
@@ -98,33 +98,22 @@ async function runFitBaselineExport(
   opts: ToolOptions & { out: string },
   cli: ToolCliContext,
 ): Promise<void> {
-  try {
-    await cli.exportBaselineSarif('fitness', opts.out);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const exitCode =
-      error instanceof ConfigurationError
-        ? EXIT_CODES.CONFIGURATION_ERROR
-        : EXIT_CODES.RUNTIME_ERROR;
-    log.warn({
-      evt: 'cli.fit.baseline_export.failed',
-      module: 'fit:cli',
-      message,
-      exitCode,
-    });
-    await cli.reportFailure({
-      message,
-      exitCode,
-      jsonRequested: opts.json === true,
-    });
-    return;
-  }
-  const result = { type: 'fit-baseline-export' as const, outPath: opts.out };
-  if (opts.json) {
-    cli.emitJson(result);
-    return;
-  }
-  process.stdout.write(`Exported fit baseline to ${opts.out}\n`);
+  await runBaselineExport({
+    cli,
+    outPath: opts.out,
+    jsonRequested: opts.json === true,
+    result: { type: 'fit-baseline-export' as const, outPath: opts.out },
+    exportArtifact: () => cli.exportBaselineSarif('fitness', opts.out),
+    writeText: (outPath) => process.stdout.write(`Exported fit baseline to ${outPath}\n`),
+    onFailure: ({ message, exitCode }) => {
+      log.warn({
+        evt: 'cli.fit.baseline_export.failed',
+        module: 'fit:cli',
+        message,
+        exitCode,
+      });
+    },
+  });
 }
 
 /**

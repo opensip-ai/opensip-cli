@@ -1,7 +1,7 @@
 /**
  * `opensip graph impact` — read-only changed→impact analysis (ADR-0085, spec §5.3).
  */
-import { computeImpact, type GraphImpactResult } from '@opensip-cli/contracts';
+import { computeImpact, EXIT_CODES, type GraphImpactResult } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   createToolLogger,
@@ -157,7 +157,7 @@ export async function executeImpact(
       truncated: computation.truncated,
     };
 
-    cli.setExitCode(0);
+    cli.setExitCode(EXIT_CODES.SUCCESS);
     log.info({
       evt: 'graph.cli.impact.complete',
       module: 'graph:cli',

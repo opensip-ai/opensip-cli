@@ -69,7 +69,7 @@ async function runFit(
     await runRecipesMode(opts, cli);
     return;
   }
-  if (opts.json) {
+  if (opts.json === true) {
     return await runJsonMode(opts, cli);
   }
   // Live mode is the only branch that needs fitness's Ink renderer. Register it

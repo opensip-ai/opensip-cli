@@ -75,8 +75,8 @@ describe('derived first-party tool-engine path gates', () => {
 
     const findings = await analyzeAllSessionPersistRequiresReplay({
       paths: [...files.keys()],
-      readMany: async (paths: readonly string[]) =>
-        new Map(paths.map((path) => [path, files.get(path) ?? ''])),
+      readMany: (paths: readonly string[]) =>
+        Promise.resolve(new Map(paths.map((path) => [path, files.get(path) ?? '']))),
     });
 
     expect(findings).toEqual([
@@ -109,8 +109,8 @@ describe('derived first-party tool-engine path gates', () => {
 
     const findings = await analyzeAllReportProducerOpenFlag({
       paths: [...files.keys()],
-      readMany: async (paths: readonly string[]) =>
-        new Map(paths.map((path) => [path, files.get(path) ?? ''])),
+      readMany: (paths: readonly string[]) =>
+        Promise.resolve(new Map(paths.map((path) => [path, files.get(path) ?? '']))),
     });
 
     expect(findings).toEqual([

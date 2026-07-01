@@ -194,7 +194,9 @@ export {
   resolveToolHooks,
 } from '@opensip-cli/core';
 export { defineRunCommand, defineListCommand, defineAuxExportCommand } from './command-presets.js';
+export { runBaselineExport } from './baseline-export.js';
 export type { DefineToolInput, ResolvedToolHooks } from '@opensip-cli/core';
+export type { BaselineExportFailure, BaselineExportOptions } from './baseline-export.js';
 export type {
   CommandSpec,
   OptionSpec,

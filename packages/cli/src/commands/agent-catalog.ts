@@ -27,7 +27,7 @@ export function executeAgentCatalog(
     internalCommands: opts.internalCommands,
   });
 
-  if (opts.json) {
+  if (opts.json === true) {
     // Return a result shape that the host can emit cleanly.
     // Using a plain object here; a proper AgentCatalogResult union member
     // can be added in Phase 6 wiring for full type safety / parity.

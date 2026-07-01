@@ -17,6 +17,7 @@
  * — which re-enters the scope around every tool dispatch (the EventEmitter ALS
  * fix). It resolves to a clean exit (0) when the transport closes on stdin EOF.
  */
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { definePrimaryCommand, readPackageVersion } from '@opensip-cli/core';
 import { runGraph } from '@opensip-cli/graph/internal';
 
@@ -53,7 +54,7 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
         suggestion:
           'Run `opensip mcp` from inside an opensip-cli project (where `opensip init` has been run).',
         code: 'MCP.DATASTORE_UNAVAILABLE',
-        exitCode: 2,
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         log: { evt: 'mcp.server.datastore_unavailable', level: 'error' },
       });
       return;
@@ -119,6 +120,6 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
 
     // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
     await server.serve();
-    cli.setExitCode(0);
+    cli.setExitCode(EXIT_CODES.SUCCESS);
   },
 });

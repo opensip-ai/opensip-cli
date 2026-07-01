@@ -183,10 +183,7 @@ describe('resolveOwningTool', () => {
   it('matches a nested command by the first command-path segment, not the leaf', () => {
     const tools = new ToolRegistry();
     tools.register(
-      makeToolWithCommandSpecs('fit-tool', [
-        { name: 'fit' },
-        { name: 'list', parent: 'fit' },
-      ]),
+      makeToolWithCommandSpecs('fit-tool', [{ name: 'fit' }, { name: 'list', parent: 'fit' }]),
     );
     tools.register(
       makeToolWithCommandSpecs('graph-tool', [
@@ -201,10 +198,7 @@ describe('resolveOwningTool', () => {
   it('returns undefined for host command groups that share tool leaf names', () => {
     const tools = new ToolRegistry();
     tools.register(
-      makeToolWithCommandSpecs('fit-tool', [
-        { name: 'fit' },
-        { name: 'list', parent: 'fit' },
-      ]),
+      makeToolWithCommandSpecs('fit-tool', [{ name: 'fit' }, { name: 'list', parent: 'fit' }]),
     );
 
     expect(resolveOwningTool(tools, 'tools list')).toBeUndefined();

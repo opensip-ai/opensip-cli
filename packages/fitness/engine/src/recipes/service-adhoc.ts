@@ -57,7 +57,7 @@ export function createAdHocRecipe(args: AdHocRecipeArgs): FitnessRecipe {
     },
     reporting: {
       format: (() => {
-        if (!args.json) return 'table' as const;
+        if (args.json !== true) return 'table' as const;
         return args.unified ? ('unified' as const) : ('json' as const);
       })(),
       verbose: args.verbose ?? false,

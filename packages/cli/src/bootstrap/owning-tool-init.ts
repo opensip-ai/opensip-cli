@@ -7,6 +7,7 @@
  * semantics live here as a cohesive unit (see also `tool-lifecycle.ts`).
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   logger,
   resolveToolCommands,
@@ -94,7 +95,7 @@ export async function maybeInitializeOwningTool(
       message: `Tool '${toolHumanId}' failed to initialize: ${msg}`,
       humanMessage: `✗ Tool '${toolHumanId}' failed to initialize: ${msg}`,
       suggestion: undefined,
-      exitCode: 1,
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
     });
   }
 }

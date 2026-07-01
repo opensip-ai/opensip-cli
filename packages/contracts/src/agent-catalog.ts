@@ -195,12 +195,17 @@ function entryPointForTool(
   if (primary === undefined) return undefined;
   const overlay = TOOL_ENTRY_OVERLAYS[primary.name] ?? TOOL_ENTRY_OVERLAYS[tool.metadata.name];
   const supportsJson = primary.commonFlags?.includes('json') === true;
-  const defaultDescription = supportsJson
-    ? `${primary.description} Use --json when available for machine output.`
-    : primary.output === 'raw-stream'
-      ? `${primary.description} Raw-stream transport; use the command protocol directly, not --json.`
-      : `${primary.description} This command does not declare --json; use its documented output.`;
-  const defaultExamples = supportsJson ? [`opensip ${primary.name} --json`] : [`opensip ${primary.name}`];
+  let defaultDescription: string;
+  if (supportsJson) {
+    defaultDescription = `${primary.description} Use --json when available for machine output.`;
+  } else if (primary.output === 'raw-stream') {
+    defaultDescription = `${primary.description} Raw-stream transport; use the command protocol directly, not --json.`;
+  } else {
+    defaultDescription = `${primary.description} This command does not declare --json; use its documented output.`;
+  }
+  const defaultExamples = supportsJson
+    ? [`opensip ${primary.name} --json`]
+    : [`opensip ${primary.name}`];
   return {
     command: primary.name,
     description: overlay?.description ?? defaultDescription,

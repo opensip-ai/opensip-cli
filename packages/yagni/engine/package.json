@@ -39,6 +39,16 @@
     },
     "stableId": "3aba9195-2297-4f20-99d5-906945092dfc",
     "apiVersion": 1,
+    "requires": [
+      {
+        "resource": "filesystem",
+        "reason": "Reads source, package, and config files and writes temporary live-worker specs"
+      },
+      {
+        "resource": "subprocess",
+        "reason": "Live runs execute the yagni-run-worker through the shared off-thread runner"
+      }
+    ],
     "commands": [
       {
         "name": "yagni",

@@ -39,7 +39,8 @@ export async function analyzeAllSessionPersistRequiresReplay(files) {
   const descriptors = new Map();
   const sessionWriters = new Map();
   const candidates = files.paths.filter(
-    (path) => path.endsWith('.ts') && TOOL_ENGINE_PATH.test(relPath(path)) && !isTestOrFixture(path),
+    (path) =>
+      path.endsWith('.ts') && TOOL_ENGINE_PATH.test(relPath(path)) && !isTestOrFixture(path),
   );
   const contents = await files.readMany(candidates);
 

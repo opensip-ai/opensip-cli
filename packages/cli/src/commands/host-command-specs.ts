@@ -145,7 +145,7 @@ function buildReportSpec(): HostSpec {
       // In `--json` mode we never launch a browser (machine-output contract).
       // ADR-0054 M4-F: composeAndWriteReport runs an EXTERNAL tool's
       // collectReportData in a forked hook worker (its runtime never runs in-host).
-      return composeAndWriteReport({ open: opts.open && !opts.json });
+      return composeAndWriteReport({ open: opts.open === true && opts.json !== true });
     },
   });
 }
@@ -299,7 +299,7 @@ function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
     handler: (rawOpts) => {
       const opts = rawOpts as { json?: boolean };
       return executeAgentCatalog({
-        json: opts.json,
+        json: opts.json === true,
         tools: ctx.tools,
         internalCommands: ctx.toolInternalCommands,
       });

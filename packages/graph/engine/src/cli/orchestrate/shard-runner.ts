@@ -18,6 +18,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   correlationToEnv,
   currentLogger,
@@ -471,7 +472,7 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
         });
         return;
       }
-      if (code !== 0) {
+      if (code !== EXIT_CODES.SUCCESS) {
         resolvePromise({
           shardId: shard.id,
           exitCode: code ?? -1,
@@ -482,12 +483,12 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
       }
       try {
         const result = JSON.parse(stdout) as ShardBuildResult;
-        resolvePromise({ shardId: shard.id, result, exitCode: 0, stderr });
+        resolvePromise({ shardId: shard.id, result, exitCode: EXIT_CODES.SUCCESS, stderr });
       } catch (error) {
         /* v8 ignore start */
         resolvePromise({
           shardId: shard.id,
-          exitCode: 1,
+          exitCode: EXIT_CODES.RUNTIME_ERROR,
           stderr: `unparseable worker output: ${error instanceof Error ? error.message : String(error)}`,
           failureClass: 'stdout_parse',
         });

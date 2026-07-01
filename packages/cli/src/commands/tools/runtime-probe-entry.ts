@@ -12,6 +12,7 @@
  * stdout. Exit 0 ⇔ report.ok.
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { resolveToolHooks } from '@opensip-cli/core';
 
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
@@ -21,7 +22,7 @@ import type { ProbeReport } from './runtime-probe.js';
 const dir = process.argv[2];
 if (dir === undefined || dir.length === 0) {
   process.stderr.write('runtime-probe-entry: missing package dir argument\n');
-  process.exitCode = 2;
+  process.exitCode = EXIT_CODES.CONFIGURATION_ERROR;
 } else {
   const report = await admitToolPackage({
     dir,
@@ -37,5 +38,5 @@ if (dir === undefined || dir.length === 0) {
     toolId: report.tool?.metadata.name ?? report.tool?.metadata.id ?? null,
   };
   process.stdout.write(`${JSON.stringify(slim)}\n`);
-  process.exitCode = report.ok ? 0 : 1;
+  process.exitCode = report.ok ? EXIT_CODES.SUCCESS : EXIT_CODES.RUNTIME_ERROR;
 }

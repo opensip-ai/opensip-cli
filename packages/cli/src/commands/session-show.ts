@@ -88,7 +88,7 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
       // the host `emitRaw` seam — the actual stdout write lives in `renderRaw`,
       // so this body routes through a documented seam, not a raw stdout bypass.
       opts.emitRaw(jsonPayload);
-      opts.setExitCode(0);
+      opts.setExitCode(EXIT_CODES.SUCCESS);
       return;
     }
 

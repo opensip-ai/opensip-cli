@@ -230,7 +230,7 @@ async function runGraphCommand(
     await executeListFiles(
       {
         cwd: opts.cwd,
-        json: opts.json,
+        json: opts.json === true,
         paths,
         workspace: opts.workspace,
         language: opts.language,
@@ -298,7 +298,7 @@ async function runGraphCommand(
   const outcome = await executeGraph(
     {
       cwd: opts.cwd,
-      json: opts.json,
+      json: opts.json === true,
       noCache: opts.cache === false,
       resolution,
       recipe: opts.recipe,

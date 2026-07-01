@@ -112,6 +112,10 @@ already reversible at that seam, so isolation is not paid for speculatively now.
 - `contracts` is untouched (progress is not an output-currency concern).
 - A new tool inherits the live surface by emitting `ProgressEvent`s and declaring
   a shape — no bespoke renderer.
+- 2026-07-01 verification note: the same live/progress currency now covers all
+  four bundled analysis tools (`fit`, `graph`, `sim`, `yagni`). The original
+  three-tool decision extended without a new renderer: `yagni` declares a
+  phased detector surface and renders through the shared live-run path.
 
 **Merge note:** This work was branched before ADR-0015 (engine-version cache
 invalidation) landed. ADR-0015 added `stampEngineVersion` to `catalog-builder.ts`,

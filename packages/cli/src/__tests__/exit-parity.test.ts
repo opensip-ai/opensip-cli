@@ -147,9 +147,11 @@ describe('exit-parity · structural guard (no tool computes its own findings exi
     // remaining writers are NON-findings exits owned by distinct commands: the
     // gate-mode commands (graph-modes gate-save/compare), the --workspace
     // child-aggregation (graph-workspace-mode.ts), graph's top-level error
-    // mapper (graph.ts), and the graph equivalence-check subcommand.
+    // mapper (graph.ts), the host output-plane render-failure fallback, internal
+    // graph shard-worker process failures, and the graph equivalence-check
+    // subcommand.
     const allow =
-      /deliver-envelope|graph-modes|graph-workspace-mode|graph\.ts|equivalence-check-command/;
+      /deliver-envelope|graph-modes|graph-workspace-mode|graph\.ts|output-plane|shard-worker|equivalence-check-command/;
     const hits = grep(repoRoot, 'setExitCode(EXIT_CODES.RUNTIME_ERROR)').filter(
       (f) => !allow.test(f),
     );

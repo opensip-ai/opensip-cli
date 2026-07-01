@@ -2,6 +2,7 @@ import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 
 import { readYagniSessionPayload } from './session-payload.js';
 
+import type { YagniSessionFinding } from './session-payload.js';
 import type {
   RunPresentation,
   SignalEnvelope,
@@ -10,7 +11,6 @@ import type {
   UnitResult,
 } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
-import type { YagniSessionFinding } from './session-payload.js';
 
 /**
  * Project a stored yagni session back into a SignalEnvelope/RunPresentation.
@@ -19,9 +19,7 @@ import type { YagniSessionFinding } from './session-payload.js';
  * intentionally nested under `metadata.yagni`; replay reads the tool payload
  * directly so that metadata remains intact for agent/session consumers.
  */
-export function yagniReplayFromSession(
-  stored: StoredSession,
-): ToolSessionReplay<RunPresentation> {
+export function yagniReplayFromSession(stored: StoredSession): ToolSessionReplay<RunPresentation> {
   const payload = readYagniSessionPayload(stored.payload);
   if (payload === undefined) {
     throw new Error('yagni session has no replay payload');
@@ -78,6 +76,7 @@ function replaySignal(input: {
   readonly findingIndex: number;
 }): Signal {
   const filePath = input.finding.filePath ?? '';
+  const metadata = input.finding.metadata ?? {};
   return {
     id: `${input.stored.id}:yagni:${String(input.checkIndex)}:${String(input.findingIndex)}`,
     source: input.source,
@@ -99,7 +98,7 @@ function replaySignal(input: {
             ...(input.finding.column === undefined ? {} : { column: input.finding.column }),
           },
         }),
-    metadata: { ...(input.finding.metadata ?? {}) },
+    metadata,
     createdAt: input.stored.startedAt,
   };
 }

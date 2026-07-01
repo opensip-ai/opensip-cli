@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildYagniRunSummary } from '../scoring/confidence.js';
 import { buildYagniSessionPayload } from '../persistence/session-payload.js';
 import { yagniReplayFromSession } from '../persistence/session-replay.js';
+import { buildYagniRunSummary } from '../scoring/confidence.js';
 
 import type { SignalEnvelope, StoredSession } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';

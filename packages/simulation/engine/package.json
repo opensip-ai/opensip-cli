@@ -49,6 +49,16 @@
     },
     "stableId": "715d32c2-692c-4ed4-985b-a35deaf186aa",
     "apiVersion": 1,
+    "requires": [
+      {
+        "resource": "filesystem",
+        "reason": "Reads project config, scenario packs, session/report data, and temporary live-worker specs"
+      },
+      {
+        "resource": "subprocess",
+        "reason": "Live runs can execute the sim-run-worker through the shared off-thread runner"
+      }
+    ],
     "commands": [
       {
         "name": "simulation",

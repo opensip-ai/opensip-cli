@@ -41,7 +41,8 @@ export async function analyzeAllReportProducerOpenFlag(files) {
   const openFlagSegments = new Set();
   const optOutSegments = new Set();
   const candidates = files.paths.filter(
-    (path) => path.endsWith('.ts') && TOOL_ENGINE_PATH.test(relPath(path)) && !isTestOrFixture(path),
+    (path) =>
+      path.endsWith('.ts') && TOOL_ENGINE_PATH.test(relPath(path)) && !isTestOrFixture(path),
   );
   const contents = await files.readMany(candidates);
 

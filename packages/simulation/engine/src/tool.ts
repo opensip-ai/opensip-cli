@@ -155,20 +155,18 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
   const { result } = await executeSim(opts);
 
   if (result.type === 'error') {
-    if (opts.json) {
-      // Structured error outcome: the host wraps and sets the exit code.
-      cli.emitError({ message: result.message, exitCode: result.exitCode });
-    } else {
-      cli.setExitCode(result.exitCode);
-      await cli.render(result);
-    }
+    await cli.reportFailure({
+      message: result.message,
+      exitCode: result.exitCode,
+      jsonRequested: opts.json === true,
+    });
     return;
   }
 
   // ADR-0011: one render path per mode. `--json` emits the envelope
   // through the shared formatSignalJson; default renders the envelope-
   // derived per-scenario table.
-  if (opts.json) {
+  if (opts.json === true) {
     emitSimJsonOutput(cli, result.envelope, opts);
   } else {
     await cli.render(result);
@@ -186,7 +184,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
 
   await cli.maybeOpenReport({
     openRequested: Boolean(opts.open),
-    jsonOutput: Boolean(opts.json),
+    jsonOutput: opts.json === true,
   });
 
   // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
