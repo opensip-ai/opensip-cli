@@ -60,6 +60,26 @@ describe('violationToSignal', () => {
     expect(signal.suggestion).toBe('Use the barrel');
   });
 
+  it('preserves structured repair guidance from recipe violations', () => {
+    const signal = violationToSignal(
+      's',
+      violation({
+        repair: {
+          repairKind: 'fix-import',
+          autofixable: false,
+          confidence: 0.8,
+          patchHint: { kind: 'text', summary: 'Use the public barrel' },
+        },
+      }),
+    );
+    expect(signal.repair).toEqual({
+      repairKind: 'fix-import',
+      autofixable: false,
+      confidence: 0.8,
+      patchHint: { kind: 'text', summary: 'Use the public barrel' },
+    });
+  });
+
   it('defaults category to quality and provider to opensip-cli', () => {
     const signal = violationToSignal('s', violation());
     expect(signal.category).toBe('quality');

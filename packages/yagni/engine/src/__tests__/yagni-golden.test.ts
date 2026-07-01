@@ -105,6 +105,7 @@ describe('yagni golden snapshots', () => {
         severity: s.severity,
         filePath: s.filePath,
         line: s.line,
+        repair: s.repair,
         metadata: s.metadata,
       })),
       sessionSummary: {

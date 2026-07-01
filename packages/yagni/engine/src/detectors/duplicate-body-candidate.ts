@@ -58,13 +58,22 @@ function groupSignal(group: DuplicateGroup): Signal {
     message: `${primary.simpleName} has a body duplicated across ${String(count)} sites — consolidate.`,
     suggestion: `Extract the shared body into one function and have all ${String(count)} sites call it.`,
     code: { file: primary.filePath, line: primary.line, column: primary.column },
+    repair: {
+      repairKind: 'extract-module',
+      autofixable: false,
+      confidence: 0.75,
+      patchHint: {
+        kind: 'text',
+        summary: `Consolidate ${String(count)} identical copies of ${primary.simpleName} (peers: ${peers}).`,
+        target: primary.filePath,
+      },
+    },
     yagni: {
       detector: DETECTOR_ID,
       reductionCategory: 'dedupe',
       confidence: CONFIDENCE,
       locDelta: { remove: netEstimate, add: 0, netEstimate, estimateKind: 'lower-bound' },
       preservationArgument: `The body is byte-identical (normalized) across ${String(count)} sites, so consolidating to one function preserves behavior.`,
-      suggestedAction: `Consolidate ${String(count)} identical copies of ${primary.simpleName} (peers: ${peers}).`,
       validationRequired: [
         'Confirm the copies are behaviorally identical, not just textually (closures, captured scope).',
         'Run the affected packages’ test suites after consolidation.',
@@ -96,13 +105,22 @@ function aggregateSignal(agg: CrossPackageAggregate): Signal {
     message: `A body is duplicated across ${String(agg.packages.length)} packages (${agg.packages.join(', ')}) in ${String(agg.occurrenceCount)} sites — hoist it into a shared package.`,
     suggestion: 'Hoist the shared body into one shared package and have every copy import it.',
     code: { file: agg.anchor.filePath, line: agg.anchor.line, column: agg.anchor.column },
+    repair: {
+      repairKind: 'extract-module',
+      autofixable: false,
+      confidence: 0.75,
+      patchHint: {
+        kind: 'text',
+        summary: `Hoist the body shared across ${agg.packages.join(', ')} into one shared package.`,
+        target: agg.anchor.filePath,
+      },
+    },
     yagni: {
       detector: DETECTOR_ID,
       reductionCategory: 'dedupe',
       confidence: CONFIDENCE,
       locDelta: { remove: netEstimate, add: 0, netEstimate, estimateKind: 'lower-bound' },
       preservationArgument: `The same normalized body appears in ${String(agg.occurrenceCount)} sites across ${String(agg.packages.length)} packages; hoisting to a shared package preserves behavior.`,
-      suggestedAction: `Hoist the body shared across ${agg.packages.join(', ')} into one shared package.`,
       validationRequired: [
         'Confirm the cross-package copies are behaviorally identical.',
         'Add the new shared package as a dependency of each consumer and run their tests.',

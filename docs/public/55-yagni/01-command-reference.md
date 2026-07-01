@@ -78,8 +78,11 @@ Each signal carries `metadata.yagni`:
 
 - `detector`, `reductionCategory`, `confidence` (`low` | `medium` | `high`)
 - `locDelta` with `estimateKind` (`exact`, `lower-bound`, `heuristic`)
-- `preservationArgument`, `suggestedAction`, `validationRequired`, `riskTags`
+- `preservationArgument`, `validationRequired`, `riskTags`
 - `evidence[]` with stable `id`, `kind`, and `summary`
+
+Remediation guidance lives on the shared `signal.repair` contract, not inside
+tool metadata.
 
 ## Human output
 

@@ -31,4 +31,21 @@ describe('Signal.repair', () => {
     const parsed = structuredClone(signal);
     expect(parsed.repair).toBeUndefined();
   });
+
+  it('bridges legacy fix hints into structured repair', () => {
+    const signal = createSignal({
+      source: 'fit',
+      ruleId: 'fit:example',
+      severity: 'medium',
+      message: 'legacy fix',
+      fix: { action: 'refactor', confidence: 0.6, description: 'Extract the helper' },
+    });
+    expect(signal.fixAction).toBe('refactor');
+    expect(signal.repair).toEqual({
+      repairKind: 'manual',
+      autofixable: false,
+      confidence: 0.6,
+      patchHint: { kind: 'text', summary: 'Extract the helper' },
+    });
+  });
 });

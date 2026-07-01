@@ -111,8 +111,28 @@ export function isErrorSignal(signal: Signal): boolean {
 
 import { randomUUID } from 'node:crypto';
 
+function repairKindFromAction(action: string | undefined): SignalRepair['repairKind'] {
+  if (action === 'add-test') return 'add-test';
+  if (action === 'fix-import') return 'fix-import';
+  if (action === 'split-function') return 'split-function';
+  if (action === 'extract-module') return 'extract-module';
+  return 'manual';
+}
+
+function repairFromFix(fix: FixHint | undefined): SignalRepair | undefined {
+  if (fix === undefined) return undefined;
+  const summary = fix.description ?? (fix.action ? `Apply ${fix.action} remediation` : undefined);
+  return {
+    repairKind: repairKindFromAction(fix.action),
+    autofixable: false,
+    ...(fix.confidence === undefined ? {} : { confidence: fix.confidence }),
+    ...(summary === undefined ? {} : { patchHint: { kind: 'text', summary } }),
+  };
+}
+
 /** Builds a {@link Signal} with default provider, generated id, and ISO timestamp. */
 export function createSignal(input: CreateSignalInput): Signal {
+  const repair = input.repair ?? repairFromFix(input.fix);
   return {
     id: `sig_${randomUUID().slice(0, 12)}`,
     source: input.source,
@@ -129,7 +149,7 @@ export function createSignal(input: CreateSignalInput): Signal {
     fixAction: input.fix?.action,
     fixConfidence: input.fix?.confidence,
     metadata: input.metadata ?? {},
-    ...(input.repair === undefined ? {} : { repair: input.repair }),
+    ...(repair === undefined ? {} : { repair }),
     createdAt: new Date().toISOString(),
   };
 }

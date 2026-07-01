@@ -11,7 +11,7 @@ import os from 'node:os';
 import { deriveRecipeId } from '@opensip-cli/core';
 
 import type { DirectiveEntry } from '../framework/directive-inventory.js';
-import type { RecipeUnitConfigMap } from '@opensip-cli/core';
+import type { RecipeUnitConfigMap, SignalRepair } from '@opensip-cli/core';
 
 // =============================================================================
 // CHECK SELECTOR TYPES
@@ -120,6 +120,9 @@ interface RecipeViolation {
   readonly message: string;
   readonly severity: 'error' | 'warning';
   readonly suggestion?: string;
+  readonly fixAction?: string;
+  readonly fixConfidence?: number;
+  readonly repair?: SignalRepair;
 }
 
 /** Result of a single check within a recipe execution */

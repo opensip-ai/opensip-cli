@@ -37,7 +37,6 @@
             "estimateKind": "exact"
           },
           "preservationArgument": "The property is declared on a public config interface but has zero read sites in the project.",
-          "suggestedAction": "Remove unused key `orphanKnob` from AppConfig.",
           "validationRequired": [
             "Confirm no dynamic property access reads this key.",
             "Run the package test suite after removal."
@@ -57,6 +56,16 @@
               }
             }
           ]
+        }
+      },
+      "repair": {
+        "repairKind": "manual",
+        "autofixable": false,
+        "confidence": 0.9,
+        "patchHint": {
+          "kind": "text",
+          "summary": "Remove unused key `orphanKnob` from AppConfig.",
+          "target": "<fixture>/src/app-config.ts"
         }
       }
     }

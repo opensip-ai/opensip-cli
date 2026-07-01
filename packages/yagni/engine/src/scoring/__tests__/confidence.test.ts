@@ -46,6 +46,12 @@ function mk(opts: MkOpts = {}): Signal {
     message: id,
     suggestion: `fix ${id}`,
     code: { file, line, column },
+    repair: {
+      repairKind: 'manual',
+      autofixable: false,
+      confidence: 0.5,
+      patchHint: { kind: 'text', summary: `fix ${id}`, target: file },
+    },
     yagni: {
       detector,
       reductionCategory: category as never,
@@ -54,7 +60,6 @@ function mk(opts: MkOpts = {}): Signal {
         ? { locDelta: { remove: net, add: 0, netEstimate: net, estimateKind: kind } }
         : {}),
       preservationArgument: 'x',
-      suggestedAction: 'x',
       validationRequired: [],
       riskTags: [],
       evidence: [],

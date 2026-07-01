@@ -26,11 +26,16 @@ function signal(overrides: Partial<Signal> = {}): Signal {
         reductionCategory: 'config',
         confidence: 'high',
         preservationArgument: 'No reads found.',
-        suggestedAction: 'Remove the unused key.',
         validationRequired: ['Run tests'],
         riskTags: [],
         evidence: [{ id: 'ev-1', kind: 'usage', summary: 'No references' }],
       },
+    },
+    repair: {
+      repairKind: 'manual',
+      autofixable: false,
+      confidence: 0.8,
+      patchHint: { kind: 'text', summary: 'Remove the unused key.', target: 'src/config.ts' },
     },
     createdAt: '2026-06-25T00:00:00.000Z',
     ...overrides,
@@ -116,6 +121,7 @@ describe('yagniReplayFromSession', () => {
       filePath: 'src/config.ts',
       code: { file: 'src/config.ts', line: 12, column: 5 },
       metadata: signals[0]?.metadata,
+      repair: signals[0]?.repair,
     });
     expect(replay.envelope.baselineIdentity).toEqual({
       fingerprintStrategyId: 'yagni.sha256-detector-locations',

@@ -176,6 +176,16 @@ function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetecto
             message: `Unused public config key '${prop.name}' in ${prop.interfaceName} (${confidence} confidence)`,
             suggestion: `Remove '${prop.name}' from ${prop.interfaceName} or wire it into runtime behavior`,
             code: { file: prop.filePath, line: prop.line, column: 0 },
+            repair: {
+              repairKind: 'manual',
+              autofixable: false,
+              confidence: 0.9,
+              patchHint: {
+                kind: 'text',
+                summary: `Remove unused key \`${prop.name}\` from ${prop.interfaceName}.`,
+                target: prop.filePath,
+              },
+            },
             yagni: {
               detector: DETECTOR_ID,
               reductionCategory: 'config',
@@ -188,7 +198,6 @@ function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetecto
               },
               preservationArgument:
                 'The property is declared on a public config interface but has zero read sites in the project.',
-              suggestedAction: `Remove unused key \`${prop.name}\` from ${prop.interfaceName}.`,
               validationRequired: [
                 'Confirm no dynamic property access reads this key.',
                 'Run the package test suite after removal.',

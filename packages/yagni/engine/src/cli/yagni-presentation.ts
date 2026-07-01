@@ -30,9 +30,10 @@ function formatCandidateBlock(signal: Signal, cwd: string, verbose: boolean): st
   const meta = readYagniMetadata(signal);
   if (meta === undefined) return [];
   const loc = formatYagniSignalLocation(signal, cwd);
+  const repairSummary = signal.repair?.patchHint?.summary ?? signal.suggestion ?? 'Review manually';
   const block = [
     `  ${meta.reductionCategory.padEnd(6)} ${meta.detector.padEnd(28)} ${loc}`,
-    `           → ${meta.suggestedAction.padEnd(44)} ${formatLocSuffix(signal)}`,
+    `           → ${repairSummary.padEnd(44)} ${formatLocSuffix(signal)}`,
   ];
   if (!verbose) return block;
   block.push(`           preservation: ${meta.preservationArgument}`);

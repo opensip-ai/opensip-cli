@@ -11,7 +11,7 @@
  */
 
 import { SeverityPolicy, type AuthorSeverity } from '../lib/severity-policy.js';
-import { createSignal, type Signal } from '../types/signal.js';
+import { createSignal, type FixHint, type Signal, type SignalRepair } from '../types/signal.js';
 
 /** A flat violation: a message at a location with an author-level severity. */
 export interface ViolationInput {
@@ -21,6 +21,10 @@ export interface ViolationInput {
   readonly file?: string;
   readonly line?: number;
   readonly column?: number;
+  readonly fix?: FixHint;
+  readonly fixAction?: string;
+  readonly fixConfidence?: number;
+  readonly repair?: SignalRepair;
 }
 
 /**
@@ -33,12 +37,19 @@ export function createSignalFromViolation(
   slug: string,
   violation: ViolationInput,
 ): Signal {
+  const fix =
+    violation.fix ??
+    (violation.fixAction === undefined
+      ? undefined
+      : { action: violation.fixAction, confidence: violation.fixConfidence });
   return createSignal({
     source: toolSource,
     ruleId: slug,
     severity: SeverityPolicy.liftAuthorSeverity(violation.severity),
     message: violation.message,
     suggestion: violation.suggestion,
+    fix,
+    repair: violation.repair,
     code: {
       file: violation.file,
       line: violation.line,

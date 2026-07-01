@@ -12,6 +12,7 @@
 import { z } from 'zod';
 
 import type { ItemType } from '../types/findings.js';
+import type { SignalRepair } from '@opensip-cli/core';
 
 // =============================================================================
 // CHECK SLUGS AND IDS
@@ -110,6 +111,8 @@ export interface CheckViolation {
   readonly match?: string;
   readonly type?: string;
   readonly filePath?: string;
+  /** Structured repair guidance (ADR-0086). Prefer this over legacy fix hints. */
+  readonly repair?: SignalRepair;
   readonly fix?: {
     readonly action: 'replace' | 'insert' | 'delete' | 'refactor' | 'configure' | 'investigate';
     readonly replacement?: string;

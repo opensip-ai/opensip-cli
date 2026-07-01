@@ -45,7 +45,7 @@ import type {
 import type { Check } from './check-types.js';
 import type { ExecutionContext, RunOptions } from './execution-context.js';
 import type { CheckResult } from '../types/findings.js';
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, SignalRepair } from '@opensip-cli/core';
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION
@@ -59,6 +59,9 @@ function toSignal(
   provider = 'opensip',
 ): Signal {
   const filePath = violation.filePath ?? defaultFilePath ?? '';
+  const fix =
+    violation.fix ??
+    (violation.suggestion ? { action: 'refactor' as const, confidence: 0.5 } : undefined);
   return createSignal({
     source: 'fitness',
     provider,
@@ -68,9 +71,8 @@ function toSignal(
     message: violation.message,
     suggestion: violation.suggestion,
     code: { file: filePath, line: violation.line, column: violation.column },
-    fix:
-      violation.fix ??
-      (violation.suggestion ? { action: 'refactor' as const, confidence: 0.5 } : undefined),
+    fix,
+    repair: repairFromViolation(violation, filePath),
     metadata: Object.fromEntries(
       Object.entries({
         match: violation.match,
@@ -80,6 +82,35 @@ function toSignal(
       }).filter(([, v]) => v != null && v !== ''),
     ),
   });
+}
+
+function repairKindForFitnessAction(
+  action: NonNullable<CheckViolation['fix']>['action'] | undefined,
+): SignalRepair['repairKind'] {
+  if (action === 'refactor') return 'extract-module';
+  return 'manual';
+}
+
+function repairFromViolation(
+  violation: CheckViolation,
+  filePath: string,
+): SignalRepair | undefined {
+  if (violation.repair !== undefined) return violation.repair;
+  if (violation.fix === undefined && violation.suggestion === undefined) return undefined;
+  const action = violation.fix?.action;
+  const summary =
+    violation.suggestion ??
+    (action === undefined ? undefined : `Apply ${action} remediation for this finding`);
+  return {
+    repairKind: repairKindForFitnessAction(action),
+    autofixable:
+      violation.fix?.replacement !== undefined &&
+      (action === 'replace' || action === 'insert' || action === 'delete'),
+    confidence: violation.fix?.confidence ?? 0.5,
+    ...(summary === undefined
+      ? {}
+      : { patchHint: { kind: 'text', summary, ...(filePath === '' ? {} : { target: filePath }) } }),
+  };
 }
 
 // =============================================================================

@@ -226,6 +226,9 @@ export function processSuccessResult(
               ? ('error' as const)
               : ('warning' as const),
             suggestion: s.suggestion,
+            ...(s.fixAction === undefined ? {} : { fixAction: s.fixAction }),
+            ...(s.fixConfidence === undefined ? {} : { fixConfidence: s.fixConfidence }),
+            ...(s.repair === undefined ? {} : { repair: s.repair }),
           })),
         }
       : {}),

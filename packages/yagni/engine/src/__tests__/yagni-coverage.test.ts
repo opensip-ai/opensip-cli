@@ -80,6 +80,12 @@ function signal(
     message: id,
     suggestion: `fix ${id}`,
     code: { file: `/repo/${id}.ts`, line: netEstimate, column: 1 },
+    repair: {
+      repairKind: 'manual',
+      autofixable: false,
+      confidence: 0.5,
+      patchHint: { kind: 'text', summary: `fix ${id}`, target: `/repo/${id}.ts` },
+    },
     yagni: {
       detector: id,
       reductionCategory: category as never,
@@ -91,7 +97,6 @@ function signal(
         estimateKind,
       },
       preservationArgument: 'covered by test',
-      suggestedAction: `fix ${id}`,
       validationRequired: ['run tests'],
       riskTags: [],
       evidence: [{ id, kind: 'test', summary: id }],

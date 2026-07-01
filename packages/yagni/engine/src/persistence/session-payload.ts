@@ -3,7 +3,7 @@ import { isErrorSignal, isPlainRecord } from '@opensip-cli/core';
 import type { SkippedDetector } from '../detectors/types.js';
 import type { YagniRunSummary } from '../types/yagni-metadata.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, SignalRepair } from '@opensip-cli/core';
 
 export interface YagniSessionFinding {
   readonly ruleId: string;
@@ -13,6 +13,8 @@ export interface YagniSessionFinding {
   readonly line?: number;
   readonly column?: number;
   readonly suggestion?: string;
+  /** Structured repair guidance (ADR-0086) — round-trips through replay. */
+  readonly repair?: SignalRepair;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -134,6 +136,7 @@ export function buildYagniSessionPayload(
       ...(signal.line === undefined ? {} : { line: signal.line }),
       ...(signal.column === undefined ? {} : { column: signal.column }),
       ...(signal.suggestion === undefined ? {} : { suggestion: signal.suggestion }),
+      ...(signal.repair === undefined ? {} : { repair: signal.repair }),
       metadata: signal.metadata,
     }));
     return {

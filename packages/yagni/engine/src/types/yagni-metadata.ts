@@ -42,7 +42,6 @@ export interface YagniFindingMetadata {
   readonly confidence: YagniConfidence;
   readonly locDelta?: YagniLocDelta;
   readonly preservationArgument: string;
-  readonly suggestedAction: string;
   readonly validationRequired: readonly string[];
   readonly riskTags: readonly string[];
   readonly evidence: readonly YagniEvidence[];

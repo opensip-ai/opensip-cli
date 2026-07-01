@@ -18,6 +18,8 @@ import type { Signal } from '@opensip-cli/core';
  * Yagni persists the shared `checks[]` payload shape, but its finding metadata is
  * intentionally nested under `metadata.yagni`; replay reads the tool payload
  * directly so that metadata remains intact for agent/session consumers.
+ *
+ * @throws {Error} When the stored session carries no decodable yagni replay payload.
  */
 export function yagniReplayFromSession(stored: StoredSession): ToolSessionReplay<RunPresentation> {
   const payload = readYagniSessionPayload(stored.payload);
@@ -87,6 +89,7 @@ function replaySignal(input: {
     message: input.finding.message,
     filePath,
     ...(input.finding.suggestion === undefined ? {} : { suggestion: input.finding.suggestion }),
+    ...(input.finding.repair === undefined ? {} : { repair: input.finding.repair }),
     ...(input.finding.line === undefined ? {} : { line: input.finding.line }),
     ...(input.finding.column === undefined ? {} : { column: input.finding.column }),
     ...(input.finding.filePath === undefined

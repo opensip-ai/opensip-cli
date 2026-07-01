@@ -46,5 +46,8 @@ export function violationToSignal(checkSlug: string, violation: RecipeViolation)
     file: violation.file,
     line: violation.line,
     column: violation.column,
+    fixAction: violation.fixAction,
+    fixConfidence: violation.fixConfidence,
+    repair: violation.repair,
   });
 }

@@ -1,9 +1,10 @@
 import { createSignal } from '@opensip-cli/core';
 
 import type { YagniFindingMetadata } from '../types/yagni-metadata.js';
-import type { CreateSignalInput, Signal } from '@opensip-cli/core';
+import type { CreateSignalInput, Signal, SignalRepair } from '@opensip-cli/core';
 
-export interface YagniSignalInput extends Omit<CreateSignalInput, 'metadata'> {
+export interface YagniSignalInput extends Omit<CreateSignalInput, 'metadata' | 'repair'> {
+  readonly repair: SignalRepair;
   readonly yagni: YagniFindingMetadata;
 }
 
