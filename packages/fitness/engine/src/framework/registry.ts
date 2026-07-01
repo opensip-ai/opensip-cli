@@ -120,24 +120,32 @@ export class CheckRegistry {
    * Resolve a slug to its canonical registry key (fail-closed on ambiguity).
    *
    * - Exact registry keys (namespaced or bare) are returned unchanged.
+   * - A namespaced ref whose exact key is NOT registered (e.g. a built-in
+   *   recipe's `@opensip-cli/checks-universal:no-console-log` against a
+   *   bare-registered first-party check) falls back to its bare slug — still
+   *   fail-closed if that bare slug is genuinely ambiguous.
    * - Bare slugs resolve via the reverse index; multiple matches return
    *   `undefined` and emit `check.registry.ambiguous` (mirrors {@link resolve}).
    * - Unknown slugs return `undefined`.
    */
   resolveBareSlug(slug: string): string | undefined {
     if (this.inner.has(slug)) return slug;
-    if (slug.includes(':')) return undefined;
 
-    const candidates = this.bareSlugIndex.get(slug);
+    // Reduce a non-exact namespaced ref to its bare slug; a bare slug is used
+    // as-is. The pack prefix is advisory when the exact key isn't registered.
+    const bareSlug = slug.includes(':') ? (slug.split(':').pop() ?? slug) : slug;
+    if (bareSlug !== slug && this.inner.has(bareSlug)) return bareSlug;
+
+    const candidates = this.bareSlugIndex.get(bareSlug);
     if (!candidates || candidates.length === 0) return undefined;
 
     if (candidates.length > 1) {
       logger.warn({
         evt: 'check.registry.ambiguous',
         module: 'fitness:checks',
-        bareSlug: slug,
+        bareSlug,
         candidates,
-        msg: `Ambiguous bare slug '${slug}' matches ${candidates.length} checks (namespaced); refusing bare lookup`,
+        msg: `Ambiguous bare slug '${bareSlug}' matches ${candidates.length} checks (namespaced); refusing bare lookup`,
       });
       return undefined;
     }

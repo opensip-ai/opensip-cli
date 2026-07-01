@@ -265,6 +265,8 @@ const EXPORT_ALLOWLIST = {
   Tool: 'tool-plugin-contract',
   ToolCapabilityDeclaration: 'tool-plugin-contract',
   ToolCliContext: 'tool-plugin-contract',
+  CommandMountContext: 'tool-plugin-contract',
+  LiveViewMountContext: 'tool-plugin-contract',
   ToolCommandDescriptor: 'tool-plugin-contract',
   ToolCommandManifest: 'tool-plugin-contract',
   ToolCommandSpecInput: 'tool-plugin-contract',

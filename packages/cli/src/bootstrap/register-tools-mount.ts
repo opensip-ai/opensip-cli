@@ -149,7 +149,7 @@ export function mountOneTool(
   const boundCtx = bindToolCliContext(tool, ctx);
   const toolHooks: RunActionHooks = {
     ...runActionHooks,
-    maybeDispatchExternal: buildMaybeDispatchExternal(tool, boundCtx),
+    maybeDispatchExternal: buildMaybeDispatchExternal(tool, boundCtx, runActionHooks),
   };
   const mountedByName = mountFlatSpecs(program, tool, boundCtx, toolHooks);
 

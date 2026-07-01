@@ -38,6 +38,8 @@ import {
 import { dispatchExternalToolCommand } from './dispatch-external-tool-command.js';
 import { provenanceRecordFor } from './tool-provenance.js';
 
+import type { RunActionHooks } from './run-plane.js';
+
 /** Find the admitted manifest for `tool` (same stable-id-then-name match). */
 function manifestFor(tool: Tool): ToolPluginManifest | undefined {
   /* v8 ignore next -- defensive: `manifestFor` is only reached from the external-dispatch arm, which has already resolved an EXTERNAL provenance record off `currentScope()?.toolProvenance` (so a scope exists for this synchronous hook body), and `RunScope` always initializes `toolManifests` to `[]` — so `currentScope()?.toolManifests` is never undefined here and the `?? []` arm cannot execute. */
@@ -68,6 +70,7 @@ function deepConfigBlockFor(tool: Tool): unknown {
 export function buildMaybeDispatchExternal(
   tool: Tool,
   ctx: ToolCliContext,
+  hooks: RunActionHooks,
 ): (
   commandName: string,
   opts: Record<string, unknown>,
@@ -81,6 +84,17 @@ export function buildMaybeDispatchExternal(
       // tools are the trusted computing base.
       return false;
     }
+    // The external dispatch is HOST code (not a tool handler), so it carries the
+    // host run-action hooks the tool-facing context deliberately omits (P1-F6).
+    // `replayResult` persists the worker's RETURNED session via `completeRun`
+    // (the mount action took the early-return dispatch branch, so the host
+    // drives session persistence here). `Object.create` inherits the bound
+    // context's members (incl. the `scope` getter) without copying; the hooks
+    // become own properties so `ctx.completeRun` resolves at replay time.
+    const dispatchCtx: ToolCliContext & RunActionHooks = Object.assign(
+      Object.create(ctx) as ToolCliContext,
+      hooks,
+    );
     // ADR-0054 M4-E trust-tier flip: an external tool ALWAYS forks the worker
     // (no opt-in gate). `OPENSIP_CLI_NO_WORKER` does not apply here — it is
     // bundled-only; the supervisor hard-errors if the fork fails (never an
@@ -90,7 +104,7 @@ export function buildMaybeDispatchExternal(
       commandName,
       opts,
       positionals,
-      ctx,
+      ctx: dispatchCtx,
       config: deepConfigBlockFor(tool),
     });
     return true;

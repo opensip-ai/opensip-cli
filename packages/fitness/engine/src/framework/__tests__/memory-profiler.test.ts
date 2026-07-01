@@ -134,13 +134,13 @@ describe('memoryProfiler — RunScope isolation', () => {
       runWithScope(scopeA, () => {
         const profiler = scopeA.fitness!.memoryProfiler;
         profiler.recordCheckComplete('scope-a-check', 0, 0, 1);
-        return profiler.getSummary();
+        return Promise.resolve(profiler.getSummary());
       }),
       runWithScope(scopeB, () => {
         const profiler = scopeB.fitness!.memoryProfiler;
         profiler.recordCheckComplete('scope-b-one', 0, 0, 1);
         profiler.recordCheckComplete('scope-b-two', 0, 0, 1);
-        return profiler.getSummary();
+        return Promise.resolve(profiler.getSummary());
       }),
     ]);
 

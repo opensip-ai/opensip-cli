@@ -62,10 +62,10 @@ import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
 import { collectFitnessReportData } from './cli/report-data.js';
 import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
 import { FileCache } from './framework/file-cache.js';
-import { MemoryProfiler } from './framework/memory-profiler.js';
 import {
   createCheckRegistry,
   createFitnessLoadState,
+  createMemoryProfiler,
   createRecipeRegistry,
   currentCheckRegistry,
   currentRecipeRegistry,
@@ -200,7 +200,7 @@ const registerFitRecipe: CapabilityRegistrar = (contribution) => {
  */
 function contributeScope(): ContributeScopeResult {
   const fileCache = new FileCache();
-  const memoryProfiler = new MemoryProfiler();
+  const memoryProfiler = createMemoryProfiler();
   // Lazily populated by checks-typescript's getSharedTypeCheckedProgram; held
   // here so one ts.Program is shared by every type-aware check in the run and
   // released on dispose. `value` is opaque (unknown) — the engine never names

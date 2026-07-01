@@ -160,7 +160,7 @@ export const tool = {
         }
         if (mode === 'hang') {
           // Busy-spin so the supervisor's wall-clock timeout must SIGKILL us.
-           
+
           for (;;) {
             /* never returns */
           }

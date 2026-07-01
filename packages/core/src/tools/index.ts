@@ -10,13 +10,12 @@ export type {
   ReportFailureLogDetail,
   ResolvedReportFailure,
 } from './report-failure.js';
+export type { CommandMountContext, LiveViewMountContext } from './mount-context.js';
 export type {
   Tool,
   ToolMetadata,
   ToolCommandDescriptor,
   ToolCliContext,
-  CommandMountContext,
-  LiveViewMountContext,
   GateCompareResult,
   SignalDeliveryResult,
   ToolPluginExports,

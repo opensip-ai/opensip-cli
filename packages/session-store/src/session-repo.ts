@@ -7,8 +7,6 @@ import { SessionWriteRepo } from './session-write-repo.js';
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
-
-
 /**
  * Persistence layer for tool-run sessions. Stores generic session columns plus
  * one opaque per-tool `payload` blob; holds ZERO tool vocabulary — it never
@@ -69,4 +67,4 @@ export class SessionRepo {
   }
 }
 
-export {type SessionListOptions} from './session-read-repo.js';
+export { type SessionListOptions } from './session-read-repo.js';

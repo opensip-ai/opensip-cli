@@ -16,6 +16,7 @@ export interface SessionListOptions {
   readonly limit?: number;
 }
 
+/** Read side of the session store: list/get/latest/count with hydration. */
 export class SessionReadRepo {
   constructor(private readonly datastore: DrizzleDataStore) {}
 

@@ -7,7 +7,9 @@ const WORKER_SUBCOMMAND = '__tool-command-worker';
 const arguments_ = process.argv.slice(2);
 const subIndex = arguments_.indexOf(WORKER_SUBCOMMAND);
 const specPath =
-  subIndex === -1 ? (arguments_.find((a) => a.endsWith('.json')) ?? arguments_[0]) : arguments_[subIndex + 1];
+  subIndex === -1
+    ? (arguments_.find((a) => a.endsWith('.json')) ?? arguments_[0])
+    : arguments_[subIndex + 1];
 readFileSync(specPath, 'utf8');
 const send = (message) => process.send?.(message);
 

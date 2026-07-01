@@ -24,7 +24,7 @@ import { currentScope } from '@opensip-cli/core';
 
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
-import { type MemoryProfiler, memoryProfiler } from './memory-profiler.js';
+import { MemoryProfiler, memoryProfiler } from './memory-profiler.js';
 import { CheckRegistry } from './registry.js';
 
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';
@@ -99,9 +99,9 @@ export function currentFitnessLoadState(): FitnessLoadState {
   return currentFitnessSubscope().load;
 }
 
-/** Read the current scope's per-run memory profiler. */
-export function currentMemoryProfiler(): MemoryProfiler {
-  return currentFitnessSubscope().memoryProfiler;
+/** Construct a fresh per-`RunScope` memory profiler (mirrors the registry factories). */
+export function createMemoryProfiler(): MemoryProfiler {
+  return new MemoryProfiler();
 }
 
 /**

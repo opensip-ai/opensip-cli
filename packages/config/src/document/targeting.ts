@@ -79,7 +79,7 @@ export interface PluginsConfig {
    * packages that do not declare the full fit-pack marker/epoch block yet, or
    * when you want to name a package explicitly in config.
    *
-   * @deprecated Prefer manifest-driven `plugins.<key>` from capability
+   * Legacy: prefer manifest-driven `plugins.<key>` from capability
    * `discovery.configKeys.packages`. Retained for backward-compatible parsing.
    */
   readonly checkPackages?: readonly string[];
@@ -88,32 +88,32 @@ export interface PluginsConfig {
    * When present, capability discovery treats the explicit set as the pinned
    * scenario source.
    *
-   * @deprecated Prefer manifest-driven `plugins.scenarioPackages`.
+   * Legacy: prefer manifest-driven `plugins.scenarioPackages`.
    */
   readonly scenarioPackages?: readonly string[];
   /**
    * Disable or enable simulation scenario name-pattern discovery.
    *
-   * @deprecated Prefer manifest-driven `plugins.autoDiscoverScenarios`.
+   * Legacy: prefer manifest-driven `plugins.autoDiscoverScenarios`.
    */
   readonly autoDiscoverScenarios?: boolean;
   /**
    * Additional npm scopes to include in simulation scenario-package
    * auto-discovery, on top of the platform default (`@opensip-cli`).
    *
-   * @deprecated Prefer manifest-driven `plugins.packageScopes`.
+   * Legacy: prefer manifest-driven `plugins.packageScopes`.
    */
   readonly packageScopes?: readonly string[];
   /**
    * Exact graph adapter package names to load from project `node_modules`.
    *
-   * @deprecated Prefer manifest-driven `plugins.graphAdapters`.
+   * Legacy: prefer manifest-driven `plugins.graphAdapters`.
    */
   readonly graphAdapters?: readonly string[];
   /**
    * Disable or enable graph adapter marker discovery.
    *
-   * @deprecated Prefer manifest-driven `plugins.autoDiscoverGraphAdapters`.
+   * Legacy: prefer manifest-driven `plugins.autoDiscoverGraphAdapters`.
    */
   readonly autoDiscoverGraphAdapters?: boolean;
   /**

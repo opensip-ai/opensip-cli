@@ -172,7 +172,11 @@ async function runStep(args: {
   const opts = stepOpts(args.step, args.suiteOpts);
   const hooks: RunActionHooks = {
     ...args.runActionHooks,
-    maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, capture.context),
+    maybeDispatchExternal: buildMaybeDispatchExternal(
+      args.step.tool,
+      capture.context,
+      args.runActionHooks,
+    ),
   };
   const diagnostics = currentScope()?.diagnostics;
   const log = currentLogger();

@@ -4,7 +4,9 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 const DATASTORE_PATH = /packages\/datastore\/src\/data-store\.ts$/;
-const SESSION_PATH = /packages\/session-store\/src\/session-repo\.ts$/;
+// The session write path (save/upsert) lives in the write repo after the
+// SessionRepo read/write/maintenance split (P1-F4); the facade only delegates.
+const SESSION_PATH = /packages\/session-store\/src\/session-write-repo\.ts$/;
 const FILE_LOCK_PATH = /packages\/core\/src\/lib\/file-lock\.ts$/;
 
 export function analyzeStateLockingPolicy(content, filePath) {
@@ -20,7 +22,7 @@ export function analyzeStateLockingPolicy(content, filePath) {
 
   if (SESSION_PATH.test(normalized) && !content.includes("withWriteLock('session.save'")) {
     violations.push({
-      message: 'SessionRepo.save missing withWriteLock',
+      message: 'SessionWriteRepo.save missing withWriteLock',
       severity: 'error',
     });
   }

@@ -44,9 +44,10 @@ function buildMatchTargets(slug: string, registry?: CheckRegistry): string[] {
  * - the universe is `registry.listSlugs()` (each key becomes a Registerable item);
  * - `keysOf` is `buildMatchTargets` (key + bare slug + tag/slug targets);
  * - the `pattern` / `all` matcher is `minimatch` (kept a fitness dependency);
- * - `resolveExplicit` is the bare-slug → namespaced-key reverse lookup
- *   (mirrors the previous `resolveExplicitSelector`: exact key first, then
- *   `getBySlug` + `endsWith(':'+id)`);
+ * - `resolveExplicit` is the bare-slug → namespaced-key reverse lookup via
+ *   `registry.resolveBareSlug`, which **fails closed** on an ambiguous bare
+ *   slug (emits a diagnostic and returns undefined) rather than picking the
+ *   first `endsWith(':'+id)` match (ADR-0106 / P1-F2);
  * - the `tags` arm routes through core's built-in tag-set intersection over
  *   `check.config.tags` (`tagsOf` reads the registry), matching the previous
  *   `resolveTagsSelector` exactly.

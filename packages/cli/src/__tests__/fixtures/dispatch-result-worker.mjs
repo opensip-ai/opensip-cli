@@ -23,7 +23,9 @@ const WORKER_SUBCOMMAND = '__tool-command-worker';
 const arguments_ = process.argv.slice(2);
 const subIndex = arguments_.indexOf(WORKER_SUBCOMMAND);
 const specPath =
-  subIndex === -1 ? (arguments_.find((a) => a.endsWith('.json')) ?? arguments_[0]) : arguments_[subIndex + 1];
+  subIndex === -1
+    ? (arguments_.find((a) => a.endsWith('.json')) ?? arguments_[0])
+    : arguments_[subIndex + 1];
 const spec = JSON.parse(readFileSync(specPath, 'utf8'));
 // A hook-mode spec (M4-F) carries `hook` instead of a command `mode`; route it to
 // the `hook-result` shape so the hook supervisor's hookResult extraction is covered.
