@@ -39,6 +39,35 @@ function assertCatalogCoversTools(
   }
 }
 
+function assertJsonExamplesMatchToolFlagSurface(
+  catalog: ReturnType<typeof buildAgentCatalog>,
+  tools: ToolRegistry,
+): void {
+  const primarySpecs = new Map(
+    tools
+      .list()
+      .flatMap((tool) => tool.commandSpecs ?? [])
+      .filter(
+        (spec) =>
+          spec.parent === undefined &&
+          spec.visibility !== 'internal' &&
+          !/(?:-run-worker|-shard-worker|-equivalence-check)\b/.test(spec.name),
+      )
+      .map((spec) => [spec.name, spec]),
+  );
+
+  for (const entry of catalog.entryPoints.filter((candidate) => candidate.tier === 'tool')) {
+    const spec = primarySpecs.get(entry.command);
+    expect(spec, `catalog entry '${entry.command}' must map to a mounted primary`).toBeDefined();
+    if (spec?.commonFlags?.includes('json') === true) continue;
+    for (const example of entry.examples) {
+      expect(example, `entry '${entry.command}' must not advertise unsupported --json`).not.toMatch(
+        /\s--json(?:\s|$)/,
+      );
+    }
+  }
+}
+
 async function makeRegistry(): Promise<ToolRegistry> {
   const tools = new ToolRegistry();
   await registerFirstPartyTools(tools);
@@ -87,6 +116,7 @@ describe('buildAgentCatalog', () => {
       expect.arrayContaining([
         'fitness',
         'graph',
+        'mcp',
         'simulation',
         'yagni',
         'third-party-tool',
@@ -96,6 +126,10 @@ describe('buildAgentCatalog', () => {
       ]),
     );
     assertCatalogCoversTools(c, tools);
+    assertJsonExamplesMatchToolFlagSurface(c, tools);
+    expect(c.entryPoints.find((entry) => entry.command === 'mcp')?.examples).toEqual([
+      'opensip mcp',
+    ]);
   });
 
   it('omits tools without a public primary command', () => {

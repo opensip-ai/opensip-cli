@@ -194,12 +194,17 @@ function entryPointForTool(
   const primary = publicPrimaryCommand(tool, internalCommands);
   if (primary === undefined) return undefined;
   const overlay = TOOL_ENTRY_OVERLAYS[primary.name] ?? TOOL_ENTRY_OVERLAYS[tool.metadata.name];
+  const supportsJson = primary.commonFlags?.includes('json') === true;
+  const defaultDescription = supportsJson
+    ? `${primary.description} Use --json when available for machine output.`
+    : primary.output === 'raw-stream'
+      ? `${primary.description} Raw-stream transport; use the command protocol directly, not --json.`
+      : `${primary.description} This command does not declare --json; use its documented output.`;
+  const defaultExamples = supportsJson ? [`opensip ${primary.name} --json`] : [`opensip ${primary.name}`];
   return {
     command: primary.name,
-    description:
-      overlay?.description ??
-      `${primary.description} Use --json when available for machine output.`,
-    examples: overlay?.examples ?? [`opensip ${primary.name} --json`],
+    description: overlay?.description ?? defaultDescription,
+    examples: overlay?.examples ?? defaultExamples,
     tier: 'tool',
   };
 }
@@ -289,14 +294,14 @@ export function buildAgentCatalog(
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',
       'graph impact answers changed→impacted without a separate git diff dance.',
-      'All machine output is under --json. Use --raw on show for the smallest possible payload.',
+      'Commands that expose machine-readable command results use --json. Raw-stream transports such as mcp document their own stdout protocol.',
       'filtersApplied, originalSignalCount, returnedSignalCount appear when --filter is used.',
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',
       'Human-readable output (no --json) uses the same tables/banners as before — unchanged.',
       // Uniform tool-primary surface (host-guaranteed; decorateToolPrimary).
       'Every tool primary (fit/graph/sim/yagni and any third-party tool) accepts `<tool> --version` ' +
         '(prints the TOOL version, e.g. `fit 0.1.6`; distinct from `opensip --version`, the CLI), ' +
-        'plus the guaranteed baseline flags --cwd, --json, --config, --quiet, --verbose.',
+        'plus its declared common flags. Do not assume raw-stream primaries accept --json.',
       'Dogfood gate requires 0 errors + 0 warnings on fit:ci and graph:ci after any change.',
       // Hygiene invariant (host-planes-scope-seams-hygiene Phases 2-4): everything runs inside an
       // entered RunScope; the only sanctioned seams for output, delivery, baselines, toolState,

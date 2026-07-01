@@ -19,9 +19,13 @@ function escapeRe(value) {
 }
 
 const bundledToolSegmentAlternation = bundledToolPackageSegments.map(escapeRe).join('|');
+const bundledToolEngineRoots = bundledToolPackageSegments.map((segment) =>
+  segment === 'mcp' ? 'packages/mcp/src/' : `packages/${segment}/engine/src/`,
+);
+const bundledToolEngineRootAlternation = bundledToolEngineRoots.map(escapeRe).join('|');
 
 export function toolEnginePathRe(suffix = '') {
-  return new RegExp(`packages/(?:${bundledToolSegmentAlternation})/engine/src/${suffix}`);
+  return new RegExp(`(?:${bundledToolEngineRootAlternation})${suffix}`);
 }
 
 export function toolEngineCliPathRe(suffix = '') {
@@ -38,5 +42,6 @@ export function toolPackagePathRe(suffix = '') {
 
 export function toolPackageSegmentForPath(filePath) {
   const norm = String(filePath).replaceAll('\\', '/');
+  if (/packages\/mcp\/src\//.test(norm)) return 'mcp';
   return new RegExp(`packages/(${bundledToolSegmentAlternation})/engine/src/`).exec(norm)?.[1];
 }

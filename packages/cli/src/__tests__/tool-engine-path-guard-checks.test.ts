@@ -10,9 +10,10 @@ import {
 describe('derived first-party tool-engine path gates', () => {
   it('derive the bundled tool segments from the manifest, including yagni', () => {
     expect(bundledToolPackageSegments).toEqual(
-      expect.arrayContaining(['fitness', 'simulation', 'graph', 'yagni']),
+      expect.arrayContaining(['fitness', 'simulation', 'graph', 'yagni', 'mcp']),
     );
     expect(toolEnginePathRe().test('/repo/packages/yagni/engine/src/cli/run.ts')).toBe(true);
+    expect(toolEnginePathRe().test('/repo/packages/mcp/src/command.ts')).toBe(true);
   });
 
   it('flags direct stdout in a yagni tool-engine path', () => {

@@ -126,4 +126,35 @@ describe('buildAgentCatalog', () => {
 
     expect(catalog.entryPoints.map((entry) => entry.command)).not.toContain('alpha');
   });
+
+  it('does not synthesize --json examples for primaries that do not declare json', () => {
+    const tools = new ToolRegistry();
+    tools.register({
+      identity: { name: 'mcp' },
+      metadata: {
+        id: '00000000-0000-4000-8000-000000000205',
+        name: 'mcp',
+        version: '0.0.0',
+        description: 'mcp tool',
+      },
+      commands: [],
+      commandSpecs: [
+        defineCommand({
+          name: 'mcp',
+          description: 'Serve MCP over stdio',
+          commonFlags: ['cwd'],
+          scope: 'project',
+          output: 'raw-stream',
+          rawStreamReason: 'mcp-stdio',
+          handler: noopHandler,
+        }),
+      ],
+    });
+
+    const catalog = buildAgentCatalog({ tools });
+    const mcp = catalog.entryPoints.find((entry) => entry.command === 'mcp');
+
+    expect(mcp?.examples).toEqual(['opensip mcp']);
+    expect(mcp?.description).toMatch(/Raw-stream transport/);
+  });
 });
