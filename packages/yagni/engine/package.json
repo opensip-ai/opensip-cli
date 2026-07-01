@@ -57,8 +57,8 @@
           "yag"
         ],
         "commonFlags": [
-          "cwd",
           "json",
+          "cwd",
           "quiet",
           "verbose",
           "debug",
@@ -80,7 +80,7 @@
           {
             "flag": "--sarif",
             "value": "<path>",
-            "description": "Write this run findings as SARIF 2.1.0 (composes with --gate-save)"
+            "description": "Also write this run findings as SARIF 2.1.0. Composes with --gate-save; written even when the gate fails."
           },
           {
             "flag": "--min-confidence",

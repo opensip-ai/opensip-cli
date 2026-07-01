@@ -69,8 +69,8 @@
           "fit"
         ],
         "commonFlags": [
-          "cwd",
           "json",
+          "cwd",
           "quiet",
           "verbose",
           "debug",

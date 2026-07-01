@@ -5,9 +5,11 @@
 import {
   agentRunFlagSpecs,
   buildAgentFilteredResult,
+  definePrimaryRunCommand,
+  gateRunFlagSpecs,
   normalizeAgentRunFilters,
+  sarifRunFlagSpec,
 } from '@opensip-cli/contracts';
-import { definePrimaryCommand } from '@opensip-cli/core';
 
 import { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
 import { applyAdvisoryExitCode } from '../lib/apply-advisory-exit.js';
@@ -181,27 +183,11 @@ function emitYagniJsonOutput(
 }
 
 export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {
-  return definePrimaryCommand<unknown, ToolCliContext>({
+  return definePrimaryRunCommand<unknown>({
     description: 'Run YAGNI reduction audit detectors',
-    commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     options: [
-      {
-        flag: '--gate-save',
-        description:
-          'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)',
-        default: false,
-      },
-      {
-        flag: '--gate-compare',
-        description:
-          'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
-        default: false,
-      },
-      {
-        flag: '--sarif',
-        value: '<path>',
-        description: 'Write this run findings as SARIF 2.1.0 (composes with --gate-save)',
-      },
+      ...gateRunFlagSpecs,
+      sarifRunFlagSpec,
       {
         flag: '--min-confidence',
         value: '<level>',
@@ -237,11 +223,6 @@ export function buildYagniCommandSpec(setUpLiveView: (cli: ToolCliContext) => vo
         optional: true,
       },
     ],
-    scope: 'project',
-    output: 'raw-stream',
-    rawStreamReason: 'runtime-render-dispatch',
-    // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
-    producesVerdict: true,
     handler: (rawOpts, cli) => runYagniCommand(rawOpts, cli, setUpLiveView),
   });
 }

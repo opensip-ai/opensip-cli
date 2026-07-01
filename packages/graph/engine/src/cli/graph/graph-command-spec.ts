@@ -26,11 +26,13 @@
 
 import {
   agentRunFlagSpecs,
+  definePrimaryRunCommand,
   EXIT_CODES,
+  gateRunFlagSpecs,
+  sarifRunFlagSpec,
   type SignalEnvelope,
   type StoredSession,
 } from '@opensip-cli/contracts';
-import { definePrimaryCommand } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { GRAPH_LIVE_VIEW_KEY as GRAPH_LIVE_KEY } from '../../identity.js';
@@ -523,13 +525,9 @@ function parseConcurrency(v: string): number {
  * The host mounts this spec, applies the ADR-0021 common flags + graph's options
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
  */
-export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
+export const graphCommandSpec = definePrimaryRunCommand<unknown>({
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
-  // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,
-  // --verbose, --debug, --report-to, --api-key, --open. `cwd` is seeded with
-  // process.cwd() by the mounter. graph-specific flags stay declared below.
-  commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
   options: [
     {
       flag: '--no-cache',
@@ -553,16 +551,7 @@ export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       value: '<session>',
       description: 'Replay a stored graph session by id, or latest for the latest graph session',
     },
-    {
-      flag: '--gate-save',
-      description: 'Save current Signal set as the gate baseline',
-      default: false,
-    },
-    {
-      flag: '--gate-compare',
-      description: 'Compare current Signals to the gate baseline',
-      default: false,
-    },
+    ...gateRunFlagSpecs,
     {
       flag: '--profile',
       value: '<path>',
@@ -597,12 +586,7 @@ export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       default: false,
     },
     ...agentRunFlagSpecs,
-    {
-      flag: '--sarif',
-      value: '<path>',
-      description:
-        'Also write this run’s findings as a SARIF 2.1.0 file (for GitHub Code Scanning). Composes with --gate-save; written even when the gate fails.',
-    },
+    sarifRunFlagSpec,
   ],
   args: [
     {
@@ -612,10 +596,5 @@ export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       description: 'Subtrees to analyze (default: whole project)',
     },
   ],
-  scope: 'project',
-  output: 'raw-stream',
-  rawStreamReason: 'runtime-render-dispatch',
-  // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
-  producesVerdict: true,
   handler: runGraphCommand,
 });

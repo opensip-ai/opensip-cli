@@ -835,7 +835,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Compare current Signals to the gate baseline",
+          "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
           "flags": "--gate-compare",
           "negate": false,
           "optional": false,
@@ -845,7 +845,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Save current Signal set as the gate baseline",
+          "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
           "flags": "--gate-save",
           "negate": false,
           "optional": false,
@@ -958,7 +958,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Also write this run’s findings as a SARIF 2.1.0 file (for GitHub Code Scanning). Composes with --gate-save; written even when the gate fails.",
+          "description": "Also write this run findings as SARIF 2.1.0. Composes with --gate-save; written even when the gate fails.",
           "flags": "--sarif <path>",
           "negate": false,
           "optional": false,
@@ -2865,7 +2865,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Write this run findings as SARIF 2.1.0 (composes with --gate-save)",
+          "description": "Also write this run findings as SARIF 2.1.0. Composes with --gate-save; written even when the gate fails.",
           "flags": "--sarif <path>",
           "negate": false,
           "optional": false,

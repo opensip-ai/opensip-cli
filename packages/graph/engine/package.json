@@ -63,8 +63,8 @@
         "description": "Run static call-graph analysis (rules, entry points, catalog summary in one report)",
         "aliases": [],
         "commonFlags": [
-          "cwd",
           "json",
+          "cwd",
           "quiet",
           "verbose",
           "debug",
@@ -100,12 +100,12 @@
           },
           {
             "flag": "--gate-save",
-            "description": "Save current Signal set as the gate baseline",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
             "default": false
           },
           {
             "flag": "--gate-compare",
-            "description": "Compare current Signals to the gate baseline",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
             "default": false
           },
           {
@@ -157,7 +157,7 @@
           {
             "flag": "--sarif",
             "value": "<path>",
-            "description": "Also write this run’s findings as a SARIF 2.1.0 file (for GitHub Code Scanning). Composes with --gate-save; written even when the gate fails."
+            "description": "Also write this run findings as SARIF 2.1.0. Composes with --gate-save; written even when the gate fails."
           }
         ],
         "args": [

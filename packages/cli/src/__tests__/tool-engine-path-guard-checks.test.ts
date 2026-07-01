@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { analyzeMandatoryRunCommonFlags } from '../../../../opensip-cli/fit/checks/cross-tool-flag-parity.mjs';
 import { analyzeDirectStdoutInToolEngine } from '../../../../opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs';
 import { analyzeNoRawFsArtifactWrite } from '../../../../opensip-cli/fit/checks/no-raw-fs-artifact-write-in-tool-engine.mjs';
 import { analyzeAllReportProducerOpenFlag } from '../../../../opensip-cli/fit/checks/report-producer-open-flag.mjs';
@@ -119,5 +120,58 @@ describe('derived first-party tool-engine path gates', () => {
         filePath: '/repo/packages/graph/engine/src/tool.ts',
       }),
     ]);
+  });
+
+  it('requires the shared reporting common flags for manual primary run commands', () => {
+    const findings = analyzeMandatoryRunCommonFlags(`
+      export const graphCommandSpec = definePrimaryCommand({
+        commonFlags: ['cwd', 'json'],
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+      });
+    `);
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('quiet'),
+      }),
+    ]);
+  });
+
+  it('allows primary run commands through the shared preset or reporting flag constant', () => {
+    expect(
+      analyzeMandatoryRunCommonFlags(`
+        export const graphCommandSpec = definePrimaryRunCommand({
+          description: 'Build the graph',
+          handler,
+        });
+      `),
+    ).toEqual([]);
+    expect(
+      analyzeMandatoryRunCommonFlags(`
+        export const graphCommandSpec = definePrimaryCommand({
+          commonFlags: [...REPORTING_RUN_COMMON_FLAGS],
+          output: 'raw-stream',
+          rawStreamReason: 'runtime-render-dispatch',
+          producesVerdict: true,
+        });
+      `),
+    ).toEqual([]);
+  });
+
+  it('does not force non-primary runtime-dispatch commands into the primary run preset', () => {
+    expect(
+      analyzeMandatoryRunCommonFlags(`
+        export const graphImpactCommandSpec = defineCommand({
+          name: 'graph impact',
+          commonFlags: ['cwd', 'json'],
+          output: 'raw-stream',
+          rawStreamReason: 'runtime-render-dispatch',
+          handler,
+        });
+      `),
+    ).toEqual([]);
   });
 });

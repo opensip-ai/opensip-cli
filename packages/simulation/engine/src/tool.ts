@@ -14,18 +14,14 @@
 import {
   agentRunFlagSpecs,
   buildAgentFilteredResult,
+  definePrimaryRunCommand,
   EXIT_CODES,
   normalizeAgentRunFilters,
   type SignalEnvelope,
   type StoredSession,
   type ToolOptions,
 } from '@opensip-cli/contracts';
-import {
-  createToolScope,
-  definePrimaryCommand,
-  defineTool,
-  readPackageVersion,
-} from '@opensip-cli/core';
+import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { collectSimulationReportData } from './cli/report-data.js';
@@ -321,12 +317,8 @@ function sessionReplayResult(
  * `emitEnvelope`/`render`), so the host renders nothing and the handler stays
  * authoritative — byte-identical to the former action body.
  */
-const simCommand = definePrimaryCommand<unknown, ToolCliContext>({
+const simCommand = definePrimaryRunCommand<unknown>({
   description: 'Run simulation scenarios',
-  // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,
-  // --verbose, --debug, --report-to, --api-key, --open. sim carries -v/--verbose
-  // (per-scenario detail). `cwd` is seeded with process.cwd() by the mounter.
-  commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
   options: [
     {
       flag: '--recipe',
@@ -340,11 +332,6 @@ const simCommand = definePrimaryCommand<unknown, ToolCliContext>({
     },
     ...agentRunFlagSpecs,
   ],
-  scope: 'project',
-  output: 'raw-stream',
-  rawStreamReason: 'runtime-render-dispatch',
-  // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
-  producesVerdict: true,
   handler: runSim,
 });
 

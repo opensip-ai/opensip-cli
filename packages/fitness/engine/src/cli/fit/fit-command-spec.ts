@@ -14,8 +14,11 @@
  * the handler stays authoritative — byte-identical to the former action body.
  */
 
-import { agentRunFlagSpecs } from '@opensip-cli/contracts';
-import { definePrimaryCommand } from '@opensip-cli/core';
+import {
+  agentRunFlagSpecs,
+  definePrimaryRunCommand,
+  gateRunFlagSpecs,
+} from '@opensip-cli/contracts';
 
 import { FITNESS_LIVE_VIEW_KEY } from '../../identity.js';
 import {
@@ -86,12 +89,8 @@ async function runFit(
  * stays next to the renderer import; this module stays renderer-free.
  */
 export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {
-  return definePrimaryCommand<unknown, ToolCliContext>({
+  return definePrimaryRunCommand<unknown>({
     description: 'Run fitness checks',
-    // ADR-0021 cross-tool flags from the single registry: --cwd, --json,
-    // --quiet, --verbose, --debug, --report-to, --api-key, --open. `cwd` is
-    // seeded with process.cwd() by the mounter. fit-specific flags below.
-    commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     options: [
       {
         flag: '--recipe',
@@ -133,18 +132,7 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
         value: '<session>',
         description: 'Replay a stored fit session by id, or latest for the latest fit session',
       },
-      {
-        flag: '--gate-save',
-        description:
-          'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)',
-        default: false,
-      },
-      {
-        flag: '--gate-compare',
-        description:
-          'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
-        default: false,
-      },
+      ...gateRunFlagSpecs,
       ...agentRunFlagSpecs,
       {
         flag: '--changed',
@@ -162,11 +150,6 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
         default: false,
       },
     ],
-    scope: 'project',
-    output: 'raw-stream',
-    rawStreamReason: 'runtime-render-dispatch',
-    // Emits a SignalEnvelope verdict (via runtime-render dispatch) → eligible as a suite step.
-    producesVerdict: true,
     handler: (opts, cli) => runFit(opts, cli, setUpLiveView),
   });
 }

@@ -67,8 +67,8 @@
           "sim"
         ],
         "commonFlags": [
-          "cwd",
           "json",
+          "cwd",
           "quiet",
           "verbose",
           "debug",

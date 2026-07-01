@@ -4,22 +4,33 @@
 
 import {
   defineCommand,
+  definePrimaryCommand,
   type CommandSpec,
   type CommonFlagKey,
+  type ArgSpec,
   type RawStreamReason,
   type ToolCliContext,
   type OptionSpec,
+  type PrimaryCommandSpecDraft,
 } from '@opensip-cli/core';
 
 import { MANDATORY_COMMON_FLAGS } from './cli-flags.js';
 
 type PresetHandler<TOpts> = CommandSpec<TOpts, ToolCliContext>['handler'];
 
-interface CommandPresetInput<TOpts extends Record<string, unknown>> {
+interface CommandPresetInput<TOpts> {
   readonly name: string;
   readonly description: string;
   readonly aliases?: readonly string[];
   readonly options?: readonly OptionSpec[];
+  readonly args?: readonly ArgSpec[];
+  readonly handler: PresetHandler<TOpts>;
+}
+
+interface PrimaryRunCommandPresetInput<TOpts> {
+  readonly description: string;
+  readonly options?: readonly OptionSpec[];
+  readonly args?: readonly ArgSpec[];
   readonly handler: PresetHandler<TOpts>;
 }
 
@@ -27,9 +38,40 @@ interface CommandPresetDefaults {
   readonly commonFlags: readonly CommonFlagKey[];
   readonly output: CommandSpec<Record<string, unknown>, ToolCliContext>['output'];
   readonly rawStreamReason?: RawStreamReason;
+  readonly producesVerdict?: boolean;
 }
 
-function definePresetCommand<TOpts extends Record<string, unknown>>(
+/** Common flags for report-producing primary run commands. */
+export const REPORTING_RUN_COMMON_FLAGS: readonly CommonFlagKey[] = [
+  ...MANDATORY_COMMON_FLAGS,
+  'open',
+] as const;
+
+/** Shared gate trigger flags for tools that participate in the baseline plane. */
+export const gateRunFlagSpecs: readonly OptionSpec[] = [
+  {
+    flag: '--gate-save',
+    description:
+      'Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)',
+    default: false,
+  },
+  {
+    flag: '--gate-compare',
+    description:
+      'Architecture-gate: compare current findings against the saved baseline; exit 1 on regression',
+    default: false,
+  },
+] as const;
+
+/** Shared SARIF side-output trigger for verdict-producing run commands. */
+export const sarifRunFlagSpec: OptionSpec = {
+  flag: '--sarif',
+  value: '<path>',
+  description:
+    'Also write this run findings as SARIF 2.1.0. Composes with --gate-save; written even when the gate fails.',
+} as const;
+
+function definePresetCommand<TOpts>(
   input: CommandPresetInput<TOpts>,
   defaults: CommandPresetDefaults,
 ): CommandSpec<TOpts, ToolCliContext> {
@@ -43,7 +85,28 @@ function definePresetCommand<TOpts extends Record<string, unknown>>(
     ...(defaults.rawStreamReason === undefined
       ? {}
       : { rawStreamReason: defaults.rawStreamReason }),
+    ...(defaults.producesVerdict === undefined
+      ? {}
+      : { producesVerdict: defaults.producesVerdict }),
     ...(input.options === undefined ? {} : { options: input.options }),
+    ...(input.args === undefined ? {} : { args: input.args }),
+    handler: input.handler,
+  });
+}
+
+/** Primary first-party run command with runtime dispatch and the full report surface. */
+export function definePrimaryRunCommand<TOpts>(
+  input: PrimaryRunCommandPresetInput<TOpts>,
+): PrimaryCommandSpecDraft<TOpts, ToolCliContext> {
+  return definePrimaryCommand<TOpts, ToolCliContext>({
+    description: input.description,
+    commonFlags: [...REPORTING_RUN_COMMON_FLAGS],
+    ...(input.options === undefined ? {} : { options: input.options }),
+    ...(input.args === undefined ? {} : { args: input.args }),
+    scope: 'project',
+    output: 'raw-stream',
+    rawStreamReason: 'runtime-render-dispatch',
+    producesVerdict: true,
     handler: input.handler,
   });
 }
