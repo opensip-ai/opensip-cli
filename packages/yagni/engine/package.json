@@ -52,10 +52,92 @@
     "commands": [
       {
         "name": "yagni",
+        "description": "Run YAGNI reduction audit detectors",
         "aliases": [
           "yag"
         ],
-        "description": "Run YAGNI reduction audit detectors"
+        "commonFlags": [
+          "cwd",
+          "json",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          },
+          {
+            "flag": "--sarif",
+            "value": "<path>",
+            "description": "Write this run findings as SARIF 2.1.0 (composes with --gate-save)"
+          },
+          {
+            "flag": "--min-confidence",
+            "value": "<level>",
+            "description": "Minimum confidence level: low, medium, or high",
+            "choices": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          {
+            "flag": "--detector",
+            "value": "<slug>",
+            "description": "Run only the named detector (repeatable)",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--category",
+            "value": "<name>",
+            "description": "Filter findings by reduction category (repeatable)",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--include-tests",
+            "description": "Include test and fixture code in analysis",
+            "default": false
+          },
+          {
+            "flag": "--filter",
+            "value": "<filter>",
+            "description": "Agent filter (repeatable): errors-only, warnings-only, category:<name>, source:<slug>, file:<path>, high-impact, top:<n>",
+            "arrayDefault": []
+          },
+          {
+            "flag": "--top",
+            "value": "<n>",
+            "description": "Limit returned signals (sugar for --filter top:<n>)"
+          },
+          {
+            "flag": "--raw",
+            "description": "Emit unwrapped payload (no CommandOutcome wrapper)",
+            "default": false
+          }
+        ],
+        "args": [
+          {
+            "name": "paths",
+            "description": "Limit analysis to one or more directory subtrees",
+            "variadic": true,
+            "optional": true
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch",
+        "producesVerdict": true
       },
       {
         "name": "yagni-run-worker",

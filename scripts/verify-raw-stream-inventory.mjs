@@ -5,27 +5,55 @@
  * `rawStreamReason`.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const BUDGET = 13;
+const BUDGET = 24;
 
-const BUNDLED_TOOL_DIRS = [
-  'packages/fitness/engine',
-  'packages/simulation/engine',
-  'packages/graph/engine',
-  'packages/yagni/engine',
+const RAW_STREAM_REASONS = [
+  'completion-script',
+  'file-export',
+  'worker-ipc',
+  'runtime-render-dispatch',
+  'session-replay',
+  'diagnostic-gate',
+  'mcp-stdio',
 ];
 
 const log = (msg) => console.error(`[verify-raw-stream-inventory] ${msg}`);
 
+function workspacePackageDirs() {
+  const packagesDir = join(REPO_ROOT, 'packages');
+  const dirs = [];
+  for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const topLevel = join(packagesDir, entry.name);
+    if (existsSync(join(topLevel, 'package.json'))) dirs.push(topLevel);
+    for (const child of readdirSync(topLevel, { withFileTypes: true })) {
+      if (!child.isDirectory()) continue;
+      const nested = join(topLevel, child.name);
+      if (existsSync(join(nested, 'package.json'))) dirs.push(nested);
+    }
+  }
+  return dirs;
+}
+
+function collectToolPackages() {
+  const packages = [];
+  for (const dir of workspacePackageDirs()) {
+    const pjPath = join(dir, 'package.json');
+    const pkg = JSON.parse(readFileSync(pjPath, 'utf8'));
+    if (pkg.opensipTools?.kind !== 'tool') continue;
+    packages.push({ dir, pkg });
+  }
+  return packages.sort((a, b) => a.pkg.name.localeCompare(b.pkg.name));
+}
+
 function collectRawStreamCommands() {
   const entries = [];
-  for (const toolDir of BUNDLED_TOOL_DIRS) {
-    const pjPath = join(REPO_ROOT, toolDir, 'package.json');
-    const pkg = JSON.parse(readFileSync(pjPath, 'utf8'));
+  for (const { pkg } of collectToolPackages()) {
     const commands = pkg.opensipTools?.commands ?? [];
     for (const cmd of commands) {
       if (cmd.output !== 'raw-stream') continue;
@@ -48,6 +76,16 @@ function main() {
     for (const e of missing) {
       const path = e.parent ? `${e.parent} ${e.name}` : e.name;
       log(`  ${e.package} ${path}`);
+    }
+    process.exit(1);
+  }
+
+  const unknown = entries.filter((e) => !RAW_STREAM_REASONS.includes(e.rawStreamReason));
+  if (unknown.length > 0) {
+    log('FAIL — raw-stream commands declare unknown rawStreamReason:');
+    for (const e of unknown) {
+      const path = e.parent ? `${e.parent} ${e.name}` : e.name;
+      log(`  ${e.package} ${path} (${e.rawStreamReason})`);
     }
     process.exit(1);
   }

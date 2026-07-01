@@ -33,12 +33,20 @@
  * Mirrors build-package-keywords.mjs (sibling generator + gate).
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHECK_ONLY = process.argv.slice(2).includes('--check');
+const BUNDLED_TOOLS_MANIFEST_PATH = join(
+  REPO_ROOT,
+  'packages',
+  'cli',
+  'src',
+  'bootstrap',
+  'bundled-tools.manifest.json',
+);
 
 const log = (msg) => console.error(`[build-tool-command-manifests] ${msg}`);
 
@@ -66,17 +74,59 @@ async function loadAdapterManifestHelpers() {
   return adapterManifestHelpers;
 }
 
+function workspacePackageDirs() {
+  const packagesDir = join(REPO_ROOT, 'packages');
+  const dirs = [];
+  for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const topLevel = join(packagesDir, entry.name);
+    if (existsSync(join(topLevel, 'package.json'))) dirs.push(topLevel);
+    for (const child of readdirSync(topLevel, { withFileTypes: true })) {
+      if (!child.isDirectory()) continue;
+      const nested = join(topLevel, child.name);
+      if (existsSync(join(nested, 'package.json'))) dirs.push(nested);
+    }
+  }
+  return dirs;
+}
+
+function workspacePackageDirByName() {
+  const byName = new Map();
+  for (const dir of workspacePackageDirs()) {
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    if (typeof pkg.name === 'string') byName.set(pkg.name, relative(REPO_ROOT, dir));
+  }
+  return byName;
+}
+
 /**
- * The bundled tool packages whose manifests carry a derived command shell. Keyed
- * to the dirs the central bundled manifest declares (kept in sync by the data in
- * packages/cli/src/bootstrap/bundled-tools.manifest.json).
+ * The bundled tool packages whose manifests carry a derived command shell. The
+ * list is derived from the same manifest the CLI bootstrap uses so a newly
+ * bundled tool cannot silently miss command-shell generation.
  */
-const BUNDLED_TOOL_DIRS = [
-  'packages/fitness/engine',
-  'packages/simulation/engine',
-  'packages/graph/engine',
-  'packages/mcp',
-];
+function bundledToolDirs() {
+  const manifest = JSON.parse(readFileSync(BUNDLED_TOOLS_MANIFEST_PATH, 'utf8'));
+  const packages = manifest.bundledPackages;
+  if (!Array.isArray(packages)) {
+    log('bundled-tools.manifest.json must declare bundledPackages[]');
+    process.exit(1);
+  }
+  const byName = workspacePackageDirByName();
+  return packages.map((packageName) => {
+    if (typeof packageName !== 'string') {
+      log('bundled-tools.manifest.json bundledPackages[] entries must be strings');
+      process.exit(1);
+    }
+    const dir = byName.get(packageName);
+    if (dir === undefined) {
+      log(`bundled tool package ${packageName} has no workspace package.json`);
+      process.exit(1);
+    }
+    return dir;
+  });
+}
+
+const BUNDLED_TOOL_DIRS = bundledToolDirs();
 
 /**
  * External Tool Adapter packages (ADR-0090, Phase-0 decision 7). These are

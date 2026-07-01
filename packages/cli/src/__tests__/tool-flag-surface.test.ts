@@ -154,6 +154,7 @@ const EXPECTED: Record<string, string[]> = {
     '--cwd',
     '--debug',
     '--detector',
+    '--filter',
     '--gate-compare',
     '--gate-save',
     '--include-tests',
@@ -161,8 +162,10 @@ const EXPECTED: Record<string, string[]> = {
     '--min-confidence',
     '--open',
     '--quiet',
+    '--raw',
     '--report-to',
     '--sarif',
+    '--top',
     '--verbose',
   ],
   // ADR-0084: the `mcp` command is a long-lived stdio JSON-RPC server
