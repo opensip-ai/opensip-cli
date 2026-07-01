@@ -894,6 +894,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
         {
           "choices": undefined,
+          "defaultValue": false,
+          "description": "Launch the HTML report in your browser after the run completes",
+          "flags": "--open",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
           "defaultValue": undefined,
           "description": "Write graph performance profile JSON to path",
           "flags": "--profile <path>",

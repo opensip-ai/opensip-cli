@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { analyzeDirectStdoutInToolEngine } from '../../../../opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs';
 import { analyzeNoRawFsArtifactWrite } from '../../../../opensip-cli/fit/checks/no-raw-fs-artifact-write-in-tool-engine.mjs';
+import { analyzeAllReportProducerOpenFlag } from '../../../../opensip-cli/fit/checks/report-producer-open-flag.mjs';
 import { analyzeAllSessionPersistRequiresReplay } from '../../../../opensip-cli/fit/checks/session-persist-requires-replay.mjs';
 import {
   bundledToolPackageSegments,
@@ -82,6 +83,40 @@ describe('derived first-party tool-engine path gates', () => {
       expect.objectContaining({
         type: 'session-persist-requires-replay',
         filePath: '/repo/packages/yagni/engine/src/tool.ts',
+      }),
+    ]);
+  });
+
+  it('requires --open when a first-party tool contributes report data', async () => {
+    const files = new Map([
+      [
+        '/repo/packages/graph/engine/src/tool.ts',
+        'export const graphTool = defineTool({ extensionPoints: { collectReportData } });',
+      ],
+      [
+        '/repo/packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+        "export const graphCommandSpec = definePrimaryCommand({ commonFlags: ['cwd', 'json'] });",
+      ],
+      [
+        '/repo/packages/yagni/engine/src/tool.ts',
+        'export const yagniTool = defineTool({ extensionPoints: { collectReportData: collectYagniReportData } });',
+      ],
+      [
+        '/repo/packages/yagni/engine/src/cli/yagni-command-spec.ts',
+        "export const spec = definePrimaryCommand({ commonFlags: ['cwd', 'json', 'open'] });",
+      ],
+    ]);
+
+    const findings = await analyzeAllReportProducerOpenFlag({
+      paths: [...files.keys()],
+      readMany: async (paths: readonly string[]) =>
+        new Map(paths.map((path) => [path, files.get(path) ?? ''])),
+    });
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        type: 'report-producer-open-flag',
+        filePath: '/repo/packages/graph/engine/src/tool.ts',
       }),
     ]);
   });

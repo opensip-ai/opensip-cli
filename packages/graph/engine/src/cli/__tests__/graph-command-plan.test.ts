@@ -61,6 +61,10 @@ describe('planGraphExecution', () => {
 });
 
 describe('graphCommandSpec option parsers', () => {
+  it('exposes --open for report auto-open parity', () => {
+    expect(graphCommandSpec.commonFlags).toContain('open');
+  });
+
   it('parses positive concurrency and rejects invalid values', () => {
     const concurrency = (graphCommandSpec.options ?? []).find(
       (option) => option.flag === '--concurrency',

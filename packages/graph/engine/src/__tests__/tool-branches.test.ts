@@ -109,6 +109,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
     writeArtifact: vi.fn((path: string, bytes: string) => {
       mkdirSync(dirname(path), { recursive: true });

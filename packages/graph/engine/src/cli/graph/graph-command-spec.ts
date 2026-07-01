@@ -68,6 +68,7 @@ interface GraphCommandOptions {
   gateCompare?: boolean;
   reportTo?: string;
   apiKey?: string;
+  open?: boolean;
   profile?: string;
   workspace?: boolean;
   exact?: boolean;
@@ -268,11 +269,12 @@ async function runGraphCommand(
   // show the staged "Code Graph" checklist in a terminal; both fall through to
   // the static path when piped. The live view is therefore eligible for any
   // rendering run — there is no `--exact` gate. Every non-rendering mode (json/
-  // gate/report/profile/workspace/positional-paths/language) is excluded.
+  // gate/report/open/profile/workspace/positional-paths/language) is excluded.
   const isLiveViewEligible =
     opts.json !== true &&
     opts.gateSave !== true &&
     opts.gateCompare !== true &&
+    opts.open !== true &&
     /* v8 ignore next */
     (typeof opts.reportTo !== 'string' || opts.reportTo.length === 0) &&
     (typeof opts.profile !== 'string' || opts.profile.length === 0) &&
@@ -330,6 +332,7 @@ async function runGraphCommand(
   }
 
   await deliverNonGateEgress(opts, outcome?.envelope, cli);
+  await maybeOpenGraphReport(opts, outcome?.envelope, cli);
 
   // host-owned-run-timing Phase 3: RETURN the generic-session contribution; the
   // host run plane persists it after this handler resolves (no tool-side write).
@@ -373,6 +376,19 @@ async function deliverNonGateEgress(
     cwd: opts.cwd,
     reportTo: opts.reportTo,
     apiKey: opts.apiKey,
+  });
+}
+
+async function maybeOpenGraphReport(
+  opts: GraphCommandOptions,
+  envelope: SignalEnvelope | undefined,
+  cli: ToolCliContext,
+): Promise<void> {
+  const isGateMode = opts.gateSave === true || opts.gateCompare === true;
+  if (envelope === undefined || isGateMode) return;
+  await cli.maybeOpenReport({
+    openRequested: opts.open === true,
+    jsonOutput: opts.json === true,
   });
 }
 
@@ -508,9 +524,9 @@ export const graphCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
   // ADR-0021 cross-tool flags from the single registry: --cwd, --json, --quiet,
-  // --verbose, --debug, --report-to, --api-key. `cwd` is seeded with
+  // --verbose, --debug, --report-to, --api-key, --open. `cwd` is seeded with
   // process.cwd() by the mounter. graph-specific flags stay declared below.
-  commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey'],
+  commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
   options: [
     {
       flag: '--no-cache',

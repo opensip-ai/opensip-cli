@@ -111,6 +111,7 @@ const EXPECTED: Record<string, string[]> = {
     '--list-files',
     '--mode',
     '--no-cache',
+    '--open',
     '--out',
     '--output-sarif',
     '--profile',
