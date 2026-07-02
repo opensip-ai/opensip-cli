@@ -1,6 +1,6 @@
 {
-  "version": "0.2.3",
-  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v0.2.3/",
+  "version": "0.2.4",
+  "rawBase": "https://raw.githubusercontent.com/opensip-ai/opensip-cli/v0.2.4/",
   "pages": [
     {
       "file": "docs/web-generated/README.md",
@@ -13,7 +13,7 @@
         "plugin-authors",
         "ci-integrators"
       ],
-      "purpose": "Public documentation entry point for opensip-cli v0.2.3: product overview, fast paths, and the full reference map."
+      "purpose": "Public documentation entry point for opensip-cli v0.2.4: product overview, fast paths, and the full reference map."
     },
     {
       "file": "docs/web-generated/00-start/00-quick-start.md",

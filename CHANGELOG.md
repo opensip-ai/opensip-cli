@@ -2,6 +2,25 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.2.4] - 2026-07-01
+
+An init UX and onboarding release. Repeat-init diagnostics summarize
+pre-existing files by count instead of listing paths, and the scaffolded
+sim example runs immediately after `opensip init` without extra plugin
+dependencies.
+
+### Changed
+
+- Init success and partial-state views report how many files were preserved
+  under `opensip-cli/` instead of printing a capped per-file preview.
+- Scaffolded sim scenario and recipe use plain objects so
+  `opensip sim --recipe example` works out of the box after init.
+
+### Fixed
+
+- Core package coverage stays above the 95% statement threshold used in
+  release preflight.
+
 ## [0.2.3] - 2026-07-01
 
 A config-discovery simplification release. Project config resolves from

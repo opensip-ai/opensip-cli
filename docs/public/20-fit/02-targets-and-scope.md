@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.2.3
+release: v0.2.4
 title: "Targets and scope"
 audience: [contributors, plugin-authors]
 purpose: "How the framework decides which files a check runs against. Targets, scope, glob expansion, and the marketplace shape."

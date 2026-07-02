@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-26
-release: v0.2.3
+release: v0.2.4
 title: "Create your first Tool"
 audience: [plugin-authors, contributors]
 purpose: "Task-led guide for creating a tracked project-local Tool plugin that adds a custom opensip-cli subcommand."
@@ -195,7 +195,7 @@ The tracked sidecar layout is ideal while authoring inside one repo. To distribu
 5. Install with `opensip tools install <spec>`.
 
 A publishable npm scaffold is deferred until consumption-side verification and
-trust enforcement mature (see [ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+trust enforcement mature (see [ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 `tools validate` and `tools install` execute the candidate package module as part of validation. Install scripts are blocked and runtime probing has a timeout, but this is still code execution with your user privileges.
 

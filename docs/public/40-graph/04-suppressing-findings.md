@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.2.3
+release: v0.2.4
 title: "Suppressing findings (graph)"
 audience: [contributors, ci-integrators]
 purpose: "Inline source-level waivers — how `@graph-ignore-next-line` and `@graph-ignore-file` work, the any-member rule for cycles, and how a waiver relates to the gate baseline."
