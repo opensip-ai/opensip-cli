@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-02
 release: v0.2.4
 owner: opensip-cli
 indexable: true
@@ -50,6 +50,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | Wire the release gate into CI | [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/) |
 | Verify release artifacts | [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/) |
 | Inspect detection-quality methodology | [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/) |
+| Audit contract/version compatibility | [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) |
 
 ## Command Map
@@ -179,22 +180,23 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 50. [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/)
 51. [Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/)
 52. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
-53. [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/)
 53. [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/)
+54. [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/)
+55. [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/)
 
 ### 80 - Internals
 
-54. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-55. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-56. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-57. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
-58. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
-59. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
-60. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
+56. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+57. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+58. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+59. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+60. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
+61. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
+62. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
 
 ## Factual Baseline
 
-This v0.2.4 doc set was rechecked against the source on 2026-06-27:
+This v0.2.4 doc set was rechecked against the source on 2026-07-02:
 
 - 151 built-in fitness checks across seven packs.
 - 42 publishable workspace packages, plus the private `@opensip-cli/test-support` package.

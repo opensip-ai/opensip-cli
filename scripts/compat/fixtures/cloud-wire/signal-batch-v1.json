@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "tool": "fit",
+  "repo": {
+    "id": "repo_fixture",
+    "commit": "abcdef1234567890"
+  },
+  "runId": "RUN_fixture",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "counts": {
+    "total": 0,
+    "bySeverity": {}
+  },
+  "signals": []
+}

@@ -143,6 +143,10 @@ const CONFIG_READER_ALLOWLIST = new Set([
   // Host-owned `opensip config validate|schema` — reads the project config
   // strictly for validation/schema export (ADR-0067), peer to bootstrap load.
   'packages/cli/src/commands/config.ts',
+  // Host-owned `opensip config migrate` implementation — intentionally reads
+  // and rewrites the project config for schema upgrade only; runtime config
+  // loading still flows through the composed document loader (ADR-0023/0121).
+  'packages/config/src/migration.ts',
   'packages/cli/src/commands/plugin/config-edit.ts',
   'packages/fitness/engine/src/signalers/loader.ts',
   'packages/fitness/engine/src/targets/loader.ts',

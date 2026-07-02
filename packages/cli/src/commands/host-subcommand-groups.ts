@@ -63,7 +63,7 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
   return [
     {
       name: 'config',
-      description: 'Project config validation and schema export',
+      description: 'Project config validation, schema export, and migration',
       leaves: buildConfigGroupLeaves(ctx),
     },
     {

@@ -43,7 +43,31 @@ export type {
   UnitResult,
   BuildEnvelopeInput,
 } from './signal-envelope.js';
-export { buildSignalEnvelope, DEFAULT_BASELINE_IDENTITY } from './signal-envelope.js';
+export {
+  buildSignalEnvelope,
+  DEFAULT_BASELINE_IDENTITY,
+  SIGNAL_ENVELOPE_SCHEMA_VERSION,
+} from './signal-envelope.js';
+
+// Platform compatibility/LTS policy registry. Defined in core so lower layers can
+// inspect policy without depending on contracts; re-exported here for the public
+// Tool↔runner facade.
+export {
+  CLI_COMMAND_SURFACE_CONTRACT_VERSION,
+  CLOUD_WIRE_CONTRACT_VERSION,
+  COMPATIBILITY_CONTRACT_CLASSES,
+  COMPATIBILITY_POLICIES,
+  DATASTORE_PAYLOAD_CONTRACT_VERSION,
+  PUBLIC_JSON_CONTRACT_VERSION,
+  RELEASE_ARTIFACT_CONTRACT_VERSION,
+  assertCompatibilityPoliciesComplete,
+  findCompatibilityPolicy,
+} from '@opensip-cli/core';
+export type {
+  CompatibilityContractClass,
+  CompatibilityContractPolicy,
+  CompatibilityStability,
+} from '@opensip-cli/core';
 
 export type {
   DeriveReviewBriefVerdictInput,
@@ -132,6 +156,7 @@ export type {
   GraphLookupResult,
   GraphImpactBasis,
   GraphImpactResult,
+  ConfigMigrateResult,
   ConfigValidateResult,
   ConfigSchemaResult,
 } from './command-results.js';
@@ -158,6 +183,7 @@ export type {
   WarningDetail,
   RenderHints,
 } from './command-outcome.js';
+export { COMMAND_OUTCOME_CONTRACT_VERSION } from './command-outcome.js';
 
 // CLI diagnostics — typed bootstrap/setup substrate (ADR-0060, Phase 2). DEFINED in
 // @opensip-cli/core; re-exported here for CommandOutcome and machine consumers.

@@ -35,6 +35,9 @@ slo-report*.json
 .opensip-quality/
 detection-quality-report*.json
 
+# Compatibility matrix artifacts
+compatibility-matrix-report*.json
+
 # In-repo git worktrees (parallel sessions). Tracked via .git/worktrees;
 # ignoring the checkout dir prevents accidental `git add` of a worktree.
 .worktrees/

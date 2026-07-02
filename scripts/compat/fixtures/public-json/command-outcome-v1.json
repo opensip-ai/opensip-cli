@@ -1,0 +1,11 @@
+{
+  "kind": "config.validate",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "config-validate",
+    "valid": true,
+    "configPath": "opensip-cli.config.yml",
+    "namespaces": ["cli"]
+  }
+}

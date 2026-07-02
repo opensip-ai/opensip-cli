@@ -41,6 +41,15 @@ export { resolveCapabilityPreferences } from './capability-preferences.js';
 export type { CapabilityPreferences } from './capability-preferences.js';
 export { toJsonSchema, jsonSchemaObjectToZod } from './json-schema.js';
 export type { JsonSchema } from './json-schema.js';
+export { MAX_CONFIG_MIGRATION_BYTES, migrateConfigFile, migrateConfigText } from './migration.js';
+export type {
+  ConfigMigrationOperation,
+  ConfigMigrationOperationKind,
+  MigrateConfigFileInput,
+  MigrateConfigFileResult,
+  MigrateConfigTextInput,
+  MigrateConfigTextResult,
+} from './migration.js';
 
 // Document-level config blocks (the tool-agnostic surface — ADR-0023).
 export { loadCliDefaults, cliConfigSchema } from './document/cli-config.js';

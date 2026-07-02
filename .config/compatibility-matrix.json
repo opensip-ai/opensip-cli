@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "contracts": [
+    { "class": "cli-command-surface" },
+    { "class": "project-config" },
+    { "class": "public-json" },
+    { "class": "tool-plugin-api" },
+    { "class": "cloud-wire" },
+    { "class": "release-artifact" },
+    { "class": "datastore-payload" }
+  ],
+  "fixtures": [
+    {
+      "contract": "public-json",
+      "kind": "signal-envelope",
+      "path": "scripts/compat/fixtures/public-json/signal-envelope-v2.json"
+    },
+    {
+      "contract": "public-json",
+      "kind": "command-outcome",
+      "path": "scripts/compat/fixtures/public-json/command-outcome-v1.json"
+    },
+    {
+      "contract": "cloud-wire",
+      "kind": "signal-batch",
+      "path": "scripts/compat/fixtures/cloud-wire/signal-batch-v1.json"
+    },
+    {
+      "contract": "project-config",
+      "kind": "config-migration",
+      "path": "scripts/compat/fixtures/project-config/legacy-no-schema.yml",
+      "expectChanged": true
+    },
+    {
+      "contract": "project-config",
+      "kind": "config-migration",
+      "path": "scripts/compat/fixtures/project-config/current-v1.yml",
+      "expectChanged": false
+    }
+  ]
+}

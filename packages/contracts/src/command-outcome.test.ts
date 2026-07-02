@@ -11,6 +11,7 @@ import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import { CLI_DIAGNOSTIC_CODES } from './cli-diagnostic.js';
+import { COMMAND_OUTCOME_CONTRACT_VERSION } from './command-outcome.js';
 import { buildSignalEnvelope } from './signal-envelope.js';
 
 import type { CommandOutcome } from './command-outcome.js';
@@ -19,6 +20,10 @@ import type { CliDiagnostic, RunDiagnostics } from '@opensip-cli/core';
 const DIAGNOSTICS: RunDiagnostics = { runId: 'run_1', events: [] };
 
 describe('CommandOutcome', () => {
+  it('exposes the public outer-wrapper contract version', () => {
+    expect(COMMAND_OUTCOME_CONTRACT_VERSION).toBe(1);
+  });
+
   it('wraps a run as .envelope without altering the inner envelope', () => {
     const envelope = buildSignalEnvelope({
       tool: 'fit',

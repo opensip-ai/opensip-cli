@@ -247,6 +247,25 @@ export {
 } from './lib/config-version.js';
 export type { SchemaCompat } from './lib/config-version.js';
 
+// Lib — platform compatibility/LTS policy registry. Used by docs, scripts, and
+// command surfaces to keep contract-class/version policy explicit.
+export {
+  CLI_COMMAND_SURFACE_CONTRACT_VERSION,
+  CLOUD_WIRE_CONTRACT_VERSION,
+  COMPATIBILITY_CONTRACT_CLASSES,
+  COMPATIBILITY_POLICIES,
+  DATASTORE_PAYLOAD_CONTRACT_VERSION,
+  PUBLIC_JSON_CONTRACT_VERSION,
+  RELEASE_ARTIFACT_CONTRACT_VERSION,
+  assertCompatibilityPoliciesComplete,
+  findCompatibilityPolicy,
+} from './lib/compatibility-policy.js';
+export type {
+  CompatibilityContractClass,
+  CompatibilityContractPolicy,
+  CompatibilityStability,
+} from './lib/compatibility-policy.js';
+
 // Lib — phantom-dir detector. Warns about orphaned opensip-cli/
 // subtrees left over from pre-discovery runs. Returns paths; callers
 // surface them; never auto-deletes.

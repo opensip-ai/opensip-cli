@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildSignalBatch, createSignal, MAX_SIGNALS_PER_BATCH } from '../index.js';
+import {
+  buildSignalBatch,
+  createSignal,
+  MAX_SIGNALS_PER_BATCH,
+  SIGNAL_BATCH_SCHEMA_VERSION,
+} from '../index.js';
 
 import type { Signal, SignalSeverity } from '../index.js';
 
@@ -21,7 +26,7 @@ describe('buildSignalBatch', () => {
       repo: { commit: 'abc123' },
       signals: [sig('high'), sig('high'), sig('low')],
     });
-    expect(batch.schemaVersion).toBe(1);
+    expect(batch.schemaVersion).toBe(SIGNAL_BATCH_SCHEMA_VERSION);
     expect(batch.tool).toBe('fit');
     expect(batch.recipe).toBe('example');
     expect(batch.repo.commit).toBe('abc123');

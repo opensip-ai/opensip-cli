@@ -33,6 +33,9 @@ import type { CliDiagnostic } from './cli-diagnostic.js';
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { RunDiagnostics } from '@opensip-cli/core';
 
+/** Public JSON contract version for the {@link CommandOutcome} outer wrapper. */
+export const COMMAND_OUTCOME_CONTRACT_VERSION = 1 as const;
+
 /** Outer status of a command outcome. `partial` = ran but with non-fatal gaps. */
 export type CommandOutcomeStatus = 'ok' | 'error' | 'partial';
 

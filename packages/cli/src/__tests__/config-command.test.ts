@@ -1,5 +1,5 @@
 /**
- * Coverage for `opensip config validate|schema`.
+ * Coverage for `opensip config validate|schema|migrate`.
  */
 
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -24,6 +24,7 @@ import { z } from 'zod';
 
 import { buildConfigDeclarations } from '../bootstrap/config-declarations.js';
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
+import { executeConfigMigrate } from '../commands/config-migrate.js';
 import { executeConfigSchema, executeConfigValidate } from '../commands/config.js';
 import { buildHostCommandInventory } from '../commands/host-subcommand-groups.js';
 
@@ -342,9 +343,65 @@ describe('executeConfigSchema', () => {
   });
 });
 
+describe('executeConfigMigrate', () => {
+  it('writes the migrated config by default', () => {
+    const configPath = join(dir, 'opensip-cli.config.yml');
+    writeFileSync(configPath, 'targets: {}\n', 'utf8');
+
+    const result = executeConfigMigrate({ configPath, cwd: dir });
+
+    expect(result).toMatchObject({
+      type: 'config-migrate',
+      configPath,
+      changed: true,
+      dryRun: false,
+      check: false,
+      wrote: true,
+      fromVersion: 1,
+      targetVersion: 1,
+    });
+    expect(result.operations[0]?.kind).toBe('add-schema-version');
+    expect(readFileSync(configPath, 'utf8')).toContain('schemaVersion: 1');
+  });
+
+  it('supports dry-run without writing', () => {
+    const configPath = join(dir, 'opensip-cli.config.yml');
+    const original = 'targets: {}\n';
+    writeFileSync(configPath, original, 'utf8');
+
+    const result = executeConfigMigrate({ configPath, cwd: dir, dryRun: true });
+
+    expect(result.changed).toBe(true);
+    expect(result.dryRun).toBe(true);
+    expect(result.wrote).toBe(false);
+    expect(readFileSync(configPath, 'utf8')).toBe(original);
+  });
+
+  it('treats --check as a dry-run result', () => {
+    const configPath = join(dir, 'opensip-cli.config.yml');
+    writeFileSync(configPath, 'targets: {}\n', 'utf8');
+
+    const result = executeConfigMigrate({ configPath, cwd: dir, check: true });
+
+    expect(result.changed).toBe(true);
+    expect(result.check).toBe(true);
+    expect(result.dryRun).toBe(true);
+    expect(result.wrote).toBe(false);
+  });
+
+  it('falls back to cwd/opensip-cli.config.yml when no config path is provided', () => {
+    const configPath = join(dir, 'opensip-cli.config.yml');
+
+    const result = executeConfigMigrate({ configPath: undefined, cwd: dir });
+
+    expect(result.changed).toBe(false);
+    expect(result.configPath).toBe(configPath);
+  });
+});
+
 describe('host config group inventory', () => {
-  it('includes config validate and config schema', () => {
+  it('includes config validate, config schema, and config migrate', () => {
     const inventory = buildHostCommandInventory();
-    expect(inventory.groupSubcommands.config).toEqual(['validate', 'schema']);
+    expect(inventory.groupSubcommands.config).toEqual(['validate', 'schema', 'migrate']);
   });
 });

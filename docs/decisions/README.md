@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0121](ADR-0121-platform-compatibility-lts-policy.md) — Public compatibility surfaces are named contract classes with explicit version markers, a config migration command, and a CI compatibility matrix over fixtures.
 - [ADR-0120](ADR-0120-detection-quality-measurement.md) — Detection quality is measured by a root-level script over a checked-in labeled OSS corpus and committed baseline; no new runtime tool, session surface, datastore table, or private-only primary corpus.
 - [ADR-0119](ADR-0119-verifiable-self-distribution.md) — OpenSIP CLI releases publish a manifest, `SHA256SUMS`, a CycloneDX release-set SBOM, and pinned GitHub Artifact Attestations before immutable npm publishing.
 - [ADR-0118](ADR-0118-scale-and-performance-slos.md) — opensip-cli performance SLOs are measured by a root-level benchmark script over deterministic synthetic corpora; CI enforces `.config/performance-slos.json` budgets and uploads `slo-report.json`.

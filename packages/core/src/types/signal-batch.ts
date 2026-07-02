@@ -21,6 +21,9 @@ import type { Signal, SignalSeverity } from './signal.js';
  *  only the cloud emission is bounded, and any drop is logged (no silent caps). */
 export const MAX_SIGNALS_PER_BATCH = 5000;
 
+/** Cloud wire schema version for {@link SignalBatch}. */
+export const SIGNAL_BATCH_SCHEMA_VERSION = 1 as const;
+
 /** Repository identity attached to a batch so stored signals key to a repo+commit. */
 export interface RepoIdentity {
   /** Stable repo id when known (e.g. graph's repoId). */
@@ -33,7 +36,7 @@ export interface RepoIdentity {
 
 /** The envelope POSTed to OpenSIP Cloud. `schemaVersion` is the wire-contract version. */
 export interface SignalBatch {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: typeof SIGNAL_BATCH_SCHEMA_VERSION;
   readonly tool: string;
   readonly recipe?: string;
   readonly repo: RepoIdentity;
@@ -103,7 +106,7 @@ export function buildSignalBatch(input: BuildSignalBatchInput): SignalBatch {
   for (const s of signals) bySeverity[s.severity] = (bySeverity[s.severity] ?? 0) + 1;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: SIGNAL_BATCH_SCHEMA_VERSION,
     tool: input.tool,
     recipe: input.recipe,
     repo: input.repo,

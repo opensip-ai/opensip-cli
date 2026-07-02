@@ -375,6 +375,10 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       '`simulation recipes` must be mounted',
     ).toBeDefined();
     expect(nestedChild(program, 'graph', 'list'), '`graph list` must be mounted').toBeDefined();
+    expect(
+      nestedChild(program, 'config', 'migrate'),
+      '`config migrate` must be mounted',
+    ).toBeDefined();
 
     // The per-tool `plugin` groups mount UNDER the pack-supporting tool primaries
     // (fit + sim; graph has no pluginLayout, so no `plugin` group).

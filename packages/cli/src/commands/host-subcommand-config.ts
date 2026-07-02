@@ -1,9 +1,11 @@
 /**
- * `config` subcommand group leaf specs (`validate`, `schema`).
+ * `config` subcommand group leaf specs (`validate`, `schema`, `migrate`).
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import { currentScope, type OptionSpec, type ProjectContext } from '@opensip-cli/core';
 
+import { executeConfigMigrate } from './config-migrate.js';
 import { executeConfigSchema, executeConfigValidate } from './config.js';
 import {
   COMMAND_RESULT,
@@ -25,12 +27,14 @@ function requireTools(ctx: CliCommandsContext) {
 }
 
 export function buildConfigGroupLeaves(ctx: CliCommandsContext): readonly HostSpec[] {
-  return [buildConfigValidateSpec(ctx), buildConfigSchemaSpec(ctx)];
+  return [buildConfigValidateSpec(ctx), buildConfigSchemaSpec(ctx), buildConfigMigrateSpec(ctx)];
 }
 
 interface ConfigCommandRawOpts {
   readonly cwd?: string;
   readonly out?: string;
+  readonly dryRun?: boolean;
+  readonly check?: boolean;
   readonly projectContext?: ProjectContext;
 }
 
@@ -38,7 +42,11 @@ interface ConfigCommandDefinition {
   readonly name: string;
   readonly description: string;
   readonly options: readonly OptionSpec[];
-  readonly run: (base: ReturnType<typeof configCommandBase>, opts: ConfigCommandRawOpts) => unknown;
+  readonly run: (
+    base: ReturnType<typeof configCommandBase>,
+    opts: ConfigCommandRawOpts,
+    ctx: CliCommandsContext,
+  ) => unknown;
 }
 
 function configCommandBase(ctx: CliCommandsContext, opts: ConfigCommandRawOpts) {
@@ -60,9 +68,9 @@ function buildConfigCommandSpec(ctx: CliCommandsContext, spec: ConfigCommandDefi
     options: spec.options,
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
-    handler: (rawOpts) => {
+    handler: (rawOpts, actionCtx) => {
       const opts = rawOpts as ConfigCommandRawOpts;
-      return spec.run(configCommandBase(ctx, opts), opts);
+      return spec.run(configCommandBase(ctx, opts), opts, actionCtx);
     },
   });
 }
@@ -100,5 +108,39 @@ function buildConfigSchemaSpec(ctx: CliCommandsContext): HostSpec {
       },
     ],
     run: (base, opts) => executeConfigSchema({ ...base, outPath: opts.out }),
+  });
+}
+
+function buildConfigMigrateSpec(ctx: CliCommandsContext): HostSpec {
+  return buildConfigCommandSpec(ctx, {
+    name: 'migrate',
+    description: 'Migrate opensip-cli.config.yml to the current schema version',
+    options: [
+      {
+        flag: '--config',
+        value: '<path>',
+        description: 'Migrate the config at this path instead of the discovered project config',
+      },
+      {
+        flag: '--dry-run',
+        description: 'Report the migration that would be applied without writing the file',
+      },
+      {
+        flag: '--check',
+        description: 'Fail when the config would be changed, without writing the file (for CI)',
+      },
+    ],
+    run: (base, opts, actionCtx) => {
+      const result = executeConfigMigrate({
+        configPath: base.configPath,
+        cwd: base.cwd,
+        dryRun: opts.dryRun,
+        check: opts.check,
+      });
+      if (result.check && result.changed) {
+        actionCtx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+      }
+      return result;
+    },
   });
 }

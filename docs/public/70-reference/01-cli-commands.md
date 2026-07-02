@@ -9,6 +9,7 @@ source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
   - packages/cli/src/commands/host-subcommand-config.ts
+  - packages/cli/src/commands/config-migrate.ts
   - packages/cli/src/commands/configure.ts
   - packages/cli/src/commands/plugin.ts
   - packages/cli/src/commands/tools/index.ts
@@ -784,21 +785,28 @@ unsafe partial state).
 
 ---
 
-## `config` — validate project config and export JSON Schema
+## `config` — validate, migrate, and export project config
 
 CLI-owned: [`packages/cli/src/commands/host-subcommand-config.ts`](../../../packages/cli/src/commands/host-subcommand-config.ts). Operator workflows over the **project** `opensip-cli.config.yml` using the same composed schema the dispatcher validates at pre-action time. Distinct from `opensip configure`, which manages the user-global OpenSIP Cloud API key.
 
 ```
 opensip config validate [--config <path>] [--json] [--cwd <path>]
 opensip config schema [--json] [--out <path>] [--cwd <path>]
+opensip config migrate [--config <path>] [--dry-run] [--check] [--json] [--cwd <path>]
 ```
 
 | Subcommand | Flags | Effect |
 |---|---|---|
 | `validate` | `--json` | Validate the effective project config; on success emit `data.type: "config-validate"`; invalid config exits **2** (`CONFIGURATION_ERROR`). |
 | `schema` | `--json`, `--out <path>` | Export the composed JSON Schema (`data.type: "config-schema"`); `--out` writes the schema file (rejects directory targets). |
+| `migrate` | `--json`, `--dry-run`, `--check` | Normalize the project config to the current schema version (`data.type: "config-migrate"`). `--dry-run` reports without writing. `--check` also avoids writes and exits **2** when a migration would be applied. |
 
-Both subcommands compose declarations from the live tool registry and admitted manifests — the same source as [`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts). They do not open the SQLite datastore.
+These subcommands use the same config path resolution as tool commands. `validate`
+and `schema` compose declarations from the live tool registry and admitted
+manifests — the same source as
+[`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts).
+`migrate` edits only `opensip-cli.config.yml`; it does not open the SQLite datastore
+or load tool runtimes.
 
 ---
 

@@ -318,57 +318,6 @@ export function viewGraphLookup(result: {
   );
 }
 
-// --- config commands ------------------------------------------------------
-
-export function viewConfigValidate(result: {
-  readonly configPath: string;
-  readonly namespaces: readonly string[];
-  readonly warnings?: readonly string[];
-}): ViewNode {
-  const children: ViewNode[] = [
-    line([
-      { text: '✓', tone: 'success' },
-      { text: ' Configuration valid: ' },
-      { text: result.configPath, bold: true },
-      {
-        text: ` (${String(result.namespaces.length)} namespace${result.namespaces.length === 1 ? '' : 's'})`,
-      },
-    ]),
-  ];
-  if (result.warnings !== undefined) {
-    for (const warning of result.warnings) {
-      children.push(line([{ text: `  ${warning}`, dim: true }]));
-    }
-  }
-  return group(children, 2);
-}
-
-export function viewConfigSchema(result: { readonly outPath?: string }): ViewNode {
-  if (result.outPath !== undefined) {
-    return group(
-      [
-        line([
-          { text: '✓', tone: 'success' },
-          { text: ' Wrote JSON Schema to ' },
-          { text: result.outPath, bold: true },
-        ]),
-      ],
-      2,
-    );
-  }
-  return group(
-    [
-      line([
-        {
-          text: 'Use --json to print the schema or --out <path> to write it to a file.',
-          dim: true,
-        },
-      ]),
-    ],
-    2,
-  );
-}
-
 // --- configure-done -------------------------------------------------------
 
 export function viewConfigureDone(result: ConfigureDoneResult): ViewNode {

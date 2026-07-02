@@ -1,11 +1,12 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-07-02
 release: v0.2.4
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
 source-files:
+  - packages/contracts/src/command-outcome.ts
   - packages/contracts/src/signal-envelope.ts
   - packages/core/src/types/signal.ts
 related-docs:
@@ -15,7 +16,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. This is the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. This is the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -27,11 +28,11 @@ related-docs:
 }
 ```
 
-`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload.
+`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload. The current outer wrapper contract is `COMMAND_OUTCOME_CONTRACT_VERSION = 1`.
 
 The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 
-> **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change.
+> **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (`SIGNAL_ENVELOPE_SCHEMA_VERSION = 2`, independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change. The compatibility matrix in `.config/compatibility-matrix.json` checks these constants against public fixtures in CI.
 
 ## Suite Run Results
 
@@ -580,7 +581,7 @@ filtered result object is emitted.
 }
 ```
 
-### `config validate|schema --json`
+### `config validate|schema|migrate --json`
 
 ```jsonc
 // validate success
@@ -605,6 +606,30 @@ filtered result object is emitted.
     "type": "config-schema",
     "schema": { /* JSON Schema document */ },
     "namespaces": ["cli", "fitness", "graph"]
+  }
+}
+
+// migrate dry-run/check result
+{
+  "kind": "config-migrate",
+  "status": "ok",
+  "exitCode": 2,
+  "data": {
+    "type": "config-migrate",
+    "configPath": "/path/to/opensip-cli.config.yml",
+    "changed": true,
+    "dryRun": true,
+    "check": true,
+    "wrote": false,
+    "fromVersion": 1,
+    "targetVersion": 1,
+    "operations": [
+      {
+        "kind": "add-schema-version",
+        "toVersion": 1,
+        "message": "Added schemaVersion: 1."
+      }
+    ]
   }
 }
 ```

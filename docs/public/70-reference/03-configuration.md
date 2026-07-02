@@ -10,6 +10,8 @@ source-files:
   - packages/cli/src/bootstrap/config-and-capabilities.ts
   - packages/cli/src/bootstrap/config-declarations.ts
   - packages/cli/src/commands/config.ts
+  - packages/cli/src/commands/config-migrate.ts
+  - packages/config/src/migration.ts
   - packages/fitness/engine/src/config/fitness-config-schema.ts
   - packages/simulation/engine/src/cli/sim-config-schema.ts
   - packages/graph/engine/src/cli/graph-config-schema.ts
@@ -33,17 +35,19 @@ opensip-cli reads two config files:
 
 Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](../../../packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](../../../packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated only when no loaded tool owns that namespace; a block named after a loaded tool that did not declare a config schema is rejected as a tool/config contract bug.
 
-## Validate and export schema
+## Validate, migrate, and export schema
 
 Use the host `config` command group to inspect the same composed schema the dispatcher uses — without running a tool command:
 
 ```bash
 opensip config validate --json
+opensip config migrate --dry-run
+opensip config migrate --check
 opensip config schema --json
 opensip config schema --out opensip-cli.config.schema.json
 ```
 
-`validate` reads the resolved project config path (or `--config`) and runs strict validation. Success returns `data.type: "config-validate"` with the claimed namespace list; failures exit **2**. `schema` emits the composed JSON Schema from [`toJsonSchema`](../../../packages/config/src/json-schema.ts) — suitable for editor completion — and optionally writes it with `--out`. See [ADR-0067](../../decisions/ADR-0067-config-validate-schema-commands.md).
+`validate` reads the resolved project config path (or `--config`) and runs strict validation. Success returns `data.type: "config-validate"` with the claimed namespace list; failures exit **2**. `migrate` normalizes the config to the current schema version. Today that means adding or normalizing `schemaVersion: 1` for legacy files; future schema bumps will add deterministic transforms here before the strict loader requires them. `--dry-run` reports pending edits without writing. `--check` is the CI form: it does not write and exits **2** when migration would change the file. `schema` emits the composed JSON Schema from [`toJsonSchema`](../../../packages/config/src/json-schema.ts) — suitable for editor completion — and optionally writes it with `--out`. See [ADR-0067](../../decisions/ADR-0067-config-validate-schema-commands.md) and [ADR-0121](../../decisions/ADR-0121-platform-compatibility-lts-policy.md).
 
 ## Top-level shape
 
@@ -67,7 +71,7 @@ Every section is optional; a missing section becomes `{}`.
 
 The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `tools`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
-`schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file.
+`schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file. Use `opensip config migrate --check` in CI to fail before stale committed configs reach that point.
 
 ---
 

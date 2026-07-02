@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "tool": "fit",
+  "runId": "RUN_fixture",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "verdict": {
+    "score": 100,
+    "passed": true,
+    "summary": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0
+    }
+  },
+  "units": [{ "slug": "example", "passed": true, "durationMs": 1 }],
+  "signals": [],
+  "baselineIdentity": {
+    "fingerprintStrategyId": "opensip.default.rule-file-line-col",
+    "fingerprintStrategyVersion": 1
+  }
+}

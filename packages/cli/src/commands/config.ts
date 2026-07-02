@@ -40,7 +40,7 @@ export interface ConfigSchemaInput extends ConfigValidateInput {
   readonly outPath?: string;
 }
 
-function configLogger(): {
+export function createConfigCommandLogger(): {
   readonly info: (entry: Record<string, unknown>) => void;
   readonly error: (entry: Record<string, unknown>) => void;
 } {
@@ -86,7 +86,7 @@ function collectWarnings(
 }
 
 export function executeConfigValidate(input: ConfigValidateInput): ConfigValidateResult {
-  const log = configLogger();
+  const log = createConfigCommandLogger();
   log.info({ evt: 'cli.config.validate.start', module: CONFIG_LOG_MODULE });
   try {
     const { declarations } = buildConfigDeclarations({
@@ -130,7 +130,7 @@ export function executeConfigValidate(input: ConfigValidateInput): ConfigValidat
  * @throws {Error} When schema composition or file write fails.
  */
 export function executeConfigSchema(input: ConfigSchemaInput): ConfigSchemaResult {
-  const log = configLogger();
+  const log = createConfigCommandLogger();
   log.info({ evt: 'cli.config.schema.start', module: CONFIG_LOG_MODULE });
   try {
     const { declarations } = buildConfigDeclarations({

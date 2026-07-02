@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-02
 release: v0.2.4
 title: "Cloud signal sync"
 audience: [getting-started, ci-integrators, contributors]
@@ -93,6 +93,10 @@ interface SignalBatch {
   signals: Signal[];            // the findings (see below)
 }
 ```
+
+`schemaVersion: 1` is the current cloud wire version
+(`SIGNAL_BATCH_SCHEMA_VERSION = 1`). The platform compatibility matrix checks
+the code constant against a public fixture before CI proceeds.
 
 Each `Signal` is a finding the tool **already produced locally** — its file path, message, suggestion, code-location hints, and rule metadata ([`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts)). The batch adds run context: the tool, recipe, a **repo identity** (your git commit SHA and origin remote URL), a run id, a timestamp, and severity counts. Large batches are capped, with a `truncated` count recording how many were dropped.
 

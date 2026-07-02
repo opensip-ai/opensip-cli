@@ -67,6 +67,16 @@ jobs:
           name: detection-quality-report
           path: detection-quality-report.json
 
+      - name: Compatibility matrix
+        run: pnpm compat:matrix:ci -- --out compatibility-matrix-report.json
+
+      - name: Upload Compatibility Matrix report
+        if: always() && hashFiles('compatibility-matrix-report.json') != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: compatibility-matrix-report
+          path: compatibility-matrix-report.json
+
       - name: Typecheck
         run: pnpm typecheck
 

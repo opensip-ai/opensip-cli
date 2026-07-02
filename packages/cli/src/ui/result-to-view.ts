@@ -32,6 +32,7 @@ import {
 } from '@opensip-cli/cli-ui';
 import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
+import { viewConfigMigrate, viewConfigSchema, viewConfigValidate } from './views/config-views.js';
 import { viewInit } from './views/init-view.js';
 import {
   viewListChecks,
@@ -40,8 +41,6 @@ import {
   viewSimNotice,
   viewReport,
   viewClearDone,
-  viewConfigSchema,
-  viewConfigValidate,
   viewGraphLookup,
   viewConfigureDone,
   viewUninstallDone,
@@ -290,6 +289,10 @@ export function presentationToView(p: RunPresentation): ViewNode {
 
 /** Map any CommandResult to its view-model node (total — every variant covered). */
 export function resultToView(result: CommandResult): ViewNode {
+  if (result.type === 'config-migrate') {
+    return viewConfigMigrate(result);
+  }
+
   switch (result.type) {
     // The render-only run-presentation adjunct (envelope-first-presentation plan):
     // the SINGLE run variant. fit/sim/graph all construct this; summary and

@@ -43,6 +43,9 @@ export const DEFAULT_BASELINE_IDENTITY: BaselineIdentity = {
   fingerprintStrategyVersion: defaultFingerprintStrategy.version,
 };
 
+/** Public JSON schema version for {@link SignalEnvelope}. */
+export const SIGNAL_ENVELOPE_SCHEMA_VERSION = 2 as const;
+
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";
  * `score` is the canonical {@link passRate} over `summary`.
@@ -103,7 +106,7 @@ export interface DeclaredInputs {
 
 /** The one tool-run output envelope. The `CommandResult` payload every tool returns. */
 export interface SignalEnvelope {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: typeof SIGNAL_ENVELOPE_SCHEMA_VERSION;
   readonly tool: ToolShortId;
   readonly recipe?: string;
   readonly runId: string;
@@ -223,7 +226,7 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
   };
 
   return {
-    schemaVersion: 2,
+    schemaVersion: SIGNAL_ENVELOPE_SCHEMA_VERSION,
     tool: input.tool,
     recipe: input.recipe,
     runId: input.runId,

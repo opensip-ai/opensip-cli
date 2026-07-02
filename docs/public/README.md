@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-02
 release: v0.2.4
 owner: opensip-cli
 indexable: true
@@ -50,6 +50,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | Wire the release gate into CI | [Wire into CI](./60-guides/03-wire-into-ci.md) |
 | Verify release artifacts | [Verifiable releases](./70-reference/13-verifiable-releases.md) |
 | Inspect detection-quality methodology | [Detection quality](./70-reference/14-detection-quality.md) |
+| Audit contract/version compatibility | [Compatibility policy](./70-reference/15-compatibility-policy.md) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 
 ## Command Map
@@ -179,22 +180,23 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 50. [Performance SLOs](./70-reference/11-performance-slos.md)
 51. [Public benchmarks](./70-reference/12-public-benchmarks.md)
 52. [`tools` command](./70-reference/12-tools-command.md)
-53. [Detection quality](./70-reference/14-detection-quality.md)
 53. [Verifiable releases](./70-reference/13-verifiable-releases.md)
+54. [Detection quality](./70-reference/14-detection-quality.md)
+55. [Compatibility policy](./70-reference/15-compatibility-policy.md)
 
 ### 80 - Internals
 
-54. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-55. [Plugin loader](./80-implementation/02-plugin-loader.md)
-56. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-57. [Coding standards](./80-implementation/04-coding-standards.md)
-58. [Layer policy](./80-implementation/05-layer-policy.md)
-59. [Doc conventions](./80-implementation/06-doc-conventions.md)
-60. [Website integration](./80-implementation/07-website-integration.md)
+56. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+57. [Plugin loader](./80-implementation/02-plugin-loader.md)
+58. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+59. [Coding standards](./80-implementation/04-coding-standards.md)
+60. [Layer policy](./80-implementation/05-layer-policy.md)
+61. [Doc conventions](./80-implementation/06-doc-conventions.md)
+62. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 
-This v0.2.4 doc set was rechecked against the source on 2026-06-27:
+This v0.2.4 doc set was rechecked against the source on 2026-07-02:
 
 - 151 built-in fitness checks across seven packs.
 - 42 publishable workspace packages, plus the private `@opensip-cli/test-support` package.

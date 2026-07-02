@@ -8,7 +8,11 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { buildSignalEnvelope, type UnitResult } from './signal-envelope.js';
+import {
+  SIGNAL_ENVELOPE_SCHEMA_VERSION,
+  buildSignalEnvelope,
+  type UnitResult,
+} from './signal-envelope.js';
 
 function signal(severity: SignalSeverity): Signal {
   return createSignal({
@@ -53,7 +57,7 @@ describe('buildSignalEnvelope', () => {
       resolutionMode: 'fast',
     });
 
-    expect(env.schemaVersion).toBe(2);
+    expect(env.schemaVersion).toBe(SIGNAL_ENVELOPE_SCHEMA_VERSION);
     expect(env.tool).toBe('fit');
     expect(env.recipe).toBe('example');
     expect(env.runId).toBe('run-1');

@@ -804,5 +804,37 @@ describe('grouped history and config views', () => {
     ).toContain('Wrote JSON Schema');
 
     expect(text({ type: 'config-schema' } as never)).toContain('Use --json');
+    expect(
+      text({
+        type: 'config-migrate',
+        configPath: '/repo/opensip-cli.config.yml',
+        changed: true,
+        dryRun: false,
+        check: false,
+        wrote: true,
+        fromVersion: 1,
+        targetVersion: 1,
+        operations: [
+          {
+            kind: 'add-schema-version',
+            toVersion: 1,
+            message: 'Added schemaVersion: 1.',
+          },
+        ],
+      } as never),
+    ).toContain('Migrated configuration');
+    expect(
+      text({
+        type: 'config-migrate',
+        configPath: '/repo/opensip-cli.config.yml',
+        changed: true,
+        dryRun: true,
+        check: true,
+        wrote: false,
+        fromVersion: 1,
+        targetVersion: 1,
+        operations: [],
+      } as never),
+    ).toContain('Configuration migration required');
   });
 });

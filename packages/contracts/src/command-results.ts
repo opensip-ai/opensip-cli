@@ -27,6 +27,7 @@ export type {
   GraphImpactResult,
 } from './command-results-variants/graph-impact-result.js';
 export type {
+  ConfigMigrateResult,
   ConfigValidateResult,
   ConfigSchemaResult,
 } from './command-results-variants/config-results.js';
@@ -87,6 +88,7 @@ export type {
 } from './command-results-variants/repair-results.js';
 
 import type {
+  ConfigMigrateResult,
   ConfigSchemaResult,
   ConfigValidateResult,
 } from './command-results-variants/config-results.js';
@@ -147,6 +149,7 @@ export type CommandResult =
   | GraphImpactResult
   | ConfigValidateResult
   | ConfigSchemaResult
+  | ConfigMigrateResult
   | ListChecksResult
   | ListRecipesResult
   | HistoryResult
