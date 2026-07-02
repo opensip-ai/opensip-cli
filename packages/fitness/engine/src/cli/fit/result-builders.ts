@@ -15,6 +15,7 @@
 import {
   buildSignalEnvelope,
   type FitOptions,
+  type ImpactTrust,
   type SignalEnvelope,
   type UnitResult,
   type RunPresentation,
@@ -93,6 +94,7 @@ export function buildFitEnvelope(
   fitnessResult: FitnessRecipeResult,
   recipeName: string | undefined,
   signalersConfig: SignalersConfig,
+  opts: { readonly verification?: ImpactTrust } = {},
 ): SignalEnvelope {
   const { checkResults } = fitnessResult;
 
@@ -127,6 +129,7 @@ export function buildFitEnvelope(
     // (ADR-0060) — runFaulted stays false for user-facing envelopes.
     policy: resolveFitVerdictPolicy(signalersConfig),
     runFaulted: false,
+    verification: opts.verification,
     // ADR-0036: fit's message-hash identity (line-shift-tolerant), stamped at
     // construction so EVERY fit envelope — live/json/cloud, not only the gate
     // path — carries gate-ready fingerprints.

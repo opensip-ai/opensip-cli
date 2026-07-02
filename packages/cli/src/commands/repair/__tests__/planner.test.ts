@@ -4,10 +4,11 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { applyRepair } from '../apply.js';
+import { applyAndVerifyRepair, applyRepair } from '../apply.js';
 import { previewRepair } from '../planner.js';
 
 import type { RepairBuildInput } from '../types.js';
+import type { RepairVerificationResult } from '@opensip-cli/contracts';
 import type { Signal, SignalRepairAction } from '@opensip-cli/core';
 
 function writeFixture(root: string, relativePath: string, content: string): void {
@@ -95,6 +96,72 @@ describe('repair planner', () => {
     if (!result.ok) return;
     expect(result.value.status).toBe('applied');
     expect(readFileSync(join(root, 'src/example.ts'), 'utf8')).toContain('@ts-expect-error');
+  });
+
+  it('applies and verifies through an injected verifier', async () => {
+    writeFixture(root, 'src/example.ts', '// @ts-ignore -- legacy third-party type\nlegacy();\n');
+    const verification: RepairVerificationResult = {
+      status: 'verified',
+      coverage: 'full',
+      scope: {
+        tool: 'fit',
+        ruleId: 'fit:typescript-directive-hygiene',
+        files: ['src/example.ts'],
+        checkRan: true,
+        changedImpacted: true,
+        fallback: 'targeted',
+      },
+      commands: [],
+      remainingFindings: [],
+    };
+
+    const result = await applyAndVerifyRepair({
+      ...input(root, [action({})]),
+      actionId: 'replace-ts-ignore',
+      force: true,
+      verifier: ({ applyResult }) =>
+        Promise.resolve({
+          ...verification,
+          commands: [
+            {
+              tool: 'fit',
+              args: ['fit', '--check', applyResult.signal.ruleId, '--changed', '--json'],
+              cwd: root,
+              check: applyResult.signal.ruleId,
+            },
+          ],
+        }),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.type).toBe('repair-apply-verify');
+    expect(result.value.status).toBe('applied');
+    expect(result.value.verification.status).toBe('verified');
+    expect(readFileSync(join(root, 'src/example.ts'), 'utf8')).toContain('@ts-expect-error');
+  });
+
+  it('skips verification for a refused repair action', async () => {
+    const result = await applyAndVerifyRepair({
+      ...input(root, [
+        action({
+          id: 'add-suppression-reason',
+          kind: 'manual-text-edit',
+          title: 'Add reason',
+          autofixable: false,
+          target: { filePath: 'src/example.ts', line: 1 },
+        }),
+      ]),
+      actionId: 'add-suppression-reason',
+      force: true,
+      verifier: () => Promise.reject(new Error('verifier should not run')),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe('refused');
+    expect(result.value.verification.status).toBe('skipped');
+    expect(result.value.verification.failure?.code).toBe('action-not-autofixable');
   });
 
   it('previews package.json dependency removal', () => {

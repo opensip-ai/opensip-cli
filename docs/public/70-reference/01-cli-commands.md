@@ -938,6 +938,7 @@ opensip repair preview latest --tool fit --signal index:0 --action replace-ts-ig
 opensip repair preview <session-id> --tool fit --signal fingerprint:<fingerprint> --action remove-unused-dependency --json
 opensip repair apply latest --tool fit --signal id:<signal-id> --action replace-ts-ignore
 opensip repair apply latest --tool fit --signal index:0 --action replace-ts-ignore --force
+opensip repair apply latest --tool fit --signal index:0 --action replace-ts-ignore --verify --json
 ```
 
 | Subcommand | Flag | Effect |
@@ -947,7 +948,8 @@ opensip repair apply latest --tool fit --signal index:0 --action replace-ts-igno
 | `preview` / `apply` | `--signal <selector>` | Required. `id:<value>`, `fingerprint:<value>`, or `index:<zero-based>`. Fingerprints must match one signal. |
 | `preview` / `apply` | `--action <id>` | Required for apply; accepted on preview. Selects the action id from `signal.repair.actions[]`. |
 | `apply` | `--force` | Bypass the git clean-worktree check. Stale file hashes and unsafe paths are still refused. |
-| `preview` / `apply` | `--json` | Emit `repair-preview` / `repair-apply` as a `CommandOutcome` result. |
+| `apply` | `--verify` | After a successful or already-applied repair, rerun deterministic verification. Fitness repairs run `fit --check <rule> --changed --include-impacted --json` and preserve impact-trust/fallback facts. |
+| `preview` / `apply` | `--json` | Emit `repair-preview`, `repair-apply`, or `repair-apply-verify` as a `CommandOutcome` result. |
 
 `preview` never mutates files. `apply` refuses advisory actions, unsupported
 action ids, paths outside the project root, symlink escapes, files above 1 MiB,
@@ -955,6 +957,22 @@ dirty git targets unless `--force` is passed, and files whose current hash no
 longer matches the preview plan. The first supported action ids are
 `replace-ts-ignore` and `remove-unused-dependency`; `normalize-generated-config`
 is reserved and currently refused.
+
+With `--verify`, the result distinguishes `verified`, `partial`, `unverified`,
+and `skipped`. Agents must only claim a repair was verified when
+`data.verification.status` is `verified`; partial/unverified/skipped results
+mean the patch was not proven clean.
+
+MCP exposes the same apply-verify flow through `repair_apply_verify` only when
+the server is started with explicit mutation enabled:
+
+```bash
+opensip mcp --allow-mutations
+# or
+OPENSIP_MCP_ALLOW_MUTATIONS=1 opensip mcp
+```
+
+The default MCP server remains read-only and does not register mutating tools.
 
 ---
 

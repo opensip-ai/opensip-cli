@@ -14,6 +14,7 @@ import { registerGetArchitecture } from './get-architecture.js';
 import { registerGetSymbol } from './get-symbol.js';
 import { registerRefreshGraph } from './refresh-graph.js';
 import { registerResultTools } from './register-result-tools.js';
+import { registerRepairApplyVerify } from './repair-apply-verify.js';
 import { registerSearchSymbols } from './search-symbols.js';
 import { registerTracePath } from './trace-path.js';
 import { registerWhoCalls } from './who-calls.js';
@@ -21,7 +22,7 @@ import { registerWhoCalls } from './who-calls.js';
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
 
-/** Register all 15 MCP tools (9 graph + 6 result/review) on `server`. */
+/** Register MCP tools. Default is 15 read tools; mutation-enabled mode adds write tools. */
 export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): void {
   // ── Graph tools (over GraphReadPort) ──────────────────────────────
   registerSearchSymbols(server, deps);
@@ -35,4 +36,7 @@ export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): voi
   registerRefreshGraph(server, deps);
 
   registerResultTools(server, deps);
+  if (deps.mutationsEnabled === true && deps.repairWrite !== undefined) {
+    registerRepairApplyVerify(server, deps);
+  }
 }

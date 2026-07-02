@@ -12,6 +12,7 @@ import { mcpTool, MCP_IDENTITY, MCP_STABLE_ID } from '../index.js';
 import { registerMcpTools } from '../tools/register.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
+import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
 import type { McpStdioServer } from '../server.js';
 import type { McpToolDeps } from '../tools/types.js';
@@ -65,6 +66,28 @@ describe('registerMcpTools', () => {
         'compare_to_baseline',
       ]),
     );
+  });
+
+  it('adds repair_apply_verify only when mutation is explicitly enabled', () => {
+    const names: string[] = [];
+    const server = {
+      register: (name: string) => {
+        names.push(name);
+        return undefined;
+      },
+    } as unknown as McpStdioServer;
+    const deps: McpToolDeps = {
+      graph: {} as GraphReadPort,
+      results: {} as ResultsReadPort,
+      validToolIds: new Set(['fit']),
+      mutationsEnabled: true,
+      repairWrite: {} as RepairWritePort,
+    };
+
+    registerMcpTools(server, deps);
+
+    expect(names).toHaveLength(16);
+    expect(names).toContain('repair_apply_verify');
   });
 
   it('describes result tools as persisted replay and warns against log/sqlite/rerun fallbacks', () => {

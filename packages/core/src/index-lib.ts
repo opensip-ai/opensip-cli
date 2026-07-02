@@ -14,6 +14,8 @@ export {
 export { ok, err, tryCatchAsync, tryCatch, formatUnknownErrorMessage } from './lib/errors.js';
 export { canonicalToolErrorCode, toolErrorFromCanonicalCode } from './lib/errors.js';
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
+export { appendBoundedUtf8Text } from './lib/bounded-text.js';
+export type { BoundedTextAppendResult } from './lib/bounded-text.js';
 
 // Lib — logger.
 //
@@ -51,6 +53,7 @@ export type { Span, Attributes, Tracer } from '@opentelemetry/api';
 // instance serve the pre-scope readers (theme, graph heap-preflight).
 export { EnvRegistry } from './lib/env-registry.js';
 export type { EnvVarSpec, EnvDeprecation, EnvReadResult } from './lib/env-registry.js';
+export { snapshotEnv } from './lib/env-snapshot.js';
 
 // Lib — run correlation (subprocess-correlation telemetry spec). The PURE
 // correlation primitive: the `RunCorrelation` field set, the canonical

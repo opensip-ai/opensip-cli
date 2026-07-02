@@ -13,10 +13,12 @@ import { registerCompareToBaseline } from '../compare-to-baseline.js';
 import { registerGetAgentCatalog } from '../get-agent-catalog.js';
 import { registerGetLatestFindings } from '../get-latest-findings.js';
 import { registerListRuns } from '../list-runs.js';
+import { registerRepairApplyVerify } from '../repair-apply-verify.js';
 import { registerReviewChange } from '../review-change.js';
 import { registerShowRun } from '../show-run.js';
 
 import type { McpReadError } from '../../mcp-error.js';
+import type { RepairApplyVerifyInput, RepairWritePort } from '../../repair-write-port.js';
 import type {
   CompareToBaselineOptions,
   LatestFindingsOptions,
@@ -31,7 +33,7 @@ import type {
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from '../../results-read-port.js';
 import type { CallToolResult, McpStdioServer } from '../../server.js';
 import type { McpToolDeps } from '../types.js';
-import type { AgentCatalog, ReviewBrief } from '@opensip-cli/contracts';
+import type { AgentCatalog, RepairApplyVerifyResult, ReviewBrief } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
 
 type Handler = (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
@@ -72,6 +74,37 @@ function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])
     } as McpToolDeps['graph'],
     results,
     validToolIds,
+  };
+}
+
+function repairResult(): RepairApplyVerifyResult {
+  return {
+    type: 'repair-apply-verify',
+    status: 'applied',
+    session: { id: 'sess-1', tool: 'fit' },
+    signal: { id: 'sig-1', ruleId: 'rule-1', message: 'message', filePath: 'src/a.ts' },
+    action: {
+      id: 'replace-ts-ignore',
+      kind: 'text-replacement',
+      title: 'Replace',
+      autofixable: true,
+    },
+    changes: [],
+    force: false,
+    verification: {
+      status: 'verified',
+      coverage: 'full',
+      scope: {
+        tool: 'fit',
+        ruleId: 'rule-1',
+        files: ['src/a.ts'],
+        checkRan: true,
+        changedImpacted: true,
+        fallback: 'targeted',
+      },
+      commands: [],
+      remainingFindings: [],
+    },
   };
 }
 
@@ -157,6 +190,74 @@ describe('get_latest_findings handler', () => {
     const out = parseResult(await handlers.get('get_latest_findings')!({ tool: 'fit' }));
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('not-found');
+  });
+});
+
+// ── repair_apply_verify ──────────────────────────────────────────────
+
+describe('repair_apply_verify handler', () => {
+  it('forwards apply-verify input to the repair write port', async () => {
+    let seen: RepairApplyVerifyInput | undefined;
+    const repairWrite: RepairWritePort = {
+      applyVerify: (input) => {
+        seen = input;
+        return Promise.resolve(ok(repairResult()));
+      },
+    };
+    const { server, handlers } = captureServer();
+    registerRepairApplyVerify(server, {
+      ...deps(fakeResults({})),
+      repairWrite,
+      mutationsEnabled: true,
+    });
+
+    const out = parseResult(
+      await handlers.get('repair_apply_verify')!({
+        ref: 'latest',
+        tool: 'fit',
+        signal: 'index:0',
+        action: 'replace-ts-ignore',
+        force: true,
+      }),
+    );
+
+    expect(seen).toEqual({
+      ref: 'latest',
+      tool: 'fit',
+      signal: 'index:0',
+      action: 'replace-ts-ignore',
+      force: true,
+    });
+    expect(out.body.type).toBe('repair-apply-verify');
+  });
+
+  it('rejects unknown tools before calling the mutating port', async () => {
+    let called = false;
+    const repairWrite: RepairWritePort = {
+      applyVerify: () => {
+        called = true;
+        return Promise.resolve(ok(repairResult()));
+      },
+    };
+    const { server, handlers } = captureServer();
+    registerRepairApplyVerify(server, {
+      ...deps(fakeResults({}), new Set(['fit'])),
+      repairWrite,
+      mutationsEnabled: true,
+    });
+
+    const out = parseResult(
+      await handlers.get('repair_apply_verify')!({
+        ref: 'latest',
+        tool: 'graph',
+        signal: 'index:0',
+        action: 'replace-ts-ignore',
+      }),
+    );
+
+    expect(called).toBe(false);
+    expect(out.isError).toBe(true);
+    expect((out.body.error as McpReadError).code).toBe('unknown-tool');
   });
 });
 

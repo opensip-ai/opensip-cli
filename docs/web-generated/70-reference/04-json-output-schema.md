@@ -603,6 +603,53 @@ scalar `target` metadata bag. The CLI host understands only documented first-
 party action ids; unknown ids are preserved in JSON but refused by
 `opensip repair preview|apply`.
 
+`opensip repair apply --verify` returns a command-result payload under
+`CommandOutcome.data`:
+
+```jsonc
+{
+  "type": "repair-apply-verify",
+  "status": "applied",
+  "session": { "id": "sess_1", "tool": "fit" },
+  "signal": { "id": "sig_1", "ruleId": "typescript-directive-hygiene" },
+  "action": { "id": "replace-ts-ignore", "kind": "text-replacement", "title": "Replace @ts-ignore", "autofixable": true },
+  "changes": [],
+  "force": false,
+  "verification": {
+    "status": "verified",
+    "coverage": "full",
+    "scope": {
+      "tool": "fit",
+      "ruleId": "typescript-directive-hygiene",
+      "files": ["src/example.ts"],
+      "checkRan": true,
+      "changedImpacted": true,
+      "fallback": "targeted"
+    },
+    "commands": [
+      {
+        "tool": "fit",
+        "args": ["fit", "--check", "typescript-directive-hygiene", "--changed", "--include-impacted", "--json"],
+        "cwd": "/repo",
+        "check": "typescript-directive-hygiene"
+      }
+    ],
+    "remainingFindings": [],
+    "trust": {
+      "coverage": "full",
+      "fallback": "targeted",
+      "fullyVerified": true,
+      "uncertainties": []
+    }
+  }
+}
+```
+
+Verification statuses are `verified`, `partial`, `unverified`, and `skipped`.
+Only `verified` means the deterministic verification command ran and proved the
+selected finding absent. `partial` and `unverified` are intentionally not
+success claims.
+
 The line and column are **1-based** to match SARIF and most editor conventions. A signal without a location omits `line` / `column` and carries an empty `filePath`.
 
 ---
@@ -611,7 +658,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 
 All three tools emit the **same envelope**; the differences are confined to a few fields:
 
-- **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`.
+- **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`. Scoped changed runs may include envelope-level `verification` impact-trust metadata (`coverage`, `fallback`, `fullyVerified`, `uncertainties`).
 - **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/graph/engine/src/cli/build-envelope.ts).
 - **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id,
   `error` set when a scenario errored).

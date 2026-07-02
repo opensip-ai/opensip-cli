@@ -161,6 +161,7 @@ function isImpactTrust(value: unknown): value is ImpactTrust {
 
 function verificationFromEnvelope(envelope: SignalEnvelope | undefined): ImpactTrust | undefined {
   if (envelope === undefined) return undefined;
+  if (isImpactTrust(envelope.verification)) return envelope.verification;
   for (const signal of envelope.signals) {
     if (isImpactTrust(signal.metadata.trust)) return signal.metadata.trust;
   }

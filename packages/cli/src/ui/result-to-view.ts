@@ -374,7 +374,8 @@ export function resultToView(result: CommandResult): ViewNode {
       return suiteResultToView(result);
     }
     case 'repair-preview':
-    case 'repair-apply': {
+    case 'repair-apply':
+    case 'repair-apply-verify': {
       return viewRepair(result);
     }
     case 'plugin-list':

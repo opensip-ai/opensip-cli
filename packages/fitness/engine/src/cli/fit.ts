@@ -45,6 +45,7 @@ import {
 
 import type {
   FitOptions,
+  ImpactTrust,
   SignalEnvelope,
   RunPresentation,
   ErrorResult,
@@ -95,7 +96,11 @@ export interface ExecuteFitOptions {
 function resolveFitScopeMap(
   args: FitOptions,
   initialScopeMap: CheckScopeMap,
-): { readonly scopeMap: CheckScopeMap; readonly warnings: readonly string[] } {
+): {
+  readonly scopeMap: CheckScopeMap;
+  readonly warnings: readonly string[];
+  readonly verification?: ImpactTrust;
+} {
   if (args.changed !== true && !args.since) {
     return { scopeMap: initialScopeMap, warnings: [] };
   }
@@ -108,17 +113,20 @@ function resolveFitScopeMap(
     return {
       scopeMap: initialScopeMap,
       warnings: changed.warning ? [changed.warning] : [],
+      verification: changed.trust,
     };
   }
   if (changed.files.size === 0) {
     return {
       scopeMap: new Map(),
       warnings: ['No changed files detected — fit run will target nothing.'],
+      verification: changed.trust,
     };
   }
   return {
     scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files),
     warnings: [],
+    verification: changed.trust,
   };
 }
 
@@ -236,7 +244,9 @@ export async function executeFit(
   // (`--json`), and delivers (cloud + `--report-to`). Cloud egress no longer
   // happens here: the root's `deliverSignals` owns it (engines dropped their
   // `@opensip-cli/output` dependency in Phase 6).
-  const envelope = buildFitEnvelope(fitnessResult, recipeName, signalersConfig);
+  const envelope = buildFitEnvelope(fitnessResult, recipeName, signalersConfig, {
+    verification: changedResolution.verification,
+  });
 
   // Collect warnings from check loading (ensureChecksLoaded → loadWarnings)
   // and from config validation (validateLanguagesAgainstAdapters). Both flow

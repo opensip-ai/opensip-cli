@@ -66,6 +66,12 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 |---|---|
 | `OPENSIP_CLI_SHOW_INTERNAL` | Set to `1` to reveal internal (Tier-3) commands — the IPC/CI workers `fit-run-worker`, `sim-run-worker`, `graph-run-worker`, `graph-shard-worker`, and the CI gate `graph-equivalence-check` — in `opensip --help` and shell completion. These commands stay directly invocable regardless of this flag; it only un-hides them from those public surfaces. The `agent-catalog` (a curated machine surface) is intentionally NOT affected. |
 
+## MCP server
+
+| Variable | Effect |
+|---|---|
+| `OPENSIP_MCP_ALLOW_MUTATIONS` | Set to `1` to enable explicitly mutating MCP tools such as `repair_apply_verify` when serving over stdio. Equivalent to `opensip mcp --allow-mutations`. |
+
 ## Graph engine
 
 | Variable | Effect |

@@ -177,6 +177,12 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'Use when a specific external tool legitimately needs a parent env var (e.g. HTTP_PROXY). ' +
       'Does not affect bundled live-run worker forks.',
   },
+  {
+    canonical: 'OPENSIP_MCP_ALLOW_MUTATIONS',
+    coerce: (raw) => raw === '1',
+    default: false,
+    docs: 'Set to 1 to enable explicitly mutating MCP tools such as repair_apply_verify when serving over stdio. Equivalent to opensip mcp --allow-mutations.',
+  },
 ];
 
 /**

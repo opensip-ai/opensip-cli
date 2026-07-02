@@ -18,26 +18,58 @@
  * fix). It resolves to a clean exit (0) when the transport closes on stdin EOF.
  */
 import { EXIT_CODES, summarizeTargetConventions } from '@opensip-cli/contracts';
-import { definePrimaryCommand, readPackageVersion } from '@opensip-cli/core';
+import {
+  definePrimaryCommand,
+  EnvRegistry,
+  readPackageVersion,
+  type EnvVarSpec,
+  type RunScope,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { runGraph } from '@opensip-cli/graph/internal';
 
 import { workingTreeContextFromCatalog } from './freshness.js';
+import { CliRepairWritePort } from './repair-write-port.js';
 import { McpStdioServer } from './server.js';
 import { SessionResultsReadPort } from './session-results-read-port.js';
 import { SqliteGraphReadPort } from './sqlite-graph-read-port.js';
 import { registerMcpTools } from './tools/register.js';
 
-import type { RunScope, ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { Catalog } from '@opensip-cli/graph';
+
+interface McpCommandOptions {
+  readonly allowMutations?: boolean;
+}
+
+const MCP_MUTATION_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
+  {
+    canonical: 'OPENSIP_MCP_ALLOW_MUTATIONS',
+    coerce: (raw) => raw === '1',
+    default: false,
+    docs: 'Set to 1 to enable explicitly mutating MCP tools such as repair_apply_verify when serving over stdio.',
+  },
+];
+
+function mutationsEnabled(opts: McpCommandOptions): boolean {
+  const env = new EnvRegistry(MCP_MUTATION_ENV_SPECS);
+  return opts.allowMutations === true || env.get<boolean>('OPENSIP_MCP_ALLOW_MUTATIONS') === true;
+}
 
 export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
   description: 'Serve the OpenSIP call graph + stored results to MCP agents over stdio',
   commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--allow-mutations',
+      description: 'Enable explicitly mutating MCP tools such as repair_apply_verify',
+      default: false,
+    },
+  ],
   scope: 'project',
   output: 'raw-stream',
   rawStreamReason: 'mcp-stdio',
-  handler: async (_opts, cli) => {
+  handler: async (rawOpts, cli) => {
     // The host enters a concrete `RunScope` for the project-scoped command and
     // hands it to tools as the narrowed `ToolScope` view; the MCP server needs
     // the full `RunScope` — for `runWithScope` re-entry AND the `tools` registry
@@ -96,6 +128,12 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       rebuild,
     });
     const results = new SessionResultsReadPort({ store, tools: scope.tools });
+    const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
+    const repairWrite = mutationEnabled
+      ? new CliRepairWritePort({
+          projectRoot,
+        })
+      : undefined;
 
     const server = new McpStdioServer({
       scope,
@@ -117,7 +155,14 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     // `void`: registerMcpTools is synchronous (returns void); the leading `void`
     // marks the discard explicitly so the detached-promises heuristic (which can't
     // see cross-file sync callables) doesn't read this floating call as a promise.
-    void registerMcpTools(server, { graph, results, validToolIds, targetConventions });
+    void registerMcpTools(server, {
+      graph,
+      results,
+      validToolIds,
+      targetConventions,
+      ...(repairWrite === undefined ? {} : { repairWrite }),
+      mutationsEnabled: mutationEnabled,
+    });
 
     // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
     await server.serve();

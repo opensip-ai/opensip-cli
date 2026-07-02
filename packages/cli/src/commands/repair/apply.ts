@@ -2,15 +2,31 @@ import { writeFileSync } from 'node:fs';
 
 import { err, ok, type Result } from '@opensip-cli/core';
 
+import { changedFilesForRepair } from './changes.js';
 import { ensureRepairWorktreeClean } from './git-safety.js';
 import { readSafeTextFile } from './path-safety.js';
 import { buildRepairPlan } from './planner.js';
+import { verifyRepair, type ProcessRunner, type VerifyRepairInput } from './verify-runner.js';
+import { skippedVerification } from './verify.js';
 
 import type { RepairBuildInput, RepairError } from './types.js';
-import type { RepairApplyResult } from '@opensip-cli/contracts';
+import type {
+  RepairApplyResult,
+  RepairApplyVerifyResult,
+  RepairVerificationResult,
+} from '@opensip-cli/contracts';
 
 export interface ApplyRepairInput extends RepairBuildInput {
   readonly force: boolean;
+}
+
+export type RepairVerifier = (input: VerifyRepairInput) => Promise<RepairVerificationResult>;
+
+export interface ApplyAndVerifyRepairInput extends ApplyRepairInput {
+  readonly verifier?: RepairVerifier;
+  readonly verificationRunner?: ProcessRunner;
+  readonly cliEntrypoint?: string;
+  readonly timeoutMs?: number;
 }
 
 function repairError(code: string, message: string): RepairError {
@@ -68,4 +84,60 @@ export function applyRepair(input: ApplyRepairInput): Result<RepairApplyResult, 
   }
 
   return ok(toApplyResult(plan.value, 'applied'));
+}
+
+function toApplyVerifyResult(
+  applyResult: RepairApplyResult,
+  verification: RepairVerificationResult,
+  force: boolean,
+): RepairApplyVerifyResult {
+  return {
+    type: 'repair-apply-verify',
+    status: applyResult.status,
+    session: applyResult.session,
+    signal: applyResult.signal,
+    action: applyResult.action,
+    changes: applyResult.changes,
+    force,
+    ...(applyResult.refusal === undefined ? {} : { refusal: applyResult.refusal }),
+    ...(applyResult.verification === undefined
+      ? {}
+      : { verificationGuidance: applyResult.verification }),
+    verification,
+  };
+}
+
+export async function applyAndVerifyRepair(
+  input: ApplyAndVerifyRepairInput,
+): Promise<Result<RepairApplyVerifyResult, RepairError>> {
+  const applied = applyRepair(input);
+  if (!applied.ok) return applied;
+
+  if (applied.value.status === 'refused') {
+    return ok(
+      toApplyVerifyResult(
+        applied.value,
+        skippedVerification({
+          tool: applied.value.session.tool,
+          ruleId: applied.value.signal.ruleId,
+          files: changedFilesForRepair(applied.value),
+          failure:
+            applied.value.refusal === undefined
+              ? undefined
+              : { code: applied.value.refusal.code, message: applied.value.refusal.message },
+        }),
+        input.force,
+      ),
+    );
+  }
+
+  const verifier = input.verifier ?? verifyRepair;
+  const verification = await verifier({
+    projectRoot: input.projectRoot,
+    applyResult: applied.value,
+    ...(input.verificationRunner === undefined ? {} : { runner: input.verificationRunner }),
+    ...(input.cliEntrypoint === undefined ? {} : { cliEntrypoint: input.cliEntrypoint }),
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+  });
+  return ok(toApplyVerifyResult(applied.value, verification, input.force));
 }

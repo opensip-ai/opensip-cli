@@ -1,10 +1,15 @@
 import { group, line, type Tone, type ViewNode } from '@opensip-cli/cli-ui';
 
-import type { RepairApplyResult, RepairPreviewResult } from '@opensip-cli/contracts';
+import type {
+  RepairApplyResult,
+  RepairApplyVerifyResult,
+  RepairPreviewResult,
+  RepairVerificationStatus,
+} from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
-type RepairResult = RepairPreviewResult | RepairApplyResult;
+type RepairResult = RepairPreviewResult | RepairApplyResult | RepairApplyVerifyResult;
 
 function statusTone(status: RepairResult['status']): Tone {
   switch (status) {
@@ -23,11 +28,70 @@ function statusTone(status: RepairResult['status']): Tone {
 
 function titleFor(result: RepairResult): string {
   if (result.type === 'repair-preview') return 'Repair preview';
+  if (result.type === 'repair-apply-verify') return 'Repair apply verify';
   return 'Repair apply';
 }
 
 function statusLabel(status: RepairResult['status']): string {
   return status.replace('-', ' ').toUpperCase();
+}
+
+function verificationTone(status: RepairVerificationStatus): Tone {
+  switch (status) {
+    case 'verified': {
+      return 'success';
+    }
+    case 'partial': {
+      return 'warning';
+    }
+    case 'skipped':
+    case 'unverified': {
+      return 'warning';
+    }
+  }
+}
+
+function verificationNodes(result: RepairApplyVerifyResult): readonly ViewNode[] {
+  const verification = result.verification;
+  const nodes: ViewNode[] = [
+    SPACER,
+    line([
+      { text: 'Verification: ', bold: true },
+      {
+        text: verification.status.toUpperCase(),
+        tone: verificationTone(verification.status),
+        bold: true,
+      },
+      { text: `  ${verification.coverage}`, dim: true },
+    ]),
+    line([
+      { text: 'Scope: ', dim: true },
+      { text: verification.scope.tool, tone: 'brand' },
+      { text: ` ${verification.scope.ruleId}` },
+      { text: verification.scope.checkRan ? ' ran' : ' not-run', dim: true },
+      { text: ` fallback=${verification.scope.fallback}`, dim: true },
+    ]),
+  ];
+  if (verification.remainingFindings.length > 0) {
+    nodes.push(
+      line([
+        { text: 'Remaining matching findings: ', dim: true },
+        { text: String(verification.remainingFindings.length), tone: 'warning' },
+      ]),
+    );
+  }
+  if (verification.failure !== undefined) {
+    nodes.push(line([{ text: verification.failure.message, tone: 'warning' }]));
+  }
+  if (verification.commands.length > 0) {
+    nodes.push(
+      line([{ text: 'Ran:', bold: true }]),
+      ...verification.commands.map((command) =>
+        line([{ text: `  opensip ${command.args.join(' ')}`, dim: true }]),
+      ),
+    );
+  }
+  return nodes;
 }
 
 export function viewRepair(result: RepairResult): ViewNode {
@@ -62,6 +126,9 @@ export function viewRepair(result: RepairResult): ViewNode {
       line([{ text: result.refusal.message, tone: 'warning' }]),
       line([{ text: result.refusal.code, dim: true }]),
     );
+    if (result.type === 'repair-apply-verify') {
+      children.push(...verificationNodes(result));
+    }
     return group(children, 2);
   }
 
@@ -78,6 +145,10 @@ export function viewRepair(result: RepairResult): ViewNode {
         { text: change.filePath },
       ]),
     );
+  }
+  if (result.type === 'repair-apply-verify') {
+    children.push(...verificationNodes(result));
+    return group(children, 2);
   }
   if (result.verification?.commands !== undefined && result.verification.commands.length > 0) {
     children.push(

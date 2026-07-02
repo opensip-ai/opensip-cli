@@ -29,6 +29,7 @@ import {
 
 import { passRate } from './score.js';
 
+import type { ImpactTrust } from './impact-trust.js';
 import type {
   BaselineIdentity,
   FingerprintStrategy,
@@ -127,6 +128,12 @@ export interface SignalEnvelope {
   readonly declaredInputs?: DeclaredInputs;
   /** Graph-only edge-fidelity marker, carried over from CliOutput.resolutionMode. */
   readonly resolutionMode?: 'exact' | 'fast';
+  /**
+   * Optional verification trust metadata for scoped runs. Fitness uses this for
+   * `--changed` / `--include-impacted` so downstream agent loops can distinguish
+   * targeted verification from conservative fallback without scraping logs.
+   */
+  readonly verification?: ImpactTrust;
 }
 
 /**
@@ -143,6 +150,7 @@ export interface BuildEnvelopeInput {
   readonly units: readonly UnitResult[];
   readonly signals: readonly Signal[];
   readonly resolutionMode?: 'exact' | 'fast';
+  readonly verification?: ImpactTrust;
   /**
    * The tool's resolved findings policy (ADR-0035). `verdict.passed` is computed
    * from `(errors, warnings)` against this — replacing the old `errors === 0`.
@@ -236,6 +244,7 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
     signals,
     baselineIdentity,
     resolutionMode: input.resolutionMode,
+    ...(input.verification === undefined ? {} : { verification: input.verification }),
   };
 }
 

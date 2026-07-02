@@ -78,6 +78,16 @@ export type {
   ErrorResult,
 } from './command-results-variants/session-results.js';
 export type {
+  RepairApplyVerifyResult,
+  RepairVerificationCommand,
+  RepairVerificationCoverage,
+  RepairVerificationFailure,
+  RepairVerificationFindingMatch,
+  RepairVerificationResult,
+  RepairVerificationScope,
+  RepairVerificationStatus,
+} from './command-results-variants/repair-apply-verify-results.js';
+export type {
   RepairActionRef,
   RepairApplyResult,
   RepairFileChange,
@@ -110,6 +120,7 @@ import type {
   ReportResult,
 } from './command-results-variants/list-history-results.js';
 import type { PluginResult } from './command-results-variants/plugin-results.js';
+import type { RepairApplyVerifyResult } from './command-results-variants/repair-apply-verify-results.js';
 import type {
   RepairApplyResult,
   RepairPreviewResult,
@@ -173,6 +184,7 @@ export type CommandResult =
   | SuiteAddResult
   | RepairPreviewResult
   | RepairApplyResult
+  | RepairApplyVerifyResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;

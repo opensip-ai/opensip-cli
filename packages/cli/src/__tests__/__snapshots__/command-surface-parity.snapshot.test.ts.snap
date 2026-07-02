@@ -1611,6 +1611,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
       "options": [
         {
           "choices": undefined,
+          "defaultValue": false,
+          "description": "Enable explicitly mutating MCP tools such as repair_apply_verify",
+          "flags": "--allow-mutations",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
           "defaultValue": undefined,
           "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
           "flags": "--config <path>",
@@ -1739,6 +1749,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "negate": false,
               "optional": false,
               "required": true,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
+              "description": "Rerun deterministic checks after applying the repair",
+              "flags": "--verify",
+              "negate": false,
+              "optional": false,
+              "required": false,
               "variadic": false,
             },
           ],

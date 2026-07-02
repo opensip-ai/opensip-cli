@@ -23,7 +23,7 @@ import {
   validateRegisteredToolFilter,
 } from '../tool-filter-validation.js';
 
-import { applyRepair } from './apply.js';
+import { applyAndVerifyRepair, applyRepair } from './apply.js';
 import { previewRepair } from './planner.js';
 
 import type { CliCommandsContext } from '../shared.js';
@@ -36,6 +36,7 @@ interface RepairCommandOptions {
   readonly signal?: string;
   readonly action?: string;
   readonly force?: boolean;
+  readonly verify?: boolean;
 }
 
 function errorResult(message: string, code: string): CommandResult {
@@ -193,6 +194,11 @@ function buildRepairApplySpec(ctx: CliCommandsContext): HostSpec {
         description: 'Bypass git clean-worktree checks; stale file hashes are still refused',
         default: false,
       },
+      {
+        flag: '--verify',
+        description: 'Rerun deterministic checks after applying the repair',
+        default: false,
+      },
     ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
@@ -204,6 +210,18 @@ function buildRepairApplySpec(ctx: CliCommandsContext): HostSpec {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return replayed.result;
       }
+      if (opts.verify === true) {
+        const result = await applyAndVerifyRepair({
+          ...replayed.input,
+          force: opts.force === true,
+        });
+        if (!result.ok) return commandError(ctx, result.error);
+        if (result.value.status === 'refused' || result.value.verification.status !== 'verified') {
+          ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        }
+        return result.value;
+      }
+
       const result = applyRepair({ ...replayed.input, force: opts.force === true });
       if (!result.ok) return commandError(ctx, result.error);
       if (result.value.status === 'refused') ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);

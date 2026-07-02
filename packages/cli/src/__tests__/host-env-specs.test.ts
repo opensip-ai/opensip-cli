@@ -105,6 +105,7 @@ describe('hostEnv reads (CLI infra)', () => {
       'OPENSIP_STATE_LOCK_STALE_MS',
       'CI',
       'OPENSIP_CLI_TOOL_ENV_PASSTHROUGH',
+      'OPENSIP_MCP_ALLOW_MUTATIONS',
     ]);
   });
 

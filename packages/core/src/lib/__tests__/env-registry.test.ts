@@ -7,8 +7,15 @@
 import { afterEach, describe, it, expect } from 'vitest';
 
 import { EnvRegistry, type EnvVarSpec } from '../env-registry.js';
+import { snapshotEnv } from '../env-snapshot.js';
 
-const TOUCHED = ['OST_TEST_FLAG', 'OST_TEST_VALUE', 'OST_TEST_ALIAS', 'OST_TEST_CANON'];
+const TOUCHED = [
+  'OST_TEST_FLAG',
+  'OST_TEST_VALUE',
+  'OST_TEST_ALIAS',
+  'OST_TEST_CANON',
+  'OST_TEST_EXTRA',
+];
 
 afterEach(() => {
   for (const key of TOUCHED) delete process.env[key];
@@ -101,5 +108,15 @@ describe('EnvRegistry', () => {
   it('throws on an unknown variable (a host-spec typo is a bug, not silent undefined)', () => {
     const reg = new EnvRegistry([{ canonical: 'OST_TEST_VALUE', docs: 'x' }]);
     expect(() => reg.get('OST_UNDECLARED')).toThrow(/unknown variable 'OST_UNDECLARED'/);
+  });
+
+  it('snapshots a declared child env plus explicit overrides', () => {
+    process.env.OST_TEST_VALUE = 'forwarded';
+    process.env.OST_TEST_EXTRA = 'blocked';
+
+    expect(snapshotEnv([{ canonical: 'OST_TEST_VALUE', docs: 'x' }], { OST_CHILD: '1' })).toEqual({
+      OST_CHILD: '1',
+      OST_TEST_VALUE: 'forwarded',
+    });
   });
 });

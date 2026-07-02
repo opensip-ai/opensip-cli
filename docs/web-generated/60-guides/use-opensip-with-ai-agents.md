@@ -106,6 +106,19 @@ opensip fit --json --raw --filter errors-only
 
 Signals may carry structured repair guidance under `signal.repair` — see
 [ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0086-signal-repair-metadata.md).
+Preview deterministic repairs before applying them. When you apply one, use
+`--verify` and treat the verification verdict literally:
+
+```bash
+opensip repair preview latest --tool fit --signal index:0 --json
+opensip repair apply latest --tool fit --signal index:0 --action replace-ts-ignore --verify --json
+```
+
+Only `data.verification.status: "verified"` is a verified repair. `partial`,
+`unverified`, or `skipped` means you must not tell the user the issue is fixed.
+MCP mutation is off by default; `repair_apply_verify` appears only when the
+server is started with `opensip mcp --allow-mutations` or
+`OPENSIP_MCP_ALLOW_MUTATIONS=1`.
 
 ## Final handoff
 
@@ -135,7 +148,7 @@ Projects can override built-in recipes in `opensip-cli.config.yml`.
 
 For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
 register `opensip mcp` as a stdio server instead of shelling out for every graph
-or findings query. The server exposes 15 tools: graph traversal (`who_calls`,
+or findings query. By default the server exposes 15 read-only tools: graph traversal (`who_calls`,
 `blast_radius`, …), result replay (`get_latest_findings`, `show_run`, …), and
 review helpers (`review_change`, `compare_to_baseline`).
 

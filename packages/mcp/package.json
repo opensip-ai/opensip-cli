@@ -53,6 +53,13 @@
         "commonFlags": [
           "cwd"
         ],
+        "options": [
+          {
+            "flag": "--allow-mutations",
+            "description": "Enable explicitly mutating MCP tools such as repair_apply_verify",
+            "default": false
+          }
+        ],
         "scope": "project",
         "output": "raw-stream",
         "rawStreamReason": "mcp-stdio"

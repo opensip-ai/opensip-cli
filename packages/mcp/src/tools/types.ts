@@ -9,6 +9,7 @@
  */
 
 import type { GraphReadPort } from '../graph-read-port.js';
+import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
 import type { TargetConventionSummary } from '@opensip-cli/contracts';
 
@@ -21,4 +22,8 @@ export interface McpToolDeps {
   readonly validToolIds: ReadonlySet<string>;
   /** Bounded target convention summaries captured from the served project scope. */
   readonly targetConventions?: readonly TargetConventionSummary[];
+  /** Optional mutating repair port. Undefined keeps the MCP server read-only. */
+  readonly repairWrite?: RepairWritePort;
+  /** True only when the server was started with explicit mutation posture. */
+  readonly mutationsEnabled?: boolean;
 }

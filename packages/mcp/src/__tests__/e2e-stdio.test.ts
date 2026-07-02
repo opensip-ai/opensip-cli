@@ -98,10 +98,19 @@ interface Connected {
 }
 
 /** Spawn `opensip mcp --cwd root` and connect an MCP client over stdio. */
-async function connect(root: string): Promise<Connected> {
+async function connect(
+  root: string,
+  opts: { readonly allowMutations?: boolean } = {},
+): Promise<Connected> {
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [CLI_DIST, 'mcp', '--cwd', root],
+    args: [
+      CLI_DIST,
+      'mcp',
+      '--cwd',
+      root,
+      ...(opts.allowMutations === true ? ['--allow-mutations'] : []),
+    ],
     env: SAFE_ENV,
     cwd: root,
     stderr: 'pipe',
@@ -231,6 +240,17 @@ describe('MCP e2e over real stdio', () => {
       expect(names).toContain('review_change');
       expect(names).toContain('compare_to_baseline');
       expect(names).toContain('refresh_graph');
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
+
+  it('lists repair_apply_verify only when mutation mode is enabled', async () => {
+    const conn = await connect(fixtureA, { allowMutations: true });
+    try {
+      const tools = await conn.client.listTools();
+      expect(tools.tools).toHaveLength(16);
+      expect(tools.tools.map((t) => t.name)).toContain('repair_apply_verify');
     } finally {
       await conn.client.close();
     }

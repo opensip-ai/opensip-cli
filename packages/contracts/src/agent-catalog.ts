@@ -66,6 +66,7 @@ export interface AgentCatalog {
   readonly outputShapes: {
     readonly signalEnvelope: string; // high-level note + reference
     readonly reviewBrief: string;
+    readonly repairApplyVerify: string;
     readonly sessionReplay: string;
     readonly history: string;
   };
@@ -281,6 +282,13 @@ export function buildAgentCatalog(
         example: 'opensip suite run audit --changed --json',
       },
       {
+        name: 'Apply and verify a structured repair',
+        description:
+          'Preview first, then apply a structured signal.repair action with --verify. Claim the fix is verified only when verification.status is "verified".',
+        example:
+          'opensip repair preview latest --tool fit --signal index:0 --json && opensip repair apply latest --tool fit --signal index:0 --action replace-ts-ignore --verify --json',
+      },
+      {
         name: 'Inspect latest fit with focus on errors',
         description:
           'After a fit run, pull only actionable errors (high severity) and limit count.',
@@ -310,6 +318,8 @@ export function buildAgentCatalog(
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
         'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
+      repairApplyVerify:
+        'For repair apply --verify: { type: "repair-apply-verify", status, session, signal, action, changes, force, verification: { status: "verified" | "partial" | "unverified" | "skipped", coverage, scope: { tool, ruleId, files, checkRan, fallback }, commands, remainingFindings, trust? } }',
       sessionReplay:
         'For sessions show: { session: {id,tool,startedAt,completedAt,score,passed,...}, fidelity: "projection", envelope: SignalEnvelope, filtersApplied?, ...counts }',
       history:
@@ -324,6 +334,8 @@ export function buildAgentCatalog(
       'graph impact answers changed→impacted without a separate git diff dance.',
       'graph impact JSON includes trust.coverage/trust.fullyVerified/trust.uncertainties; do not claim targeted verification when fullyVerified is false.',
       'fit --changed --include-impacted falls back to the full target set when graph/git impact trust is partial or unknown.',
+      'repair apply --verify and MCP repair_apply_verify are mutating. MCP repair_apply_verify is absent unless the server starts with --allow-mutations or OPENSIP_MCP_ALLOW_MUTATIONS=1.',
+      'For repair results, partial/unverified/skipped verification means the agent must not claim the finding was fixed.',
       'Commands that expose machine-readable command results use --json. Raw-stream transports such as mcp document their own stdout protocol.',
       'filtersApplied, originalSignalCount, returnedSignalCount appear when --filter is used.',
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',
