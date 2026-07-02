@@ -62,10 +62,12 @@ function helpCommand(
 }
 
 function signalEnvelope(input: {
+  readonly tool?: SignalEnvelope['tool'];
   readonly passed: boolean;
   readonly errors?: number;
   readonly warnings?: number;
   readonly findings?: number;
+  readonly ruleId?: string;
   readonly message?: string;
   readonly filePath?: string;
   readonly metadata?: Record<string, unknown>;
@@ -79,17 +81,17 @@ function signalEnvelope(input: {
     provider: 'fixture',
     severity: index < errors ? 'high' : 'low',
     category: 'quality',
-    ruleId: 'fixture-rule',
+    ruleId: input.ruleId ?? 'fixture-rule',
     message: input.message ?? `fixture finding ${index}`,
     filePath: input.filePath ?? 'src/fixture.ts',
     metadata: input.metadata ?? {},
-    fingerprint: `fixture-rule|${input.filePath ?? 'src/fixture.ts'}|${index + 1}|0`,
+    fingerprint: `${input.ruleId ?? 'fixture-rule'}|${input.filePath ?? 'src/fixture.ts'}|${index + 1}|0`,
     createdAt: '2026-01-01T00:00:00.000Z',
   }));
   return {
     schemaVersion: 2,
-    tool: 'fit',
-    runId: 'run-fixture',
+    tool: input.tool ?? 'fit',
+    runId: `run-${input.tool ?? 'fit'}`,
     createdAt: '2026-01-01T00:00:00.000Z',
     verdict: {
       score: input.passed ? 100 : 0,
@@ -764,6 +766,80 @@ describe('runSuite', () => {
         evt: 'cli.suite.run.step',
         command: 'empty',
         verdict: { passed: true, findings: 0 },
+      }),
+    );
+  });
+
+  it('correlates related risks across live suite step envelopes', async () => {
+    const shared = { qualifiedName: 'src/review.ts#reviewChange' };
+    const fit = helpCommand('fit', async (_opts, cli) => {
+      await cli.deliverSignals(
+        signalEnvelope({
+          tool: 'fit',
+          passed: false,
+          errors: 1,
+          findings: 1,
+          message: 'Add input validation',
+          filePath: 'src/review.ts',
+          metadata: shared,
+        }),
+        { cwd: '/repo' },
+      );
+      return { type: 'help' };
+    });
+    const graph = helpCommand('graph', async (_opts, cli) => {
+      await cli.deliverSignals(
+        signalEnvelope({
+          tool: 'graph',
+          passed: false,
+          errors: 1,
+          findings: 1,
+          ruleId: 'graph:large-function',
+          message: 'Function has high blast radius',
+          filePath: 'src/review.ts',
+          metadata: shared,
+        }),
+        { cwd: '/repo' },
+      );
+      return { type: 'help' };
+    });
+    const info = vi.fn();
+    const scope = new RunScope({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: {
+          steps: [
+            { tool: TOOL_ID, command: 'fit' },
+            { tool: OTHER_TOOL_ID, command: 'graph' },
+          ],
+        },
+        tools: [tool(TOOL_ID, 'fitness', [fit]), tool(OTHER_TOOL_ID, 'graph', [graph])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: {},
+      }),
+    );
+
+    expect(result.reviewBrief?.correlatedRisks).toHaveLength(1);
+    expect(result.reviewBrief?.correlatedRisks?.[0]).toEqual(
+      expect.objectContaining({
+        reasons: expect.arrayContaining([
+          expect.objectContaining({
+            key: expect.objectContaining({ kind: 'symbol', value: 'src/review.ts#reviewChange' }),
+          }),
+        ]),
+        members: expect.arrayContaining([
+          expect.objectContaining({ signalRef: expect.objectContaining({ tool: 'fit' }) }),
+          expect.objectContaining({ signalRef: expect.objectContaining({ tool: 'graph' }) }),
+        ]),
+      }),
+    );
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.suite.brief.built',
+        correlatedRisks: 1,
       }),
     );
   });

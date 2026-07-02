@@ -1,32 +1,11 @@
 /**
  * @opensip-cli/contracts — public Tool↔runner contract facade.
  *
- * Tool packages (fitness, simulation, graph, and third-party plugins) and the
- * CLI entry-point both depend on this package for:
- *   - CLI option / output / result types
- *   - Exit code constants and error suggestions
- *   - The cross-tool StoredSession type (the SessionRepo runtime + the
- *     sessions schema live in @opensip-cli/session-store)
- *   - Runtime helpers that are part of the plugin authoring surface but whose
- *     implementation belongs in @opensip-cli/core (defineCommand,
- *     checkCompatibility, PLUGIN_API_VERSION)
- *
- * The GraphCatalog shape is DEFINED here (./graph-catalog.ts), not
- * re-exported from elsewhere. It is the contract surface between the
- * graph tool (which writes catalog.json) and @opensip-cli/dashboard
- * (which renders it): both producer and consumer depend on contracts
- * from below, so the shape lives in the layer beneath both. contracts
- * holds zero runtime dependency on dashboard or graph — these are
- * type-only declarations.
- *
- * This package is intentionally not "types-only": it may re-export small,
- * tool-facing runtime helpers from @opensip-cli/core and may own pure contract
- * helpers such as buildSignalEnvelope. It must not own host/runtime services
- * such as config loading, persistence, output delivery, or tool execution.
- *
- * contracts depends only on @opensip-cli/core. Tools depend on contracts. The
- * CLI entry-point depends on contracts and on every tool package — the
- * dependency graph stays acyclic.
+ * Tool packages and host surfaces share this package for option/result types,
+ * SignalEnvelope helpers, StoredSession shapes, graph catalog types, and the
+ * small tool-facing helpers re-exported from @opensip-cli/core. Host/runtime
+ * services such as config loading, persistence, delivery, and tool execution
+ * stay outside this facade.
  */
 
 // CLI option / argument types
@@ -83,6 +62,7 @@ export type {
   ReviewBriefVersion,
   SignalToReviewBriefRiskInput,
 } from './review-brief.js';
+export type * from './review-brief-correlation.js';
 export {
   REVIEW_BRIEF_VERSION,
   buildReviewBriefBaselineDelta,
@@ -102,6 +82,16 @@ export {
   reviewBriefSignalRefSchema,
   signalToReviewBriefRisk,
 } from './review-brief.js';
+export {
+  buildReviewBriefCorrelations,
+  reviewBriefCorrelationGroupSchema,
+  reviewBriefCorrelationKeySchema,
+  reviewBriefCorrelationKeys,
+  reviewBriefCorrelationReasonSchema,
+  reviewBriefEntities,
+  reviewBriefEntityRefSchema,
+  reviewBriefRiskRefSchema,
+} from './review-brief-correlation.js';
 
 export type * from './impact-trust.js';
 export {

@@ -102,14 +102,18 @@ function signal(over: {
   readonly fingerprint?: string;
   readonly baselineState?: 'added' | 'unchanged';
   readonly severity?: Signal['severity'];
+  readonly metadata?: Record<string, unknown>;
 }): Signal {
+  const metadata: Record<string, unknown> = {};
+  if (over.baselineState !== undefined) metadata.baselineState = over.baselineState;
+  Object.assign(metadata, over.metadata);
   const base = createSignal({
     source: 'u',
     severity: over.severity ?? 'high',
     ruleId: over.ruleId,
     message: over.message ?? over.ruleId,
     code: { file: over.filePath ?? 'src/a.ts', line: 1, column: 0 },
-    metadata: over.baselineState === undefined ? {} : { baselineState: over.baselineState },
+    metadata,
   });
   return {
     ...base,
@@ -125,6 +129,7 @@ function replayReviewSuiteStep(stored: StoredSession): ToolSessionReplay<Command
       filePath: stored.tool === 'fit' ? 'src/a.ts' : 'src/b.ts',
       fingerprint: `${stored.tool}-fp`,
       baselineState: stored.tool === 'fit' ? 'added' : 'unchanged',
+      metadata: { qualifiedName: 'src/review.ts#reviewChange' },
     }),
   ]);
 }
@@ -316,10 +321,58 @@ describe('SessionResultsReadPort — reviewChange', () => {
         added: 1,
         unchanged: 1,
       });
+      expect(out.value.data.reviewBrief.correlatedRisks).toBeUndefined();
       expect(out.value.data.source.sessionIds).toEqual(['graph-step', 'fit-step']);
       expect(out.value.data.freshness.graph?.fresh).toBe(true);
     }
     expect(replayCalls).toEqual(['graph', 'fit']);
+  });
+
+  it('rebuilds correlated risks from stored suite evidence', async () => {
+    new SessionRepo(store).save(
+      makeSession({
+        id: 'fit-step',
+        tool: 'fit',
+        startedAt: '2026-05-21T12:00:01.000Z',
+        completedAt: '2026-05-21T12:00:02.000Z',
+        suiteRunId: 'suite-1',
+        suiteName: 'audit',
+      }),
+    );
+    new SessionRepo(store).save(
+      makeSession({
+        id: 'graph-step',
+        tool: 'graph',
+        startedAt: '2026-05-21T12:00:03.000Z',
+        completedAt: '2026-05-21T12:00:04.000Z',
+        suiteRunId: 'suite-1',
+        suiteName: 'audit',
+      }),
+    );
+    const out = await new SessionResultsReadPort({
+      store,
+      replayFor: reviewSuiteResolver,
+    }).reviewChange({
+      suiteRunId: 'suite-1',
+    });
+
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.reviewBrief.correlatedRisks).toHaveLength(1);
+      expect(out.value.data.reviewBrief.correlatedRisks?.[0]).toEqual(
+        expect.objectContaining({
+          reasons: expect.arrayContaining([
+            expect.objectContaining({
+              key: expect.objectContaining({ kind: 'symbol', value: 'src/review.ts#reviewChange' }),
+            }),
+          ]),
+          members: expect.arrayContaining([
+            expect.objectContaining({ signalRef: expect.objectContaining({ tool: 'fit' }) }),
+            expect.objectContaining({ signalRef: expect.objectContaining({ tool: 'graph' }) }),
+          ]),
+        }),
+      );
+    }
   });
 
   it('returns a degraded brief when a stored suite step cannot replay', async () => {

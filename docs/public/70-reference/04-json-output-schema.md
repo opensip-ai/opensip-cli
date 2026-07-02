@@ -11,6 +11,12 @@ source-files:
   - packages/contracts/src/impact-trust.ts
   - packages/contracts/src/command-results-variants/graph-impact-result.ts
   - packages/contracts/src/command-results-variants/suite-results.ts
+  - packages/contracts/src/review-brief.ts
+  - packages/contracts/src/review-brief-correlation.ts
+  - packages/contracts/src/review-brief-correlation-order.ts
+  - packages/contracts/src/review-brief-correlation-projection.ts
+  - packages/contracts/src/review-brief-correlation-types.ts
+  - packages/contracts/src/review-brief-correlation-schemas.ts
   - packages/core/src/types/signal.ts
 related-docs:
   - ../10-concepts/04-contract-surfaces.md
@@ -124,10 +130,106 @@ per-step verdict fields are additive; older fields keep their names and types.
             "runId": "GRAPH_abc",
             "fingerprint": "graph:cycle|src/a.ts|42|0",
             "signalIndex": 0
-          }
+          },
+          "entities": [
+            {
+              "kind": "symbol",
+              "id": "src/a.ts#loadUser",
+              "confidence": "high",
+              "label": "src/a.ts#loadUser",
+              "file": "src/a.ts",
+              "line": 42,
+              "source": "metadata.qualifiedName"
+            }
+          ],
+          "correlationKeys": [
+            {
+              "kind": "symbol",
+              "value": "src/a.ts#loadUser",
+              "confidence": "high"
+            }
+          ]
         }
       ],
       "newFindings": [],
+      "correlatedRisks": [
+        {
+          "id": "corr-symbol-src-a-ts-loaduser",
+          "title": "Related findings for symbol src/a.ts#loadUser",
+          "severity": "high",
+          "isNew": false,
+          "primary": {
+            "source": "graph",
+            "ruleId": "graph:cycle",
+            "file": "src/a.ts",
+            "line": 42,
+            "column": 0,
+            "signalRef": {
+              "tool": "graph",
+              "suiteRunId": "suite_3c4e8a1b9d21",
+              "stepIndex": 1,
+              "runId": "GRAPH_abc",
+              "fingerprint": "graph:cycle|src/a.ts|42|0",
+              "signalIndex": 0
+            }
+          },
+          "members": [
+            {
+              "source": "graph",
+              "ruleId": "graph:cycle",
+              "file": "src/a.ts",
+              "line": 42,
+              "column": 0,
+              "signalRef": {
+                "tool": "graph",
+                "suiteRunId": "suite_3c4e8a1b9d21",
+                "stepIndex": 1,
+                "runId": "GRAPH_abc",
+                "fingerprint": "graph:cycle|src/a.ts|42|0",
+                "signalIndex": 0
+              }
+            },
+            {
+              "source": "fit",
+              "ruleId": "typescript:no-unsafe-async",
+              "file": "src/a.ts",
+              "line": 42,
+              "column": 0,
+              "signalRef": {
+                "tool": "fit",
+                "suiteRunId": "suite_3c4e8a1b9d21",
+                "stepIndex": 0,
+                "runId": "FIT_def",
+                "fingerprint": "typescript:no-unsafe-async|src/a.ts|42|0",
+                "signalIndex": 0
+              }
+            }
+          ],
+          "entities": [
+            {
+              "kind": "symbol",
+              "id": "src/a.ts#loadUser",
+              "confidence": "high",
+              "label": "src/a.ts#loadUser",
+              "file": "src/a.ts",
+              "line": 42,
+              "source": "metadata.qualifiedName"
+            }
+          ],
+          "reasons": [
+            {
+              "kind": "same-symbol",
+              "key": {
+                "kind": "symbol",
+                "value": "src/a.ts#loadUser",
+                "confidence": "high"
+              },
+              "confidence": "high",
+              "message": "Risks share symbol correlation key 'src/a.ts#loadUser'."
+            }
+          ]
+        }
+      ],
       "baselineDelta": {
         "available": false,
         "added": 0,
@@ -209,15 +311,60 @@ per-tool output.
 | `changedFiles` | number \| `null` | yes | Changed-file count when trustworthy; `null` when unavailable. |
 | `topRisks` | `ReviewBriefRisk[]` | yes | Deterministically ranked current risks, capped by the host. |
 | `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. |
+| `correlatedRisks` | `ReviewBriefCorrelationGroup[]` | no | Bounded, explainable groups of related risks. Additive and absent when no group has at least two risks. |
 | `baselineDelta` | object | yes | `{ available, added, removed, unchanged }`; `available:false` means the suite did not capture compare evidence. |
 | `degraded` | object[] | yes | Evidence-quality notes such as missing envelopes, step faults, missing fingerprints, partial impact verification, or failing verdicts without signals. |
 | `recommendedActions` | object[] | yes | Short host-generated next steps for agents and CI annotations. |
 
 Each `topRisks[]` item carries `source`, `ruleId`, `message`, `severity`, `file`,
 optional `line`/`column`, `isNew`, optional `repair`, optional `blastRadius`,
-and `signalRef`. `signalRef` preserves provenance back to the original evidence:
-`tool`, `suiteRunId`, `stepIndex`, optional `runId`, optional `fingerprint`, and
-`signalIndex`.
+optional `entities`, optional `correlationKeys`, and `signalRef`. `signalRef`
+preserves provenance back to the original evidence: `tool`, `suiteRunId`,
+`stepIndex`, optional `runId`, optional `fingerprint`, and `signalIndex`.
+
+`entities[]` and `correlationKeys[]` are deterministic projections from the
+source `Signal`, not separate evidence. They are capped and derived only from
+trusted scalar signal fields plus allowlisted metadata such as `qualifiedName`,
+`bodyHash`, `sccId`, `package`, `packages`, and `relatedPackageCycle`.
+
+### `ReviewBriefCorrelationGroup`
+
+Correlation groups are additive. They do not deduplicate or suppress entries in
+`topRisks[]`, `newFindings[]`, or raw stored envelopes. Always follow
+`members[].signalRef` back to source evidence before editing code.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | yes | Stable group id derived from the correlation key. |
+| `title` | string | yes | Short display title for the shared entity or key. |
+| `severity` | `"critical"` \| `"high"` \| `"medium"` \| `"low"` | yes | Highest-ranked member severity. |
+| `isNew` | boolean | yes | True when any member is new according to baseline metadata. |
+| `primary` | `ReviewBriefRiskRef` | yes | Highest-ranked member used as the lead finding. |
+| `members` | `ReviewBriefRiskRef[]` | yes | Bounded member list with source, rule, file, location, and `signalRef`. |
+| `entities` | `ReviewBriefEntityRef[]` | yes | Bounded union of projected entities across members. |
+| `reasons` | `ReviewBriefCorrelationReason[]` | yes | Explainable reasons such as `same-symbol` or `same-graph-node`. |
+| `blastRadius` | object | no | Strongest member blast-radius projection when present. |
+
+### `ReviewBriefEntityRef`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kind` | `"fingerprint"` \| `"file"` \| `"file-range"` \| `"symbol"` \| `"graph-node"` \| `"package"` | yes | Entity namespace. |
+| `id` | string | yes | Deterministic entity id. |
+| `confidence` | `"low"` \| `"medium"` \| `"high"` | yes | Strength of the projection. |
+| `label` | string | no | Display label. |
+| `file` | string | no | File associated with the entity. |
+| `line` | number | no | Line associated with the entity. |
+| `source` | string | no | Signal field or metadata key that produced the entity. |
+
+### `ReviewBriefCorrelationReason`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kind` | string | yes | Reason enum, currently `same-fingerprint`, `same-graph-node`, `same-symbol`, `same-rule-location`, `same-file-range`, `same-package`, or `same-file`. |
+| `key` | `ReviewBriefCorrelationKey` | yes | Correlation key shared by the group members. |
+| `confidence` | `"low"` \| `"medium"` \| `"high"` | yes | Strength of the reason. |
+| `message` | string | yes | Human-readable reason summary. |
 
 There is no suite-level review-brief SARIF output in v1. Use each source tool's
 existing SARIF path when SARIF is required.

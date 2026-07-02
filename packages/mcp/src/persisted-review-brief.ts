@@ -1,5 +1,6 @@
 import {
   buildReviewBriefBaselineDelta,
+  buildReviewBriefCorrelations,
   buildReviewBriefRecommendedActions,
   type CommandResult,
   compareReviewBriefRisks,
@@ -55,6 +56,7 @@ export function buildPersistedReviewBrief(
   });
   const sortedRisks = [...collected.risks].sort(compareReviewBriefRisks);
   const focusedRisks = focusRisks(sortedRisks, input.files);
+  const correlatedRisks = buildReviewBriefCorrelations(focusedRisks);
   const unavailableBaseline = collected.baselineStates.length === 0 && sortedRisks.length > 0;
   const degraded = [...collected.reviewDegraded];
   if (unavailableBaseline) {
@@ -87,6 +89,7 @@ export function buildPersistedReviewBrief(
       degraded,
       risks: sortedRisks,
     }),
+    ...(correlatedRisks.length === 0 ? {} : { correlatedRisks }),
   };
   const mcpDegraded = [...collected.evidenceDegraded];
   if (unavailableBaseline) {

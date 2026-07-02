@@ -91,6 +91,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     suiteRunId,
     verdict: reviewBrief.verdict,
     risks: reviewBrief.topRisks.length,
+    correlatedRisks: reviewBrief.correlatedRisks?.length ?? 0,
     degraded: reviewBrief.degraded.length,
   });
 

@@ -110,7 +110,7 @@ export interface McpReviewChangeFreshness {
   };
 }
 
-/** The `review_change` payload: v1 ReviewBrief plus persisted evidence context. */
+/** The `review_change` payload: v1 ReviewBrief, optional correlated risks, and persisted evidence context. */
 export interface McpReviewChangeData {
   readonly reviewBrief: ReviewBrief;
   readonly source: McpReviewChangeSource;

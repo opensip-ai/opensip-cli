@@ -9,6 +9,7 @@ source-files:
   - packages/cli/src/commands/agent-catalog.ts
   - packages/contracts/src/agent-filters.ts
   - packages/contracts/src/impact-trust.ts
+  - packages/contracts/src/review-brief-correlation.ts
   - packages/core/src/lib/git-changed-files.ts
   - packages/graph/engine/src/cli/impact.ts
   - packages/fitness/engine/src/cli/fit/changed-targeting.ts
@@ -23,6 +24,7 @@ related-docs:
   - ../../decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md
   - ../../decisions/ADR-0110-host-owned-review-brief-contract.md
   - ../../decisions/ADR-0123-impact-analysis-trust-foundation.md
+  - ../../decisions/ADR-0124-review-brief-correlation-join.md
 ---
 # Use OpenSIP with AI agents
 
@@ -55,11 +57,14 @@ opensip suite run audit --changed --json
 ```
 
 The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
-baseline/degradation notes, and `signalRef` pointers back to the source
-envelopes. When MCP is available, prefer the `review_change` tool for the same
-read-side review shape over persisted suite evidence; do not re-run hidden
-analysis or inspect raw logs to answer a question that the brief/session
-evidence already answers.
+optional `correlatedRisks[]`, baseline/degradation notes, and `signalRef`
+pointers back to the source envelopes. Inspect `correlatedRisks[]` first when it
+is present: it shows when multiple tools are pointing at the same symbol, graph
+node, file range, package, or fingerprint. Treat those groups as navigation
+only, then follow each member's `signalRef` before changing code. When MCP is
+available, prefer the `review_change` tool for the same read-side review shape
+over persisted suite evidence; do not re-run hidden analysis or inspect raw logs
+to answer a question that the brief/session evidence already answers.
 
 When the user says a tool **already reported findings**, use the OpenSIP MCP
 result tools first: `get_latest_findings`, `show_run`, or `list_runs`. If MCP is

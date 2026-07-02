@@ -6,6 +6,7 @@ import type {
   SuiteListEntry,
   SuiteListResult,
   SuiteListStep,
+  ReviewBriefCorrelationGroup,
   ReviewBriefDegradation,
   ReviewBriefRisk,
   SuiteRunResult,
@@ -74,6 +75,20 @@ function riskRow(risk: ReviewBriefRisk): Span[] {
   ];
 }
 
+function correlatedRiskRow(group: ReviewBriefCorrelationGroup): Span[] {
+  const tools = [...new Set(group.members.map((member) => member.signalRef.tool))].join(',');
+  const reason = group.reasons[0]?.kind ?? '-';
+  const errorTone = group.severity === 'critical' || group.severity === 'high';
+  return [
+    { text: group.primary.ruleId },
+    { text: String(group.members.length), tone: group.members.length > 1 ? 'warning' : undefined },
+    { text: tools },
+    { text: group.severity, tone: errorTone ? 'error' : 'warning' },
+    { text: reason },
+    { text: group.title },
+  ];
+}
+
 function degradedRow(entry: ReviewBriefDegradation): Span[] {
   return [
     { text: entry.source, tone: 'brand' },
@@ -129,6 +144,10 @@ function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
       { text: 'Review: ', dim: true },
       { text: brief.verdict.toUpperCase(), tone: reviewVerdictTone(brief.verdict), bold: true },
       { text: `  risks:${brief.topRisks.length}`, dim: brief.topRisks.length === 0 },
+      {
+        text: `  correlated:${brief.correlatedRisks?.length ?? 0}`,
+        dim: (brief.correlatedRisks?.length ?? 0) === 0,
+      },
       { text: `  degraded:${brief.degraded.length}`, dim: brief.degraded.length === 0 },
     ]),
   ];
@@ -141,6 +160,16 @@ function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
       viewTable(
         ['Source', 'Rule', 'Severity', 'Location', 'New', 'Message'],
         brief.topRisks.slice(0, 5).map(riskRow),
+      ),
+    );
+  }
+
+  if ((brief.correlatedRisks?.length ?? 0) > 0) {
+    nodes.push(
+      SPACER,
+      viewTable(
+        ['Primary', 'Members', 'Tools', 'Severity', 'Reason', 'Title'],
+        brief.correlatedRisks?.slice(0, 5).map(correlatedRiskRow) ?? [],
       ),
     );
   }

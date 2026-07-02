@@ -303,6 +303,7 @@ describe('buildAgentCatalog', () => {
     expect(JSON.stringify(c)).not.toContain('opensip audit');
     expect(c.outputShapes.signalEnvelope).toMatch(/SignalEnvelope|schemaVersion/);
     expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
+    expect(c.outputShapes.reviewBrief).toMatch(/correlatedRisks/);
     expect(c.outputShapes.reviewBrief).toMatch(/verification/);
     expect(c.outputShapes.sessionReplay).toMatch(/fidelity/);
     expect(c.outputShapes.history).toMatch(/history/);

@@ -1,5 +1,6 @@
 import {
   buildReviewBriefBaselineDelta,
+  buildReviewBriefCorrelations,
   buildReviewBriefRecommendedActions,
   REVIEW_BRIEF_VERSION,
   compareReviewBriefRisks,
@@ -152,6 +153,7 @@ export function buildReviewBrief(input: BuildReviewBriefInput): ReviewBrief {
   const sortedRisks = [...collected.risks].sort(compareReviewBriefRisks);
   const topRisks = sortedRisks.slice(0, riskLimit);
   const newFindings = sortedRisks.filter((risk) => risk.isNew).slice(0, riskLimit);
+  const correlatedRisks = buildReviewBriefCorrelations(sortedRisks);
   const verdict = deriveReviewBriefVerdict({
     risks: sortedRisks,
     degraded: collected.degraded,
@@ -172,5 +174,6 @@ export function buildReviewBrief(input: BuildReviewBriefInput): ReviewBrief {
       degraded: collected.degraded,
       risks: sortedRisks,
     }),
+    ...(correlatedRisks.length === 0 ? {} : { correlatedRisks }),
   };
 }

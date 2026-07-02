@@ -1,6 +1,17 @@
 import { isErrorSeverity, isPlainRecord } from '@opensip-cli/core';
 import { z } from 'zod';
 
+import {
+  reviewBriefCorrelationGroupSchema,
+  reviewBriefCorrelationKeySchema,
+  reviewBriefCorrelationKeys,
+  reviewBriefEntities,
+  reviewBriefEntityRefSchema,
+  type ReviewBriefCorrelationGroup,
+  type ReviewBriefCorrelationKey,
+  type ReviewBriefEntityRef,
+} from './review-brief-correlation.js';
+
 import type { Signal, SignalRepair, SignalSeverity } from '@opensip-cli/core';
 
 export const REVIEW_BRIEF_VERSION = 1;
@@ -36,6 +47,8 @@ export interface ReviewBriefRisk {
   readonly repair?: SignalRepair;
   readonly blastRadius?: ReviewBriefBlastRadius;
   readonly dedupedRefs?: readonly ReviewBriefSignalRef[];
+  readonly entities?: readonly ReviewBriefEntityRef[];
+  readonly correlationKeys?: readonly ReviewBriefCorrelationKey[];
 }
 
 export interface ReviewBriefBaselineDelta {
@@ -77,6 +90,7 @@ export interface ReviewBrief {
   readonly baselineDelta: ReviewBriefBaselineDelta;
   readonly degraded: readonly ReviewBriefDegradation[];
   readonly recommendedActions: readonly ReviewBriefRecommendedAction[];
+  readonly correlatedRisks?: readonly ReviewBriefCorrelationGroup[];
 }
 
 export interface DeriveReviewBriefVerdictInput {
@@ -192,6 +206,8 @@ export function signalToReviewBriefRisk(input: SignalToReviewBriefRiskInput): Re
   const state = reviewBriefBaselineState(input.signal);
   const fingerprint = input.signal.fingerprint;
   const signalBlastRadius = reviewBriefBlastRadius(input.signal);
+  const entities = reviewBriefEntities(input.signal);
+  const correlationKeys = reviewBriefCorrelationKeys(input.signal, entities);
   return {
     source: input.tool,
     ruleId: input.signal.ruleId,
@@ -215,6 +231,8 @@ export function signalToReviewBriefRisk(input: SignalToReviewBriefRiskInput): Re
     },
     ...(input.signal.repair === undefined ? {} : { repair: input.signal.repair }),
     ...(signalBlastRadius === undefined ? {} : { blastRadius: signalBlastRadius }),
+    ...(entities.length === 0 ? {} : { entities }),
+    ...(correlationKeys.length === 0 ? {} : { correlationKeys }),
   };
 }
 
@@ -368,6 +386,8 @@ export const reviewBriefRiskSchema = z
     repair: reviewBriefRepairSchema.optional(),
     blastRadius: reviewBriefBlastRadiusSchema.optional(),
     dedupedRefs: z.array(reviewBriefSignalRefSchema).optional(),
+    entities: z.array(reviewBriefEntityRefSchema).optional(),
+    correlationKeys: z.array(reviewBriefCorrelationKeySchema).optional(),
   })
   .strict();
 
@@ -419,5 +439,6 @@ export const reviewBriefSchema = z
     baselineDelta: reviewBriefBaselineDeltaSchema,
     degraded: z.array(reviewBriefDegradationSchema),
     recommendedActions: z.array(reviewBriefRecommendedActionSchema),
+    correlatedRisks: z.array(reviewBriefCorrelationGroupSchema).optional(),
   })
   .strict();

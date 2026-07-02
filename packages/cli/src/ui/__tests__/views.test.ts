@@ -520,6 +520,75 @@ describe('suite views', () => {
           },
         ],
         newFindings: [],
+        correlatedRisks: [
+          {
+            id: 'corr-symbol-src-a',
+            title: 'Related findings for symbol src/a.ts#handler',
+            severity: 'high',
+            isNew: false,
+            primary: {
+              source: 'fit',
+              ruleId: 'fixture-rule',
+              file: 'src/a.ts',
+              signalRef: {
+                tool: 'fit',
+                suiteRunId: 'run-1',
+                stepIndex: 0,
+                runId: 'FIT_1',
+                fingerprint: 'fp-1',
+                signalIndex: 0,
+              },
+              line: 2,
+              column: 0,
+            },
+            members: [
+              {
+                source: 'fit',
+                ruleId: 'fixture-rule',
+                file: 'src/a.ts',
+                signalRef: {
+                  tool: 'fit',
+                  suiteRunId: 'run-1',
+                  stepIndex: 0,
+                  runId: 'FIT_1',
+                  fingerprint: 'fp-1',
+                  signalIndex: 0,
+                },
+                line: 2,
+                column: 0,
+              },
+              {
+                source: 'graph',
+                ruleId: 'wide-function',
+                file: 'src/a.ts',
+                signalRef: {
+                  tool: 'graph',
+                  suiteRunId: 'run-1',
+                  stepIndex: 1,
+                  runId: 'GRAPH_1',
+                  fingerprint: 'fp-2',
+                  signalIndex: 0,
+                },
+              },
+            ],
+            entities: [
+              {
+                kind: 'symbol',
+                id: 'src/a.ts#handler',
+                confidence: 'high',
+                label: 'src/a.ts#handler',
+              },
+            ],
+            reasons: [
+              {
+                kind: 'same-symbol',
+                key: { kind: 'symbol', value: 'src/a.ts#handler', confidence: 'high' },
+                confidence: 'high',
+                message: 'Risks share symbol correlation key.',
+              },
+            ],
+          },
+        ],
         degraded: [
           {
             source: 'graph',
@@ -533,6 +602,9 @@ describe('suite views', () => {
     });
     expect(run).toContain('Suite security');
     expect(run).toContain('Review: FAIL');
+    expect(run).toContain('correlated:1');
+    expect(run).toContain('Related findings for symbol src/a.ts#handler');
+    expect(run).toContain('same-symbol');
     expect(run).toContain('fixture-rule');
     expect(run).toContain('src/a.ts:2:0');
     expect(run).toContain('missing-envelope');
