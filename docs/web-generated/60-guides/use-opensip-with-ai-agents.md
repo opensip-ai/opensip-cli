@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-30
-release: v0.2.0
+release: v0.2.1
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
@@ -52,7 +52,7 @@ re-running:
 opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
 ```
 
-See [ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/docs/decisions/ADR-0085-change-detection-substrate.md) for how
+See [ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0085-change-detection-substrate.md) for how
 change detection and filtering share one substrate.
 
 ## Edit loop
@@ -79,7 +79,7 @@ opensip fit --json --raw --filter errors-only
 ```
 
 Signals may carry structured repair guidance under `signal.repair` — see
-[ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/docs/decisions/ADR-0086-signal-repair-metadata.md).
+[ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0086-signal-repair-metadata.md).
 
 ## Final handoff
 
@@ -116,7 +116,7 @@ For existing-result questions, MCP is the first source of truth. Do not grep
 `.runtime/logs`, read `datastore.sqlite` directly, or re-run `fit` / `graph` /
 `yagni` / `sim` just to answer what the last stored run reported; those are
 fallback/debug paths. See
-[ADR-0109](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/docs/decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
+[ADR-0109](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
 
 Setup is client-specific (JSON vs TOML, config file locations, approval flows).
 See **[Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)** for copy-paste config for

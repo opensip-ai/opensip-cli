@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/checks-java",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "Apache-2.0",
   "description": "Java fitness checks for opensip-cli",
   "keywords": [

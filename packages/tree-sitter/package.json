@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tree-sitter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "Apache-2.0",
   "description": "Grammar-agnostic tree-sitter substrate (parser lifecycle + node accessors) shared by lang-* and the graph adapters",
   "keywords": [

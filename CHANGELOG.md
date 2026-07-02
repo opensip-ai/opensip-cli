@@ -2,6 +2,26 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.2.1] - 2026-07-01
+
+An MCP-first agent-guidance release. Repeat `opensip init` now refreshes
+managed OpenSIP guidance in known agent-instruction files and updates the
+project `.gitignore`, without rewriting config or examples unless `--keep` or
+`--remove` is explicit.
+
+### Added
+
+- MCP-first agent guidance refresh on repeat `opensip init`, including managed
+  `AGENTS.md` / `CLAUDE.md` blocks and ADR-0109.
+- `mcp-first-agent-guidance` and `mcp-results-no-rerun` fitness checks that
+  enforce MCP-first routing in agent instruction files.
+
+### Changed
+
+- `opensip init` documentation and agent guides now describe the refresh
+  behavior for existing projects.
+- MCP client setup guide updated for the merged guidance refresh flow.
+
 ## [0.2.0] - 2026-07-01
 
 An architecture-audit remediation and agent-ergonomics release. It hardens
