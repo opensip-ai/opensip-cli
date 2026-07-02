@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.2.1
+release: v0.2.2
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph/yagni aren't the right shape and you want something fundamentally different."
@@ -36,7 +36,7 @@ This is the heaviest extension shape. Most teams never need it. If you just want
 a compatibility wrapper for older authored tools, but new scaffolds use
 `defineTool()` plus command-spec drafts directly. Neither path synthesizes
 lifecycle `extensionPoints` — absence is the safe default
-([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.
 
@@ -77,8 +77,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
 	    ]
 	  },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^0.2.1",
-    "@opensip-cli/core": "^0.2.1"
+    "@opensip-cli/contracts": "^0.2.2",
+    "@opensip-cli/core": "^0.2.2"
   }
 }
 ```
@@ -256,7 +256,7 @@ handler: async (opts, cli) => {
 };
 ```
 
-See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
+See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
 
 `defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
 nested children). The manifest lists every command by **short name** — `list`,
@@ -335,7 +335,7 @@ main entry:
 The runtime contract is unchanged — the directory's resolved main must export
 `tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
 Authored discovery, admission, dynamic import, and registration travel the exact
-same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
 > **Sidecar vs `tools install --project`.** `tools install --project` *installs an
 > npm package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
@@ -440,9 +440,9 @@ host process with import-error isolation only — no worker boundary. The extern
 worker fork does **not** cover them.
 
 For the full extension trust-tier matrix, see
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
 (canonical) and the contributor reference
-[`docs/internal/plugin-isolation-surface.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/internal/plugin-isolation-surface.md).
+[`docs/internal/plugin-isolation-surface.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/internal/plugin-isolation-surface.md).
 
 What is enforced at admission:
 

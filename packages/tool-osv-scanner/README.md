@@ -25,8 +25,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.2.1/packages/tool-osv-scanner
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.2.2/packages/tool-osv-scanner
 
 ## License
 

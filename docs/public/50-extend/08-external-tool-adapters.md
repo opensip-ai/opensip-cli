@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-28
-release: v0.2.1
+release: v0.2.2
 title: "External tool adapters"
 audience: [plugin-authors]
 purpose: "Wrap a local CLI scanner (gitleaks/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."

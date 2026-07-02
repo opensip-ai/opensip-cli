@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.2.1
+release: v0.2.2
 title: "CLI output rendering"
 audience: [contributors]
 purpose: "How every command's human-readable output is defined once and rendered two ways — Ink for a TTY, plain text for pipes/CI — so the two cannot drift."

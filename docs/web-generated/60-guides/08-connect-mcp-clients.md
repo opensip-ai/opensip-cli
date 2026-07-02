@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-30
-release: v0.2.1
+release: v0.2.2
 title: "Connect MCP clients (Cursor, Claude Code, Codex)"
 audience: [getting-started, ci-integrators]
 purpose: "Register opensip mcp as a stdio MCP server in Cursor, Claude Code, and Codex."
@@ -310,4 +310,4 @@ stdout must stay clean for JSON-RPC; do not pipe or tee it manually while testin
 
 - [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) — CLI loops without MCP
 - [`mcp` command reference](/docs/opensip-cli/70-reference/01-cli-commands/#mcp--serve-the-call-graph--results-to-agents-over-stdio) — full tool table and limitations
-- [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0084-mcp-server-surface.md) — design decisions and trust model
+- [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0084-mcp-server-surface.md) — design decisions and trust model

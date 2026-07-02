@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.2.1
+release: v0.2.2
 title: "Project-local plugins"
 audience: [plugin-authors, getting-started]
 purpose: "The fastest path to extend opensip: drop .mjs files under opensip-cli/{fit,sim}/ — checks, recipes, scenarios."
@@ -64,7 +64,7 @@ The id is a UUID v4. Generate one with `node -e "console.log(crypto.randomUUID()
 | `scope` | Almost always. Tells the framework what kind of code this check is for. |
 | `contentFilter` | Set to `'strip-strings-and-comments'` for regex-shaped checks; default `'raw'` is for text scanners. |
 
-For walking the TypeScript AST instead of regex, see [Ban an API pattern](/docs/opensip-cli/60-guides/02-ban-an-api-pattern/) for the AST shape, and [`@opensip-cli/lang-typescript`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/packages/languages/lang-typescript/src/index.ts) for the helper exports.
+For walking the TypeScript AST instead of regex, see [Ban an API pattern](/docs/opensip-cli/60-guides/02-ban-an-api-pattern/) for the AST shape, and [`@opensip-cli/lang-typescript`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/packages/languages/lang-typescript/src/index.ts) for the helper exports.
 
 ## A project-local recipe
 
@@ -135,7 +135,7 @@ Same shape for `defineChaosScenario` — each pinned to its own kind. See [scena
 
 ## Loose source is current-epoch source, not a portable artifact
 
-Loose project-local `.mjs` files (and authored project-local tools) are **source authored against the CLI and domain epoch you have installed right now** — they are not portable, package-compatible artifacts. They carry no `apiVersion` / `minSupportedApiVersion` / target-domain epoch and so do **not** participate in the bounded-epoch compatibility negotiation that published packs and whole-tool manifests use ([ADR-0074](https://github.com/opensip-ai/opensip-cli/blob/v0.2.1/docs/decisions/ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md)). The contract is simply: they run against the current CLI. If you upgrade the CLI across a domain epoch and a loose file stops loading, re-author it against the new epoch (or graduate it to a versioned pack). Do not copy a loose file between projects on different CLI versions and expect epoch checks to protect you — there are none.
+Loose project-local `.mjs` files (and authored project-local tools) are **source authored against the CLI and domain epoch you have installed right now** — they are not portable, package-compatible artifacts. They carry no `apiVersion` / `minSupportedApiVersion` / target-domain epoch and so do **not** participate in the bounded-epoch compatibility negotiation that published packs and whole-tool manifests use ([ADR-0074](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0074-open-domain-contract-versions-and-compatibility-epochs.md)). The contract is simply: they run against the current CLI. If you upgrade the CLI across a domain epoch and a loose file stops loading, re-author it against the new epoch (or graduate it to a versioned pack). Do not copy a loose file between projects on different CLI versions and expect epoch checks to protect you — there are none.
 
 ## When to graduate
 

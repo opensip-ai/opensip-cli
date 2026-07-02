@@ -2,6 +2,21 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.2.2] - 2026-07-01
+
+An `opensip init` hardening release. File classification skips generated
+dependency and build-output directories, and the init view caps long
+pre-existing-file previews so repeat-init diagnostics stay readable on large
+projects.
+
+### Fixed
+
+- Init file classification no longer walks `node_modules`, `dist`, `coverage`,
+  or `.turbo` under `opensip-cli/`; symlink entries are handled safely via
+  `lstat`.
+- Partial-state and success init views cap pre-existing file listings at 40
+  entries with a trailing overflow hint.
+
 ## [0.2.1] - 2026-07-01
 
 An MCP-first agent-guidance release. Repeat `opensip init` now refreshes
