@@ -10,16 +10,7 @@ import type {
   AgentGuidanceTargetAction,
   AgentGuidanceTargetResult,
   InitResult,
-  PreExistingFile,
 } from '@opensip-cli/contracts';
-
-const PRE_EXISTING_FILE_DISPLAY_LIMIT = 40;
-
-function classificationTone(cls: PreExistingFile['classification']): Tone {
-  if (cls === 'custom') return 'success';
-  if (cls === 'stale-scaffolded') return 'warning';
-  return 'brand';
-}
 
 function relativize(p: string, cwd: string): string {
   return p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : p;
@@ -49,26 +40,8 @@ function createdHeadline(state: InitResult['state']): string {
   return 'Scaffolded';
 }
 
-function preExistingLines(files: readonly PreExistingFile[], cwd: string): ViewNode[] {
-  return files.map((f) =>
-    line([
-      { text: `    ${relativize(f.path, cwd)}`, dim: true },
-      {
-        text: `  (${f.classification})`,
-        tone: classificationTone(f.classification),
-      },
-    ]),
-  );
-}
-
-function preExistingPreviewLines(files: readonly PreExistingFile[], cwd: string): ViewNode[] {
-  const visible = files.slice(0, PRE_EXISTING_FILE_DISPLAY_LIMIT);
-  const nodes = preExistingLines(visible, cwd);
-  const hidden = files.length - visible.length;
-  if (hidden > 0) {
-    nodes.push(line([{ text: `    ... ${String(hidden)} more file(s) not shown`, dim: true }]));
-  }
-  return nodes;
+function preExistingSummary(fileCount: number): string {
+  return `${String(fileCount)} file(s) preserved under opensip-cli/.`;
 }
 
 function guidanceActionTone(action: AgentGuidanceTargetAction): Tone | undefined {
@@ -124,17 +97,15 @@ function partialStateView(
     ]),
   ];
   if (err.preExistingFiles.length > 0) {
-    const fileLines = preExistingPreviewLines(err.preExistingFiles, cwd);
     children.push(
       { kind: 'spacer' },
       line([
         {
-          text: `  Found ${err.preExistingFiles.length} file(s) under opensip-cli/:`,
+          text: `  Found ${preExistingSummary(err.preExistingFiles.length)}`,
           dim: true,
         },
       ]),
     );
-    for (const node of fileLines) children.push(node);
   }
   children.push(
     { kind: 'spacer' },
@@ -180,9 +151,15 @@ function createdView(result: InitResult): ViewNode {
     children.push(line([{ text: '    Agent guidance:', dim: true }]), ...guidance);
   }
   if (result.preExistingFiles && result.preExistingFiles.length > 0) {
-    const fileLines = preExistingPreviewLines(result.preExistingFiles, cwd);
-    children.push({ kind: 'spacer' }, line([{ text: '  Pre-existing files:', dim: true }]));
-    for (const node of fileLines) children.push(node);
+    children.push(
+      { kind: 'spacer' },
+      line([
+        {
+          text: `  Pre-existing files: ${preExistingSummary(result.preExistingFiles.length)}`,
+          dim: true,
+        },
+      ]),
+    );
   }
   children.push(
     { kind: 'spacer' },

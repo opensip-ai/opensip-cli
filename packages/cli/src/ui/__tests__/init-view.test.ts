@@ -1,7 +1,7 @@
 /**
  * init view-model builder. `viewInit` expresses every InitResult branch as a
  * ViewNode: the inside-existing-project refusal, ambiguous-language refusal, the
- * partial-state report (with each pre-existing-file classification tone), the
+ * partial-state report (with a pre-existing-file count summary), the
  * created/re-scaffolded/recovered success headlines, and the scaffold-failure
  * fallback. Driven by input variety and asserted through `renderToText`.
  */
@@ -50,7 +50,7 @@ describe('viewInit — refusals', () => {
 });
 
 describe('viewInit — partial-state report', () => {
-  it('renders each headline state and every pre-existing-file classification tone', () => {
+  it('renders each headline state and summarizes pre-existing files without listing them', () => {
     const files = [
       { path: '/proj/opensip-cli/custom.ts', classification: 'custom' },
       { path: '/proj/opensip-cli/old.ts', classification: 'stale-scaffolded' },
@@ -65,9 +65,11 @@ describe('viewInit — partial-state report', () => {
       } as Partial<InitResult>),
     );
     expect(dirOnly).toContain('opensip-cli/ present but');
-    expect(dirOnly).toContain('(custom)');
-    expect(dirOnly).toContain('(stale-scaffolded)');
-    expect(dirOnly).toContain('(scaffolded)');
+    expect(dirOnly).toContain('Found 3 file(s) preserved under opensip-cli/.');
+    expect(dirOnly).not.toContain('custom.ts');
+    expect(dirOnly).not.toContain('(custom)');
+    expect(dirOnly).not.toContain('(stale-scaffolded)');
+    expect(dirOnly).not.toContain('(scaffolded)');
     expect(dirOnly).toContain('opensip init --keep');
 
     const cfgOnly = text(
@@ -88,7 +90,7 @@ describe('viewInit — partial-state report', () => {
     expect(full).toContain('Already initialized');
   });
 
-  it('caps large pre-existing-file lists instead of rendering every file', () => {
+  it('renders only a count for large pre-existing-file lists', () => {
     const files = Array.from({ length: 45 }, (_, index) => ({
       path: `/proj/opensip-cli/fit/checks/file-${String(index).padStart(2, '0')}.mjs`,
       classification: 'custom' as const,
@@ -102,10 +104,10 @@ describe('viewInit — partial-state report', () => {
       } as Partial<InitResult>),
     );
 
-    expect(out).toContain('Found 45 file(s) under opensip-cli/');
-    expect(out).toContain('opensip-cli/fit/checks/file-39.mjs');
+    expect(out).toContain('Found 45 file(s) preserved under opensip-cli/.');
+    expect(out).not.toContain('opensip-cli/fit/checks/file-39.mjs');
     expect(out).not.toContain('opensip-cli/fit/checks/file-40.mjs');
-    expect(out).toContain('... 5 more file(s) not shown');
+    expect(out).not.toContain('more file(s) not shown');
   });
 });
 
@@ -124,7 +126,8 @@ describe('viewInit — created success', () => {
     expect(out).toContain('Scaffolded for');
     expect(out).toContain('typescript, python');
     expect(out).toContain('.gitignore');
-    expect(out).toContain('Pre-existing files');
+    expect(out).toContain('Pre-existing files: 1 file(s) preserved under opensip-cli/.');
+    expect(out).not.toContain('keep.ts');
     expect(out).toContain('opensip fit --recipe example');
   });
 

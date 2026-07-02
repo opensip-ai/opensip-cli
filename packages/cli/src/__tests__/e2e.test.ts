@@ -415,7 +415,26 @@ describe('CLI e2e', () => {
       expect(
         existsSync(join(tempDir, 'opensip-cli', 'sim', 'scenarios', 'example-scenario.mjs')),
       ).toBe(true);
+      expect(existsSync(join(tempDir, 'opensip-cli', 'sim', 'recipes', 'example-recipe.mjs'))).toBe(
+        true,
+      );
       expect(existsSync(join(tempDir, '.gitignore'))).toBe(true);
+
+      const sim = cli.run(['sim', '--recipe', 'example', '--json'], {
+        cwd: tempDir,
+        timeout: 120_000,
+      });
+      expect(sim.exitCode).toBe(0);
+      const outcome = JSON.parse(sim.stdout) as {
+        kind?: string;
+        envelope?: {
+          recipe?: string;
+          units?: { slug?: string }[];
+        };
+      };
+      expect(outcome.kind).toBe('sim.run');
+      expect(outcome.envelope?.recipe).toBe('example');
+      expect(outcome.envelope?.units?.[0]?.slug).toBe('example-scenario');
     });
 
     it('reports already-initialized state on second run', () => {
