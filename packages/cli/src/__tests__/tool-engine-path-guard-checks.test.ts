@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { analyzeMandatoryRunCommonFlags } from '../../../../opensip-cli/fit/checks/cross-tool-flag-parity.mjs';
+import { analyzeDeferredRunPipelineBoundary } from '../../../../opensip-cli/fit/checks/deferred-run-pipeline-boundary.mjs';
 import { analyzeDirectStdoutInToolEngine } from '../../../../opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs';
 import { analyzeNoRawFsArtifactWrite } from '../../../../opensip-cli/fit/checks/no-raw-fs-artifact-write-in-tool-engine.mjs';
 import { analyzeAllReportProducerOpenFlag } from '../../../../opensip-cli/fit/checks/report-producer-open-flag.mjs';
@@ -105,7 +106,7 @@ describe('derived first-party tool-engine path gates', () => {
       ],
       [
         '/repo/packages/yagni/engine/src/cli/yagni-command-spec.ts',
-        "export const spec = definePrimaryCommand({ commonFlags: ['cwd', 'json', 'open'] });",
+        'export const spec = defineAnalysisRunCommand({ description: "Run YAGNI", handler });',
       ],
     ]);
 
@@ -212,5 +213,56 @@ describe('derived first-party tool-engine path gates', () => {
         '/repo/packages/graph/engine/src/cli/__tests__/graph-gate-mode.test.ts',
       ),
     ).toEqual([]);
+  });
+
+  it('allows approved analysis-run helpers at contracts and YAGNI command boundaries', () => {
+    expect(
+      analyzeDeferredRunPipelineBoundary(
+        'export function defineAnalysisRunCommand() {}\nexport type RunLifecycleEvent = string;',
+        '/repo/packages/contracts/src/analysis-run-command.ts',
+      ),
+    ).toEqual([]);
+
+    expect(
+      analyzeDeferredRunPipelineBoundary(
+        "import { defineAnalysisRunCommand } from '@opensip-cli/contracts';\nconst spec = defineAnalysisRunCommand(input);",
+        '/repo/packages/yagni/engine/src/cli/yagni-analysis-run.ts',
+      ),
+    ).toEqual([]);
+
+    expect(
+      analyzeDeferredRunPipelineBoundary(
+        "import { readToolConfig } from '@opensip-cli/contracts';\nconst cfg = readToolConfig(cli, 'yagni', schema, {});",
+        '/repo/packages/yagni/engine/src/cli/yagni-config.ts',
+      ),
+    ).toEqual([]);
+  });
+
+  it('rejects tool-local analysis-run helper copies', () => {
+    const findings = analyzeDeferredRunPipelineBoundary(
+      'export function defineAnalysisRunCommand() {}',
+      '/repo/packages/yagni/engine/src/cli/local-pipeline.ts',
+    );
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('defineAnalysisRunCommand'),
+      }),
+    ]);
+  });
+
+  it('keeps RunCommandPipeline reserved', () => {
+    const findings = analyzeDeferredRunPipelineBoundary(
+      'export class RunCommandPipeline {}',
+      '/repo/packages/contracts/src/analysis-run-command.ts',
+    );
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('RunCommandPipeline'),
+      }),
+    ]);
   });
 });

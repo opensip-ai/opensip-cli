@@ -224,6 +224,14 @@ The `--no-cache` flag forces a cache miss; the existing fingerprint-based invali
 
 **The contribution model.** A tool RECORDS a run by RETURNING a `ToolRunCompletion` from its command handler or live renderer — `{ result?, envelope?, session?, dashboard? }`. Its `session` is a `ToolSessionContribution` `{ tool, cwd, recipe?, score, passed, payload? }` (no timing). The host run plane then stamps the frozen `startedAt`/`completedAt`/`durationMs`, generates the id via `generatePrefixedId(tool)`, writes via `SessionRepo`, records `persistMs` on the sibling host-metrics record, and (for a live run) records `ttyBusyMs`. Persistence is best-effort: no datastore ⇒ no row, never throws, never affects the result or exit code.
 
+For primary verdict-producing analysis commands, prefer
+`defineAnalysisRunCommand` from `@opensip-cli/contracts`. The tool's `session`
+adapter returns only the `ToolSessionContribution`; the helper carries it back
+through `ToolRunCompletion`, and the host run plane remains the only writer of
+generic timing and persistence. This keeps static runs, live runs, gate modes,
+SARIF side output, and report opening on the same host-owned return path
+([ADR-0117](../../decisions/ADR-0117-host-owned-analysis-run-pipeline.md)).
+
 ### Clock taxonomy
 
 | Clock | Owner | Where it lives |

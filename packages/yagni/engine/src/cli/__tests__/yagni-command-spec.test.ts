@@ -14,7 +14,6 @@ const loadYagniConfigMock = vi.hoisted(() =>
     includeTests: false,
   })),
 );
-const runYagniGateModeMock = vi.hoisted(() => vi.fn());
 const applyAdvisoryExitCodeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../execute-yagni.js', () => ({
@@ -23,10 +22,7 @@ vi.mock('../execute-yagni.js', () => ({
 
 vi.mock('../yagni-config.js', () => ({
   loadYagniConfig: loadYagniConfigMock,
-}));
-
-vi.mock('../yagni-gate-mode.js', () => ({
-  runYagniGateMode: runYagniGateModeMock,
+  readYagniConfig: loadYagniConfigMock,
 }));
 
 vi.mock('../../lib/apply-advisory-exit.js', () => ({
@@ -57,12 +53,19 @@ function mockCli(): ToolCliContext {
   return {
     emitEnvelope: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
+    emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
     maybeOpenReport: vi.fn(() => Promise.resolve()),
     writeSarif: vi.fn(() => Promise.resolve()),
+    saveBaseline: vi.fn(() => Promise.resolve()),
+    compareBaseline: vi.fn(() =>
+      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+    ),
+    reportFailure: vi.fn(() => Promise.resolve()),
     renderLive: vi.fn(),
     setExitCode: vi.fn(),
-    logger: console,
+    logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   } as unknown as ToolCliContext;
 }
 
@@ -78,19 +81,72 @@ beforeEach(() => {
       payload: { summary: { skippedDetectors: [] } },
     },
   });
-  runYagniGateModeMock.mockResolvedValue({ session: { tool: 'yagni', cwd: '/repo' } });
 });
 
 describe('buildYagniCommandSpec', () => {
-  it('delegates gate flags to runYagniGateMode', async () => {
+  it('keeps report-producing primary run flags on the migrated command', () => {
+    const spec = buildYagniCommandSpec(() => undefined);
+
+    expect(spec.commonFlags).toContain('open');
+  });
+
+  it('routes gate flags through the host gate dispatch path', async () => {
     const spec = buildYagniCommandSpec(() => undefined);
     const cli = mockCli();
 
-    await spec.handler?.({ cwd: '/repo', gateSave: true }, cli);
+    await spec.handler?.({ cwd: '/repo', gateSave: true, sarif: 'yagni.sarif' }, cli);
 
-    expect(runYagniGateModeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ cwd: '/repo', gateSave: true }),
-      cli,
+    expect(executeYagniMock).toHaveBeenCalled();
+    expect(cli.saveBaseline).toHaveBeenCalledWith(
+      'yagni',
+      expect.objectContaining({ tool: 'yagni' }),
+    );
+    expect(cli.deliverSignals).toHaveBeenCalled();
+    expect(cli.writeSarif).toHaveBeenCalledWith(
+      expect.objectContaining({ tool: 'yagni' }),
+      'yagni.sarif',
+    );
+  });
+
+  it('fails gate compare delivery when the baseline degraded', async () => {
+    const spec = buildYagniCommandSpec(() => undefined);
+    const cli = mockCli();
+    (cli.compareBaseline as ReturnType<typeof vi.fn>).mockResolvedValue({
+      degraded: true,
+      added: [1],
+      resolved: [],
+      unchanged: [],
+    });
+
+    await spec.handler?.({ cwd: '/repo', gateCompare: true }, cli);
+
+    expect(cli.compareBaseline).toHaveBeenCalledWith(
+      'yagni',
+      expect.objectContaining({ tool: 'yagni' }),
+    );
+    expect(cli.deliverSignals).toHaveBeenCalledWith(
+      expect.objectContaining({ tool: 'yagni' }),
+      expect.objectContaining({ runFailed: true }),
+    );
+    expect(cli.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'gate-done',
+        lines: ['YAGNI gate FAILED: 1 new finding(s) since baseline.'],
+      }),
+    );
+  });
+
+  it('reports mutually exclusive gate flags before execution', async () => {
+    const spec = buildYagniCommandSpec(() => undefined);
+    const cli = mockCli();
+
+    await spec.handler?.({ cwd: '/repo', gateSave: true, gateCompare: true, json: true }, cli);
+
+    expect(cli.reportFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('mutually exclusive'),
+        jsonRequested: true,
+      }),
     );
     expect(executeYagniMock).not.toHaveBeenCalled();
   });

@@ -52,7 +52,9 @@ Every shape above plugs into the same kernel. The CLI is a generic dispatcher; i
 
 ## `raw-stream` output (sanctioned escape hatch)
 
-Most tool commands return a `signal-envelope` or `command-result` and let the host dispatch output. Primary commands with **multi-mode runtime dispatch** (`fit`, `graph`, `sim`) declare `output: 'raw-stream'` instead: the handler owns render, egress, and exit-code decisions. This is intentional, not a seam bypass — but new commands should default to host dispatch unless multi-mode IO is required. In-repo fitness checks (`raw-stream-output-guarded`) require an in-file justification when a command spec uses `raw-stream`.
+Most tool commands return a `signal-envelope` or `command-result` and let the host dispatch output. New verdict-producing analysis primaries should normally use `defineAnalysisRunCommand` from `@opensip-cli/contracts`: the tool supplies normalize/execute/envelope/presentation adapters, while the helper owns JSON/agent filters, human rendering, gates, delivery, report opening, SARIF, and session contribution return (ADR-0117).
+
+Some commands still declare `output: 'raw-stream'`: file exports, worker IPC, MCP stdio, and primary commands with **multi-mode runtime dispatch** that have not yet moved onto the analysis-run helper. This is intentional, not a seam bypass — but new commands should default to host dispatch or `defineAnalysisRunCommand` unless a documented transport/file/runtime reason is required. In-repo fitness checks (`raw-stream-output-guarded`) require an in-file justification when a command spec uses `raw-stream`.
 
 That's by design. The whole point of the platform is that adding a new tool or pack requires zero CLI changes. For the architecture: [the tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/) walks through it end-to-end.
 

@@ -246,10 +246,39 @@ export {
   gateRunFlagSpecs,
   sarifRunFlagSpec,
 } from './command-presets.js';
+export { defineAnalysisRunCommand } from './analysis-run-command.js';
+export { readOptionalToolConfig, readToolConfig } from './tool-config-read.js';
 export { runHostGateDispatch } from './gate-dispatch.js';
 export { runBaselineExport } from './baseline-export.js';
+export {
+  configLifecycleEvent,
+  deliveryLifecycleEvent,
+  emitAnalysisLifecycleEvent,
+  runLifecycleEvent,
+  unitLifecycleEvent,
+} from './run-lifecycle-events.js';
+export type {
+  AnalysisRunCommandInput,
+  AnalysisRunCommandOptions,
+  AnalysisRunGateAdapter,
+  AnalysisRunHookInput,
+  AnalysisRunLiveAdapter,
+  AnalysisRunLiveHookInput,
+  AnalysisRunPresentationInput,
+} from './analysis-run-command.js';
 export type { DefineToolInput, ResolvedToolHooks } from '@opensip-cli/core';
 export type { BaselineExportFailure, BaselineExportOptions } from './baseline-export.js';
+export type {
+  AnalysisLifecycleEvent,
+  AnalysisLifecycleRecord,
+  ConfigLifecycleEvent,
+  DeliveryLifecycleEvent,
+  LifecycleMetadata,
+  LifecycleMetadataValue,
+  RunLifecycleEvent,
+  UnitLifecycleEvent,
+} from './run-lifecycle-events.js';
+export type { SafeToolConfigParser, ToolConfigParser } from './tool-config-read.js';
 export type {
   HostGateCompareRenderInput,
   HostGateDeliveryOptions,

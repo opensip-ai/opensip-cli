@@ -132,6 +132,27 @@ fingerprints.
 Add new formats by extending the `choices` array on the export spec — no new
 top-level command name.
 
+## Verdict-producing analysis commands
+
+Use `defineAnalysisRunCommand` from `@opensip-cli/contracts` for a primary
+command that runs analysis and emits a `SignalEnvelope`. The tool provides
+adapters for normalization, execution, envelope extraction, session
+contribution, presentation, and optional live/gate behavior. The helper then
+routes the common host-owned tail: `--json` / agent filters, human rendering,
+`--gate-save` / `--gate-compare`, `deliverSignals`, report opening, `--sarif`,
+lifecycle diagnostics, and `{ session }` return for host-owned persistence.
+
+Read production tool config through `readToolConfig(cli, namespace, schema,
+defaults)` or `readOptionalToolConfig(...)`; those helpers read the already
+composed `cli.scope.toolConfig` namespace and do not re-read YAML. Scope-less
+YAML fallback loaders are only for tests or explicit worker compatibility.
+
+`defineAnalysisRunCommand` still produces a primary command draft with
+`output: 'raw-stream'` and `rawStreamReason: 'runtime-render-dispatch'`, because
+the helper performs runtime dispatch internally. Tool code should not copy that
+orchestration locally. See
+[ADR-0117](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0117-host-owned-analysis-run-pipeline.md).
+
 ## Long-lived stream commands (`output: 'raw-stream'`)
 
 Most tool primaries use `output: 'command-result'` (the host renders a

@@ -20,6 +20,7 @@
  * exactly this reason.
  */
 
+import { readToolConfig } from '@opensip-cli/contracts';
 import {
   currentScope,
   isPlainRecord,
@@ -32,8 +33,9 @@ import { DEFAULT_YAGNI_CONFIG } from '../types/yagni-config.js';
 import { YagniConfigSchema } from './yagni-config-schema.js';
 
 import type { YagniConfig } from '../types/yagni-config.js';
+import type { ToolCliContext } from '@opensip-cli/core';
 
-function mergeDefaults(parsed: YagniConfig): YagniConfig {
+export function mergeYagniConfigDefaults(parsed: YagniConfig): YagniConfig {
   return {
     failOnErrors: parsed.failOnErrors ?? DEFAULT_YAGNI_CONFIG.failOnErrors,
     failOnWarnings: parsed.failOnWarnings ?? DEFAULT_YAGNI_CONFIG.failOnWarnings,
@@ -58,21 +60,25 @@ export function loadYagniConfig(cwd: string, explicitPath?: string): YagniConfig
   const scoped = scope?.toolConfig?.yagni;
   if (isPlainRecord(scoped)) {
     const parsed = YagniConfigSchema.safeParse(scoped);
-    if (parsed.success) return mergeDefaults(parsed.data);
+    if (parsed.success) return mergeYagniConfigDefaults(parsed.data);
   }
   if (scope !== undefined) {
     // A scope-bound dispatch has already had its config composed. If there is no
     // resolved `yagni:` block, do not perform a second YAML read; use the merged
     // tool defaults instead (mirrors loadGraphConfig / readSimulationRecipe).
-    return mergeDefaults({});
+    return mergeYagniConfigDefaults({});
   }
 
   const configPath = resolveProjectConfigPath(cwd, explicitPath);
   const doc = readYamlFile(configPath);
   if (!isPlainRecord(doc) || !isPlainRecord(doc.yagni)) {
-    return mergeDefaults({});
+    return mergeYagniConfigDefaults({});
   }
   const parsed = YagniConfigSchema.safeParse(doc.yagni);
-  if (!parsed.success) return mergeDefaults({});
-  return mergeDefaults(parsed.data);
+  if (!parsed.success) return mergeYagniConfigDefaults({});
+  return mergeYagniConfigDefaults(parsed.data);
+}
+
+export function readYagniConfig(cli: ToolCliContext): YagniConfig {
+  return mergeYagniConfigDefaults(readToolConfig(cli, 'yagni', YagniConfigSchema, {}));
 }

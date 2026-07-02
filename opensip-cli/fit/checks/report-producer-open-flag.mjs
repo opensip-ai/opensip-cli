@@ -10,10 +10,11 @@ import { toolEnginePathRe, toolPackageSegmentForPath } from './tool-engine-paths
 const TOOL_ENGINE_PATH = toolEnginePathRe();
 const COLLECT_REPORT_RE = /\bcollectReportData\b\s*[:,}]/;
 const OPEN_COMMON_FLAG_RE = /commonFlags\s*:\s*\[[\s\S]*?['"]open['"][\s\S]*?\]/;
-// The shared `definePrimaryRunCommand` preset (and the REPORTING_RUN_COMMON_FLAGS
-// constant it spreads) include `open` by construction, so a command built on the
-// preset exposes --open without a literal `commonFlags: [... 'open' ...]` array.
-const PRESET_OPEN_RE = /\bdefinePrimaryRunCommand\b|\bREPORTING_RUN_COMMON_FLAGS\b/;
+// The shared run-command presets (and the REPORTING_RUN_COMMON_FLAGS constant
+// they spread) include `open` by construction, so commands built on those
+// helpers expose --open without a literal `commonFlags: [... 'open' ...]` array.
+const PRESET_OPEN_RE =
+  /\bdefinePrimaryRunCommand\b|\bdefineAnalysisRunCommand\b|\bREPORTING_RUN_COMMON_FLAGS\b/;
 const OPT_OUT_RE = /\breport-open-opt-out\b/;
 
 function relPath(filePath) {

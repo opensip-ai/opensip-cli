@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-30T21:50:35.122Z",
+  "generatedAt": "2026-07-02T10:21:09.289Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,7 +25,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 213,
+        "total": 215,
         "bySlug": {
           "no-markdown-references": 5,
           "exit-code-correctness": 1,
@@ -34,6 +34,7 @@
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 6,
+          "async-waterfall-detection": 2,
           "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
@@ -102,6 +103,7 @@
         "byPackage": {
           "cli": 7,
           "cli-ui": 1,
+          "contracts": 2,
           "core": 5,
           "dashboard": 1,
           "fitness/checks-typescript": 64,
@@ -123,7 +125,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 41,
+        "total": 43,
         "bySlug": {
           "no-markdown-references": 3,
           "exit-code-correctness": 1,
@@ -132,6 +134,7 @@
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 2,
+          "async-waterfall-detection": 2,
           "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
@@ -156,6 +159,7 @@
         "byPackage": {
           "cli": 7,
           "cli-ui": 1,
+          "contracts": 2,
           "core": 5,
           "dashboard": 1,
           "fitness/engine": 12,
@@ -385,20 +389,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 213,
-    "budgetGateFitnessSlugs": 71,
-    "productRuntimeFitness": 41,
-    "productRuntimeFitnessSlugs": 27,
+    "budgetGateFitness": 215,
+    "budgetGateFitnessSlugs": 72,
+    "productRuntimeFitness": 43,
+    "productRuntimeFitnessSlugs": 28,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 74,
+    "productRuntimeCombined": 76,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
-    "unbudgetedProductRuntimeSlugs": 26
+    "unbudgetedProductRuntimeSlugs": 27
   },
   "phase4Audit": {
     "baseline": {
@@ -411,10 +415,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -264,
+      "productRuntimeFitness": -262,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -238,
-      "budgetGateFitness": -329,
+      "productRuntimeCombined": -236,
+      "budgetGateFitness": -327,
       "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

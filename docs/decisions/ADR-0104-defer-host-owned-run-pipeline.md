@@ -1,6 +1,6 @@
 ---
-status: active
-last_verified: 2026-07-01
+status: superseded
+last_verified: 2026-07-02
 owner: opensip-cli
 ---
 
@@ -10,19 +10,21 @@ owner: opensip-cli
 id: ADR-0104
 title: Defer the host-owned run pipeline behind contract conformance
 date: 2026-07-01
-status: active
+status: superseded
 supersedes: []
-superseded_by: null
+superseded_by: ADR-0117
 related: [ADR-0051, ADR-0060, ADR-0065, ADR-0093]
 tags: [cli, tools, run-pipeline, diagnostics, gates]
 enforcement: mechanizable
 enforcement-reason: >
-  The project-local fitness check deferred-run-pipeline-boundary reserves
-  RunCommandPipeline, defineAnalysisRunCommand, readToolConfig,
-  readOptionalToolConfig, and the planned lifecycle event type names in
-  production TypeScript until this ADR is promoted into an implementation spec
-  and the approved package boundary is named.
+  Superseded by ADR-0117. The project-local fitness check
+  deferred-run-pipeline-boundary now permits the promoted contracts helpers only
+  at approved boundaries and keeps RunCommandPipeline reserved.
 ```
+
+**Superseded:** ADR-0117 promotes the deferred boundary into the
+`defineAnalysisRunCommand` contracts helper, config-read helpers, lifecycle event
+vocabulary, and the first `yagni` migration.
 
 **Decision:** Defer the host-owned run pipeline as a single architecture epic.
 Do not introduce `RunCommandPipeline`, `defineAnalysisRunCommand`, production
