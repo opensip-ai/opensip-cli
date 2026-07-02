@@ -12,6 +12,7 @@ related-docs:
   - ../70-reference/01-cli-commands.md
   - ./use-opensip-with-ai-agents.md
   - ../../decisions/ADR-0084-mcp-server-surface.md
+  - ../../decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md
 ---
 # Connect MCP clients (Cursor, Claude Code, Codex)
 
@@ -102,6 +103,8 @@ team standardizes in docs/onboarding.
 1. Restart Cursor or reload MCP servers from Settings.
 2. Open the MCP panel — `opensip` should appear with **13 tools** (9 graph + 4 result).
 3. Ask the agent: *"Use OpenSIP to call `get_architecture` and summarize the graph."*
+4. Ask a result replay question: *"Use OpenSIP MCP to show the latest `fit`
+   findings before deciding whether to re-run fit."*
 
 ---
 

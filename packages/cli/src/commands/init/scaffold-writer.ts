@@ -8,9 +8,9 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
-import { ensureAgentsMd } from './agents-md.js';
+import { ensureOpenSipAgentGuidance } from './agents-md.js';
 import { generateConfig } from './config-templates.js';
 
 import type { SupportedLanguage } from './language-detection.js';
@@ -21,7 +21,7 @@ import type { ProjectPaths, ScaffoldContext } from '@opensip-cli/core';
 
 const GITIGNORE_LINE = 'opensip-cli/.runtime/';
 
-function ensureGitignore(cwd: string): boolean {
+export function ensureGitignore(cwd: string): boolean {
   const path = join(cwd, '.gitignore');
   if (!existsSync(path)) {
     writeFileSync(path, `${GITIGNORE_LINE}\n`, 'utf8');
@@ -121,6 +121,42 @@ export interface ScaffoldRunInputs {
   readonly toolScaffolds: readonly ToolScaffold[];
 }
 
+export interface RefreshRunInputs {
+  readonly languages?: readonly SupportedLanguage[];
+  readonly cwd: string;
+  readonly state: Extract<WorkingDirState, 'fully-initialized' | 'partial-config-only'>;
+  readonly preExistingFiles: readonly PreExistingFile[];
+  readonly toolScaffolds: readonly ToolScaffold[];
+}
+
+function agentsMdWasCreated(agentGuidance: ReturnType<typeof ensureOpenSipAgentGuidance>): boolean {
+  return agentGuidance.targets.some(
+    (target) => target.action === 'created' && basename(target.path) === 'AGENTS.md',
+  );
+}
+
+export function runRefresh(
+  inputs: RefreshRunInputs,
+  baseResult: Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>,
+): InitResult {
+  const { cwd, state, languages, preExistingFiles, toolScaffolds } = inputs;
+  const gitignoreUpdated = ensureGitignore(cwd);
+  const agentGuidance = ensureOpenSipAgentGuidance(cwd, { toolScaffolds });
+
+  return {
+    ...baseResult,
+    created: false,
+    refreshed: true,
+    state,
+    ...(languages === undefined ? {} : { languages }),
+    createdFiles: [],
+    gitignoreUpdated,
+    agentGuidance,
+    agentsMdCreated: agentsMdWasCreated(agentGuidance),
+    preExistingFiles,
+  };
+}
+
 export function runScaffold(
   inputs: ScaffoldRunInputs,
   baseResult: Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>,
@@ -153,7 +189,7 @@ export function runScaffold(
   scaffoldToolExamples(paths, toolScaffolds, ctx, { keepCustom, preExistingByPath }, createdFiles);
 
   const gitignoreUpdated = ensureGitignore(cwd);
-  const agentsMdCreated = ensureAgentsMd(cwd, { toolScaffolds });
+  const agentGuidance = ensureOpenSipAgentGuidance(cwd, { toolScaffolds });
 
   return {
     ...baseResult,
@@ -162,7 +198,8 @@ export function runScaffold(
     languages,
     createdFiles,
     gitignoreUpdated,
-    agentsMdCreated,
+    agentGuidance,
+    agentsMdCreated: agentsMdWasCreated(agentGuidance),
     preExistingFiles: state === 'pristine' ? [] : preExistingFiles,
   };
 }

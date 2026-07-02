@@ -126,6 +126,33 @@ describe('viewInit — created success', () => {
   });
 });
 
+describe('viewInit — refresh success', () => {
+  it('renders refreshed guidance targets and the partial-config hint', () => {
+    const out = text(
+      result({
+        created: false,
+        refreshed: true,
+        state: 'partial-config-only',
+        gitignoreUpdated: true,
+        agentGuidance: {
+          changed: true,
+          targets: [
+            { path: '/proj/AGENTS.md', action: 'updated' },
+            { path: '/proj/CLAUDE.md', action: 'skipped', reason: 'missing' },
+          ],
+        },
+      }),
+    );
+    expect(out).toContain('Already initialized; refreshed OpenSIP agent guidance');
+    expect(out).toContain('.gitignore');
+    expect(out).toContain('AGENTS.md');
+    expect(out).toContain('updated');
+    expect(out).toContain('CLAUDE.md');
+    expect(out).toContain('missing');
+    expect(out).toContain('opensip init --keep');
+  });
+});
+
 describe('viewInit — failure fallback', () => {
   it('renders the scaffold-failure line when nothing was created and no error branch matched', () => {
     const out = text(result({ created: false }));

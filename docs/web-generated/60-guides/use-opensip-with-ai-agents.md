@@ -18,6 +18,7 @@ related-docs:
   - ../../decisions/ADR-0084-mcp-server-surface.md
   - ../../decisions/ADR-0085-change-detection-substrate.md
   - ../../decisions/ADR-0086-signal-repair-metadata.md
+  - ../../decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md
 ---
 # Use OpenSIP with AI agents
 
@@ -25,8 +26,11 @@ OpenSIP CLI is designed for coding agents: structured `--json` output, session
 history, composable filters, and conventional agent recipes. This guide walks
 the three loops agents should follow.
 
-`opensip init` writes a short `AGENTS.md` playbook at the project root
-(write-if-absent) with the same commands.
+`opensip init` creates `AGENTS.md` when absent and refreshes a managed
+MCP-first guidance block in known agent-instruction files. Re-running
+`opensip init` on an already configured project is safe: it refreshes
+`.gitignore` and the managed guidance block without rewriting config or example
+scaffolds unless `--keep` or `--remove` is explicit.
 
 ## Discover
 
@@ -39,8 +43,10 @@ opensip agent-catalog --json
 The catalog lists tool entry points, common patterns, agent recipes, and notes
 about `--filter` / `--raw` / `graph impact`.
 
-When the user says a tool **already reported findings**, inspect the latest
-stored result before re-running:
+When the user says a tool **already reported findings**, use the OpenSIP MCP
+result tools first: `get_latest_findings`, `show_run`, or `list_runs`. If MCP is
+unavailable, inspect the latest stored result through session replay before
+re-running:
 
 ```bash
 opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
@@ -102,9 +108,15 @@ Projects can override built-in recipes in `opensip-cli.config.yml`.
 ## MCP (Cursor, Claude Code, Codex)
 
 For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
-register `opensip mcp` as a stdio server instead of shelling out for every graph or
-findings query. The server exposes 13 tools: graph traversal (`who_calls`,
+register `opensip mcp` as a stdio server instead of shelling out for every graph
+or findings query. The server exposes 13 tools: graph traversal (`who_calls`,
 `blast_radius`, …) and result replay (`get_latest_findings`, `show_run`, …).
+
+For existing-result questions, MCP is the first source of truth. Do not grep
+`.runtime/logs`, read `datastore.sqlite` directly, or re-run `fit` / `graph` /
+`yagni` / `sim` just to answer what the last stored run reported; those are
+fallback/debug paths. See
+[ADR-0109](https://github.com/opensip-ai/opensip-cli/blob/v0.2.0/docs/decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
 
 Setup is client-specific (JSON vs TOML, config file locations, approval flows).
 See **[Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)** for copy-paste config for

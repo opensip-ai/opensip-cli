@@ -21,10 +21,13 @@ export function registerShowRun(server: McpStdioServer, deps: McpToolDeps): void
     {
       title: 'Show an OpenSIP run',
       description:
-        'Replay a stored OpenSIP run by id, or "latest" (with `tool`). Returns the decoded ' +
-        'finding envelope plus session provenance and recommendedNext commands — the same ' +
-        'filters/raw shape as `opensip sessions show`. Use `filters` (e.g. errors-only, ' +
-        'warnings-only, top:N) to narrow. Replays persisted data; never re-runs the tool.',
+        'Use this OpenSIP MCP result tool first to replay an existing or prior ' +
+        'fit/graph/yagni/sim result by id, or "latest" (with `tool`) for last-run, score, ' +
+        'session, errors, warnings, or findings questions. Returns the decoded finding ' +
+        'envelope plus session provenance and recommendedNext commands — the same filters/raw ' +
+        'shape as `opensip sessions show`. Replays persisted sessions and never re-runs ' +
+        'fit/graph/yagni/sim. Do not grep .runtime/logs, read datastore.sqlite directly, or ' +
+        're-run a CLI tool to answer stored-result questions.',
       inputSchema: {
         ref: z.string().min(1).max(128),
         tool: toolIdSchema().optional(),

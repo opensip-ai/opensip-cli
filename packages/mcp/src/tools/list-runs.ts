@@ -20,10 +20,13 @@ export function registerListRuns(server: McpStdioServer, deps: McpToolDeps): voi
     {
       title: 'List OpenSIP runs',
       description:
-        'List recent stored OpenSIP runs (fit/graph/yagni/sim) as lean pointers — id, tool, ' +
-        'timing, score/passed, and the replay command. Drill into one with show_run, or jump to ' +
-        'a tool’s current findings with get_latest_findings. Replays persisted sessions; ' +
-        'never re-runs a tool. Filter by `tool`, cap with `limit`.',
+        'Use this OpenSIP MCP result tool first for existing or prior fit/graph/yagni/sim ' +
+        'results, scores, sessions, errors, warnings, findings, or last-run questions. Lists ' +
+        'stored runs as lean pointers — id, tool, timing, score/passed, and replay command. ' +
+        'Drill into one with show_run, or jump to current findings with get_latest_findings. ' +
+        'Replays persisted sessions and never re-runs fit/graph/yagni/sim. Do not grep ' +
+        '.runtime/logs, read datastore.sqlite directly, or re-run a CLI tool to answer ' +
+        'stored-result questions.',
       inputSchema: {
         tool: toolIdSchema().optional(),
         limit: limitSchema(),

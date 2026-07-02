@@ -18,9 +18,12 @@ export function registerGetAgentCatalog(server: McpStdioServer, deps: McpToolDep
     {
       title: 'OpenSIP agent command catalog',
       description:
-        'The self-describing catalog of OpenSIP commands an agent can run. Prefer the result ' +
-        'tools (get_latest_findings, show_run, list_runs) to inspect EXISTING findings before ' +
-        're-running any tool — re-running is expensive and usually unnecessary.',
+        'The self-describing catalog of OpenSIP commands an agent can run. Before re-running, ' +
+        'use OpenSIP MCP result tools (get_latest_findings, show_run, list_runs) first for ' +
+        'existing or prior results, scores, sessions, errors, warnings, or findings. They ' +
+        'replay persisted sessions and never re-run fit/graph/yagni/sim. Do not grep ' +
+        '.runtime/logs, read datastore.sqlite directly, or re-run a CLI tool to answer ' +
+        'stored-result questions.',
     },
     () => {
       const outcome = deps.results.agentCatalog();
