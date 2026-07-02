@@ -61,7 +61,7 @@
  *
  * Two flags express explicit user intent for the non-pristine states:
  *
- *   - `--keep`   — re-scaffold examples; preserve custom files.
+ *   - `--keep`   — re-scaffold examples; preserve existing config and custom files.
  *   - `--remove` — delete `opensip-cli/` entirely; scaffold fresh.
  *
  * The two flags are mutually exclusive. The legacy `--force` flag is
@@ -281,7 +281,7 @@ export function executeInit(args: ExecuteInitArgs): InitResult {
     );
   }
 
-  // --keep: re-scaffold examples; preserve custom + stale-scaffolded files.
+  // --keep: re-scaffold examples; preserve existing config plus custom/stale files.
   return runScaffold(
     {
       paths,

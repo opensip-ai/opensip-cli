@@ -77,7 +77,7 @@ subcommand is that tool's own:
 | Flag | Effect |
 |---|---|
 | `--version` | At the root (`opensip --version`): the CLI version. After a tool verb (`opensip fit --version`): that tool's version. |
-| `--config <path>` | Path to `opensip-cli.config.yml` (overrides the package.json pointer and default discovery). Guaranteed on every tool primary. |
+| `--config <path>` | Path to `opensip-cli.config.yml` (overrides default root discovery). Guaranteed on every tool primary. |
 | `--debug` | Enable debug-level logging (events of `debug` level appear in stderr and the run log file). |
 | `--quiet` | Suppress banner / boxes; print only the pass/fail summary line. (Where supported.) |
 | `--cwd <path>` | Override the project root (default: `process.cwd()`). Registered on `init`, `fit`, `sim`, `graph`, `yagni`, and the `<tool> plugin <subcmd>` commands. |
@@ -180,7 +180,7 @@ opensip fit --gate-compare
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch the HTML report after run. |
-| `--config <path>` | path | discovered | Override the `opensip-cli.config.yml` location (defaults to the project's config or the package.json pointer). |
+| `--config <path>` | path | discovered | Override the `opensip-cli.config.yml` location (defaults to the project root config). |
 | `--cwd <path>` | path | `process.cwd()` | Target directory. |
 | `--debug` | bool | `false` | Enable debug-level logging. |
 | `--filter <token>` | repeatable | `[]` | Agent filter (repeatable). Values: `errors-only`, `warnings-only`, `category:<name>`, `source:<tool>`, `file:<prefix>`, `high-impact`, `top:<n>`. Composable with `--top`. See [Agent run filters](#agent-run-filters-fit-graph-sim). |
@@ -719,7 +719,7 @@ The scaffold output is loose `.mjs` files — the lightest-weight starting point
 | Flag | Effect |
 |---|---|
 | `--language <list>` | Language list (`typescript`, `rust`, …). Repeatable (`--language ts --language rust`) or comma-separated (`--language ts,rust`). Overrides detection. |
-| `--keep` | Re-scaffold examples; preserve any custom files in `opensip-cli/`. |
+| `--keep` | Re-scaffold examples; preserve an existing root config and any custom files in `opensip-cli/`. |
 | `--remove` | Delete `opensip-cli/` entirely, then scaffold fresh. |
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |
 | `--json` | Emit a structured JSON result instead of the human-readable summary. |
@@ -732,8 +732,8 @@ After parsing flags init classifies the working directory into one of four state
 | State | `opensip-cli.config.yml` | `opensip-cli/` (excluding `.runtime/`) | Default | `--keep` | `--remove` |
 |---|---|---|---|---|---|
 | `pristine` | absent | absent | scaffold | scaffold | scaffold |
-| `fully-initialized` | present | present | refresh `.gitignore` + managed agent guidance | re-scaffold; preserve custom | `rm -rf opensip-cli/`; scaffold |
-| `partial-config-only` | present | absent | refresh `.gitignore` + managed agent guidance | scaffold the dir | scaffold the dir |
+| `fully-initialized` | present | present | refresh `.gitignore` + managed agent guidance | preserve config; re-scaffold examples; preserve custom files | `rm -rf opensip-cli/`; scaffold |
+| `partial-config-only` | present | absent | refresh `.gitignore` + managed agent guidance | preserve config; scaffold the dir | scaffold the dir |
 | `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-cli/`; write YAML; scaffold |
 
 `--keep` and `--remove` are mutually exclusive. Use `--remove` when you want to

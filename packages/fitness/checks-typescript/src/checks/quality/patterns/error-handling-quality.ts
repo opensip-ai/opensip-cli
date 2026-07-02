@@ -82,7 +82,6 @@ const PROBE_FUNCTION_NAME_PATTERNS = [
   /^tryDiscoverPackage$/,
   /^readProjectPluginsList$/,
   /^extractTimestamp$/,
-  /^readConfigPathFromPackageJson$/,
   /^readPackageJson$/,
   /^readPackageVersion/,
   /^readYaml/,

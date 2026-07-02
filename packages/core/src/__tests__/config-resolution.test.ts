@@ -60,38 +60,31 @@ describe('resolveProjectConfigPath', () => {
     });
   });
 
-  describe('package.json pointer', () => {
-    it('reads opensip-cli.configPath from package.json and resolves relative paths', () => {
+  describe('canonical root config', () => {
+    it('ignores package.json#opensip-cli.configPath when the root config exists', () => {
       mkdirSync(join(testDir, '.config'));
-      const target = join(testDir, '.config', 'cfg.yml');
-      writeFileSync(target, 'targets: {}');
+      const pointed = join(testDir, '.config', 'cfg.yml');
+      const defaultPath = join(testDir, PROJECT_CONFIG_FILENAME);
+      writeFileSync(pointed, 'targets: pointed');
+      writeFileSync(defaultPath, 'targets: root');
       writeFileSync(
         join(testDir, 'package.json'),
         JSON.stringify({ 'opensip-cli': { configPath: '.config/cfg.yml' } }),
       );
 
-      expect(resolveProjectConfigPath(testDir)).toBe(target);
+      expect(resolveProjectConfigPath(testDir)).toBe(defaultPath);
     });
 
-    it('accepts an absolute path in package.json pointer', () => {
-      const target = join(testDir, 'cfg.yml');
-      writeFileSync(target, 'targets: {}');
+    it('throws when only package.json#opensip-cli.configPath points at a config', () => {
+      mkdirSync(join(testDir, '.config'));
+      const pointed = join(testDir, '.config', 'cfg.yml');
+      writeFileSync(pointed, 'targets: pointed');
       writeFileSync(
         join(testDir, 'package.json'),
-        JSON.stringify({ 'opensip-cli': { configPath: target } }),
+        JSON.stringify({ 'opensip-cli': { configPath: '.config/cfg.yml' } }),
       );
 
-      expect(resolveProjectConfigPath(testDir)).toBe(target);
-    });
-
-    it('throws when the package.json pointer targets a missing file', () => {
-      writeFileSync(
-        join(testDir, 'package.json'),
-        JSON.stringify({ 'opensip-cli': { configPath: 'nope/missing.yml' } }),
-      );
-      expect(() => resolveProjectConfigPath(testDir)).toThrow(
-        /points to a file that does not exist/,
-      );
+      expect(() => resolveProjectConfigPath(testDir)).toThrow(/No opensip-cli.config.yml found/);
     });
 
     it('falls through to default when package.json is malformed', () => {
@@ -103,26 +96,6 @@ describe('resolveProjectConfigPath', () => {
 
     it('falls through to default when package.json has no opensip-cli section', () => {
       writeFileSync(join(testDir, 'package.json'), JSON.stringify({ name: 'x' }));
-      const defaultPath = join(testDir, PROJECT_CONFIG_FILENAME);
-      writeFileSync(defaultPath, 'targets: {}');
-      expect(resolveProjectConfigPath(testDir)).toBe(defaultPath);
-    });
-
-    it('falls through when configPath is missing or empty', () => {
-      writeFileSync(
-        join(testDir, 'package.json'),
-        JSON.stringify({ 'opensip-cli': { configPath: '' } }),
-      );
-      const defaultPath = join(testDir, PROJECT_CONFIG_FILENAME);
-      writeFileSync(defaultPath, 'targets: {}');
-      expect(resolveProjectConfigPath(testDir)).toBe(defaultPath);
-    });
-
-    it('falls through when opensip-cli is not an object', () => {
-      writeFileSync(
-        join(testDir, 'package.json'),
-        JSON.stringify({ 'opensip-cli': 'string-not-object' }),
-      );
       const defaultPath = join(testDir, PROJECT_CONFIG_FILENAME);
       writeFileSync(defaultPath, 'targets: {}');
       expect(resolveProjectConfigPath(testDir)).toBe(defaultPath);

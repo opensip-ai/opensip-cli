@@ -124,10 +124,8 @@ describe('resolveProjectContext', () => {
     });
   });
 
-  describe('package.json pointer at ancestor', () => {
-    it('honors package.json#opensip-cli.configPath when walking up', () => {
-      // testDir/package.json → "configPath": "config/opensip-cli.config.yml"
-      // testDir/config/opensip-cli.config.yml exists
+  describe('canonical root config at ancestor', () => {
+    it('does not treat package.json#opensip-cli.configPath as a project marker', () => {
       mkdirSync(join(testDir, 'config'));
       const pointedConfig = join(testDir, 'config', 'opensip-cli.config.yml');
       writeFileSync(pointedConfig, 'targets: {}\n');
@@ -144,9 +142,8 @@ describe('resolveProjectContext', () => {
         cwdExplicit: false,
         stopAt: testDir,
       });
-      expect(ctx.projectRoot).toBe(testDir);
-      expect(ctx.configPath).toBe(pointedConfig);
-      expect(ctx.walkedUp).toBe(1);
+      expect(ctx.scope).toBe('none');
+      expect(ctx.configPath).toBeUndefined();
     });
   });
 

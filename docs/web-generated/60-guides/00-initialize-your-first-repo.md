@@ -106,7 +106,7 @@ opensip graph --list-files
 If `init` finds existing opensip-cli files, it protects user-authored content:
 
 ```bash
-opensip init --keep     # preserve custom files and refresh missing scaffold files
+opensip init --keep     # preserve root config/custom files; refresh missing scaffold files
 opensip init --remove   # delete opensip-cli/ and scaffold fresh
 ```
 

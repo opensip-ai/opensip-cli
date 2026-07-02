@@ -236,15 +236,16 @@ describe('CLI e2e', () => {
       }
     });
 
-    it('respects package.json#opensip-cli.configPath pointer', () => {
+    it('ignores package.json#opensip-cli.configPath pointer', () => {
       const tempDir = join(
         tmpdir(),
         `opensip-e2e-pkgjson-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       );
       mkdirSync(join(tempDir, '.config'), { recursive: true });
       try {
-        const configSrc = readFileSync(join(FIXTURE, 'opensip-cli.config.yml'), 'utf8');
-        writeFileSync(join(tempDir, '.config', 'opensip-cli.config.yml'), configSrc);
+        // Invalid on purpose: if the package.json pointer were still honored,
+        // pre-action config validation would fail before fit runs.
+        writeFileSync(join(tempDir, '.config', 'opensip-cli.config.yml'), 'targets:\n  bad:\n');
         writeFileSync(
           join(tempDir, 'package.json'),
           JSON.stringify({
@@ -255,12 +256,14 @@ describe('CLI e2e', () => {
         mkdirSync(join(tempDir, 'src'), { recursive: true });
         writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1\n');
 
-        const { stdout, exitCode } = cli.run(['fit', '--json', '--check', 'no-console-log'], {
-          cwd: tempDir,
-        });
-        expect(exitCode).toBe(0);
-        const output = JSON.parse(stdout).envelope;
-        expect(output.tool).toBe('fit');
+        const { stdout, stderr, exitCode } = cli.run(
+          ['fit', '--json', '--check', 'no-console-log'],
+          {
+            cwd: tempDir,
+          },
+        );
+        expect(exitCode).not.toBe(0);
+        expect(`${stdout}\n${stderr}`).toContain('No opensip-cli.config.yml found');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }

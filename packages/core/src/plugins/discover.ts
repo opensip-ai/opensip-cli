@@ -112,18 +112,14 @@ export function discoverPlugins(layout: PluginLayout, projectDir?: string): Disc
  * undefined so discovery falls through gracefully and the config-layer
  * schema validation surfaces parse errors on its own path.
  *
- * Config-path resolution mirrors `resolveProjectConfigPath` (the same
- * helper the targets loader uses): --config flag → `package.json#
- * opensip-cli.configPath` pointer → default `<projectDir>/opensip-
- * tools.config.yml`. Without this, projects that locate their config
- * via the package.json pointer have their `plugins.<domain>: [...]`
- * declaration silently ignored — discovery falls through to the empty
- * default path and the plugin pack never registers.
+ * Config-path resolution mirrors `resolveProjectConfigPath` (the same helper
+ * the targets loader uses): explicit callers may use --config, while implicit
+ * discovery reads only the canonical `<projectDir>/opensip-cli.config.yml`.
  *
- * The `--config` precedence is honored only when callers pass through
- * their explicit value via `explicitConfigPath`; this entry point is
- * the implicit one (no --config available at the discovery seam), so
- * we resolve without an explicit path and rely on the pointer + default.
+ * The `--config` precedence is honored only when callers pass through their
+ * explicit value via `explicitConfigPath`; this entry point is the implicit
+ * one (no --config available at the discovery seam), so we resolve without an
+ * explicit path and rely on the default root config.
  */
 export function readProjectPluginsList(
   projectDir: string,

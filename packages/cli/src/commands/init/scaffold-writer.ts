@@ -172,12 +172,13 @@ export function runScaffold(
 
   const createdFiles: string[] = [];
 
-  // Always rewrite the config — its content is a function of the
-  // selected languages, and a re-init with new --language values must
-  // refresh it. (The legacy code rewrote it unconditionally on --force
-  // too; we keep that semantics.)
-  writeFileSync(paths.configFile, generateConfig(languages, toolScaffolds), 'utf8');
-  createdFiles.push(paths.configFile);
+  // Config is authoritative project state. `--keep` fills missing scaffold
+  // pieces without rewriting an existing config; `--remove` and pristine init
+  // still write the generated config intentionally.
+  if (!keepCustom || !existsSync(paths.configFile)) {
+    writeFileSync(paths.configFile, generateConfig(languages, toolScaffolds), 'utf8');
+    createdFiles.push(paths.configFile);
+  }
 
   // After --remove the dir is gone, so nothing pre-existed; pass an
   // empty map so writeScaffoldedFile creates everything fresh.

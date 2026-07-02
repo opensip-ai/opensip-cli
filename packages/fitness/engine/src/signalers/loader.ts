@@ -105,8 +105,8 @@ function projectSignalersConfig(parsed: unknown, sourceLabel: string): Signalers
  * tool resolving a different file than the host did. The file-read fallback
  * below serves scope-less callers only (programmatic use, unit tests).
  *
- * Fallback resolution: --config (explicit) → package.json#opensip-cli.configPath
- * → <rootDir>/opensip-cli.config.yml. See resolveProjectConfigPath().
+ * Fallback resolution: --config (explicit) → <rootDir>/opensip-cli.config.yml.
+ * See resolveProjectConfigPath().
  * Results are cached per resolved file path.
  *
  * @param rootDir - Absolute path to the project root directory

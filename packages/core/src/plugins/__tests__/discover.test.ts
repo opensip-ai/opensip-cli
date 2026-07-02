@@ -304,22 +304,10 @@ describe('discoverPlugins', () => {
     });
   });
 
-  describe('config-path resolution (package.json#opensip-cli.configPath)', () => {
-    // Regression: readProjectPluginsList used to hardcode
-    // `join(projectDir, 'opensip-cli.config.yml')`, ignoring the
-    // package.json pointer that the targets loader already honored. As
-    // a result, projects whose config lived elsewhere (e.g.,
-    // `<projectDir>/opensip-cli/opensip-cli.config.yml`) had their
-    // `plugins.<domain>: [...]` declaration silently skipped — the
-    // plugins-dir fallback returned an empty user-level dir and no
-    // pack registered.
-    //
-    // The fix routes config-path lookup through `resolveProjectConfigPath`,
-    // so the precedence (--config → package.json pointer → default)
-    // is identical across the targets and plugins loaders.
-
-    it('honors `package.json#opensip-cli.configPath` for plugin declarations', () => {
-      // Config lives at a non-default path; the package.json points there.
+  describe('config-path resolution', () => {
+    it('ignores `package.json#opensip-cli.configPath` for plugin declarations', () => {
+      // Config lives at a non-default path; the package.json points there, but
+      // implicit project discovery is intentionally root-config-only.
       mkdirSync(join(testDir, 'sub'), { recursive: true });
       writeFileSync(
         join(testDir, 'sub', 'opensip-cli.config.yml'),
@@ -347,15 +335,10 @@ describe('discoverPlugins', () => {
       expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(false);
 
       const result = discoverPlugins(FIT_LAYOUT, testDir);
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        type: 'package',
-        namespace: 'pointed-pkg',
-      });
+      expect(result).toEqual([]);
     });
 
-    it('falls back to default config path when no pointer is set', () => {
-      // No package.json pointer; default path has the config.
+    it('uses the default root config path', () => {
       setupPluginsConfig(['default-pkg']);
       const pluginsRoot = fitPluginsDir();
       const pkgDir = join(pluginsRoot, 'node_modules', 'default-pkg');

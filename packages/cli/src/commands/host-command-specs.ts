@@ -69,7 +69,8 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       },
       {
         flag: '--keep',
-        description: 'Re-scaffold example files. Preserve any custom files in opensip-cli/.',
+        description:
+          'Re-scaffold example files. Preserve existing config and custom files in opensip-cli/.',
         default: false,
       },
       {

@@ -314,7 +314,7 @@ describe('executeInit (fully-initialized state)', () => {
     );
   });
 
-  it('--keep overwrites scaffolded files but preserves custom ones', () => {
+  it('--keep preserves existing config and custom files', () => {
     executeInit(makeArgs());
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# manually edited');
     // A user-authored file that --keep must preserve.
@@ -330,9 +330,10 @@ describe('executeInit (fully-initialized state)', () => {
     expect(result.created).toBe(true);
     expect(result.state).toBe('fully-initialized');
 
-    // Config rewritten (it's a function of language, not of user content).
+    // Existing root config is authoritative project state under --keep.
     const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
-    expect(config).not.toContain('manually edited');
+    expect(config).toBe('# manually edited');
+    expect(result.createdFiles).not.toContain(join(testDir, 'opensip-cli.config.yml'));
     // Custom file preserved.
     expect(readFileSync(customPath, 'utf8')).toBe('// custom logic');
     // Tweaked example also preserved (drifted bytes → custom).
@@ -360,8 +361,11 @@ describe('executeInit (partial-config-only state)', () => {
   });
 
   it('--keep scaffolds the missing dir', () => {
+    const configBefore = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     const result = executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
+    expect(readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8')).toBe(configBefore);
+    expect(result.createdFiles).not.toContain(join(testDir, 'opensip-cli.config.yml'));
     expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       true,
     );
@@ -401,6 +405,7 @@ describe('executeInit (partial-dir-only state)', () => {
     const result = executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
+    expect(result.createdFiles).toContain(join(testDir, 'opensip-cli.config.yml'));
     expect(
       readFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), 'utf8'),
     ).toBe('// custom');

@@ -4,8 +4,8 @@
  *
  * `--config` is NOT an ADR-0021 `commonFlags` registry entry: it is a HOST flag,
  * read by the pre-action hook as `opts.config` (the explicit
- * `opensip-cli.config.yml` path that overrides the package.json pointer and the
- * default discovery). Fitness historically declared its own `--config`
+ * `opensip-cli.config.yml` path that overrides default root discovery). Fitness
+ * historically declared its own `--config`
  * OptionSpec; the host decorator (`decorateToolPrimary`) now guarantees the SAME
  * flag on graph / sim / any third-party primary that did not declare it, so the
  * targeting-config override is uniform across tools.
@@ -16,5 +16,5 @@
  */
 export const CONFIG_FLAG = {
   flags: '--config <path>',
-  description: 'Path to opensip-cli.config.yml (overrides package.json pointer and default)',
+  description: 'Path to opensip-cli.config.yml (overrides default root discovery)',
 } as const;

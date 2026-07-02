@@ -274,7 +274,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)",
+          "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
           "flags": "--config <path>",
           "negate": false,
           "optional": false,
@@ -785,7 +785,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)",
+          "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
           "flags": "--config <path>",
           "negate": false,
           "optional": false,
@@ -1512,7 +1512,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Re-scaffold example files. Preserve any custom files in opensip-cli/.",
+          "description": "Re-scaffold example files. Preserve existing config and custom files in opensip-cli/.",
           "flags": "--keep",
           "negate": false,
           "optional": false,
@@ -1552,7 +1552,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)",
+          "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
           "flags": "--config <path>",
           "negate": false,
           "optional": false,
@@ -1835,7 +1835,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)",
+          "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
           "flags": "--config <path>",
           "negate": false,
           "optional": false,
@@ -2731,7 +2731,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": undefined,
-          "description": "Path to opensip-cli.config.yml (overrides package.json pointer and default)",
+          "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
           "flags": "--config <path>",
           "negate": false,
           "optional": false,

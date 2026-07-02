@@ -88,7 +88,7 @@ export function buildPartialStateMessage(
   lines.push(
     '',
     'Choose one:',
-    '  opensip init --keep    Re-scaffold examples; preserve custom files.',
+    '  opensip init --keep    Re-scaffold examples; preserve config and custom files.',
     '  opensip init --remove  Delete opensip-cli/ and scaffold fresh.',
   );
   return lines.join('\n');

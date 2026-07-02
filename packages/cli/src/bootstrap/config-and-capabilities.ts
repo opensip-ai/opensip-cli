@@ -120,7 +120,7 @@ export function composeAndValidateToolConfig(args: {
   if (!hasToolNamespaces) return { config: undefined, document: {} };
 
   // When a configPath was resolved by the project context (i.e. a real
-  // opensip-cli.config.yml or a package.json pointer), read it *strictly*.
+  // opensip-cli.config.yml), read it *strictly*.
   // Malformed YAML or unreadable file must fail before any dispatch (a
   // silent `{}` would bypass targets, gates, cloud settings, etc.).
   // When no configPath, fall back to defaults only (permissive discovery

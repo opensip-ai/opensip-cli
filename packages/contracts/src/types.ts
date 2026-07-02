@@ -21,7 +21,7 @@ export interface FitOptions {
   apiKey?: string;
   exclude: string[];
   cwd: string;
-  /** Explicit path to opensip-cli.config.yml (overrides package.json pointer and default location). */
+  /** Explicit path to opensip-cli.config.yml (overrides default root discovery). */
   config?: string;
   debug: boolean;
   /** Suppress banner/boxes; show only the pass-fail summary line. */

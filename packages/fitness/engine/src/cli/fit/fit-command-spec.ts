@@ -125,7 +125,7 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
       {
         flag: '--config',
         value: '<path>',
-        description: 'Path to opensip-cli.config.yml (overrides package.json pointer and default)',
+        description: 'Path to opensip-cli.config.yml (overrides default root discovery)',
       },
       {
         flag: '--show',

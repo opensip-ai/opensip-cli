@@ -6,10 +6,9 @@
  * single `ProjectContext` carrying everything downstream consumers
  * need: cwd, cwdExplicit, projectRoot, configPath, walkedUp, scope.
  *
- * The walker leans on `resolveProjectConfigPath` at each ancestor so
- * the `package.json#opensip-cli.configPath` pointer is honored
- * everywhere it works at a single directory (matches existing
- * `resolveProjectConfigPath` contract).
+ * The walker leans on `resolveProjectConfigPath` at each ancestor so explicit
+ * `--config` and canonical root `opensip-cli.config.yml` resolution stay
+ * consistent with the rest of the config-loading surface.
  *
  * Strict `--config` semantics: when the caller passes `explicitConfigPath`
  * and `resolveProjectConfigPath` rejects it at the starting ancestor,
@@ -138,14 +137,8 @@ function tryResolveConfig(dir: string, explicit: string | undefined): string | u
   } catch (error) {
     if (explicit !== undefined) throw error;
     // Only swallow the terminal "no config discovered at this root after all
-    // attempts (default + package pointer + etc.)". This allows upward walking
-    // when a directory simply has no OpenSIP config.
-    //
-    // Propagate other ValidationErrors, notably:
-    //  - broken package.json#opensip-cli.configPath pointers ("points to a file that does not exist")
-    //  - other resolution problems
-    // So a misconfigured pointer fails loudly instead of the walk silently
-    // adopting an ancestor project's config.
+    // attempts". This allows upward walking when a directory simply has no
+    // OpenSIP config. Propagate other resolution problems.
     if (error instanceof ValidationError && /No .*? found\. Checked:/.test(error.message)) {
       return undefined;
     }
