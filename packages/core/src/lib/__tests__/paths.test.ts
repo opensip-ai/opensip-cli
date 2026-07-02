@@ -2,12 +2,13 @@
  * @fileoverview Path resolver contract tests.
  */
 
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir, platform } from 'node:os';
+import { join, resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { resolveProjectPaths, resolveUserPaths } from '../paths.js';
+import { isPathInside, resolveProjectPaths, resolveUserPaths, toPosixRelative } from '../paths.js';
 
 // eslint-disable-next-line sonarjs/publicly-writable-directories -- string-only fixture; resolver is pure (no fs touch)
 const PROJECT = '/tmp/test-project';
@@ -77,5 +78,63 @@ describe('resolveUserPaths', () => {
   it('places global authored Tool sidecars under ~/.opensip-cli/tools (trusted-by-default)', () => {
     const u = resolveUserPaths();
     expect(u.authoredToolsDir).toBe(join(u.userHomeDir, 'tools'));
+  });
+});
+
+describe('isPathInside', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), 'opensip-paths-inside-'));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it('returns true for a child path inside the parent', () => {
+    const child = join(testDir, 'opensip-cli', 'fit', 'checks');
+    mkdirSync(child, { recursive: true });
+    expect(isPathInside(child, testDir)).toBe(true);
+  });
+
+  it('returns false for paths outside the parent', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'opensip-paths-outside-'));
+    try {
+      expect(isPathInside(outside, testDir)).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('returns false when the child path does not exist', () => {
+    expect(isPathInside(join(testDir, 'missing'), testDir)).toBe(false);
+  });
+
+  it('returns false when a symlinked directory resolves outside the parent', () => {
+    if (platform() === 'win32') return;
+
+    const outside = mkdtempSync(join(tmpdir(), 'opensip-paths-escape-'));
+    const container = join(testDir, 'opensip-cli', 'fit', 'checks');
+    mkdirSync(container, { recursive: true });
+    try {
+      symlinkSync(outside, join(container, 'escape'));
+      expect(isPathInside(join(container, 'escape'), container)).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('toPosixRelative', () => {
+  it('preserves already-relative paths in POSIX form', () => {
+    expect(toPosixRelative('/proj', 'src/pkg/file.ts')).toBe('src/pkg/file.ts');
+  });
+
+  it('makes absolute paths relative to cwd in POSIX form', () => {
+    const cwd = resolve('/proj');
+    expect(toPosixRelative(cwd, resolve('/proj/packages/cli/src/index.ts'))).toBe(
+      'packages/cli/src/index.ts',
+    );
   });
 });

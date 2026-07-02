@@ -302,6 +302,30 @@ describe('discoverPlugins', () => {
       expect(result.length).toBeGreaterThanOrEqual(1);
       expect(result.every((p) => p.type === 'file')).toBe(true);
     });
+
+    it('rejects nested directories that symlink outside the source dir', () => {
+      if (platform() === 'win32') return;
+
+      const outside = mkdtempSync(join(tmpdir(), 'opensip-discover-outside-'));
+      try {
+        writeFileSync(join(outside, 'outside.mjs'), 'export const checks = []');
+        mkdirSync(fitChecksDir(), { recursive: true });
+        symlinkSync(outside, join(fitChecksDir(), 'escape'));
+
+        expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([]);
+      } finally {
+        rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores dangling file symlinks that do not resolve to a regular file', () => {
+      if (platform() === 'win32') return;
+
+      mkdirSync(fitChecksDir(), { recursive: true });
+      symlinkSync(join(testDir, 'missing-target.mjs'), join(fitChecksDir(), 'broken.mjs'));
+
+      expect(discoverPlugins(FIT_LAYOUT, testDir)).toEqual([]);
+    });
   });
 
   describe('config-path resolution', () => {

@@ -75,6 +75,15 @@ describe('classifyModuleError', () => {
     expect(diag.category).toBe('runtime');
     expect(diag.severity).toBe('error');
   });
+
+  it('classifies module-not-found from the message when code is absent', () => {
+    const diag = classifyModuleError(
+      new Error("Cannot find module '@opensip-cli/missing' imported from ./loader.js"),
+    );
+
+    expect(diag.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_RUNTIME_MODULE_NOT_FOUND);
+    expect(diag.message).toContain("Cannot find module '@opensip-cli/missing'");
+  });
 });
 
 describe('classifyIntegrityFailure', () => {

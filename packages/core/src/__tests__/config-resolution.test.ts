@@ -30,6 +30,7 @@ describe('resolveProjectConfigPath', () => {
       resolveProjectConfigPath(testDir);
     } catch (error) {
       expect((error as Error).message).toContain('No opensip-cli.config.yml found');
+      expect((error as ValidationError).code).toBe('ERRORS.CONFIG.NOT_FOUND');
     }
   });
 
