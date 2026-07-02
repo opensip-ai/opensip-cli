@@ -66,6 +66,8 @@
     "tool-manifests": "node scripts/build-tool-command-manifests.mjs",
     "tool-manifests:check": "node scripts/build-tool-command-manifests.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
+    "release:artifacts": "node scripts/build-release-artifacts.mjs",
+    "release:artifacts:verify": "node scripts/verify-release-artifacts.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "supply-chain:verify": "node scripts/verify-supply-chain.mjs",
     "smoke-pack": "node scripts/smoke-pack.mjs",

@@ -1,9 +1,10 @@
 name: Release
 
 # Pinned action SHAs (bump via dependabot or deliberate review):
-#   actions/checkout@v6        → df4cb1c069e1874edd31b4311f1884172cec0e10
+#   actions/checkout@v7        → 9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 #   pnpm/action-setup@v6       → 0ebf47130e4866e96fce0953f49152a61190b271
 #   actions/setup-node@v6      → 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+#   actions/attest@v4          → f6bf1532d7d6793fce74eac584813a8eee607999
 #   softprops/action-gh-release@v3 → 718ea10b132b3b2eba29c1007bb80653f286566b
 
 on:
@@ -21,6 +22,8 @@ jobs:
     permissions:
       contents: write # softprops/action-gh-release creates the GitHub Release
       id-token: write # OIDC token for npm trusted publishing
+      attestations: write # GitHub Artifact Attestations for release artifacts
+      artifact-metadata: write # storage records for attested release artifacts
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -180,6 +183,41 @@ jobs:
           done < <(node scripts/release-package-order.mjs --print pack)
           ls -la /tmp/tarballs
 
+      - name: Generate release verification artifacts
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node scripts/build-release-artifacts.mjs \
+            --dir /tmp/tarballs \
+            --expected-version "$RELEASE_TAG" \
+            --git-tag "$RELEASE_TAG" \
+            --git-sha "$GITHUB_SHA"
+
+      - name: Verify release verification artifacts
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node scripts/verify-release-artifacts.mjs \
+            --dir /tmp/tarballs \
+            --manifest /tmp/tarballs/opensip-cli-release-manifest.v1.json \
+            --expected-version "$RELEASE_TAG"
+
+      - name: Attest release artifact provenance
+        uses: actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999 # v4
+        with:
+          subject-checksums: /tmp/tarballs/SHA256SUMS
+
+      - name: Attest release checksum file
+        uses: actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999 # v4
+        with:
+          subject-path: /tmp/tarballs/SHA256SUMS
+
+      - name: Attest release SBOM
+        uses: actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999 # v4
+        with:
+          subject-checksums: /tmp/tarballs/SHA256SUMS
+          sbom-path: /tmp/tarballs/opensip-cli-sbom.cyclonedx.json
+
       # Post-pack / pre-publish smoke test. Installs the freshly-packed
       # tarballs *together* into a throwaway consumer project (forcing
       # every @opensip-cli/* dep to its local tarball via npm
@@ -309,3 +347,8 @@ jobs:
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            /tmp/tarballs/opensip-cli-release-manifest.v1.json
+            /tmp/tarballs/SHA256SUMS
+            /tmp/tarballs/opensip-cli-sbom.cyclonedx.json

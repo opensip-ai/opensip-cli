@@ -13,6 +13,7 @@ import { RELEASE_PACKAGE_ORDER } from './release-package-order.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DEFAULT_TARBALL_PREFIX = join(tmpdir(), 'opensip-cli-release-tarballs-');
+const RELEASE_MANIFEST_NAME = 'opensip-cli-release-manifest.v1.json';
 
 function readVersion() {
   const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'packages/core/package.json'), 'utf8'));
@@ -87,6 +88,24 @@ function main() {
       args.tarballDir,
     ]);
   }
+
+  run('generate release verification artifacts', 'node', [
+    'scripts/build-release-artifacts.mjs',
+    '--dir',
+    args.tarballDir,
+    '--expected-version',
+    args.expectedVersion,
+  ]);
+
+  run('verify release verification artifacts', 'node', [
+    'scripts/verify-release-artifacts.mjs',
+    '--dir',
+    args.tarballDir,
+    '--manifest',
+    join(args.tarballDir, RELEASE_MANIFEST_NAME),
+    '--expected-version',
+    args.expectedVersion,
+  ]);
 
   run('packed tarball smoke', 'node', [
     'scripts/smoke-pack.mjs',

@@ -521,6 +521,12 @@
       "title": "Opensip Action Comment"
     },
     {
+      "file": "docs/web-generated/60-guides/examples/opensip-action-pinned-non-cloud.md",
+      "path": "/docs/opensip-cli/60-guides/examples/opensip-action-pinned-non-cloud/",
+      "section": "60-guides",
+      "title": "Opensip Action Pinned Non Cloud"
+    },
+    {
       "file": "docs/web-generated/60-guides/examples/opensip-action-sarif.md",
       "path": "/docs/opensip-cli/60-guides/examples/opensip-action-sarif/",
       "section": "60-guides",
@@ -669,6 +675,18 @@
         "contributors"
       ],
       "purpose": "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
+    },
+    {
+      "file": "docs/web-generated/70-reference/13-verifiable-releases.md",
+      "path": "/docs/opensip-cli/70-reference/13-verifiable-releases/",
+      "section": "70-reference",
+      "title": "Verifiable releases",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "contributors"
+      ],
+      "purpose": "How opensip-cli release artifacts are checksummed, attested, published, and verified."
     },
     {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
@@ -847,6 +865,7 @@
         "/docs/opensip-cli/60-guides/08-connect-mcp-clients/",
         "/docs/opensip-cli/60-guides/cloud-handoff/",
         "/docs/opensip-cli/60-guides/examples/opensip-action-comment/",
+        "/docs/opensip-cli/60-guides/examples/opensip-action-pinned-non-cloud/",
         "/docs/opensip-cli/60-guides/examples/opensip-action-sarif/",
         "/docs/opensip-cli/60-guides/examples/opensip-action-summary/",
         "/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/"
@@ -866,7 +885,8 @@
         "/docs/opensip-cli/70-reference/10-environment-variables/",
         "/docs/opensip-cli/70-reference/11-performance-slos/",
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
-        "/docs/opensip-cli/70-reference/12-tools-command/"
+        "/docs/opensip-cli/70-reference/12-tools-command/",
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/"
       ]
     },
     {
@@ -910,7 +930,8 @@
         "/docs/opensip-cli/70-reference/03-configuration/",
         "/docs/opensip-cli/70-reference/05-checks-index/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
-        "/docs/opensip-cli/70-reference/12-public-benchmarks/"
+        "/docs/opensip-cli/70-reference/12-public-benchmarks/",
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/"
       ]
     },
     {
@@ -989,7 +1010,8 @@
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
         "/docs/opensip-cli/70-reference/10-environment-variables/",
         "/docs/opensip-cli/70-reference/11-performance-slos/",
-        "/docs/opensip-cli/70-reference/12-public-benchmarks/"
+        "/docs/opensip-cli/70-reference/12-public-benchmarks/",
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/"
       ]
     },
     {
@@ -1027,6 +1049,7 @@
         "/docs/opensip-cli/60-guides/06-use-graph/",
         "/docs/opensip-cli/60-guides/07-create-your-first-tool/",
         "/docs/opensip-cli/60-guides/examples/opensip-action-comment/",
+        "/docs/opensip-cli/60-guides/examples/opensip-action-pinned-non-cloud/",
         "/docs/opensip-cli/60-guides/examples/opensip-action-sarif/",
         "/docs/opensip-cli/60-guides/examples/opensip-action-summary/",
         "/docs/opensip-cli/70-reference/01-cli-commands/",
@@ -1036,6 +1059,7 @@
         "/docs/opensip-cli/70-reference/11-performance-slos/",
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
         "/docs/opensip-cli/70-reference/12-tools-command/",
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
         "/docs/opensip-cli/80-implementation/03-session-and-persistence/",

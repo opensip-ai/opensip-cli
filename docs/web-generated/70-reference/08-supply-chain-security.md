@@ -57,6 +57,9 @@ standard controls explicit and fail closed.
   references long-lived npm publish tokens in a publish step. A classic token used
   solely for `npm dist-tag add` promotion in an OIDC publish workflow is the
   documented exception (OIDC does not cover dist-tag).
+- The release workflow stops generating or verifying the release manifest,
+  `SHA256SUMS`, CycloneDX SBOM, or pinned GitHub Artifact Attestations before
+  publish.
 
 ### Producer provenance lane
 
@@ -64,6 +67,13 @@ Ordinary OpenSIP releases publish with **OIDC trusted publishing** and
 `npm publish <tarball> --provenance`. `pnpm supply-chain:verify` gates this in CI
 and `release.yml` before publish. The only documented non-provenance exception is
 the one-time bootstrap for brand-new package names — see `RELEASING.md`.
+
+Tag releases also upload verification files to the GitHub Release:
+`opensip-cli-release-manifest.v1.json`, `SHA256SUMS`, and
+`opensip-cli-sbom.cyclonedx.json`. The same workflow creates pinned
+`actions/attest` provenance/SBOM attestations for the release artifact set. See
+[Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/) for hash and provenance
+verification commands.
 
 **Consumption-side verification** (install/load provenance checks for third-party
 packages) is a separate trust gate coordinated with

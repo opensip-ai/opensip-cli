@@ -48,6 +48,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | Use graph on a real project | [Use graph](./60-guides/06-use-graph.md) |
 | Create your own CLI subcommand | [Create your first Tool](./60-guides/07-create-your-first-tool.md) |
 | Wire the release gate into CI | [Wire into CI](./60-guides/03-wire-into-ci.md) |
+| Verify release artifacts | [Verifiable releases](./70-reference/13-verifiable-releases.md) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 
 ## Command Map
@@ -89,7 +90,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | Evaluating opensip-cli | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [Public benchmarks](./70-reference/12-public-benchmarks.md) -> [FAQ](./00-start/04-faq.md) |
 | Understanding the two products | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [OpenSIP and OpenSIP CLI](./00-start/08-opensip-and-opensip-cli.md) |
 | New user | [Quick start](./00-start/00-quick-start.md) -> [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) -> [Write your first check](./60-guides/01-write-your-first-check.md) |
-| CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
+| CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Verifiable releases](./70-reference/13-verifiable-releases.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
 | Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) -> [External tool adapters](./50-extend/08-external-tool-adapters.md) |
 | Graph adopter | [Use graph](./60-guides/06-use-graph.md) -> [Stages and catalog](./40-graph/01-stages-and-catalog.md) -> [Rules and gating](./40-graph/02-rules-and-gating.md) |
 | AI agent (CLI + MCP) | [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md) -> [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
@@ -177,16 +178,17 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 50. [Performance SLOs](./70-reference/11-performance-slos.md)
 51. [Public benchmarks](./70-reference/12-public-benchmarks.md)
 52. [`tools` command](./70-reference/12-tools-command.md)
+53. [Verifiable releases](./70-reference/13-verifiable-releases.md)
 
 ### 80 - Internals
 
-53. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-54. [Plugin loader](./80-implementation/02-plugin-loader.md)
-55. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-56. [Coding standards](./80-implementation/04-coding-standards.md)
-57. [Layer policy](./80-implementation/05-layer-policy.md)
-58. [Doc conventions](./80-implementation/06-doc-conventions.md)
-59. [Website integration](./80-implementation/07-website-integration.md)
+54. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+55. [Plugin loader](./80-implementation/02-plugin-loader.md)
+56. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+57. [Coding standards](./80-implementation/04-coding-standards.md)
+58. [Layer policy](./80-implementation/05-layer-policy.md)
+59. [Doc conventions](./80-implementation/06-doc-conventions.md)
+60. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 

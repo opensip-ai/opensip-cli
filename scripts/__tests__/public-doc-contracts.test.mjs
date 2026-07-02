@@ -29,6 +29,7 @@ test('CI guide links benchmarks and checked action examples without stale timing
   assert.match(text, /examples\/opensip-action-comment\.md/u);
   assert.match(text, /examples\/opensip-action-summary\.md/u);
   assert.match(text, /examples\/opensip-action-sarif\.md/u);
+  assert.match(text, /examples\/opensip-action-pinned-non-cloud\.md/u);
   assert.doesNotMatch(text, /`fit` \(default recipe, parallel\).*~8s/u);
   assert.doesNotMatch(text, /`graph` \(cold\).*~15s/u);
 });

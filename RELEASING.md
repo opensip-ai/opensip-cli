@@ -150,7 +150,10 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 3. Run the local preflight. Do not tag or push a release until this passes.
    This command mirrors the tag-driven release lane before publish, including a
    fresh Turbo coverage run (`--force`) so stale cached package coverage cannot
-   mask a CI threshold failure:
+   mask a CI threshold failure. It also packs every publishable package,
+   generates `opensip-cli-release-manifest.v1.json`, `SHA256SUMS`, and
+   `opensip-cli-sbom.cyclonedx.json`, then verifies the local hashes before the
+   tarball smoke test:
 
    ```bash
    pnpm release:preflight --expected-version v0.1.0
@@ -193,6 +196,25 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    done
    printf '%-40s %s\n' "opensip-cli" "$(npm view opensip-cli version 2>/dev/null || echo MISSING)"
    ```
+
+7. Verify the GitHub Release assets. The workflow uploads the release manifest,
+   checksum file, and CycloneDX SBOM only after staging publish, promotion, and
+   publish-surface verification succeed:
+
+   ```bash
+   VERSION=0.1.0
+   TAG="v$VERSION"
+   mkdir -p "/tmp/opensip-cli-$TAG"
+   gh release download "$TAG" \
+     --repo opensip-ai/opensip-cli \
+     --dir "/tmp/opensip-cli-$TAG" \
+     --pattern opensip-cli-release-manifest.v1.json \
+     --pattern SHA256SUMS \
+     --pattern opensip-cli-sbom.cyclonedx.json
+   ```
+
+   Full hash and provenance verification commands are documented in
+   [Verifiable releases](docs/public/70-reference/13-verifiable-releases.md).
 
 ## Partial publish recovery
 

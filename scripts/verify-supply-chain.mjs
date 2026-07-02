@@ -10,6 +10,8 @@
 //   3. pnpm supply-chain settings stay explicit and fail-closed.
 //   4. GitHub workflows use frozen installs.
 //   5. npm publish uses OIDC/provenance and not long-lived publish tokens.
+//   6. Dependency update automation stays bounded.
+//   7. The release workflow emits checksums/SBOM and pinned artifact attestations.
 
 import { promises as fs } from 'node:fs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -243,6 +245,71 @@ function checkDependencyAutomation() {
   }
 }
 
+function checkReleaseArtifactAttestations(workflows) {
+  const workflow = workflows.find((entry) => entry.relPath === '.github/workflows/release.yml');
+  if (workflow === undefined) {
+    fail(7, '.github/workflows/release.yml is missing.');
+    return;
+  }
+
+  const problems = [];
+  const content = workflow.content;
+  const orderedSteps = [
+    'scripts/build-release-artifacts.mjs',
+    'scripts/verify-release-artifacts.mjs',
+    'scripts/smoke-pack.mjs',
+    'Publish via npm',
+  ];
+
+  if (!/attestations:\s*write/u.test(content)) {
+    problems.push('permissions.attestations: write is missing');
+  }
+  if (!/artifact-metadata:\s*write/u.test(content)) {
+    problems.push('permissions.artifact-metadata: write is missing');
+  }
+  if (!/uses:\s*actions\/attest@[a-f0-9]{40}\b/u.test(content)) {
+    problems.push('actions/attest must be pinned to a full commit SHA');
+  }
+  if (!/subject-checksums:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(content)) {
+    problems.push('artifact attestation must use the generated SHA256SUMS subject list');
+  }
+  if (!/subject-path:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(content)) {
+    problems.push('SHA256SUMS must have its own artifact attestation');
+  }
+  if (!/sbom-path:\s*\/tmp\/tarballs\/opensip-cli-sbom\.cyclonedx\.json/u.test(content)) {
+    problems.push('SBOM attestation must use opensip-cli-sbom.cyclonedx.json');
+  }
+  for (const required of [
+    'opensip-cli-release-manifest.v1.json',
+    'SHA256SUMS',
+    'opensip-cli-sbom.cyclonedx.json',
+  ]) {
+    if (!content.includes(required)) {
+      problems.push(`${required} is not wired into the release workflow`);
+    }
+  }
+
+  let previousIndex = -1;
+  let previousMarker = '';
+  for (const marker of orderedSteps) {
+    const index = content.indexOf(marker);
+    if (index === -1) {
+      problems.push(`${marker} is missing from the release workflow`);
+    } else if (index < previousIndex) {
+      problems.push(`${marker} must run after ${previousMarker}`);
+    } else {
+      previousIndex = index;
+      previousMarker = marker;
+    }
+  }
+
+  if (problems.length === 0) {
+    pass(7, 'release workflow emits checksums/SBOM and pinned artifact attestations.');
+  } else {
+    fail(7, `release artifact attestation problems:\n    ${problems.join('\n    ')}`);
+  }
+}
+
 await checkNoPublishedInstallHooks();
 await checkPackageManagerPin();
 checkPnpmPolicy();
@@ -250,6 +317,7 @@ const workflows = readWorkflowFiles();
 checkFrozenInstalls(workflows);
 checkTrustedPublish(workflows);
 checkDependencyAutomation();
+checkReleaseArtifactAttestations(workflows);
 
 for (const p of passes) console.log(`✓ [${p.id}] ${p.msg}`);
 if (failures.length > 0) {
