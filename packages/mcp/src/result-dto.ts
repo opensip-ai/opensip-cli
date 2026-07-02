@@ -10,7 +10,12 @@
 
 import type { Freshness } from './symbol-dto.js';
 import type { ReviewBrief, SignalEnvelope } from '@opensip-cli/contracts';
-import type { BaselineIdentityMetadata, SignalSeverity, ToolShortId } from '@opensip-cli/core';
+import type {
+  BaselineIdentityMetadata,
+  SignalRepair,
+  SignalSeverity,
+  ToolShortId,
+} from '@opensip-cli/core';
 
 /** The verdict-count block shared with `SignalEnvelope`. */
 export type RunVerdictSummary = SignalEnvelope['verdict']['summary'];
@@ -71,6 +76,7 @@ export interface McpFinding {
   readonly filePath?: string;
   readonly line?: number;
   readonly column?: number;
+  readonly repair?: SignalRepair;
 }
 
 /** Machine-readable degraded evidence note for MCP review/baseline tools. */

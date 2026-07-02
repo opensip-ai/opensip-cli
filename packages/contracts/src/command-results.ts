@@ -76,6 +76,15 @@ export type {
   HelpResult,
   ErrorResult,
 } from './command-results-variants/session-results.js';
+export type {
+  RepairActionRef,
+  RepairApplyResult,
+  RepairFileChange,
+  RepairPreviewResult,
+  RepairRefusal,
+  RepairSessionRef,
+  RepairSignalRef,
+} from './command-results-variants/repair-results.js';
 
 import type {
   ConfigSchemaResult,
@@ -99,6 +108,10 @@ import type {
   ReportResult,
 } from './command-results-variants/list-history-results.js';
 import type { PluginResult } from './command-results-variants/plugin-results.js';
+import type {
+  RepairApplyResult,
+  RepairPreviewResult,
+} from './command-results-variants/repair-results.js';
 import type {
   SessionReplayResult,
   HelpResult,
@@ -155,6 +168,8 @@ export type CommandResult =
   | SuiteRunResult
   | SuiteListResult
   | SuiteAddResult
+  | RepairPreviewResult
+  | RepairApplyResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;

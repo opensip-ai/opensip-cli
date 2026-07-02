@@ -92,7 +92,20 @@ describe('buildReplaySignal', () => {
       source: 'graph:large-function',
       finding: finding({
         severity: 'error',
-        repair: { repairKind: 'split-function', autofixable: false, confidence: 0.7 },
+        repair: {
+          repairKind: 'split-function',
+          autofixable: false,
+          confidence: 0.7,
+          actions: [
+            {
+              id: 'manual-split',
+              kind: 'manual',
+              title: 'Split large function',
+              autofixable: false,
+              verification: { commands: ['opensip graph --check large-function'] },
+            },
+          ],
+        },
       }),
       checkIndex: 0,
       findingIndex: 0,
@@ -104,6 +117,15 @@ describe('buildReplaySignal', () => {
       repairKind: 'split-function',
       autofixable: false,
       confidence: 0.7,
+      actions: [
+        {
+          id: 'manual-split',
+          kind: 'manual',
+          title: 'Split large function',
+          autofixable: false,
+          verification: { commands: ['opensip graph --check large-function'] },
+        },
+      ],
     });
   });
 

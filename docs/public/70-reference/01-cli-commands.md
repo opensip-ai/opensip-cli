@@ -33,7 +33,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](../50-extend/07-command-taxonomy.md).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](../50-extend/07-command-taxonomy.md).
 
 ---
 
@@ -910,6 +910,37 @@ and exit 2.
 The `--filter` and `--raw` options (plus `--summary-only` on `list`) were added specifically to make historical result inspection efficient for AI agents while leaving all human-readable tables and banners unchanged.
 
 **See also:** [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md).
+
+---
+
+## `repair preview` and `repair apply` — safe stored-session repair actions
+
+CLI-owned. Replays a stored session, selects one signal, selects one
+`signal.repair.actions[]` entry, and either previews the deterministic file
+change or applies it with host-owned safety checks.
+
+```
+opensip repair preview latest --tool fit --signal index:0 --action replace-ts-ignore
+opensip repair preview <session-id> --tool fit --signal fingerprint:<fingerprint> --action remove-unused-dependency --json
+opensip repair apply latest --tool fit --signal id:<signal-id> --action replace-ts-ignore
+opensip repair apply latest --tool fit --signal index:0 --action replace-ts-ignore --force
+```
+
+| Subcommand | Flag | Effect |
+|---|---|---|
+| `preview` | `<ref>` | Session id, relative session ref, or `latest` with `--tool`. |
+| `preview` / `apply` | `--tool <name>` | Required. Resolves the stored session's tool identity. |
+| `preview` / `apply` | `--signal <selector>` | Required. `id:<value>`, `fingerprint:<value>`, or `index:<zero-based>`. Fingerprints must match one signal. |
+| `preview` / `apply` | `--action <id>` | Required for apply; accepted on preview. Selects the action id from `signal.repair.actions[]`. |
+| `apply` | `--force` | Bypass the git clean-worktree check. Stale file hashes and unsafe paths are still refused. |
+| `preview` / `apply` | `--json` | Emit `repair-preview` / `repair-apply` as a `CommandOutcome` result. |
+
+`preview` never mutates files. `apply` refuses advisory actions, unsupported
+action ids, paths outside the project root, symlink escapes, files above 1 MiB,
+dirty git targets unless `--force` is passed, and files whose current hash no
+longer matches the preview plan. The first supported action ids are
+`replace-ts-ignore` and `remove-unused-dependency`; `normalize-generated-config`
+is reserved and currently refused.
 
 ---
 

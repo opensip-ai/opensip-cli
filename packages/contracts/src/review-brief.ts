@@ -312,6 +312,36 @@ export const reviewBriefRepairSchema = z
       })
       .strict()
       .optional(),
+    actions: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            kind: z.string(),
+            title: z.string(),
+            description: z.string().optional(),
+            autofixable: z.boolean(),
+            confidence: z.number().optional(),
+            patchHint: z
+              .object({
+                kind: z.enum(['text', 'structured']),
+                summary: z.string(),
+                target: z.string().optional(),
+              })
+              .strict()
+              .optional(),
+            verification: z
+              .object({
+                commands: z.array(z.string()),
+                notes: z.array(z.string()).optional(),
+              })
+              .strict()
+              .optional(),
+            target: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
   })
   .strict();
 

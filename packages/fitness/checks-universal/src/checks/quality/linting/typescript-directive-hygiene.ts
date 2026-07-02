@@ -32,6 +32,7 @@ const GENERIC_JUSTIFICATIONS = [
 ];
 
 const MIN_JUSTIFICATION_LENGTH = 10;
+const TYPECHECK_VERIFICATION = ['pnpm typecheck'] as const;
 
 /**
  * Extract justification from the text after a TypeScript directive
@@ -134,6 +135,37 @@ export const typescriptDirectiveHygiene = defineCheck({
           severity: 'error',
           suggestion: `Add a justification after the directive: ${directive} -- Reason why this suppression is needed`,
           match: directive,
+          repair: {
+            repairKind: 'manual',
+            autofixable: false,
+            confidence: 0.8,
+            patchHint: {
+              kind: 'text',
+              summary: `Add a specific justification after ${directive}`,
+              target: filePath,
+            },
+            actions: [
+              {
+                id: 'add-suppression-reason',
+                kind: 'manual-text-edit',
+                title: 'Add TypeScript suppression reason',
+                autofixable: false,
+                confidence: 0.8,
+                patchHint: {
+                  kind: 'text',
+                  summary: `Add a specific justification after ${directive}`,
+                  target: filePath,
+                },
+                verification: {
+                  commands: TYPECHECK_VERIFICATION,
+                  notes: [
+                    'Use a reason that explains why the type error is intentionally suppressed.',
+                  ],
+                },
+                target: { filePath, line: lineNum, directive },
+              },
+            ],
+          },
         });
       } else if (isGeneric(justification)) {
         violations.push({
@@ -143,6 +175,37 @@ export const typescriptDirectiveHygiene = defineCheck({
           severity: 'warning',
           suggestion: `Replace generic justification with a specific explanation. Minimum ${MIN_JUSTIFICATION_LENGTH} characters describing WHY the suppression is needed`,
           match: justification,
+          repair: {
+            repairKind: 'manual',
+            autofixable: false,
+            confidence: 0.8,
+            patchHint: {
+              kind: 'text',
+              summary:
+                'Replace the generic TypeScript suppression reason with a specific explanation',
+              target: filePath,
+            },
+            actions: [
+              {
+                id: 'add-suppression-reason',
+                kind: 'manual-text-edit',
+                title: 'Replace generic TypeScript suppression reason',
+                autofixable: false,
+                confidence: 0.8,
+                patchHint: {
+                  kind: 'text',
+                  summary:
+                    'Replace the generic TypeScript suppression reason with a specific explanation',
+                  target: filePath,
+                },
+                verification: {
+                  commands: TYPECHECK_VERIFICATION,
+                  notes: ['Use a reason that names the incompatible type or upstream limitation.'],
+                },
+                target: { filePath, line: lineNum, directive },
+              },
+            ],
+          },
         });
       } else if (directive === '@ts-ignore') {
         violations.push({
@@ -153,6 +216,37 @@ export const typescriptDirectiveHygiene = defineCheck({
           suggestion:
             'Replace @ts-ignore with @ts-expect-error. The latter will error if the suppressed issue is fixed, preventing stale suppressions',
           match: directive,
+          repair: {
+            repairKind: 'manual',
+            autofixable: true,
+            confidence: 0.95,
+            patchHint: {
+              kind: 'text',
+              summary: 'Replace @ts-ignore with @ts-expect-error',
+              target: filePath,
+            },
+            actions: [
+              {
+                id: 'replace-ts-ignore',
+                kind: 'text-replacement',
+                title: 'Replace @ts-ignore with @ts-expect-error',
+                autofixable: true,
+                confidence: 0.95,
+                patchHint: {
+                  kind: 'text',
+                  summary: 'Replace @ts-ignore with @ts-expect-error',
+                  target: filePath,
+                },
+                verification: { commands: TYPECHECK_VERIFICATION },
+                target: {
+                  filePath,
+                  line: lineNum,
+                  expectedText: '@ts-ignore',
+                  replacementText: '@ts-expect-error',
+                },
+              },
+            ],
+          },
         });
       }
     }

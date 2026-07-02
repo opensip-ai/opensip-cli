@@ -48,6 +48,7 @@ import {
   viewHelp,
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
+import { viewRepair } from './views/repair-views.js';
 import { viewSuiteAdd, viewSuiteList, viewSuiteRun } from './views/suite-views.js';
 import {
   viewToolsCreate,
@@ -368,6 +369,10 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'suite-list':
     case 'suite-run': {
       return suiteResultToView(result);
+    }
+    case 'repair-preview':
+    case 'repair-apply': {
+      return viewRepair(result);
     }
     case 'plugin-list':
     case 'plugin-add':

@@ -72,6 +72,33 @@ export interface FixHint {
   readonly description?: string;
 }
 
+/** Scalar action target metadata safe to persist in session payloads. */
+export type SignalRepairActionTarget = Readonly<Record<string, string | number | boolean>>;
+
+/** Verification guidance agents should run after an action is applied. */
+export interface SignalRepairVerification {
+  readonly commands: readonly string[];
+  readonly notes?: readonly string[];
+}
+
+/** One deterministic action a repair-aware consumer may preview or apply. */
+export interface SignalRepairAction {
+  readonly id: string;
+  /** Open string; first-party values are documented in the public JSON schema. */
+  readonly kind: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly autofixable: boolean;
+  readonly confidence?: number;
+  readonly patchHint?: {
+    readonly kind: 'text' | 'structured';
+    readonly summary: string;
+    readonly target?: string;
+  };
+  readonly verification?: SignalRepairVerification;
+  readonly target?: SignalRepairActionTarget;
+}
+
 /** Structured repair contract for AI agents (ADR-0086, spec §5.5). */
 export interface SignalRepair {
   readonly repairKind?:
@@ -90,6 +117,8 @@ export interface SignalRepair {
     readonly summary: string;
     readonly target?: string;
   };
+  /** Optional concrete actions for deterministic preview/apply consumers. */
+  readonly actions?: readonly SignalRepairAction[];
 }
 
 /**

@@ -3,13 +3,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import {
-  currentScope,
-  registeredToolShortIds,
-  resolveToolFilterToLayoutKey,
-  ValidationError,
-  type ToolShortId,
-} from '@opensip-cli/core';
+import { currentScope, ValidationError, type ToolShortId } from '@opensip-cli/core';
 
 import { executeClear } from './clear.js';
 import { showHistory } from './history.js';
@@ -21,27 +15,13 @@ import {
   type HostSpec,
 } from './host-subcommand-shared.js';
 import { executeSessionShow } from './session-show.js';
+import {
+  resolveRegisteredToolFilter,
+  validateRegisteredToolFilter,
+} from './tool-filter-validation.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { DataStore } from '@opensip-cli/datastore';
-
-function validateToolFilter(
-  tool: string | undefined,
-): { message: string; code: string } | undefined {
-  if (tool === undefined) return undefined;
-  const registry = currentScope()?.tools;
-  if (registry === undefined) return undefined;
-  const known = registeredToolShortIds(registry);
-  const resolved = resolveToolFilterToLayoutKey(registry, tool) ?? tool;
-  if (known.has(tool) || known.has(resolved)) return undefined;
-  const knownList = [...known].sort();
-  return {
-    code: 'unknown-tool',
-    message:
-      `unknown tool '${tool}'` +
-      (knownList.length > 0 ? `; registered tools: ${knownList.join(', ')}` : ''),
-  };
-}
 
 function normalizeFilterOption(filter: string | string[] | undefined): string[] | undefined {
   if (Array.isArray(filter)) return filter;
@@ -101,7 +81,8 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
         limit?: number;
         summaryOnly?: boolean;
       };
-      const invalid = validateToolFilter(opts.tool);
+      const registry = currentScope()?.tools;
+      const invalid = validateRegisteredToolFilter(registry, opts.tool);
       if (invalid) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return {
@@ -110,11 +91,7 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
           exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         };
       }
-      const registry = currentScope()?.tools;
-      const layoutFilter =
-        registry === undefined || opts.tool === undefined
-          ? opts.tool
-          : resolveToolFilterToLayoutKey(registry, opts.tool);
+      const layoutFilter = resolveRegisteredToolFilter(registry, opts.tool);
       return showHistory(ctx.datastore() as DataStore, {
         tool: layoutFilter,
         limit: opts.limit,
@@ -165,7 +142,8 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         raw?: boolean;
       };
       const ref = opts._args[0];
-      const invalid = validateToolFilter(opts.tool);
+      const registry = currentScope()?.tools;
+      const invalid = validateRegisteredToolFilter(registry, opts.tool);
       if (invalid) {
         if (opts.json === true) {
           ctx.emitError({
@@ -184,11 +162,7 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
         return;
       }
       const filters = normalizeFilterOption(opts.filter);
-      const registry = currentScope()?.tools;
-      const layoutTool =
-        registry === undefined || opts.tool === undefined
-          ? opts.tool
-          : resolveToolFilterToLayoutKey(registry, opts.tool);
+      const layoutTool = resolveRegisteredToolFilter(registry, opts.tool);
       await executeSessionShow({
         replayRegistry: ctx.sessionReplayRegistry,
         ref,

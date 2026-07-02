@@ -77,6 +77,7 @@ describe('registerCliCommands', () => {
       'config',
       'configure',
       'init',
+      'repair',
       'report',
       'sessions',
       'suite',
@@ -89,6 +90,12 @@ describe('registerCliCommands', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge', 'show']);
+  });
+
+  it('mounts the documented repair subcommands', () => {
+    const program = new Command('opensip');
+    registerCliCommands(program, makeContext());
+    expect(subcommandNames(program, 'repair')).toEqual(['apply', 'preview']);
   });
 
   it('mounts the documented suite subcommands', () => {

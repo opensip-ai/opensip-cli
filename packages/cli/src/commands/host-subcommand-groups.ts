@@ -21,6 +21,7 @@
 import { buildConfigGroupLeaves } from './host-subcommand-config.js';
 import { buildSessionsGroupLeaves } from './host-subcommand-sessions.js';
 import { type HostSpec } from './host-subcommand-shared.js';
+import { buildRepairGroupLeaves } from './repair/command-specs.js';
 import { buildSuiteGroupLeaves } from './suite/suite-command-specs.js';
 import { buildToolsGroupLeaves } from './tools/index.js';
 
@@ -51,6 +52,7 @@ export interface HostSubcommandGroup {
  */
 export const HOST_SUBCOMMAND_GROUPS: readonly string[] = [
   'config',
+  'repair',
   'sessions',
   'suite',
   'tools',
@@ -63,6 +65,11 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
       name: 'config',
       description: 'Project config validation and schema export',
       leaves: buildConfigGroupLeaves(ctx),
+    },
+    {
+      name: 'repair',
+      description: 'Preview and apply stored-session repair actions',
+      leaves: buildRepairGroupLeaves(ctx),
     },
     {
       name: 'sessions',

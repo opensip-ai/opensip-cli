@@ -128,6 +128,23 @@ describe('reviewBriefSchema', () => {
         repairKind: 'manual',
         autofixable: false,
         patchHint: { kind: 'text', summary: 'Inspect the failing rule.' },
+        actions: [
+          {
+            id: 'add-reason',
+            kind: 'add-suppression-reason',
+            title: 'Add suppression reason',
+            autofixable: false,
+            confidence: 0.6,
+            verification: {
+              commands: ['opensip fit --check typescript-directive-hygiene'],
+            },
+            target: {
+              filePath: 'src/a.ts',
+              line: 1,
+              checkSlug: 'typescript-directive-hygiene',
+            },
+          },
+        ],
       },
     });
     const brief: ReviewBrief = {

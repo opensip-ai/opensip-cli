@@ -47,7 +47,7 @@ Authoring on-ramps: `opensip tools create` (`minimal-js`, `ts-local`). See
 
 | Tier | Who owns it | Grammar | Examples |
 |------|-------------|---------|----------|
-| **Tier 1 — Host** | CLI composition root | Flat top-level names | `init`, `report`, `sessions`, `configure`, `agent-catalog`, `completion`, `uninstall` |
+| **Tier 1 — Host** | CLI composition root | Flat top-level names | `init`, `report`, `sessions`, `repair`, `configure`, `agent-catalog`, `completion`, `uninstall` |
 | **Tier 2 — Tool public** | Each Tool's `commandSpecs` | `<tool>` primary + nested `<tool> <verb>` children | `fit`, `fit list`, `graph export`, `sim recipes` |
 | **Tier 3 — Tool internal** | Same Tool, `visibility: 'internal'` | Flat names, hidden from public surfaces | `fit-run-worker`, `graph-shard-worker`, `graph-equivalence-check` |
 

@@ -231,6 +231,8 @@ function decodeRepair(value: unknown): SignalRepair | undefined {
   if (typeof raw.confidence === 'number') out.confidence = raw.confidence;
   const patchHint = decodePatchHint(raw.patchHint);
   if (patchHint !== undefined) out.patchHint = patchHint;
+  const actions = decodeRepairActions(raw.actions);
+  if (actions !== undefined) out.actions = actions;
   return Object.keys(out).length === 0 ? undefined : out;
 }
 
@@ -246,6 +248,76 @@ function decodePatchHint(value: unknown): SignalRepair['patchHint'] | undefined 
     summary: raw.summary,
     ...(typeof raw.target === 'string' ? { target: raw.target } : {}),
   };
+}
+
+type DecodedRepairAction = NonNullable<SignalRepair['actions']>[number];
+
+function decodeRepairActions(value: unknown): readonly DecodedRepairAction[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const actions = value
+    .map((entry) => decodeRepairAction(entry))
+    .filter((entry): entry is DecodedRepairAction => entry !== undefined);
+  return actions.length === 0 ? undefined : actions;
+}
+
+function decodeRepairAction(value: unknown): DecodedRepairAction | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  if (
+    typeof raw.id !== 'string' ||
+    typeof raw.kind !== 'string' ||
+    typeof raw.title !== 'string' ||
+    typeof raw.autofixable !== 'boolean'
+  ) {
+    return undefined;
+  }
+  const out: {
+    -readonly [K in keyof DecodedRepairAction]: DecodedRepairAction[K];
+  } = {
+    id: raw.id,
+    kind: raw.kind,
+    title: raw.title,
+    autofixable: raw.autofixable,
+  };
+  if (typeof raw.description === 'string') out.description = raw.description;
+  if (typeof raw.confidence === 'number') out.confidence = raw.confidence;
+  const patchHint = decodePatchHint(raw.patchHint);
+  if (patchHint !== undefined) out.patchHint = patchHint;
+  const verification = decodeRepairVerification(raw.verification);
+  if (verification !== undefined) out.verification = verification;
+  const target = decodeRepairActionTarget(raw.target);
+  if (target !== undefined) out.target = target;
+  return out;
+}
+
+function decodeRepairVerification(value: unknown): DecodedRepairAction['verification'] | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+  const commands = stringArray(raw.commands);
+  if (commands === undefined) return undefined;
+  const notes = stringArray(raw.notes);
+  return {
+    commands,
+    ...(notes === undefined ? {} : { notes }),
+  };
+}
+
+function stringArray(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
+    return undefined;
+  }
+  return value;
+}
+
+function decodeRepairActionTarget(value: unknown): DecodedRepairAction['target'] | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+      out[key] = entry;
+    }
+  }
+  return Object.keys(out).length === 0 ? undefined : out;
 }
 
 /** Narrow an open metadata bag to its scalar subset; undefined when nothing survives. */

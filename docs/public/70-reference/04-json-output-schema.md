@@ -420,9 +420,37 @@ fix hint with confidence.
   "suggestedCommand": "opensip fit --check large-function",
   "docsRef": "../60-guides/use-opensip-with-ai-agents.md",
   "confidence": 0.7,
-  "patchHint": { "kind": "text", "summary": "Extract helper from lines 40-120" }
+  "patchHint": { "kind": "text", "summary": "Extract helper from lines 40-120" },
+  "actions": [
+    {
+      "id": "replace-ts-ignore",
+      "kind": "text-replacement",
+      "title": "Replace @ts-ignore with @ts-expect-error",
+      "autofixable": true,
+      "confidence": 0.95,
+      "patchHint": {
+        "kind": "text",
+        "summary": "Replace @ts-ignore with @ts-expect-error",
+        "target": "src/example.ts"
+      },
+      "verification": { "commands": ["pnpm typecheck"] },
+      "target": {
+        "filePath": "src/example.ts",
+        "line": 12,
+        "expectedText": "@ts-ignore",
+        "replacementText": "@ts-expect-error"
+      }
+    }
+  ]
 }
 ```
+
+`actions[]` is optional and additive. Each action has a stable `id`, open
+`kind`, human `title`, `autofixable`, optional `confidence`, optional
+`patchHint`, optional `verification.commands[]` / `verification.notes[]`, and a
+scalar `target` metadata bag. The CLI host understands only documented first-
+party action ids; unknown ids are preserved in JSON but refused by
+`opensip repair preview|apply`.
 
 The line and column are **1-based** to match SARIF and most editor conventions. A signal without a location omits `line` / `column` and carries an empty `filePath`.
 

@@ -110,6 +110,31 @@ describe('decodeSessionPayload — repair round-trip (ADR-0086)', () => {
       docsRef: 'https://opensip.ai/docs',
       confidence: 0.7,
       patchHint: { kind: 'structured', summary: 'extract helper', target: 'src/x.ts' },
+      actions: [
+        {
+          id: 'replace-ts-ignore-with-ts-expect-error',
+          kind: 'replace-ts-ignore',
+          title: 'Replace @ts-ignore with @ts-expect-error',
+          description: 'Use the stale-suppression-safe TypeScript directive.',
+          autofixable: true,
+          confidence: 0.9,
+          patchHint: {
+            kind: 'structured',
+            summary: 'Replace the TypeScript directive.',
+            target: 'src/x.ts',
+          },
+          verification: {
+            commands: ['opensip fit --check typescript-directive-hygiene'],
+            notes: ['Rerun the directive hygiene check.'],
+          },
+          target: {
+            filePath: 'src/x.ts',
+            line: 4,
+            expectedText: '@ts-ignore',
+            replacementText: '@ts-expect-error',
+          },
+        },
+      ],
     };
     const decoded = decodeSessionPayload(
       {
@@ -121,6 +146,65 @@ describe('decodeSessionPayload — repair round-trip (ADR-0086)', () => {
       { tool: 'fit' },
     );
     expect(decoded.checks[0].findings[0].repair).toEqual(repair);
+  });
+
+  it('drops malformed repair actions while preserving valid repair fields', () => {
+    const decoded = decodeSessionPayload(
+      {
+        summary: SUMMARY,
+        checks: [
+          fitCheck({
+            findings: [
+              {
+                ruleId: 'r',
+                message: 'm',
+                severity: 'error',
+                repair: {
+                  repairKind: 'manual',
+                  autofixable: true,
+                  actions: [
+                    { id: 'missing-required-fields' },
+                    {
+                      id: 'remove-unused-dependency',
+                      kind: 'remove-unused-dependency',
+                      title: 'Remove unused dependency',
+                      autofixable: true,
+                      target: {
+                        filePath: 'package.json',
+                        packageName: 'left-pad',
+                        dependencySection: 'dependencies',
+                        nested: { drop: true },
+                      },
+                      verification: { commands: ['pnpm install --lockfile-only'], notes: [42] },
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        ],
+      },
+      { tool: 'fit' },
+    );
+
+    expect(decoded.checks[0].findings[0].repair).toEqual({
+      repairKind: 'manual',
+      autofixable: true,
+      actions: [
+        {
+          id: 'remove-unused-dependency',
+          kind: 'remove-unused-dependency',
+          title: 'Remove unused dependency',
+          autofixable: true,
+          target: {
+            filePath: 'package.json',
+            packageName: 'left-pad',
+            dependencySection: 'dependencies',
+          },
+          verification: { commands: ['pnpm install --lockfile-only'] },
+        },
+      ],
+    });
   });
 
   it('omits repair when the finding has none (forward-compat with pre-feature rows)', () => {

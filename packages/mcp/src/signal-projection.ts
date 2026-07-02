@@ -10,5 +10,6 @@ export function toMcpFinding(signal: Signal): McpFinding {
     ...(signal.filePath ? { filePath: signal.filePath } : {}),
     ...(signal.line === undefined ? {} : { line: signal.line }),
     ...(signal.column === undefined ? {} : { column: signal.column }),
+    ...(signal.repair === undefined ? {} : { repair: signal.repair }),
   };
 }

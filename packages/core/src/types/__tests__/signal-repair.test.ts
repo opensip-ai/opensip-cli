@@ -20,6 +20,69 @@ describe('Signal.repair', () => {
     expect(parsed.repair?.repairKind).toBe('split-function');
   });
 
+  it('round-trips structured repair actions through JSON', () => {
+    const signal = createSignal({
+      source: 'fit',
+      ruleId: 'fit:typescript-directive-hygiene',
+      severity: 'high',
+      message: '@ts-ignore missing justification',
+      repair: {
+        repairKind: 'manual',
+        autofixable: true,
+        actions: [
+          {
+            id: 'replace-ts-ignore-with-ts-expect-error',
+            kind: 'replace-ts-ignore',
+            title: 'Replace @ts-ignore with @ts-expect-error',
+            autofixable: true,
+            confidence: 0.9,
+            patchHint: {
+              kind: 'structured',
+              summary: 'Replace the TypeScript suppression directive.',
+              target: 'src/example.ts',
+            },
+            verification: {
+              commands: ['opensip fit --check typescript-directive-hygiene'],
+              notes: ['Rerun the directive hygiene check after applying.'],
+            },
+            target: {
+              filePath: 'src/example.ts',
+              line: 3,
+              expectedText: '@ts-ignore',
+              replacementText: '@ts-expect-error',
+            },
+          },
+        ],
+      },
+    });
+
+    const parsed = structuredClone(signal);
+    expect(parsed.repair?.actions).toEqual([
+      {
+        id: 'replace-ts-ignore-with-ts-expect-error',
+        kind: 'replace-ts-ignore',
+        title: 'Replace @ts-ignore with @ts-expect-error',
+        autofixable: true,
+        confidence: 0.9,
+        patchHint: {
+          kind: 'structured',
+          summary: 'Replace the TypeScript suppression directive.',
+          target: 'src/example.ts',
+        },
+        verification: {
+          commands: ['opensip fit --check typescript-directive-hygiene'],
+          notes: ['Rerun the directive hygiene check after applying.'],
+        },
+        target: {
+          filePath: 'src/example.ts',
+          line: 3,
+          expectedText: '@ts-ignore',
+          replacementText: '@ts-expect-error',
+        },
+      },
+    ]);
+  });
+
   it('omits repair when absent (forward-compat)', () => {
     const signal = createSignal({
       source: 'fit',

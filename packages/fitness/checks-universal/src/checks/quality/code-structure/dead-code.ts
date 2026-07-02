@@ -120,20 +120,56 @@ function processDependencies(
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
 
-  for (const dep of [...(issue.dependencies ?? []), ...(issue.devDependencies ?? [])]) {
-    const depName = dep.name ?? 'unknown';
-    violations.push({
-      line: dep.line ?? 1,
-      message: `Unused dependency '${depName}'`,
-      severity: 'warning',
-      type: 'unused-dependency',
-      suggestion: `Remove '${depName}' from package.json dependencies with 'pnpm remove ${depName}'`,
-      match: depName,
-      // Use the actual package.json path from Knip's issue, not the project root.
-      // In a monorepo, each workspace has its own package.json — pointing to the
-      // root masked which sub-package owned the unused dep.
-      filePath,
-    });
+  for (const dependencySection of ['dependencies', 'devDependencies'] as const) {
+    for (const dep of issue[dependencySection] ?? []) {
+      const depName = dep.name ?? 'unknown';
+      violations.push({
+        line: dep.line ?? 1,
+        message: `Unused dependency '${depName}'`,
+        severity: 'warning',
+        type: 'unused-dependency',
+        suggestion: `Remove '${depName}' from package.json dependencies with 'pnpm remove ${depName}'`,
+        match: depName,
+        // Use the actual package.json path from Knip's issue, not the project root.
+        // In a monorepo, each workspace has its own package.json — pointing to the
+        // root masked which sub-package owned the unused dep.
+        filePath,
+        repair: {
+          repairKind: 'manual',
+          autofixable: true,
+          confidence: 0.85,
+          patchHint: {
+            kind: 'structured',
+            summary: `Remove '${depName}' from package.json ${dependencySection}`,
+            target: filePath,
+          },
+          actions: [
+            {
+              id: 'remove-unused-dependency',
+              kind: 'package-json-remove-dependency',
+              title: `Remove unused dependency '${depName}'`,
+              autofixable: true,
+              confidence: 0.85,
+              patchHint: {
+                kind: 'structured',
+                summary: `Remove '${depName}' from package.json ${dependencySection}`,
+                target: filePath,
+              },
+              verification: {
+                commands: ['pnpm install --lockfile-only', 'pnpm typecheck'],
+                notes: ['Review lockfile changes before committing.'],
+              },
+              target: {
+                filePath,
+                line: dep.line ?? 1,
+                packageName: depName,
+                dependencySection,
+              },
+            },
+          ],
+        },
+      });
+    }
   }
 
   for (const dep of issue.unlisted ?? []) {
