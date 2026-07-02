@@ -166,6 +166,7 @@ describe('createCapturingContext', () => {
 
     expect(capture.getEnvelopeStats()).toBeUndefined();
     await capture.context.deliverSignals(first, { cwd: '/x' });
+    expect(capture.getEnvelope()).toBe(first);
     expect(capture.getEnvelopeStats()).toEqual({
       verdict: first.verdict,
       findings: first.signals.length,
@@ -173,6 +174,7 @@ describe('createCapturingContext', () => {
 
     capture.context.emitEnvelope(second);
     expect(emitEnvelope).toHaveBeenCalledWith(second);
+    expect(capture.getEnvelope()).toBe(second);
     expect(capture.getEnvelopeStats()).toEqual({
       verdict: second.verdict,
       findings: second.signals.length,

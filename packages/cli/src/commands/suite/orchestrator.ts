@@ -16,8 +16,10 @@ import { assembleOptsFromSpec } from '../assemble-opts.js';
 import { dispatchOutput } from '../mount-command-spec.js';
 
 import { createCapturingContext } from './capturing-context.js';
+import { buildReviewBrief } from './review-brief-builder.js';
 import { validateSuite, type ValidatedSuite, type ValidatedSuiteStep } from './validate-suite.js';
 
+import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
 import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
 
@@ -53,7 +55,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     stepCount: suite.steps.length,
   });
 
-  const steps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
+  const internalSteps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
     runStepsSerially({
       suite,
       suiteRunId,
@@ -62,9 +64,24 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
       suiteOpts: input.suiteOpts,
     }),
   );
+  const steps = internalSteps.map((step) => step.summary);
   const exitCode = Math.max(0, ...steps.map((step) => step.exitCode));
   const aggregate = deriveSuiteAggregate(steps);
+  const reviewBrief = buildReviewBrief({
+    suite: suite.name,
+    suiteRunId,
+    steps: internalSteps,
+  });
   const durationMs = Math.max(0, performance.now() - started);
+
+  log.info?.({
+    evt: 'cli.suite.brief.built',
+    suite: suite.name,
+    suiteRunId,
+    verdict: reviewBrief.verdict,
+    risks: reviewBrief.topRisks.length,
+    degraded: reviewBrief.degraded.length,
+  });
 
   log.info?.({
     evt: 'cli.suite.run.complete',
@@ -83,6 +100,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     durationMs,
     aggregate,
     steps,
+    reviewBrief,
   };
 }
 
@@ -124,8 +142,8 @@ async function runStepsSerially(args: {
   readonly ctx: ToolCliContext;
   readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
-}): Promise<SuiteStepSummary[]> {
-  const summaries: SuiteStepSummary[] = [];
+}): Promise<SuiteStepReviewInput[]> {
+  const summaries: SuiteStepReviewInput[] = [];
   let chain = Promise.resolve();
 
   for (const step of args.suite.steps) {
@@ -154,7 +172,7 @@ async function runStep(args: {
   readonly ctx: ToolCliContext;
   readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
-}): Promise<SuiteStepSummary> {
+}): Promise<SuiteStepReviewInput> {
   const started = performance.now();
   const bound = bindToolCliContext(args.step.tool, args.ctx);
   const capture = createCapturingContext(bound);
@@ -279,7 +297,7 @@ async function runStep(args: {
         }),
   });
 
-  return {
+  const summary: SuiteStepSummary = {
     tool: args.step.tool.metadata.name,
     stableId: args.step.tool.metadata.id,
     command: args.step.spec.name,
@@ -287,6 +305,12 @@ async function runStep(args: {
     durationMs,
     ...(errorMessage === undefined ? {} : { error: errorMessage }),
     ...(verdict === undefined ? {} : { verdict }),
+  };
+  const capturedEnvelope = capture.getEnvelope();
+  return {
+    stepIndex: args.step.index,
+    summary,
+    ...(capturedEnvelope === undefined ? {} : { capturedEnvelope }),
   };
 }
 

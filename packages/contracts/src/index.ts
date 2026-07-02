@@ -45,6 +45,32 @@ export type {
 } from './signal-envelope.js';
 export { buildSignalEnvelope, DEFAULT_BASELINE_IDENTITY } from './signal-envelope.js';
 
+export type {
+  DeriveReviewBriefVerdictInput,
+  ReviewBrief,
+  ReviewBriefBaselineDelta,
+  ReviewBriefBlastRadius,
+  ReviewBriefDegradation,
+  ReviewBriefRecommendedAction,
+  ReviewBriefRisk,
+  ReviewBriefSignalRef,
+  ReviewBriefVerdict,
+  ReviewBriefVersion,
+} from './review-brief.js';
+export {
+  REVIEW_BRIEF_VERSION,
+  compareReviewBriefRisks,
+  deriveReviewBriefVerdict,
+  reviewBriefBaselineDeltaSchema,
+  reviewBriefBlastRadiusSchema,
+  reviewBriefDegradationSchema,
+  reviewBriefRecommendedActionSchema,
+  reviewBriefRepairSchema,
+  reviewBriefRiskSchema,
+  reviewBriefSchema,
+  reviewBriefSignalRefSchema,
+} from './review-brief.js';
+
 // Command result types (the CommandResult union + per-command variants)
 export type {
   CommandResult,

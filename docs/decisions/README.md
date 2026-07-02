@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0110](ADR-0110-host-owned-review-brief-contract.md) — Review briefs are a versioned contract in `@opensip-cli/contracts` but are built by the CLI host after suite steps finish; tools continue to emit `SignalEnvelope`s and never own cross-tool review aggregation.
 - [ADR-0109](ADR-0109-mcp-first-agent-guidance-init-refresh.md) — Agent-facing OpenSIP guidance must route existing-result, finding, session, and graph questions through MCP first; repeat `opensip init` refreshes managed guidance and `.gitignore` without rewriting config/examples unless `--keep` or `--remove` is explicit.
 - [ADR-0108](ADR-0108-graph-cache-key-includes-resolution-mode.md) — Graph adapter cache keys must include `resolutionMode` (the `CacheKeyInput` MUST-fold contract; not invariant I-8, which is per-adapter prefix uniqueness); `makeConfigCacheKey` in graph-adapter-common appends or hashes mode alongside config-path hash.
 - [ADR-0107](ADR-0107-datastore-repository-only-boundary.md) — DataStore public barrel is repository-only; `DrizzleDataStore.db` moves behind `@internal` subpath for sibling persistence packages; extends ADR-0056 R18.

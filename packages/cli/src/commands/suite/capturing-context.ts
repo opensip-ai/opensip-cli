@@ -26,8 +26,24 @@ export interface StepCapture {
    * emit an envelope, which is distinct from an envelope with zero findings.
    */
   readonly getEnvelopeStats: () => StepEnvelopeStats | undefined;
+  /**
+   * Last emitted full envelope for host-owned aggregate projections. The public
+   * suite step summary stays count-only; the orchestrator consumes this internal
+   * value before returning the final command result.
+   */
+  readonly getEnvelope: () => SignalEnvelope | undefined;
   readonly signalDeliveries: readonly SignalDeliveryResult[];
   readonly context: ToolCliContext;
+}
+
+function captureEnvelope(envelope: unknown): SignalEnvelope | undefined {
+  const maybeEnvelope = envelope as Partial<SignalEnvelope> | undefined;
+  if (maybeEnvelope?.schemaVersion !== 2) return undefined;
+  if (typeof maybeEnvelope.tool !== 'string') return undefined;
+  if (typeof maybeEnvelope.runId !== 'string') return undefined;
+  if (maybeEnvelope.verdict?.summary === undefined) return undefined;
+  if (!Array.isArray(maybeEnvelope.signals)) return undefined;
+  return maybeEnvelope as SignalEnvelope;
 }
 
 function captureEnvelopeStats(envelope: unknown): StepEnvelopeStats | undefined {
@@ -49,6 +65,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
   // single source of truth for the step's verdict.
   let exitCode: number | undefined;
   let lastEnvelopeStats: StepEnvelopeStats | undefined;
+  let lastEnvelope: SignalEnvelope | undefined;
   const signalDeliveries: SignalDeliveryResult[] = [];
   const context = Object.defineProperties(
     {},
@@ -82,6 +99,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
         const result = await base.deliverSignals(envelope, opts);
         signalDeliveries.push(result);
         lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
+        lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
         // Mirror the host's `deliverEnvelope` exit precedence
         // (`bootstrap/deliver-envelope.ts` → `deriveReportExitDecision`). The host
         // applies the findings/report exit through ITS OWN `outputPlane.setExitCode`,
@@ -110,6 +128,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
     emitEnvelope: {
       value: (envelope: Parameters<ToolCliContext['emitEnvelope']>[0]) => {
         lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
+        lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
         base.emitEnvelope(envelope);
       },
     },
@@ -118,6 +137,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
   return {
     getExitCode: () => exitCode,
     getEnvelopeStats: () => lastEnvelopeStats,
+    getEnvelope: () => lastEnvelope,
     signalDeliveries,
     context,
   };

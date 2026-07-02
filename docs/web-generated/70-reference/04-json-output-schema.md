@@ -37,7 +37,8 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 
 `opensip suite run <name> --json` emits a `CommandOutcome` whose `.data` is a
 `SuiteRunResult` ([ADR-0093](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0093-host-owned-suite-plane.md),
-[ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md)).
+[ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md),
+[ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0110-host-owned-review-brief-contract.md)).
 The suite exit code remains the worst step exit code. The aggregate and
 per-step verdict fields are additive; older fields keep their names and types.
 
@@ -95,7 +96,56 @@ per-step verdict fields are additive; older fields keep their names and types.
         "durationMs": 490,
         "error": "scenario faulted"
       }
-    ]
+    ],
+    "reviewBrief": {
+      "version": 1,
+      "suite": "security",
+      "suiteRunId": "suite_3c4e8a1b9d21",
+      "verdict": "fail",
+      "changedFiles": null,
+      "topRisks": [
+        {
+          "source": "graph",
+          "ruleId": "graph:cycle",
+          "message": "Cycle crosses package boundary",
+          "severity": "high",
+          "file": "src/a.ts",
+          "line": 42,
+          "column": 0,
+          "isNew": false,
+          "signalRef": {
+            "tool": "graph",
+            "suiteRunId": "suite_3c4e8a1b9d21",
+            "stepIndex": 1,
+            "runId": "GRAPH_abc",
+            "fingerprint": "graph:cycle|src/a.ts|42|0",
+            "signalIndex": 0
+          }
+        }
+      ],
+      "newFindings": [],
+      "baselineDelta": {
+        "available": false,
+        "added": 0,
+        "removed": 0,
+        "unchanged": 0
+      },
+      "degraded": [
+        {
+          "source": "sim",
+          "code": "missing-envelope",
+          "stepIndex": 2,
+          "reason": "Suite step 'sim' did not emit a SignalEnvelope."
+        }
+      ],
+      "recommendedActions": [
+        {
+          "priority": "high",
+          "source": "suite",
+          "message": "Review and fix the error-severity top risks before merging."
+        }
+      ]
+    }
   }
 }
 ```
@@ -111,6 +161,7 @@ per-step verdict fields are additive; older fields keep their names and types.
 | `durationMs` | number | yes | Host-measured suite duration. |
 | `aggregate` | object | no | Additive roll-up over step summaries. Present on current CLI output; optional for compatibility. |
 | `steps` | `SuiteStepSummary[]` | yes | One summary per configured step, in execution order. |
+| `reviewBrief` | `ReviewBrief` | no | Host-owned v1 review aggregate. Present on current suite runs; optional for compatibility. |
 
 ### `SuiteAggregate`
 
@@ -138,6 +189,34 @@ per-step verdict fields are additive; older fields keep their names and types.
 `steps[].verdict` contains only `passed`, `errors`, `warnings`, and `findings`
 (`SignalEnvelope.signals.length`). It intentionally excludes signal messages,
 file paths, symbols, match snippets, and raw scanner output.
+
+### `ReviewBrief`
+
+The review brief is built by the CLI host after all suite steps complete. It is
+a bounded projection over captured `SignalEnvelope`s, not a replacement for raw
+per-tool output.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `version` | `1` | yes | Review-brief contract version. |
+| `suite` | string | yes | Suite name. |
+| `suiteRunId` | string | yes | Host-generated suite id, repeated in every `signalRef`. |
+| `verdict` | `"pass"` \| `"warn"` \| `"fail"` | yes | `fail` for error-severity risks, `warn` for warning-only risks or degraded evidence, `pass` when clean. |
+| `changedFiles` | number \| `null` | yes | Changed-file count when trustworthy; `null` when unavailable. |
+| `topRisks` | `ReviewBriefRisk[]` | yes | Deterministically ranked current risks, capped by the host. |
+| `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. |
+| `baselineDelta` | object | yes | `{ available, added, removed, unchanged }`; `available:false` means the suite did not capture compare evidence. |
+| `degraded` | object[] | yes | Evidence-quality notes such as missing envelopes, step faults, missing fingerprints, or failing verdicts without signals. |
+| `recommendedActions` | object[] | yes | Short host-generated next steps for agents and CI annotations. |
+
+Each `topRisks[]` item carries `source`, `ruleId`, `message`, `severity`, `file`,
+optional `line`/`column`, `isNew`, optional `repair`, optional `blastRadius`,
+and `signalRef`. `signalRef` preserves provenance back to the original evidence:
+`tool`, `suiteRunId`, `stepIndex`, optional `runId`, optional `fingerprint`, and
+`signalIndex`.
+
+There is no suite-level review-brief SARIF output in v1. Use each source tool's
+existing SARIF path when SARIF is required.
 
 ## The `SignalEnvelope`
 

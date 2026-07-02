@@ -1,3 +1,5 @@
+import type { ReviewBrief } from '../review-brief.js';
+
 export interface SuiteStepSummary {
   readonly tool: string;
   readonly stableId: string;
@@ -32,6 +34,7 @@ export interface SuiteRunResult {
     readonly warnings: number;
   };
   readonly steps: readonly SuiteStepSummary[];
+  readonly reviewBrief?: ReviewBrief;
 }
 
 export interface SuiteListStep {

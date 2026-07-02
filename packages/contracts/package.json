@@ -37,7 +37,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-cli/core": "workspace:*"
+    "@opensip-cli/core": "workspace:*",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "commander": "^14.0.0 || ^15.0.0"

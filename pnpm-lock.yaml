@@ -374,6 +374,9 @@ importers:
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../core
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -5748,6 +5751,7 @@ snapshots:
   '@opensip-cli/contracts@file:packages/contracts(commander@15.0.0)':
     dependencies:
       '@opensip-cli/core': file:packages/core
+      zod: 4.4.3
     optionalDependencies:
       commander: 15.0.0
 

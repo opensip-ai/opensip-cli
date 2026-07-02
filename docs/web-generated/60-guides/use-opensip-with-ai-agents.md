@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-30
+last_verified: 2026-07-02
 release: v0.2.4
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
@@ -19,6 +19,7 @@ related-docs:
   - ../../decisions/ADR-0085-change-detection-substrate.md
   - ../../decisions/ADR-0086-signal-repair-metadata.md
   - ../../decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md
+  - ../../decisions/ADR-0110-host-owned-review-brief-contract.md
 ---
 # Use OpenSIP with AI agents
 
@@ -42,6 +43,19 @@ opensip agent-catalog --json
 
 The catalog lists tool entry points, common patterns, agent recipes, and notes
 about `--filter` / `--raw` / `graph impact`.
+
+For configured multi-tool suites, read the host-owned review brief before
+drilling into individual tool payloads:
+
+```bash
+opensip suite run security --json
+```
+
+The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
+baseline/degradation notes, and `signalRef` pointers back to the source
+envelopes. It is the interim read-side review surface until the MCP
+`review_change` tool lands; do not re-run hidden analysis or inspect raw logs to
+answer a question that the brief/session evidence already answers.
 
 When the user says a tool **already reported findings**, use the OpenSIP MCP
 result tools first: `get_latest_findings`, `show_run`, or `list_runs`. If MCP is

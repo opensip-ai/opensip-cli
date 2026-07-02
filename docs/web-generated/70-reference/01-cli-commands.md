@@ -915,7 +915,7 @@ opensip suite add security --tool fitness --command fit --arg recipe=security
 |---|---|---|
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
-| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts and per-step verdict counts when a step emitted an envelope. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -933,7 +933,22 @@ tools must scan different roots or target sets.
 Each `data.steps[].verdict` is present only when that step emitted a
 `SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
 `findings`) so suite summaries do not leak signal messages, file paths, symbols,
-or match content. See [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md).
+or match content.
+
+Current suite JSON also includes `data.reviewBrief`, a versioned v1 aggregate
+that ranks current signals into one review verdict. The brief is intentionally a
+bounded projection: `topRisks[]` and `newFindings[]` carry source tool, rule,
+message, location, severity, optional repair metadata, and `signalRef`
+(`tool`, `suiteRunId`, `stepIndex`, `runId`, `fingerprint`, `signalIndex`) so an
+agent or CI job can replay the original evidence. `degraded[]` records missing
+envelopes, faulted steps, missing fingerprints, or failing verdicts without
+signals. `baselineDelta.available` is `false` until a suite step exposes
+baseline-compare evidence; in that case findings are not labeled new unless the
+source signal explicitly carries baseline state. Suite-level brief SARIF is not
+emitted in this phase; use the source tools' existing SARIF output.
+
+See [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md)
+and [ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0110-host-owned-review-brief-contract.md).
 
 **See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites),
 [`04-json-output-schema.md#suite-run-results`](/docs/opensip-cli/70-reference/04-json-output-schema/#suite-run-results).

@@ -492,8 +492,50 @@ describe('suite views', () => {
           error: 'gate failed',
         },
       ],
+      reviewBrief: {
+        version: 1,
+        suite: 'security',
+        suiteRunId: 'run-1',
+        verdict: 'fail',
+        changedFiles: null,
+        baselineDelta: { available: false, added: 0, removed: 0, unchanged: 0 },
+        topRisks: [
+          {
+            source: 'fit',
+            ruleId: 'fixture-rule',
+            message: 'Fix the issue',
+            severity: 'high',
+            file: 'src/a.ts',
+            line: 2,
+            column: 0,
+            isNew: false,
+            signalRef: {
+              tool: 'fit',
+              suiteRunId: 'run-1',
+              stepIndex: 0,
+              runId: 'FIT_1',
+              fingerprint: 'fp-1',
+              signalIndex: 0,
+            },
+          },
+        ],
+        newFindings: [],
+        degraded: [
+          {
+            source: 'graph',
+            code: 'missing-envelope',
+            reason: 'No envelope was emitted.',
+            stepIndex: 1,
+          },
+        ],
+        recommendedActions: [],
+      },
     });
     expect(run).toContain('Suite security');
+    expect(run).toContain('Review: FAIL');
+    expect(run).toContain('fixture-rule');
+    expect(run).toContain('src/a.ts:2:0');
+    expect(run).toContain('missing-envelope');
     expect(run).toContain('gate failed');
     expect(run).toContain('-');
 
@@ -550,6 +592,70 @@ describe('suite views', () => {
         suites: [],
       }),
     ).toContain('No suites configured');
+  });
+
+  it('renders pass and warn review brief states', () => {
+    const pass = text({
+      type: 'suite-run',
+      suite: 'clean',
+      suiteRunId: 'run-clean',
+      exitCode: 0,
+      durationMs: 10,
+      steps: [],
+      reviewBrief: {
+        version: 1,
+        suite: 'clean',
+        suiteRunId: 'run-clean',
+        verdict: 'pass',
+        changedFiles: null,
+        topRisks: [],
+        newFindings: [],
+        baselineDelta: { available: false, added: 0, removed: 0, unchanged: 0 },
+        degraded: [],
+        recommendedActions: [],
+      },
+    });
+    expect(pass).toContain('Review: PASS');
+    expect(pass).toContain('No review risks found.');
+
+    const warn = text({
+      type: 'suite-run',
+      suite: 'warnings',
+      suiteRunId: 'run-warn',
+      exitCode: 0,
+      durationMs: 10,
+      steps: [],
+      reviewBrief: {
+        version: 1,
+        suite: 'warnings',
+        suiteRunId: 'run-warn',
+        verdict: 'warn',
+        changedFiles: null,
+        topRisks: [
+          {
+            source: 'graph',
+            ruleId: 'wide-function',
+            message: 'Function is wide',
+            severity: 'medium',
+            file: 'src/wide.ts',
+            isNew: true,
+            signalRef: {
+              tool: 'graph',
+              suiteRunId: 'run-warn',
+              stepIndex: 0,
+              signalIndex: 0,
+            },
+          },
+        ],
+        newFindings: [],
+        baselineDelta: { available: true, added: 1, removed: 0, unchanged: 0 },
+        degraded: [],
+        recommendedActions: [],
+      },
+    });
+    expect(warn).toContain('Review: WARN');
+    expect(warn).toContain('wide-function');
+    expect(warn).toContain('yes');
   });
 });
 

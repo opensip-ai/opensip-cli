@@ -75,6 +75,7 @@ function signalEnvelope(input: {
     message: input.message ?? `fixture finding ${index}`,
     filePath: input.filePath ?? 'src/fixture.ts',
     metadata: {},
+    fingerprint: `fixture-rule|${input.filePath ?? 'src/fixture.ts'}|${index + 1}|0`,
     createdAt: '2026-01-01T00:00:00.000Z',
   }));
   return {
@@ -334,6 +335,23 @@ describe('runSuite', () => {
       stableId: EXTERNAL_TOOL_ID,
       verdict: { passed: false, errors: 1, warnings: 0, findings: 1 },
     });
+    expect(result.reviewBrief).toMatchObject({
+      version: 1,
+      suite: 'security',
+      verdict: 'fail',
+      topRisks: [
+        {
+          source: 'fit',
+          ruleId: 'fixture-rule',
+          severity: 'high',
+          signalRef: {
+            suiteRunId: result.suiteRunId,
+            stepIndex: 0,
+            signalIndex: 0,
+          },
+        },
+      ],
+    });
   });
 
   it('summarizes a mixed bundled/external suite without collapsing outcome classes', async () => {
@@ -399,6 +417,28 @@ describe('runSuite', () => {
       errors: 2,
       warnings: 1,
     });
+    expect(result.reviewBrief).toEqual(
+      expect.objectContaining({
+        version: 1,
+        suite: 'mixed',
+        verdict: 'fail',
+        baselineDelta: { available: false, added: 0, removed: 0, unchanged: 0 },
+      }),
+    );
+    expect(result.reviewBrief?.topRisks).toHaveLength(3);
+    expect(result.reviewBrief?.topRisks.map((risk) => risk.severity)).toEqual([
+      'high',
+      'high',
+      'low',
+    ]);
+    expect(result.reviewBrief?.degraded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'missing-envelope', stepIndex: 3 }),
+        expect.objectContaining({ code: 'step-fault', stepIndex: 4 }),
+        expect.objectContaining({ code: 'missing-envelope', stepIndex: 4 }),
+        expect.objectContaining({ code: 'missing-envelope', stepIndex: 5 }),
+      ]),
+    );
     expect(result.steps[0]).toMatchObject({
       command: 'empty',
       exitCode: EXIT_CODES.SUCCESS,
@@ -502,10 +542,21 @@ describe('runSuite', () => {
         'passed',
         'warnings',
       ]);
+      expect(result.reviewBrief?.topRisks[0]).toMatchObject({
+        message: secretMessage,
+        file: secretPath,
+        signalRef: {
+          suiteRunId: result.suiteRunId,
+          stepIndex: 0,
+          signalIndex: 0,
+        },
+      });
       const serialized = JSON.stringify(result);
-      expect(serialized).not.toContain(secretMessage);
-      expect(serialized).not.toContain(secretPath);
-      expect(serialized).not.toContain('fixture-rule');
+      expect(JSON.stringify(result.steps)).not.toContain(secretMessage);
+      expect(JSON.stringify(result.steps)).not.toContain(secretPath);
+      expect(serialized).toContain(secretMessage);
+      expect(serialized).toContain(secretPath);
+      expect(serialized).toContain('fixture-rule');
     } finally {
       stdoutSpy.mockRestore();
     }

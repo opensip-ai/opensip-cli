@@ -120,6 +120,7 @@ describe('buildAgentCatalog', () => {
         'simulation',
         'yagni',
         'third-party-tool',
+        'suite run',
         'sessions list',
         'sessions show',
         'agent-catalog',
@@ -208,6 +209,7 @@ describe('buildAgentCatalog', () => {
       const tierOf = (command: string) => c.entryPoints.find((e) => e.command === command)?.tier;
       expect(tierOf('fitness')).toBe('tool');
       expect(tierOf('graph')).toBe('tool');
+      expect(tierOf('suite run')).toBe('platform');
       expect(tierOf('sessions list')).toBe('platform');
       expect(tierOf('sessions show')).toBe('platform');
       expect(tierOf('agent-catalog')).toBe('platform');
@@ -254,6 +256,7 @@ describe('buildAgentCatalog', () => {
       expect(p.example).toMatch(/^opensip /);
     }
     expect(c.outputShapes.signalEnvelope).toMatch(/SignalEnvelope|schemaVersion/);
+    expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(c.outputShapes.sessionReplay).toMatch(/fidelity/);
     expect(c.outputShapes.history).toMatch(/history/);
     expect(c.notes.length).toBeGreaterThan(0);
@@ -263,6 +266,7 @@ describe('buildAgentCatalog', () => {
     const c = buildAgentCatalog({ tools: await makeRegistry() });
     expect(c.commonPatterns.some((p) => p.name.toLowerCase().includes('read-latest'))).toBe(true);
     expect(c.commonPatterns.some((p) => p.example.includes('agent-fast'))).toBe(true);
+    expect(c.commonPatterns.some((p) => p.example.includes('suite run'))).toBe(true);
     expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
     expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
   });

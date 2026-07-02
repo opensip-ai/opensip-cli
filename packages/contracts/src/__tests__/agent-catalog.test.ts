@@ -29,11 +29,16 @@ describe('buildAgentCatalog', () => {
     const catalog = buildAgentCatalog();
     expect(catalog.version).toBe('1.0.0');
     expect(catalog.entryPoints.map((entry) => entry.command)).toEqual([
+      'suite run',
       'sessions list',
       'sessions show',
       'agent-catalog',
     ]);
     expect(catalog.commonPatterns.length).toBeGreaterThan(0);
+    expect(catalog.commonPatterns.some((pattern) => pattern.example.includes('suite run'))).toBe(
+      true,
+    );
+    expect(catalog.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(catalog.notes.length).toBeGreaterThan(0);
   });
 
