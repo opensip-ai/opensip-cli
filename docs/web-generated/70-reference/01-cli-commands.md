@@ -414,7 +414,7 @@ opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
 | `get_architecture` | High-level shape: function/edge counts, languages, the most-coupled packages, and the highest blast-radius hotspots. A cheap first call to orient. |
 | `refresh_graph` | Rebuild the catalog from the working tree — the **only** state-changing tool. EXPENSIVE; see freshness below. |
 
-### Result tools (4 — replay stored runs, never re-run)
+### Result and review tools (6 — replay stored runs, never re-run)
 
 | Tool | Purpose |
 |------|---------|
@@ -422,8 +422,10 @@ opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
 | `list_runs` | List recent stored runs (`fit`/`graph`/`yagni`/`sim`) as lean pointers — id, tool, timing, score/passed, replay command. |
 | `show_run` | Replay a stored run by id, or `"latest"` (with `tool`); same `filters`/`raw` shape as `opensip sessions show`. |
 | `get_latest_findings` | The findings from the most recent run of a tool, filterable by `severity`. |
+| `review_change` | Rebuild the v1 `ReviewBrief` from persisted suite step sessions. Inputs: `suiteRunId`, `suite`, `files`, and `limit`. Includes graph freshness and source session ids; does not refresh the graph. |
+| `compare_to_baseline` | Compare a replayed stored run (`tool`, optional `ref`) to that tool's stored baseline fingerprints. Returns added/unchanged/resolved counts, bounded finding details, and missing-baseline degradation. |
 
-The four result tools **replay persisted sessions only** — they never re-run
+The six result/review tools **replay persisted sessions only** — they never re-run
 `fit`/`graph`/`sim`/`yagni`. They are the preferred first source for existing
 run/finding/history questions. Agents should not grep `.runtime/logs`, read
 `datastore.sqlite` directly, or re-run a tool to answer a stored-result question

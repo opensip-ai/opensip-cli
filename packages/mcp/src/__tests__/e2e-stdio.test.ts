@@ -219,15 +219,17 @@ afterAll(() => {
 });
 
 describe('MCP e2e over real stdio', () => {
-  it('handshakes and lists all 13 tools', async () => {
+  it('handshakes and lists all 15 tools', async () => {
     const conn = await connect(fixtureA);
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(13);
+      expect(tools.tools).toHaveLength(15);
       const names = tools.tools.map((t) => t.name).sort();
       expect(names).toContain('get_symbol');
       expect(names).toContain('who_calls');
       expect(names).toContain('get_latest_findings');
+      expect(names).toContain('review_change');
+      expect(names).toContain('compare_to_baseline');
       expect(names).toContain('refresh_graph');
     } finally {
       await conn.client.close();

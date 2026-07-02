@@ -53,9 +53,10 @@ opensip suite run audit --changed --json
 
 The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
 baseline/degradation notes, and `signalRef` pointers back to the source
-envelopes. It is the interim read-side review surface until the MCP
-`review_change` tool lands; do not re-run hidden analysis or inspect raw logs to
-answer a question that the brief/session evidence already answers.
+envelopes. When MCP is available, prefer the `review_change` tool for the same
+read-side review shape over persisted suite evidence; do not re-run hidden
+analysis or inspect raw logs to answer a question that the brief/session
+evidence already answers.
 
 When the user says a tool **already reported findings**, use the OpenSIP MCP
 result tools first: `get_latest_findings`, `show_run`, or `list_runs`. If MCP is
@@ -123,8 +124,9 @@ Projects can override built-in recipes in `opensip-cli.config.yml`.
 
 For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
 register `opensip mcp` as a stdio server instead of shelling out for every graph
-or findings query. The server exposes 13 tools: graph traversal (`who_calls`,
-`blast_radius`, …) and result replay (`get_latest_findings`, `show_run`, …).
+or findings query. The server exposes 15 tools: graph traversal (`who_calls`,
+`blast_radius`, …), result replay (`get_latest_findings`, `show_run`, …), and
+review helpers (`review_change`, `compare_to_baseline`).
 
 For existing-result questions, MCP is the first source of truth. Do not grep
 `.runtime/logs`, read `datastore.sqlite` directly, or re-run `fit` / `graph` /

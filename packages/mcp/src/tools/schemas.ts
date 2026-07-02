@@ -72,5 +72,14 @@ export const limit = () => z.number().int().positive().max(MAX_LIMIT).optional()
 /** A registered-tool id (validated against the live registry in the handler). */
 export const toolId = () => z.string().min(1).max(64);
 
+/** A stored suite run id. */
+export const suiteRunId = () => z.string().min(1).max(128);
+
+/** A configured suite name. */
+export const suiteName = () => z.string().min(1).max(128);
+
+/** A stored session reference or the `latest` sentinel. */
+export const sessionRef = () => z.string().min(1).max(128);
+
 /** Severity filter for `get_latest_findings`. */
 export const severity = () => z.enum(['errors', 'warnings', 'all']).optional();

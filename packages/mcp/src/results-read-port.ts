@@ -12,9 +12,13 @@
 
 import type { McpReadError } from './mcp-error.js';
 import type {
+  CompareToBaselineOptions,
   LatestFindingsOptions,
+  McpBaselineComparisonData,
   McpFinding,
+  McpReviewChangeData,
   McpResultReplay,
+  ReviewChangeOptions,
   RunSummary,
   ShowRunData,
 } from './result-dto.js';
@@ -51,4 +55,12 @@ export interface ResultsReadPort {
   latestFindings(
     opts: LatestFindingsOptions,
   ): Promise<Result<McpResultReplay<readonly McpFinding[]>, McpReadError>>;
+  /** Rebuild a v1 review brief from persisted suite sessions — never re-run. */
+  reviewChange(
+    opts: ReviewChangeOptions,
+  ): Promise<Result<McpResultReplay<McpReviewChangeData>, McpReadError>>;
+  /** Compare a replayed stored run to the stored baseline rows — never re-run. */
+  compareToBaseline(
+    opts: CompareToBaselineOptions,
+  ): Promise<Result<McpResultReplay<McpBaselineComparisonData>, McpReadError>>;
 }

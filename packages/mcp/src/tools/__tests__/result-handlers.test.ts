@@ -9,23 +9,29 @@
 import { err, ok } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import { registerCompareToBaseline } from '../compare-to-baseline.js';
 import { registerGetAgentCatalog } from '../get-agent-catalog.js';
 import { registerGetLatestFindings } from '../get-latest-findings.js';
 import { registerListRuns } from '../list-runs.js';
+import { registerReviewChange } from '../review-change.js';
 import { registerShowRun } from '../show-run.js';
 
 import type { McpReadError } from '../../mcp-error.js';
 import type {
+  CompareToBaselineOptions,
   LatestFindingsOptions,
+  McpBaselineComparisonData,
   McpFinding,
+  McpReviewChangeData,
   McpResultReplay,
+  ReviewChangeOptions,
   RunSummary,
   ShowRunData,
 } from '../../result-dto.js';
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from '../../results-read-port.js';
 import type { CallToolResult, McpStdioServer } from '../../server.js';
 import type { McpToolDeps } from '../types.js';
-import type { AgentCatalog } from '@opensip-cli/contracts';
+import type { AgentCatalog, ReviewBrief } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
 
 type Handler = (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
@@ -53,12 +59,36 @@ function fakeResults(over: Partial<ResultsReadPort>): ResultsReadPort {
     listRuns: () => ok([]),
     showRun: () => Promise.resolve(err({ code: 'x', message: 'x' })),
     latestFindings: () => Promise.resolve(err({ code: 'x', message: 'x' })),
+    reviewChange: () => Promise.resolve(err({ code: 'x', message: 'x' })),
+    compareToBaseline: () => Promise.resolve(err({ code: 'x', message: 'x' })),
   };
   return { ...base, ...over };
 }
 
 function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])): McpToolDeps {
-  return { graph: {} as McpToolDeps['graph'], results, validToolIds };
+  return {
+    graph: {
+      freshness: () => ({ fresh: true, builtAt: '2026-07-02T00:00:00.000Z' }),
+    } as McpToolDeps['graph'],
+    results,
+    validToolIds,
+  };
+}
+
+function reviewBrief(over: Partial<ReviewBrief> = {}): ReviewBrief {
+  return {
+    version: 1,
+    suite: 'audit',
+    suiteRunId: 'suite-1',
+    verdict: 'pass',
+    changedFiles: null,
+    topRisks: [],
+    newFindings: [],
+    baselineDelta: { available: false, added: 0, removed: 0, unchanged: 0 },
+    degraded: [],
+    recommendedActions: [],
+    ...over,
+  };
 }
 
 // ── get_latest_findings ──────────────────────────────────────────────
@@ -125,6 +155,145 @@ describe('get_latest_findings handler', () => {
       ),
     );
     const out = parseResult(await handlers.get('get_latest_findings')!({ tool: 'fit' }));
+    expect(out.isError).toBe(true);
+    expect((out.body.error as McpReadError).code).toBe('not-found');
+  });
+});
+
+// ── review_change ───────────────────────────────────────────────────
+
+describe('review_change handler', () => {
+  it('forwards suite filters, files, limit, and graph freshness to the port', async () => {
+    let seen: ReviewChangeOptions | undefined;
+    const replay: McpResultReplay<McpReviewChangeData> = {
+      data: {
+        reviewBrief: reviewBrief(),
+        source: { suiteRunId: 'suite-1', suiteName: 'audit', sessionIds: ['fit-1'] },
+        freshness: {
+          graph: { fresh: true, builtAt: '2026-07-02T00:00:00.000Z' },
+          sessions: {
+            replayedAt: '2026-07-02T00:00:01.000Z',
+            replayedSessions: 1,
+            degradedSteps: 0,
+          },
+        },
+      },
+    };
+    const { server, handlers } = captureServer();
+    registerReviewChange(
+      server,
+      deps(
+        fakeResults({
+          reviewChange: (opts) => {
+            seen = opts;
+            return Promise.resolve(ok(replay));
+          },
+        }),
+      ),
+    );
+    const out = parseResult(
+      await handlers.get('review_change')!({
+        suiteRunId: 'suite-1',
+        suite: 'audit',
+        files: ['src/a.ts'],
+        limit: 5,
+      }),
+    );
+    expect(seen).toEqual({
+      suiteRunId: 'suite-1',
+      suite: 'audit',
+      files: ['src/a.ts'],
+      limit: 5,
+      graphFreshness: { fresh: true, builtAt: '2026-07-02T00:00:00.000Z' },
+    });
+    expect((out.body.data as McpReviewChangeData).reviewBrief.version).toBe(1);
+  });
+
+  it('surfaces the port err arm', async () => {
+    const { server, handlers } = captureServer();
+    registerReviewChange(
+      server,
+      deps(
+        fakeResults({
+          reviewChange: () => Promise.resolve(err({ code: 'not-found', message: 'no suite' })),
+        }),
+      ),
+    );
+    const out = parseResult(await handlers.get('review_change')!({ suiteRunId: 'missing' }));
+    expect(out.isError).toBe(true);
+    expect((out.body.error as McpReadError).code).toBe('not-found');
+  });
+});
+
+// ── compare_to_baseline ─────────────────────────────────────────────
+
+describe('compare_to_baseline handler', () => {
+  it('forwards tool/ref/limit/includeResolved to the port', async () => {
+    let seen: CompareToBaselineOptions | undefined;
+    const replay: McpResultReplay<McpBaselineComparisonData> = {
+      data: {
+        tool: 'fit',
+        baseline: { available: true, rowCount: 1 },
+        delta: { added: 1, resolved: 0, unchanged: 0, missingFingerprint: 0 },
+        addedFindings: [{ ruleId: 'r', message: 'm', severity: 'high' }],
+      },
+    };
+    const { server, handlers } = captureServer();
+    registerCompareToBaseline(
+      server,
+      deps(
+        fakeResults({
+          compareToBaseline: (opts) => {
+            seen = opts;
+            return Promise.resolve(ok(replay));
+          },
+        }),
+      ),
+    );
+    const out = parseResult(
+      await handlers.get('compare_to_baseline')!({
+        tool: 'fit',
+        ref: 'fit-1',
+        limit: 10,
+        includeResolved: true,
+      }),
+    );
+    expect(seen).toEqual({ tool: 'fit', ref: 'fit-1', limit: 10, includeResolved: true });
+    expect((out.body.data as McpBaselineComparisonData).delta.added).toBe(1);
+  });
+
+  it('rejects an unknown tool with a structured unknown-tool error (no port call)', async () => {
+    let called = false;
+    const { server, handlers } = captureServer();
+    registerCompareToBaseline(
+      server,
+      deps(
+        fakeResults({
+          compareToBaseline: () => {
+            called = true;
+            return Promise.resolve(ok({ data: {} as McpBaselineComparisonData }));
+          },
+        }),
+      ),
+    );
+    const out = parseResult(await handlers.get('compare_to_baseline')!({ tool: 'nope' }));
+    expect(out.isError).toBe(true);
+    expect((out.body.error as McpReadError).code).toBe('unknown-tool');
+    expect(called).toBe(false);
+  });
+
+  it('surfaces the port err arm', async () => {
+    const { server, handlers } = captureServer();
+    registerCompareToBaseline(
+      server,
+      deps(
+        fakeResults({
+          compareToBaseline: () =>
+            Promise.resolve(err({ code: 'not-found', message: 'no session' })),
+        }),
+      ),
+    );
+    const out = parseResult(await handlers.get('compare_to_baseline')!({ tool: 'fit' }));
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('not-found');
   });

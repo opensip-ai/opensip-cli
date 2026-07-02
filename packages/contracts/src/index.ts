@@ -48,6 +48,7 @@ export { buildSignalEnvelope, DEFAULT_BASELINE_IDENTITY } from './signal-envelop
 export type {
   DeriveReviewBriefVerdictInput,
   ReviewBrief,
+  ReviewBriefBaselineState,
   ReviewBriefBaselineDelta,
   ReviewBriefBlastRadius,
   ReviewBriefDegradation,
@@ -56,12 +57,18 @@ export type {
   ReviewBriefSignalRef,
   ReviewBriefVerdict,
   ReviewBriefVersion,
+  SignalToReviewBriefRiskInput,
 } from './review-brief.js';
 export {
   REVIEW_BRIEF_VERSION,
+  buildReviewBriefBaselineDelta,
+  buildReviewBriefRecommendedActions,
   compareReviewBriefRisks,
   deriveReviewBriefVerdict,
+  pushReviewBriefDegradation,
+  reviewBriefBaselineState,
   reviewBriefBaselineDeltaSchema,
+  reviewBriefBlastRadius,
   reviewBriefBlastRadiusSchema,
   reviewBriefDegradationSchema,
   reviewBriefRecommendedActionSchema,
@@ -69,6 +76,7 @@ export {
   reviewBriefRiskSchema,
   reviewBriefSchema,
   reviewBriefSignalRefSchema,
+  signalToReviewBriefRisk,
 } from './review-brief.js';
 
 // Command result types (the CommandResult union + per-command variants)

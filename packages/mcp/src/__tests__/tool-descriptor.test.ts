@@ -3,7 +3,7 @@
  *
  * Asserts the bundled tool descriptor (`mcp` identity, the single `mcp` command,
  * the `mcp-graph-adapter` capability registrar) and that `registerMcpTools`
- * mounts all 13 tools (9 graph + 4 result) through the server's register seam.
+ * mounts all 15 tools (9 graph + 6 result/review) through the server's register seam.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -29,7 +29,7 @@ describe('mcpTool descriptor', () => {
 });
 
 describe('registerMcpTools', () => {
-  it('mounts all 13 MCP tools (9 graph + 4 result) on the server', () => {
+  it('mounts all 15 MCP tools (9 graph + 6 result/review) on the server', () => {
     const names: string[] = [];
     const server = {
       register: (name: string) => {
@@ -45,7 +45,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(13);
+    expect(names).toHaveLength(15);
     expect(new Set(names)).toEqual(
       new Set([
         'search_symbols',
@@ -61,6 +61,8 @@ describe('registerMcpTools', () => {
         'list_runs',
         'show_run',
         'get_latest_findings',
+        'review_change',
+        'compare_to_baseline',
       ]),
     );
   });

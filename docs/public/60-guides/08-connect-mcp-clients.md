@@ -101,7 +101,7 @@ team standardizes in docs/onboarding.
 ### Verify
 
 1. Restart Cursor or reload MCP servers from Settings.
-2. Open the MCP panel — `opensip` should appear with **13 tools** (9 graph + 4 result).
+2. Open the MCP panel — `opensip` should appear with **15 tools** (9 graph + 6 result/review).
 3. Ask the agent: *"Use OpenSIP to call `get_architecture` and summarize the graph."*
 4. Ask a result replay question: *"Use OpenSIP MCP to show the latest `fit`
    findings before deciding whether to re-run fit."*

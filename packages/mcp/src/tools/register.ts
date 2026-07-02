@@ -10,21 +10,18 @@
 import { registerBlastRadius } from './blast-radius.js';
 import { registerCalleesOf } from './callees-of.js';
 import { registerFindDeadCode } from './find-dead-code.js';
-import { registerGetAgentCatalog } from './get-agent-catalog.js';
 import { registerGetArchitecture } from './get-architecture.js';
-import { registerGetLatestFindings } from './get-latest-findings.js';
 import { registerGetSymbol } from './get-symbol.js';
-import { registerListRuns } from './list-runs.js';
 import { registerRefreshGraph } from './refresh-graph.js';
+import { registerResultTools } from './register-result-tools.js';
 import { registerSearchSymbols } from './search-symbols.js';
-import { registerShowRun } from './show-run.js';
 import { registerTracePath } from './trace-path.js';
 import { registerWhoCalls } from './who-calls.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
 
-/** Register all 13 MCP tools (9 graph + 4 result) on `server`. */
+/** Register all 15 MCP tools (9 graph + 6 result/review) on `server`. */
 export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): void {
   // ── Graph tools (over GraphReadPort) ──────────────────────────────
   registerSearchSymbols(server, deps);
@@ -37,9 +34,5 @@ export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): voi
   registerGetArchitecture(server, deps);
   registerRefreshGraph(server, deps);
 
-  // ── Result/history tools (over ResultsReadPort — replay only) ─────
-  registerGetAgentCatalog(server, deps);
-  registerListRuns(server, deps);
-  registerShowRun(server, deps);
-  registerGetLatestFindings(server, deps);
+  registerResultTools(server, deps);
 }

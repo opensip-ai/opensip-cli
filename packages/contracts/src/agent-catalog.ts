@@ -273,7 +273,7 @@ export function buildAgentCatalog(
       {
         name: 'Read audit review brief',
         description:
-          'For PR review workflows, read the host-owned audit review brief before inspecting individual tool payloads.',
+          'For PR review workflows, use MCP review_change when available; fall back to the host-owned suite review brief over CLI JSON.',
         example: 'opensip suite run audit --changed --json',
       },
       {
@@ -305,7 +305,7 @@ export function buildAgentCatalog(
         'The canonical cross-tool currency (schemaVersion, tool, runId, verdict, units, signals). ' +
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
-        'For suite run: { type: "suite-run", suite, suiteRunId, aggregate, steps, reviewBrief: { version: 1, verdict, changedFiles, topRisks, newFindings, baselineDelta, degraded, recommendedActions } }',
+        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, aggregate, steps, reviewBrief: { version: 1, ... } }',
       sessionReplay:
         'For sessions show: { session: {id,tool,startedAt,completedAt,score,passed,...}, fidelity: "projection", envelope: SignalEnvelope, filtersApplied?, ...counts }',
       history:

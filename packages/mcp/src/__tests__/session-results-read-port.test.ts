@@ -22,7 +22,12 @@ import {
   type ToolShortId,
   type Signal,
 } from '@opensip-cli/core';
-import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import {
+  BaselineRepo,
+  DataStoreFactory,
+  DEFAULT_TEST_BASELINE_IDENTITY,
+  type DataStore,
+} from '@opensip-cli/datastore';
 import { SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -73,6 +78,99 @@ function replayEnvelope(tool: ToolShortId): ToolSessionReplay<CommandResult> {
   });
   return { result: {} as CommandResult, envelope, fidelity: 'projection' };
 }
+
+function replayEnvelopeWithSignals(
+  tool: ToolShortId,
+  signals: readonly Signal[],
+): ToolSessionReplay<CommandResult> {
+  const envelope = buildSignalEnvelope({
+    tool,
+    runId: `${tool}-run`,
+    createdAt: '2026-05-21T12:00:00.000Z',
+    units: [{ slug: 'u', passed: signals.length === 0, durationMs: 1 }],
+    signals,
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
+  });
+  return { result: {} as CommandResult, envelope, fidelity: 'projection' };
+}
+
+function signal(over: {
+  readonly ruleId: string;
+  readonly message?: string;
+  readonly filePath?: string;
+  readonly fingerprint?: string;
+  readonly baselineState?: 'added' | 'unchanged';
+  readonly severity?: Signal['severity'];
+}): Signal {
+  const base = createSignal({
+    source: 'u',
+    severity: over.severity ?? 'high',
+    ruleId: over.ruleId,
+    message: over.message ?? over.ruleId,
+    code: { file: over.filePath ?? 'src/a.ts', line: 1, column: 0 },
+    metadata: over.baselineState === undefined ? {} : { baselineState: over.baselineState },
+  });
+  return {
+    ...base,
+    ...(over.fingerprint === undefined ? {} : { fingerprint: over.fingerprint }),
+  };
+}
+
+function replayReviewSuiteStep(stored: StoredSession): ToolSessionReplay<CommandResult> {
+  replayCalls.push(stored.tool);
+  return replayEnvelopeWithSignals(stored.tool, [
+    signal({
+      ruleId: `${stored.tool}-rule`,
+      filePath: stored.tool === 'fit' ? 'src/a.ts' : 'src/b.ts',
+      fingerprint: `${stored.tool}-fp`,
+      baselineState: stored.tool === 'fit' ? 'added' : 'unchanged',
+    }),
+  ]);
+}
+
+const reviewSuiteResolver: (tool: ToolShortId) => SessionReplayFn | undefined = () =>
+  replayReviewSuiteStep;
+
+function replayCorruptPayload(_stored: StoredSession): never {
+  throw new Error('corrupt payload');
+}
+
+const corruptPayloadResolver: (tool: ToolShortId) => SessionReplayFn | undefined = () =>
+  replayCorruptPayload;
+
+function compareBaselineSignals(): readonly [Signal, Signal, Signal, Signal] {
+  return [
+    signal({ ruleId: 'same', fingerprint: 'fp-same' }),
+    signal({ ruleId: 'same-duplicate', fingerprint: 'fp-same' }),
+    signal({ ruleId: 'new', fingerprint: 'fp-new' }),
+    signal({ ruleId: 'missing-fp' }),
+  ];
+}
+
+function replayCompareBaseline(stored: StoredSession): ToolSessionReplay<CommandResult> {
+  replayCalls.push(stored.tool);
+  const replay = replayEnvelopeWithSignals(stored.tool, compareBaselineSignals());
+  return {
+    ...replay,
+    envelope: {
+      ...replay.envelope,
+      signals: replay.envelope.signals.map((replayed) =>
+        replayed.ruleId === 'missing-fp' ? { ...replayed, fingerprint: '' } : replayed,
+      ),
+    },
+  };
+}
+
+const compareBaselineResolver: (tool: ToolShortId) => SessionReplayFn | undefined = () =>
+  replayCompareBaseline;
+
+function replayNewFinding(stored: StoredSession): ToolSessionReplay<CommandResult> {
+  return replayEnvelopeWithSignals(stored.tool, [signal({ ruleId: 'new', fingerprint: 'fp-new' })]);
+}
+
+const newFindingResolver: (tool: ToolShortId) => SessionReplayFn | undefined = () =>
+  replayNewFinding;
 
 /** Records every replayed tool (proving "no re-run") then returns its envelope. */
 const replayAndRecord: SessionReplayFn = (stored) => {
@@ -174,6 +272,147 @@ describe('SessionResultsReadPort — showRun', () => {
   it('returns a structured err for an unknown ref', async () => {
     const out = await port().showRun({ ref: 'does-not-exist' });
     expect(out.ok).toBe(false);
+  });
+});
+
+describe('SessionResultsReadPort — reviewChange', () => {
+  it('rebuilds a v1 ReviewBrief from stored suite step sessions in run order', async () => {
+    new SessionRepo(store).save(
+      makeSession({
+        id: 'fit-step',
+        tool: 'fit',
+        startedAt: '2026-05-21T12:00:01.000Z',
+        completedAt: '2026-05-21T12:00:02.000Z',
+        suiteRunId: 'suite-1',
+        suiteName: 'audit',
+      }),
+    );
+    new SessionRepo(store).save(
+      makeSession({
+        id: 'graph-step',
+        tool: 'graph',
+        startedAt: '2026-05-21T12:00:03.000Z',
+        completedAt: '2026-05-21T12:00:04.000Z',
+        suiteRunId: 'suite-1',
+        suiteName: 'audit',
+      }),
+    );
+    const out = await new SessionResultsReadPort({
+      store,
+      replayFor: reviewSuiteResolver,
+    }).reviewChange({
+      suiteRunId: 'suite-1',
+      files: ['src/a.ts'],
+      graphFreshness: { fresh: true, builtAt: '2026-05-21T12:00:00.000Z' },
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.reviewBrief.version).toBe(1);
+      expect(out.value.data.reviewBrief.suite).toBe('audit');
+      expect(out.value.data.reviewBrief.topRisks.map((risk) => risk.ruleId)).toEqual(['fit-rule']);
+      expect(out.value.data.reviewBrief.topRisks[0]?.signalRef.stepIndex).toBe(0);
+      expect(out.value.data.reviewBrief.baselineDelta).toMatchObject({
+        available: true,
+        added: 1,
+        unchanged: 1,
+      });
+      expect(out.value.data.source.sessionIds).toEqual(['graph-step', 'fit-step']);
+      expect(out.value.data.freshness.graph?.fresh).toBe(true);
+    }
+    expect(replayCalls).toEqual(['graph', 'fit']);
+  });
+
+  it('returns a degraded brief when a stored suite step cannot replay', async () => {
+    new SessionRepo(store).save(
+      makeSession({
+        id: 'fit-step',
+        tool: 'fit',
+        suiteRunId: 'suite-1',
+        suiteName: 'audit',
+      }),
+    );
+    const out = await new SessionResultsReadPort({
+      store,
+      replayFor: corruptPayloadResolver,
+    }).reviewChange({
+      suiteRunId: 'suite-1',
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.reviewBrief.verdict).toBe('warn');
+      expect(out.value.data.reviewBrief.degraded[0]?.code).toBe('step-fault');
+      expect(out.value.data.freshness.sessions.degradedSteps).toBe(1);
+    }
+  });
+
+  it('returns a structured not-found error when no suite group matches', async () => {
+    const out = await port().reviewChange({ suiteRunId: 'missing' });
+    expect(out.ok).toBe(false);
+  });
+});
+
+describe('SessionResultsReadPort — compareToBaseline', () => {
+  it('compares replayed signals to stored baseline fingerprints', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-1', tool: 'fit' }));
+    const current = compareBaselineSignals();
+    const resolved = signal({ ruleId: 'resolved', fingerprint: 'fp-resolved' });
+    new BaselineRepo(store).save(
+      'fit',
+      [
+        { fingerprint: 'fp-same', payload: current[0] },
+        { fingerprint: 'fp-resolved', payload: resolved },
+      ],
+      DEFAULT_TEST_BASELINE_IDENTITY,
+    );
+    const out = await new SessionResultsReadPort({
+      store,
+      replayFor: compareBaselineResolver,
+    }).compareToBaseline({
+      tool: 'fit',
+      includeResolved: true,
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.baseline.available).toBe(true);
+      expect(out.value.data.delta).toEqual({
+        added: 1,
+        resolved: 1,
+        unchanged: 1,
+        missingFingerprint: 1,
+      });
+      expect(out.value.data.addedFindings.map((finding) => finding.ruleId)).toEqual(['new']);
+      expect(out.value.data.resolvedFindings?.map((finding) => finding.ruleId)).toEqual([
+        'resolved',
+      ]);
+      expect(out.value.data.degraded?.[0]?.code).toBe('missing-fingerprint');
+    }
+    expect(replayCalls).toEqual(['fit']);
+  });
+
+  it('returns degraded baseline metadata when the baseline is missing', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-1', tool: 'fit' }));
+    const out = await port().compareToBaseline({ tool: 'fit' });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.baseline.available).toBe(false);
+      expect(out.value.data.degraded?.[0]?.code).toBe('missing-baseline');
+    }
+  });
+
+  it('treats a saved empty baseline as available', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-1', tool: 'fit' }));
+    new BaselineRepo(store).save('fit', [], DEFAULT_TEST_BASELINE_IDENTITY);
+    const out = await new SessionResultsReadPort({
+      store,
+      replayFor: newFindingResolver,
+    }).compareToBaseline({
+      tool: 'fit',
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.baseline).toMatchObject({ available: true, rowCount: 0 });
+      expect(out.value.data.delta.added).toBe(1);
+    }
   });
 });
 
