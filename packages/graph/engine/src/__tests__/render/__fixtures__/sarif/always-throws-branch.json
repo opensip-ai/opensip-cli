@@ -15,6 +15,13 @@
           ]
         }
       },
+      "properties": {
+        "openSipSchema": "opensip.signal-run.v1",
+        "baselineIdentity": {
+          "fingerprintStrategyId": "graph.rule-file-line-col",
+          "fingerprintStrategyVersion": 1
+        }
+      },
       "results": [
         {
           "ruleId": "graph.safety.always-throws-branch",
@@ -33,7 +40,18 @@
                 }
               }
             }
-          ]
+          ],
+          "partialFingerprints": {
+            "opensipFingerprint": "graph.safety.always-throws-branch|src/error/handler.ts|67|0"
+          },
+          "properties": {
+            "openSipSchema": "opensip.signal-result.v1",
+            "signalId": "sig_always_throws_branch",
+            "source": "graph.safety.always-throws-branch",
+            "provider": "opensip-cli",
+            "category": "quality",
+            "fingerprint": "graph.safety.always-throws-branch|src/error/handler.ts|67|0"
+          }
         }
       ]
     }

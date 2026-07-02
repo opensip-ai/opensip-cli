@@ -78,12 +78,14 @@ artifact/capability belongs in Cloud iff it needs >1 repo, >1 run, or >1 actor).
 
 **Consequences:**
 
-- **Implemented by spec 20** (Platform Evidence Authority and Egress Contract):
-  full-fidelity, authority-tagged egress + a **divergence-severity model** (only
-  divergence that would change a gate/ticket outcome surfaces; sub-verdict
-  divergence is suppressed). Depends on **spec 05** (cross-engine identity tiers),
-  **spec 09** (provenance/signing for the CLI-attested tier), **spec 13a** (signed
-  distribution), **spec 11** (wire-contract versioning), and spec 01's
+- **Implemented locally by ADR-0127 / spec 20** (Platform Evidence Authority and
+  Egress Contract): SARIF preserves OpenSIP fingerprints/properties, native
+  `SignalBatch` carries an optional evidence authority header, incomplete local
+  provenance downgrades to `external-untrusted`, and contracts expose the
+  divergence-severity DTO. Parent Cloud still owns server-side authority
+  enforcement and divergence storage. Depends on **spec 05** (cross-engine identity
+  tiers), **spec 09** (provenance/signing for the CLI-attested tier), **spec 13a**
+  (signed distribution), **spec 11** (wire-contract versioning), and spec 01's
   declared-inputs manifest.
 - **Near-term, low-cost step:** map `signal.fingerprint → SARIF
   `partialFingerprints`` and a *curated allowlist* of `metadata` →

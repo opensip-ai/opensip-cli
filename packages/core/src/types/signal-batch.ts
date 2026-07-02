@@ -23,6 +23,28 @@ export const MAX_SIGNALS_PER_BATCH = 5000;
 
 /** Cloud wire schema version for {@link SignalBatch}. */
 export const SIGNAL_BATCH_SCHEMA_VERSION = 1 as const;
+export const SIGNAL_BATCH_EVIDENCE_CONTRACT_VERSION = 1 as const;
+export const SIGNAL_BATCH_DIVERGENCE_CONTRACT_VERSION = 1 as const;
+
+export type SignalBatchAuthorityTier = 'cloud-derived' | 'cli-attested' | 'external-untrusted';
+export type SignalBatchAttestationStatus = 'verified' | 'partial' | 'unavailable' | 'failed';
+
+export interface SignalBatchEvidence {
+  readonly contractVersion: typeof SIGNAL_BATCH_EVIDENCE_CONTRACT_VERSION;
+  readonly tier: SignalBatchAuthorityTier;
+  readonly attestation: {
+    readonly status: SignalBatchAttestationStatus;
+    readonly reason?: string;
+  };
+  readonly baselineIdentity?: {
+    readonly fingerprintStrategyId: string;
+    readonly fingerprintStrategyVersion: number;
+  };
+  readonly declaredInputs?: Readonly<Record<string, unknown>>;
+  readonly policy?: Readonly<Record<string, unknown>>;
+  readonly provenance?: Readonly<Record<string, unknown>>;
+  readonly divergenceContractVersion: typeof SIGNAL_BATCH_DIVERGENCE_CONTRACT_VERSION;
+}
 
 /** Repository identity attached to a batch so stored signals key to a repo+commit. */
 export interface RepoIdentity {
@@ -48,6 +70,11 @@ export interface SignalBatch {
   };
   /** Present only when the run exceeded {@link MAX_SIGNALS_PER_BATCH}. */
   readonly truncated?: { readonly dropped: number };
+  /**
+   * Optional evidence authority header. Absent means an older/no-header producer;
+   * consumers must treat that as `external-untrusted` rather than authoritative.
+   */
+  readonly evidence?: SignalBatchEvidence;
   readonly signals: readonly Signal[];
 }
 
@@ -68,6 +95,8 @@ export interface BuildSignalBatchInput {
   readonly runId?: string;
   /** Preserve the envelope's `createdAt` instead of stamping `now`. */
   readonly createdAt?: string;
+  /** Optional evidence authority header stamped by the CLI composition root. */
+  readonly evidence?: SignalBatchEvidence;
 }
 
 // Highest severity first when we must drop signals to fit the cap.
@@ -114,6 +143,7 @@ export function buildSignalBatch(input: BuildSignalBatchInput): SignalBatch {
     createdAt: input.createdAt ?? new Date().toISOString(),
     counts: { total: signals.length, bySeverity },
     truncated,
+    ...(input.evidence === undefined ? {} : { evidence: input.evidence }),
     signals,
   };
 }

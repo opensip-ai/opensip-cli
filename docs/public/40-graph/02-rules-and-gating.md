@@ -305,8 +305,12 @@ Per [ADR-0011](../../decisions/ADR-0011-signal-output-currency-formatter-sink.md
 | Signal | `runs[0].results[]`, each with `ruleId` set to its mapped OpenSIP rule id |
 | Function occurrence | `result.locations[0].physicalLocation.{artifactLocation,region}` |
 | Severity | `result.level` (`critical`/`high` → `error`; `medium` → `warning`; `low` → `note`) |
+| Fingerprint | `result.partialFingerprints.opensipFingerprint` copied from `Signal.fingerprint` |
+| Bounded evidence | `result.properties` and `run.properties` carry OpenSIP schema markers plus allowlisted baseline/declared-input/repair context |
 
-Today the SARIF carries `ruleId` + location only; fingerprinting remains part of the graph gate's SQLite baseline.
+SARIF does not carry arbitrary graph metadata. The shared formatter exports only
+the bounded evidence allowlist from [ADR-0127](../../decisions/ADR-0127-evidence-authority-and-egress-fidelity.md);
+full graph/session replay remains a JSON/session concern.
 
 Exit code 4 is reserved for `--report-to` upload failure (network error or non-2xx response). This separates "the gate said no" (exit 1) from "we couldn't tell the gate anything" (exit 4) — both fail the build but mean different things.
 

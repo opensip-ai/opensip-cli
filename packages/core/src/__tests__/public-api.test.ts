@@ -57,6 +57,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'Registry',
   'RunScope',
   'SeverityPolicy',
+  'SIGNAL_BATCH_DIVERGENCE_CONTRACT_VERSION',
+  'SIGNAL_BATCH_EVIDENCE_CONTRACT_VERSION',
   'SIGNAL_BATCH_SCHEMA_VERSION',
   'SystemError',
   // ADR-0035: host-owned verdict policy surface.

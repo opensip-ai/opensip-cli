@@ -12,13 +12,24 @@ import { logger, withSpanAsync } from '@opensip-cli/core';
 
 import { postChunked } from './http-egress.js';
 
-import type { EmitResult, RepoIdentity, Signal, SignalBatch, SignalSink } from '@opensip-cli/core';
+import type {
+  EmitResult,
+  RepoIdentity,
+  Signal,
+  SignalBatch,
+  SignalBatchEvidence,
+  SignalSink,
+} from '@opensip-cli/core';
 
 const MODULE_TAG = 'cloud-signal-sink';
 const MAX_SIGNALS_PER_CHUNK = 500;
 // Best-effort policy: try a little harder than reportToCloud, but bound the
 // whole sync so a throttling server can never hang the CLI.
-const POLICY = { maxAttempts: 4, overallDeadlineMs: 120_000, honorRetryAfter: true } as const;
+const POLICY = {
+  maxAttempts: 4,
+  overallDeadlineMs: 120_000,
+  honorRetryAfter: true,
+} as const;
 
 /** Construction options for the OpenSIP Cloud signal sink: target endpoint, API key, and an injectable `fetch` for tests. */
 export interface CloudSignalSinkOptions {
@@ -35,6 +46,7 @@ interface ChunkBody {
   readonly repo: RepoIdentity;
   readonly runId: string;
   readonly createdAt: string;
+  readonly evidence?: SignalBatchEvidence;
   readonly chunkIndex: number;
   readonly chunkCount: number;
   readonly signals: readonly Signal[];
@@ -52,6 +64,7 @@ function chunkBatch(batch: SignalBatch, size: number): ChunkBody[] {
     repo: batch.repo,
     runId: batch.runId,
     createdAt: batch.createdAt,
+    ...(batch.evidence === undefined ? {} : { evidence: batch.evidence }),
     chunkIndex,
     chunkCount: groups.length,
     signals,

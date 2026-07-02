@@ -8,6 +8,8 @@ purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --jso
 source-files:
   - packages/contracts/src/command-outcome.ts
   - packages/contracts/src/signal-envelope.ts
+  - packages/contracts/src/evidence-authority.ts
+  - packages/contracts/src/evidence-divergence.ts
   - packages/contracts/src/impact-trust.ts
   - packages/contracts/src/command-results-variants/graph-impact-result.ts
   - packages/contracts/src/command-results-variants/suite-results.ts
@@ -18,6 +20,7 @@ source-files:
   - packages/contracts/src/review-brief-correlation-types.ts
   - packages/contracts/src/review-brief-correlation-schemas.ts
   - packages/core/src/types/signal.ts
+  - packages/core/src/types/signal-batch.ts
 related-docs:
   - ../10-concepts/04-contract-surfaces.md
   - ../20-fit/04-output-gate-sarif.md
@@ -560,7 +563,7 @@ fix hint with confidence.
 | `strength` | number | no | Optional signal-strength weight. |
 | `fingerprint` | string | no | Stable de-dup fingerprint when the producer computes one. |
 | `createdAt` | string (ISO 8601) | yes | When the signal was created. |
-| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. Not exported to SARIF. |
+| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. SARIF exports only a bounded repair projection in `result.properties.repair`. |
 
 #### `SignalRepair` (optional)
 
@@ -722,7 +725,50 @@ opensip fit --json | jq '.envelope.signals[] | select(.source == "no-console-log
 opensip fit --json | jq -e '.envelope.verdict.score >= 90'
 ```
 
-For SARIF (the gate's native shape), use `--gate-save` / `--gate-compare`. The SARIF shape is the SARIF 2.1.0 spec's, not opensip-cli' — see [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
+For SARIF, use `--sarif`, `--report-to`, or the tool-specific export path. The
+SARIF shape is the SARIF 2.1.0 spec's, not opensip-cli's, but OpenSIP preserves
+identity through `result.partialFingerprints.opensipFingerprint` and bounded
+OpenSIP property bags. See [`10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
+
+## Native Evidence Authority
+
+OpenSIP Cloud signal sync uses the native `SignalBatch` wire contract from
+[`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/core/src/types/signal-batch.ts).
+The batch has `schemaVersion: 1`; spec 20 adds an optional `evidence` header
+without bumping that version.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "tool": "fit",
+  "runId": "run_9bb6ef4d07c0",
+  "repo": { "commit": "abc123" },
+  "counts": { "total": 1, "bySeverity": { "high": 1 } },
+  "evidence": {
+    "contractVersion": 1,
+    "tier": "cli-attested", // cloud-derived | cli-attested | external-untrusted
+    "attestation": { "status": "verified" },
+    "baselineIdentity": {
+      "fingerprintStrategyId": "fitness.sha256-file-rule-message",
+      "fingerprintStrategyVersion": 1
+    },
+    "declaredInputs": {
+      "cliVersion": "0.2.4",
+      "nodeVersion": "24.16.0",
+      "platform": "darwin/arm64",
+      "tool": "fit",
+      "engineVersion": "0.2.4"
+    },
+    "divergenceContractVersion": 1
+  },
+  "signals": [ /* Signal[] */ ]
+}
+```
+
+Absence of `evidence` means an older/no-header producer and must be treated by
+consumers as `external-untrusted`. The CLI emits `cli-attested` only when local
+provenance and declared inputs are complete enough to support that claim;
+otherwise the header is present but downgraded to `external-untrusted`.
 
 ### Agent-filtered live/replay output
 

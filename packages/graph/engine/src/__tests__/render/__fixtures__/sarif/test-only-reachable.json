@@ -15,6 +15,13 @@
           ]
         }
       },
+      "properties": {
+        "openSipSchema": "opensip.signal-run.v1",
+        "baselineIdentity": {
+          "fingerprintStrategyId": "graph.rule-file-line-col",
+          "fingerprintStrategyVersion": 1
+        }
+      },
       "results": [
         {
           "ruleId": "graph.dead-code.test-only-reachable",
@@ -33,7 +40,18 @@
                 }
               }
             }
-          ]
+          ],
+          "partialFingerprints": {
+            "opensipFingerprint": "graph.dead-code.test-only-reachable|src/users/mock.ts|5|0"
+          },
+          "properties": {
+            "openSipSchema": "opensip.signal-result.v1",
+            "signalId": "sig_test_only_reachable",
+            "source": "graph.dead-code.test-only-reachable",
+            "provider": "opensip-cli",
+            "category": "quality",
+            "fingerprint": "graph.dead-code.test-only-reachable|src/users/mock.ts|5|0"
+          }
         }
       ]
     }

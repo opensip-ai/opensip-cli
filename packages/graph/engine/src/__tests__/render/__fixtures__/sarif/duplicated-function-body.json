@@ -15,6 +15,13 @@
           ]
         }
       },
+      "properties": {
+        "openSipSchema": "opensip.signal-run.v1",
+        "baselineIdentity": {
+          "fingerprintStrategyId": "graph.rule-file-line-col",
+          "fingerprintStrategyVersion": 1
+        }
+      },
       "results": [
         {
           "ruleId": "graph.duplication.duplicated-function-body",
@@ -33,7 +40,18 @@
                 }
               }
             }
-          ]
+          ],
+          "partialFingerprints": {
+            "opensipFingerprint": "graph.duplication.duplicated-function-body|src/utils/format.ts|8|0"
+          },
+          "properties": {
+            "openSipSchema": "opensip.signal-result.v1",
+            "signalId": "sig_duplicated_function_body",
+            "source": "graph.duplication.duplicated-function-body",
+            "provider": "opensip-cli",
+            "category": "quality",
+            "fingerprint": "graph.duplication.duplicated-function-body|src/utils/format.ts|8|0"
+          }
         }
       ]
     }

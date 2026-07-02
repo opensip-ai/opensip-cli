@@ -52,10 +52,19 @@ export type { BaselineIdentity, BaselineIdentityMetadata } from './baseline/base
 export { createSignalFromViolation } from './signals/create-signal-from-violation.js';
 export type { ViolationInput } from './signals/create-signal-from-violation.js';
 // Cloud signal egress envelope (ADR-0008)
-export type { SignalBatch, RepoIdentity, BuildSignalBatchInput } from './types/signal-batch.js';
+export type {
+  SignalBatch,
+  RepoIdentity,
+  BuildSignalBatchInput,
+  SignalBatchAttestationStatus,
+  SignalBatchAuthorityTier,
+  SignalBatchEvidence,
+} from './types/signal-batch.js';
 export {
   buildSignalBatch,
   MAX_SIGNALS_PER_BATCH,
+  SIGNAL_BATCH_DIVERGENCE_CONTRACT_VERSION,
+  SIGNAL_BATCH_EVIDENCE_CONTRACT_VERSION,
   SIGNAL_BATCH_SCHEMA_VERSION,
 } from './types/signal-batch.js';
 // Cloud signal sink seam (ADR-0008)

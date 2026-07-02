@@ -28,6 +28,96 @@ describe('formatSignalSarif', () => {
     ]);
   });
 
+  it('preserves signal fingerprints as SARIF partial fingerprints', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          fingerprint: 'graph|src/foo.ts|10|3',
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: { results: { partialFingerprints?: Record<string, string> }[] }[];
+    };
+    expect(parsed.runs[0].results[0].partialFingerprints).toEqual({
+      opensipFingerprint: 'graph|src/foo.ts|10|3',
+    });
+  });
+
+  it('emits bounded OpenSIP result properties and drops unallowlisted metadata', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          fingerprint: 'fp-1',
+          metadata: {
+            baselineState: 'added',
+            qualifiedName: 'src/foo.ts#foo',
+            secretUnallowlisted: 'do-not-ship',
+          },
+          repair: {
+            repairKind: 'manual',
+            patchHint: { kind: 'text', summary: 'Use a narrower API' },
+          },
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: {
+        results: {
+          properties: {
+            openSipSchema: string;
+            fingerprint?: string;
+            metadata?: Record<string, unknown>;
+            repair?: unknown;
+          };
+        }[];
+      }[];
+    };
+    const props = parsed.runs[0].results[0].properties;
+    expect(props.openSipSchema).toBe('opensip.signal-result.v1');
+    expect(props.fingerprint).toBe('fp-1');
+    expect(props.metadata).toEqual({
+      baselineState: 'added',
+      qualifiedName: 'src/foo.ts#foo',
+    });
+    expect(JSON.stringify(props)).not.toContain('do-not-ship');
+    expect(props.repair).toEqual({
+      repairKind: 'manual',
+      patchHint: { kind: 'text', summary: 'Use a narrower API' },
+    });
+  });
+
+  it('emits run properties from baseline identity and declared inputs', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      declaredInputs: {
+        cliVersion: '0.1.0',
+        nodeVersion: '24.0.0',
+        platform: 'test/arch',
+        tool: 'graph',
+        baselineIdentity: FIXTURE_ENVELOPE.baselineIdentity,
+      },
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: {
+        properties?: {
+          openSipSchema?: string;
+          baselineIdentity?: unknown;
+          declaredInputs?: { cliVersion?: string; tool?: string };
+        };
+      }[];
+    };
+    expect(parsed.runs[0].properties).toMatchObject({
+      openSipSchema: 'opensip.signal-run.v1',
+      baselineIdentity: FIXTURE_ENVELOPE.baselineIdentity,
+      declaredInputs: { cliVersion: '0.1.0', tool: 'graph' },
+    });
+  });
+
   it('maps severity to SARIF level (high → error, medium → warning)', () => {
     const parsed = JSON.parse(formatSignalSarif(FIXTURE_ENVELOPE)) as {
       runs: { results: { level: string }[] }[];
@@ -65,7 +155,10 @@ describe('formatSignalSarif', () => {
       runs: {
         results: {
           locations: {
-            physicalLocation: { artifactLocation: { uri: string }; region?: unknown };
+            physicalLocation: {
+              artifactLocation: { uri: string };
+              region?: unknown;
+            };
           }[];
         }[];
       }[];
@@ -132,7 +225,9 @@ describe('formatSignalSarif', () => {
       runs: {
         results: {
           locations: {
-            physicalLocation: { region?: { startLine?: number; startColumn?: number } };
+            physicalLocation: {
+              region?: { startLine?: number; startColumn?: number };
+            };
           }[];
         }[];
       }[];

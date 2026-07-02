@@ -21,6 +21,13 @@ exports[`formatSignalSarif > renders the envelope as SARIF v2.1.0 (snapshot) 1`]
           ]
         }
       },
+      "properties": {
+        "openSipSchema": "opensip.signal-run.v1",
+        "baselineIdentity": {
+          "fingerprintStrategyId": "graph.rule-file-line-col",
+          "fingerprintStrategyVersion": 1
+        }
+      },
       "results": [
         {
           "ruleId": "graph:orphan-subtree",
@@ -40,7 +47,14 @@ exports[`formatSignalSarif > renders the envelope as SARIF v2.1.0 (snapshot) 1`]
                 }
               }
             }
-          ]
+          ],
+          "properties": {
+            "openSipSchema": "opensip.signal-result.v1",
+            "signalId": "sig_fixture0001",
+            "source": "graph:orphan-subtree",
+            "provider": "opensip-cli",
+            "category": "architecture"
+          }
         },
         {
           "ruleId": "graph:large-function",
@@ -60,7 +74,14 @@ exports[`formatSignalSarif > renders the envelope as SARIF v2.1.0 (snapshot) 1`]
                 }
               }
             }
-          ]
+          ],
+          "properties": {
+            "openSipSchema": "opensip.signal-result.v1",
+            "signalId": "sig_fixture0002",
+            "source": "graph:large-function",
+            "provider": "opensip-cli",
+            "category": "quality"
+          }
         }
       ]
     }

@@ -18,12 +18,15 @@ import {
 import {
   LanguageRegistry,
   noopSignalSink,
+  PLUGIN_API_VERSION,
   RunScope,
   ToolRegistry,
   runWithScope,
   type EmitResult,
   type SignalBatch,
   type SignalSink,
+  type ToolPluginManifest,
+  type ToolProvenance,
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -86,13 +89,40 @@ const ENVELOPE: SignalEnvelope = {
   },
 };
 
-function makeScope(signalSink?: SignalSink): RunScope {
+function makeScope(
+  signalSink?: SignalSink,
+  extras: {
+    readonly toolManifests?: readonly ToolPluginManifest[];
+    readonly toolProvenance?: readonly ToolProvenance[];
+  } = {},
+): RunScope {
   return new RunScope({
     tools: new ToolRegistry(),
     languages: new LanguageRegistry(),
     signalSink,
+    ...extras,
   });
 }
+
+const FIT_MANIFEST: ToolPluginManifest = {
+  kind: 'tool',
+  apiVersion: PLUGIN_API_VERSION,
+  id: 'fit',
+  stableId: 'fit-stable-id',
+  identity: { name: 'fit' },
+  name: 'Fit',
+  version: '1.2.3',
+  commands: [],
+};
+
+const FIT_PROVENANCE: ToolProvenance = {
+  source: 'bundled',
+  id: 'fit',
+  stableId: 'fit-stable-id',
+  version: '1.2.3',
+  packageName: '@opensip-cli/fitness',
+  manifestHash: 'sha256-fit',
+};
 
 // A `--report-to` receiver returning 400 is non-transient → postChunked aborts
 // without retry/backoff (the test stays fast). 200 = success.
@@ -265,10 +295,52 @@ describe('root cloud egress (deliverEnvelope → scope.signalSink)', () => {
     expect(seen[0].runId).toBe('run_routing0001'); // run identity preserved
     expect(seen[0].tool).toBe('fit');
     expect(seen[0].signals).toHaveLength(2);
+    expect(seen[0].evidence).toMatchObject({
+      contractVersion: 1,
+      tier: 'external-untrusted',
+      attestation: { status: 'unavailable' },
+      baselineIdentity: ENVELOPE.baselineIdentity,
+      divergenceContractVersion: 1,
+    });
     // verdict/units are dropped on the cloud wire shape.
     expect('verdict' in seen[0]).toBe(false);
     expect('units' in seen[0]).toBe(false);
     expect(out.cloudAccepted).toBe(2);
+  });
+
+  it('attests bundled tool egress when provenance and declared inputs are complete', async () => {
+    const seen: SignalBatch[] = [];
+    const sink: SignalSink = {
+      emit: (batch: SignalBatch): Promise<EmitResult> => {
+        seen.push(batch);
+        return Promise.resolve({
+          accepted: batch.signals.length,
+          authRejected: false,
+        });
+      },
+    };
+
+    await runWithScope(
+      makeScope(sink, {
+        toolManifests: [FIT_MANIFEST],
+        toolProvenance: [FIT_PROVENANCE],
+      }),
+      () => deliverEnvelope(ENVELOPE, { cwd: process.cwd(), repo: {} }),
+    );
+
+    expect(seen[0].evidence).toMatchObject({
+      tier: 'cli-attested',
+      attestation: { status: 'verified' },
+      provenance: {
+        source: 'bundled',
+        packageName: '@opensip-cli/fitness',
+        manifestHash: 'sha256-fit',
+      },
+      declaredInputs: {
+        tool: 'fit',
+        engineVersion: '1.2.3',
+      },
+    });
   });
 
   it('never throws and reports 0 accepted when the sink reports zero', async () => {

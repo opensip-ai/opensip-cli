@@ -90,6 +90,7 @@ interface SignalBatch {
   createdAt: string;
   counts: { total: number; bySeverity: Record<string, number> };
   truncated?: { dropped: number };
+  evidence?: SignalBatchEvidence; // optional authority/provenance header
   signals: Signal[];            // the findings (see below)
 }
 ```
@@ -99,6 +100,27 @@ interface SignalBatch {
 the code constant against a public fixture before CI proceeds.
 
 Each `Signal` is a finding the tool **already produced locally** — its file path, message, suggestion, code-location hints, and rule metadata ([`packages/core/src/types/signal.ts`](../../../packages/core/src/types/signal.ts)). The batch adds run context: the tool, recipe, a **repo identity** (your git commit SHA and origin remote URL), a run id, a timestamp, and severity counts. Large batches are capped, with a `truncated` count recording how many were dropped.
+
+The optional `evidence` header ([ADR-0127](../../decisions/ADR-0127-evidence-authority-and-egress-fidelity.md))
+describes local authority:
+
+```ts
+interface SignalBatchEvidence {
+  contractVersion: 1;
+  tier: 'cloud-derived' | 'cli-attested' | 'external-untrusted';
+  attestation: { status: 'verified' | 'partial' | 'unavailable' | 'failed'; reason?: string };
+  baselineIdentity?: { fingerprintStrategyId: string; fingerprintStrategyVersion: number };
+  declaredInputs?: Record<string, unknown>;
+  policy?: Record<string, unknown>;
+  provenance?: Record<string, unknown>;
+  divergenceContractVersion: 1;
+}
+```
+
+The CLI emits `cli-attested` only when local provenance and declared inputs are
+complete enough to support that claim. Otherwise it emits
+`external-untrusted`. Absence of the `evidence` header means an older/no-header
+producer and must also be treated as `external-untrusted` by consumers.
 
 Nothing else leaves your machine — no source file contents beyond the path/line/hint already in a finding, no environment, no credentials. The local SQLite store is unaffected and remains the source of truth.
 

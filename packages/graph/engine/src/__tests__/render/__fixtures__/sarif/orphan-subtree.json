@@ -15,6 +15,13 @@
           ]
         }
       },
+      "properties": {
+        "openSipSchema": "opensip.signal-run.v1",
+        "baselineIdentity": {
+          "fingerprintStrategyId": "graph.rule-file-line-col",
+          "fingerprintStrategyVersion": 1
+        }
+      },
       "results": [
         {
           "ruleId": "graph.dead-code.orphan-subtree",
@@ -33,7 +40,18 @@
                 }
               }
             }
-          ]
+          ],
+          "partialFingerprints": {
+            "opensipFingerprint": "graph.dead-code.orphan-subtree|src/order/process.ts|42|0"
+          },
+          "properties": {
+            "openSipSchema": "opensip.signal-result.v1",
+            "signalId": "sig_orphan_subtree",
+            "source": "graph.dead-code.orphan-subtree",
+            "provider": "opensip-cli",
+            "category": "quality",
+            "fingerprint": "graph.dead-code.orphan-subtree|src/order/process.ts|42|0"
+          }
         }
       ]
     }

@@ -37,6 +37,31 @@ describe('buildSignalBatch', () => {
     expect(batch.truncated).toBeUndefined();
   });
 
+  it('preserves optional evidence authority without requiring it', () => {
+    const evidence = {
+      contractVersion: 1,
+      tier: 'cli-attested',
+      attestation: { status: 'verified' },
+      divergenceContractVersion: 1,
+    } as const;
+
+    const withEvidence = buildSignalBatch({
+      tool: 'fit',
+      repo: {},
+      signals: [],
+      evidence,
+    });
+    const withoutEvidence = buildSignalBatch({
+      tool: 'fit',
+      repo: {},
+      signals: [],
+    });
+
+    expect(withEvidence.evidence).toEqual(evidence);
+    expect(withoutEvidence.evidence).toBeUndefined();
+    expect(withoutEvidence).not.toHaveProperty('evidence');
+  });
+
   it('caps the batch and keeps the highest-severity signals, recording the dropped count', () => {
     const signals = [
       ...Array.from({ length: 3 }, (_, i) => sig('low', i)),

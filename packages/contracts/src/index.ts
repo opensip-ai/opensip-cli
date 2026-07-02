@@ -27,6 +27,7 @@ export {
   DEFAULT_BASELINE_IDENTITY,
   SIGNAL_ENVELOPE_SCHEMA_VERSION,
 } from './signal-envelope.js';
+export * from './evidence.js';
 
 // Platform compatibility/LTS policy registry. Defined in core so lower layers can
 // inspect policy without depending on contracts; re-exported here for the public

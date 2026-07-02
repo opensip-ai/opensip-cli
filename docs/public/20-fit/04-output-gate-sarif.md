@@ -210,9 +210,23 @@ opensip fit --report-to https://opensip.ai/api --api-key $OPENSIP_API_KEY
 
 The envelope is formatted to SARIF via the single shared `formatSignalSarif` formatter and POSTed to the configured URL through the shared chunked transport. This is a **composition-root** path (ADR-0011): the tool returns its envelope; `cli.deliverSignals` (→ [`deliver-envelope.ts`](../../../packages/cli/src/bootstrap/deliver-envelope.ts)) owns the SARIF formatting *and* the upload. The tool itself never imports `@opensip-cli/output`. This path is composable — `--report-to` runs alongside the default Ink renderer, alongside `--json`, alongside `--gate-compare`. Reporting is a side-channel, not a stdout-replacement.
 
+The SARIF output preserves OpenSIP evidence identity ([ADR-0127](../../decisions/ADR-0127-evidence-authority-and-egress-fidelity.md)):
+
+- `result.partialFingerprints.opensipFingerprint` is copied from
+  `Signal.fingerprint`, so Code Scanning and SARIF-compatible receivers can
+  correlate the same identity the host baseline plane uses.
+- `result.properties` carries a bounded OpenSIP allowlist: schema marker,
+  signal id/source/provider/category, fingerprint, selected baseline/impact
+  metadata, and bounded structured repair hints.
+- `run.properties` carries the envelope's baseline identity and host-declared
+  input manifest when present.
+
+Unknown `Signal.metadata` keys are intentionally dropped at this boundary. SARIF
+is a portable exchange format, not a raw session dump.
+
 The transport lives in [`packages/output/src/sink/http-egress.ts`](../../../packages/output/src/sink/http-egress.ts) (`postChunked`). For `--report-to`, the whole SARIF log is sent as one chunk (the envelope is capped upstream):
 
-- It POSTs to `<url>/sarif` with `X-API-Key` if provided, and a stable `Idempotency-Key` per chunk (`<runId>:report:<i>`) so a retried-but-stored chunk is de-duplicated server-side.
+- It POSTs to `<url>/sarif` with `Authorization: Bearer <api-key>` if provided, and a stable `Idempotency-Key` per chunk (`<runId>:report:<i>`) so a retried-but-stored chunk is de-duplicated server-side.
 - The timeout is `min(300_000, 60_000 + signalCount * 100)` ms — 60s base plus 100ms per signal, capped at 5 minutes. The receiver does per-signal work (dedup, persistence, trace writes); the timeout scales with the workload.
 - Retry policy: up to 3 attempts per chunk, honoring `Retry-After` on `429`/`503`, bounded by an overall deadline. `postChunked` **never throws** — it returns a structured `EgressResult`.
 

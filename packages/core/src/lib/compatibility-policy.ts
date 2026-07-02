@@ -103,6 +103,7 @@ export const COMPATIBILITY_POLICIES: readonly CompatibilityContractPolicy[] = [
       'SignalBatch schemaVersion bump',
       'cloud wire fixture update',
       'Cloud signal-sync docs update',
+      'evidence authority absent-field fallback review',
     ],
     docsPath: 'docs/public/10-concepts/06-cloud-signal-sync.md',
   },

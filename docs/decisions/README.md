@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0127](ADR-0127-evidence-authority-and-egress-fidelity.md) — SARIF now preserves OpenSIP fingerprints/properties and native `SignalBatch` carries an optional evidence authority header; incomplete local provenance downgrades to `external-untrusted`.
+- [ADR-0126](ADR-0126-cli-local-trust-policy-plane.md) — The CLI owns one offline trust-policy PDP in `@opensip-cli/config`, with thin host enforcement points and bounded local policy audit persistence.
 - [ADR-0125](ADR-0125-deterministic-repair-apply-verify-loop.md) — `repair apply --verify` reruns deterministic checks before agents may claim a repair is verified; MCP mutation stays disabled by default behind an explicit write posture.
 - [ADR-0124](ADR-0124-review-brief-correlation-join.md) — Review briefs join related risks through deterministic, bounded correlation groups without deduplicating source evidence or breaking `signalRef` provenance.
 - [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md) — Impact analysis carries explicit trust metadata; uncertain changed/impacted verification falls back to full target execution instead of changed-only confidence.

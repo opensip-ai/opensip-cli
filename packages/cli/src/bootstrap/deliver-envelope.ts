@@ -37,6 +37,7 @@ import {
 
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { stampDeclaredInputs } from './declared-inputs.js';
+import { buildEvidenceAuthority } from './evidence-authority.js';
 import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 import type { ArtifactWriteContext } from './atomic-artifact-write.js';
@@ -82,6 +83,7 @@ export type DeliverEnvelopeResult = SignalDeliveryResult;
  * add repo identity, preserve the run identity, drop `verdict`/`units`.
  */
 export function envelopeToSignalBatch(envelope: SignalEnvelope, repo: RepoIdentity): SignalBatch {
+  const evidence = buildEvidenceAuthority({ envelope, scope: currentScope() });
   return buildSignalBatch({
     tool: envelope.tool,
     recipe: envelope.recipe,
@@ -89,6 +91,7 @@ export function envelopeToSignalBatch(envelope: SignalEnvelope, repo: RepoIdenti
     signals: envelope.signals,
     runId: envelope.runId,
     createdAt: envelope.createdAt,
+    evidence,
   });
 }
 

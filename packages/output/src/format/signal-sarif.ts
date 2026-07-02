@@ -23,6 +23,7 @@
  * SINGLE canonical physical location; `relatedLocations` is not populated.
  */
 import type { Formatter } from './types.js';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, SignalSeverity } from '@opensip-cli/core';
 
 /** SARIF v2.1.0 level — `'none' | 'note' | 'warning' | 'error'`. */
@@ -77,6 +78,7 @@ interface SarifRun {
       readonly rules: readonly SarifReportingDescriptor[];
     };
   };
+  readonly properties?: Record<string, unknown>;
   readonly results: readonly SarifResult[];
 }
 
@@ -89,6 +91,8 @@ interface SarifResult {
   readonly level: SarifLevel;
   readonly message: { readonly text: string };
   readonly locations: readonly SarifLocation[];
+  readonly partialFingerprints?: Record<string, string>;
+  readonly properties?: Record<string, unknown>;
 }
 
 interface SarifLocation {
@@ -117,6 +121,116 @@ export interface SarifDriver {
  * on {@link buildOpenSipSarif} directly.
  */
 const DEFAULT_DRIVER_VERSION = '1.0.0';
+const OPEN_SIP_SARIF_RESULT_SCHEMA = 'opensip.signal-result.v1';
+const OPEN_SIP_SARIF_RUN_SCHEMA = 'opensip.signal-run.v1';
+const MAX_PROPERTY_STRING_LENGTH = 500;
+const MAX_PROPERTY_ARRAY_ITEMS = 10;
+const MAX_PROPERTY_OBJECT_KEYS = 16;
+const MAX_PROPERTY_DEPTH = 3;
+
+const ALLOWLISTED_METADATA_KEYS = new Set([
+  'baselineState',
+  'originalFingerprint',
+  'impact',
+  'impactTrust',
+  'verification',
+  'qualifiedName',
+  'simpleName',
+  'graphNodeId',
+  'blastRadius',
+  'yagni',
+]);
+
+interface BuildOpenSipSarifOptions {
+  readonly runProperties?: Record<string, unknown>;
+}
+
+type JsonLike =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonLike[]
+  | { readonly [key: string]: JsonLike };
+
+interface BoundedJson {
+  readonly value: JsonLike;
+}
+
+function boundedJson(value: unknown, depth = 0): JsonLike | undefined {
+  return boundedJsonValue(value, depth)?.value;
+}
+
+function boundedJsonValue(value: unknown, depth = 0): BoundedJson | undefined {
+  if (value === null) return { value: null };
+  if (typeof value === 'string') return { value: value.slice(0, MAX_PROPERTY_STRING_LENGTH) };
+  if (typeof value === 'number') return Number.isFinite(value) ? { value } : undefined;
+  if (typeof value === 'boolean') return { value };
+  if (depth >= MAX_PROPERTY_DEPTH) return undefined;
+  if (Array.isArray(value)) return boundedJsonArray(value, depth);
+  if (typeof value === 'object') return boundedJsonObject(value, depth);
+  return undefined;
+}
+
+function boundedJsonArray(value: readonly unknown[], depth: number): BoundedJson | undefined {
+  const items = value
+    .slice(0, MAX_PROPERTY_ARRAY_ITEMS)
+    .map((item) => boundedJsonValue(item, depth + 1))
+    .filter((item): item is BoundedJson => item !== undefined)
+    .map((item) => item.value);
+  return items.length > 0 ? { value: items } : undefined;
+}
+
+function boundedJsonObject(value: object, depth: number): BoundedJson | undefined {
+  const output: Record<string, JsonLike> = {};
+  for (const [key, nested] of Object.entries(value).slice(0, MAX_PROPERTY_OBJECT_KEYS)) {
+    const safe = boundedJson(nested, depth + 1);
+    if (safe !== undefined) output[key] = safe;
+  }
+  return Object.keys(output).length > 0 ? { value: output } : undefined;
+}
+
+function selectedMetadata(metadata: Record<string, unknown>): Record<string, JsonLike> | undefined {
+  const output: Record<string, JsonLike> = {};
+  for (const key of ALLOWLISTED_METADATA_KEYS) {
+    if (!(key in metadata)) continue;
+    const safe = boundedJson(metadata[key]);
+    if (safe !== undefined) output[key] = safe;
+  }
+  return Object.keys(output).length > 0 ? output : undefined;
+}
+
+function resultProperties(signal: Signal): Record<string, unknown> {
+  const metadata = selectedMetadata(signal.metadata);
+  const repair = signal.repair === undefined ? undefined : boundedJson(signal.repair);
+  return {
+    openSipSchema: OPEN_SIP_SARIF_RESULT_SCHEMA,
+    signalId: signal.id,
+    source: signal.source,
+    provider: signal.provider,
+    category: signal.category,
+    ...(signal.fingerprint === undefined ? {} : { fingerprint: signal.fingerprint }),
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(repair === undefined ? {} : { repair }),
+  };
+}
+
+function partialFingerprints(signal: Signal): Record<string, string> | undefined {
+  return signal.fingerprint === undefined ? undefined : { opensipFingerprint: signal.fingerprint };
+}
+
+function runProperties(envelope: SignalEnvelope): Record<string, unknown> {
+  return {
+    openSipSchema: OPEN_SIP_SARIF_RUN_SCHEMA,
+    baselineIdentity: envelope.baselineIdentity,
+    ...(envelope.declaredInputs === undefined
+      ? {}
+      : { declaredInputs: boundedJson(envelope.declaredInputs) }),
+    ...(envelope.verification === undefined
+      ? {}
+      : { verification: boundedJson(envelope.verification) }),
+  };
+}
 
 /**
  * Build a SARIF v2.1.0 log from `Signal[]` and a driver identity.
@@ -127,7 +241,11 @@ const DEFAULT_DRIVER_VERSION = '1.0.0';
  * primary site); transitive context carried in `Signal.metadata` is
  * intentionally dropped at the SARIF boundary.
  */
-export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDriver): string {
+export function buildOpenSipSarif(
+  signals: readonly Signal[],
+  driver: SarifDriver,
+  options: BuildOpenSipSarifOptions = {},
+): string {
   const results: SarifResult[] = [];
   const ruleIds = new Set<string>();
 
@@ -155,11 +273,14 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
           }),
     };
 
+    const fingerprints = partialFingerprints(signal);
     results.push({
       ruleId: signal.ruleId,
       level: mapSeverityToSarifLevel(signal.severity),
       message: { text: signal.message },
       locations: [{ physicalLocation }],
+      ...(fingerprints === undefined ? {} : { partialFingerprints: fingerprints }),
+      properties: resultProperties(signal),
     });
   }
 
@@ -176,6 +297,7 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
             rules: [...ruleIds].sort().map((id) => ({ id })),
           },
         },
+        ...(options.runProperties === undefined ? {} : { properties: options.runProperties }),
         results,
       },
     ],
@@ -190,7 +312,13 @@ export function buildOpenSipSarif(signals: readonly Signal[], driver: SarifDrive
  * string`.
  */
 export const formatSignalSarif: Formatter = (envelope) =>
-  buildOpenSipSarif(envelope.signals, {
-    name: `opensip-cli-${envelope.tool}`,
-    version: DEFAULT_DRIVER_VERSION,
-  });
+  buildOpenSipSarif(
+    envelope.signals,
+    {
+      name: `opensip-cli-${envelope.tool}`,
+      version: DEFAULT_DRIVER_VERSION,
+    },
+    {
+      runProperties: runProperties(envelope),
+    },
+  );
