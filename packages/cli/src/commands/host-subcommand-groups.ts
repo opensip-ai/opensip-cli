@@ -19,6 +19,7 @@
  */
 
 import { buildConfigGroupLeaves } from './host-subcommand-config.js';
+import { buildPolicyGroupLeaves } from './host-subcommand-policy.js';
 import { buildSessionsGroupLeaves } from './host-subcommand-sessions.js';
 import { type HostSpec } from './host-subcommand-shared.js';
 import { buildRepairGroupLeaves } from './repair/command-specs.js';
@@ -52,6 +53,7 @@ export interface HostSubcommandGroup {
  */
 export const HOST_SUBCOMMAND_GROUPS: readonly string[] = [
   'config',
+  'policy',
   'repair',
   'sessions',
   'suite',
@@ -65,6 +67,11 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
       name: 'config',
       description: 'Project config validation, schema export, and migration',
       leaves: buildConfigGroupLeaves(ctx),
+    },
+    {
+      name: 'policy',
+      description: 'Inspect local trust policy decisions and audit events',
+      leaves: buildPolicyGroupLeaves(ctx),
     },
     {
       name: 'repair',

@@ -167,6 +167,7 @@ export type {
   ConfigValidateResult,
   ConfigSchemaResult,
 } from './command-results.js';
+export type * from './command-results-variants/policy-results.js';
 
 // Render-only run-presentation adjunct (envelope-first-presentation plan). The
 // single run variant on `CommandResult`: it carries the SignalEnvelope (the

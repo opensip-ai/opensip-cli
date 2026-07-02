@@ -15,12 +15,18 @@
 import { execFileSync } from 'node:child_process';
 
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
+import { policyCiEvidenceFromCurrentEnv } from '../../bootstrap/policy-evidence.js';
+import {
+  evaluatePolicyPep,
+  policyAuditFromCurrentScope,
+  policyFromCurrentScope,
+} from '../../bootstrap/policy-pep.js';
 import { recordInstalledToolTrust } from '../../bootstrap/tool-trust.js';
 import { addToolPlugin } from '../plugin-host-ops.js';
 
 import { runToolValidation } from './validate.js';
 
-import type { ToolsInstallResult } from '@opensip-cli/contracts';
+import type { ToolsInstallResult, ToolsValidateResult } from '@opensip-cli/contracts';
 import type { ToolPluginManifest } from '@opensip-cli/core';
 
 /** Options for {@link toolsInstall}. */
@@ -48,6 +54,26 @@ function installNextSteps(manifest: ToolPluginManifest | undefined): readonly st
   return commandName === undefined ? [] : [`opensip ${commandName}`];
 }
 
+function installFailure(args: {
+  readonly spec: string;
+  readonly scope: 'global' | 'project';
+  readonly validation: ToolsValidateResult;
+  readonly error?: string;
+  readonly toolId?: string;
+  readonly version?: string;
+}): ToolsInstallResult {
+  return {
+    type: 'tools-install',
+    spec: args.spec,
+    success: false,
+    scope: args.scope,
+    validation: args.validation,
+    ...(args.error === undefined ? {} : { error: args.error }),
+    ...(args.toolId === undefined ? {} : { toolId: args.toolId }),
+    ...(args.version === undefined ? {} : { version: args.version }),
+  };
+}
+
 /** Stage, validate, and (on a `passed` verdict only) activate one tool package. */
 export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInstallResult> {
   const scope = opts.project === true ? 'project' : 'global';
@@ -57,24 +83,53 @@ export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInst
   );
   try {
     if (result.verdict !== 'passed') {
-      return {
-        type: 'tools-install',
-        spec: opts.spec,
-        success: false,
-        scope,
-        validation: result,
-      };
+      return installFailure({ spec: opts.spec, scope, validation: result });
     }
     /* v8 ignore next 9 -- defensive: a passed verdict from a keepStaged run always carries the staged dir */
     if (stagedPkgDir === undefined) {
-      return {
-        type: 'tools-install',
+      return installFailure({
         spec: opts.spec,
-        success: false,
         scope,
         validation: result,
         error: 'validation passed but no staged package dir was retained',
-      };
+      });
+    }
+
+    const report = await admitToolPackage({
+      dir: stagedPkgDir,
+      source: 'installed',
+      explicitlyRequested: true,
+      staticOnly: true,
+    });
+    if (report.manifest === undefined) {
+      return installFailure({
+        spec: opts.spec,
+        scope,
+        validation: result,
+        error: 'validated package could not be re-read for policy admission',
+      });
+    }
+
+    const policyDecision = evaluatePolicyPep({
+      policy: policyFromCurrentScope(),
+      subject: { kind: 'installed-tool', id: report.manifest.id, source: 'installed' },
+      action: 'install',
+      evidence: {
+        legacyTrusted: true,
+        provenanceStatus: 'unavailable',
+        ci: policyCiEvidenceFromCurrentEnv(),
+      },
+      audit: policyAuditFromCurrentScope(),
+    });
+    if (!policyDecision.allowed) {
+      return installFailure({
+        spec: opts.spec,
+        scope,
+        validation: result,
+        toolId: report.manifest.id,
+        version: report.manifest.version,
+        error: `policy denied install: ${policyDecision.decision.reasons.join('; ')}`,
+      });
     }
 
     // Activate the VALIDATED bytes: pack the staged dir, install the tarball.
@@ -93,13 +148,6 @@ export async function toolsInstall(opts: ToolsInstallOptions): Promise<ToolsInst
       };
     }
 
-    // Inventory row from the ACTIVATED install (manifest file read — no import).
-    const report = await admitToolPackage({
-      dir: stagedPkgDir,
-      source: 'installed',
-      explicitlyRequested: true,
-      staticOnly: true,
-    });
     if (report.manifest !== undefined && report.provenance !== undefined) {
       recordInstalledToolTrust({
         scope,

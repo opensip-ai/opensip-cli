@@ -183,6 +183,32 @@ const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
     examples: ['opensip agent-catalog --json'],
     tier: 'platform' as const,
   },
+  {
+    command: 'policy status',
+    description:
+      'Inspect the effective local trust-policy mode, source tiers, org-cache state, and active exceptions.',
+    examples: ['opensip policy status --json'],
+    tier: 'platform' as const,
+  },
+  {
+    command: 'policy explain',
+    description:
+      'Explain the policy decision for a local subject/action pair without running the target command.',
+    examples: [
+      'opensip policy explain installed-tool:audit-sec --action load --json',
+      'opensip policy explain baseline:fit --action baseline-save --json',
+    ],
+    tier: 'platform' as const,
+  },
+  {
+    command: 'policy audit',
+    description: 'Read or export the durable local trust-policy audit event log.',
+    examples: [
+      'opensip policy audit --json --limit 50',
+      'opensip policy audit --out opensip-policy-audit.json',
+    ],
+    tier: 'platform' as const,
+  },
 ];
 
 function publicPrimaryCommand(
@@ -311,6 +337,12 @@ export function buildAgentCatalog(
         description: 'Walk backwards through recent runs of a specific tool without tracking IDs.',
         example: 'opensip sessions show previous --tool fit --json --filter warnings-only',
       },
+      {
+        name: 'Explain a trust-policy denial',
+        description:
+          'When a Tool, capability pack, disabled check, or baseline save is denied, inspect the same local policy decision without re-running the mutating command.',
+        example: 'opensip policy explain installed-tool:audit-sec --action load --json',
+      },
     ],
     outputShapes: {
       signalEnvelope:
@@ -339,6 +371,7 @@ export function buildAgentCatalog(
       'Commands that expose machine-readable command results use --json. Raw-stream transports such as mcp document their own stdout protocol.',
       'filtersApplied, originalSignalCount, returnedSignalCount appear when --filter is used.',
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',
+      'Trust-policy decisions are local and deterministic. Use policy status/explain/audit before changing policy exceptions.',
       'Human-readable output (no --json) uses the same tables/banners as before — unchanged.',
       // Uniform tool-primary surface (host-guaranteed; decorateToolPrimary).
       'Every tool primary (fit/graph/sim/yagni and any third-party tool) accepts `<tool> --version` ' +

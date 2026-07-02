@@ -19,6 +19,8 @@
 
 import { z } from 'zod';
 
+import { trustPolicySchema } from '../policy/trust-policy-schema.js';
+
 import { cliConfigSchema } from './cli-config.js';
 import { dashboardConfigSchema } from './dashboard.js';
 import { suitesConfigSchema } from './suites.js';
@@ -73,6 +75,7 @@ export function hostConfigDeclarations(
     { namespace: 'checkOverrides', schema: checkOverridesSchema },
     { namespace: 'suites', schema: suitesConfigSchema },
     { namespace: 'tools', schema: toolsConfigSchema },
+    { namespace: 'policy', schema: trustPolicySchema },
     {
       namespace: 'plugins',
       schema: createPluginsConfigSchema(options.pluginConfigKeys),

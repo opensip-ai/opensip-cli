@@ -28,6 +28,12 @@ import { diffBaseline } from '@opensip-cli/output';
 
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { writeEnvelopeSarif } from './deliver-envelope.js';
+import { policyCiEvidenceFromCurrentEnv } from './policy-evidence.js';
+import {
+  evaluatePolicyPep,
+  policyAuditFromCurrentScope,
+  policyFromCurrentScope,
+} from './policy-pep.js';
 import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
@@ -108,6 +114,26 @@ function emitIdentityMismatchDiagnostic(
   );
 }
 
+function enforceBaselineSavePolicy(tool: string): void {
+  const decision = evaluatePolicyPep({
+    policy: policyFromCurrentScope(),
+    subject: { kind: 'baseline', id: tool },
+    action: 'baseline-save',
+    evidence: { ci: policyCiEvidenceFromCurrentEnv() },
+    audit: policyAuditFromCurrentScope(),
+  });
+  if (decision.allowed) return;
+  currentScope()?.diagnostics?.event('validate', 'warn', 'policy denied baseline save', {
+    tool,
+    outcome: decision.decision.outcome,
+    reasons: decision.decision.reasons,
+  });
+  throw new ConfigurationError(
+    `Policy denied baseline save for '${tool}': ${decision.decision.reasons.join('; ')}`,
+    { code: 'CONFIGURATION.POLICY.DENIED' },
+  );
+}
+
 /**
  * Build the four baseline seams over a lazy datastore resolver. `getDatastore`
  * throws when accessed outside a project scope (the host's existing contract).
@@ -128,6 +154,7 @@ export function buildBaselineSeams(deps: {
     // Sync-bodied (SQLite is synchronous) but typed Promise to match the seam
     // contract; a sync throw still rejects for an `await`ing caller.
     saveBaseline: (tool, envelope) => {
+      enforceBaselineSavePolicy(tool);
       const env = envelope as SignalEnvelope;
       const identity = requireEnvelopeBaselineIdentity(tool, env, 'saveBaseline');
       const entries = requireStampedEntries(tool, env.signals, 'saveBaseline');

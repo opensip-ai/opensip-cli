@@ -25,6 +25,8 @@
 import { isPlainRecord, readYamlFile, resolveProjectConfigPath } from '@opensip-cli/core';
 import { z } from 'zod';
 
+import { trustPolicySchema, type TrustPolicyDocument } from '../policy/trust-policy-schema.js';
+
 /** Config URLs that may carry credentials must use https. */
 const httpsUrlSchema = z.string().refine(
   (value) => {
@@ -187,4 +189,26 @@ export function loadCliDefaults(cwd: string, explicitPath?: string): CliDefaults
   const cliBlock = doc.cli;
   if (!isPlainRecord(cliBlock)) return {};
   return projectCliDefaults(cliBlock);
+}
+
+/** Result of reading a project-level trust-policy block without throwing. */
+export interface ReadProjectTrustPolicyResult {
+  readonly policy?: TrustPolicyDocument;
+  readonly error?: string;
+}
+
+/** Best-effort read of `opensip-cli.config.yml#policy` from a resolved config path. */
+export function readProjectTrustPolicy(
+  configPath: string | undefined,
+): ReadProjectTrustPolicyResult {
+  if (configPath === undefined) return {};
+  const document = readYamlFile(configPath);
+  if (!isPlainRecord(document) || document.policy === undefined) return {};
+  const parsed = trustPolicySchema.safeParse(document.policy);
+  if (parsed.success) return { policy: parsed.data };
+  return {
+    error: parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || 'policy'}: ${issue.message}`)
+      .join('; '),
+  };
 }

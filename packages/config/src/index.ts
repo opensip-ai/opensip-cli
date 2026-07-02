@@ -52,8 +52,8 @@ export type {
 } from './migration.js';
 
 // Document-level config blocks (the tool-agnostic surface — ADR-0023).
-export { loadCliDefaults, cliConfigSchema } from './document/cli-config.js';
-export type { CliDefaults } from './document/cli-config.js';
+export { loadCliDefaults, readProjectTrustPolicy, cliConfigSchema } from './document/cli-config.js';
+export type { CliDefaults, ReadProjectTrustPolicyResult } from './document/cli-config.js';
 export { dashboardConfigSchema } from './document/dashboard.js';
 export {
   suiteDefinitionSchema,
@@ -92,12 +92,59 @@ export type {
 export {
   GLOBAL_CONFIG_PATH,
   readGlobalConfig,
+  readGlobalTrustPolicy,
   writeGlobalConfig,
   resolveApiKey,
   resolveEffectiveCloudConfig,
   CONFIG_ENV_SPECS,
 } from './document/global-config.js';
-export type { GlobalConfig } from './document/global-config.js';
+export type { GlobalConfig, ReadGlobalTrustPolicyResult } from './document/global-config.js';
 export { renderDocumentHeader } from './document/template.js';
 export type { DocumentHeaderInput, TargetTemplateInput } from './document/template.js';
 export { hostConfigDeclarations } from './document/host-declarations.js';
+export {
+  POLICY_ACTIONS,
+  POLICY_DECISION_OUTCOMES,
+  POLICY_EXCEPTION_MAX_COUNT,
+  POLICY_ID_MAX_LENGTH,
+  POLICY_ORG_CACHE_MAX_AGE_MS,
+  POLICY_REASON_MAX_LENGTH,
+  POLICY_SUBJECT_KINDS,
+  POLICY_SUBJECT_MAX_LENGTH,
+  PROVENANCE_STATUSES,
+  TRUST_POLICY_SOURCE_TIERS,
+  formatPolicySubject,
+  orgPolicyCacheSchema,
+  parsePolicySubject,
+  policyDecisionOutcomeSchema,
+  policySubjectKindSchema,
+  provenanceStatusSchema,
+  trustPolicyExceptionSchema,
+  trustPolicyOrgConfigSchema,
+  trustPolicySchema,
+} from './policy/trust-policy-schema.js';
+export type {
+  OrgPolicyCacheDocument,
+  OrgPolicyStatus,
+  PolicyAction,
+  PolicyAuditEvent,
+  PolicyDecision,
+  PolicyDecisionOutcome,
+  PolicyEvaluationRequest,
+  PolicySubject,
+  PolicySubjectKind,
+  ProvenanceStatus,
+  ResolvedTrustPolicy,
+  ResolvedTrustPolicyException,
+  TrustPolicyDocument,
+  TrustPolicyExceptionDocument,
+  TrustPolicyOrgConfig,
+  TrustPolicySource,
+  TrustPolicySourceTier,
+} from './policy/trust-policy-schema.js';
+export {
+  BUILTIN_TRUST_POLICY,
+  resolveTrustPolicySources,
+  trustPolicySource,
+} from './policy/trust-policy-resolution.js';
+export { evaluateTrustPolicy } from './policy/trust-policy-evaluator.js';

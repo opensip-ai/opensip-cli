@@ -26,11 +26,15 @@ import {
 } from '@opensip-cli/core';
 
 import { importToolRuntime, workerRuntimeImportPolicyFor } from './admit-tool-package.js';
+import { type PolicyAuditCollector } from './policy-audit.js';
+import { policyCiEvidenceFromEnv } from './policy-evidence.js';
+import { evaluatePolicyPep } from './policy-pep.js';
 import { synthesizeExternalTool } from './synthesize-external-tool.js';
 import { isHostRuntimeImportForbidden } from './tool-provenance.js';
 import { isProjectLocalToolTrusted } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
+import type { ResolvedTrustPolicy } from '@opensip-cli/config';
 
 export type AuthoredAdmission = ToolAdmission;
 
@@ -82,6 +86,8 @@ export function admitProjectLocalTool(args: {
   readonly dir: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly projectTrustedTools?: ReadonlySet<string>;
+  readonly trustPolicy?: ResolvedTrustPolicy;
+  readonly policyAudit?: PolicyAuditCollector;
 }): AuthoredAdmission {
   const manifest = loadToolManifest('project-local', args.dir);
   if (manifest === undefined) {
@@ -91,14 +97,35 @@ export function admitProjectLocalTool(args: {
     );
   }
   const trustedByConfig = args.projectTrustedTools?.has(manifest.id) === true;
-  if (!trustedByConfig && !isProjectLocalToolTrusted(manifest.id, args.env)) {
-    throw new PluginIncompatibleError(
-      `project-local tool '${manifest.id}' is not trusted to load (deny-by-default). ` +
-        `List it in tools.trusted or use OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
-      { diagnostic: 'project-local tool not trusted (deny-by-default)' },
-    );
-  }
-  return admitAuthoredTool('project-local', args.dir, manifest);
+  const trustedByEnv = isProjectLocalToolTrusted(manifest.id, args.env);
+  const trusted = trustedByConfig || trustedByEnv;
+  const policyDecision =
+    args.trustPolicy === undefined
+      ? undefined
+      : evaluatePolicyPep({
+          policy: args.trustPolicy,
+          audit: args.policyAudit,
+          subject: {
+            kind: 'project-local-tool',
+            id: manifest.id,
+            source: 'project-local',
+          },
+          action: 'load',
+          evidence: {
+            legacyTrusted: trusted,
+            projectTrusted: trustedByConfig,
+            envAllowed: trustedByEnv,
+            provenanceStatus: 'unavailable',
+            ci: policyCiEvidenceFromEnv(args.env),
+          },
+        });
+  const allowed = policyDecision?.allowed ?? trusted;
+  if (allowed) return admitAuthoredTool('project-local', args.dir, manifest);
+  throw new PluginIncompatibleError(
+    `project-local tool '${manifest.id}' is not trusted to load (deny-by-default). ` +
+      `List it in tools.trusted or use OPENSIP_CLI_ALLOW_PROJECT_TOOLS='${manifest.id}' to admit it.`,
+    { diagnostic: 'project-local tool not trusted (deny-by-default)' },
+  );
 }
 
 /**
@@ -124,6 +151,8 @@ export async function discoverAndRegisterAuthoredTools(
     readonly globalAuthoredDir: string;
     readonly env?: NodeJS.ProcessEnv;
     readonly projectTrustedTools?: ReadonlySet<string>;
+    readonly trustPolicy?: ResolvedTrustPolicy;
+    readonly policyAudit?: PolicyAuditCollector;
   },
   builtInIds: ReadonlySet<string>,
   provenance: ToolProvenance[] = [],
@@ -131,15 +160,33 @@ export async function discoverAndRegisterAuthoredTools(
 ): Promise<void> {
   const env = opts.env ?? process.env;
   for (const candidate of discoverAuthoredToolSidecars(opts.globalAuthoredDir)) {
-    await admitAndRegisterAuthored({
-      registry,
-      admission: admitUserGlobalTool({ dir: candidate.dir }),
-      dir: candidate.dir,
-      builtInIds,
-      provenance,
-      manifests,
-      env,
-    });
+    const manifest = loadToolManifest('user-global', candidate.dir);
+    const allowed =
+      manifest === undefined ||
+      opts.trustPolicy === undefined ||
+      evaluatePolicyPep({
+        policy: opts.trustPolicy,
+        audit: opts.policyAudit,
+        subject: { kind: 'user-global-tool', id: manifest.id, source: 'user-global' },
+        action: 'load',
+        evidence: {
+          legacyTrusted: true,
+          trustedByLocation: true,
+          provenanceStatus: 'unavailable',
+          ci: policyCiEvidenceFromEnv(env),
+        },
+      }).allowed;
+    if (allowed) {
+      await admitAndRegisterAuthored({
+        registry,
+        admission: admitUserGlobalTool({ dir: candidate.dir }),
+        dir: candidate.dir,
+        builtInIds,
+        provenance,
+        manifests,
+        env,
+      });
+    }
   }
   if (opts.projectAuthoredDir !== undefined) {
     for (const candidate of discoverAuthoredToolSidecars(opts.projectAuthoredDir)) {
@@ -149,6 +196,8 @@ export async function discoverAndRegisterAuthoredTools(
           dir: candidate.dir,
           env: opts.env,
           projectTrustedTools: opts.projectTrustedTools,
+          trustPolicy: opts.trustPolicy,
+          policyAudit: opts.policyAudit,
         }),
         dir: candidate.dir,
         builtInIds,

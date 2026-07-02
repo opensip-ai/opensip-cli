@@ -21,6 +21,8 @@ export default {
     './src/schema/baseline.ts',
     // ADR-0042: the generic keyed tool-state table (the cli.toolState seams).
     './src/schema/tool-state.ts',
+    // Spec 09: host-owned local trust-policy audit evidence.
+    './src/schema/policy-audit.ts',
   ],
   out: './migrations',
 } satisfies Config;

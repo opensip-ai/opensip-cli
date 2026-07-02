@@ -23,6 +23,11 @@
 import { join } from 'node:path';
 
 import {
+  evaluateTrustPolicy,
+  type PolicySubject,
+  type ResolvedTrustPolicy,
+} from '@opensip-cli/config';
+import {
   discoverPackagesInNodeModules,
   loadToolManifest,
   resolveProjectContext,
@@ -32,6 +37,7 @@ import {
   type ToolProvenance,
 } from '@opensip-cli/core';
 
+import { policyCiEvidenceFromEnv } from '../../bootstrap/policy-evidence.js';
 import {
   readProjectTrustedToolIds,
   resolveInstalledToolTrust,
@@ -58,6 +64,7 @@ export interface ToolsListOptions {
   readonly provenance?: readonly ToolProvenance[];
   readonly manifests?: readonly ToolPluginManifest[];
   readonly env?: NodeJS.ProcessEnv;
+  readonly policy?: ResolvedTrustPolicy;
 }
 
 interface ProjectTrustContext {
@@ -93,6 +100,7 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
   const globalHostDir = resolveUserPaths().pluginsDir(TOOL_DOMAIN);
   const loadedPackageNames = new Set<string>();
   const trustContext = projectTrustContext(opts.cwd);
+  const env = opts.env ?? process.env;
 
   // Installed-but-not-loaded set — marker scan + manifest file read per host.
   const hosts: readonly { dir: string; source: ListSource }[] = [
@@ -100,8 +108,8 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
     { dir: globalHostDir, source: 'global' },
   ];
   const rows = [
-    ...loadedRows(opts, projectHostDir, globalHostDir, loadedPackageNames, trustContext),
-    ...manifestOnlyRows(hosts, loadedPackageNames, opts.env ?? process.env, trustContext),
+    ...loadedRows(opts, projectHostDir, globalHostDir, loadedPackageNames, trustContext, env),
+    ...manifestOnlyRows(hosts, loadedPackageNames, env, trustContext, opts.policy),
   ];
 
   // Shadow-marking: a project row shadows a global row with the same tool id
@@ -136,6 +144,7 @@ function loadedRows(
   globalHostDir: string,
   loadedPackageNames: Set<string>,
   trustContext: ProjectTrustContext,
+  env: NodeJS.ProcessEnv,
 ): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   const provenance = opts.provenance ?? [];
@@ -155,6 +164,13 @@ function loadedRows(
       commands: manifest?.commands.map((c) => c.name) ?? [],
       status: 'loaded',
       trustReason: loadedTrustReason(prov, trustContext),
+      ...policyFacts(
+        opts.policy,
+        policySubjectForLoaded(prov),
+        true,
+        prov.source === 'bundled',
+        env,
+      ),
     });
   }
   return rows;
@@ -177,10 +193,11 @@ function manifestOnlyRows(
   loadedPackageNames: ReadonlySet<string>,
   env: NodeJS.ProcessEnv,
   trustContext: ProjectTrustContext,
+  policy: ResolvedTrustPolicy | undefined,
 ): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   for (const host of hosts) {
-    rows.push(...manifestRowsForHost(host, loadedPackageNames, env, trustContext));
+    rows.push(...manifestRowsForHost(host, loadedPackageNames, env, trustContext, policy));
   }
   return rows;
 }
@@ -190,11 +207,23 @@ function manifestRowsForHost(
   loadedPackageNames: ReadonlySet<string>,
   env: NodeJS.ProcessEnv,
   trustContext: ProjectTrustContext,
+  policy: ResolvedTrustPolicy | undefined,
 ): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   for (const pkg of discoverPackagesInNodeModules(join(host.dir, 'node_modules'), 'tool')) {
     if (loadedPackageNames.has(pkg.name)) continue;
     const manifest = loadToolManifest('installed', pkg.packageDir);
+    const trust =
+      manifest === undefined
+        ? undefined
+        : resolveInstalledToolTrust({
+            toolId: manifest.id,
+            packageName: pkg.name,
+            packageDir: pkg.packageDir,
+            env,
+            projectRoot: trustContext.projectRoot,
+            projectTrustedTools: trustContext.projectTrustedTools,
+          });
     rows.push({
       id: manifest?.id ?? pkg.name,
       ...(manifest?.stableId === undefined
@@ -205,20 +234,65 @@ function manifestRowsForHost(
       source: host.source,
       commands: manifest?.commands.map((c) => c.name) ?? [],
       status: 'manifest-only',
-      trustReason:
+      trustReason: trust?.reason ?? 'denied',
+      ...policyFacts(
+        policy,
         manifest === undefined
-          ? 'denied'
-          : resolveInstalledToolTrust({
-              toolId: manifest.id,
+          ? undefined
+          : {
+              kind: 'installed-tool',
+              id: manifest.id,
               packageName: pkg.name,
-              packageDir: pkg.packageDir,
-              env,
-              projectRoot: trustContext.projectRoot,
-              projectTrustedTools: trustContext.projectTrustedTools,
-            }).reason,
+              source: 'installed',
+            },
+        trust?.trusted === true,
+        false,
+        env,
+      ),
     });
   }
   return rows;
+}
+
+function policySubjectForLoaded(provenance: ToolProvenance): PolicySubject {
+  if (provenance.source === 'project-local') {
+    return { kind: 'project-local-tool', id: provenance.id, source: provenance.source };
+  }
+  if (provenance.source === 'user-global') {
+    return { kind: 'user-global-tool', id: provenance.id, source: provenance.source };
+  }
+  return {
+    kind: 'installed-tool',
+    id: provenance.id,
+    ...(provenance.packageName === undefined ? {} : { packageName: provenance.packageName }),
+    source: provenance.source,
+  };
+}
+
+function policyFacts(
+  policy: ResolvedTrustPolicy | undefined,
+  subject: PolicySubject | undefined,
+  legacyTrusted: boolean,
+  bundled: boolean,
+  env: NodeJS.ProcessEnv | undefined,
+): Pick<ToolsListRow, 'policyOutcome' | 'policyReasons' | 'policyExceptionIds'> {
+  if (policy === undefined || subject === undefined) return {};
+  const decision = evaluateTrustPolicy(policy, {
+    subject,
+    action: 'load',
+    evidence: {
+      legacyTrusted,
+      bundled,
+      provenanceStatus: bundled ? 'verified' : 'unavailable',
+      ci: policyCiEvidenceFromEnv(env),
+    },
+    now: new Date(),
+  });
+  return {
+    policyOutcome: decision.outcome,
+    policyReasons: decision.reasons,
+    policyExceptionIds: decision.matchedExceptionIds,
+  };
 }
 
 function filterRows(rows: readonly ToolsListRow[], opts: ToolsListOptions): ToolsListRow[] {

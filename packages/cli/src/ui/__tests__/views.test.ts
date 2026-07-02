@@ -160,6 +160,62 @@ describe('sim notice + help + report views', () => {
   });
 });
 
+describe('policy views', () => {
+  it('renders policy status, explain, and audit variants', () => {
+    expect(
+      text({
+        type: 'policy-status',
+        mode: 'strict',
+        ci: 'default',
+        orgStatus: { state: 'available' },
+        sources: ['builtin', 'project'],
+        exceptions: [
+          {
+            id: 'temp',
+            subject: 'installed-tool:demo',
+            action: 'load',
+            expiresAt: '2026-09-01T00:00:00.000Z',
+            sourceTier: 'project',
+          },
+        ],
+      }),
+    ).toContain('Policy');
+    expect(
+      text({
+        type: 'policy-explain',
+        subject: 'installed-tool:demo',
+        action: 'load',
+        decision: {
+          outcome: 'deny',
+          reasons: ['strict mode requires verified provenance'],
+          matchedExceptionIds: [],
+          sourceTiers: ['builtin', 'project'],
+        },
+      }),
+    ).toContain('strict mode requires verified provenance');
+    expect(
+      text({
+        type: 'policy-audit',
+        totalCount: 1,
+        events: [
+          {
+            id: 'policy_audit_1',
+            runId: 'run_1',
+            timestamp: '2026-07-02T00:00:00.000Z',
+            subject: 'installed-tool:demo',
+            subjectKind: 'installed-tool',
+            action: 'load',
+            outcome: 'deny',
+            reasons: ['strict mode'],
+            matchedExceptionIds: [],
+            sourceTiers: ['project'],
+          },
+        ],
+      }),
+    ).toContain('Policy audit');
+  });
+});
+
 describe('clear/configure/uninstall done views', () => {
   it('clear-done: empty / cancelled / done', () => {
     expect(

@@ -101,7 +101,8 @@ Discovery is **deduplicated by package name** with nearest-ancestor wins. If a p
 Discovery is **synchronous and at startup**. Tools are cheap (each one is a small adapter); the walk completes in single-digit milliseconds. There is no lazy-load path for tools; either the package is installed by argv parse time or it doesn't exist for this run.
 
 The bundled tools (`@opensip-cli/fitness`, `@opensip-cli/simulation`,
-`@opensip-cli/graph`) declare the same `opensipTools.kind === 'tool'` marker.
+`@opensip-cli/graph`, `@opensip-cli/yagni`) declare the same
+`opensipTools.kind === 'tool'` marker.
 They are **not** imported statically — `register-tools.ts` lists them by
 package name (`BUNDLED_TOOL_PACKAGES`) and loads each through the same
 `loadToolManifest → admitTool → dynamic import → register` path a third-party
@@ -176,11 +177,14 @@ No package is privileged — the bundled packs (`@opensip-cli/checks-universal`,
 ### Producer vs consumption provenance
 
 First-party OpenSIP packages are published with npm **producer provenance**
-(OIDC + `--provenance`). **Consumption-side** verification — checking provenance
-when a project installs or loads a third-party pack — is a documented trust gate
-([ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0068-consumption-side-verification-policy.md)) that
-is **not implemented** in the loader yet. Until spec 03 lands enforcement, admission
-remains trust-tier + allowlist policy only.
+(OIDC + `--provenance`). The CLI-local trust-policy plane evaluates provenance
+facts at installed Tool, authored Tool, capability-pack, and `tools install`
+admission points. The initial verifier is deterministic and offline: bundled
+first-party packages are verified by the release trust base; non-bundled
+packages are `unavailable` until a future local verifier supplies signed
+evidence. Default mode preserves existing local trust behavior; strict mode
+denies unverified non-bundled executable load/install actions unless an exact
+unexpired exception applies.
 
 The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `opensip fit plugin add/remove/sync`.
 

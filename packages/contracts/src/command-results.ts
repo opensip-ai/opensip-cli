@@ -73,6 +73,15 @@ export type {
   PluginResult,
 } from './command-results-variants/plugin-results.js';
 export type {
+  PolicyAuditResult,
+  PolicyAuditRow,
+  PolicyDecisionOutcome,
+  PolicyDecisionSummary,
+  PolicyExplainResult,
+  PolicyMode,
+  PolicyStatusResult,
+} from './command-results-variants/policy-results.js';
+export type {
   SessionReplayResult,
   HelpResult,
   ErrorResult,
@@ -120,6 +129,11 @@ import type {
   ReportResult,
 } from './command-results-variants/list-history-results.js';
 import type { PluginResult } from './command-results-variants/plugin-results.js';
+import type {
+  PolicyAuditResult,
+  PolicyExplainResult,
+  PolicyStatusResult,
+} from './command-results-variants/policy-results.js';
 import type { RepairApplyVerifyResult } from './command-results-variants/repair-apply-verify-results.js';
 import type {
   RepairApplyResult,
@@ -168,6 +182,9 @@ export type CommandResult =
   | InitResult
   | SimNoticeResult
   | PluginResult
+  | PolicyStatusResult
+  | PolicyExplainResult
+  | PolicyAuditResult
   | ClearDoneResult
   | ConfigureDoneResult
   | UninstallDoneResult

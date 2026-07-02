@@ -36,7 +36,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/).
 
 ---
 
@@ -879,6 +879,41 @@ This is the recommended starting point for any agent that needs to discover how 
 
 ---
 
+## `policy status`, `policy explain`, and `policy audit` — inspect local trust policy
+
+CLI-owned. Reads the effective local trust-policy plane used by bootstrap and
+host enforcement points. The policy decision point is offline and deterministic:
+it layers builtin defaults, user config, project config, and the optional
+project-local org cache. It never calls OpenSIP Cloud, npm, GitHub, or a model.
+
+```
+opensip policy status
+opensip policy status --json
+opensip policy explain installed-tool:audit-sec --action load --json
+opensip policy explain baseline:fit --action baseline-save --json
+opensip policy audit --json --limit 50
+opensip policy audit --out opensip-policy-audit.json
+```
+
+| Subcommand | Effect |
+|---|---|
+| `status` | Shows `mode`, `ci`, source tiers, org-cache state, and active exceptions. |
+| `explain <subject>` | Evaluates one subject/action pair against the current policy and returns reasons plus matched exception ids. |
+| `audit` | Lists local policy decisions persisted in `policy_audit_events`; `--out` writes the same JSON result to a file. |
+
+Subject strings are exact `kind:id` pairs. Supported kinds are
+`installed-tool`, `project-local-tool`, `user-global-tool`, `capability-pack`,
+`fitness.disabledChecks`, `baseline`, and `runtime-exclude`. Supported actions
+are `load`, `install`, `disable-check`, `runtime-exclude`, and
+`baseline-save`.
+
+Strict mode denies unverified non-bundled executable loads/installs and
+gate-weakening actions (`fitness.disabledChecks`, baseline saves) unless an
+unexpired exact exception applies. Default mode preserves existing OSS behavior
+and records conditioned decisions where provenance is missing or failed.
+
+---
+
 ## `sessions list`, `sessions show`, and `sessions purge` — manage session records
 
 CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
@@ -1105,7 +1140,10 @@ opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
 opensip tools data-purge <tool-id>
 ```
 
-`validate` runs the same admission pipeline the CLI's own bootstrap admits tools through — one validator, shared. `install` is atomic: stage → validate → activate; a failed install leaves nothing behind. `uninstall` never deletes project SQLite data; `data-purge` deletes rows (sessions, baselines, tool state), never tables. **`validate` and `install` execute the package's module** — see the trust notes in the full reference.
+`validate` runs the same admission pipeline the CLI's own bootstrap admits tools through — one validator, shared. `install` is atomic: stage → validate → policy admission → activate; a failed or policy-denied install leaves nothing behind. `uninstall` never deletes project SQLite data; `data-purge` deletes rows (sessions, baselines, tool state), never tables. **`validate` and `install` execute the package's module** — see the trust notes in the full reference.
+
+`tools list` also reports the current local policy outcome for each row when a
+run scope has resolved policy.
 
 ---
 

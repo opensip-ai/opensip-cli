@@ -34,6 +34,7 @@ import {
   type StartupTimingEvent,
   takeBootstrapDiagnostics,
 } from './bootstrap-diagnostics-buffer.js';
+import { resolveBootstrapPolicyState, type BootstrapPolicyState } from './bootstrap-policy.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
@@ -46,25 +47,7 @@ import {
 import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
 import { readProjectTrustedToolIds } from './tool-trust.js';
 
-// Re-export only the symbols the CLI composition root (`index.ts`) consumes.
-export { mountAllToolCommands, EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
-// The shared admission callable (ADR-0041: one validator, four consumers) —
-// consumed by the tools command group (validate/install) and the
-// admission-parity / bundled-conformance tests.
-export {
-  admitToolPackage,
-  importToolRuntime,
-  type AdmissionReport,
-  type AdmissionSection,
-  type AdmissionSectionResult,
-  type AdmitToolPackageOptions,
-} from './admit-tool-package.js';
-export { renderResult } from './render.js';
-export { maybeOpenReport } from './report.js';
-export { installPreActionHook } from './pre-action-hook.js';
-export { buildCommandRegistrationInput } from './build-command-registration-input.js';
-export { buildHostPlanes } from './host-planes.js';
-export { isRootVersionRequest } from './root-version.js';
+export * from './bootstrap-exports.js';
 
 export interface BootstrapOptions {
   readonly langRegistry: LanguageRegistry;
@@ -151,6 +134,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   const builtInIds = new Set(manifests.map((m) => m.id));
   let projectRoot: string | undefined;
   let projectAuthoredDir: string | undefined;
+  let projectConfigPath: string | undefined;
   let projectTrustedTools: ReadonlySet<string> = new Set();
   startupTimer.measure('project-trust-context', () => {
     try {
@@ -160,6 +144,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
       });
       if (project.scope === 'project') {
         projectRoot = project.projectRoot;
+        projectConfigPath = project.configPath;
         projectAuthoredDir = resolveProjectPaths(project.projectRoot).authoredToolsDir;
         projectTrustedTools = readProjectTrustedToolIds(project.configPath);
       }
@@ -169,6 +154,14 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
       // later in per-run bootstrap for commands that enter a project scope.
     }
   });
+  const bootstrapPolicy = startupTimer.measure('policy-source-resolution', () =>
+    resolveBootstrapPolicyState({
+      cwd: opts.cwd,
+      projectRoot,
+      projectConfigPath,
+      now: new Date(),
+    }),
+  );
   const argv = opts.argv ?? [];
   if (shouldSkipInstalledToolDiscovery(argv)) {
     startupTimer.mark('installed-tool-discovery', { skipped: true });
@@ -185,6 +178,8 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
           sources: buildToolDiscoverySources(opts.cwd, opts.projectDir),
           projectRoot,
           projectTrustedTools,
+          trustPolicy: bootstrapPolicy.policy,
+          policyAudit: bootstrapPolicy.audit,
           bootstrapDiagnostics: getBootstrapDiagnosticsBuffer(),
         },
         builtInIds,
@@ -209,6 +204,8 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
         globalAuthoredDir,
         env: process.env,
         projectTrustedTools,
+        trustPolicy: bootstrapPolicy.policy,
+        policyAudit: bootstrapPolicy.audit,
       },
       builtInIds,
       provenance,
@@ -224,6 +221,8 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
     manifests,
     bootstrapDiagnostics: takeBootstrapDiagnostics(),
     startupTimings: startupTimer.events(),
+    trustPolicy: bootstrapPolicy.policy,
+    policyAudit: bootstrapPolicy.audit,
   };
 }
 
@@ -249,4 +248,8 @@ export interface BootstrapResult {
   readonly bootstrapDiagnostics: readonly CliDiagnostic[];
   /** Startup phase timings captured before Commander preAction enters the run scope. */
   readonly startupTimings: readonly StartupTimingEvent[];
+  /** Resolved pre-scope policy used for startup extension admission. */
+  readonly trustPolicy: BootstrapPolicyState['policy'];
+  /** Bootstrap policy audit events gathered before per-run scope construction. */
+  readonly policyAudit: BootstrapPolicyState['audit'];
 }

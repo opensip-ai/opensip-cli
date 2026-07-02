@@ -16,6 +16,7 @@ import {
 import { renderDiagnosticHuman } from '../render-diagnostic.js';
 
 import type {
+  CommandResult,
   ToolsCreateResult,
   ToolsDataPurgeResult,
   ToolsDoctorResult,
@@ -35,6 +36,7 @@ const TOOLS_LIST_COLUMNS: readonly (string | TableColumnSpec)[] = [
   'Source',
   'Status',
   'Trust',
+  'Policy',
   'Version',
   'Package',
   'Commands',
@@ -70,6 +72,21 @@ function verdictTone(verdict: ToolsValidateResult['verdict']): Tone {
   }
 }
 
+function policyOutcomeTone(outcome: ToolsListRow['policyOutcome']): Tone {
+  switch (outcome) {
+    case 'deny': {
+      return 'error';
+    }
+    case 'allow-with-conditions': {
+      return 'warning';
+    }
+    case 'allow':
+    case undefined: {
+      return 'muted';
+    }
+  }
+}
+
 function toolsListRow(row: ToolsListRow): Span[] {
   return [
     { text: row.id, tone: 'brand', bold: true },
@@ -77,10 +94,63 @@ function toolsListRow(row: ToolsListRow): Span[] {
     { text: row.shadowed === true ? `${row.source} (shadowed)` : row.source },
     { text: row.status, tone: row.status === 'loaded' ? 'success' : 'muted' },
     { text: row.trustReason ?? '-', dim: row.trustReason === undefined },
+    {
+      text: row.policyOutcome ?? '-',
+      tone: policyOutcomeTone(row.policyOutcome),
+      dim: row.policyOutcome === undefined,
+    },
     { text: row.version },
     { text: row.packageName ?? '-', dim: row.packageName === undefined },
     { text: row.commands.length === 0 ? '-' : row.commands.join(', ') },
   ];
+}
+
+type ToolsCommandResult = Extract<
+  CommandResult,
+  {
+    type:
+      | 'tools-list'
+      | 'tools-doctor'
+      | 'tools-create'
+      | 'tools-validate'
+      | 'tools-install'
+      | 'tools-uninstall'
+      | 'tools-data-purge';
+  }
+>;
+
+/** @throws {Error} When the closed tools result union and renderer drift. */
+function assertToolsNever(result: never): never {
+  throw new Error(`Unhandled tools command result '${JSON.stringify(result)}'`);
+}
+
+export function viewToolsResult(result: ToolsCommandResult): ViewNode {
+  switch (result.type) {
+    case 'tools-list': {
+      return viewToolsList(result);
+    }
+    case 'tools-doctor': {
+      return viewToolsDoctor(result);
+    }
+    case 'tools-create': {
+      return viewToolsCreate(result);
+    }
+    case 'tools-validate': {
+      return viewToolsValidate(result);
+    }
+    case 'tools-install': {
+      return viewToolsInstall(result);
+    }
+    case 'tools-uninstall': {
+      return viewToolsUninstall(result);
+    }
+    case 'tools-data-purge': {
+      return viewToolsDataPurge(result);
+    }
+    default: {
+      return assertToolsNever(result);
+    }
+  }
 }
 
 function validationSectionRow(section: ToolsValidateSection): Span[] {

@@ -34,11 +34,16 @@ import {
   recordInstalledManifestInvalid,
   recordInstalledTrustDenied,
 } from './discovery-diagnostics.js';
+import { type PolicyAuditCollector } from './policy-audit.js';
+import { policyCiEvidenceFromEnv } from './policy-evidence.js';
+import { evaluatePolicyPep } from './policy-pep.js';
+import { verifyPackageProvenance } from './provenance-verifier.js';
 import { synthesizeExternalTool } from './synthesize-external-tool.js';
 import { isHostRuntimeImportForbidden } from './tool-provenance.js';
 import { resolveInstalledToolTrust, type ToolTrustReason } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
+import type { ResolvedTrustPolicy } from '@opensip-cli/config';
 
 const BUNDLED_PACKAGE_NAMES = new Set<string>(BUNDLED_TOOL_PACKAGES);
 
@@ -152,6 +157,8 @@ export interface DiscoveryOptions {
   readonly projectRoot?: string;
   /** Tool ids from project config `tools.trusted`. */
   readonly projectTrustedTools?: ReadonlySet<string>;
+  readonly trustPolicy?: ResolvedTrustPolicy;
+  readonly policyAudit?: PolicyAuditCollector;
   /** Optional bootstrap diagnostics sink (defaults to the process-wide buffer). */
   readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
 }
@@ -224,6 +231,8 @@ async function registerDiscoveredInstalledPackage(
     readonly env: NodeJS.ProcessEnv;
     readonly projectRoot?: string;
     readonly projectTrustedTools?: ReadonlySet<string>;
+    readonly trustPolicy?: ResolvedTrustPolicy;
+    readonly policyAudit?: PolicyAuditCollector;
     readonly registeredStableIds: Set<string>;
     readonly provenance: ToolProvenance[];
     readonly manifests: ToolPluginManifest[];
@@ -242,12 +251,40 @@ async function registerDiscoveredInstalledPackage(
     projectRoot: args.projectRoot,
     projectTrustedTools: args.projectTrustedTools,
   });
-  if (!trust.trusted) {
+  const policy = args.trustPolicy;
+  const policyDecision =
+    policy === undefined
+      ? undefined
+      : evaluatePolicyPep({
+          policy,
+          audit: args.policyAudit,
+          subject: {
+            kind: 'installed-tool',
+            id: admission.manifest.id,
+            packageName: pkg.name,
+            source: 'installed',
+          },
+          action: 'load',
+          evidence: {
+            legacyTrusted: trust.trusted,
+            trustReason: trust.reason,
+            managedInstall: trust.reason === 'managed-install',
+            envAllowed: trust.reason === 'env',
+            projectTrusted: trust.reason === 'project-config',
+            provenanceStatus: verifyPackageProvenance({
+              packageName: pkg.name,
+              provenance: admission.provenance,
+            }),
+            ci: policyCiEvidenceFromEnv(args.env),
+          },
+        });
+  const allowed = policyDecision?.allowed ?? trust.trusted;
+  if (allowed === false) {
     emitInstalledTrustDenied(
       admission.manifest.id,
       pkg.name,
       pkg.packageDir,
-      trust.reason,
+      trust.trusted ? 'denied' : trust.reason,
       args.bootstrapDiagnostics,
     );
     return;
@@ -342,6 +379,8 @@ export async function discoverAndRegisterToolPackages(
         env,
         projectRoot: opts.projectRoot,
         projectTrustedTools: opts.projectTrustedTools,
+        trustPolicy: opts.trustPolicy,
+        policyAudit: opts.policyAudit,
         registeredStableIds,
         provenance,
         manifests,

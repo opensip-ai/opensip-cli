@@ -129,19 +129,22 @@ describe('toolsInstall — activation', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('omits toolId/version when the admitted package has no manifest', async () => {
+  it('fails before activation when the staged package cannot be re-read for policy admission', async () => {
     stageValidation('passed');
-    addToolPlugin.mockReturnValue({ type: 'plugin-add', success: true });
     admitToolPackage.mockResolvedValue({ manifest: undefined });
 
     const result = await toolsInstall({ spec: '@x/demo', cwd: '/proj' });
-    expect(result.success).toBe(true);
-    expect(result).not.toHaveProperty('toolId');
-    expect(result).not.toHaveProperty('version');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('validated package could not be re-read for policy admission');
+    expect(addToolPlugin).not.toHaveBeenCalled();
   });
 
   it('surfaces a typed activation error', async () => {
     stageValidation('passed');
+    admitToolPackage.mockResolvedValue({
+      manifest: { id: 'demo', version: '1.0.0', commands: [] },
+      provenance: { manifestHash: 'manifest-hash-demo' },
+    });
     addToolPlugin.mockReturnValue({
       type: 'plugin-add',
       success: false,
@@ -151,11 +154,14 @@ describe('toolsInstall — activation', () => {
     const result = await toolsInstall({ spec: '@x/demo', cwd: '/proj' });
     expect(result.success).toBe(false);
     expect(result.error).toBe('npm install failed');
-    expect(admitToolPackage).not.toHaveBeenCalled();
   });
 
   it('falls back to a generic message when activation returns an unexpected shape', async () => {
     stageValidation('passed');
+    admitToolPackage.mockResolvedValue({
+      manifest: { id: 'demo', version: '1.0.0', commands: [] },
+      provenance: { manifestHash: 'manifest-hash-demo' },
+    });
     // Wrong result type → not plugin-add → the `'error' in activation ? … : 'activation failed'`
     // false branch (no error key present).
     addToolPlugin.mockReturnValue({ type: 'plugin-remove', success: false });

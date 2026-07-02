@@ -21,6 +21,8 @@ source-files:
   - packages/graph/engine/src/persistence/schema.ts
   - packages/datastore/src/baseline-repo.ts
   - packages/datastore/src/schema/baseline.ts
+  - packages/datastore/src/policy-audit-repo.ts
+  - packages/datastore/src/schema/policy-audit.ts
   - packages/cli/src/bootstrap/session-retention.ts
   - packages/cli/src/bootstrap/declared-inputs.ts
 related-docs:
@@ -76,6 +78,7 @@ Schemas are owned by the package that produces the data — datastore is paradig
 | `@opensip-cli/session-store` | `src/schema/sessions.ts` | `sessions`, `session_tool_payload` |
 | `@opensip-cli/graph` | `src/persistence/schema.ts` | `graph_catalog`, `graph_shard_fragment` |
 | `@opensip-cli/datastore` (host) | `src/schema/baseline.ts` | `tool_baseline_entries`, `tool_baseline_meta` (all tools' gate baselines) |
+| `@opensip-cli/datastore` (host) | `src/schema/policy-audit.ts` | `policy_audit_events` (local trust-policy decisions) |
 
 `__drizzle_migrations` is a fourth, internal table — Drizzle uses it to record which migrations have been applied. (The historical per-tool baseline tables — `fit_baseline`, `graph_baseline_signals`, `graph_baseline_meta` — were dropped by migration when ADR-0036 landed; baselines are drop-and-recapture, so a re-run of `--gate-save` rebuilds them in the generic pair.)
 
@@ -86,6 +89,7 @@ flowchart TB
   Migrations["__drizzle_migrations"]
   Sessions["sessions<br/>session_tool_payload"]
   Baselines["tool_baseline_entries<br/>tool_baseline_meta<br/>(scoped by tool)"]
+  PolicyAudit["policy_audit_events<br/>(trust-policy decisions)"]
   Graph["graph_catalog<br/>graph_shard_fragment"]
 
   Logger["core logger"]
@@ -99,6 +103,7 @@ flowchart TB
   Store --> Migrations
   Store --> Sessions
   Store --> Baselines
+  Store --> PolicyAudit
   Store --> Graph
 
   Logger --> Logs
@@ -183,6 +188,20 @@ Retention is best-effort. A prune, file-lock, size-check, or vacuum failure is
 logged under `session.retention.*`, but it never changes the primary tool
 verdict, session write result, or process exit code. Tools do not call this
 maintenance path directly; the host owns it per ADR-0096.
+
+## Policy audit events
+
+The trust-policy plane records bounded local evidence in
+`policy_audit_events`. Events are produced by host policy-enforcement points
+only: installed/authored Tool admission, capability-pack admission,
+`tools install`, strict `fitness.disabledChecks` handling, baseline capture, and
+`policy explain`. Tools never write this table directly.
+
+Events are buffered on `RunScope.policyAudit` during the command and flushed by
+the host before the datastore close disposer. `opensip policy audit --json`
+reads the table newest-first; `--out <path>` writes the same command result JSON
+through the host artifact writer. Retention is bounded in the repository layer
+so the audit surface stays local and small.
 
 The dashboard reads the same store to populate its run-history view. For programmatic discovery of these surfaces (especially the new agent ergonomics around filtering and raw output), see `agent-catalog` in the [CLI commands reference](../70-reference/01-cli-commands.md).
 

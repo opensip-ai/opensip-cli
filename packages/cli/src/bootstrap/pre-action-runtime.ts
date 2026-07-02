@@ -1,4 +1,6 @@
+import type { PolicyAuditCollector } from './policy-audit.js';
 import type { StartupTimingEvent } from './startup-timing.js';
+import type { ResolvedTrustPolicy } from '@opensip-cli/config';
 import type {
   CliDiagnostic,
   LanguageRegistry,
@@ -15,4 +17,6 @@ export interface PreActionRuntime {
   readonly provenance: readonly ToolProvenance[];
   readonly bootstrapDiagnostics: readonly CliDiagnostic[];
   readonly startupTimings?: readonly StartupTimingEvent[];
+  readonly trustPolicy: ResolvedTrustPolicy;
+  readonly policyAudit: PolicyAuditCollector;
 }

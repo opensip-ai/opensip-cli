@@ -21,14 +21,14 @@ related-docs:
   - ../../decisions/ADR-0030-authored-tool-discovery.md
 ---
 # NOTE (host-planes hygiene)
-All host command paths (including sessions/* and agent-catalog) now execute after a RunScope has been entered via the pre-action hook (or explicit runWithScope in tests). The pre-scope holder is gone for production. Only the documented ToolCliContext seams may be used for output/state/hostPlanes. See the hygiene plan for details.
+All host command paths (including sessions/*, policy/*, and agent-catalog) now execute after a RunScope has been entered via the pre-action hook (or explicit runWithScope in tests). The pre-scope holder is gone for production. Only the documented ToolCliContext seams may be used for output/state/hostPlanes. See the hygiene plan for details.
 # CLI dispatch
 
 `packages/cli/src/index.ts` is the binary's entry point. It does the same five things on every invocation and then hands argv to Commander. This doc walks those five things.
 
 > **What you'll understand after this:**
 > - The exact startup sequence, in order.
-> - Which commands are CLI-owned (`init`, `report`, `config`, `sessions`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, `uninstall`) vs. tool-owned (`fit`, `sim`, `graph`, `yagni`), and how the per-tool `<tool> plugin` groups mount under each pack-supporting tool primary.
+> - Which commands are CLI-owned (`init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, `uninstall`) vs. tool-owned (`fit`, `sim`, `graph`, `yagni`), and how the per-tool `<tool> plugin` groups mount under each pack-supporting tool primary.
 > - The global flag set vs. per-command flags.
 > - How the CLI handles errors before, during, and after Tool execution.
 
@@ -46,13 +46,15 @@ All host command paths (including sessions/* and agent-catalog) now execute afte
 2. await bootstrapCli({ langRegistry, toolRegistry, projectDir }):
      a. Registers the bundled language adapters (typescript, rust,
         python, java, go, cpp) into langRegistry.
-     b. Resolves and dynamically imports the first-party tool packages
+     b. Resolves the pre-scope local trust policy from user/project/org
+        sources so executable plugin admission can fail before imports.
+     c. Resolves and dynamically imports the first-party tool packages
         (@opensip-cli/fitness, @opensip-cli/simulation,
         @opensip-cli/graph, @opensip-cli/yagni) into toolRegistry.
-     c. Walks node_modules via discoverToolPackages() to load any
+     d. Walks node_modules via discoverToolPackages() to load any
         third-party packages whose package.json declares
         opensipTools.kind === 'tool'.
-     d. Walks the two authored `tools/` roots via
+     e. Walks the two authored `tools/` roots via
         discoverAndRegisterAuthoredTools(): global
         `~/.opensip-cli/tools/` (trusted-by-default) then project
         `<project>/opensip-cli/tools/` (deny-by-default). Each
@@ -65,8 +67,8 @@ All host command paths (including sessions/* and agent-catalog) now execute afte
                                               via mountCommandSpec().
 4. mountHostCommands()                      ← mount CLI-owned commands
                                               (init, report, config,
-                                              sessions, repair, tools, configure,
-                                              agent-catalog, completion,
+                                              sessions, policy, repair, tools,
+                                              configure, agent-catalog, completion,
                                               uninstall), then hang
                                               each per-tool <tool>
                                               plugin group under its
@@ -95,7 +97,7 @@ sequenceDiagram
 
   User->>CLI: opensip command
   CLI->>Core: create LanguageRegistry + ToolRegistry
-  CLI->>Bootstrap: register adapters, tools, discovered tools
+  CLI->>Bootstrap: resolve policy, register adapters, tools, discovered tools
   Bootstrap->>Core: LanguageRegistry.register(...)
   Bootstrap->>Tools: ToolRegistry.register(...)
   CLI->>Tools: mountAllToolCommands(program, ctx)
@@ -127,8 +129,9 @@ A few of the constraints that pinned the order:
 
 - **Language adapters before any check ever runs.** The fitness tool's content filter dispatches per-file based on the language registry. A check that runs before any adapter is registered would treat every file as raw text and silently miss violations. The adapters are registered first inside `bootstrapCli()`, so they're in place before any tool is admitted and mounted.
 - **First-party tools before discovery.** `ToolRegistry.register()` is **first-writer-wins** (`warn-first-wins`). `bootstrapCli()` admits the bundled tools first, so a same-id third-party package can't clobber a built-in: the first-writer policy keeps the incumbent (and warns), and the discovery walk via `discoverToolPackages()` *also* explicitly skips packages whose `metadata.id` matches a bundled tool. Both guards point the same way — bundled `fit`/`sim`/`graph`/`yagni` win.
+- **Policy before executable plugin import.** The pre-scope trust policy is resolved before installed or authored Tool runtimes are imported. A denied installed/project/user Tool fails closed at the admission point, so merely having a package or sidecar on disk does not run its module.
 - **Authored discovery is the third leg — bundled, then installed, then authored sidecars.** After the bundled + installed legs, `discoverAndRegisterAuthoredTools()` walks the two authored `tools/` roots and converges on the same `importToolRuntime` → `isValidTool` → `registry.register` path. It carries **two trust postures**: a global-authored tool (`~/.opensip-cli/tools/`) is trusted-by-default, while a project-authored tool (`<project>/opensip-cli/tools/`) is **deny-by-default** — admitted only when its id appears in `tools.trusted` or the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override. The **trust decision always precedes the dynamic import**: an untrusted project tool throws `PluginIncompatibleError` (exit 5) before its module is ever loaded, so a `git clone`-borne tool cannot run code by mere presence ([ADR-0030](../../decisions/ADR-0030-authored-tool-discovery.md)).
-- **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `yagni`, …) get mounted in `mountAllToolCommands()` first from each tool's `commandSpecs`. CLI-owned commands (`init`, `report`, `config`, `sessions`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, `uninstall`) are mounted afterwards in `mountHostCommands()`, also through `mountCommandSpec()` — which then hangs each per-tool `<tool> plugin` group under its tool primary via `mountToolPluginGroups()` (so there is no top-level `opensip plugin`). The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
+- **Tools mount before CLI-owned commands.** Tool subcommands (`fit`, `sim`, `graph`, `yagni`, …) get mounted in `mountAllToolCommands()` first from each tool's `commandSpecs`. CLI-owned commands (`init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, `uninstall`) are mounted afterwards in `mountHostCommands()`, also through `mountCommandSpec()` — which then hangs each per-tool `<tool> plugin` group under its tool primary via `mountToolPluginGroups()` (so there is no top-level `opensip plugin`). The order avoids duplicate-name collisions (a tool can't squat a CLI-owned name) and keeps tool subcommands at the top of `--help`.
 - **`parseAsync` last.** Commander parses argv synchronously but action handlers are async. `parseAsync` returns when the action handler resolves, which is what blocks Node's event loop until the run completes.
 
 ---
@@ -158,6 +161,7 @@ Some commands belong to the CLI itself, not to any Tool. They live under [`packa
 | `completion` | CLI | Prints a shell-completion script whose subcommands + flags are **derived from the live `CommandSpec`s** at generation time (`assembleCompletionInventory`) — the same specs the runtime mounts, so it can't drift; a flag-parity test enforces it. Discovered third-party tool commands are included (the inventory is sourced from the populated registry). |
 | `report` | CLI | Generates + opens the HTML report, aggregating each tool's contributed report data (composition root). Cross-tool. |
 | `sessions list/purge` | CLI | Reads the runtime session store. Cross-tool. New agent ergonomics (`--summary-only`, `--filter`, `--raw` on show) are also host-owned here. |
+| `policy status/explain/audit` | CLI | Inspects the resolved local trust-policy plane and the host-owned policy audit table. Cross-tool. |
 
 Tool-owned commands are mounted from each Tool's declared `commandSpecs` via the
 host's `mountCommandSpec`, in the canonical nested `<tool> <verb>` grammar. The
@@ -282,7 +286,7 @@ For `acme-api` running `opensip fit --gate-compare` from CI on 2026-05-17:
    `graph recipes` / `graph lookup` / `graph index` / `graph export` (and its
    internal workers); yagni's spec mounts `yagni`. `commandSpecs` is the only
    command surface.
-4. `mountHostCommands()`: host-owned `CommandSpec`s mount `init`, `report`, `config`, `sessions`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, and `uninstall`, then `mountToolPluginGroups()` hangs each per-tool `<tool> plugin` group under its tool primary.
+4. `mountHostCommands()`: host-owned `CommandSpec`s mount `init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, and `uninstall`, then `mountToolPluginGroups()` hangs each per-tool `<tool> plugin` group under its tool primary.
 5. `argv = ['node', 'opensip-cli', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-cli/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
 

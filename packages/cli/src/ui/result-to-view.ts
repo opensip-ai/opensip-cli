@@ -47,17 +47,10 @@ import {
   viewHelp,
 } from './views/misc-views.js';
 import { viewPlugin } from './views/plugin-view.js';
+import { viewPolicyResult } from './views/policy-views.js';
 import { viewRepair } from './views/repair-views.js';
 import { viewSuiteAdd, viewSuiteList, viewSuiteRun } from './views/suite-views.js';
-import {
-  viewToolsCreate,
-  viewToolsDataPurge,
-  viewToolsDoctor,
-  viewToolsInstall,
-  viewToolsList,
-  viewToolsUninstall,
-  viewToolsValidate,
-} from './views/tools-views.js';
+import { viewToolsResult } from './views/tools-views.js';
 
 import type {
   CommandResult,
@@ -347,26 +340,14 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'sim-notice': {
       return viewSimNotice(result);
     }
-    case 'tools-list': {
-      return viewToolsList(result);
-    }
-    case 'tools-doctor': {
-      return viewToolsDoctor(result);
-    }
-    case 'tools-create': {
-      return viewToolsCreate(result);
-    }
+    case 'tools-create':
+    case 'tools-data-purge':
+    case 'tools-doctor':
+    case 'tools-install':
+    case 'tools-list':
+    case 'tools-uninstall':
     case 'tools-validate': {
-      return viewToolsValidate(result);
-    }
-    case 'tools-install': {
-      return viewToolsInstall(result);
-    }
-    case 'tools-uninstall': {
-      return viewToolsUninstall(result);
-    }
-    case 'tools-data-purge': {
-      return viewToolsDataPurge(result);
+      return viewToolsResult(result);
     }
     case 'suite-add':
     case 'suite-list':
@@ -383,6 +364,11 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'plugin-remove':
     case 'plugin-sync': {
       return viewPlugin(result);
+    }
+    case 'policy-audit':
+    case 'policy-explain':
+    case 'policy-status': {
+      return viewPolicyResult(result);
     }
     case 'clear-done': {
       return viewClearDone(result);

@@ -32,6 +32,8 @@ import { join } from 'node:path';
 import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import { trustPolicySchema, type TrustPolicyDocument } from '../policy/trust-policy-schema.js';
+
 /**
  * Config-layer environment variables (§5.12). Declared as an
  * immutable spec table read through the {@link EnvRegistry} primitive, so the env
@@ -65,6 +67,7 @@ export interface GlobalConfig {
    * own `cli.cloud:` setting. `endpoint` overrides the cloud URL per user.
    */
   cloud?: { sync?: boolean; endpoint?: string };
+  policy?: unknown;
   [key: string]: unknown;
 }
 
@@ -81,6 +84,27 @@ export function readGlobalConfig(): GlobalConfig {
   } catch {
     return {};
   }
+}
+
+/** Result of reading the user-level trust-policy block without throwing. */
+export interface ReadGlobalTrustPolicyResult {
+  readonly policy?: TrustPolicyDocument;
+  readonly error?: string;
+}
+
+/** Read + validate the user-level `policy:` block without throwing. */
+export function readGlobalTrustPolicy(): ReadGlobalTrustPolicyResult {
+  const raw = readGlobalConfig().policy;
+  if (raw === undefined) return {};
+  const parsed = trustPolicySchema.safeParse(raw);
+  if (parsed.success) return { policy: parsed.data };
+  const summary = parsed.error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join('.') : '(policy)';
+      return `${path}: ${issue.message}`;
+    })
+    .join('; ');
+  return { error: summary };
 }
 
 /**

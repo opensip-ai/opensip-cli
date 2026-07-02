@@ -29,6 +29,12 @@ export interface ToolsListRow {
     | 'env'
     | 'user-global'
     | 'denied';
+  /** Effective trust-policy decision for this row, when evaluated by this run. */
+  readonly policyOutcome?: 'allow' | 'allow-with-conditions' | 'deny';
+  /** Bounded policy reasons for user and agent inspection. */
+  readonly policyReasons?: readonly string[];
+  /** Policy exception ids that matched this row. */
+  readonly policyExceptionIds?: readonly string[];
   /** True on a GLOBAL row whose tool id is shadowed by a project-local install. */
   readonly shadowed?: boolean;
 }

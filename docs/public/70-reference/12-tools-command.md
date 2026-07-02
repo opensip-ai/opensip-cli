@@ -65,6 +65,7 @@ The effective tool inventory: bundled tools, user-global installs
 | `version` | Manifest version. |
 | `source` | `bundled`, `global`, or `project`. |
 | `trust` | Why the row is admitted or denied: `bundled`, `managed-install`, `project-config`, `env`, `user-global`, or `denied`. |
+| `policy` | Effective local trust-policy outcome when available: `allow`, `allow-with-conditions`, or `deny`. |
 | `commands` | Command names the manifest declares. |
 | `[manifest-only]` | Present on disk but not loaded by this run (e.g. a broken runtime — listing never imports, so it still lists). |
 | `[shadowed]` | A global row whose tool id is overridden by a project-local install (project wins, matching discovery order). |
@@ -186,15 +187,19 @@ Surface note: this is a flat `data-purge` subcommand (the spec drafted a
 nested `tools data purge`; the host's command machinery is deliberately one
 group level deep).
 
-## Trust tier and provenance (current vs planned)
+## Trust tier, policy, and provenance
 
 `tools list` and `tools validate` surface trust tier and install provenance
-metadata where available. **Enforcement** of consumption-side provenance
-(install/load verification for non-bundled npm packages) is defined in
-[ADR-0068](../../decisions/ADR-0068-consumption-side-verification-policy.md) but
-**not active** in the loader yet — enterprise strict mode will deny missing or
-mismatched provenance unless an approved exception exists. Bundled first-party
-tools remain trusted TCB verified by the release provenance lane.
+metadata where available. The local trust-policy plane evaluates those facts at
+bootstrap and install time. Default mode preserves existing local trust behavior
+and records conditioned decisions when provenance is missing or failed. Strict
+mode denies unverified non-bundled Tool loads/installs unless an unexpired exact
+exception exists. Bundled first-party tools remain trusted TCB verified by the
+release provenance lane.
+
+Use `opensip policy explain installed-tool:<id> --action load --json` or
+`opensip policy audit --json` to inspect the same decisions outside the install
+path.
 
 ## See also
 

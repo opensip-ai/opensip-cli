@@ -107,14 +107,15 @@ async function main(): Promise<void> {
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
   const userArgv = process.argv.slice(2);
-  const { provenance, manifests, bootstrapDiagnostics, startupTimings } = await bootstrapCli({
-    langRegistry,
-    toolRegistry,
-    projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
-    cwd: process.cwd(),
-    cliEntryUrl: import.meta.url,
-    argv: userArgv,
-  });
+  const { provenance, manifests, bootstrapDiagnostics, startupTimings, trustPolicy, policyAudit } =
+    await bootstrapCli({
+      langRegistry,
+      toolRegistry,
+      projectDir: dirname(dirname(fileURLToPath(import.meta.url))),
+      cwd: process.cwd(),
+      cliEntryUrl: import.meta.url,
+      argv: userArgv,
+    });
 
   const { ctx, runActionHooks } = buildToolCliContext({
     render: renderResult,
@@ -166,6 +167,8 @@ async function main(): Promise<void> {
       provenance,
       bootstrapDiagnostics,
       startupTimings,
+      trustPolicy,
+      policyAudit,
     },
     commandScopes,
   );

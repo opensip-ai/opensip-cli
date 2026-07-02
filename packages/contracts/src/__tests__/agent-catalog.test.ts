@@ -33,6 +33,9 @@ describe('buildAgentCatalog', () => {
       'sessions list',
       'sessions show',
       'agent-catalog',
+      'policy status',
+      'policy explain',
+      'policy audit',
     ]);
     expect(catalog.commonPatterns.length).toBeGreaterThan(0);
     expect(
@@ -41,6 +44,7 @@ describe('buildAgentCatalog', () => {
     expect(JSON.stringify(catalog)).toContain('MCP review_change');
     expect(JSON.stringify(catalog)).toContain('opensip suite run audit --changed --json');
     expect(JSON.stringify(catalog)).not.toContain('opensip audit');
+    expect(JSON.stringify(catalog)).toContain('opensip policy explain installed-tool:audit-sec');
     expect(catalog.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(catalog.notes.length).toBeGreaterThan(0);
   });

@@ -18,6 +18,8 @@ source-files:
   - packages/yagni/engine/src/cli/yagni-config-schema.ts
   - packages/config/src/document/global-config.ts
   - packages/config/src/document/targeting.ts
+  - packages/config/src/policy/trust-policy-schema.ts
+  - packages/config/src/policy/trust-policy-resolution.ts
   - packages/cli/src/commands/init.ts
 related-docs:
   - ../00-start/06-system-context.md
@@ -31,7 +33,7 @@ opensip-cli reads two config files:
 | File | Scope | Holds |
 |---|---|---|
 | `<project>/opensip-cli.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
-| `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key and machine-wide cloud-sync controls |
+| `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key, machine-wide cloud-sync controls, and user policy |
 
 Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated only when no loaded tool owns that namespace; a block named after a loaded tool that did not declare a config schema is rejected as a tool/config contract bug.
 
@@ -61,6 +63,7 @@ simulation: {}            # SimulationConfig
 cli: {}                   # CliDefaults
 plugins: {}               # per-domain pin lists
 tools: {}                 # host-owned whole-Tool trust
+policy: {}                # host-owned local trust-policy plane
 suites: {}                # host-owned multi-tool suites
 dashboard: {}             # dashboard.editor
 graph: {}                 # graph rule knobs (tool-contributed namespace)
@@ -69,7 +72,7 @@ yagni: {}                 # YAGNI reduction audit knobs (tool-contributed namesp
 
 Every section is optional; a missing section becomes `{}`.
 
-The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `tools`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `tools`, `policy`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file. Use `opensip config migrate --check` in CI to fail before stale committed configs reach that point.
 
@@ -283,6 +286,54 @@ tools:
     - audit-sec
 ```
 
+## `policy`
+
+Host-owned local trust-policy plane. The same resolved policy gates installed
+Tool load, authored Tool load, capability-pack load, `tools install`,
+`fitness.disabledChecks`, and baseline capture. It is local-only: the CLI never
+contacts OpenSIP Cloud, npm, GitHub, or a model to make a policy decision.
+
+Policy sources layer in this order: builtin defaults, user config
+(`~/.opensip-cli/config.yml#policy`), project config
+(`<project>/opensip-cli.config.yml#policy`), then an optional project-local org
+cache. Later sources override scalar fields and append exceptions.
+
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `mode` | `'default' \| 'strict'` | `default` | Default decision mode. Strict denies unverified non-bundled executable loads/installs and gate-weakening actions without an exact unexpired exception. |
+| `ci` | `'default' \| 'strict'` | `default` | Mode used when `CI=true`; `strict` here makes CI stricter without changing local interactive runs. |
+| `exceptions` | list | `[]` | Exact subject/action exceptions. No wildcards. Maximum 100 entries. |
+| `org.required` | boolean | `false` | If true, a missing/stale/invalid org cache fails closed. |
+| `org.cachePath` | string | `.opensip/policy/org-policy.json` | Project-relative org policy cache path. Absolute paths are allowed only if they remain inside the project root after realpath checks. |
+| `org.maxAgeMs` | positive integer | `86400000` | Maximum org cache age. |
+
+```yaml
+policy:
+  mode: default
+  ci: strict
+  org:
+    required: true
+    cachePath: .opensip/policy/org-policy.json
+    maxAgeMs: 86400000
+  exceptions:
+    - id: allow-legacy-fit-baseline
+      subject: baseline:fit
+      action: baseline-save
+      reason: Temporary migration baseline during rollout
+      expiresAt: '2026-08-01T00:00:00.000Z'
+```
+
+Subject strings are exact `kind:id` pairs. Supported kinds are
+`installed-tool`, `project-local-tool`, `user-global-tool`, `capability-pack`,
+`fitness.disabledChecks`, `baseline`, and `runtime-exclude`. Supported actions
+are `load`, `install`, `disable-check`, `runtime-exclude`, and
+`baseline-save`.
+
+Use `opensip policy status --json` to see the effective sources and org-cache
+state, `opensip policy explain <subject> --action <name> --json` to inspect a
+decision before running a command, and `opensip policy audit --json` to read the
+durable local audit events.
+
 ## `suites`
 
 Host-owned named multi-tool runs. Each step resolves by the tool's stable UUID
@@ -450,13 +501,16 @@ apiKey: '<your-opensip-cloud-key>'
 cloud:
   sync: false               # optional: machine-wide opt-out of cloud signal sync
   endpoint: https://...     # optional: https override of the built-in cloud URL
+policy:
+  ci: strict                # optional: machine-wide local trust policy layer
 ```
 
 Cross-project, flat keys. `apiKey` is the OpenSIP Cloud key (for `--report-to`
 and cloud signal sync). The optional `cloud` block is the machine-wide
 privacy control: `sync: false` disables cloud signal sync for every project run
 from this account (it layers over each project's `cli.cloud:`; a `false` in
-either place wins). Use `opensip configure` to write the key;
+either place wins). The optional `policy` block is the user-level trust-policy
+layer and uses the same schema as project `policy:`. Use `opensip configure` to write the key;
 `opensip uninstall --user` removes the entire `~/.opensip-cli/` directory.
 
 ---

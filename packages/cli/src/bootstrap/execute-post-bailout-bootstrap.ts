@@ -152,6 +152,7 @@ export async function executePostBailoutBootstrap(
         provenance,
         bootstrapDiagnostics,
         startupTimings: runtime.startupTimings,
+        bootstrapPolicyAudit: runtime.policyAudit,
         apiKey,
         noCloud,
         logger: runLogger,

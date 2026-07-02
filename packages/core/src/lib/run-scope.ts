@@ -141,6 +141,10 @@ export interface RunScopeOptions {
    * collector; the CLI bootstrap transfers startup diagnostics here.
    */
   readonly bootstrapDiagnostics?: readonly CliDiagnostic[];
+  /** Host-owned opaque trust policy state. Core carries it but never interprets it. */
+  readonly trustPolicy?: unknown;
+  /** Host-owned opaque policy audit collector. Core carries it but never interprets it. */
+  readonly policyAudit?: unknown;
 }
 
 /**
@@ -211,6 +215,10 @@ export class RunScope {
    * commands filter or surface the full stream via `tools doctor`.
    */
   readonly bootstrapDiagnostics: BootstrapDiagnosticsCollector;
+  /** Host-owned opaque trust policy state; narrowed only by the CLI composition root. */
+  readonly trustPolicy: unknown;
+  /** Host-owned opaque policy audit collector; narrowed only by the CLI composition root. */
+  readonly policyAudit: unknown;
 
   /**
    * Tool-registered teardown callbacks, invoked once during {@link dispose}.
@@ -244,6 +252,8 @@ export class RunScope {
     for (const diagnostic of opts.bootstrapDiagnostics ?? []) {
       this.bootstrapDiagnostics.record(diagnostic);
     }
+    this.trustPolicy = opts.trustPolicy;
+    this.policyAudit = opts.policyAudit;
   }
 
   /**

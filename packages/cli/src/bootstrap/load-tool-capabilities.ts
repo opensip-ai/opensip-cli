@@ -34,6 +34,12 @@ import {
 } from '@opensip-cli/core';
 
 import { BUNDLED_CAPABILITY_PACKS } from './bundled-manifest.js';
+import { policyCiEvidenceFromCurrentEnv } from './policy-evidence.js';
+import {
+  evaluatePolicyPep,
+  policyAuditFromCurrentScope,
+  policyFromCurrentScope,
+} from './policy-pep.js';
 import { CAPABILITY_PACK_ALLOWLIST_ENV, isCapabilityPackTrusted } from './tool-trust.js';
 
 /**
@@ -120,19 +126,44 @@ function admitCapabilityPackage(
   pkg: SelectedCapabilityPackage,
   explicitlyConfiguredPackages: ReadonlySet<string>,
 ): CapabilityPackageAdmission {
-  if (isBundledCapabilityPack(descriptor, pkg.name)) {
+  const bundled = isBundledCapabilityPack(descriptor, pkg.name);
+  const explicitlyConfigured = explicitlyConfiguredPackages.has(pkg.name);
+  const envTrusted = isCapabilityPackTrusted(pkg.name);
+  const policyDecision = evaluatePolicyPep({
+    policy: policyFromCurrentScope(),
+    audit: policyAuditFromCurrentScope(),
+    subject: {
+      kind: 'capability-pack',
+      id: pkg.name,
+      packageName: pkg.name,
+      source: 'capability-pack',
+    },
+    action: 'load',
+    evidence: {
+      legacyTrusted: bundled || explicitlyConfigured || envTrusted,
+      bundled,
+      explicitlyConfigured,
+      envAllowed: envTrusted,
+      capabilityExport: descriptor.exportName,
+      provenanceStatus: bundled ? 'verified' : 'unavailable',
+      ci: policyCiEvidenceFromCurrentEnv(),
+    },
+  });
+  if (bundled && policyDecision.allowed) {
     return capabilityPackProvenancePassthrough(pkg, { admit: true });
   }
-  if (explicitlyConfiguredPackages.has(pkg.name)) {
+  if (explicitlyConfigured && policyDecision.allowed) {
     return capabilityPackProvenancePassthrough(pkg, { admit: true });
   }
-  if (isCapabilityPackTrusted(pkg.name)) {
+  if (envTrusted && policyDecision.allowed) {
     return capabilityPackProvenancePassthrough(pkg, { admit: true });
   }
   const configuredPackageKey = descriptor.configKeys.packages;
   const configuredPackageHint =
     configuredPackageKey === undefined ? '' : ` or list it in plugins.${configuredPackageKey}`;
-  const reason = `set ${CAPABILITY_PACK_ALLOWLIST_ENV} to '${pkg.name}'${configuredPackageHint}`;
+  const reason = policyDecision.allowed
+    ? `set ${CAPABILITY_PACK_ALLOWLIST_ENV} to '${pkg.name}'${configuredPackageHint}`
+    : policyDecision.decision.reasons.join('; ');
   logger.warn({
     evt: 'cli.capability.trust_denied',
     module: 'cli:capability',

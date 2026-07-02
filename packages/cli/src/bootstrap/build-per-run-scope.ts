@@ -18,20 +18,16 @@
  * hook stays focused on orchestration.
  */
 
-import { basename } from 'node:path';
-
-import { resolveApiKey, resolveEffectiveCloudConfig } from '@opensip-cli/config';
+import { resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
   BootstrapDiagnosticsCollector,
   createCapabilityRegistry,
-  currentTraceparent,
   isContributionWithDisposer,
   type CliDiagnostic,
   type LanguageRegistry,
   type Logger,
   PluginIncompatibleError,
   type ProjectContext,
-  type RunCorrelation,
   resolveUserPaths,
   RunScope,
   resolveToolHooks,
@@ -45,11 +41,15 @@ import { resolveSignalSink } from '@opensip-cli/output';
 
 import { buildDatastoreThunk } from '../cli-context.js';
 
+import { assembleCorrelation } from './assemble-correlation.js';
 import { buildTargets } from './build-targets.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
+import { flushPolicyAuditEvents } from './policy-audit-flush.js';
+import { resolvePolicyForRun } from './run-policy.js';
 import { shouldRunHookInHost } from './tool-provenance.js';
 
 import type { loadCliDefaults } from './cli-defaults.js';
+import type { PolicyAuditCollector } from './policy-audit.js';
 import type { StartupTimingEvent } from './startup-timing.js';
 
 const FORBIDDEN_SCOPE_CONTRIBUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
@@ -141,6 +141,8 @@ export interface BuildPerRunScopeInput {
    * the same local timing facts as logs.
    */
   readonly startupTimings?: readonly StartupTimingEvent[];
+  /** Policy audit events gathered before this run scope existed. */
+  readonly bootstrapPolicyAudit?: PolicyAuditCollector;
   readonly apiKey?: string;
   readonly noCloud?: boolean;
   readonly logger: Logger;
@@ -229,6 +231,16 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     bootstrapDiagnostics: scopeBootstrapDiagnostics,
   });
 
+  const runPolicy = resolvePolicyForRun({
+    project,
+    runId,
+    parentCommand: input.parentCommand,
+    configDocument,
+    toolConfig,
+    diagnostics: scopeBootstrapDiagnostics,
+    bootstrapPolicyAudit: input.bootstrapPolicyAudit,
+  });
+
   // ADR-0037: build the host file-targeting accessor from the SAME single
   // validated config document the composer already read (ADR-0023: one
   // reader — `buildTargets` is a pure builder, never a second `readYamlFile`).
@@ -272,8 +284,15 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // B2: the cloud-aware correlation bag, read downstream via
     // `currentScope()?.correlation` and forwarded into spawned/forked children.
     correlation,
+    trustPolicy: runPolicy.policy,
+    policyAudit: runPolicy.audit,
   });
 
+  // Flush policy audit events before the datastore close disposer. Both are
+  // best-effort; flush opens the project store only when policy decisions exist.
+  scope.onDispose(() => {
+    flushPolicyAuditEvents();
+  });
   // Close the datastore on scope teardown — the "consumer responsibility"
   // RunScope.dispose() documents. No-op when no command opened it.
   scope.onDispose(datastoreThunk.dispose);
@@ -372,45 +391,6 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   );
 
   return scope;
-}
-
-/** Inputs for {@link assembleCorrelation}. */
-interface AssembleCorrelationInput {
-  readonly runId: string;
-  readonly tool: string;
-  readonly parentCommand: string;
-  readonly apiKey?: string;
-  readonly noCloud?: boolean;
-  readonly effectiveCloud: { readonly sync?: boolean; readonly endpoint?: string } | undefined;
-  readonly project: ProjectContext;
-  readonly cwd: string;
-}
-
-/** Assemble the cloud-aware {@link RunCorrelation} bag and diagnostics facts. */
-function assembleCorrelation(input: AssembleCorrelationInput): {
-  readonly correlation: RunCorrelation;
-  readonly cloudActive: boolean;
-  readonly traceId: string | undefined;
-} {
-  const cloudActive =
-    resolveApiKey(input.apiKey) !== undefined &&
-    input.noCloud !== true &&
-    input.effectiveCloud?.sync !== false;
-
-  const repoBaseDir = input.project.scope === 'project' ? input.project.projectRoot : input.cwd;
-  const repo = cloudActive ? basename(repoBaseDir) || undefined : undefined;
-
-  const traceId = currentTraceparent();
-
-  const correlation: RunCorrelation = {
-    runId: input.runId,
-    tool: input.tool,
-    parentCommand: input.parentCommand,
-    ...(traceId ? { traceId } : {}),
-    ...(repo ? { repo } : {}),
-  };
-
-  return { correlation, cloudActive, traceId };
 }
 
 function configDocumentSlot(

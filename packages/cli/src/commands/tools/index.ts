@@ -16,6 +16,8 @@ import {
   type ProjectContext,
 } from '@opensip-cli/core';
 
+import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
+
 import { toolsCreate } from './create.js';
 import { toolsDataPurge } from './data-purge.js';
 import { toolsDoctor } from './doctor.js';
@@ -94,6 +96,7 @@ function buildToolsListSpec(): HostSpec {
           project: opts.project,
           provenance: scope?.toolProvenance ?? [],
           manifests: scope?.toolManifests ?? [],
+          policy: policyFromCurrentScope(),
         }),
       );
     },
