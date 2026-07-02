@@ -33,6 +33,7 @@ export const INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
   'fit-run-worker',
   'sim-run-worker',
   'graph-run-worker',
+  '__capability-pack-worker',
   '__tool-command-worker',
 ]);
 

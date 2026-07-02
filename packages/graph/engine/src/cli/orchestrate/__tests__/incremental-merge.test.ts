@@ -141,14 +141,14 @@ function walkAdapter(byFile: Record<string, FunctionOccurrence[]>): GraphLanguag
 const PROJECT: ParsedProject = { token: 'p' };
 
 describe('expandClosureToFixpoint', () => {
-  it('reaches a fixpoint in one pass when no cached hash went stale', () => {
+  it('reaches a fixpoint in one pass when no cached hash went stale', async () => {
     const root = '/repo';
     const changed = join(root, 'a.ts');
     // Changed file re-walks to the SAME hash → nothing went stale.
     const cached = catalogOf(occ('a', 'a.ts', 'A1'), occ('b', 'b.ts', 'B1'));
     const adapter = walkAdapter({ 'a.ts': [occ('a', 'a.ts', 'A1')] });
 
-    const { walked, closureRel } = expandClosureToFixpoint({
+    const { walked, closureRel } = await expandClosureToFixpoint({
       adapter,
       discovery: { projectDirAbs: root, files: [changed, join(root, 'b.ts')] },
       cachedCatalog: cached,
@@ -159,7 +159,7 @@ describe('expandClosureToFixpoint', () => {
     expect(walked.occurrences.a?.[0]?.bodyHash).toBe('A1');
   });
 
-  it('does not grow the closure when the stale hash has no cached dependents', () => {
+  it('does not grow the closure when the stale hash has no cached dependents', async () => {
     const root = '/repo';
     const changed = join(root, 'a.ts');
     // a.ts's cached hash A1 vanishes (re-walks to A2), but no cached edge
@@ -167,7 +167,7 @@ describe('expandClosureToFixpoint', () => {
     const cached = catalogOf(occ('a', 'a.ts', 'A1'), occ('b', 'b.ts', 'B1'));
     const adapter = walkAdapter({ 'a.ts': [occ('a', 'a.ts', 'A2')] });
 
-    const { closureRel } = expandClosureToFixpoint({
+    const { closureRel } = await expandClosureToFixpoint({
       adapter,
       discovery: { projectDirAbs: root, files: [changed, join(root, 'b.ts')] },
       cachedCatalog: cached,

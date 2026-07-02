@@ -107,7 +107,7 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
   }
 
   const adapter = pickAdapter(input.cwd);
-  const discovery = adapter.discoverFiles({
+  const discovery = await adapter.discoverFiles({
     cwd: input.cwd,
     configPathOverride: input.configPathOverride,
   });

@@ -37,6 +37,32 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
           "variadic": false,
         },
       ],
+      "name": "__capability-pack-worker",
+      "options": [
+        {
+          "choices": undefined,
+          "defaultValue": "<cwd>",
+          "description": "Target directory",
+          "flags": "--cwd <path>",
+          "negate": false,
+          "optional": false,
+          "required": true,
+          "variadic": false,
+        },
+      ],
+      "subcommands": [],
+      "synopsis": "[internal] Run one capability-pack operation in a resource-bounded worker (forked by the capability isolation supervisor)",
+      "usage": "[options] <specPath>",
+    },
+    {
+      "aliases": [],
+      "args": [
+        {
+          "name": "specPath",
+          "required": true,
+          "variadic": false,
+        },
+      ],
       "name": "__tool-command-worker",
       "options": [
         {

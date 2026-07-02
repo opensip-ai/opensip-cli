@@ -10,6 +10,7 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-cli/core';
 
+import { capabilityWorkerCommandSpec } from '../bootstrap/capability-worker/entry.js';
 import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-entry.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
@@ -385,6 +386,7 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
     // (`opensip __tool-command-worker <spec>`); visibility:'internal' (hidden,
     // still invocable). See its spec's JSDoc in tool-command-worker-entry.ts.
     toolCommandWorkerCommandSpec,
+    capabilityWorkerCommandSpec,
   ];
 }
 

@@ -7,10 +7,13 @@ audience: [contributors, plugin-authors]
 purpose: "How plugins are discovered, loaded, and registered. Source files, npm packages, project pinning, the sync command."
 source-files:
   - packages/core/src/plugins/discover.ts
+  - packages/core/src/plugins/capability-discovery.ts
   - packages/core/src/plugins/marker-discovery.ts
   - packages/core/src/plugins/tool-package-discovery.ts
   - packages/core/src/plugins/types.ts
   - packages/config/src/capability-preferences.ts
+  - packages/cli/src/bootstrap/load-tool-capabilities.ts
+  - packages/cli/src/bootstrap/capability-worker/
   - packages/cli/src/commands/plugin.ts
   - packages/fitness/engine/src/cli/fit/check-loader.ts
   - packages/fitness/engine/src/plugins/
@@ -27,6 +30,7 @@ opensip-cli loads four kinds of plugins. Each has its own discovery shape, but t
 > **What you'll understand after this:**
 > - The five discovery shapes (Tool marker; fit-pack marker + augmenting pin; sim-pack `scenarios-*` name pattern + pin; graph-adapter marker + explicit pin; language-adapter direct import) — the middle three now flow through the ONE generic capability substrate (§5.3 / ADR-0029).
 > - Why source-file plugins auto-load but project-pinned npm packages require explicit listing.
+> - Why non-bundled capability packages are admitted by policy but executed through worker bridges.
 > - The on-disk layout the `<tool> plugin add/remove/list/sync` commands operate on.
 > - What `<tool> plugin sync` does and when CI should run it.
 
@@ -37,9 +41,9 @@ opensip-cli loads four kinds of plugins. Each has its own discovery shape, but t
 | Plugin kind | Discovery shape | Where loaded |
 |---|---|---|
 | **Tools** | `node_modules` walk for `opensipTools.kind === 'tool'` marker | At CLI startup, by `discoverToolPackages()` |
-| **Check packs** (`fit-pack`) | (a) `node_modules` walk for the `fit-pack` marker plus target-domain epoch (built-ins resolve from the CLI install tree), (b) exact `plugins.checkPackages:` list ADDED to marker discovery. Co-located `recipes` route to the `fit-recipe` domain. | The GENERIC substrate (`discoverCapabilityContributions` → `loadCapabilityDomain`), driven by fitness's `ensureChecksLoaded()` |
-| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-cli/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()` |
-| **Graph adapters** (`graph-adapter`) | (a) Explicit `plugins.graphAdapters:` list (pins the set), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for the `graph-adapter` marker plus target-domain epoch (built-ins from the CLI install tree; shared scaffolding like `@opensip-cli/graph-adapter-common` carries no marker and is skipped). | The GENERIC substrate, driven per command by the CLI pre-action hook (`loadOwningToolCapabilities`) |
+| **Check packs** (`fit-pack`) | (a) `node_modules` walk for the `fit-pack` marker plus target-domain epoch (built-ins resolve from the CLI install tree), (b) exact `plugins.checkPackages:` list ADDED to marker discovery. Co-located `recipes` route to the `fit-recipe` domain. | The GENERIC substrate (`discoverCapabilityContributions` → `loadCapabilityDomain`), driven by fitness's `ensureChecksLoaded()`. Non-bundled packs execute through the capability worker bridge. |
+| **Sim scenario packs** (`sim-pack`) | (a) Project-local source files under `opensip-cli/sim/`, (b) `node_modules` walk for `<scope>/scenarios-*` under default + configured `plugins.packageScopes`, (c) explicit `plugins.scenarioPackages:` pin. Co-located `recipes` route to the `sim-recipe` domain. | The GENERIC substrate, driven by simulation's `ensureScenariosLoaded()`. Non-bundled packs execute through the capability worker bridge. |
+| **Graph adapters** (`graph-adapter`) | (a) Explicit `plugins.graphAdapters:` list (pins the set), (b) `plugins.autoDiscoverGraphAdapters: false` opt-out, (c) default: `node_modules` walk for the `graph-adapter` marker plus target-domain epoch (built-ins from the CLI install tree; shared scaffolding like `@opensip-cli/graph-adapter-common` carries no marker and is skipped). | The GENERIC substrate, driven per command by the CLI pre-action hook (`loadOwningToolCapabilities`). Non-bundled adapters execute through the capability worker bridge. |
 | **Language adapters** | Direct CLI imports (no discovery walk) | At CLI bootstrap, before any tool is mounted |
 
 Different kinds, different lifetimes. Tools are global to the binary — once registered, they're available regardless of cwd. Check packs and scenario packs are project-scoped — they load when the relevant Tool actually runs. Language adapters are bundled — they're a CLI dep, not a discoverable plugin, because the framework can't usefully run without them.
@@ -187,6 +191,44 @@ denies unverified non-bundled executable load/install actions unless an exact
 unexpired exception applies.
 
 The marker shape is what makes "install and use" frictionless without constraining npm names. The exact-list shape (`plugins.checkPackages:`) handles non-marker packages. Project-pinned fit packs (`plugins.fit:`) are managed by `opensip fit plugin add/remove/sync`.
+
+### Capability pack resource isolation
+
+Capability packs declare resource posture in `package.json#opensipTools.requires`
+before any package module is imported:
+
+```json
+{
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1,
+    "requires": [
+      { "resource": "env", "scope": "OPENAI_API_KEY", "reason": "read project scanner token" }
+    ]
+  }
+}
+```
+
+The CLI policy PEP evaluates every capability-pack `load`. Bundled first-party
+packs receive a `host` resource decision. Non-bundled packs receive a `worker`
+resource decision, even when explicitly configured or allowlisted. If policy
+allows a pack but returns no resource decision, the CLI denies the load before
+importing the package.
+
+Worker-admitted packs are not dynamically imported in the host process. The
+owner tool supplies a `CapabilityIsolationBridge` for its domain:
+
+- fit creates proxy checks; the real check package runs in the capability worker.
+- sim creates proxy scenarios; the real scenario package runs in the capability worker.
+- graph creates proxy adapters; adapter discovery/parse/walk/resolve/cache-key calls run through the worker bridge.
+
+The hidden `__capability-pack-worker` command receives a serialized worker spec,
+installs best-effort Node guards, imports the package inside the worker, and
+returns only the requested contribution result. Worker environments forward the
+documented worker baseline plus declared `env` resource scopes; the external-tool
+`OPENSIP_CLI_TOOL_ENV_PASSTHROUGH` escape hatch is intentionally ignored for
+capability workers.
 
 ---
 

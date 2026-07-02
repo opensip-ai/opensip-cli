@@ -38,7 +38,11 @@
  *   - `./tool-results.js` — GateCompareResult/SignalDeliveryResult
  */
 
-import type { CapabilityRegistrar, ToolConfigContribution } from './capability.js';
+import type {
+  CapabilityIsolationBridge,
+  CapabilityRegistrar,
+  ToolConfigContribution,
+} from './capability.js';
 import type { ToolCliContext } from './cli-context.js';
 import type { CommandSpec } from './command-spec.js';
 import type { ToolIdentity } from './identity.js';
@@ -232,6 +236,7 @@ export interface ToolExtensionPoints {
   readonly sessionReplay?: ToolSessionReplayContribution;
   readonly config?: ToolConfigContribution;
   readonly capabilityRegistrars?: Readonly<Record<string, CapabilityRegistrar>>;
+  readonly capabilityIsolationBridges?: Readonly<Record<string, CapabilityIsolationBridge>>;
   readonly fingerprintStrategy?: FingerprintStrategy;
   readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
   readonly stableExampleIds?: () => readonly string[];

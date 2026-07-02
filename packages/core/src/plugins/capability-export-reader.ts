@@ -15,6 +15,10 @@ interface ExportSpec {
   readonly metadataTag: {
     readonly packageTargetDomain?: string;
     readonly packageTargetDomainApiVersion?: number;
+    readonly packageRequires?: RawCapabilityContribution['packageRequires'];
+    readonly packageRequiresInvalid?: RawCapabilityContribution['packageRequiresInvalid'];
+    readonly packageManifestHash?: string;
+    readonly resourceDecision?: RawCapabilityContribution['resourceDecision'];
   };
 }
 

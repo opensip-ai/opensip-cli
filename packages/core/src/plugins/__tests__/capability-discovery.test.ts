@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   discoverCapabilityContributions,
   type CapabilityDiscoveryDiagnostic,
+  type CapabilityPackageAdmission,
 } from '../capability-discovery.js';
 
 import type { CapabilityDiscoveryDescriptor } from '../../tools/capability.js';
@@ -72,6 +73,9 @@ const SINGLE_DESCRIPTOR: CapabilityDiscoveryDescriptor = {
   configKeys: {},
 };
 
+const ADMIT_ALL = (): CapabilityPackageAdmission => ({ admit: true });
+const MANIFEST_HASH = expect.stringMatching(/^sha256:[a-f0-9]{64}$/);
+
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-cap-discovery-'));
 });
@@ -81,6 +85,100 @@ afterEach(() => {
 });
 
 describe('discoverCapabilityContributions — marker mode', () => {
+  it('denies an external marker package by default before importing its entry', async () => {
+    const dir = join(testDir, 'node_modules/@acme/items-default-denied');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/items-default-denied',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: { kind: 'items-pack' },
+      }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), "throw new Error('must not import');\n");
+    const diags: CapabilityDiscoveryDiagnostic[] = [];
+
+    const out = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+      onDiagnostic: (d) => diags.push(d),
+    });
+
+    expect(out).toEqual([]);
+    expect(diags).toEqual([
+      {
+        evt: 'capability.discovery.package_denied',
+        packageName: '@acme/items-default-denied',
+        message:
+          'package @acme/items-default-denied denied by capability-pack trust policy: ' +
+          'external capability packages require explicit host policy admission',
+      },
+    ]);
+  });
+
+  it('uses a worker contribution loader for worker-admitted packages without host import', async () => {
+    const dir = join(testDir, 'node_modules/@acme/items-worker');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/items-worker',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: {
+          kind: 'items-pack',
+          targetDomain: 'items',
+          targetDomainApiVersion: 1,
+          requires: [{ resource: 'env', scope: 'API_TOKEN', reason: 'fixture auth' }],
+        },
+      }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), "throw new Error('must not import in host');\n");
+
+    const out = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+      shouldLoadPackage: (pkg) => ({
+        admit: true,
+        resourceDecision: {
+          isolation: 'worker',
+          allowedResources: pkg.packageRequires ?? [],
+          denyUndeclared: true,
+          reasons: ['test worker isolation'],
+        },
+      }),
+      contributionLoader: (pkg, context) =>
+        Promise.resolve([
+          {
+            contribution: { id: 'worker' },
+            sourcePackage: pkg.name,
+            ...(pkg.packageRequires === undefined ? {} : { packageRequires: pkg.packageRequires }),
+            ...(pkg.packageManifestHash === undefined
+              ? {}
+              : { packageManifestHash: pkg.packageManifestHash }),
+            ...(context.admission.resourceDecision === undefined
+              ? {}
+              : { resourceDecision: context.admission.resourceDecision }),
+          },
+        ]),
+    });
+
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      contribution: { id: 'worker' },
+      sourcePackage: '@acme/items-worker',
+      packageRequires: [{ resource: 'env', scope: 'API_TOKEN', reason: 'fixture auth' }],
+      resourceDecision: {
+        isolation: 'worker',
+        allowedResources: [{ resource: 'env', scope: 'API_TOKEN', reason: 'fixture auth' }],
+        denyUndeclared: true,
+      },
+    });
+    expect(out[0]?.packageManifestHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
   it('carries package target metadata on discovered contributions', async () => {
     const dir = join(testDir, 'node_modules', '@acme/items-meta');
     mkdirSync(dir, { recursive: true });
@@ -102,6 +200,7 @@ describe('discoverCapabilityContributions — marker mode', () => {
     const contributions = await discoverCapabilityContributions({
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
 
     expect(contributions).toEqual([
@@ -110,6 +209,7 @@ describe('discoverCapabilityContributions — marker mode', () => {
         sourcePackage: '@acme/items-meta',
         packageTargetDomain: 'items',
         packageTargetDomainApiVersion: 1,
+        packageManifestHash: MANIFEST_HASH,
       },
     ]);
   });
@@ -125,10 +225,19 @@ describe('discoverCapabilityContributions — marker mode', () => {
     const out = await discoverCapabilityContributions({
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([
-      { contribution: { id: 'one' }, sourcePackage: '@acme/items-a' },
-      { contribution: { id: 'two' }, sourcePackage: '@acme/items-a' },
+      {
+        contribution: { id: 'one' },
+        sourcePackage: '@acme/items-a',
+        packageManifestHash: MANIFEST_HASH,
+      },
+      {
+        contribution: { id: 'two' },
+        sourcePackage: '@acme/items-a',
+        packageManifestHash: MANIFEST_HASH,
+      },
     ]);
   });
 
@@ -143,6 +252,7 @@ describe('discoverCapabilityContributions — marker mode', () => {
     const out = await discoverCapabilityContributions({
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([]);
   });
@@ -158,8 +268,15 @@ describe('discoverCapabilityContributions — marker mode', () => {
     const out = await discoverCapabilityContributions({
       descriptor: SINGLE_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
-    expect(out).toEqual([{ contribution: { language: 'go' }, sourcePackage: '@acme/adapter' }]);
+    expect(out).toEqual([
+      {
+        contribution: { language: 'go' },
+        sourcePackage: '@acme/adapter',
+        packageManifestHash: MANIFEST_HASH,
+      },
+    ]);
   });
 
   it('splits built-ins to cliDir when builtinScope is declared', async () => {
@@ -194,6 +311,7 @@ describe('discoverCapabilityContributions — marker mode', () => {
         descriptor: { ...MARKER_DESCRIPTOR, builtinScope: '@builtin' },
         projectDir: testDir,
         cliDir,
+        shouldLoadPackage: ADMIT_ALL,
       });
       const ids = out.map((c) => (c.contribution as { id: string }).id).sort();
       expect(ids).toEqual(['builtin', 'custom']); // 'shadow' dropped
@@ -221,6 +339,7 @@ describe('discoverCapabilityContributions — name-pattern mode', () => {
     const out = await discoverCapabilityContributions({
       descriptor: NAME_PATTERN_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([{ contribution: { id: 'load' }, sourcePackage: '@acme/items-load' }]);
   });
@@ -236,6 +355,7 @@ describe('discoverCapabilityContributions — name-pattern mode', () => {
       descriptor: NAME_PATTERN_DESCRIPTOR,
       projectDir: testDir,
       preferences: { scopes: ['@other'] },
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([{ contribution: { id: 'z' }, sourcePackage: '@other/items-z' }]);
   });
@@ -262,6 +382,7 @@ describe('discoverCapabilityContributions — preferences', () => {
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
       preferences: { packages: ['@acme/explicit'] },
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([{ contribution: { id: 'explicit' }, sourcePackage: '@acme/explicit' }]);
   });
@@ -278,6 +399,7 @@ describe('discoverCapabilityContributions — preferences', () => {
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
       preferences: { autoDiscover: false },
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([]);
   });
@@ -288,6 +410,7 @@ describe('discoverCapabilityContributions — preferences', () => {
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
       preferences: { packages: ['@acme/missing'] },
+      shouldLoadPackage: ADMIT_ALL,
       onDiagnostic: (d) => diags.push(d),
     });
     expect(out).toEqual([]);
@@ -361,18 +484,25 @@ describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
         ],
       },
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(out).toEqual([
-      { contribution: { id: 'a' }, sourcePackage: '@acme/items-co' },
+      {
+        contribution: { id: 'a' },
+        sourcePackage: '@acme/items-co',
+        packageManifestHash: MANIFEST_HASH,
+      },
       {
         contribution: { id: 'x' },
         sourcePackage: '@acme/items-co',
         targetDomainId: 'extras-domain',
+        packageManifestHash: MANIFEST_HASH,
       },
       {
         contribution: { id: 'y' },
         sourcePackage: '@acme/items-co',
         targetDomainId: 'extras-domain',
+        packageManifestHash: MANIFEST_HASH,
       },
     ]);
   });
@@ -392,9 +522,16 @@ describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
         coContributions: [{ exportName: 'recipes', exportShape: 'array', domainId: 'r' }],
       },
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
       onDiagnostic: (d) => diags.push(d),
     });
-    expect(out).toEqual([{ contribution: { id: 'a' }, sourcePackage: '@acme/items-only' }]);
+    expect(out).toEqual([
+      {
+        contribution: { id: 'a' },
+        sourcePackage: '@acme/items-only',
+        packageManifestHash: MANIFEST_HASH,
+      },
+    ]);
     expect(diags).toEqual([]);
   });
 });
@@ -419,6 +556,7 @@ describe('discoverCapabilityContributions — explicit list mode', () => {
       descriptor: { ...MARKER_DESCRIPTOR, explicitListMode: 'augment' },
       projectDir: testDir,
       preferences: { packages: ['@acme/items-explicit'] },
+      shouldLoadPackage: ADMIT_ALL,
     });
     const ids = out.map((c) => (c.contribution as { id: string }).id).sort();
     expect(ids).toEqual(['auto', 'explicit']);
@@ -445,10 +583,17 @@ describe('discoverCapabilityContributions — per-package isolation', () => {
     const out = await discoverCapabilityContributions({
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
       onDiagnostic: (d) => diags.push(d),
     });
     // the good package still loads — one bad export doesn't fail the others
-    expect(out).toEqual([{ contribution: { id: 'good' }, sourcePackage: '@acme/items-good' }]);
+    expect(out).toEqual([
+      {
+        contribution: { id: 'good' },
+        sourcePackage: '@acme/items-good',
+        packageManifestHash: MANIFEST_HASH,
+      },
+    ]);
     expect(diags.map((d) => d.evt)).toContain('capability.discovery.bad_export');
   });
 
@@ -469,6 +614,7 @@ describe('discoverCapabilityContributions — per-package isolation', () => {
     const out = await discoverCapabilityContributions({
       descriptor: MARKER_DESCRIPTOR,
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
       onDiagnostic: (d) => diags.push(d),
     });
     expect(out).toEqual([]);

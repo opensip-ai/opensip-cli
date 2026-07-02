@@ -35,7 +35,10 @@ import { hostEnv } from '../env/host-env-specs.js';
  * surface). Unioned into {@link internalCommandNames} so the help hide pass +
  * completion treat it as internal exactly like the tool workers.
  */
-export const HOST_INTERNAL_COMMANDS: ReadonlySet<string> = new Set(['__tool-command-worker']);
+export const HOST_INTERNAL_COMMANDS: ReadonlySet<string> = new Set([
+  '__tool-command-worker',
+  '__capability-pack-worker',
+]);
 
 /**
  * Collect the names of every command declared `visibility: 'internal'` (Tier-3):

@@ -44,6 +44,17 @@ function parsePassthroughKeys(raw: string | undefined): readonly string[] {
     .filter((s) => s.length > 0);
 }
 
+function copyAllowedEnv(
+  parentEnv: NodeJS.ProcessEnv,
+  childEnv: NodeJS.ProcessEnv,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    const value = parentEnv[key];
+    if (value !== undefined) childEnv[key] = value;
+  }
+}
+
 /**
  * Build the child env for an external-tool dispatch worker fork.
  *
@@ -56,19 +67,18 @@ export function buildExternalWorkerChildEnv(
     readonly parentEnv?: NodeJS.ProcessEnv;
     readonly runId?: string;
     readonly traceparent?: string;
+    readonly extraAllowlist?: readonly string[];
+    readonly includePassthrough?: boolean;
   } = {},
 ): NodeJS.ProcessEnv {
   const parentEnv = args.parentEnv ?? process.env;
   const childEnv: NodeJS.ProcessEnv = {};
 
-  for (const key of EXTERNAL_WORKER_CHILD_ENV_ALLOWLIST) {
-    const value = parentEnv[key];
-    if (value !== undefined) childEnv[key] = value;
-  }
+  copyAllowedEnv(parentEnv, childEnv, EXTERNAL_WORKER_CHILD_ENV_ALLOWLIST);
+  copyAllowedEnv(parentEnv, childEnv, args.extraAllowlist ?? []);
 
-  for (const key of parsePassthroughKeys(parentEnv[TOOL_ENV_PASSTHROUGH_ENV])) {
-    const value = parentEnv[key];
-    if (value !== undefined) childEnv[key] = value;
+  if (args.includePassthrough !== false) {
+    copyAllowedEnv(parentEnv, childEnv, parsePassthroughKeys(parentEnv[TOOL_ENV_PASSTHROUGH_ENV]));
   }
 
   childEnv[IN_TOOL_WORKER_ENV] = '1';

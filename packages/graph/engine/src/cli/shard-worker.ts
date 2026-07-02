@@ -194,7 +194,7 @@ async function buildShard(
   // pre-enumerated), NOT the tsconfig's own include/exclude glob — so test
   // files now assigned to a package shard parse even though that package's
   // tsconfig would have excluded them (tsc compiles `rootNames` verbatim).
-  const discovered = adapter.discoverFiles({
+  const discovered = await adapter.discoverFiles({
     cwd: shard.rootDir,
     configPathOverride: shard.configPathAbs,
   });

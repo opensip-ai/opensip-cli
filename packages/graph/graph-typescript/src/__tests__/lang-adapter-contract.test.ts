@@ -78,23 +78,23 @@ function setupFixture(dir: string): void {
   }
 }
 
-function buildPipeline(
+async function buildPipeline(
   adapter = typescriptGraphAdapter,
   dir: string,
-): {
+): Promise<{
   readonly project: TsParsed;
   readonly walk: WalkOutput;
   readonly catalog: Catalog;
-  readonly discovery: ReturnType<typeof typescriptGraphAdapter.discoverFiles>;
-} {
-  const discovery = adapter.discoverFiles({ cwd: dir });
-  const parsed = adapter.parseProject({
+  readonly discovery: Awaited<ReturnType<typeof typescriptGraphAdapter.discoverFiles>>;
+}> {
+  const discovery = await adapter.discoverFiles({ cwd: dir });
+  const parsed = await adapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     resolutionMode: 'exact',
   });
-  const walk = adapter.walkProject({
+  const walk = await adapter.walkProject({
     project: parsed.project,
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -104,7 +104,7 @@ function buildPipeline(
     tool: 'graph',
     language: adapter.id,
     builtAt: '2026-05-18T00:00:00.000Z',
-    cacheKey: adapter.cacheKey({
+    cacheKey: await adapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
@@ -160,9 +160,9 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-1: walkProject is deterministic ────────────────────────
 
-  it('I-1 — walkProject is deterministic across two runs over the same project', () => {
-    const a = buildPipeline(typescriptGraphAdapter, dir);
-    const b = buildPipeline(typescriptGraphAdapter, dir);
+  it('I-1 — walkProject is deterministic across two runs over the same project', async () => {
+    const a = await buildPipeline(typescriptGraphAdapter, dir);
+    const b = await buildPipeline(typescriptGraphAdapter, dir);
     const ca = canonicalizeWalkOutput(a.walk);
     const cb = canonicalizeWalkOutput(b.walk);
     expect(cb.occurrences).toEqual(ca.occurrences);
@@ -171,8 +171,8 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-2: bodyHash collisions are intentional duplicates ──────
 
-  it('I-2 — different function bodies produce different bodyHashes', () => {
-    const { walk } = buildPipeline(typescriptGraphAdapter, dir);
+  it('I-2 — different function bodies produce different bodyHashes', async () => {
+    const { walk } = await buildPipeline(typescriptGraphAdapter, dir);
     const allOccs: FunctionOccurrence[] = [];
     for (const arr of Object.values(walk.occurrences)) allOccs.push(...arr);
     // Map bodyHash → count of occurrences.
@@ -186,8 +186,8 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-3: every CallSiteRecord.ownerHash exists in occurrences ──
 
-  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', () => {
-    const { walk } = buildPipeline(typescriptGraphAdapter, dir);
+  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', async () => {
+    const { walk } = await buildPipeline(typescriptGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(walk.occurrences)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
@@ -200,7 +200,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
   // ── I-4: resolveCallSites doesn't mutate catalog ─────────────
 
   it('I-4 — resolveCallSites does not mutate the input catalog', async () => {
-    const { walk, catalog, project } = buildPipeline(typescriptGraphAdapter, dir);
+    const { walk, catalog, project } = await buildPipeline(typescriptGraphAdapter, dir);
     const before = JSON.stringify(catalog);
     await typescriptGraphAdapter.resolveCallSites({
       project,
@@ -216,7 +216,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
   // ── I-5: every CallEdge.to references a catalog bodyHash or is empty ──
 
   it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', async () => {
-    const { walk, catalog, project } = buildPipeline(typescriptGraphAdapter, dir);
+    const { walk, catalog, project } = await buildPipeline(typescriptGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(catalog.functions)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
@@ -240,15 +240,15 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-6: cacheKey is stable for stable input ─────────────────
 
-  it('I-6 — cacheKey is stable for the same projectDir / configPath input', () => {
-    const { discovery } = buildPipeline(typescriptGraphAdapter, dir);
-    const k1 = typescriptGraphAdapter.cacheKey({
+  it('I-6 — cacheKey is stable for the same projectDir / configPath input', async () => {
+    const { discovery } = await buildPipeline(typescriptGraphAdapter, dir);
+    const k1 = await typescriptGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
       resolutionMode: 'exact',
     });
-    const k2 = typescriptGraphAdapter.cacheKey({
+    const k2 = await typescriptGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
@@ -260,9 +260,9 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
     expect(k1.startsWith('ts-')).toBe(true);
   });
 
-  it('I-6 — cacheKey changes when the tsconfig content changes', () => {
-    const { discovery } = buildPipeline(typescriptGraphAdapter, dir);
-    const before = typescriptGraphAdapter.cacheKey({
+  it('I-6 — cacheKey changes when the tsconfig content changes', async () => {
+    const { discovery } = await buildPipeline(typescriptGraphAdapter, dir);
+    const before = await typescriptGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
@@ -284,7 +284,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
         'utf8',
       );
     }
-    const after = typescriptGraphAdapter.cacheKey({
+    const after = await typescriptGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       configPathAbs: discovery.configPathAbs,
       compilerOptions: discovery.compilerOptions,
@@ -295,9 +295,9 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-7: parseProject is total over `files` ──────────────────
 
-  it('I-7 — parseProject is total: every file is either parsed or in parseErrors', () => {
-    const discovery = typescriptGraphAdapter.discoverFiles({ cwd: dir });
-    const parsed = typescriptGraphAdapter.parseProject({
+  it('I-7 — parseProject is total: every file is either parsed or in parseErrors', async () => {
+    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: dir });
+    const parsed = await typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
@@ -321,19 +321,22 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── I-8: adapter is single-language ──────────────────────────
 
-  it('I-8 — adapter id matches its handled language family', () => {
+  it('I-8 — adapter id matches its handled language family', async () => {
     expect(typescriptGraphAdapter.id).toBe('typescript');
     // The TS adapter's catalog cacheKey prefix encodes the language;
     // a Python adapter (when it lands) MUST emit a different prefix.
-    const k = typescriptGraphAdapter.cacheKey({ projectDirAbs: dir, resolutionMode: 'exact' });
+    const k = await typescriptGraphAdapter.cacheKey({
+      projectDirAbs: dir,
+      resolutionMode: 'exact',
+    });
     expect(k).toMatch(/^ts-/);
   });
 
   // ── I-9: adapter is referentially transparent ────────────────
 
-  it('I-9 — repeated discoverFiles calls return the same files list', () => {
-    const a = typescriptGraphAdapter.discoverFiles({ cwd: dir });
-    const b = typescriptGraphAdapter.discoverFiles({ cwd: dir });
+  it('I-9 — repeated discoverFiles calls return the same files list', async () => {
+    const a = await typescriptGraphAdapter.discoverFiles({ cwd: dir });
+    const b = await typescriptGraphAdapter.discoverFiles({ cwd: dir });
     expect(b.projectDirAbs).toBe(a.projectDirAbs);
     expect([...b.files].sort()).toEqual([...a.files].sort());
     expect(b.configPathAbs).toBe(a.configPathAbs);
@@ -341,8 +344,8 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
 
   // ── walkOutput shape ─────────────────────────────────────────
 
-  it('walkProject emits the expected occurrence kinds for the fixture', () => {
-    const { walk } = buildPipeline(typescriptGraphAdapter, dir);
+  it('walkProject emits the expected occurrence kinds for the fixture', async () => {
+    const { walk } = await buildPipeline(typescriptGraphAdapter, dir);
     const kinds = new Set<string>();
     for (const arr of Object.values(walk.occurrences)) {
       for (const o of arr) kinds.add(o.kind);
@@ -354,7 +357,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
   });
 
   it('CallSiteRecord opaque handles round-trip through resolveCallSites', async () => {
-    const { walk, catalog, project } = buildPipeline(typescriptGraphAdapter, dir);
+    const { walk, catalog, project } = await buildPipeline(typescriptGraphAdapter, dir);
     const records: CallSiteRecord[] = [...walk.callSites];
     expect(records.length).toBeGreaterThan(0);
     // The opaque shape uses nodeRef/sourceFileRef; the adapter can
@@ -428,23 +431,23 @@ function setupPythonFixture(dir: string): void {
   }
 }
 
-function buildPythonPipeline(
+async function buildPythonPipeline(
   adapter: GraphLanguageAdapter<PythonParsedProject>,
   dir: string,
-): {
+): Promise<{
   readonly project: PythonParsedProject;
   readonly walk: WalkOutput;
   readonly catalog: Catalog;
-  readonly discovery: ReturnType<typeof adapter.discoverFiles>;
-} {
-  const discovery = adapter.discoverFiles({ cwd: dir });
-  const parsed = adapter.parseProject({
+  readonly discovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
+}> {
+  const discovery = await adapter.discoverFiles({ cwd: dir });
+  const parsed = await adapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     resolutionMode: 'exact',
   });
-  const walk = adapter.walkProject({
+  const walk = await adapter.walkProject({
     project: parsed.project,
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -462,7 +465,7 @@ function buildPythonPipeline(
     tool: 'graph',
     language: adapter.id,
     builtAt: '2026-05-18T00:00:00.000Z',
-    cacheKey: adapter.cacheKey(cacheKeyArgs),
+    cacheKey: await adapter.cacheKey(cacheKeyArgs),
     functions: walk.occurrences,
   };
   return { project: parsed.project, walk, catalog, discovery };
@@ -491,17 +494,17 @@ describe('GraphLanguageAdapter contract — Python', () => {
     expect(typeof pythonGraphAdapter.cacheKey).toBe('function');
   });
 
-  it('I-1 — walkProject is deterministic across two runs over the same project', () => {
-    const a = buildPythonPipeline(pythonGraphAdapter, dir);
-    const b = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-1 — walkProject is deterministic across two runs over the same project', async () => {
+    const a = await buildPythonPipeline(pythonGraphAdapter, dir);
+    const b = await buildPythonPipeline(pythonGraphAdapter, dir);
     const ca = canonicalizeWalkOutput(a.walk);
     const cb = canonicalizeWalkOutput(b.walk);
     expect(cb.occurrences).toEqual(ca.occurrences);
     expect(cb.callSiteSummary).toEqual(ca.callSiteSummary);
   });
 
-  it('I-2 — different function bodies produce different bodyHashes', () => {
-    const { walk } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-2 — different function bodies produce different bodyHashes', async () => {
+    const { walk } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const allOccs: FunctionOccurrence[] = [];
     for (const arr of Object.values(walk.occurrences)) allOccs.push(...arr);
     const byHash = new Map<string, number>();
@@ -510,8 +513,8 @@ describe('GraphLanguageAdapter contract — Python', () => {
     expect(collisions).toHaveLength(0);
   });
 
-  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', () => {
-    const { walk } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', async () => {
+    const { walk } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(walk.occurrences)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
@@ -521,8 +524,8 @@ describe('GraphLanguageAdapter contract — Python', () => {
     }
   });
 
-  it('I-4 — resolveCallSites does not mutate the input catalog', () => {
-    const { walk, catalog, project } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-4 — resolveCallSites does not mutate the input catalog', async () => {
+    const { walk, catalog, project } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const before = JSON.stringify(catalog);
     pythonGraphAdapter.resolveCallSites({
       project,
@@ -535,8 +538,8 @@ describe('GraphLanguageAdapter contract — Python', () => {
     expect(after).toBe(before);
   });
 
-  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', () => {
-    const { walk, catalog, project } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', async () => {
+    const { walk, catalog, project } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(catalog.functions)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
@@ -558,8 +561,8 @@ describe('GraphLanguageAdapter contract — Python', () => {
     }
   });
 
-  it('I-6 — cacheKey is stable for the same projectDir / configPath input', () => {
-    const { discovery } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-6 — cacheKey is stable for the same projectDir / configPath input', async () => {
+    const { discovery } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const k1 = pythonGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
@@ -574,8 +577,8 @@ describe('GraphLanguageAdapter contract — Python', () => {
     expect(k1.startsWith('py-')).toBe(true);
   });
 
-  it('I-6 — cacheKey changes when the pyproject content changes', () => {
-    const { discovery } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('I-6 — cacheKey changes when the pyproject content changes', async () => {
+    const { discovery } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const before = pythonGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
@@ -635,8 +638,8 @@ requires-python = ">=3.11"
     expect(b.configPathAbs).toBe(a.configPathAbs);
   });
 
-  it('walkProject emits the expected occurrence kinds for the fixture', () => {
-    const { walk } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('walkProject emits the expected occurrence kinds for the fixture', async () => {
+    const { walk } = await buildPythonPipeline(pythonGraphAdapter, dir);
     const kinds = new Set<string>();
     for (const arr of Object.values(walk.occurrences)) {
       for (const o of arr) kinds.add(o.kind);
@@ -648,8 +651,8 @@ requires-python = ">=3.11"
     expect(kinds.has('arrow')).toBe(true);
   });
 
-  it('resolveCallSites produces non-empty edges for the fixture', () => {
-    const { walk, catalog, project } = buildPythonPipeline(pythonGraphAdapter, dir);
+  it('resolveCallSites produces non-empty edges for the fixture', async () => {
+    const { walk, catalog, project } = await buildPythonPipeline(pythonGraphAdapter, dir);
     expect(walk.callSites.length).toBeGreaterThan(0);
     const resolved = pythonGraphAdapter.resolveCallSites({
       project,
@@ -744,23 +747,23 @@ function setupRustFixture(dir: string): void {
   }
 }
 
-function buildRustPipeline(
+async function buildRustPipeline(
   adapter: GraphLanguageAdapter<RustParsedProject>,
   dir: string,
-): {
+): Promise<{
   readonly project: RustParsedProject;
   readonly walk: WalkOutput;
   readonly catalog: Catalog;
-  readonly discovery: ReturnType<typeof adapter.discoverFiles>;
-} {
-  const discovery = adapter.discoverFiles({ cwd: dir });
-  const parsed = adapter.parseProject({
+  readonly discovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
+}> {
+  const discovery = await adapter.discoverFiles({ cwd: dir });
+  const parsed = await adapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     resolutionMode: 'exact',
   });
-  const walk = adapter.walkProject({
+  const walk = await adapter.walkProject({
     project: parsed.project,
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -775,7 +778,7 @@ function buildRustPipeline(
     tool: 'graph',
     language: adapter.id,
     builtAt: '2026-05-18T00:00:00.000Z',
-    cacheKey: adapter.cacheKey(cacheKeyArgs),
+    cacheKey: await adapter.cacheKey(cacheKeyArgs),
     functions: walk.occurrences,
   };
   return { project: parsed.project, walk, catalog, discovery };
@@ -804,17 +807,17 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     expect(typeof rustGraphAdapter.cacheKey).toBe('function');
   });
 
-  it('I-1 — walkProject is deterministic across two runs over the same project', () => {
-    const a = buildRustPipeline(rustGraphAdapter, dir);
-    const b = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-1 — walkProject is deterministic across two runs over the same project', async () => {
+    const a = await buildRustPipeline(rustGraphAdapter, dir);
+    const b = await buildRustPipeline(rustGraphAdapter, dir);
     const ca = canonicalizeWalkOutput(a.walk);
     const cb = canonicalizeWalkOutput(b.walk);
     expect(cb.occurrences).toEqual(ca.occurrences);
     expect(cb.callSiteSummary).toEqual(ca.callSiteSummary);
   });
 
-  it('I-2 — different function bodies produce different bodyHashes', () => {
-    const { walk } = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-2 — different function bodies produce different bodyHashes', async () => {
+    const { walk } = await buildRustPipeline(rustGraphAdapter, dir);
     const allOccs: FunctionOccurrence[] = [];
     for (const arr of Object.values(walk.occurrences)) allOccs.push(...arr);
     const byHash = new Map<string, number>();
@@ -823,8 +826,8 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     expect(collisions).toHaveLength(0);
   });
 
-  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', () => {
-    const { walk } = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-3 — every CallSiteRecord.ownerHash maps to a known occurrence', async () => {
+    const { walk } = await buildRustPipeline(rustGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(walk.occurrences)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
@@ -834,8 +837,8 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     }
   });
 
-  it('I-4 — resolveCallSites does not mutate the input catalog', () => {
-    const { walk, catalog, project } = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-4 — resolveCallSites does not mutate the input catalog', async () => {
+    const { walk, catalog, project } = await buildRustPipeline(rustGraphAdapter, dir);
     const before = JSON.stringify(catalog);
     rustGraphAdapter.resolveCallSites({
       project,
@@ -848,8 +851,8 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     expect(after).toBe(before);
   });
 
-  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', () => {
-    const { walk, catalog, project } = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-5 — every CallEdge.to references a catalog bodyHash or is empty', async () => {
+    const { walk, catalog, project } = await buildRustPipeline(rustGraphAdapter, dir);
     const knownHashes = new Set<string>();
     for (const arr of Object.values(catalog.functions)) {
       for (const o of arr) knownHashes.add(o.bodyHash);
@@ -871,8 +874,8 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     }
   });
 
-  it('I-6 — cacheKey is stable for the same projectDir / configPath input', () => {
-    const { discovery } = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-6 — cacheKey is stable for the same projectDir / configPath input', async () => {
+    const { discovery } = await buildRustPipeline(rustGraphAdapter, dir);
     const k1 = rustGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
@@ -887,8 +890,8 @@ describe('GraphLanguageAdapter contract — Rust', () => {
     expect(k1.startsWith('rs-')).toBe(true);
   });
 
-  it('I-6 — cacheKey changes when the Cargo manifest content changes', () => {
-    const { discovery } = buildRustPipeline(rustGraphAdapter, dir);
+  it('I-6 — cacheKey changes when the Cargo manifest content changes', async () => {
+    const { discovery } = await buildRustPipeline(rustGraphAdapter, dir);
     const before = rustGraphAdapter.cacheKey({
       projectDirAbs: discovery.projectDirAbs,
       ...(discovery.configPathAbs === undefined ? {} : { configPathAbs: discovery.configPathAbs }),
@@ -948,8 +951,8 @@ edition = "2021"
     expect(b.configPathAbs).toBe(a.configPathAbs);
   });
 
-  it('walkProject emits the expected occurrence kinds for the fixture', () => {
-    const { walk } = buildRustPipeline(rustGraphAdapter, dir);
+  it('walkProject emits the expected occurrence kinds for the fixture', async () => {
+    const { walk } = await buildRustPipeline(rustGraphAdapter, dir);
     const kinds = new Set<string>();
     const enclosingClasses = new Set<string | null>();
     for (const arr of Object.values(walk.occurrences)) {
@@ -966,8 +969,8 @@ edition = "2021"
     expect(enclosingClasses.has('Greeter')).toBe(true);
   });
 
-  it('resolveCallSites produces non-empty edges for the fixture', () => {
-    const { walk, catalog, project } = buildRustPipeline(rustGraphAdapter, dir);
+  it('resolveCallSites produces non-empty edges for the fixture', async () => {
+    const { walk, catalog, project } = await buildRustPipeline(rustGraphAdapter, dir);
     expect(walk.callSites.length).toBeGreaterThan(0);
     const resolved = rustGraphAdapter.resolveCallSites({
       project,

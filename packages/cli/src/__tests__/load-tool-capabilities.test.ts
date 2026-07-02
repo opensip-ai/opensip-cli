@@ -15,6 +15,7 @@ import {
   RunScope,
   logger,
   runWithScope,
+  type CapabilityIsolationBridge,
   type CapabilityDomainSpec,
   type Tool,
 } from '@opensip-cli/core';
@@ -94,6 +95,25 @@ function writeThrowingMarkedAdapterPackage(
   writeFileSync(join(dir, 'index.mjs'), "throw new Error('must not import denied pack');\n");
 }
 
+function writeWorkerAdapterPackage(name: string): void {
+  const dir = join(testDir, 'node_modules', name);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({
+      name,
+      type: 'module',
+      main: './index.mjs',
+      opensipTools: {
+        targetDomain: 'mine',
+        targetDomainApiVersion: 1,
+        requires: [{ resource: 'env', scope: 'OPENAI_API_KEY', reason: 'fixture auth' }],
+      },
+    }),
+  );
+  writeFileSync(join(dir, 'index.mjs'), "throw new Error('must not import in host');\n");
+}
+
 /** Run `fn` inside a scope carrying `registry` as scope.capabilities. */
 async function withCapabilities(
   registry: CapabilityRegistry,
@@ -137,19 +157,68 @@ describe('loadOwningToolCapabilities', () => {
   it('uses pluginsConfig explicit packages as a trust decision for the owning domain', async () => {
     const registry = new CapabilityRegistry();
     const registrar = vi.fn();
+    const workerBridge: CapabilityIsolationBridge = {
+      createHostContributions: vi.fn(() =>
+        Promise.resolve([{ contribution: { id: 'from-config' } }]),
+      ),
+      runInWorker: vi.fn(),
+    };
     registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
     writeExplicitAdapterPackage('@acme/configured-adapter', "{ id: 'from-config' }");
 
     await withCapabilities(registry, async () => {
       const driven = await loadOwningToolCapabilities({
-        owningTool: makeTool('mytool'),
+        owningTool: {
+          ...makeTool('mytool'),
+          extensionPoints: { capabilityIsolationBridges: { mine: workerBridge } },
+        },
         projectDir: testDir,
         pluginsConfig: { pkgs: ['@acme/configured-adapter'] },
       });
 
       expect(driven).toBe(1);
+      expect(workerBridge.createHostContributions).toHaveBeenCalledTimes(1);
       expect(registrar).toHaveBeenCalledTimes(1);
       expect(registrar).toHaveBeenCalledWith({ id: 'from-config' });
+    });
+  });
+
+  it('routes worker-admitted external packages through the owning tool isolation bridge', async () => {
+    const registry = new CapabilityRegistry();
+    const registrar = vi.fn();
+    const createHostContributions = vi.fn((context) => {
+      expect(context.domainId).toBe('mine');
+      expect(context.pkg.name).toBe('@acme/worker-adapter');
+      expect(context.pkg.packageRequires).toEqual([
+        { resource: 'env', scope: 'OPENAI_API_KEY', reason: 'fixture auth' },
+      ]);
+      expect(context.resourceDecision).toMatchObject({
+        isolation: 'worker',
+        allowedResources: [{ resource: 'env', scope: 'OPENAI_API_KEY', reason: 'fixture auth' }],
+        denyUndeclared: true,
+      });
+      return Promise.resolve([{ contribution: { id: 'from-worker-proxy' } }]);
+    }) satisfies CapabilityIsolationBridge['createHostContributions'];
+    const workerBridge: CapabilityIsolationBridge = {
+      createHostContributions,
+      runInWorker: vi.fn(),
+    };
+    registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
+    writeWorkerAdapterPackage('@acme/worker-adapter');
+
+    await withCapabilities(registry, async () => {
+      const driven = await loadOwningToolCapabilities({
+        owningTool: {
+          ...makeTool('mytool'),
+          extensionPoints: { capabilityIsolationBridges: { mine: workerBridge } },
+        },
+        projectDir: testDir,
+        pluginsConfig: { pkgs: ['@acme/worker-adapter'] },
+      });
+
+      expect(driven).toBe(1);
+      expect(createHostContributions).toHaveBeenCalledTimes(1);
+      expect(registrar).toHaveBeenCalledWith({ id: 'from-worker-proxy' });
     });
   });
 

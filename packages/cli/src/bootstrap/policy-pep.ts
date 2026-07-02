@@ -4,6 +4,7 @@ import {
   formatPolicySubject,
   type PolicyAction,
   type PolicyDecision,
+  type PolicyResourceRequirement,
   type PolicySubject,
   type ProvenanceStatus,
   type ResolvedTrustPolicy,
@@ -21,6 +22,9 @@ export interface PolicyPepRequest {
     readonly provenanceStatus?: ProvenanceStatus;
     readonly bundled?: boolean;
     readonly trustedByLocation?: boolean;
+    readonly declaredResources?: readonly PolicyResourceRequirement[];
+    readonly targetDomain?: string;
+    readonly manifestHash?: string;
   };
   readonly audit?: PolicyAuditCollector;
   readonly now?: Date;

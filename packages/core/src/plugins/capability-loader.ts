@@ -26,8 +26,10 @@ import { checkCapabilityContributionCompatibility } from './capability-compatibi
 import {
   discoverCapabilityContributions,
   type CapabilityPackageAdmission,
+  type CapabilityContributionLoader,
   type CapabilityDiscoveryDiagnostic,
   type CapabilityDiscoveryPreferences,
+  type RawCapabilityContribution,
   type SelectedCapabilityPackage,
 } from './capability-discovery.js';
 
@@ -47,6 +49,8 @@ export interface LoadCapabilityDomainOptions {
   readonly preferences?: CapabilityDiscoveryPreferences;
   /** Optional pre-import package admission gate. Core stays policy-free. */
   readonly shouldLoadPackage?: (pkg: SelectedCapabilityPackage) => CapabilityPackageAdmission;
+  /** Optional caller-owned contribution loader, used for isolated external packages. */
+  readonly contributionLoader?: CapabilityContributionLoader;
   /** Optional sink for the substrate's per-package discovery diagnostics. */
   readonly onDiagnostic?: (diagnostic: CapabilityDiscoveryDiagnostic) => void;
 }
@@ -65,8 +69,16 @@ export interface LoadCapabilityDomainOptions {
 export async function loadCapabilityDomain(
   options: LoadCapabilityDomainOptions,
 ): Promise<readonly string[]> {
-  const { registry, domainId, projectDir, cliDir, preferences, shouldLoadPackage, onDiagnostic } =
-    options;
+  const {
+    registry,
+    domainId,
+    projectDir,
+    cliDir,
+    preferences,
+    shouldLoadPackage,
+    contributionLoader,
+    onDiagnostic,
+  } = options;
   const projectKey = projectDir ?? '';
 
   if (registry.isDomainLoaded(domainId, projectKey)) {
@@ -87,6 +99,7 @@ export async function loadCapabilityDomain(
     ...(cliDir === undefined ? {} : { cliDir }),
     ...(preferences === undefined ? {} : { preferences }),
     ...(shouldLoadPackage === undefined ? {} : { shouldLoadPackage }),
+    ...(contributionLoader === undefined ? {} : { contributionLoader }),
     onDiagnostic: (diagnostic) => {
       errors.push(formatDiscoveryError(domainId, diagnostic));
       onDiagnostic?.(diagnostic);
@@ -94,63 +107,77 @@ export async function loadCapabilityDomain(
   });
 
   let routed = 0;
-  for (const {
-    contribution,
-    sourcePackage,
-    targetDomainId,
-    packageTargetDomain,
-    packageTargetDomainApiVersion,
-  } of contributions) {
-    // A co-contribution (§5.3) routes to its OWN domain (e.g. recipes → fit-recipe).
-    // A primary contribution routes to the domain it DECLARES (`packageTargetDomain`,
-    // from the pack's `opensipTools.targetDomain`), falling back to the domain being
-    // loaded when the pack declares none. This lets a domain whose `markerKind`
-    // matches a shared pack family (ADR-0084: `mcp-graph-adapter` shares the
-    // `graph-adapter` markerKind) DISCOVER those packs and route each to its real
-    // target domain (`graph-adapter`) — registered there with that domain's
-    // registrar — instead of rejecting it as a cross-domain mismatch. Same-domain
-    // packs (`packageTargetDomain === domainId`) and undeclared packs are unchanged.
-    const target = targetDomainId ?? packageTargetDomain ?? domainId;
-    const domainSpec = registry.getDomain(target);
-    if (domainSpec === undefined) {
-      const msg = `unknown capability domain '${target}'`;
-      errors.push(`${sourcePackage} → ${target}: ${msg}`);
-      continue;
-    }
-    const compatibility = checkCapabilityContributionCompatibility({
-      targetDomainId: target,
-      packageTargetDomain,
-      packageTargetDomainApiVersion,
-      domainSpec,
-    });
-    if (compatibility.kind === 'incompatible') {
-      const msg = compatibility.reason;
-      errors.push(`${sourcePackage} → ${target}: ${msg}`);
-      logger.warn({
-        evt: 'capability.compatibility.rejected',
-        module: 'core:plugins',
-        sourcePackage,
-        targetDomainId: target,
-        declaredTargetDomain: compatibility.declaredTargetDomain,
-        declaredApiVersion: compatibility.declaredApiVersion,
-        minSupportedApiVersion: compatibility.minSupportedApiVersion,
-        currentApiVersion: compatibility.currentApiVersion,
-        message: msg,
-      });
-      continue;
-    }
-    try {
-      registry.routeContribution(target, contribution);
-      routed++;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      errors.push(`${sourcePackage} → ${target}: ${msg}`);
-    }
+  for (const contribution of contributions) {
+    if (routeLoadedContribution(registry, domainId, contribution, errors)) routed++;
   }
 
   registry.markDomainLoaded(domainId, projectKey, errors);
   emitLoadedEvent(domainId, routed, errors);
   return errors;
+}
+
+function routeLoadedContribution(
+  registry: CapabilityRegistry,
+  domainId: string,
+  loaded: RawCapabilityContribution,
+  errors: string[],
+): boolean {
+  const { sourcePackage, packageTargetDomain, packageTargetDomainApiVersion } = loaded;
+  const target = loaded.targetDomainId ?? packageTargetDomain ?? domainId;
+  const domainSpec = registry.getDomain(target);
+  if (domainSpec === undefined) {
+    errors.push(`${sourcePackage} → ${target}: unknown capability domain '${target}'`);
+    return false;
+  }
+  const compatibility = checkCapabilityContributionCompatibility({
+    targetDomainId: target,
+    packageTargetDomain,
+    packageTargetDomainApiVersion,
+    domainSpec,
+  });
+  if (compatibility.kind === 'incompatible') {
+    recordCompatibilityError(sourcePackage, target, compatibility, errors);
+    return false;
+  }
+  try {
+    registry.routeContribution(target, loaded.contribution);
+    return true;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.warn({
+      evt: 'capability.route.failed',
+      module: 'core:plugins',
+      sourcePackage,
+      targetDomainId: target,
+      error: msg,
+    });
+    errors.push(`${sourcePackage} → ${target}: ${msg}`);
+    return false;
+  }
+}
+
+function recordCompatibilityError(
+  sourcePackage: string,
+  target: string,
+  compatibility: Extract<
+    ReturnType<typeof checkCapabilityContributionCompatibility>,
+    { readonly kind: 'incompatible' }
+  >,
+  errors: string[],
+): void {
+  const msg = compatibility.reason;
+  errors.push(`${sourcePackage} → ${target}: ${msg}`);
+  logger.warn({
+    evt: 'capability.compatibility.rejected',
+    module: 'core:plugins',
+    sourcePackage,
+    targetDomainId: target,
+    declaredTargetDomain: compatibility.declaredTargetDomain,
+    declaredApiVersion: compatibility.declaredApiVersion,
+    minSupportedApiVersion: compatibility.minSupportedApiVersion,
+    currentApiVersion: compatibility.currentApiVersion,
+    message: msg,
+  });
 }
 
 function formatDiscoveryError(domainId: string, diagnostic: CapabilityDiscoveryDiagnostic): string {

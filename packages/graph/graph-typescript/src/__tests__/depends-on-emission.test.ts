@@ -78,16 +78,16 @@ async function runAdapter(): Promise<{
       >
     | undefined;
 }> {
-  const discovery = typescriptGraphAdapter.discoverFiles({
+  const discovery = await typescriptGraphAdapter.discoverFiles({
     cwd: fixtureRoot,
   });
-  const parsed = typescriptGraphAdapter.parseProject({
+  const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     compilerOptions: discovery.compilerOptions,
     resolutionMode: 'exact',
   });
-  const walked = typescriptGraphAdapter.walkProject({
+  const walked = await typescriptGraphAdapter.walkProject({
     project: parsed.project,
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

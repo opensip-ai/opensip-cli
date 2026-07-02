@@ -44,6 +44,8 @@ export const FIT_PLUGIN_LAYOUT: PluginLayout = {
   userSubdirs: ['checks', 'recipes'],
 };
 
+export { isolatedFitPackBridge } from '../capability/isolated-fit-pack.js';
+
 /**
  * Language-adapter domain layout — adapters ship as direct CLI deps, so
  * there is no project-local loose-file layout or `plugins.lang` config path.

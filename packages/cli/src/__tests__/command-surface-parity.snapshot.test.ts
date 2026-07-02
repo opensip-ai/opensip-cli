@@ -79,7 +79,13 @@
  *    dispatch supervisor forks it (`opensip __tool-command-worker <spec>`) to run
  *    one external tool command out-of-process. It declares `visibility:'internal'`,
  *    so it is mounted-but-hidden (ABSENT from `--help`/completion, PRESENT and
- *    invocable in the tree) exactly like the five Tier-3 workers — asserted below.
+ *    invocable in the tree) like the other Tier-3 workers — asserted below.
+ *
+ * 9. ADR-0128 (capability-resource isolation): a second host-mounted internal
+ *    command, `__capability-pack-worker`, appears in the full tree. The
+ *    capability isolation supervisor forks it to run a single external capability
+ *    pack operation in a resource-bounded worker. It is mounted-but-hidden under
+ *    the same public-surface invariant as `__tool-command-worker`.
  *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
@@ -290,9 +296,9 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     const topLevel = program.commands.map((c) => c.name());
 
     // The known Tier-3 internal/worker commands (tool-command-surface-taxonomy
-    // T-1, + ADR-0054 M4-E). They are IPC/CI bootstrap entry points — still
-    // directly invocable, so they MUST remain mounted in the full tree (PRESENT
-    // below)...
+    // T-1, ADR-0054 M4-E, and ADR-0128). They are IPC/CI bootstrap entry
+    // points — still directly invocable, so they MUST remain mounted in the full
+    // tree (PRESENT below)...
     //
     // `__tool-command-worker` is the M4-E addition: a HOST-mounted internal
     // command (the dispatch supervisor forks it). It is the case that proved the
@@ -309,6 +315,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'sim-run-worker',
       'yagni-run-worker',
       '__tool-command-worker',
+      '__capability-pack-worker',
     ];
     for (const name of TIER_3_INTERNAL) {
       expect(topLevel, `internal command '${name}' must stay mounted (invocable)`).toContain(name);

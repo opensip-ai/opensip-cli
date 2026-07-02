@@ -20,22 +20,12 @@ import { pathToFileURL } from 'node:url';
 import { logger } from '../lib/logger.js';
 
 import { readOneExport } from './capability-export-reader.js';
-import {
-  discoverPackagesByDeclaredKind,
-  readDeclaredCapabilityPackageMetadata,
-  type DiscoveredDeclaredPackage,
-} from './marker-discovery.js';
-import { discoverScopedPackages, resolvePackageDir } from './node-modules-walk.js';
+import { defaultPackageAdmission, selectPackages } from './capability-package-selection.js';
 import { resolvePackageEntryPoint } from './package-entry.js';
-import {
-  coreDescriptionAt,
-  filterSameCorePackages,
-  selfCoreVersionString,
-  selfScopeAbiVersion,
-} from './single-core-guard.js';
 
 import type {
   CapabilityDiscoveryDiagnostic,
+  CapabilityPackageAdmission,
   DiscoverCapabilityContributionsOptions,
   RawCapabilityContribution,
   SelectedCapabilityPackage,
@@ -45,7 +35,11 @@ import type { CapabilityDiscoveryDescriptor } from '../tools/capability.js';
 export type {
   CapabilityDiscoveryDiagnostic,
   CapabilityDiscoveryPreferences,
+  CapabilityIsolationLevel,
+  CapabilityContributionLoader,
+  CapabilityContributionLoadContext,
   CapabilityPackageAdmission,
+  CapabilityResourceDecision,
   DiscoverCapabilityContributionsOptions,
   RawCapabilityContribution,
   SelectedCapabilityPackage,
@@ -82,177 +76,6 @@ export async function discoverCapabilityContributions(
 }
 
 /**
- * Resolve which packages to load, applying the preference rules:
- *   - explicit `preferences.packages` list resolved (built-ins from `cliDir`);
- *   - auto-discovery (by the descriptor's mode) runs UNLESS `autoDiscover: false`
- *     OR (an explicit list is present AND `explicitListMode` is `'replace'`);
- *   - `'augment'` mode unions explicit + auto-discovered, deduped.
- * Finally, the single-core guard drops any pack resolving a foreign
- * `@opensip-cli/core` (a split run scope → false positives).
- */
-function selectPackages(
-  options: DiscoverCapabilityContributionsOptions,
-): SelectedCapabilityPackage[] {
-  const { descriptor, preferences = {}, onDiagnostic } = options;
-  const explicitMode = descriptor.explicitListMode ?? 'replace';
-  const hasExplicit = preferences.packages !== undefined;
-
-  const explicit = hasExplicit ? resolveExplicit(preferences.packages ?? [], options) : [];
-  // 'replace' + an explicit list → skip auto-discovery; otherwise auto-discover
-  // (unless opted out). 'augment' always auto-discovers and adds the explicit list.
-  const includeAuto =
-    preferences.autoDiscover !== false && !(hasExplicit && explicitMode === 'replace');
-  const auto = includeAuto ? autoDiscover(options) : [];
-
-  // Explicit config wins on a name collision (listed first).
-  const merged = dedupeSelected([...explicit, ...auto]);
-  return applySingleCoreGuard(merged, onDiagnostic);
-}
-
-/** Auto-discover packages by the descriptor's mode (marker | name-pattern). */
-function autoDiscover(
-  options: DiscoverCapabilityContributionsOptions,
-): SelectedCapabilityPackage[] {
-  const { descriptor, projectDir, cliDir, preferences = {} } = options;
-  return descriptor.discovery.mode === 'marker'
-    ? autoDiscoverByMarker(descriptor, projectDir, cliDir)
-    : autoDiscoverByNamePattern(descriptor, projectDir, preferences.scopes);
-}
-
-/**
- * Resolve an explicit package-name list to on-disk dirs. Built-in names (under
- * `descriptor.builtinScope`) resolve from `cliDir`; the rest from `projectDir` —
- * the same ownership split auto-discovery applies. Diagnose any not installed.
- */
-function resolveExplicit(
-  names: readonly string[],
-  options: DiscoverCapabilityContributionsOptions,
-): SelectedCapabilityPackage[] {
-  const { descriptor, projectDir, cliDir, onDiagnostic } = options;
-  const scope = descriptor.builtinScope;
-  const out: SelectedCapabilityPackage[] = [];
-  for (const name of names) {
-    const anchor =
-      scope !== undefined && cliDir !== undefined && isUnderScope(name, scope)
-        ? cliDir
-        : projectDir;
-    const packageDir = resolvePackageDir(anchor, name);
-    if (packageDir) {
-      out.push({ name, packageDir });
-    } else {
-      onDiagnostic?.({
-        evt: 'capability.discovery.package_not_resolved',
-        packageName: name,
-        message: `configured package "${name}" is not installed in node_modules — skipping`,
-      });
-    }
-  }
-  return out;
-}
-
-/**
- * Marker mode. When the descriptor declares a `builtinScope`, packages split by
- * ownership: built-ins (names under the scope) resolve from `cliDir`; everything
- * else from `projectDir`, and a project-installed built-in is dropped as a shadow.
- * Without a `builtinScope`, all markers resolve from `projectDir`.
- */
-function autoDiscoverByMarker(
-  descriptor: CapabilityDiscoveryDescriptor,
-  projectDir: string,
-  cliDir: string | undefined,
-): SelectedCapabilityPackage[] {
-  if (descriptor.discovery.mode !== 'marker') return [];
-  const { markerKind } = descriptor.discovery;
-  const scope = descriptor.builtinScope;
-
-  if (scope === undefined || cliDir === undefined) {
-    return dedupe(discoverPackagesByDeclaredKind(projectDir, markerKind));
-  }
-  const builtin = discoverPackagesByDeclaredKind(cliDir, markerKind).filter((p) =>
-    isUnderScope(p.name, scope),
-  );
-  const custom = discoverPackagesByDeclaredKind(projectDir, markerKind).filter(
-    (p) => !isUnderScope(p.name, scope),
-  );
-  return dedupe([...builtin, ...custom]);
-}
-
-/** name-pattern mode: scan the descriptor's (or override) scopes for `<scope>/<prefix>*`. */
-function autoDiscoverByNamePattern(
-  descriptor: CapabilityDiscoveryDescriptor,
-  projectDir: string,
-  scopeOverride: readonly string[] | undefined,
-): SelectedCapabilityPackage[] {
-  if (descriptor.discovery.mode !== 'name-pattern') return [];
-  const { prefix, defaultScopes } = descriptor.discovery;
-  const scopes = scopeOverride ?? defaultScopes;
-  return discoverScopedPackages({ projectDir, scopes, prefix }).map((p) => ({
-    name: p.name,
-    packageDir: p.packageDir,
-  }));
-}
-
-/** A package name is "under" a scope when it begins with `<scope>/`. */
-function isUnderScope(name: string, scope: string): boolean {
-  return name.startsWith(scope.endsWith('/') ? scope : `${scope}/`);
-}
-
-/** Dedupe discovered packages by name (first occurrence wins) and drop the kind tag. */
-function dedupe(packages: readonly DiscoveredDeclaredPackage[]): SelectedCapabilityPackage[] {
-  const seen = new Set<string>();
-  const out: SelectedCapabilityPackage[] = [];
-  for (const p of packages) {
-    if (seen.has(p.name)) continue;
-    seen.add(p.name);
-    out.push({ name: p.name, packageDir: p.packageDir });
-  }
-  return out;
-}
-
-/** Dedupe selected packages by name (first occurrence wins). */
-function dedupeSelected(
-  packages: readonly SelectedCapabilityPackage[],
-): SelectedCapabilityPackage[] {
-  const seen = new Set<string>();
-  const out: SelectedCapabilityPackage[] = [];
-  for (const p of packages) {
-    if (seen.has(p.name)) continue;
-    seen.add(p.name);
-    out.push(p);
-  }
-  return out;
-}
-
-/**
- * Single-core guard: drop any pack that resolves a DIFFERENT `@opensip-cli/core`
- * than this runtime (a split run scope → false positives). Delegates to the shared
- * {@link filterSameCorePackages}; wraps each drop in a discovery diagnostic.
- * Generic: every domain's packs get the guard, not just fit's.
- */
-function applySingleCoreGuard(
-  packages: readonly SelectedCapabilityPackage[],
-  onDiagnostic?: (d: CapabilityDiscoveryDiagnostic) => void,
-): SelectedCapabilityPackage[] {
-  return filterSameCorePackages(packages, (pkg, foreignCore) => {
-    const foreign = coreDescriptionAt(foreignCore);
-    const foreignVer = foreign.version ?? '<unknown version>';
-    const selfVer = selfCoreVersionString() ?? '<unknown version>';
-    const foreignAbi =
-      foreign.scopeAbi === undefined ? 'pre-shared-scope' : `scope ABI ${foreign.scopeAbi}`;
-    onDiagnostic?.({
-      evt: 'capability.discovery.foreign_core',
-      packageName: pkg.name,
-      message:
-        `package ${pkg.name} was built against @opensip-cli/core ${foreignVer} (${foreignAbi}), ` +
-        `but this CLI uses ${selfVer} (scope ABI ${selfScopeAbiVersion()}) — skipping the pack ` +
-        `because mismatched core scope ABIs cannot share run scope. ` +
-        `Align the CLI and the pack's @opensip-cli/core to the same scope ABI ` +
-        `(matching versions, or rebuild the pack against this CLI's @opensip-cli/* line).`,
-    });
-  });
-}
-
-/**
  * Resolve a package's entry, dynamic-import it, and read the declared export.
  * `exportShape: 'array'` spreads the array; `'single'` yields the one value.
  * Missing package metadata, a missing/wrong-shape export, or an import that
@@ -263,13 +86,15 @@ async function loadPackageContributions(
   options: DiscoverCapabilityContributionsOptions,
 ): Promise<RawCapabilityContribution[]> {
   const { descriptor, onDiagnostic, shouldLoadPackage } = options;
-  const admission = shouldLoadPackage?.(pkg) ?? { admit: true };
+  const admission = shouldLoadPackage?.(pkg) ?? defaultPackageAdmission(pkg, descriptor);
   if (!admission.admit) {
-    onDiagnostic?.({
-      evt: 'capability.discovery.package_denied',
-      packageName: pkg.name,
-      message: `package ${pkg.name} denied by capability-pack trust policy: ${admission.reason}`,
-    });
+    diagnoseDeniedPackage(pkg, admission, onDiagnostic);
+    return [];
+  }
+  const loaded = await tryContributionLoader(pkg, descriptor, admission, options);
+  if (loaded !== undefined) return loaded;
+  if (admission.resourceDecision?.isolation === 'worker') {
+    diagnoseIsolationUnsupported(pkg, onDiagnostic);
     return [];
   }
   const resolved = resolvePackageEntryPoint(pkg.packageDir, pkg.name);
@@ -283,16 +108,23 @@ async function loadPackageContributions(
   }
   try {
     const mod = (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
-    const packageMetadata = readDeclaredCapabilityPackageMetadata(pkg.packageDir);
     const metadataTag = {
-      ...(packageMetadata?.targetDomain === undefined
+      ...(pkg.packageTargetDomain === undefined
         ? {}
-        : { packageTargetDomain: packageMetadata.targetDomain }),
-      ...(packageMetadata?.targetDomainApiVersion === undefined
+        : { packageTargetDomain: pkg.packageTargetDomain }),
+      ...(pkg.packageTargetDomainApiVersion === undefined
         ? {}
         : {
-            packageTargetDomainApiVersion: packageMetadata.targetDomainApiVersion,
+            packageTargetDomainApiVersion: pkg.packageTargetDomainApiVersion,
           }),
+      ...(pkg.packageRequires === undefined ? {} : { packageRequires: pkg.packageRequires }),
+      ...(pkg.packageRequiresInvalid === true ? { packageRequiresInvalid: true } : {}),
+      ...(pkg.packageManifestHash === undefined
+        ? {}
+        : { packageManifestHash: pkg.packageManifestHash }),
+      ...(admission.resourceDecision === undefined
+        ? {}
+        : { resourceDecision: admission.resourceDecision }),
     };
     // Primary export (required — a missing/wrong-shape primary is diagnosed).
     const out = readOneExport(mod, pkg.name, onDiagnostic, {
@@ -334,4 +166,66 @@ async function loadPackageContributions(
     });
     return [];
   }
+}
+
+function diagnoseDeniedPackage(
+  pkg: SelectedCapabilityPackage,
+  admission: Exclude<CapabilityPackageAdmission, { readonly admit: true }>,
+  onDiagnostic: ((d: CapabilityDiscoveryDiagnostic) => void) | undefined,
+): void {
+  onDiagnostic?.({
+    evt: 'capability.discovery.package_denied',
+    packageName: pkg.name,
+    message: `package ${pkg.name} denied by capability-pack trust policy: ${admission.reason}`,
+  });
+}
+
+async function tryContributionLoader(
+  pkg: SelectedCapabilityPackage,
+  descriptor: CapabilityDiscoveryDescriptor,
+  admission: Extract<CapabilityPackageAdmission, { readonly admit: true }>,
+  options: DiscoverCapabilityContributionsOptions,
+): Promise<RawCapabilityContribution[] | undefined> {
+  const { contributionLoader, onDiagnostic } = options;
+  if (contributionLoader === undefined) return undefined;
+  try {
+    const loaded = await contributionLoader(pkg, {
+      descriptor,
+      admission,
+    });
+    return loaded === undefined ? undefined : [...loaded];
+  } catch (error) {
+    return diagnoseLoadFailed(pkg, error, onDiagnostic);
+  }
+}
+
+function diagnoseLoadFailed(
+  pkg: SelectedCapabilityPackage,
+  error: unknown,
+  onDiagnostic: ((d: CapabilityDiscoveryDiagnostic) => void) | undefined,
+): RawCapabilityContribution[] {
+  const msg = error instanceof Error ? error.message : String(error);
+  logger.warn({
+    evt: 'capability.discovery.load_failed',
+    module: 'core:plugins',
+    name: pkg.name,
+    error: msg,
+  });
+  onDiagnostic?.({
+    evt: 'capability.discovery.load_failed',
+    packageName: pkg.name,
+    message: `failed to load package ${pkg.name}: ${msg}`,
+  });
+  return [];
+}
+
+function diagnoseIsolationUnsupported(
+  pkg: SelectedCapabilityPackage,
+  onDiagnostic: ((d: CapabilityDiscoveryDiagnostic) => void) | undefined,
+): void {
+  onDiagnostic?.({
+    evt: 'capability.discovery.isolation_unsupported',
+    packageName: pkg.name,
+    message: `package ${pkg.name} requires worker isolation but no isolated capability loader is wired`,
+  });
 }

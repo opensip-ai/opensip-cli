@@ -21,6 +21,8 @@ export const POLICY_SUBJECT_KINDS = [
 export const TRUST_POLICY_SOURCE_TIERS = ['builtin', 'user', 'project', 'org'] as const;
 export const POLICY_DECISION_OUTCOMES = ['allow', 'deny', 'allow-with-conditions'] as const;
 export const PROVENANCE_STATUSES = ['verified', 'unavailable', 'failed'] as const;
+export const POLICY_RESOURCE_CLASSES = ['filesystem', 'network', 'env', 'subprocess'] as const;
+export const CAPABILITY_ISOLATION_LEVELS = ['host', 'worker'] as const;
 
 export const POLICY_EXCEPTION_MAX_COUNT = 100;
 export const POLICY_REASON_MAX_LENGTH = 240;
@@ -81,6 +83,8 @@ export const orgPolicyCacheSchema = z
 export const policySubjectKindSchema = z.enum(POLICY_SUBJECT_KINDS);
 export const policyDecisionOutcomeSchema = z.enum(POLICY_DECISION_OUTCOMES);
 export const provenanceStatusSchema = z.enum(PROVENANCE_STATUSES);
+export const policyResourceClassSchema = z.enum(POLICY_RESOURCE_CLASSES);
+export const capabilityIsolationLevelSchema = z.enum(CAPABILITY_ISOLATION_LEVELS);
 
 export type TrustPolicyDocument = z.infer<typeof trustPolicySchema>;
 export type TrustPolicyOrgConfig = z.infer<typeof trustPolicyOrgConfigSchema>;
@@ -90,7 +94,22 @@ export type PolicyAction = z.infer<typeof policyActionSchema>;
 export type PolicySubjectKind = z.infer<typeof policySubjectKindSchema>;
 export type PolicyDecisionOutcome = z.infer<typeof policyDecisionOutcomeSchema>;
 export type ProvenanceStatus = z.infer<typeof provenanceStatusSchema>;
+export type PolicyResourceClass = z.infer<typeof policyResourceClassSchema>;
+export type CapabilityIsolationLevel = z.infer<typeof capabilityIsolationLevelSchema>;
 export type OrgPolicyCacheDocument = z.infer<typeof orgPolicyCacheSchema>;
+
+export interface PolicyResourceRequirement {
+  readonly resource: PolicyResourceClass;
+  readonly scope?: string;
+  readonly reason?: string;
+}
+
+export interface PolicyResourceDecision {
+  readonly isolation: CapabilityIsolationLevel;
+  readonly allowedResources: readonly PolicyResourceRequirement[];
+  readonly denyUndeclared: true;
+  readonly reasons: readonly string[];
+}
 
 export interface PolicySubject {
   readonly kind: PolicySubjectKind;
@@ -132,6 +151,9 @@ export interface PolicyEvaluationRequest {
     readonly bundled?: boolean;
     readonly legacyTrusted?: boolean;
     readonly trustedByLocation?: boolean;
+    readonly declaredResources?: readonly PolicyResourceRequirement[];
+    readonly targetDomain?: string;
+    readonly manifestHash?: string;
   };
   readonly now: Date;
 }
@@ -153,6 +175,7 @@ export interface PolicyDecision {
   readonly matchedExceptionIds: readonly string[];
   readonly sourceTiers: readonly TrustPolicySourceTier[];
   readonly provenanceStatus?: ProvenanceStatus;
+  readonly resourceDecision?: PolicyResourceDecision;
   readonly auditEvent: PolicyAuditEvent;
 }
 

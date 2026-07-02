@@ -34,7 +34,10 @@ import type {
 } from './command-spec.js';
 import type { ToolIdentity } from './identity.js';
 import type { ToolConfigManifestDescriptor } from './manifest-config.js';
+import type { ToolResourceRequirement } from './resource-requirement.js';
 import type { PluginLayout } from '../plugins/types.js'; // leaf import — manifest must not pull the plugins barrel
+
+export type { ToolResourceClass, ToolResourceRequirement } from './resource-requirement.js';
 
 /**
  * The oldest plugin-API epoch this engine still admits.
@@ -79,20 +82,6 @@ export const PLUGIN_API_VERSION = 1;
  *                       `OPENSIP_CLI_ALLOW_PROJECT_TOOLS`.
  */
 export type ToolSource = 'bundled' | 'installed' | 'user-global' | 'project-local';
-
-/** Coarse classes of host resources a tool or capability pack may declare it needs. */
-export type ToolResourceClass = 'filesystem' | 'network' | 'env' | 'subprocess';
-
-/**
- * Declaration-only permission need. The loader validates and carries this shape
- * for install/review tooling; admission and runtime enforcement are ADR-gated
- * follow-on work.
- */
-export interface ToolResourceRequirement {
-  readonly resource: ToolResourceClass;
-  readonly scope?: string;
-  readonly reason?: string;
-}
 
 /**
  * The serializable subset of {@link OptionSpec} a tool may declare in its static

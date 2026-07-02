@@ -27,6 +27,8 @@
  * contracts).
  */
 
+import type { ToolResourceRequirement } from './resource-requirement.js';
+
 /**
  * How a contribution to a capability domain is delivered. Mirrors the
  * three ways a pack contributes today, so an external tool can declare
@@ -74,6 +76,59 @@ export interface CapabilityCoContribution {
   readonly exportShape: 'array' | 'single';
   /** The domain id these secondary contributions route to (e.g. `fit-recipe`). */
   readonly domainId: string;
+}
+
+/** Package identity and manifest metadata passed into an isolation bridge. */
+export interface CapabilityBridgePackage {
+  readonly name: string;
+  readonly packageDir: string;
+  readonly packageTargetDomain?: string;
+  readonly packageTargetDomainApiVersion?: number;
+  readonly packageRequires?: readonly ToolResourceRequirement[];
+  readonly packageManifestHash?: string;
+}
+
+/** Resource policy decision the host enforces for one capability package load. */
+export interface CapabilityBridgeResourceDecision {
+  readonly isolation: 'host' | 'worker';
+  readonly allowedResources: readonly ToolResourceRequirement[];
+  readonly denyUndeclared: true;
+  readonly reasons: readonly string[];
+}
+
+/** One contribution emitted by an isolation bridge back to the host router. */
+export interface CapabilityBridgeContribution {
+  readonly contribution: unknown;
+  readonly targetDomainId?: string;
+}
+
+/** Host-side bridge context used to create proxy contributions. */
+export interface CapabilityHostBridgeContext {
+  readonly domainId: string;
+  readonly descriptor: CapabilityDiscoveryDescriptor;
+  readonly pkg: CapabilityBridgePackage;
+  readonly resourceDecision: CapabilityBridgeResourceDecision;
+  readonly invoke: (request: unknown) => Promise<unknown>;
+}
+
+/** Worker-side bridge context used to execute one isolated package operation. */
+export interface CapabilityWorkerBridgeContext {
+  readonly domainId: string;
+  readonly descriptor: CapabilityDiscoveryDescriptor;
+  readonly pkg: CapabilityBridgePackage;
+  readonly resourceDecision: CapabilityBridgeResourceDecision;
+  readonly request: unknown;
+}
+
+/**
+ * Tool-owned adapter between the generic worker supervisor and a capability
+ * domain's concrete contribution contract.
+ */
+export interface CapabilityIsolationBridge {
+  readonly createHostContributions: (
+    context: CapabilityHostBridgeContext,
+  ) => Promise<readonly CapabilityBridgeContribution[]>;
+  readonly runInWorker: (context: CapabilityWorkerBridgeContext) => Promise<unknown>;
 }
 
 /**

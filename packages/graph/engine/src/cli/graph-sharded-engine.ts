@@ -91,9 +91,9 @@ async function resolveShards(
   if (units.length <= 1) return resolveSyntheticFlatShards(opts);
 
   const adapter = pickAdapter(opts.cwd);
-  let rootDiscovery: ReturnType<typeof adapter.discoverFiles>;
+  let rootDiscovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
   try {
-    rootDiscovery = adapter.discoverFiles({ cwd: opts.cwd });
+    rootDiscovery = await adapter.discoverFiles({ cwd: opts.cwd });
   } catch {
     /* v8 ignore next */
     return resolveSyntheticFlatShards(opts);
@@ -126,13 +126,13 @@ export async function resolveShardsForCwd(
   return resolution.shards;
 }
 
-function resolveSyntheticFlatShards(opts: GraphCommandOptions): ShardResolution {
+async function resolveSyntheticFlatShards(opts: GraphCommandOptions): Promise<ShardResolution> {
   if (typeof opts.language === 'string' && opts.language.length > 0) return { shards: [] };
   const adapter = pickAdapter(opts.cwd);
   if (adapter.id !== 'typescript') return { shards: [] };
-  let discovery: ReturnType<typeof adapter.discoverFiles>;
+  let discovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
   try {
-    discovery = adapter.discoverFiles({ cwd: opts.cwd });
+    discovery = await adapter.discoverFiles({ cwd: opts.cwd });
   } catch {
     return { shards: [] };
   }

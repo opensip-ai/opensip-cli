@@ -237,6 +237,8 @@ export type { RuleHints } from '../types.js';
 
 // ── the interface ─────────────────────────────────────────────────
 
+export type MaybePromise<T> = T | Promise<T>;
+
 export interface GraphLanguageAdapter<P = ParsedProject> {
   /** Stable identifier. Stored in Catalog.language. */
   readonly id: string;
@@ -245,9 +247,9 @@ export interface GraphLanguageAdapter<P = ParsedProject> {
   /** Optional human-readable name; defaults to id. */
   readonly displayName?: string;
 
-  discoverFiles(input: DiscoverInput): DiscoverOutput;
-  parseProject(input: ParseInput): ParseOutput<P>;
-  walkProject(input: WalkInput<P>): WalkOutput;
+  discoverFiles(input: DiscoverInput): MaybePromise<DiscoverOutput>;
+  parseProject(input: ParseInput): MaybePromise<ParseOutput<P>>;
+  walkProject(input: WalkInput<P>): MaybePromise<WalkOutput>;
   /**
    * Resolve call sites to edges. May return synchronously OR a Promise: the
    * resolve stage is a tool's heaviest loop (tens of thousands of call sites),
@@ -257,7 +259,7 @@ export interface GraphLanguageAdapter<P = ParsedProject> {
    * result, so sync adapters are unaffected.
    */
   resolveCallSites(input: ResolveInput<P>): ResolveOutput | Promise<ResolveOutput>;
-  cacheKey(input: CacheKeyInput): string;
+  cacheKey(input: CacheKeyInput): MaybePromise<string>;
 
   readonly ruleHints?: RuleHints;
 }

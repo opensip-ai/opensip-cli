@@ -46,6 +46,22 @@ import type { ToolCliContext } from '@opensip-cli/core';
 const log = createToolLogger('graph:cli');
 
 const MODULE_GRAPH_CLI = 'graph:cli';
+const DISCOVERY_CONCURRENCY = 8;
+
+async function mapInBatches<T, R>(
+  items: readonly T[],
+  fn: (item: T) => R | Promise<R>,
+  start = 0,
+  out: R[] = [],
+): Promise<R[]> {
+  if (start >= items.length) return out;
+  const batch = items.slice(start, start + DISCOVERY_CONCURRENCY);
+  const promises: Promise<R>[] = [];
+  for (const item of batch) promises.push(Promise.resolve(fn(item)));
+  const results = await Promise.all(promises);
+  out.push(...results);
+  return mapInBatches(items, fn, start + DISCOVERY_CONCURRENCY, out);
+}
 
 /**
  * Run `graph --list-files`: resolve the discovery set for the scope encoded in
@@ -73,7 +89,9 @@ export async function executeListFiles(
     }
 
     const files =
-      opts.workspace === true ? await discoverWorkspaceFiles(opts, cli) : discoverScopedFiles(opts);
+      opts.workspace === true
+        ? await discoverWorkspaceFiles(opts, cli)
+        : await discoverScopedFiles(opts);
 
     const rel = relativizeSorted(files, realpathOrResolve(opts.cwd));
 
@@ -104,16 +122,14 @@ export async function executeListFiles(
  * the adapter calls `runGraph` (bare) and `executeMultiPathGraph`
  * (positional) make at stage 0.
  */
-function discoverScopedFiles(opts: GraphCommandOptions): readonly string[] {
+async function discoverScopedFiles(opts: GraphCommandOptions): Promise<readonly string[]> {
   const adapter = resolveDiscoveryAdapter(opts);
   const scopes =
     opts.paths && opts.paths.length > 0 ? resolvePositionalPaths(opts.paths, opts.cwd) : [opts.cwd];
-  const all: string[] = [];
-  for (const scope of scopes) {
-    const discovered = adapter.discoverFiles({ cwd: scope });
-    all.push(...discovered.files);
-  }
-  return all;
+  const discoveredByScope = await mapInBatches(scopes, (scope) =>
+    adapter.discoverFiles({ cwd: scope }),
+  );
+  return discoveredByScope.flatMap((discovered) => discovered.files);
 }
 
 /**
@@ -136,19 +152,17 @@ async function discoverWorkspaceFiles(
     );
   }
   const adapter = resolveDiscoveryAdapter(opts);
-  const all: string[] = [];
-  for (const unit of units) {
+  const discoveredByUnit = await mapInBatches(units, async (unit) => {
     try {
-      const discovered = adapter.discoverFiles({
+      return await adapter.discoverFiles({
         cwd: unit.rootDir,
         configPathOverride: unit.configPath,
       });
-      all.push(...discovered.files);
     } catch {
-      continue; // a unit the graph adapter can't discover is skipped, not fatal
+      return null; // a unit the graph adapter can't discover is skipped, not fatal
     }
-  }
-  return all;
+  });
+  return discoveredByUnit.flatMap((discovered) => discovered?.files ?? []);
 }
 
 /**

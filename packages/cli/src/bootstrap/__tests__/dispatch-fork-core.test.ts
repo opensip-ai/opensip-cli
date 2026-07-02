@@ -9,6 +9,7 @@ import {
   EXTERNAL_WORKER_CHILD_ENV_ALLOWLIST,
   TOOL_ENV_PASSTHROUGH_ENV,
 } from '../build-external-worker-child-env.js';
+import { buildCapabilityWorkerChildEnv } from '../capability-worker/env.js';
 import { IN_TOOL_WORKER_ENV } from '../tool-provenance.js';
 
 describe('buildExternalWorkerChildEnv', () => {
@@ -86,5 +87,33 @@ describe('buildExternalWorkerChildEnv', () => {
     });
 
     expect(childEnv.TRACEPARENT).toBe('00-active-span-01');
+  });
+});
+
+describe('buildCapabilityWorkerChildEnv', () => {
+  it('forwards declared env resources and ignores passthrough-listed undeclared env vars', () => {
+    const childEnv = buildCapabilityWorkerChildEnv({
+      parentEnv: {
+        PATH: '/bin',
+        OPENAI_API_KEY: 'declared',
+        OTHER_SECRET: 'undeclared',
+        [TOOL_ENV_PASSTHROUGH_ENV]: 'OTHER_SECRET',
+      },
+      runId: 'run_capability_1',
+      traceparent: '00-capability-span-01',
+      resourceDecision: {
+        isolation: 'worker',
+        allowedResources: [{ resource: 'env', scope: 'OPENAI_API_KEY', reason: 'fixture auth' }],
+        denyUndeclared: true,
+        reasons: ['worker isolation'],
+      },
+    });
+
+    expect(childEnv.PATH).toBe('/bin');
+    expect(childEnv.OPENAI_API_KEY).toBe('declared');
+    expect(childEnv.OTHER_SECRET).toBeUndefined();
+    expect(childEnv[IN_TOOL_WORKER_ENV]).toBe('1');
+    expect(childEnv.OPENSIP_RUN_ID).toBe('run_capability_1');
+    expect(childEnv.TRACEPARENT).toBe('00-capability-span-01');
   });
 });

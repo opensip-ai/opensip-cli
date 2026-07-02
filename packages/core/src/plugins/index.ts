@@ -44,7 +44,11 @@ export type { DiscoveredDeclaredPackage } from './marker-discovery.js';
 export { discoverCapabilityContributions } from './capability-discovery.js';
 export type {
   CapabilityDiscoveryPreferences,
+  CapabilityIsolationLevel,
+  CapabilityContributionLoadContext,
+  CapabilityContributionLoader,
   CapabilityPackageAdmission,
+  CapabilityResourceDecision,
   RawCapabilityContribution,
   CapabilityDiscoveryDiagnostic,
   DiscoverCapabilityContributionsOptions,

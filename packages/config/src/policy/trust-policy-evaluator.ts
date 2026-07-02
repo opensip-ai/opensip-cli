@@ -4,6 +4,9 @@ import {
   type PolicyDecision,
   type PolicyDecisionOutcome,
   type PolicyEvaluationRequest,
+  type PolicyResourceClass,
+  type PolicyResourceDecision,
+  type PolicyResourceRequirement,
   type PolicySubject,
   type ProvenanceStatus,
   type ResolvedTrustPolicy,
@@ -211,6 +214,7 @@ function buildDecision(
   draft: DecisionDraft,
 ): PolicyDecision {
   const status = provenanceStatus(request);
+  const resourceDecision = buildCapabilityResourceDecision(request, draft);
   const auditEvent: PolicyAuditEvent = {
     occurredAt: request.now.toISOString(),
     action: request.action,
@@ -223,6 +227,7 @@ function buildDecision(
       subjectKind: request.subject.kind,
       provenanceStatus: status,
       policyMode: effectiveMode(policy, request),
+      ...(resourceDecision === undefined ? {} : { resourceDecision }),
       sourceTiers: policy.sourceTiers,
       orgStatus: policy.orgStatus.state,
       ...request.evidence,
@@ -234,25 +239,91 @@ function buildDecision(
     matchedExceptionIds: draft.matchedExceptionIds,
     sourceTiers: policy.sourceTiers,
     ...(status === undefined ? {} : { provenanceStatus: status }),
+    ...(resourceDecision === undefined ? {} : { resourceDecision }),
     auditEvent,
   };
+}
+
+function buildCapabilityResourceDecision(
+  request: PolicyEvaluationRequest,
+  draft: DecisionDraft,
+): PolicyResourceDecision | undefined {
+  if (
+    request.subject.kind !== 'capability-pack' ||
+    request.action !== 'load' ||
+    draft.outcome === 'deny'
+  ) {
+    return undefined;
+  }
+  const allowedResources = normalizeDeclaredResources(request.evidence?.declaredResources);
+  const isolation = request.evidence?.bundled === true ? 'host' : 'worker';
+  return {
+    isolation,
+    allowedResources,
+    denyUndeclared: true,
+    reasons: [
+      isolation === 'host'
+        ? 'bundled first-party capability pack may run in the host'
+        : 'external capability pack must run in a resource-bounded worker',
+      'undeclared resources are denied',
+    ],
+  };
+}
+
+function normalizeDeclaredResources(value: unknown): readonly PolicyResourceRequirement[] {
+  if (!Array.isArray(value)) return [];
+  const out: PolicyResourceRequirement[] = [];
+  for (const entry of value) {
+    const requirement = normalizeDeclaredResource(entry);
+    if (requirement !== undefined) out.push(requirement);
+  }
+  return out;
+}
+
+function normalizeDeclaredResource(value: unknown): PolicyResourceRequirement | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (!isPolicyResourceClass(record.resource)) return undefined;
+  const { scope, reason } = record;
+  return {
+    resource: record.resource,
+    ...(typeof scope === 'string' ? { scope } : {}),
+    ...(typeof reason === 'string' ? { reason } : {}),
+  };
+}
+
+function isPolicyResourceClass(value: unknown): value is PolicyResourceClass {
+  return value === 'filesystem' || value === 'network' || value === 'env' || value === 'subprocess';
 }
 
 function sanitizeMetadata(input: Record<string, unknown>): Record<string, unknown> {
   const output: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(input)) {
-    if (value === undefined) continue;
-    if (typeof value === 'string') {
-      output[key] = redact(value).slice(0, 240);
-    } else if (typeof value === 'number' || typeof value === 'boolean') {
-      output[key] = value;
-    } else if (Array.isArray(value)) {
-      output[key] = value
-        .slice(0, 20)
-        .map((item: unknown) => (typeof item === 'string' ? redact(item).slice(0, 120) : item));
-    }
+    const sanitized = sanitizeMetadataValue(value, 0);
+    if (sanitized !== undefined) output[key] = sanitized;
   }
   return output;
+}
+
+function sanitizeMetadataValue(value: unknown, depth: number): unknown {
+  if (value === undefined || depth > 2) return undefined;
+  if (typeof value === 'string') return redact(value).slice(0, depth === 0 ? 240 : 120);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 20)
+      .map((item: unknown) => sanitizeMetadataValue(item, depth + 1))
+      .filter((item: unknown) => item !== undefined);
+  }
+  if (typeof value === 'object' && value !== null) {
+    const output: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value).slice(0, 20)) {
+      const sanitized = sanitizeMetadataValue(child, depth + 1);
+      if (sanitized !== undefined) output[redact(key).slice(0, 80)] = sanitized;
+    }
+    return output;
+  }
+  return undefined;
 }
 
 function redact(value: string): string {

@@ -22,6 +22,7 @@ import {
 import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
+import { isolatedSimPackBridge } from './capability/isolated-sim-pack.js';
 import { collectSimulationReportData } from './cli/report-data.js';
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { simRecipesCommandSpec } from './cli/sim-recipes.js';
@@ -381,6 +382,9 @@ export const simulationTool: Tool = defineTool({
     capabilityRegistrars: {
       'sim-pack': registerSimScenario,
       'sim-recipe': registerSimRecipe,
+    },
+    capabilityIsolationBridges: {
+      'sim-pack': isolatedSimPackBridge,
     },
     scaffoldExamples: simScaffoldExamples,
     stableExampleIds: simStableExampleIds,

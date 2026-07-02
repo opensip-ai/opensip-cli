@@ -28,6 +28,7 @@ import { createToolScope, defineTool, logger, readPackageVersion } from '@opensi
 // (register-graph-adapters.ts). The historical engine-side bootstrap is
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
+import { isolatedGraphAdapterBridge } from './capability/isolated-graph-adapter.js';
 import {
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
@@ -191,6 +192,7 @@ export const graphTool: Tool = defineTool({
       env: graphConfigDeclaration.env,
     },
     capabilityRegistrars: { 'graph-adapter': registerGraphAdapter },
+    capabilityIsolationBridges: { 'graph-adapter': isolatedGraphAdapterBridge },
     fingerprintStrategy: graphFingerprintStrategy,
   },
 });

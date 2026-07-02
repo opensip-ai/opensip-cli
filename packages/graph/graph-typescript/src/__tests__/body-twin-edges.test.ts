@@ -59,14 +59,14 @@ function findOcc(catalog: Catalog, name: string, filePath: string): FunctionOccu
 
 describe('body-twin edge keying', () => {
   it('keeps each twin occurrence’s edges to its own file, not the union', async () => {
-    const discovery = typescriptGraphAdapter.discoverFiles({ cwd: root });
-    const parsed = typescriptGraphAdapter.parseProject({
+    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: root });
+    const parsed = await typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
       compilerOptions: discovery.compilerOptions,
       resolutionMode: 'exact',
     });
-    const walked = typescriptGraphAdapter.walkProject({
+    const walked = await typescriptGraphAdapter.walkProject({
       project: parsed.project,
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

@@ -56,7 +56,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
   const cachedCatalog: Catalog | null =
     input.useCache && input.catalogRepo ? input.catalogRepo.loadFullCatalog() : null;
   const currentCacheKey = stampEngineVersion(
-    input.adapter.cacheKey({
+    await input.adapter.cacheKey({
       projectDirAbs: input.discovery.projectDirAbs,
       configPathAbs: input.discovery.configPathAbs,
       compilerOptions: input.discovery.compilerOptions,

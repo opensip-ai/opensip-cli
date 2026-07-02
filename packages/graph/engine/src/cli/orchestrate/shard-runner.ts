@@ -296,28 +296,33 @@ export interface ShardWorkPlan {
  * Cheap by design — it stats each shard's files (fingerprint) and reads
  * each shard's config (cacheKey); no parsing, no worker spawn.
  */
-export function planShardWork(
+export async function planShardWork(
   shards: readonly Shard[],
   repo: CatalogRepo | null,
   adapter: GraphLanguageAdapter,
   resolutionMode: ResolutionMode,
   useCache: boolean,
-): ShardWorkPlan {
+): Promise<ShardWorkPlan> {
   if (!useCache || !repo) return { cached: [], toBuild: [...shards] };
   const cached: ShardBuildResult[] = [];
   const toBuild: Shard[] = [];
-  for (const shard of shards) {
-    const cacheKey = stampEngineVersion(
-      adapter.cacheKey({
-        projectDirAbs: shard.rootDir,
-        configPathAbs: shard.configPathAbs,
-        resolutionMode,
-      }),
-      // Shard fragments only ever feed the sharded engine; stamp the mode so a
-      // fragment row can never be confused with a single-program (exact) build.
-      'sharded',
-    );
-    const fingerprint = computeFilesFingerprint(shard.files);
+  const cacheInputs = await Promise.all(
+    shards.map(async (shard) => ({
+      shard,
+      cacheKey: stampEngineVersion(
+        await adapter.cacheKey({
+          projectDirAbs: shard.rootDir,
+          configPathAbs: shard.configPathAbs,
+          resolutionMode,
+        }),
+        // Shard fragments only ever feed the sharded engine; stamp the mode so a
+        // fragment row can never be confused with a single-program (exact) build.
+        'sharded',
+      ),
+      fingerprint: computeFilesFingerprint(shard.files),
+    })),
+  );
+  for (const { shard, cacheKey, fingerprint } of cacheInputs) {
     const fragment = repo.loadValidShardFragment(shard.id, cacheKey, fingerprint);
     if (fragment) cached.push(fragment);
     else toBuild.push(shard);

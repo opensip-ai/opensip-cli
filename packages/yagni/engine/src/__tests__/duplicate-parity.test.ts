@@ -171,9 +171,9 @@ afterAll(() => {
 });
 
 describe('yagni duplicate detection — extraction + shared policy parity', () => {
-  it('matches graph-typescript eligible CloneCandidates and exact-duplicate findings', () => {
+  it('matches graph-typescript eligible CloneCandidates and exact-duplicate findings', async () => {
     const yagniCandidates = buildTsInventory(root).filter(isEligibleKind);
-    const graphCandidates = graphEligibleCandidates(root);
+    const graphCandidates = await graphEligibleCandidates(root);
 
     expect(candidateSignatures(yagniCandidates)).toEqual(candidateSignatures(graphCandidates));
     expect(duplicateFindingsSignature(yagniCandidates)).toEqual(
@@ -274,9 +274,9 @@ type GraphOccurrenceLike = Pick<
   | 'qualifiedName'
 >;
 
-function graphEligibleCandidates(projectRoot: string): CloneCandidate[] {
-  const discovery = typescriptGraphAdapter.discoverFiles({ cwd: projectRoot });
-  const parsed = typescriptGraphAdapter.parseProject({
+async function graphEligibleCandidates(projectRoot: string): Promise<CloneCandidate[]> {
+  const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectRoot });
+  const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
     configPathAbs: discovery.configPathAbs,
@@ -284,7 +284,7 @@ function graphEligibleCandidates(projectRoot: string): CloneCandidate[] {
     resolutionMode: 'exact',
   });
   expect(parsed.parseErrors).toEqual([]);
-  const walked = typescriptGraphAdapter.walkProject({
+  const walked = await typescriptGraphAdapter.walkProject({
     project: parsed.project,
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

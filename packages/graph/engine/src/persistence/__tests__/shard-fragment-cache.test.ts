@@ -116,14 +116,14 @@ describe('planShardWork', () => {
     };
   }
 
-  it('rebuilds every shard when the cache is empty', () => {
+  it('rebuilds every shard when the cache is empty', async () => {
     const shards = [shard('a'), shard('b')];
-    const plan = planShardWork(shards, repo, adapter, 'exact', true);
+    const plan = await planShardWork(shards, repo, adapter, 'exact', true);
     expect(plan.cached).toHaveLength(0);
     expect(plan.toBuild).toHaveLength(2);
   });
 
-  it('reuses an unchanged shard and rebuilds only the changed one', () => {
+  it('reuses an unchanged shard and rebuilds only the changed one', async () => {
     const a = shard('a');
     const b = shard('b');
     // Seed both with a fragment whose key+fingerprint match the current files.
@@ -133,7 +133,7 @@ describe('planShardWork', () => {
       // production the worker stamps via assembleCatalog with engineMode:
       // 'sharded'). ADR-0015 / ADR-0031.
       const key = stampEngineVersion(
-        adapter.cacheKey({
+        await adapter.cacheKey({
           projectDirAbs: s.rootDir,
           configPathAbs: s.configPathAbs,
           resolutionMode: 'exact',
@@ -146,13 +146,13 @@ describe('planShardWork', () => {
     // Change shard b's file so its fingerprint no longer matches.
     writeFileSync(b.files[0], 'export const x = 2; export const y = 3;\n', 'utf8');
 
-    const plan = planShardWork([a, b], repo, adapter, 'exact', true);
+    const plan = await planShardWork([a, b], repo, adapter, 'exact', true);
     expect(plan.cached.map((r) => r.shardId)).toEqual(['a']);
     expect(plan.toBuild.map((s) => s.id)).toEqual(['b']);
   });
 
-  it('rebuilds everything when useCache is false', () => {
-    const plan = planShardWork([shard('a')], repo, adapter, 'exact', false);
+  it('rebuilds everything when useCache is false', async () => {
+    const plan = await planShardWork([shard('a')], repo, adapter, 'exact', false);
     expect(plan.toBuild).toHaveLength(1);
   });
 });

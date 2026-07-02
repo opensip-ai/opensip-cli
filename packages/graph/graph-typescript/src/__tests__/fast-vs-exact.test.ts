@@ -47,19 +47,19 @@ async function buildBothTiers(
     resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>;
     cacheKey: string;
   }> => {
-    const disc = adapter.discoverFiles({ cwd: dir });
-    const parsed = adapter.parseProject({
+    const disc = await adapter.discoverFiles({ cwd: dir });
+    const parsed = await adapter.parseProject({
       projectDirAbs: disc.projectDirAbs,
       files: disc.files,
       compilerOptions: disc.compilerOptions,
       resolutionMode,
     });
-    const walk = adapter.walkProject({
+    const walk = await adapter.walkProject({
       project: parsed.project,
       files: disc.files,
       projectDirAbs: disc.projectDirAbs,
     });
-    const cacheKey = adapter.cacheKey({
+    const cacheKey = await adapter.cacheKey({
       projectDirAbs: disc.projectDirAbs,
       configPathAbs: disc.configPathAbs,
       compilerOptions: disc.compilerOptions,

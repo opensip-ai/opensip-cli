@@ -84,4 +84,81 @@ describe('evaluateTrustPolicy', () => {
     expect(decision.outcome).toBe('deny');
     expect(decision.reasons).toContain('required org policy unavailable: cache stale');
   });
+
+  it('returns a worker resource decision for allowed external capability packs', () => {
+    const policy = resolveTrustPolicySources([], NOW);
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'capability-pack', id: '@acme/fit-pack', source: 'capability-pack' },
+      action: 'load',
+      evidence: {
+        legacyTrusted: true,
+        provenanceStatus: 'unavailable',
+        declaredResources: [
+          { resource: 'env', scope: 'OPENAI_API_KEY', reason: 'fixture auth' },
+          { resource: 'network', scope: 'https://example.test', reason: 'metadata fetch' },
+        ],
+        targetDomain: 'fit-pack',
+        manifestHash: 'sha256:abc',
+      },
+      now: NOW,
+    });
+
+    expect(decision.outcome).toBe('allow-with-conditions');
+    expect(decision.resourceDecision).toEqual({
+      isolation: 'worker',
+      allowedResources: [
+        { resource: 'env', scope: 'OPENAI_API_KEY', reason: 'fixture auth' },
+        { resource: 'network', scope: 'https://example.test', reason: 'metadata fetch' },
+      ],
+      denyUndeclared: true,
+      reasons: [
+        'external capability pack must run in a resource-bounded worker',
+        'undeclared resources are denied',
+      ],
+    });
+    expect(decision.auditEvent.metadata.resourceDecision).toMatchObject({
+      isolation: 'worker',
+      denyUndeclared: true,
+    });
+  });
+
+  it('returns a host resource decision only for bundled capability packs', () => {
+    const policy = resolveTrustPolicySources([], NOW);
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'capability-pack', id: '@opensip-cli/checks-typescript' },
+      action: 'load',
+      evidence: {
+        legacyTrusted: true,
+        bundled: true,
+        provenanceStatus: 'verified',
+        declaredResources: [],
+      },
+      now: NOW,
+    });
+
+    expect(decision.outcome).toBe('allow');
+    expect(decision.resourceDecision?.isolation).toBe('host');
+    expect(decision.resourceDecision?.denyUndeclared).toBe(true);
+  });
+
+  it('does not grant resources for denied capability pack loads', () => {
+    const policy = resolveTrustPolicySources(
+      [{ tier: 'project', policy: { mode: 'strict' } }],
+      NOW,
+    );
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'capability-pack', id: '@acme/fit-pack' },
+      action: 'load',
+      evidence: {
+        legacyTrusted: true,
+        provenanceStatus: 'unavailable',
+        declaredResources: [{ resource: 'env', scope: 'TOKEN' }],
+      },
+      now: NOW,
+    });
+
+    expect(decision.outcome).toBe('deny');
+    expect(decision.resourceDecision).toBeUndefined();
+    expect(decision.auditEvent.metadata.resourceDecision).toBeUndefined();
+  });
 });

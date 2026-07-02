@@ -1,0 +1,117 @@
+import { readFileSync } from 'node:fs';
+
+import {
+  currentScope,
+  defineCommand,
+  IpcPayloadTooLargeError,
+  sendWorkerIpcMessage,
+  startWorkerHeartbeat,
+  type CommandSpec,
+  type WorkerMessage,
+} from '@opensip-cli/core';
+
+import { type CliCommandsContext } from '../../commands/shared.js';
+
+import { installCapabilityWorkerGuards } from './guards.js';
+
+import type { CapabilityWorkerErrorPayload, CapabilityWorkerSpec } from './types.js';
+
+type CapabilityWorkerMessage = WorkerMessage<never, unknown>;
+
+function send(msg: CapabilityWorkerMessage): void {
+  try {
+    sendWorkerIpcMessage(msg);
+  } catch (error) {
+    if (error instanceof IpcPayloadTooLargeError) {
+      process.send?.({
+        kind: 'error',
+        message: error.message,
+        failureClass: 'payload_too_large',
+      } satisfies CapabilityWorkerErrorPayload & { kind: 'error' });
+      return;
+    }
+    throw error;
+  }
+}
+
+function readSpec(specPath: string): CapabilityWorkerSpec {
+  return JSON.parse(readFileSync(specPath, 'utf8')) as CapabilityWorkerSpec;
+}
+
+/**
+ * Execute one worker request through the owning tool's isolation bridge.
+ *
+ * @throws {Error} when the owning tool has no bridge for the requested domain.
+ */
+async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown> {
+  installCapabilityWorkerGuards({
+    cwd: process.cwd(),
+    packageDir: spec.pkg.packageDir,
+    resourceDecision: spec.resourceDecision,
+  });
+  const tools = currentScope()?.tools;
+  const tool =
+    tools?.get(spec.ownerToolId) ??
+    tools
+      ?.list()
+      .find(
+        (candidate) =>
+          candidate.metadata.id === spec.ownerToolId ||
+          candidate.metadata.name === spec.ownerToolId,
+      );
+  const bridge = tool?.extensionPoints?.capabilityIsolationBridges?.[spec.domainId];
+  if (bridge === undefined) {
+    throw new Error(
+      `capability worker: no isolation bridge for domain '${spec.domainId}' on tool '${spec.ownerToolId}'`,
+    );
+  }
+  return await bridge.runInWorker({
+    domainId: spec.domainId,
+    descriptor: spec.descriptor,
+    pkg: spec.pkg,
+    resourceDecision: spec.resourceDecision,
+    request: spec.request,
+  });
+}
+
+export async function executeCapabilityWorker(specPath: string): Promise<void> {
+  const stopHeartbeat = startWorkerHeartbeat();
+  try {
+    send({
+      kind: 'result',
+      value: await runCapabilityWorker(readSpec(specPath)),
+    });
+  } catch (error) {
+    send({
+      kind: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+    });
+  } finally {
+    stopHeartbeat();
+  }
+}
+
+export const capabilityWorkerCommandSpec: CommandSpec<unknown, CliCommandsContext> = defineCommand<
+  unknown,
+  CliCommandsContext
+>({
+  name: '__capability-pack-worker',
+  visibility: 'internal',
+  description:
+    '[internal] Run one capability-pack operation in a resource-bounded worker (forked by the capability isolation supervisor)',
+  commonFlags: ['cwd'],
+  args: [
+    {
+      name: 'specPath',
+      description: 'Path to the JSON capability worker spec file',
+    },
+  ],
+  scope: 'project',
+  output: 'raw-stream',
+  rawStreamReason: 'worker-ipc',
+  handler: async (rawOpts): Promise<void> => {
+    const specPath = (rawOpts as { _args?: readonly string[] })._args?.[0] ?? '';
+    await executeCapabilityWorker(specPath);
+  },
+});

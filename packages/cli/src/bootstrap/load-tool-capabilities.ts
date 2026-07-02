@@ -27,13 +27,18 @@ import {
   currentScope,
   loadCapabilityDomain,
   logger,
+  type CapabilityBridgeContribution,
+  type CapabilityContributionLoader,
   type CapabilityDiscoveryDescriptor,
   type CapabilityPackageAdmission,
+  type CapabilityResourceDecision,
+  type RawCapabilityContribution,
   type SelectedCapabilityPackage,
   type Tool,
 } from '@opensip-cli/core';
 
 import { BUNDLED_CAPABILITY_PACKS } from './bundled-manifest.js';
+import { runCapabilityWorkerSpec } from './capability-worker/supervisor.js';
 import { policyCiEvidenceFromCurrentEnv } from './policy-evidence.js';
 import {
   evaluatePolicyPep,
@@ -107,6 +112,11 @@ export async function loadOwningToolCapabilities(
       preferences,
       shouldLoadPackage: (pkg) =>
         admitCapabilityPackage(descriptor, pkg, explicitlyConfiguredPackages),
+      contributionLoader: createIsolatedContributionLoader({
+        owningTool,
+        domainId: domain.id,
+        projectDir,
+      }),
       onDiagnostic: (diagnostic) => {
         currentScope()?.bootstrapDiagnostics.record(
           capabilityDiscoveryToCliDiagnostic(diagnostic, domain.id, {
@@ -121,11 +131,97 @@ export async function loadOwningToolCapabilities(
   return driven;
 }
 
+interface IsolatedContributionLoaderArgs {
+  readonly owningTool: Tool;
+  readonly domainId: string;
+  readonly projectDir: string;
+}
+
+function createIsolatedContributionLoader(
+  args: IsolatedContributionLoaderArgs,
+): CapabilityContributionLoader {
+  return (pkg, context) => loadIsolatedContribution(args, pkg, context);
+}
+
+/**
+ * Use the owning tool's bridge to turn a worker-isolated package into host-side
+ * proxy contributions.
+ *
+ * @throws {Error} when policy requires worker isolation but the tool exposes no
+ * bridge for that domain.
+ */
+async function loadIsolatedContribution(
+  args: IsolatedContributionLoaderArgs,
+  pkg: SelectedCapabilityPackage,
+  context: Parameters<CapabilityContributionLoader>[1],
+): Promise<readonly RawCapabilityContribution[] | undefined> {
+  const resourceDecision = context.admission.resourceDecision;
+  if (resourceDecision?.isolation !== 'worker') return undefined;
+  const bridge = args.owningTool.extensionPoints?.capabilityIsolationBridges?.[args.domainId];
+  if (bridge === undefined) {
+    throw new Error(
+      `capability domain '${args.domainId}' does not support isolated external packages`,
+    );
+  }
+  const contributions = await bridge.createHostContributions({
+    domainId: args.domainId,
+    descriptor: context.descriptor,
+    pkg,
+    resourceDecision,
+    invoke: (request) =>
+      runCapabilityWorkerSpec({
+        cwd: args.projectDir,
+        spec: {
+          ownerToolId: args.owningTool.metadata.id,
+          domainId: args.domainId,
+          descriptor: context.descriptor,
+          pkg,
+          resourceDecision,
+          request,
+        },
+      }),
+  });
+  return contributions.map((contribution) =>
+    rawContributionFromBridge(pkg, resourceDecision, contribution),
+  );
+}
+
+function rawContributionFromBridge(
+  pkg: SelectedCapabilityPackage,
+  resourceDecision: CapabilityResourceDecision,
+  contribution: CapabilityBridgeContribution,
+): RawCapabilityContribution {
+  return {
+    contribution: contribution.contribution,
+    sourcePackage: pkg.name,
+    ...(contribution.targetDomainId === undefined
+      ? {}
+      : { targetDomainId: contribution.targetDomainId }),
+    ...(pkg.packageTargetDomain === undefined
+      ? {}
+      : { packageTargetDomain: pkg.packageTargetDomain }),
+    ...(pkg.packageTargetDomainApiVersion === undefined
+      ? {}
+      : { packageTargetDomainApiVersion: pkg.packageTargetDomainApiVersion }),
+    ...(pkg.packageRequires === undefined ? {} : { packageRequires: pkg.packageRequires }),
+    ...(pkg.packageManifestHash === undefined
+      ? {}
+      : { packageManifestHash: pkg.packageManifestHash }),
+    resourceDecision,
+  };
+}
+
 function admitCapabilityPackage(
   descriptor: CapabilityDiscoveryDescriptor,
   pkg: SelectedCapabilityPackage,
   explicitlyConfiguredPackages: ReadonlySet<string>,
 ): CapabilityPackageAdmission {
+  if (pkg.packageRequiresInvalid === true) {
+    return {
+      admit: false,
+      reason: `package ${pkg.name} has an invalid opensipTools.requires declaration`,
+    };
+  }
   const bundled = isBundledCapabilityPack(descriptor, pkg.name);
   const explicitlyConfigured = explicitlyConfiguredPackages.has(pkg.name);
   const envTrusted = isCapabilityPackTrusted(pkg.name);
@@ -145,18 +241,28 @@ function admitCapabilityPackage(
       explicitlyConfigured,
       envAllowed: envTrusted,
       capabilityExport: descriptor.exportName,
+      declaredResources: pkg.packageRequires ?? [],
+      targetDomain: pkg.packageTargetDomain,
+      manifestHash: pkg.packageManifestHash,
       provenanceStatus: bundled ? 'verified' : 'unavailable',
       ci: policyCiEvidenceFromCurrentEnv(),
     },
   });
+  const resourceDecision = policyResourceDecisionToCapability(policyDecision.decision);
+  if (policyDecision.allowed && resourceDecision === undefined) {
+    return {
+      admit: false,
+      reason: `policy allowed ${pkg.name} but did not return a capability resource decision`,
+    };
+  }
   if (bundled && policyDecision.allowed) {
-    return capabilityPackProvenancePassthrough(pkg, { admit: true });
+    return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
   }
   if (explicitlyConfigured && policyDecision.allowed) {
-    return capabilityPackProvenancePassthrough(pkg, { admit: true });
+    return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
   }
   if (envTrusted && policyDecision.allowed) {
-    return capabilityPackProvenancePassthrough(pkg, { admit: true });
+    return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
   }
   const configuredPackageKey = descriptor.configKeys.packages;
   const configuredPackageHint =
@@ -179,9 +285,15 @@ function capabilityPackProvenancePassthrough(
   _pkg: SelectedCapabilityPackage,
   admission: CapabilityPackageAdmission,
 ): CapabilityPackageAdmission {
-  // ADR-0081: `requires` is declaration-only until consumption-side provenance
-  // and capability enforcement graduate from trust metadata to policy.
+  // ADR-0128: resource decisions are produced by the policy plane and consumed by
+  // the worker/proxy path. The loader only carries the decision through.
   return admission;
+}
+
+function policyResourceDecisionToCapability(decision: {
+  readonly resourceDecision?: CapabilityResourceDecision;
+}): CapabilityResourceDecision | undefined {
+  return decision.resourceDecision;
 }
 
 function isBundledCapabilityPack(

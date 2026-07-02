@@ -911,6 +911,9 @@ Strict mode denies unverified non-bundled executable loads/installs and
 gate-weakening actions (`fitness.disabledChecks`, baseline saves) unless an
 unexpired exact exception applies. Default mode preserves existing OSS behavior
 and records conditioned decisions where provenance is missing or failed.
+For `capability-pack:...` `load` decisions, allowed decisions also carry a
+resource decision: bundled first-party packs may run in-host, while non-bundled
+packs run through the capability worker bridge with undeclared resources denied.
 
 ---
 
@@ -1228,6 +1231,7 @@ These commands are mounted through the same `CommandSpec` system but are primari
 | `opensip graph-shard-worker <specPath>` | graph | Internal worker for sharded catalog builds. |
 | `opensip fit-run-worker` | fitness | Internal worker for memory-isolated fitness runs. |
 | `opensip sim-run-worker` | simulation | Internal worker for memory-isolated simulation runs. |
+| `opensip __capability-pack-worker <specPath>` | host | Hidden worker for resource-isolated external capability packs. |
 
 The worker commands are not the public authoring surface; they exist so parent commands can fan out safely while preserving the same tool-owned execution contracts.
 

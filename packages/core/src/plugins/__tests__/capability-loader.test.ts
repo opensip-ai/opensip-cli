@@ -14,6 +14,8 @@ import { CapabilityRegistry } from '../capability-registry.js';
 
 let testDir: string;
 
+const ADMIT_ALL = () => ({ admit: true }) as const;
+
 const ITEMS_DISCOVERY: CapabilityDiscoveryDescriptor = {
   discovery: { mode: 'marker', markerKind: 'items-pack' },
   exportName: 'items',
@@ -78,6 +80,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
 
     expect(errors).toEqual([]);
@@ -97,6 +100,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(registrar).toHaveBeenCalledTimes(1);
 
@@ -106,6 +110,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(registrar).toHaveBeenCalledTimes(1);
   });
@@ -120,6 +125,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry: reg1,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(first).toHaveBeenCalledTimes(1);
 
@@ -131,6 +137,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry: reg2,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
     expect(second).toHaveBeenCalledTimes(1);
   });
@@ -149,6 +156,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
 
     expect(registrar).toHaveBeenCalledTimes(1);
@@ -168,6 +176,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
 
     expect(errors).toEqual([]);
@@ -203,6 +212,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
 
     expect(registrar).not.toHaveBeenCalled();
@@ -232,6 +242,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       registry,
       domainId: 'items',
       projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
     });
 
     expect(registrar).not.toHaveBeenCalled();
@@ -250,6 +261,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
         registry,
         domainId: 'items',
         projectDir: testDir,
+        shouldLoadPackage: ADMIT_ALL,
       });
     });
 

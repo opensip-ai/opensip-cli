@@ -99,10 +99,14 @@ function validateOptionalCapabilities(
   return normalizeCapabilities(raw) ?? 'invalid';
 }
 
-function validateOptionalRequirements(
+/**
+ * Validate an optional manifest `requires` block and normalize each resource
+ * requirement. Returns `'invalid'` when the field is present but malformed.
+ */
+export function validateOptionalRequirements(
   raw: unknown,
 ): readonly ToolResourceRequirement[] | undefined | 'invalid' {
-  const requirements = normalizeRequirements(raw);
+  const requirements = normalizeResourceRequirements(raw);
   return raw !== undefined && requirements === undefined ? 'invalid' : requirements;
 }
 
@@ -284,7 +288,11 @@ function isRequirementResource(value: unknown): value is ToolResourceClass {
   return typeof value === 'string' && (REQUIREMENT_RESOURCES as readonly string[]).includes(value);
 }
 
-function normalizeRequirement(value: unknown): ToolResourceRequirement | undefined {
+/**
+ * Normalize one manifest resource requirement from an unknown JSON value.
+ * Undefined means the value is not a valid requirement object.
+ */
+export function normalizeResourceRequirement(value: unknown): ToolResourceRequirement | undefined {
   if (!isRecord(value)) return undefined;
   const { resource, scope, reason } = value;
   if (!isRequirementResource(resource)) return undefined;
@@ -297,12 +305,18 @@ function normalizeRequirement(value: unknown): ToolResourceRequirement | undefin
   };
 }
 
-function normalizeRequirements(value: unknown): readonly ToolResourceRequirement[] | undefined {
+/**
+ * Normalize a manifest `requires` array. Undefined means the field is absent or
+ * malformed; callers distinguish those cases when needed.
+ */
+export function normalizeResourceRequirements(
+  value: unknown,
+): readonly ToolResourceRequirement[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) return undefined;
   const out: ToolResourceRequirement[] = [];
   for (const entry of value) {
-    const parsed = normalizeRequirement(entry);
+    const parsed = normalizeResourceRequirement(entry);
     if (parsed === undefined) return undefined;
     out.push(parsed);
   }

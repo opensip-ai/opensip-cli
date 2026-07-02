@@ -43,10 +43,8 @@ export interface ClosureOutput {
  * vanished hashes, and adds those callers to the closure. Stops when
  * no new dependents are discovered.
  *
- * @throws {Error} When the incremental walk produces no result for a
- *   non-empty closure (a logic invariant violation in the walker).
  */
-export function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
+export async function expandClosureToFixpoint(input: ClosureInput): Promise<ClosureOutput> {
   const { adapter, discovery, cachedCatalog, parsedProject, changedFilesAbs } = input;
   const closureRel = new Set(
     changedFilesAbs.map((p) => relative(discovery.projectDirAbs, p).split(sep).join('/')),
@@ -63,24 +61,7 @@ export function expandClosureToFixpoint(input: ClosureInput): ClosureOutput {
     projectDirAbs: discovery.projectDirAbs,
   };
 
-  let walked: WalkOutput | null = null;
-  // Iterate to fixpoint. On a typical 1-file change, this loop runs
-  // exactly once — a file's hashes generally don't reach into
-  // unchanged callers' edges. Worst case is bounded by file count
-  // (each iteration adds at least one file).
-  for (;;) {
-    walked = adapter.walkProject({
-      project: parsedProject,
-      files: discovery.files.filter((p) => closureAbs.has(p)),
-      projectDirAbs: discovery.projectDirAbs,
-    });
-    const grew = expandClosureOnce(walked, ctx);
-    if (!grew) break;
-  }
-  /* v8 ignore next 3 */
-  if (!walked) {
-    throw new Error('incremental walk produced no result; closure was empty');
-  }
+  const walked = await walkClosureToFixpoint(adapter, parsedProject, discovery, ctx);
   return { walked, closureRel };
 }
 
@@ -91,6 +72,22 @@ interface ClosureExpansionContext {
   readonly closureAbs: Set<string>;
   readonly cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>;
   readonly projectDirAbs: string;
+}
+
+async function walkClosureToFixpoint(
+  adapter: GraphLanguageAdapter,
+  parsedProject: ParsedProject,
+  discovery: DiscoverOutput,
+  ctx: ClosureExpansionContext,
+): Promise<WalkOutput> {
+  const walked = await adapter.walkProject({
+    project: parsedProject,
+    files: discovery.files.filter((p) => ctx.closureAbs.has(p)),
+    projectDirAbs: discovery.projectDirAbs,
+  });
+  return expandClosureOnce(walked, ctx)
+    ? walkClosureToFixpoint(adapter, parsedProject, discovery, ctx)
+    : walked;
 }
 
 function expandClosureOnce(walked: WalkOutput, ctx: ClosureExpansionContext): boolean {

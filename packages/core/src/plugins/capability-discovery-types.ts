@@ -1,4 +1,14 @@
 import type { CapabilityDiscoveryDescriptor } from '../tools/capability.js';
+import type { ToolResourceRequirement } from '../tools/manifest.js';
+
+export type CapabilityIsolationLevel = 'host' | 'worker';
+
+export interface CapabilityResourceDecision {
+  readonly isolation: CapabilityIsolationLevel;
+  readonly allowedResources: readonly ToolResourceRequirement[];
+  readonly denyUndeclared: true;
+  readonly reasons: readonly string[];
+}
 
 /**
  * Resolved discovery preferences for one domain. The host resolves these from
@@ -32,6 +42,13 @@ export interface RawCapabilityContribution {
   readonly packageTargetDomain?: string;
   /** Package-declared target epoch from `opensipTools.targetDomainApiVersion`. */
   readonly packageTargetDomainApiVersion?: number;
+  /** Package-declared resource requirements from `opensipTools.requires`. */
+  readonly packageRequires?: readonly ToolResourceRequirement[];
+  readonly packageRequiresInvalid?: boolean;
+  /** Stable hash of the package's `opensipTools` manifest block. */
+  readonly packageManifestHash?: string;
+  /** Admission-time resource decision for this package, when evaluated. */
+  readonly resourceDecision?: CapabilityResourceDecision;
 }
 
 /** A structured non-fatal discovery diagnostic (missing package, bad export, import throw). */
@@ -46,13 +63,28 @@ export interface CapabilityDiscoveryDiagnostic {
 
 /** Policy-free admission decision for a selected capability package. */
 export type CapabilityPackageAdmission =
-  | { readonly admit: true }
+  | { readonly admit: true; readonly resourceDecision?: CapabilityResourceDecision }
   | { readonly admit: false; readonly reason: string };
+
+export interface CapabilityContributionLoadContext {
+  readonly descriptor: CapabilityDiscoveryDescriptor;
+  readonly admission: Extract<CapabilityPackageAdmission, { readonly admit: true }>;
+}
+
+export type CapabilityContributionLoader = (
+  pkg: SelectedCapabilityPackage,
+  context: CapabilityContributionLoadContext,
+) => Promise<readonly RawCapabilityContribution[] | undefined>;
 
 /** A package selected for loading: its name + on-disk directory. */
 export interface SelectedCapabilityPackage {
   readonly name: string;
   readonly packageDir: string;
+  readonly packageTargetDomain?: string;
+  readonly packageTargetDomainApiVersion?: number;
+  readonly packageRequires?: readonly ToolResourceRequirement[];
+  readonly packageRequiresInvalid?: boolean;
+  readonly packageManifestHash?: string;
 }
 
 /** Options for {@link discoverCapabilityContributions}. */
@@ -73,6 +105,8 @@ export interface DiscoverCapabilityContributionsOptions {
   readonly preferences?: CapabilityDiscoveryPreferences;
   /** Optional pre-import package admission gate. Core emits diagnostics, policy lives with the caller. */
   readonly shouldLoadPackage?: (pkg: SelectedCapabilityPackage) => CapabilityPackageAdmission;
+  /** Optional caller-owned contribution loader, used for worker-backed isolation. */
+  readonly contributionLoader?: CapabilityContributionLoader;
   /** Sink for non-fatal per-package diagnostics. */
   readonly onDiagnostic?: (diagnostic: CapabilityDiscoveryDiagnostic) => void;
 }

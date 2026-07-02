@@ -219,8 +219,8 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       // canonical set, so both engines parse/walk an identical file set. Real
       // test files are kept (needed for test-only-reachable + test→prod edges);
       // only `__fixtures__/` (synthetic test input) is dropped.
-      fn: () => {
-        const raw = adapter.discoverFiles({
+      fn: async () => {
+        const raw = await adapter.discoverFiles({
           cwd: input.cwd,
           configPathOverride: input.tsConfigPath,
         });

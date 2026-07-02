@@ -165,7 +165,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    subprocesses) — its sub-label reflects the shard count.
   const parseStart = Date.now();
   emitStageStart(onProgress, 'parse');
-  const plan = planShardWork(shards, catalogRepo, adapter, resolutionMode, useCache);
+  const plan = await planShardWork(shards, catalogRepo, adapter, resolutionMode, useCache);
   const built = await runShardsInParallel({
     shards: plan.toBuild,
     projectRoot,

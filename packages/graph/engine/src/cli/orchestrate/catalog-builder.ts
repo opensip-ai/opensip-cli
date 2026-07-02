@@ -113,8 +113,8 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     stage: 'parse',
     onProgress,
     monitor,
-    fn: () =>
-      adapter.parseProject({
+    fn: async () =>
+      await adapter.parseProject({
         projectDirAbs: discovery.projectDirAbs,
         files: discovery.files,
         compilerOptions: discovery.compilerOptions,
@@ -126,8 +126,8 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     stage: 'walk',
     onProgress,
     monitor,
-    fn: () =>
-      adapter.walkProject({
+    fn: async () =>
+      await adapter.walkProject({
         project: parsed.project,
         files: discovery.files,
         projectDirAbs: discovery.projectDirAbs,
@@ -135,7 +135,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     detailFn: (w) => `${String(Object.keys(w.occurrences).length)} functions`,
   });
 
-  const initialCatalog = assembleCatalog({
+  const initialCatalog = await assembleCatalog({
     adapter,
     discovery,
     occurrences: walked.occurrences,
@@ -235,8 +235,8 @@ export async function buildAndResolveCatalogIncremental(
     stage: 'parse',
     onProgress,
     monitor,
-    fn: () =>
-      adapter.parseProject({
+    fn: async () =>
+      await adapter.parseProject({
         projectDirAbs: discovery.projectDirAbs,
         files: discovery.files,
         compilerOptions: discovery.compilerOptions,
@@ -249,8 +249,8 @@ export async function buildAndResolveCatalogIncremental(
     stage: 'walk',
     onProgress,
     monitor,
-    fn: () =>
-      expandClosureToFixpoint({
+    fn: async () =>
+      await expandClosureToFixpoint({
         adapter,
         discovery,
         cachedCatalog,
@@ -265,12 +265,12 @@ export async function buildAndResolveCatalogIncremental(
   const mergedFunctions = mergeOccurrences(cachedCatalog, walked.occurrences, closureRel);
   const mergedReExports = mergeReExports(cachedCatalog, walked.reExports ?? [], closureRel);
   const initialCatalog = {
-    ...assembleCatalog({
+    ...(await assembleCatalog({
       adapter,
       discovery,
       occurrences: mergedFunctions as Record<string, FunctionOccurrence[]>,
       resolutionMode,
-    }),
+    })),
     functions: mergedFunctions,
     ...(mergedReExports.length > 0 ? { reExports: mergedReExports } : {}),
   } as Catalog;
@@ -373,7 +373,7 @@ interface AssembleCatalogInput {
  * empty `calls` arrays at this point; `resolveCallSites` produces the
  * edges, and `stitchEdges` writes them in.
  */
-function assembleCatalog(input: AssembleCatalogInput): Catalog {
+async function assembleCatalog(input: AssembleCatalogInput): Promise<Catalog> {
   const {
     adapter,
     discovery,
@@ -393,7 +393,7 @@ function assembleCatalog(input: AssembleCatalogInput): Catalog {
     // Stamp the engine version AND mode so the exact and sharded engines never
     // read each other's persisted catalog / shard-fragment rows (Phase 2).
     cacheKey: stampEngineVersion(
-      adapter.cacheKey({
+      await adapter.cacheKey({
         projectDirAbs: discovery.projectDirAbs,
         configPathAbs: discovery.configPathAbs,
         compilerOptions: discovery.compilerOptions,
