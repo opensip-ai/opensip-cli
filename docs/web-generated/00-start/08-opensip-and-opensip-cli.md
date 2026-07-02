@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-29
+last_verified: 2026-07-02
 release: v0.2.4
 title: "OpenSIP and OpenSIP CLI"
 audience: [getting-started, contributors, ci-integrators]
@@ -9,6 +9,7 @@ related-docs:
   - ./01-what-is-opensip-cli.md
   - ./06-system-context.md
   - ../../decisions/ADR-0095-ai-native-guardrail-platform-posture.md
+  - ../../decisions/ADR-0122-agent-workflow-product-wedge.md
 ---
 # OpenSIP and OpenSIP CLI
 
@@ -30,6 +31,20 @@ thesis, and an origin.
 One sentence: **opensip-cli is the evidence-and-enforcement layer; OpenSIP is the
 autonomous loop that consumes it.** You can adopt the CLI alone forever. The
 platform is the optional layer above it.
+
+## Current product wedge
+
+The post-hardening product wedge is **agent workflow**:
+deterministic evidence and guardrails that let coding agents review, edit,
+verify, and hand off changes without unbounded blast radius. That decision is
+recorded in
+[ADR-0122](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0122-agent-workflow-product-wedge.md).
+
+This does not make opensip-cli an AI runtime. The CLI stays local-first and
+deterministic; the platform remains the autonomous layer that consumes CLI
+evidence. It does mean the next roadmap spine prioritizes impact trust,
+correlation, apply/verify, evidence authority, and capability controls around
+safe AI-assisted engineering.
 
 ## The shared origin
 
