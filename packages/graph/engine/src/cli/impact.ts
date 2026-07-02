@@ -5,7 +5,9 @@ import {
   buildSignalEnvelope,
   computeImpact,
   EXIT_CODES,
+  gitWarningsToImpactUncertainties,
   type GraphImpactResult,
+  type ImpactUncertainty,
   type SignalEnvelope,
   type UnitResult,
 } from '@opensip-cli/contracts';
@@ -19,6 +21,7 @@ import {
   SystemError,
   ToolError,
   toPosixRelative,
+  type ChangedFileEntry,
   type Signal,
   type ToolCliContext,
 } from '@opensip-cli/core';
@@ -68,7 +71,11 @@ function humanImpactLines(result: GraphImpactResult): readonly string[] {
   const lines = [
     `Changed ${String(result.changedFiles.length)} file(s) → ${String(changed)} function(s)`,
     `Impacted ${String(impacted)} additional function(s) across ${String(packages)} package(s)`,
+    `Verification coverage: ${result.trust.coverage}${result.trust.fullyVerified ? ' (fully verified)' : ' (broader verification required)'}`,
   ];
+  if (result.trust.uncertainties.length > 0) {
+    lines.push(`Uncertainty: ${result.trust.uncertainties.map((item) => item.code).join(', ')}`);
+  }
   if (result.truncated) {
     lines.push('(truncated — use --top to cap or --json for full detail)');
   }
@@ -83,6 +90,7 @@ function buildImpactSignals(result: GraphImpactResult): readonly Signal[] {
   if (result.impactedFunctions.length === 0) return [];
   const primaryFunction = result.impactedFunctions[0] ?? result.changedFunctions[0];
   const impactedFiles = new Set(result.impactedFunctions.map((fn) => fn.filePath));
+  const blastConfidence = blastConfidenceForTrust(result.trust.coverage);
   return [
     createSignal({
       source: 'graph',
@@ -106,17 +114,27 @@ function buildImpactSignals(result: GraphImpactResult): readonly Signal[] {
         changedFiles: result.changedFiles,
         changedFunctions: result.changedFunctions.length,
         impactedFunctions: result.impactedFunctions.length,
+        impactedFiles: result.impactedFiles,
         impactedPackages: result.impactedPackages.map((pkg) => pkg.name),
         recommendedCommands: result.recommendedCommands,
+        trust: result.trust,
         truncated: result.truncated,
         blastRadius: {
           dependents: result.impactedFunctions.length,
           impactedFiles: impactedFiles.size,
-          confidence: 'high',
+          confidence: blastConfidence,
         },
       },
     }),
   ];
+}
+
+function blastConfidenceForTrust(
+  coverage: GraphImpactResult['trust']['coverage'],
+): 'low' | 'medium' | 'high' {
+  if (coverage === 'full') return 'high';
+  if (coverage === 'partial') return 'medium';
+  return 'low';
 }
 
 function buildImpactEnvelope(result: GraphImpactResult, durationMs: number): SignalEnvelope {
@@ -144,18 +162,30 @@ function buildImpactEnvelope(result: GraphImpactResult, durationMs: number): Sig
 function resolveImpactBasis(opts: ImpactCommandOptions): {
   changedFiles: readonly string[];
   basis: GraphImpactResult['basis'];
+  entries: readonly ChangedFileEntry[];
+  uncertainties: readonly ImpactUncertainty[];
 } {
   const explicitFiles = opts.files ?? [];
   if (explicitFiles.length > 0) {
     const changedFiles = explicitFiles.map((f) => toPosixRelative(opts.cwd, f));
-    return { changedFiles, basis: { type: 'files', files: changedFiles } };
+    return {
+      changedFiles,
+      basis: { type: 'files', files: changedFiles },
+      entries: changedFiles.map((path) => ({ path, status: 'unknown' })),
+      uncertainties: [],
+    };
   }
   if (opts.changed === true || opts.since) {
     const resolved = resolveChangedFiles(opts.cwd, { since: opts.since });
     if (!resolved.ok) {
       throw new ConfigurationError(resolved.message, { code: resolved.reason });
     }
-    return { changedFiles: resolved.files, basis: resolved.basis };
+    return {
+      changedFiles: resolved.files,
+      basis: resolved.basis,
+      entries: resolved.entries,
+      uncertainties: gitWarningsToImpactUncertainties(resolved.basis.warnings),
+    };
   }
   throw new ConfigurationError('impact: specify --changed, --since <ref>, or --files <paths...>');
 }
@@ -216,11 +246,15 @@ export async function executeImpact(
       throw new ConfigurationError('impact: graph impact requires a DataStore on ToolCliContext.');
     }
 
-    const { changedFiles, basis } = resolveImpactBasis(opts);
+    const { changedFiles, basis, entries, uncertainties } = resolveImpactBasis(opts);
 
     const catalog = await loadOrBuildCatalog(opts.cwd, datastore, opts.noCache);
     const topCap = parseTopCap(opts.top);
-    const computation = computeImpact(catalog, changedFiles, { top: topCap });
+    const computation = computeImpact(catalog, changedFiles, {
+      top: topCap,
+      changedFileEntries: entries,
+      uncertainties,
+    });
 
     const result: GraphImpactResult = {
       type: 'graph-impact',
@@ -229,6 +263,8 @@ export async function executeImpact(
       changedFunctions: computation.changedFunctions,
       impactedFunctions: computation.impactedFunctions,
       impactedPackages: computation.impactedPackages,
+      impactedFiles: computation.impactedFiles,
+      trust: computation.trust,
       recommendedCommands: recommendedCommands(),
       truncated: computation.truncated,
     };
@@ -245,6 +281,8 @@ export async function executeImpact(
       changedFiles: changedFiles.length,
       impactedFunctions: computation.impactedFunctions.length,
       impactedPackages: computation.impactedPackages.length,
+      trustCoverage: computation.trust.coverage,
+      fullyVerified: computation.trust.fullyVerified,
     });
 
     await emitImpactOutput(cli, result, opts);

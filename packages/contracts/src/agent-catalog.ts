@@ -269,7 +269,8 @@ export function buildAgentCatalog(
       },
       {
         name: 'Agent edit loop',
-        description: 'Fast check → impact analysis → changed-only fit → final gate.',
+        description:
+          'Fast check → impact analysis → changed/impacted fit with trust metadata → final gate.',
         example:
           'opensip fit --recipe agent-fast --json && opensip graph impact --changed --json && opensip fit --changed --include-impacted --json',
       },
@@ -308,7 +309,7 @@ export function buildAgentCatalog(
         'The canonical cross-tool currency (schemaVersion, tool, runId, verdict, units, signals). ' +
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
-        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, aggregate, steps, reviewBrief: { version: 1, ... } }',
+        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, ... } }',
       sessionReplay:
         'For sessions show: { session: {id,tool,startedAt,completedAt,score,passed,...}, fidelity: "projection", envelope: SignalEnvelope, filtersApplied?, ...counts }',
       history:
@@ -321,6 +322,8 @@ export function buildAgentCatalog(
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',
       'graph impact answers changed→impacted without a separate git diff dance.',
+      'graph impact JSON includes trust.coverage/trust.fullyVerified/trust.uncertainties; do not claim targeted verification when fullyVerified is false.',
+      'fit --changed --include-impacted falls back to the full target set when graph/git impact trust is partial or unknown.',
       'Commands that expose machine-readable command results use --json. Raw-stream transports such as mcp document their own stdout protocol.',
       'filtersApplied, originalSignalCount, returnedSignalCount appear when --filter is used.',
       'The fidelity field on replays is always "projection" (rebuilt from persisted data).',

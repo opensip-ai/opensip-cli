@@ -94,7 +94,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | New user | [Quick start](./00-start/00-quick-start.md) -> [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) -> [Write your first check](./60-guides/01-write-your-first-check.md) |
 | CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Verifiable releases](./70-reference/13-verifiable-releases.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
 | Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) -> [External tool adapters](./50-extend/08-external-tool-adapters.md) |
-| Graph adopter | [Use graph](./60-guides/06-use-graph.md) -> [Stages and catalog](./40-graph/01-stages-and-catalog.md) -> [Rules and gating](./40-graph/02-rules-and-gating.md) |
+| Graph adopter | [Use graph](./60-guides/06-use-graph.md) -> [Stages and catalog](./40-graph/01-stages-and-catalog.md) -> [Rules and gating](./40-graph/02-rules-and-gating.md) -> [Impact analysis](./40-graph/05-impact-analysis.md) |
 | AI agent (CLI + MCP) | [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md) -> [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 | Contributor | [Architecture overview](./00-start/07-architecture-overview.md) -> [Layered package graph](./10-concepts/03-modular-monolith.md) -> [Layer policy](./80-implementation/05-layer-policy.md) |
 
@@ -140,59 +140,60 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 22. [Rules and gating](./40-graph/02-rules-and-gating.md)
 23. [Adding a language](./40-graph/03-adding-a-language.md)
 24. [Suppressing findings](./40-graph/04-suppressing-findings.md)
+25. [Impact analysis and trust](./40-graph/05-impact-analysis.md)
 
 ### 55 - Yagni
 
-25. [Command reference](./55-yagni/01-command-reference.md)
+26. [Command reference](./55-yagni/01-command-reference.md)
 
 ### 50 - Extend
 
-26. [Plugin authoring](./50-extend/01-plugin-authoring.md)
-27. [Project-local plugins](./50-extend/02-project-local-plugins.md)
-28. [Publishable packs](./50-extend/03-publishable-packs.md)
-29. [Check pack architecture](./50-extend/04-check-pack-architecture.md)
-30. [Language adapters](./50-extend/05-language-adapters.md)
-31. [Full Tool plugins](./50-extend/06-full-tool-plugins.md)
+27. [Plugin authoring](./50-extend/01-plugin-authoring.md)
+28. [Project-local plugins](./50-extend/02-project-local-plugins.md)
+29. [Publishable packs](./50-extend/03-publishable-packs.md)
+30. [Check pack architecture](./50-extend/04-check-pack-architecture.md)
+31. [Language adapters](./50-extend/05-language-adapters.md)
+32. [Full Tool plugins](./50-extend/06-full-tool-plugins.md)
 
 ### 60 - Guides
 
-32. [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md)
-33. [Write your first check](./60-guides/01-write-your-first-check.md)
-34. [Ban an API pattern](./60-guides/02-ban-an-api-pattern.md)
-35. [Wire into CI](./60-guides/03-wire-into-ci.md)
-36. [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md)
-37. [Migrate from ESLint](./60-guides/05-migrate-from-eslint.md)
-38. [Use graph](./60-guides/06-use-graph.md)
-39. [Create your first Tool](./60-guides/07-create-your-first-tool.md)
-40. [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md)
-41. [Connect MCP clients](./60-guides/08-connect-mcp-clients.md)
+33. [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md)
+34. [Write your first check](./60-guides/01-write-your-first-check.md)
+35. [Ban an API pattern](./60-guides/02-ban-an-api-pattern.md)
+36. [Wire into CI](./60-guides/03-wire-into-ci.md)
+37. [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md)
+38. [Migrate from ESLint](./60-guides/05-migrate-from-eslint.md)
+39. [Use graph](./60-guides/06-use-graph.md)
+40. [Create your first Tool](./60-guides/07-create-your-first-tool.md)
+41. [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md)
+42. [Connect MCP clients](./60-guides/08-connect-mcp-clients.md)
 
 ### 70 - Reference
 
-42. [CLI commands](./70-reference/01-cli-commands.md)
-43. [Package catalog](./70-reference/02-package-catalog.md)
-44. [Configuration](./70-reference/03-configuration.md)
-45. [JSON output schema](./70-reference/04-json-output-schema.md)
-46. [Checks reference](./70-reference/05-checks-index.md)
-47. [Report](./70-reference/06-dashboard.md)
-48. [Supply-chain security](./70-reference/08-supply-chain-security.md)
-49. [Environment variables](./70-reference/10-environment-variables.md)
-50. [Performance SLOs](./70-reference/11-performance-slos.md)
-51. [Public benchmarks](./70-reference/12-public-benchmarks.md)
-52. [`tools` command](./70-reference/12-tools-command.md)
-53. [Verifiable releases](./70-reference/13-verifiable-releases.md)
-54. [Detection quality](./70-reference/14-detection-quality.md)
-55. [Compatibility policy](./70-reference/15-compatibility-policy.md)
+43. [CLI commands](./70-reference/01-cli-commands.md)
+44. [Package catalog](./70-reference/02-package-catalog.md)
+45. [Configuration](./70-reference/03-configuration.md)
+46. [JSON output schema](./70-reference/04-json-output-schema.md)
+47. [Checks reference](./70-reference/05-checks-index.md)
+48. [Report](./70-reference/06-dashboard.md)
+49. [Supply-chain security](./70-reference/08-supply-chain-security.md)
+50. [Environment variables](./70-reference/10-environment-variables.md)
+51. [Performance SLOs](./70-reference/11-performance-slos.md)
+52. [Public benchmarks](./70-reference/12-public-benchmarks.md)
+53. [`tools` command](./70-reference/12-tools-command.md)
+54. [Verifiable releases](./70-reference/13-verifiable-releases.md)
+55. [Detection quality](./70-reference/14-detection-quality.md)
+56. [Compatibility policy](./70-reference/15-compatibility-policy.md)
 
 ### 80 - Internals
 
-56. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-57. [Plugin loader](./80-implementation/02-plugin-loader.md)
-58. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-59. [Coding standards](./80-implementation/04-coding-standards.md)
-60. [Layer policy](./80-implementation/05-layer-policy.md)
-61. [Doc conventions](./80-implementation/06-doc-conventions.md)
-62. [Website integration](./80-implementation/07-website-integration.md)
+57. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+58. [Plugin loader](./80-implementation/02-plugin-loader.md)
+59. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+60. [Coding standards](./80-implementation/04-coding-standards.md)
+61. [Layer policy](./80-implementation/05-layer-policy.md)
+62. [Doc conventions](./80-implementation/06-doc-conventions.md)
+63. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 

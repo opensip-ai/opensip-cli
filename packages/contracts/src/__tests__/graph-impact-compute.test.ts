@@ -8,6 +8,8 @@ function minimalCatalog(): GraphCatalog {
     tool: 'graph',
     language: 'typescript',
     builtAt: '2026-01-01T00:00:00.000Z',
+    cacheKey: 'test-cache',
+    filesFingerprint: 'test-fingerprint',
     functions: {
       caller: [
         {
@@ -109,6 +111,8 @@ function chainCatalog(length: number): GraphCatalog {
     tool: 'graph',
     language: 'typescript',
     builtAt: '2026-01-01T00:00:00.000Z',
+    cacheKey: 'test-cache',
+    filesFingerprint: 'test-fingerprint',
     functions,
   };
 }
@@ -133,11 +137,19 @@ describe('computeImpact', () => {
     expect(r.changedFunctions).toHaveLength(1);
     expect(r.changedFunctions[0]?.qualifiedName).toBe('callee');
     expect(r.impactedFunctions.some((f) => f.qualifiedName === 'caller')).toBe(true);
+    expect(r.impactedFiles).toEqual(['src/callee.ts', 'src/caller.ts']);
+    expect(r.trust).toMatchObject({
+      coverage: 'full',
+      fallback: 'targeted',
+      fullyVerified: true,
+    });
   });
 
   it('honors top cap and sets truncated', () => {
     const r = computeImpact(minimalCatalog(), ['src/callee.ts'], { top: 1 });
     expect(r.truncated).toBe(true);
+    expect(r.trust.fullyVerified).toBe(false);
+    expect(r.trust.uncertainties.map((item) => item.code)).toContain('impact-truncated');
   });
 
   it('does not truncate when the top cap covers the full result', () => {
@@ -194,5 +206,109 @@ describe('computeImpact', () => {
     const cat = minimalCatalog();
     const r = computeImpact(cat, ['src/callee.ts']);
     expect(r.impactedFunctions.length).toBeGreaterThan(0);
+  });
+
+  it('marks unmatched changed files as uncertain', () => {
+    const r = computeImpact(minimalCatalog(), ['src/config.ts']);
+    expect(r.trust).toMatchObject({
+      coverage: 'unknown',
+      fallback: 'targeted',
+      fullyVerified: false,
+    });
+    expect(r.trust.uncertainties).toContainEqual(
+      expect.objectContaining({
+        code: 'changed-file-unmatched',
+        filePath: 'src/config.ts',
+      }),
+    );
+  });
+
+  it('marks deleted and renamed changed files as uncertain', () => {
+    const deleted = computeImpact(minimalCatalog(), ['src/callee.ts'], {
+      changedFileEntries: [{ path: 'src/callee.ts', status: 'deleted' }],
+    });
+    expect(deleted.trust.uncertainties.map((item) => item.code)).toContain('changed-file-deleted');
+
+    const renamed = computeImpact(minimalCatalog(), ['src/callee-renamed.ts'], {
+      changedFileEntries: [
+        {
+          path: 'src/callee-renamed.ts',
+          previousPath: 'src/callee.ts',
+          status: 'renamed',
+        },
+      ],
+    });
+    expect(renamed.trust.uncertainties.map((item) => item.code)).toEqual(
+      expect.arrayContaining(['changed-file-renamed', 'changed-file-unmatched']),
+    );
+  });
+
+  it('marks legacy catalogs without freshness metadata as incomplete', () => {
+    const source = minimalCatalog();
+    const legacy: GraphCatalog = {
+      version: source.version,
+      tool: source.tool,
+      language: source.language,
+      builtAt: source.builtAt,
+      functions: source.functions,
+    };
+    const r = computeImpact(legacy, ['src/callee.ts']);
+    expect(r.trust.uncertainties).toContainEqual(
+      expect.objectContaining({ code: 'graph-catalog-incomplete' }),
+    );
+  });
+
+  it('marks fast or approximate edge catalogs as uncertain', () => {
+    const fast = computeImpact(
+      {
+        ...minimalCatalog(),
+        resolutionMode: 'fast',
+      },
+      ['src/callee.ts'],
+    );
+    expect(fast.trust.uncertainties).toContainEqual(
+      expect.objectContaining({ code: 'graph-catalog-approximate' }),
+    );
+
+    const source = minimalCatalog();
+    const approximateEdge = computeImpact(
+      {
+        ...source,
+        functions: {
+          ...source.functions,
+          caller: [
+            {
+              ...source.functions.caller[0],
+              calls: [
+                {
+                  to: ['callee'],
+                  line: 2,
+                  column: 4,
+                  resolution: 'syntactic',
+                  confidence: 'medium',
+                  text: 'callee()',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      ['src/callee.ts'],
+    );
+    expect(approximateEdge.trust.uncertainties).toContainEqual(
+      expect.objectContaining({ code: 'graph-catalog-approximate' }),
+    );
+  });
+
+  it('bounds large unmatched-file uncertainty output', () => {
+    const r = computeImpact(
+      minimalCatalog(),
+      Array.from({ length: 80 }, (_, index) => `src/config-${String(index)}.ts`),
+    );
+
+    expect(r.trust.uncertainties).toHaveLength(50);
+    expect(r.trust.uncertainties.at(-1)).toMatchObject({
+      code: 'impact-uncertainty-truncated',
+    });
   });
 });

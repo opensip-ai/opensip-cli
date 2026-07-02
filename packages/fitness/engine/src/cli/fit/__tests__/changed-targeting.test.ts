@@ -1,4 +1,7 @@
-import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path, { join } from 'node:path';
 
 import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
@@ -13,6 +16,8 @@ function minimalImpactCatalog(): GraphCatalog {
     tool: 'graph',
     language: 'typescript',
     builtAt: '2026-01-01T00:00:00.000Z',
+    cacheKey: 'test-cache',
+    filesFingerprint: 'test-fingerprint',
     functions: {
       caller: [
         {
@@ -67,6 +72,22 @@ function minimalImpactCatalog(): GraphCatalog {
   };
 }
 
+function git(cwd: string, args: string[]): void {
+  execFileSync('git', args, { cwd, stdio: 'ignore' });
+}
+
+function initGitProject(): string {
+  const cwd = mkdtempSync(join(tmpdir(), 'opensip-fit-changed-'));
+  git(cwd, ['init']);
+  git(cwd, ['config', 'user.email', 't@example.com']);
+  git(cwd, ['config', 'user.name', 'T']);
+  mkdirSync(join(cwd, 'src'));
+  writeFileSync(join(cwd, 'src', 'callee.ts'), 'initial\n', 'utf8');
+  git(cwd, ['add', 'src/callee.ts']);
+  git(cwd, ['commit', '-m', 'init']);
+  return cwd;
+}
+
 describe('restrictFileMapToChanged', () => {
   it('intersects check targets with the changed set and drops empty checks', () => {
     const cwd = '/proj';
@@ -82,8 +103,9 @@ describe('restrictFileMapToChanged', () => {
 });
 
 describe('resolveChangedSet', () => {
-  it('degrades to changed-only when graphCatalog thunk is absent', () => {
-    const cwd = '/proj';
+  it('falls back to a full run when graphCatalog thunk is absent', () => {
+    const cwd = initGitProject();
+    writeFileSync(join(cwd, 'src', 'callee.ts'), 'changed\n', 'utf8');
     const scope = new RunScope({
       tools: new ToolRegistry(),
       languages: new LanguageRegistry(),
@@ -94,13 +116,22 @@ describe('resolveChangedSet', () => {
         changed: true,
         includeImpacted: true,
       });
-      expect(result.ok).toBe(false);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.trust).toMatchObject({
+          coverage: 'partial',
+          fallback: 'full-run',
+          fullyVerified: false,
+        });
+        expect(result.warning).toContain('full fit target set');
+      }
     });
     scope.dispose();
   });
 
   it('expands targets with impacted files when catalog thunk is wired', () => {
-    const cwd = '/proj';
+    const cwd = initGitProject();
+    writeFileSync(join(cwd, 'src', 'callee.ts'), 'changed\n', 'utf8');
     const catalog = minimalImpactCatalog();
     const scope = new RunScope({
       tools: new ToolRegistry(),
@@ -117,10 +148,68 @@ describe('resolveChangedSet', () => {
         includeImpacted: true,
         since: undefined,
       });
-      // Without git, resolveChangedFiles fails — this exercises the degraded path.
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.warning).toBeTruthy();
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.trust.fullyVerified).toBe(true);
+        expect(result.files).toContain(path.resolve(cwd, 'src/callee.ts'));
+        expect(result.files).toContain(path.resolve(cwd, 'src/caller.ts'));
+      }
+    });
+    scope.dispose();
+  });
+
+  it('falls back to a full run when the graph catalog is incomplete', () => {
+    const cwd = initGitProject();
+    writeFileSync(join(cwd, 'src', 'callee.ts'), 'changed\n', 'utf8');
+    const source = minimalImpactCatalog();
+    const catalog: GraphCatalog = {
+      version: source.version,
+      tool: source.tool,
+      language: source.language,
+      builtAt: source.builtAt,
+      functions: source.functions,
+    };
+    const scope = new RunScope({
+      tools: new ToolRegistry(),
+      languages: new LanguageRegistry(),
+    });
+    Object.assign(scope, { graphCatalog: () => catalog });
+    runWithScopeSync(scope, () => {
+      const result = resolveChangedSet({
+        cwd,
+        changed: true,
+        includeImpacted: true,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.trust.fallback).toBe('full-run');
+        expect(result.trust.uncertainties.map((item) => item.code)).toContain(
+          'graph-catalog-incomplete',
+        );
+      }
+    });
+    scope.dispose();
+  });
+
+  it('falls back to a full run for deleted changed files even without impact expansion', () => {
+    const cwd = initGitProject();
+    rmSync(join(cwd, 'src', 'callee.ts'));
+    const scope = new RunScope({
+      tools: new ToolRegistry(),
+      languages: new LanguageRegistry(),
+    });
+    runWithScopeSync(scope, () => {
+      const result = resolveChangedSet({
+        cwd,
+        changed: true,
+        includeImpacted: false,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.trust.fallback).toBe('full-run');
+        expect(result.trust.uncertainties.map((item) => item.code)).toContain(
+          'changed-file-deleted',
+        );
       }
     });
     scope.dispose();

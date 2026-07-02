@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md) — Impact analysis carries explicit trust metadata; uncertain changed/impacted verification falls back to full target execution instead of changed-only confidence.
 - [ADR-0122](ADR-0122-agent-workflow-product-wedge.md) — Agent workflow is the post-hardening product wedge; impact trust, correlation, apply/verify, evidence authority, and capability controls are ordered around safe AI-assisted engineering rather than security-scanner or marketplace positioning.
 - [ADR-0121](ADR-0121-platform-compatibility-lts-policy.md) — Public compatibility surfaces are named contract classes with explicit version markers, a config migration command, and a CI compatibility matrix over fixtures.
 - [ADR-0120](ADR-0120-detection-quality-measurement.md) — Detection quality is measured by a root-level script over a checked-in labeled OSS corpus and committed baseline; no new runtime tool, session surface, datastore table, or private-only primary corpus.

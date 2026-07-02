@@ -275,4 +275,11 @@ export { detectPhantomRuntimes } from './lib/phantom-detect.js';
 // for `fit --changed` and `graph impact --changed`; tools must not shell out
 // independently.
 export { resolveChangedFiles } from './lib/git-changed-files.js';
-export type { ChangedFilesResult, ChangedFileBasis } from './lib/git-changed-files.js';
+export type {
+  ChangedFilesResult,
+  ChangedFileBasis,
+  ChangedFileEntry,
+  ChangedFileStatus,
+  ChangedFileWarning,
+  ChangedFileWarningCode,
+} from './lib/git-changed-files.js';

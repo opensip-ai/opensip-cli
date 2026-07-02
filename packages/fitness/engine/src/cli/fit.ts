@@ -52,6 +52,8 @@ import type {
 
 const log = createToolLogger('fitness:cli');
 
+type CheckScopeMap = Map<string, readonly string[]>;
+
 // ---------------------------------------------------------------------------
 // Re-exports — preserve the public surface that external consumers
 // (`opensip-cli`, `report-data.ts`, fitness's barrel) import from
@@ -88,6 +90,36 @@ export { getDisplayName, getIcon } from './fit/display-registry.js';
  */
 export interface ExecuteFitOptions {
   onProgress?: (completed: number, total: number) => void;
+}
+
+function resolveFitScopeMap(
+  args: FitOptions,
+  initialScopeMap: CheckScopeMap,
+): { readonly scopeMap: CheckScopeMap; readonly warnings: readonly string[] } {
+  if (args.changed !== true && !args.since) {
+    return { scopeMap: initialScopeMap, warnings: [] };
+  }
+
+  const changed = resolveChangedSet(args);
+  if (!changed.ok) {
+    return { scopeMap: initialScopeMap, warnings: [changed.warning] };
+  }
+  if (!changed.trust.fullyVerified && changed.trust.fallback === 'full-run') {
+    return {
+      scopeMap: initialScopeMap,
+      warnings: changed.warning ? [changed.warning] : [],
+    };
+  }
+  if (changed.files.size === 0) {
+    return {
+      scopeMap: new Map(),
+      warnings: ['No changed files detected — fit run will target nothing.'],
+    };
+  }
+  return {
+    scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files),
+    warnings: [],
+  };
 }
 
 /**
@@ -170,19 +202,11 @@ export async function executeFit(
     const check = checkRegistry.getBySlug(key);
     return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
   });
-  let scopeMap = buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd);
-  const changedWarnings: string[] = [];
-  if (args.changed === true || args.since) {
-    const changed = resolveChangedSet(args);
-    if (!changed.ok) {
-      changedWarnings.push(changed.warning);
-    } else if (changed.files.size === 0) {
-      changedWarnings.push('No changed files detected — fit run will target nothing.');
-      scopeMap = new Map();
-    } else {
-      scopeMap = restrictFileMapToChanged(scopeMap, changed.files);
-    }
-  }
+  const changedResolution = resolveFitScopeMap(
+    args,
+    buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd),
+  );
+  const scopeMap = changedResolution.scopeMap;
   const checkTargetFiles =
     args.changed === true || args.since || scopeMap.size > 0 ? scopeMap : undefined;
 
@@ -218,7 +242,7 @@ export async function executeFit(
   // and from config validation (validateLanguagesAgainstAdapters). Both flow
   // through the result rather than direct stderr writes so the live renderer
   // can surface them without breaking Ink's frame tracking.
-  const warnings = [...getLoadWarnings(), ...validationWarnings, ...changedWarnings];
+  const warnings = [...getLoadWarnings(), ...validationWarnings, ...changedResolution.warnings];
 
   const result = buildFitPresentation({
     args,

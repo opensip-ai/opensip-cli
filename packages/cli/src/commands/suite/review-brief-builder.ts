@@ -28,6 +28,42 @@ export interface BuildReviewBriefInput {
   readonly degradationLimit?: number;
 }
 
+function pushStepSummaryDegradations(
+  degraded: ReviewBriefDegradation[],
+  step: SuiteStepReviewInput,
+  degradationLimit: number,
+): void {
+  if (step.summary.error !== undefined) {
+    pushReviewBriefDegradation(
+      degraded,
+      {
+        source: step.summary.tool,
+        reason: step.summary.error,
+        code: 'step-fault',
+        stepIndex: step.stepIndex,
+      },
+      degradationLimit,
+    );
+  }
+
+  if (step.summary.verification === undefined || step.summary.verification.fullyVerified) return;
+  const uncertaintyCodes = step.summary.verification.uncertainties
+    .map((item) => item.code)
+    .join(', ');
+  pushReviewBriefDegradation(
+    degraded,
+    {
+      source: step.summary.tool,
+      reason:
+        `Step '${step.summary.command}' had ${step.summary.verification.coverage} impact verification` +
+        (uncertaintyCodes ? ` (${uncertaintyCodes}).` : '.'),
+      code: 'impact-verification-partial',
+      stepIndex: step.stepIndex,
+    },
+    degradationLimit,
+  );
+}
+
 function collectRisks(input: {
   readonly suiteRunId: string;
   readonly steps: readonly SuiteStepReviewInput[];
@@ -42,18 +78,7 @@ function collectRisks(input: {
   const baselineStates: ReviewBriefBaselineState[] = [];
 
   for (const step of input.steps) {
-    if (step.summary.error !== undefined) {
-      pushReviewBriefDegradation(
-        degraded,
-        {
-          source: step.summary.tool,
-          reason: step.summary.error,
-          code: 'step-fault',
-          stepIndex: step.stepIndex,
-        },
-        input.degradationLimit,
-      );
-    }
+    pushStepSummaryDegradations(degraded, step, input.degradationLimit);
 
     const envelope = step.capturedEnvelope;
     if (envelope === undefined) {

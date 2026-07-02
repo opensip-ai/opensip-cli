@@ -105,6 +105,12 @@ describe('executeImpact', () => {
     expect(result.type).toBe('graph-impact');
     expect(result.changedFiles).toContain('src/callee.ts');
     expect(result.changedFunctions.some((f) => f.qualifiedName === 'callee')).toBe(true);
+    expect(result.impactedFiles).toEqual(['src/callee.ts', 'src/caller.ts']);
+    expect(result.trust).toMatchObject({
+      coverage: 'full',
+      fallback: 'targeted',
+      fullyVerified: true,
+    });
     expect(result.recommendedCommands.length).toBeGreaterThan(0);
     expect(cli.emitJson).toHaveBeenCalledWith(result);
     const delivered = (
@@ -119,6 +125,10 @@ describe('executeImpact', () => {
       dependents: 1,
       impactedFiles: 1,
       confidence: 'high',
+    });
+    expect(delivered?.signals[0]?.metadata).toMatchObject({
+      impactedFiles: ['src/callee.ts', 'src/caller.ts'],
+      trust: result.trust,
     });
     expect(delivered?.verdict).toMatchObject({
       passed: true,
@@ -145,6 +155,38 @@ describe('executeImpact', () => {
     datastore.close();
   });
 
+  it('downgrades signal blast confidence when impact trust is unknown', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const source = makeCatalog();
+    new CatalogRepo(datastore).replaceAll({
+      version: source.version,
+      tool: source.tool,
+      language: source.language,
+      builtAt: source.builtAt,
+      cacheKey: source.cacheKey,
+      functions: source.functions,
+    });
+    const cli = mockCli(datastore);
+    const result = await executeImpact(
+      {
+        cwd: '/proj',
+        json: true,
+        files: ['src/callee.ts'],
+      },
+      cli,
+    );
+    expect(result.trust.coverage).toBe('unknown');
+    const delivered = (
+      cli.deliverSignals as unknown as {
+        mock: { calls: [[SignalEnvelope, unknown]] };
+      }
+    ).mock.calls[0]?.[0];
+    expect(delivered?.signals[0]?.metadata.blastRadius).toMatchObject({
+      confidence: 'low',
+    });
+    datastore.close();
+  });
+
   it('renders human impact lines and the truncation hint outside JSON mode', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     new CatalogRepo(datastore).replaceAll(makeCatalog());
@@ -161,6 +203,7 @@ describe('executeImpact', () => {
     const renderCalls = (cli.render as unknown as { mock: { calls: unknown[][] } }).mock.calls;
     const rendered = renderCalls[0]?.[0] as { lines?: readonly string[] } | undefined;
     expect(rendered?.lines?.some((line) => line.includes('truncated'))).toBe(true);
+    expect(rendered?.lines?.some((line) => line.includes('Verification coverage'))).toBe(true);
     expect(rendered?.lines?.some((line) => line.includes('Recommended next commands'))).toBe(true);
     datastore.close();
   });
@@ -230,6 +273,8 @@ describe('executeImpact', () => {
     );
     expect(result.changedFunctions).toHaveLength(0);
     expect(result.impactedFunctions).toHaveLength(0);
+    expect(result.trust.fullyVerified).toBe(false);
+    expect(result.trust.uncertainties.map((item) => item.code)).toContain('changed-file-unmatched');
     datastore.close();
   });
 
@@ -247,6 +292,7 @@ describe('executeImpact', () => {
       cli,
     );
     expect(result.truncated).toBe(true);
+    expect(result.trust.uncertainties.map((item) => item.code)).toContain('impact-truncated');
     datastore.close();
   });
 

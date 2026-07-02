@@ -4,7 +4,10 @@
  * Lives in contracts (layer 2) so both graph and fitness can import it without
  * a tool→tool edge.
  */
+import { buildImpactTrust, mergeImpactUncertainties } from './impact-trust.js';
+
 import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
+import type { ImpactTrust, ImpactUncertainty } from './impact-trust.js';
 
 /** One function in the impact result — a changed function or an impacted caller. */
 export interface ImpactFunction {
@@ -28,7 +31,31 @@ export interface ImpactComputation {
   readonly changedFunctions: readonly ImpactFunction[];
   readonly impactedFunctions: readonly ImpactFunction[];
   readonly impactedPackages: readonly ImpactPackage[];
+  readonly impactedFiles: readonly string[];
+  readonly trust: ImpactTrust;
   readonly truncated: boolean;
+}
+
+/** Changed-file entry metadata accepted by {@link computeImpact}. */
+export interface ComputeImpactChangedFileEntry {
+  readonly path: string;
+  readonly status?:
+    | 'added'
+    | 'modified'
+    | 'copied'
+    | 'renamed'
+    | 'deleted'
+    | 'untracked'
+    | 'unknown';
+  readonly previousPath?: string;
+}
+
+/** Optional knobs and caller-known uncertainty facts for {@link computeImpact}. */
+export interface ComputeImpactOptions {
+  readonly maxDepth?: number;
+  readonly top?: number;
+  readonly changedFileEntries?: readonly ComputeImpactChangedFileEntry[];
+  readonly uncertainties?: readonly ImpactUncertainty[];
 }
 
 const DEFAULT_MAX_DEPTH = 5;
@@ -176,6 +203,17 @@ function buildImpactedPackages(
     .sort((a, b) => b.functionCount - a.functionCount);
 }
 
+function buildImpactedFiles(
+  changedFunctions: readonly ImpactFunction[],
+  impactedFunctions: readonly ImpactFunction[],
+): string[] {
+  const fileSet = new Set<string>();
+  for (const fn of [...changedFunctions, ...impactedFunctions]) {
+    fileSet.add(fn.filePath);
+  }
+  return [...fileSet].sort();
+}
+
 function applyTopCap(
   changedFunctions: readonly ImpactFunction[],
   impactedFunctions: readonly ImpactFunction[],
@@ -192,13 +230,94 @@ function applyTopCap(
   return { impactedFunctions: impactedFunctions.slice(0, remaining), truncated: true };
 }
 
+function catalogFileSet(catalog: GraphCatalog): ReadonlySet<string> {
+  const files = new Set<string>();
+  for (const occ of allOccurrences(catalog)) {
+    files.add(occ.filePath.replaceAll('\\', '/'));
+  }
+  return files;
+}
+
+function isCatalogApproximate(catalog: GraphCatalog): boolean {
+  if (catalog.resolutionMode === 'fast') return true;
+  for (const occurrences of Object.values(catalog.functions)) {
+    for (const occ of occurrences) {
+      if (occ.calls.some((edge) => edge.confidence !== 'high' || edge.resolution === 'syntactic')) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function catalogUncertainties(catalog: GraphCatalog): ImpactUncertainty[] {
+  const uncertainties: ImpactUncertainty[] = [];
+  if (!catalog.cacheKey || !catalog.filesFingerprint) {
+    uncertainties.push({
+      code: 'graph-catalog-incomplete',
+      source: 'catalog',
+      message: 'Graph catalog is missing cache freshness metadata.',
+    });
+  }
+  if (isCatalogApproximate(catalog)) {
+    uncertainties.push({
+      code: 'graph-catalog-approximate',
+      source: 'catalog',
+      message: 'Graph catalog contains approximate call resolution.',
+    });
+  }
+  return uncertainties;
+}
+
+function changedFileEntryUncertainties(
+  catalog: GraphCatalog,
+  changedFiles: readonly string[],
+  entries: readonly ComputeImpactChangedFileEntry[] | undefined,
+): ImpactUncertainty[] {
+  const catalogFiles = catalogFileSet(catalog);
+  const normalizedEntries: readonly ComputeImpactChangedFileEntry[] =
+    entries === undefined || entries.length === 0
+      ? changedFiles.map((path) => ({ path }))
+      : entries;
+  const uncertainties: ImpactUncertainty[] = [];
+  for (const entry of normalizedEntries) {
+    const normalizedPath = entry.path.replaceAll('\\', '/');
+    if (entry.status === 'deleted') {
+      uncertainties.push({
+        code: 'changed-file-deleted',
+        source: 'git',
+        filePath: normalizedPath,
+        message: `Changed file ${normalizedPath} was deleted; downstream imports may need a broader run.`,
+      });
+      continue;
+    }
+    if (entry.status === 'renamed') {
+      uncertainties.push({
+        code: 'changed-file-renamed',
+        source: 'git',
+        filePath: normalizedPath,
+        message: `Changed file ${normalizedPath} was renamed; import edges may have shifted.`,
+      });
+    }
+    if (!catalogFiles.has(normalizedPath)) {
+      uncertainties.push({
+        code: 'changed-file-unmatched',
+        source: 'impact',
+        filePath: normalizedPath,
+        message: `Changed file ${normalizedPath} is not represented in the graph catalog.`,
+      });
+    }
+  }
+  return uncertainties;
+}
+
 /**
  * Compute changed functions and reverse-BFS impacted closure over a catalog.
  */
 export function computeImpact(
   catalog: GraphCatalog,
   changedFiles: readonly string[],
-  opts?: { readonly maxDepth?: number; readonly top?: number },
+  opts?: ComputeImpactOptions,
 ): ImpactComputation {
   const maxDepth = opts?.maxDepth ?? DEFAULT_MAX_DEPTH;
   const changedSet = new Set(changedFiles.map((f) => f.replaceAll('\\', '/')));
@@ -228,11 +347,29 @@ export function computeImpact(
     impactedFunctions,
     opts?.top,
   );
+  const trust = buildImpactTrust({
+    uncertainties: mergeImpactUncertainties(
+      opts?.uncertainties,
+      catalogUncertainties(catalog),
+      changedFileEntryUncertainties(catalog, changedFiles, opts?.changedFileEntries),
+      truncated
+        ? [
+            {
+              code: 'impact-truncated',
+              source: 'impact',
+              message: 'Impact result was truncated by --top.',
+            },
+          ]
+        : undefined,
+    ),
+  });
 
   return {
     changedFunctions,
     impactedFunctions: finalImpacted,
     impactedPackages,
+    impactedFiles: buildImpactedFiles(changedFunctions, finalImpacted),
+    trust,
     truncated,
   };
 }

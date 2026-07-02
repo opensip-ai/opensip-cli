@@ -1,3 +1,4 @@
+import type { ImpactTrust } from '../impact-trust.js';
 import type { ReviewBrief } from '../review-brief.js';
 
 export interface SuiteStepSummary {
@@ -14,6 +15,7 @@ export interface SuiteStepSummary {
     readonly warnings: number;
     readonly findings: number;
   };
+  readonly verification?: ImpactTrust;
 }
 
 export interface SuiteRunResult {

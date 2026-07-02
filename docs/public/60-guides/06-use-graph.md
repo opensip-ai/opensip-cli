@@ -12,6 +12,7 @@ source-files:
 related-docs:
   - ../40-graph/01-stages-and-catalog.md
   - ../40-graph/02-rules-and-gating.md
+  - ../40-graph/05-impact-analysis.md
   - ../70-reference/01-cli-commands.md
   - ../70-reference/06-dashboard.md
 ---
@@ -160,5 +161,6 @@ No `--recipe` means the default graph rule set.
 |---|---|
 | Understand the pipeline | [Stages and catalog](../40-graph/01-stages-and-catalog.md) |
 | Understand rules and baselines | [Rules and gating](../40-graph/02-rules-and-gating.md) |
+| Understand impact trust | [Impact analysis and trust](../40-graph/05-impact-analysis.md) |
 | Add a graph language adapter | [Adding a language](../40-graph/03-adding-a-language.md) |
 | Look up every graph flag | [CLI commands](../70-reference/01-cli-commands.md#graph--static-call-graph--dead-end-analysis) |

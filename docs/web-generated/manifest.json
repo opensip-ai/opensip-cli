@@ -308,6 +308,18 @@
       "purpose": "Inline source-level waivers — how `@graph-ignore-next-line` and `@graph-ignore-file` work, the any-member rule for cycles, and how a waiver relates to the gate baseline."
     },
     {
+      "file": "docs/web-generated/40-graph/05-impact-analysis.md",
+      "path": "/docs/opensip-cli/40-graph/05-impact-analysis/",
+      "section": "40-graph",
+      "title": "Impact analysis and trust",
+      "audience": [
+        "contributors",
+        "ci-integrators",
+        "agent-builders"
+      ],
+      "purpose": "How `graph impact` and `fit --changed --include-impacted` report coverage, uncertainty, and conservative fallbacks."
+    },
+    {
       "file": "docs/web-generated/50-extend/01-plugin-authoring.md",
       "path": "/docs/opensip-cli/50-extend/01-plugin-authoring/",
       "section": "50-extend",
@@ -849,7 +861,8 @@
         "/docs/opensip-cli/40-graph/01-stages-and-catalog/",
         "/docs/opensip-cli/40-graph/02-rules-and-gating/",
         "/docs/opensip-cli/40-graph/03-adding-a-language/",
-        "/docs/opensip-cli/40-graph/04-suppressing-findings/"
+        "/docs/opensip-cli/40-graph/04-suppressing-findings/",
+        "/docs/opensip-cli/40-graph/05-impact-analysis/"
       ]
     },
     {
@@ -1019,6 +1032,7 @@
         "/docs/opensip-cli/40-graph/01-stages-and-catalog/",
         "/docs/opensip-cli/40-graph/02-rules-and-gating/",
         "/docs/opensip-cli/40-graph/04-suppressing-findings/",
+        "/docs/opensip-cli/40-graph/05-impact-analysis/",
         "/docs/opensip-cli/50-extend/07-command-taxonomy/",
         "/docs/opensip-cli/55-yagni/01-command-reference/",
         "/docs/opensip-cli/60-guides/00-initialize-your-first-repo/",
@@ -1070,6 +1084,7 @@
         "/docs/opensip-cli/40-graph/02-rules-and-gating/",
         "/docs/opensip-cli/40-graph/03-adding-a-language/",
         "/docs/opensip-cli/40-graph/04-suppressing-findings/",
+        "/docs/opensip-cli/40-graph/05-impact-analysis/",
         "/docs/opensip-cli/50-extend/04-check-pack-architecture/",
         "/docs/opensip-cli/50-extend/05-language-adapters/",
         "/docs/opensip-cli/50-extend/07-command-taxonomy/",

@@ -3,15 +3,29 @@
  */
 import path from 'node:path';
 
-import { computeImpact, type GraphCatalog, type FitOptions } from '@opensip-cli/contracts';
+import {
+  buildImpactTrust,
+  changedEntriesToImpactUncertainties,
+  computeImpact,
+  gitWarningsToImpactUncertainties,
+  mergeImpactUncertainties,
+  type FitOptions,
+  type GraphCatalog,
+  type ImpactTrust,
+  type ImpactUncertainty,
+} from '@opensip-cli/contracts';
 import { createToolLogger, currentScope, resolveChangedFiles } from '@opensip-cli/core';
 
 const log = createToolLogger('fitness:cli');
+const WORKING_TREE_BASIS = 'changed:git:working-tree';
+const CHANGED_DEGRADED_EVENT = 'fitness.cli.changed.degraded';
 
 export interface ChangedSetOk {
   readonly ok: true;
   readonly files: ReadonlySet<string>;
   readonly basis: string;
+  readonly trust: ImpactTrust;
+  readonly warning?: string;
 }
 
 export interface ChangedSetFail {
@@ -23,6 +37,61 @@ export type ChangedSetResult = ChangedSetOk | ChangedSetFail;
 
 function toAbsolute(cwd: string, relativePosix: string): string {
   return path.resolve(cwd, relativePosix.split('/').join(path.sep));
+}
+
+function fallbackWarning(trust: ImpactTrust): string | undefined {
+  if (trust.fullyVerified) return undefined;
+  const reasons = trust.uncertainties.map((item) => item.code).join(', ');
+  const suffix = reasons ? ` (${reasons})` : '';
+  return `Impact verification is ${trust.coverage}; running the full fit target set instead of a narrowed changed-file set${suffix}.`;
+}
+
+function conservativeTrust(uncertainties: readonly ImpactUncertainty[]): ImpactTrust {
+  return buildImpactTrust({ uncertainties, fallback: 'full-run' });
+}
+
+function basisLabel(ref: string | undefined): string {
+  return ref ? `changed:git:${ref}` : WORKING_TREE_BASIS;
+}
+
+function fallbackResult(input: {
+  readonly files: ReadonlySet<string>;
+  readonly basis: string;
+  readonly trust: ImpactTrust;
+  readonly reason: string;
+}): ChangedSetOk {
+  log.warn({
+    evt: CHANGED_DEGRADED_EVENT,
+    module: 'fitness:cli',
+    reason: input.reason,
+    uncertainties: input.trust.uncertainties.map((item) => item.code),
+  });
+  return {
+    ok: true,
+    files: input.files,
+    basis: input.basis,
+    trust: input.trust,
+    warning: fallbackWarning(input.trust),
+  };
+}
+
+function resolveCatalogFallback(
+  fileSet: ReadonlySet<string>,
+  gitUncertainties: readonly ImpactUncertainty[],
+): ChangedSetOk {
+  return fallbackResult({
+    files: fileSet,
+    basis: 'changed:full-run-fallback (graph catalog unavailable)',
+    trust: conservativeTrust([
+      ...gitUncertainties,
+      {
+        code: 'graph-catalog-unavailable',
+        source: 'catalog',
+        message: 'Graph catalog is unavailable for --include-impacted.',
+      },
+    ]),
+    reason: 'graph-catalog-unavailable',
+  });
 }
 
 /**
@@ -38,7 +107,7 @@ export function resolveChangedSet(
   const resolved = resolveChangedFiles(args.cwd, { since: args.since });
   if (!resolved.ok) {
     log.warn({
-      evt: 'fitness.cli.changed.degraded',
+      evt: CHANGED_DEGRADED_EVENT,
       module: 'fitness:cli',
       reason: resolved.reason,
     });
@@ -49,24 +118,38 @@ export function resolveChangedSet(
   for (const rel of resolved.files) {
     fileSet.add(toAbsolute(args.cwd, rel));
   }
+  const gitUncertainties = mergeImpactUncertainties(
+    gitWarningsToImpactUncertainties(resolved.basis.warnings),
+    changedEntriesToImpactUncertainties(resolved.entries),
+  );
+  if (args.includeImpacted !== true && gitUncertainties.length > 0) {
+    return fallbackResult({
+      files: fileSet,
+      basis: basisLabel(resolved.basis.ref),
+      trust: conservativeTrust(gitUncertainties),
+      reason: 'changed-file-uncertain',
+    });
+  }
 
   if (args.includeImpacted === true) {
     const catalog = currentScope()?.graphCatalog?.() as GraphCatalog | null | undefined;
     if (!catalog) {
-      log.warn({
-        evt: 'fitness.cli.changed.degraded',
-        module: 'fitness:cli',
-        reason: 'graph-catalog-unavailable',
-      });
-      return {
-        ok: true,
-        files: fileSet,
-        basis: `${resolved.basis.type}:changed-only (graph catalog unavailable)`,
-      };
+      return resolveCatalogFallback(fileSet, gitUncertainties);
     }
-    const impact = computeImpact(catalog, resolved.files);
+    const impact = computeImpact(catalog, resolved.files, {
+      changedFileEntries: resolved.entries,
+      uncertainties: gitUncertainties,
+    });
     for (const fn of [...impact.changedFunctions, ...impact.impactedFunctions]) {
       fileSet.add(toAbsolute(args.cwd, fn.filePath));
+    }
+    if (!impact.trust.fullyVerified) {
+      return fallbackResult({
+        files: fileSet,
+        basis: basisLabel(resolved.basis.ref),
+        trust: conservativeTrust(impact.trust.uncertainties),
+        reason: 'impact-trust-uncertain',
+      });
     }
   }
 
@@ -80,7 +163,8 @@ export function resolveChangedSet(
   return {
     ok: true,
     files: fileSet,
-    basis: resolved.basis.ref ? `changed:git:${resolved.basis.ref}` : 'changed:git:working-tree',
+    basis: basisLabel(resolved.basis.ref),
+    trust: buildImpactTrust(),
   };
 }
 

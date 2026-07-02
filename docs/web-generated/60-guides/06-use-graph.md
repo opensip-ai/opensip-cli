@@ -12,6 +12,7 @@ source-files:
 related-docs:
   - ../40-graph/01-stages-and-catalog.md
   - ../40-graph/02-rules-and-gating.md
+  - ../40-graph/05-impact-analysis.md
   - ../70-reference/01-cli-commands.md
   - ../70-reference/06-dashboard.md
 ---
@@ -160,5 +161,6 @@ No `--recipe` means the default graph rule set.
 |---|---|
 | Understand the pipeline | [Stages and catalog](/docs/opensip-cli/40-graph/01-stages-and-catalog/) |
 | Understand rules and baselines | [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/) |
+| Understand impact trust | [Impact analysis and trust](/docs/opensip-cli/40-graph/05-impact-analysis/) |
 | Add a graph language adapter | [Adding a language](/docs/opensip-cli/40-graph/03-adding-a-language/) |
 | Look up every graph flag | [CLI commands](/docs/opensip-cli/70-reference/01-cli-commands/#graph--static-call-graph--dead-end-analysis) |

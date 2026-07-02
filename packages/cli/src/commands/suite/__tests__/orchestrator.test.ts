@@ -68,6 +68,7 @@ function signalEnvelope(input: {
   readonly findings?: number;
   readonly message?: string;
   readonly filePath?: string;
+  readonly metadata?: Record<string, unknown>;
 }): SignalEnvelope {
   const errors = input.errors ?? 0;
   const warnings = input.warnings ?? 0;
@@ -81,7 +82,7 @@ function signalEnvelope(input: {
     ruleId: 'fixture-rule',
     message: input.message ?? `fixture finding ${index}`,
     filePath: input.filePath ?? 'src/fixture.ts',
-    metadata: {},
+    metadata: input.metadata ?? {},
     fingerprint: `fixture-rule|${input.filePath ?? 'src/fixture.ts'}|${index + 1}|0`,
     createdAt: '2026-01-01T00:00:00.000Z',
   }));
@@ -181,6 +182,51 @@ describe('runSuite', () => {
         _args: ['src'],
       },
     ]);
+  });
+
+  it('projects impact trust metadata onto suite step verification', async () => {
+    const trust = {
+      coverage: 'partial',
+      fallback: 'full-run',
+      fullyVerified: false,
+      uncertainties: [
+        {
+          code: 'graph-catalog-unavailable',
+          source: 'catalog',
+          message: 'Graph catalog is unavailable for --include-impacted.',
+        },
+      ],
+    };
+    const spec = helpCommand('graph-impact', async (_opts, cli) => {
+      await cli.deliverSignals(
+        signalEnvelope({
+          passed: true,
+          warnings: 1,
+          findings: 1,
+          metadata: { trust },
+        }),
+        { cwd: '/repo' },
+      );
+      return { type: 'help' };
+    });
+
+    const result = await runSuite({
+      name: 'impact',
+      suite: { steps: [{ tool: TOOL_ID, command: 'graph-impact' }] },
+      tools: [tool(TOOL_ID, 'fitness', [spec])],
+      ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: {},
+      suiteOpts: {},
+    });
+
+    expect(result.steps[0]?.verification).toEqual(trust);
+    expect(result.reviewBrief?.degraded).toContainEqual(
+      expect.objectContaining({
+        code: 'impact-verification-partial',
+        stepIndex: 0,
+      }),
+    );
+    expect(result.reviewBrief?.verdict).toBe('warn');
   });
 
   it("loads each step tool's capability domains before handlers run", async () => {

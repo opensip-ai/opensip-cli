@@ -8,6 +8,9 @@ purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --jso
 source-files:
   - packages/contracts/src/command-outcome.ts
   - packages/contracts/src/signal-envelope.ts
+  - packages/contracts/src/impact-trust.ts
+  - packages/contracts/src/command-results-variants/graph-impact-result.ts
+  - packages/contracts/src/command-results-variants/suite-results.ts
   - packages/core/src/types/signal.ts
 related-docs:
   - ../10-concepts/04-contract-surfaces.md
@@ -207,7 +210,7 @@ per-tool output.
 | `topRisks` | `ReviewBriefRisk[]` | yes | Deterministically ranked current risks, capped by the host. |
 | `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. |
 | `baselineDelta` | object | yes | `{ available, added, removed, unchanged }`; `available:false` means the suite did not capture compare evidence. |
-| `degraded` | object[] | yes | Evidence-quality notes such as missing envelopes, step faults, missing fingerprints, or failing verdicts without signals. |
+| `degraded` | object[] | yes | Evidence-quality notes such as missing envelopes, step faults, missing fingerprints, partial impact verification, or failing verdicts without signals. |
 | `recommendedActions` | object[] | yes | Short host-generated next steps for agents and CI annotations. |
 
 Each `topRisks[]` item carries `source`, `ruleId`, `message`, `severity`, `file`,
@@ -559,11 +562,22 @@ filtered result object is emitted.
     "changedFunctions": [ /* ImpactFunction[] */ ],
     "impactedFunctions": [ /* ImpactFunction[] */ ],
     "impactedPackages": [ /* ImpactPackage[] */ ],
+    "impactedFiles": ["src/foo.ts", "src/caller.ts"],
+    "trust": {
+      "coverage": "full",
+      "fallback": "targeted",
+      "fullyVerified": true,
+      "uncertainties": []
+    },
     "recommendedCommands": ["opensip fit --changed --include-impacted --json"],
     "truncated": false
   }
 }
 ```
+
+`trust.fullyVerified` is the field agents should inspect before claiming a
+targeted verification was complete. Non-empty `uncertainties[]` explain why the
+result is partial or unknown.
 
 ### `graph lookup --json`
 

@@ -94,7 +94,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | New user | [Quick start](/docs/opensip-cli/00-start/00-quick-start/) -> [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/) -> [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/) |
 | CI owner | [Output, gate, SARIF](/docs/opensip-cli/20-fit/04-output-gate-sarif/) -> [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/) -> [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/) -> [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/) |
 | Plugin author | [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/) -> [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) -> [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) -> [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/) |
-| Graph adopter | [Use graph](/docs/opensip-cli/60-guides/06-use-graph/) -> [Stages and catalog](/docs/opensip-cli/40-graph/01-stages-and-catalog/) -> [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/) |
+| Graph adopter | [Use graph](/docs/opensip-cli/60-guides/06-use-graph/) -> [Stages and catalog](/docs/opensip-cli/40-graph/01-stages-and-catalog/) -> [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/) -> [Impact analysis](/docs/opensip-cli/40-graph/05-impact-analysis/) |
 | AI agent (CLI + MCP) | [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) -> [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) |
 | Contributor | [Architecture overview](/docs/opensip-cli/00-start/07-architecture-overview/) -> [Layered package graph](/docs/opensip-cli/10-concepts/03-modular-monolith/) -> [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/) |
 
@@ -140,59 +140,60 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 22. [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/)
 23. [Adding a language](/docs/opensip-cli/40-graph/03-adding-a-language/)
 24. [Suppressing findings](/docs/opensip-cli/40-graph/04-suppressing-findings/)
+25. [Impact analysis and trust](/docs/opensip-cli/40-graph/05-impact-analysis/)
 
 ### 55 - Yagni
 
-25. [Command reference](/docs/opensip-cli/55-yagni/01-command-reference/)
+26. [Command reference](/docs/opensip-cli/55-yagni/01-command-reference/)
 
 ### 50 - Extend
 
-26. [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/)
-27. [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/)
-28. [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/)
-29. [Check pack architecture](/docs/opensip-cli/50-extend/04-check-pack-architecture/)
-30. [Language adapters](/docs/opensip-cli/50-extend/05-language-adapters/)
-31. [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/)
+27. [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/)
+28. [Project-local plugins](/docs/opensip-cli/50-extend/02-project-local-plugins/)
+29. [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/)
+30. [Check pack architecture](/docs/opensip-cli/50-extend/04-check-pack-architecture/)
+31. [Language adapters](/docs/opensip-cli/50-extend/05-language-adapters/)
+32. [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/)
 
 ### 60 - Guides
 
-32. [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/)
-33. [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/)
-34. [Ban an API pattern](/docs/opensip-cli/60-guides/02-ban-an-api-pattern/)
-35. [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/)
-36. [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/)
-37. [Migrate from ESLint](/docs/opensip-cli/60-guides/05-migrate-from-eslint/)
-38. [Use graph](/docs/opensip-cli/60-guides/06-use-graph/)
-39. [Create your first Tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/)
-40. [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/)
-41. [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)
+33. [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/)
+34. [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/)
+35. [Ban an API pattern](/docs/opensip-cli/60-guides/02-ban-an-api-pattern/)
+36. [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/)
+37. [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/)
+38. [Migrate from ESLint](/docs/opensip-cli/60-guides/05-migrate-from-eslint/)
+39. [Use graph](/docs/opensip-cli/60-guides/06-use-graph/)
+40. [Create your first Tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/)
+41. [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/)
+42. [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)
 
 ### 70 - Reference
 
-42. [CLI commands](/docs/opensip-cli/70-reference/01-cli-commands/)
-43. [Package catalog](/docs/opensip-cli/70-reference/02-package-catalog/)
-44. [Configuration](/docs/opensip-cli/70-reference/03-configuration/)
-45. [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)
-46. [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/)
-47. [Report](/docs/opensip-cli/70-reference/06-dashboard/)
-48. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
-49. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
-50. [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/)
-51. [Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/)
-52. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
-53. [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/)
-54. [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/)
-55. [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/)
+43. [CLI commands](/docs/opensip-cli/70-reference/01-cli-commands/)
+44. [Package catalog](/docs/opensip-cli/70-reference/02-package-catalog/)
+45. [Configuration](/docs/opensip-cli/70-reference/03-configuration/)
+46. [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)
+47. [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/)
+48. [Report](/docs/opensip-cli/70-reference/06-dashboard/)
+49. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
+50. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
+51. [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/)
+52. [Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/)
+53. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
+54. [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/)
+55. [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/)
+56. [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/)
 
 ### 80 - Internals
 
-56. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-57. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-58. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-59. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
-60. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
-61. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
-62. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
+57. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+58. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+59. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+60. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+61. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
+62. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
+63. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
 
 ## Factual Baseline
 

@@ -2,6 +2,7 @@
  * Graph impact command result (ADR-0085, spec §5.3).
  */
 import type { ImpactFunction, ImpactPackage } from '../graph-impact-compute.js';
+import type { ImpactTrust } from '../impact-trust.js';
 import type { ChangedFileBasis } from '@opensip-cli/core';
 
 export type GraphImpactBasis =
@@ -15,6 +16,8 @@ export interface GraphImpactResult {
   readonly changedFunctions: readonly ImpactFunction[];
   readonly impactedFunctions: readonly ImpactFunction[];
   readonly impactedPackages: readonly ImpactPackage[];
+  readonly impactedFiles: readonly string[];
+  readonly trust: ImpactTrust;
   readonly recommendedCommands: readonly string[];
   readonly truncated: boolean;
 }

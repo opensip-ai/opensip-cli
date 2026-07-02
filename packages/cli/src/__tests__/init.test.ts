@@ -574,6 +574,7 @@ describe('executeInit (AGENTS.md)', () => {
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('Agent Playbook');
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('OpenSIP MCP First');
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('agent-fast');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('trust.fullyVerified');
   });
 
   it('creates a graph-only AGENTS.md when no fit scaffold domain is registered', () => {
@@ -581,6 +582,7 @@ describe('executeInit (AGENTS.md)', () => {
     const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     expect(result.agentsMdCreated).toBe(true);
     expect(agents).toContain('opensip graph impact --changed --json --top 20');
+    expect(agents).toContain('trust.fullyVerified');
     expect(agents).toContain('opensip graph --recipe agent-final --gate-compare');
     expect(agents).not.toContain('agent-fast');
   });

@@ -110,9 +110,17 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
       'opensip graph impact --changed --json --top 20',
       'opensip fit --changed --include-impacted --json',
       '```',
+      '',
+      'Read `graph impact` JSON `trust.fullyVerified` before claiming targeted verification; `fit --changed --include-impacted` falls back to a full target set when impact trust is partial or unknown.',
     );
   } else {
-    lines.push('```bash', 'opensip graph impact --changed --json --top 20', '```');
+    lines.push(
+      '```bash',
+      'opensip graph impact --changed --json --top 20',
+      '```',
+      '',
+      'Read `graph impact` JSON `trust.fullyVerified` before claiming targeted verification.',
+    );
   }
 
   lines.push(

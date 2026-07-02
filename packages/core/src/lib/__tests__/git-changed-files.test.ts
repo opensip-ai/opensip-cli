@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -47,6 +47,12 @@ describe('resolveChangedFiles', () => {
     if (r.ok) {
       expect(r.files).toContain('a.txt');
       expect(r.files).toContain('b.txt');
+      expect(r.entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: 'a.txt', status: 'modified' }),
+          expect.objectContaining({ path: 'b.txt', status: 'untracked' }),
+        ]),
+      );
     }
   });
 
@@ -78,6 +84,7 @@ describe('resolveChangedFiles', () => {
     if (r.ok) {
       expect(r.files).toEqual([]);
       expect(r.basis).toEqual({ type: 'changed', source: 'git' });
+      expect(r.entries).toEqual([]);
     }
   });
 
@@ -101,6 +108,37 @@ describe('resolveChangedFiles', () => {
       expect(r.files).toContain('b.txt');
       expect(r.files).not.toContain('a.txt');
       expect(r.basis.ref).toBe('HEAD~1');
+      expect(r.entries).toContainEqual(expect.objectContaining({ path: 'b.txt', status: 'added' }));
+    }
+  });
+
+  it('reports deleted and renamed file entries', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opensip-git-'));
+    dirs.push(dir);
+    git(dir, ['init']);
+    git(dir, ['config', 'user.email', 't@example.com']);
+    git(dir, ['config', 'user.name', 'T']);
+    writeFileSync(join(dir, 'delete-me.txt'), '1\n', 'utf8');
+    writeFileSync(join(dir, 'rename-me.txt'), 'same content\n', 'utf8');
+    git(dir, ['add', 'delete-me.txt', 'rename-me.txt']);
+    git(dir, ['commit', '-m', 'init']);
+    rmSync(join(dir, 'delete-me.txt'));
+    git(dir, ['mv', 'rename-me.txt', 'renamed.txt']);
+
+    const r = resolveChangedFiles(dir);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: 'delete-me.txt', status: 'deleted' }),
+          expect.objectContaining({
+            path: 'renamed.txt',
+            previousPath: 'rename-me.txt',
+            status: 'renamed',
+          }),
+        ]),
+      );
+      expect(r.files).toEqual(expect.arrayContaining(['delete-me.txt', 'renamed.txt']));
     }
   });
 

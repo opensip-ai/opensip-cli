@@ -23,7 +23,12 @@ import { validateSuite, type ValidatedSuite, type ValidatedSuiteStep } from './v
 
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
-import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
+import type {
+  ImpactTrust,
+  SignalEnvelope,
+  SuiteRunResult,
+  SuiteStepSummary,
+} from '@opensip-cli/contracts';
 
 class DirectProcessExit extends Error {
   constructor(readonly code: number) {
@@ -140,6 +145,25 @@ export function deriveSuiteAggregate(
     errors,
     warnings,
   };
+}
+
+function isImpactTrust(value: unknown): value is ImpactTrust {
+  const maybe = value as Partial<ImpactTrust> | undefined;
+  return (
+    maybe !== undefined &&
+    (maybe.coverage === 'full' || maybe.coverage === 'partial' || maybe.coverage === 'unknown') &&
+    (maybe.fallback === 'targeted' || maybe.fallback === 'full-run') &&
+    typeof maybe.fullyVerified === 'boolean' &&
+    Array.isArray(maybe.uncertainties)
+  );
+}
+
+function verificationFromEnvelope(envelope: SignalEnvelope | undefined): ImpactTrust | undefined {
+  if (envelope === undefined) return undefined;
+  for (const signal of envelope.signals) {
+    if (isImpactTrust(signal.metadata.trust)) return signal.metadata.trust;
+  }
+  return undefined;
 }
 
 async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
@@ -306,6 +330,8 @@ async function runStep(args: {
   }
   const durationMs = Math.max(0, performance.now() - started);
   const envelopeStats = capture.getEnvelopeStats();
+  const capturedEnvelope = capture.getEnvelope();
+  const verification = verificationFromEnvelope(capturedEnvelope);
   const verdict =
     envelopeStats === undefined
       ? undefined
@@ -342,8 +368,8 @@ async function runStep(args: {
     durationMs,
     ...(errorMessage === undefined ? {} : { error: errorMessage }),
     ...(verdict === undefined ? {} : { verdict }),
+    ...(verification === undefined ? {} : { verification }),
   };
-  const capturedEnvelope = capture.getEnvelope();
   return {
     stepIndex: args.step.index,
     summary,

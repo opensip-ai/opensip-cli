@@ -303,6 +303,7 @@ describe('buildAgentCatalog', () => {
     expect(JSON.stringify(c)).not.toContain('opensip audit');
     expect(c.outputShapes.signalEnvelope).toMatch(/SignalEnvelope|schemaVersion/);
     expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
+    expect(c.outputShapes.reviewBrief).toMatch(/verification/);
     expect(c.outputShapes.sessionReplay).toMatch(/fidelity/);
     expect(c.outputShapes.history).toMatch(/history/);
     expect(c.notes.length).toBeGreaterThan(0);
@@ -315,6 +316,7 @@ describe('buildAgentCatalog', () => {
     expect(c.commonPatterns.some((p) => p.example.includes('suite run audit'))).toBe(true);
     expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
     expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
+    expect(c.notes.some((n) => n.includes('fullyVerified'))).toBe(true);
   });
 
   it('omits project context when no convention summary is provided', () => {

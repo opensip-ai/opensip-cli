@@ -103,6 +103,15 @@ export {
   signalToReviewBriefRisk,
 } from './review-brief.js';
 
+export type * from './impact-trust.js';
+export {
+  FULL_IMPACT_TRUST,
+  buildImpactTrust,
+  changedEntriesToImpactUncertainties,
+  gitWarningsToImpactUncertainties,
+  mergeImpactUncertainties,
+} from './impact-trust.js';
+
 // Command result types (the CommandResult union + per-command variants)
 export type {
   CommandResult,

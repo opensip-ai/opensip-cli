@@ -16,8 +16,10 @@ source-files:
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/commands/completion.ts
   - packages/fitness/engine/src/tool.ts
+  - packages/fitness/engine/src/cli/fit/changed-targeting.ts
   - packages/simulation/engine/src/tool.ts
   - packages/graph/engine/src/tool.ts
+  - packages/graph/engine/src/cli/impact.ts
   - packages/yagni/engine/src/tool.ts
   - packages/mcp/src/command.ts
   - packages/mcp/src/tools/register.ts
@@ -189,7 +191,7 @@ opensip fit --gate-compare
 | `--raw` | bool | `false` | Emit the filtered payload without the `CommandOutcome` wrapper (with `--json`). |
 | `--changed` | bool | `false` | Restrict the run to git-changed files (intersects scope targets). |
 | `--since <ref>` | string | — | Git ref base for changed-file detection (implies changed semantics). |
-| `--include-impacted` | bool | `false` | Expand `--changed` targets with graph impact callers (requires a built catalog; degrades to changed-only with a warning). |
+| `--include-impacted` | bool | `false` | Expand `--changed` targets with graph impact callers. If graph/git impact trust is partial or unknown, fitness warns and runs the full target set instead of narrowing unsafely. |
 
 **Agent recipes:** `agent-fast`, `agent-risk`, `agent-final` — see [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/).
 
@@ -502,6 +504,10 @@ opensip graph impact --files packages/core/src/index.ts --json
 | `--json` | bool | `false` | Emit structured `GraphImpactResult` (see [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/)). |
 
 **Exit codes:** 0 (success), 2 (configuration error — not a git repo, missing basis, invalid `--top`).
+
+`graph impact --json` includes `trust.coverage`, `trust.fullyVerified`,
+`trust.fallback`, and bounded `trust.uncertainties[]`. See
+[Impact analysis and trust](/docs/opensip-cli/40-graph/05-impact-analysis/).
 
 **Agent recipes:** `agent-risk`, `agent-final` on `graph --recipe`.
 
@@ -1000,7 +1006,8 @@ override propagated values.
 Each `data.steps[].verdict` is present only when that step emitted a
 `SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
 `findings`) so suite summaries do not leak signal messages, file paths, symbols,
-or match content.
+or match content. Steps may also include `verification` impact-trust metadata
+when a step emitted it.
 
 Current suite JSON also includes `data.reviewBrief`, a versioned v1 aggregate
 that ranks current signals into one review verdict. The brief is intentionally a

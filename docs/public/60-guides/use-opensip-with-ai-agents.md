@@ -8,8 +8,10 @@ purpose: "Three agent loops — Discover, Edit, Final — over the machine-first
 source-files:
   - packages/cli/src/commands/agent-catalog.ts
   - packages/contracts/src/agent-filters.ts
+  - packages/contracts/src/impact-trust.ts
   - packages/core/src/lib/git-changed-files.ts
   - packages/graph/engine/src/cli/impact.ts
+  - packages/fitness/engine/src/cli/fit/changed-targeting.ts
   - packages/mcp/src/command.ts
 related-docs:
   - ../70-reference/01-cli-commands.md
@@ -20,6 +22,7 @@ related-docs:
   - ../../decisions/ADR-0086-signal-repair-metadata.md
   - ../../decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md
   - ../../decisions/ADR-0110-host-owned-review-brief-contract.md
+  - ../../decisions/ADR-0123-impact-analysis-trust-foundation.md
 ---
 # Use OpenSIP with AI agents
 
@@ -82,10 +85,13 @@ opensip fit --changed --include-impacted --json
 
 - `agent-fast` — cheap, high-confidence checks (console.log, secrets, skipped tests, …).
 - `graph impact` — what changed and what depends on it (git or explicit `--files`).
-- `fit --changed` — only checks whose targets intersect changed (+ impacted) files.
+- `fit --changed` — checks whose targets intersect changed (+ impacted) files when
+  impact trust is full; otherwise it falls back to the full target set.
 
-If git or the graph catalog is unavailable, fit degrades gracefully with a
-warning — it does not crash.
+Read `graph impact` JSON `data.trust.fullyVerified` before claiming targeted
+verification. If git or the graph catalog is unavailable or incomplete, fit
+degrades conservatively with a warning and broader execution — it does not crash
+or silently claim changed-only coverage.
 
 Use `--raw` when you need the smallest payload (no `CommandOutcome` wrapper):
 

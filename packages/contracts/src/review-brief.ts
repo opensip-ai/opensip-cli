@@ -53,6 +53,7 @@ export interface ReviewBriefDegradation {
     | 'step-fault'
     | 'missing-fingerprint'
     | 'failing-verdict-without-signals'
+    | 'impact-verification-partial'
     | 'baseline-delta-unavailable';
   readonly stepIndex?: number;
 }
@@ -389,6 +390,7 @@ export const reviewBriefDegradationSchema = z
         'step-fault',
         'missing-fingerprint',
         'failing-verdict-without-signals',
+        'impact-verification-partial',
         'baseline-delta-unavailable',
       ])
       .optional(),
