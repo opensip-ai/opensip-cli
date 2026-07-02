@@ -29,6 +29,8 @@ import { logger } from './logger.js';
 
 const MODULE_TAG = 'core:project-context';
 
+export type ProjectContextScope = 'project' | 'ephemeral' | 'none';
+
 /** Resolved per-invocation project context — read by every downstream consumer. */
 export interface ProjectContext {
   /** Literal cwd at invocation (or the value of an explicit `--cwd` flag). Absolute. */
@@ -44,8 +46,16 @@ export interface ProjectContext {
   readonly configPath: string | undefined;
   /** Ancestor steps walked from `cwd` to `projectRoot`. 0 when cwd is the root. */
   readonly walkedUp: number;
-  /** `'project'` iff a config was discovered; `'none'` otherwise. */
-  readonly scope: 'project' | 'none';
+  /**
+   * Project scope for this invocation.
+   *
+   * - `project`: a real config file was discovered or supplied.
+   * - `ephemeral`: the CLI synthesized a no-init config document.
+   * - `none`: no project context is available.
+   */
+  readonly scope: ProjectContextScope;
+  /** Synthetic config document used for no-init ephemeral runs. */
+  readonly ephemeralConfigDocument?: unknown;
 }
 
 /** Input to {@link resolveProjectContext}: cwd plus optional overrides controlling discovery. */
@@ -122,6 +132,30 @@ export function resolveProjectContext(input: ResolveProjectContextInput): Projec
     walkedUp: 0,
     scope: 'none',
   };
+}
+
+/** True only for initialized projects backed by a real config file. */
+export function isInitializedProjectContext(
+  project: ProjectContext | undefined,
+): project is ProjectContext & { readonly scope: 'project'; readonly configPath: string } {
+  return project?.scope === 'project' && project.configPath !== undefined;
+}
+
+/** True only for no-init project contexts backed by a synthetic document. */
+export function isEphemeralProjectContext(
+  project: ProjectContext | undefined,
+): project is ProjectContext & {
+  readonly scope: 'ephemeral';
+  readonly ephemeralConfigDocument: unknown;
+} {
+  return project?.scope === 'ephemeral' && project.ephemeralConfigDocument !== undefined;
+}
+
+/** True when the context has a runtime storage root. */
+export function hasRuntimeProjectContext(
+  project: ProjectContext | undefined,
+): project is ProjectContext & { readonly scope: 'project' | 'ephemeral' } {
+  return project?.scope === 'project' || project?.scope === 'ephemeral';
 }
 
 /**

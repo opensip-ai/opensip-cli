@@ -41,9 +41,10 @@
  * change to the layout is a single-file edit.
  */
 
+import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, normalize, relative, sep } from 'node:path';
+import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 
 import type { BundledToolShortId } from '../tools/ids.js';
 
@@ -51,8 +52,28 @@ import type { BundledToolShortId } from '../tools/ids.js';
 // PROJECT PATHS
 // =============================================================================
 
+/** Host-owned runtime-state subtree, whether project-local or ephemeral. */
+export interface RuntimePaths {
+  /** Root runtime directory. */
+  readonly runtimeDir: string;
+  /** Runtime sessions directory. */
+  readonly sessionsDir: string;
+  /** Runtime reports directory. */
+  readonly reportsDir: string;
+  /** Runtime logs directory. */
+  readonly logsDir: string;
+  /** Host-owned raw scanner artifact store. */
+  readonly artifactsDir: string;
+  /** Per-tool artifact directory. */
+  readonly artifactDir: (tool: string) => string;
+  /** Runtime cache directory. */
+  readonly cacheDir: string;
+  /** Graph-tool catalog cache root. */
+  readonly graphCacheDir: string;
+}
+
 /** Per-project paths produced by `resolveProjectPaths(projectDir)`. */
-export interface ProjectPaths {
+export interface ProjectPaths extends RuntimePaths {
   /** Absolute path to the project root (== input). */
   readonly projectDir: string;
   /** <project>/opensip-cli.config.yml */
@@ -73,33 +94,16 @@ export interface ProjectPaths {
    * (ADR-0009 corollary 1); the layout's `userSubdirs` supply the kinds.
    */
   readonly userPluginDir: (domain: string, kind: string) => string;
-  /** <project>/opensip-cli/.runtime — gitignored runtime state. */
-  readonly runtimeDir: string;
-  /** <project>/opensip-cli/.runtime/sessions */
-  readonly sessionsDir: string;
-  /** <project>/opensip-cli/.runtime/reports */
-  readonly reportsDir: string;
-  /** <project>/opensip-cli/.runtime/logs */
-  readonly logsDir: string;
-  /**
-   * `<project>/opensip-cli/.runtime/artifacts` — host-owned raw scanner artifact
-   * store. The host owns every write into it (SARIF, baselines, scanner output)
-   * through the `writeArtifact` seam; tool engines never write here directly.
-   */
-  readonly artifactsDir: string;
-  /**
-   * `<artifactsDir>/<tool>` — per-tool artifact subdir. The substrate composes
-   * the per-run segment underneath (`<artifactDir(tool)>/<runId>/<name>`); the
-   * run segment is substrate-owned, so the immediate children of this dir are the
-   * per-run dirs host-side retention prunes (ADR-0090 Phase-0 decision 1).
-   */
-  readonly artifactDir: (tool: string) => string;
-  /** <project>/opensip-cli/.runtime/cache */
-  readonly cacheDir: string;
-  /** <project>/opensip-cli/.runtime/cache/graph — graph-tool catalog cache root. */
-  readonly graphCacheDir: string;
   /** <project>/opensip-cli/.runtime/plugins/<domain> — npm-installed plugins. */
   readonly pluginsDir: (domain: string) => string;
+}
+
+/** Runtime paths for a no-init ephemeral project. */
+export interface EphemeralProjectPaths extends RuntimePaths {
+  /** Absolute project root whose no-init runtime this cache entry belongs to. */
+  readonly projectDir: string;
+  /** Stable hash key used in the user cache path. */
+  readonly cacheKey: string;
 }
 
 /**
@@ -118,19 +122,11 @@ export interface ProjectPaths {
  */
 export type PathDomain = BundledToolShortId;
 
-/** Resolve the project path layout for a given project directory. */
-export function resolveProjectPaths(projectDir: string): ProjectPaths {
-  const userSourceDir = join(projectDir, 'opensip-cli');
-  const runtimeDir = join(userSourceDir, '.runtime');
+function buildRuntimePaths(runtimeDir: string): RuntimePaths {
   const cacheDir = join(runtimeDir, 'cache');
   const graphCacheDir = join(cacheDir, 'graph');
   const artifactsDir = join(runtimeDir, 'artifacts');
   return {
-    projectDir,
-    configFile: join(projectDir, 'opensip-cli.config.yml'),
-    userSourceDir,
-    authoredToolsDir: join(userSourceDir, 'tools'),
-    userPluginDir: (domain, kind) => join(userSourceDir, domain, kind),
     runtimeDir,
     sessionsDir: join(runtimeDir, 'sessions'),
     reportsDir: join(runtimeDir, 'reports'),
@@ -139,7 +135,21 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
     artifactDir: (tool) => join(artifactsDir, tool),
     cacheDir,
     graphCacheDir,
-    pluginsDir: (domain) => join(runtimeDir, 'plugins', domain),
+  };
+}
+
+/** Resolve the project path layout for a given project directory. */
+export function resolveProjectPaths(projectDir: string): ProjectPaths {
+  const userSourceDir = join(projectDir, 'opensip-cli');
+  const runtimePaths = buildRuntimePaths(join(userSourceDir, '.runtime'));
+  return {
+    ...runtimePaths,
+    projectDir,
+    configFile: join(projectDir, 'opensip-cli.config.yml'),
+    userSourceDir,
+    authoredToolsDir: join(userSourceDir, 'tools'),
+    userPluginDir: (domain, kind) => join(userSourceDir, domain, kind),
+    pluginsDir: (domain) => join(runtimePaths.runtimeDir, 'plugins', domain),
   };
 }
 
@@ -153,6 +163,10 @@ export interface UserPaths {
   readonly userHomeDir: string;
   /** ~/.opensip-cli/config.yml — cloud API key + per-user defaults. */
   readonly configFile: string;
+  /** ~/.opensip-cli/cache — user-level tool-generated cache state. */
+  readonly cacheDir: string;
+  /** ~/.opensip-cli/cache/ephemeral — no-init per-project runtime roots. */
+  readonly ephemeralProjectsDir: string;
   /**
    * `~/.opensip-cli/plugins/<domain>` — user-global (cross-project)
    * npm-installed plugins. Used today by the `tool` domain: a Tool plugin
@@ -183,12 +197,40 @@ export interface UserPaths {
 /** Resolve the user-level path layout. */
 export function resolveUserPaths(): UserPaths {
   const userHomeDir = join(homedir(), '.opensip-cli');
+  const cacheDir = join(userHomeDir, 'cache');
   return {
     userHomeDir,
     configFile: join(userHomeDir, 'config.yml'),
+    cacheDir,
+    ephemeralProjectsDir: join(cacheDir, 'ephemeral'),
     updateStateFile: join(userHomeDir, 'update-state.json'),
     authoredToolsDir: join(userHomeDir, 'tools'),
     pluginsDir: (domain) => join(userHomeDir, 'plugins', domain),
+  };
+}
+
+function canonicalProjectDir(projectDir: string): string {
+  const absolute = resolve(projectDir);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
+}
+
+/** Stable user-cache key for a project's no-init runtime directory. */
+export function ephemeralProjectCacheKey(projectDir: string): string {
+  return createHash('sha256').update(canonicalProjectDir(projectDir)).digest('hex').slice(0, 24);
+}
+
+/** Resolve the no-init runtime path layout for a project directory. */
+export function resolveEphemeralProjectPaths(projectDir: string): EphemeralProjectPaths {
+  const projectDirAbsolute = resolve(projectDir);
+  const cacheKey = ephemeralProjectCacheKey(projectDirAbsolute);
+  return {
+    ...buildRuntimePaths(join(resolveUserPaths().ephemeralProjectsDir, cacheKey)),
+    projectDir: projectDirAbsolute,
+    cacheKey,
   };
 }
 

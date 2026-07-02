@@ -18,7 +18,7 @@
  * hook stays focused on orchestration.
  */
 
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 
 import { resolveApiKey, resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
@@ -195,7 +195,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     apiKey,
     cloud: effectiveCloud,
     noCloud,
-    cacheDir: join(resolveUserPaths().userHomeDir, 'cache'), // note: resolveUserPaths is from core
+    cacheDir: resolveUserPaths().cacheDir,
   });
 
   // B2: assemble the cloud-aware RunCorrelation here — the one place the
@@ -223,6 +223,8 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // (coarse, no Zod import); the deep Zod pass runs in the worker.
     provenance,
     configPath: project.scope === 'project' ? project.configPath : undefined,
+    rawDocumentOverride:
+      project.scope === 'ephemeral' ? project.ephemeralConfigDocument : undefined,
     env: process.env,
     bootstrapDiagnostics: scopeBootstrapDiagnostics,
   });
@@ -415,7 +417,8 @@ function configDocumentSlot(
   project: { readonly scope: string; readonly configPath: string | undefined },
   configDocument: unknown,
 ): { configDocument?: Record<string, unknown> } {
-  return project.scope === 'project' && project.configPath !== undefined
+  return (project.scope === 'project' && project.configPath !== undefined) ||
+    project.scope === 'ephemeral'
     ? { configDocument: configDocument as Record<string, unknown> }
     : {};
 }

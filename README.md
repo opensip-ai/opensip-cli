@@ -54,12 +54,19 @@ Run OpenSIP in your project:
 
 ```bash
 cd your-project
+opensip fit       # first look; no config required for supported languages
+opensip graph     # optional: inspect graph analysis before scaffolding
 opensip init
 opensip fit
 opensip graph
 opensip yagni
 opensip report
 ```
+
+`fit`, `graph`, `graph impact`, and `suite run audit` can run before `init`
+using an auto-detected in-memory config. Run `opensip init` when you are ready
+to save the config, commit custom checks or recipes, and keep baselines in the
+project runtime.
 
 Want a smoke test before pointing it at real checks?
 

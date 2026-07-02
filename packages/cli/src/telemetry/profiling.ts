@@ -23,7 +23,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector';
 import { join } from 'node:path';
 
-import { logger, type RunScope } from '@opensip-cli/core';
+import { logger, resolveEphemeralProjectPaths, type RunScope } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
 
@@ -94,6 +94,17 @@ function profilingStateFor(scope: RunScope | undefined): ProfilingState {
   const created = createProfilingState();
   scope.telemetry.profiling = created;
   return created;
+}
+
+function profilingBaseDir(scope: RunScope | undefined): string {
+  const project = scope?.projectContext;
+  if (project?.scope === 'project') {
+    return join(project.projectRoot, 'opensip-cli/.runtime/profiles');
+  }
+  if (project?.scope === 'ephemeral') {
+    return join(resolveEphemeralProjectPaths(project.projectRoot).runtimeDir, 'profiles');
+  }
+  return join(process.cwd(), 'opensip-cli/.runtime/profiles');
 }
 
 const fallbackProfilingState = createProfilingState();
@@ -170,11 +181,7 @@ export function startProfiling(scope?: RunScope, command?: string): void {
         const safeCommand = (command ?? 'cli').replace(/[^a-z0-9_-]/gi, '_');
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
 
-        // Place profiles under project logs dir if available, else cwd/.runtime/profiles
-        const baseDir =
-          scope?.projectContext?.scope === 'project'
-            ? join(scope.projectContext.projectRoot, 'opensip-cli/.runtime/profiles')
-            : join(process.cwd(), 'opensip-cli/.runtime/profiles');
+        const baseDir = profilingBaseDir(scope);
 
         mkdirSync(baseDir, { recursive: true });
 

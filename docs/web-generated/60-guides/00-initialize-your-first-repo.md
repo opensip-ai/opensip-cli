@@ -40,17 +40,29 @@ Language detection is marker-based:
 | Language | Marker |
 |---|---|
 | TypeScript / JavaScript | `tsconfig.json`, or `package.json` alone |
-| Python | `pyproject.toml`, `setup.py` |
+| Python | `pyproject.toml`, `setup.py`, `requirements.txt` |
 | Rust | `Cargo.toml` |
 | Go | `go.mod` |
 | Java | `pom.xml`, `build.gradle` |
-| C / C++ | `CMakeLists.txt` |
+| C / C++ | `CMakeLists.txt`, `Makefile` |
 
 If your repo has multiple markers, either let `init` scaffold for all detected languages or pass the list explicitly:
 
 ```bash
 opensip init --language typescript,python
 ```
+
+Before you scaffold, the built-in analysis commands can still run:
+
+```bash
+opensip fit
+opensip graph --list-files
+opensip suite run audit --changed
+```
+
+In that no-init mode, the CLI synthesizes a validated in-memory config from the
+same language markers and writes no project files. Runtime state goes to your
+user cache until you adopt the project with `opensip init`.
 
 ## 3. Scaffold
 
@@ -72,6 +84,9 @@ opensip-cli/
 ```
 
 It also adds `opensip-cli/.runtime/` to `.gitignore`. Commit the config and the authored content under `opensip-cli/`. Do not commit `.runtime/`; it holds local sessions, reports, logs, caches, baselines, and the SQLite datastore.
+
+If you ran a no-init command first, `init` moves that rebuildable runtime state
+into `opensip-cli/.runtime/` when the project runtime does not already exist.
 
 `graph` does not scaffold a directory because graph rules and adapters are package-level extensions, not project-local files created by `init`.
 

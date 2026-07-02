@@ -688,6 +688,18 @@ opensip init --keep
 opensip init --remove
 ```
 
+### No-init first runs
+
+`fit`, `graph`, `graph impact`, and the built-in `suite run audit` can run from
+a supported project before `opensip init`. The CLI synthesizes an in-memory
+config from language markers, validates it through the normal config schema, and
+stores rebuildable runtime state under `~/.opensip-cli/cache/ephemeral/`.
+
+No project files are written in no-init mode. Human output includes an adoption
+hint; JSON, help, and SARIF-oriented output stay quiet. Run `opensip init` when
+you want to persist the config, create example files, refresh agent guidance, and
+move the no-init runtime into `<project>/opensip-cli/.runtime/`.
+
 Detects the project's primary language(s) from filesystem markers and writes one
 directory tree per **registered tool** — each tool owns its own example files and
 config block; `init` itself hardcodes no tool. With the bundled fitness +
@@ -757,10 +769,10 @@ Detection markers:
 | Marker | Language |
 |---|---|
 | `Cargo.toml` | `rust` |
-| `pyproject.toml`, `setup.py` | `python` |
+| `pyproject.toml`, `setup.py`, `requirements.txt` | `python` |
 | `go.mod` | `go` |
 | `pom.xml`, `build.gradle` | `java` |
-| `CMakeLists.txt` | `cpp` |
+| `CMakeLists.txt`, `Makefile` | `cpp` |
 | `tsconfig.json` (or `package.json` alone with no other marker) | `typescript` |
 
 Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to specify `--language`.

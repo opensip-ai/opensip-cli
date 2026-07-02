@@ -137,6 +137,30 @@ describe('planPreActionBootstrap', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
+  it('synthesizes an ephemeral project for eligible no-init commands with markers', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-plan-'));
+    writeFileSync(join(tmp, 'package.json'), '{"type":"module"}\n', 'utf8');
+    writeFileSync(join(tmp, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: tmp,
+      cwdExplicit: false,
+      runId: 'RUN_test',
+      commandName: 'fit',
+      commandPath: 'fit',
+      commandScopes: COMMAND_SCOPES,
+    });
+    expect(plan.project.scope).toBe('ephemeral');
+    expect(plan.project.configPath).toBeUndefined();
+    expect(plan.project.ephemeralConfigDocument).toMatchObject({
+      schemaVersion: expect.any(Number),
+      targets: expect.objectContaining({ 'typescript-source': expect.any(Object) }),
+    });
+    expect(plan.runLoggerOptions.logDir).toContain('.opensip-cli');
+    expect((plan.opts.projectContext as { scope: string }).scope).toBe('ephemeral');
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
   it('agnostic command pass-through when no project', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'opensip-plan-'));
     const plan = planPreActionBootstrap({

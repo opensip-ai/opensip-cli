@@ -125,7 +125,11 @@ The handler resolves two things:
 1. **Project paths.** `resolveProjectPaths(cwd)` returns the canonical layout: where the config file is, where checks live, where the runtime dir is, where the gate baseline default lives. Every other component reads paths through this resolver — there's no `path.join('opensip-cli', '.runtime', ...)` scattered through the codebase.
 2. **The project config.** Read from `<project>/opensip-cli.config.yml` (or the path passed via `--config`). The config carries `targets:`, `plugins:`, `globalExcludes:`, recipe overrides, and reporting defaults. See [`70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/) for the full schema.
 
-If the config is missing, the CLI exits 2 with a pointer to `opensip init`. If the config is malformed, the CLI exits 2 with the validation error.
+If the config is missing, first-run eligible commands such as `fit` synthesize a
+validated in-memory config from language markers and use user-cache runtime
+state. If marker detection cannot identify a supported language, the CLI exits 2
+with a pointer to `opensip init`. If a config file is present but malformed, the
+CLI exits 2 with the validation error.
 
 > **Where the example lands:** `acme-api/opensip-cli.config.yml` declares two languages (`typescript`, `python`), one custom check directory, and a `quick-smoke` recipe pointing at universal checks only. The default invocation runs *every* check, not the `quick-smoke` set.
 

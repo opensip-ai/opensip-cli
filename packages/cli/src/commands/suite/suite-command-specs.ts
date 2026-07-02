@@ -69,6 +69,19 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
         _args?: readonly string[];
       };
       const name = String(opts._args?.[0] ?? '');
+      if (
+        currentScope()?.projectContext?.scope === 'ephemeral' &&
+        name !== BUILT_IN_AUDIT_SUITE_NAME
+      ) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return {
+          type: 'error',
+          message:
+            `suite run without opensip init only supports the built-in ` +
+            `'${BUILT_IN_AUDIT_SUITE_NAME}' suite.`,
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+        };
+      }
       const resolved = resolveSuite(name, configuredSuites());
       if (resolved === undefined) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);

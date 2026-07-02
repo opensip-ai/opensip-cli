@@ -7,8 +7,18 @@
  * runtime state subtree.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, join } from 'node:path';
+
+import { resolveEphemeralProjectPaths } from '@opensip-cli/core';
 
 import { ensureOpenSipAgentGuidance } from './agents-md.js';
 import { generateConfig } from './config-templates.js';
@@ -135,6 +145,21 @@ function agentsMdWasCreated(agentGuidance: ReturnType<typeof ensureOpenSipAgentG
   );
 }
 
+function migrateEphemeralRuntime(paths: ProjectPaths): void {
+  const source = resolveEphemeralProjectPaths(paths.projectDir).runtimeDir;
+  if (!existsSync(source) || existsSync(paths.runtimeDir)) return;
+
+  mkdirSync(paths.userSourceDir, { recursive: true });
+  try {
+    renameSync(source, paths.runtimeDir);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'EXDEV') throw error;
+    cpSync(source, paths.runtimeDir, { recursive: true, errorOnExist: true });
+    rmSync(source, { recursive: true, force: true });
+  }
+}
+
 export function runRefresh(
   inputs: RefreshRunInputs,
   baseResult: Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>,
@@ -191,6 +216,7 @@ export function runScaffold(
 
   const gitignoreUpdated = ensureGitignore(cwd);
   const agentGuidance = ensureOpenSipAgentGuidance(cwd, { toolScaffolds });
+  migrateEphemeralRuntime(paths);
 
   return {
     ...baseResult,

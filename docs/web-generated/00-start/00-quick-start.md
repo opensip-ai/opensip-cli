@@ -21,7 +21,8 @@ From a clean shell to a passing fitness run. The point of this page is to give y
 
 > **What you'll have after this page:**
 > - The `opensip-cli` CLI installed.
-> - An `opensip-cli.config.yml` and an `opensip-cli/` directory in a project of your choice.
+> - A first analysis run, either before initialization or after scaffolding.
+> - An `opensip-cli.config.yml` and an `opensip-cli/` directory when you choose to initialize.
 > - One passing `fit` run, plus an optional `sim` smoke test.
 > - Enough mechanical context that [`./01-what-is-opensip-cli.md`](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
 
@@ -65,15 +66,24 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 # 2. Enter your project
 cd your-project
 
-# 3. Scaffold config + example check/scenario (language auto-detected)
+# 3. Try the built-in checks before writing project files
+opensip fit
+opensip graph --list-files
+
+# 4. Scaffold config + example check/scenario (language auto-detected)
 opensip init
 
-# 4. Run the fitness smoke test
+# 5. Run the fitness smoke test
 opensip fit --recipe example
 
-# 5. Optional: run the scaffolded simulation smoke test
+# 6. Optional: run the scaffolded simulation smoke test
 opensip sim --recipe example
 ```
+
+`fit`, `graph`, `graph impact`, and `suite run audit` work in supported projects
+before `init`. The CLI uses a validated in-memory config and stores rebuildable
+runtime state in your user cache. `init` makes the setup explicit by writing the
+config, examples, `.gitignore`, and agent guidance into the project.
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
 

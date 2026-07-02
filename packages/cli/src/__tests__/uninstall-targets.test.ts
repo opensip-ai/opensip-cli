@@ -7,9 +7,15 @@
  * variants are reachable without touching the filesystem.
  */
 
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { resolveEphemeralProjectPaths } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import {
+  collectTargets,
   printProjectDefault,
   printProjectPurge,
   printUserModeTargets,
@@ -102,6 +108,31 @@ describe('printProjectDefault', () => {
     expect(out).toContain('fit/checks/ (3 files)'); // plural
     expect(out).toContain('notes/ (1 file)'); // singular
     expect(out).toContain('--purge');
+  });
+});
+
+describe('collectTargets', () => {
+  it('includes no-init ephemeral runtime state in project default cleanup', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-uninstall-targets-'));
+    const oldHome = process.env.HOME;
+    process.env.HOME = join(tmp, 'home');
+    try {
+      const projectDir = join(tmp, 'project');
+      mkdirSync(projectDir, { recursive: true });
+      const ephemeralRuntime = resolveEphemeralProjectPaths(projectDir).runtimeDir;
+      mkdirSync(join(ephemeralRuntime, 'logs'), { recursive: true });
+      writeFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), '{}\n', 'utf8');
+
+      const targets = collectTargets('project', join(tmp, 'unused-user-root'), projectDir);
+
+      expect(targets.some((entry) => entry.path === ephemeralRuntime)).toBe(true);
+      expect(targets.find((entry) => entry.path === ephemeralRuntime)?.bucket).toBe('runtime');
+      expect(existsSync(join(projectDir, 'opensip-cli'))).toBe(false);
+    } finally {
+      if (oldHome === undefined) delete process.env.HOME;
+      else process.env.HOME = oldHome;
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 

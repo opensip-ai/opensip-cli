@@ -21,6 +21,7 @@ import {
   SystemError,
   currentScope,
   logger as defaultLogger,
+  resolveEphemeralProjectPaths,
   resolveProjectPaths,
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
@@ -89,8 +90,8 @@ export interface DatastoreThunk {
  * commands reach the same instance.
  *
  * @throws {SystemError} (`SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT`) When the
- *   returned thunk is invoked outside a project scope — callers must check
- *   `project.scope === 'project'` first or handle the throw as a "no project
+ *   returned thunk is invoked outside a runtime-backed project scope — callers
+ *   must check the command scope first or handle the throw as a "no project
  *   found" error.
  */
 export function buildDatastoreThunk(
@@ -101,14 +102,18 @@ export function buildDatastoreThunk(
   let cached: DataStore | undefined;
   const thunk = (() => {
     if (cached) return cached;
-    if (project.scope !== 'project') {
+    if (project.scope !== 'project' && project.scope !== 'ephemeral') {
       throw new SystemError(
         'Datastore accessed in a non-project context. The action body should have ' +
           'errored earlier with "No OpenSIP CLI project found" before touching this.',
         { code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT' },
       );
     }
-    const path = `${resolveProjectPaths(project.projectRoot).runtimeDir}/datastore.sqlite`;
+    const runtime =
+      project.scope === 'ephemeral'
+        ? resolveEphemeralProjectPaths(project.projectRoot)
+        : resolveProjectPaths(project.projectRoot);
+    const path = `${runtime.runtimeDir}/datastore.sqlite`;
     cached = DataStoreFactory.open({
       backend: 'sqlite',
       path,

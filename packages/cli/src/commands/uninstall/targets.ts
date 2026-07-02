@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveProjectPaths } from '@opensip-cli/core';
+import { resolveEphemeralProjectPaths, resolveProjectPaths } from '@opensip-cli/core';
 
 import { formatBytes } from '../../format-bytes.js';
 
@@ -115,12 +115,21 @@ export function collectTargets(
 
 function collectProjectTargets(projectDir: string): Target[] {
   const paths = resolveProjectPaths(projectDir);
+  const ephemeralPaths = resolveEphemeralProjectPaths(projectDir);
   const targets: Target[] = [];
   if (existsSync(paths.runtimeDir)) {
     targets.push({
       path: paths.runtimeDir,
       kind: 'dir',
       sizeBytes: dirSize(paths.runtimeDir),
+      bucket: 'runtime',
+    });
+  }
+  if (existsSync(ephemeralPaths.runtimeDir)) {
+    targets.push({
+      path: ephemeralPaths.runtimeDir,
+      kind: 'dir',
+      sizeBytes: dirSize(ephemeralPaths.runtimeDir),
       bucket: 'runtime',
     });
   }

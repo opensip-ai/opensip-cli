@@ -21,6 +21,7 @@ import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
 import { buildPerRunScope } from './build-per-run-scope.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
+import { shouldRenderNoInitAdoptionHint } from './no-init-eligibility.js';
 import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
 import { PRE_ACTION_PHASES } from './pre-action-bootstrap-phases.js';
 import {
@@ -162,6 +163,19 @@ export async function executePostBailoutBootstrap(
 
   record(PRE_ACTION_PHASES.enterScope);
   preActionTimer.measure(PRE_ACTION_PHASES.enterScope, () => {
+    if (shouldRenderNoInitAdoptionHint({ project: plan.project, opts: plan.opts })) {
+      scope.bootstrapDiagnostics.record({
+        severity: 'warning',
+        code: 'OPENSIP_NO_INIT_EPHEMERAL_PROJECT',
+        category: 'configuration',
+        message: 'Running with auto-detected no-init configuration.',
+        impact:
+          'Project-local plugins, custom recipes, and committed baselines are unavailable until the project is initialized.',
+        action: "Run 'opensip init' to save this configuration and track baselines across runs.",
+        provenance: { toolId: toolName },
+      });
+    }
+
     d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
 
     if (

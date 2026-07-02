@@ -39,10 +39,16 @@ const MARKERS: readonly DetectionMarker[] = [
     file: 'setup.py',
     description: 'Python project (setup.py)',
   },
+  {
+    language: 'python',
+    file: 'requirements.txt',
+    description: 'Python project (requirements.txt)',
+  },
   { language: 'go', file: 'go.mod', description: 'Go module' },
   { language: 'java', file: 'pom.xml', description: 'Maven project' },
   { language: 'java', file: 'build.gradle', description: 'Gradle project' },
   { language: 'cpp', file: 'CMakeLists.txt', description: 'CMake project' },
+  { language: 'cpp', file: 'Makefile', description: 'Make project' },
 ];
 
 /**

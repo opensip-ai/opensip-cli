@@ -12,6 +12,7 @@ import { existsSync } from 'node:fs';
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   resolveProjectContext,
+  resolveEphemeralProjectPaths,
   resolveProjectPaths,
   type LoggerOptions,
   type ProjectContext,
@@ -19,6 +20,8 @@ import {
 
 import { BootstrapError } from './bootstrap-error.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
+import { synthesizeNoInitConfigDocument } from './no-init-config.js';
+import { isNoInitEligibleCommand } from './no-init-eligibility.js';
 import { PRE_ACTION_PHASES } from './pre-action-bootstrap-phases.js';
 import {
   checkNoProjectAndBailout,
@@ -53,6 +56,16 @@ export interface PreActionBootstrapPlan {
   /** Per-run logger options computed after bailouts (ADR-0053). */
   readonly runLoggerOptions: LoggerOptions;
   readonly completedThrough: typeof PRE_ACTION_PHASES.bailoutWindow;
+}
+
+function logDirForProject(project: ProjectContext): { readonly logDir?: string } {
+  if (project.scope === 'project' && existsSync(project.projectRoot)) {
+    return { logDir: resolveProjectPaths(project.projectRoot).logsDir };
+  }
+  if (project.scope === 'ephemeral' && existsSync(project.projectRoot)) {
+    return { logDir: resolveEphemeralProjectPaths(project.projectRoot).logsDir };
+  }
+  return {};
 }
 
 /**
@@ -94,6 +107,21 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
     });
   }
 
+  if (
+    project.scope === 'none' &&
+    explicitConfigPath === undefined &&
+    isNoInitEligibleCommand(commandPath)
+  ) {
+    const synthesized = synthesizeNoInitConfigDocument(project.projectRoot);
+    if (synthesized !== undefined) {
+      project = {
+        ...project,
+        scope: 'ephemeral',
+        ephemeralConfigDocument: synthesized.document,
+      };
+    }
+  }
+
   opts.projectContext = project;
   opts.cwdExplicit = cwdExplicit;
 
@@ -105,9 +133,7 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
     silent: true,
     debugMode: Boolean(opts.debug),
     runId,
-    ...(project.scope === 'project' && existsSync(project.projectRoot)
-      ? { logDir: resolveProjectPaths(project.projectRoot).logsDir }
-      : {}),
+    ...logDirForProject(project),
   };
 
   return {

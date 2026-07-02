@@ -96,13 +96,22 @@ export function composeAndValidateToolConfig(args: {
   readonly manifests?: readonly ToolPluginManifest[];
   readonly provenance?: readonly ToolProvenance[];
   readonly configPath: string | undefined;
+  readonly rawDocumentOverride?: unknown;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
 }): {
   readonly config: ResolvedToolConfig | undefined;
   readonly document: unknown;
 } {
-  const { tools, configPath, env, manifests = [], provenance = [], bootstrapDiagnostics } = args;
+  const {
+    tools,
+    configPath,
+    rawDocumentOverride,
+    env,
+    manifests = [],
+    provenance = [],
+    bootstrapDiagnostics,
+  } = args;
   // ADR-0054 M4-E: provenance-aware fold — bundled tools' Zod is composed
   // host-side (trusted), external tools validate from their serializable
   // manifest descriptor (coarse, NO Zod import); the deep Zod pass runs in the
@@ -117,7 +126,7 @@ export function composeAndValidateToolConfig(args: {
   // document-level blocks (cli/dashboard/schemaVersion) only need composing when
   // there is a tool dispatch to validate the document for; the real CLI always
   // registers fit/graph/sim, so they are always composed in practice.
-  if (!hasToolNamespaces) return { config: undefined, document: {} };
+  if (!hasToolNamespaces) return { config: undefined, document: rawDocumentOverride ?? {} };
 
   // When a configPath was resolved by the project context (i.e. a real
   // opensip-cli.config.yml), read it *strictly*.
@@ -126,7 +135,8 @@ export function composeAndValidateToolConfig(args: {
   // When no configPath, fall back to defaults only (permissive discovery
   // paths elsewhere still use the non-throwing reader).
   const raw: unknown =
-    configPath === undefined ? {} : readYamlFileOrThrow(configPath, { loader: 'project-config' });
+    rawDocumentOverride ??
+    (configPath === undefined ? {} : readYamlFileOrThrow(configPath, { loader: 'project-config' }));
 
   const schema = composeConfigSchema(declarations);
   // STRICT gate: a typo in any tool namespace throws ConfigurationError here,

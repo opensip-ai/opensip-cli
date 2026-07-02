@@ -144,6 +144,7 @@ function withSuiteScope<T>(
   fn: () => Promise<T> | T,
   suites?: Record<string, unknown>,
   toolsInput: readonly Tool[] = auditTools(),
+  projectContext?: Record<string, unknown>,
 ): Promise<T> {
   const resolvedSuites = suites ?? {
     security: {
@@ -159,9 +160,10 @@ function withSuiteScope<T>(
   });
   Object.assign(scope, {
     configDocument: { suites: resolvedSuites },
-    projectContext: {
+    projectContext: projectContext ?? {
       projectRoot: tmp,
       configPath: join(tmp, 'opensip-cli.config.yml'),
+      scope: 'project',
     },
   });
   return runWithScope(scope, fn);
@@ -232,6 +234,32 @@ describe('buildSuiteGroupLeaves', () => {
         }),
       }),
     );
+  });
+
+  it('rejects configured suites in ephemeral no-init scope', async () => {
+    const host = makeDispatchHostCtx();
+    const ctx = hostCtx(host.ctx);
+    const [runSpec] = buildSuiteGroupLeaves(ctx);
+
+    const result = await withSuiteScope(
+      () => runSpec.handler?.({ _args: ['security'] }, ctx),
+      undefined,
+      auditTools(),
+      {
+        projectRoot: tmp,
+        configPath: undefined,
+        scope: 'ephemeral',
+        ephemeralConfigDocument: { targets: {} },
+      },
+    );
+
+    expect(result).toEqual({
+      type: 'error',
+      message: "suite run without opensip init only supports the built-in 'audit' suite.",
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    });
+    expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(runSuiteMock).not.toHaveBeenCalled();
   });
 
   it('lets configured audit override the built-in suite', async () => {

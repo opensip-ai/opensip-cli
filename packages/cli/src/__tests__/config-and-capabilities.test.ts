@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   CapabilityRegistry,
+  CLI_SUPPORTED_SCHEMA_VERSION,
   ConfigurationError,
   ToolRegistry,
   type CapabilityRegistrar,
@@ -174,6 +175,30 @@ describe('composeAndValidateToolConfig', () => {
       env: {},
     });
     expect(result.config?.fitness).toEqual({ failOnErrors: 3 });
+  });
+
+  it('validates an in-memory config document override through the composed schema', () => {
+    const result = composeAndValidateToolConfig({
+      tools: registryWith([fitnessTool]),
+      configPath: undefined,
+      rawDocumentOverride: {
+        schemaVersion: CLI_SUPPORTED_SCHEMA_VERSION,
+        targets: {
+          app: {
+            description: 'Application source',
+            languages: ['typescript'],
+            include: ['src/**/*.ts'],
+          },
+        },
+        fitness: { failOnErrors: 4 },
+      },
+      env: {},
+    });
+
+    expect(result.config?.fitness).toEqual({ failOnErrors: 4 });
+    expect(result.document).toMatchObject({
+      targets: { app: { include: ['src/**/*.ts'] } },
+    });
   });
 
   // Tool identity single source: config namespace aligns with identity.name (`fitness`).

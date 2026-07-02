@@ -210,6 +210,38 @@ describe('CLI e2e', () => {
       }
     });
 
+    it('runs with synthesized config in a TypeScript project before init', () => {
+      const tempDir = join(
+        tmpdir(),
+        `opensip-e2e-noinit-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
+      mkdirSync(join(tempDir, 'src'), { recursive: true });
+      try {
+        writeFileSync(join(tempDir, 'package.json'), '{"type":"module"}\n', 'utf8');
+        writeFileSync(join(tempDir, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+        writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1;\nconsole.log(x);\n');
+
+        const fakeHome = join(tempDir, '.home');
+        const { stdout, stderr, exitCode } = cli.run(
+          ['fit', '--json', '--check', 'no-console-log'],
+          {
+            cwd: tempDir,
+            env: { HOME: fakeHome },
+          },
+        );
+        expect([0, 1]).toContain(exitCode);
+        const outcome = JSON.parse(stdout);
+        expect(outcome.kind).toBe('fit.run');
+        expect(outcome.status).toBe('ok');
+        expect(outcome.envelope.verdict.summary.total).toBe(1);
+        expect(stderr).not.toContain('opensip init');
+        expect(existsSync(join(tempDir, 'opensip-cli'))).toBe(false);
+        expect(existsSync(join(fakeHome, '.opensip-cli', 'cache', 'ephemeral'))).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
     it('respects --config flag with an explicit path', () => {
       const tempDir = join(
         tmpdir(),
@@ -262,8 +294,11 @@ describe('CLI e2e', () => {
             cwd: tempDir,
           },
         );
-        expect(exitCode).not.toBe(0);
-        expect(`${stdout}\n${stderr}`).toContain('No opensip-cli.config.yml found');
+        expect([0, 1]).toContain(exitCode);
+        const outcome = JSON.parse(stdout);
+        expect(outcome.kind).toBe('fit.run');
+        expect(outcome.status).toBe('ok');
+        expect(`${stdout}\n${stderr}`).not.toContain('.config/opensip-cli.config.yml');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }

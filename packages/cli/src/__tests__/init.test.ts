@@ -7,7 +7,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { resolveToolHooks } from '@opensip-cli/core';
+import {
+  resolveEphemeralProjectPaths,
+  resolveProjectPaths,
+  resolveToolHooks,
+} from '@opensip-cli/core';
 import { fitnessTool } from '@opensip-cli/fitness';
 import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -76,6 +80,11 @@ describe('detectLanguages', () => {
     expect(detectLanguages(testDir)).toEqual(['python']);
   });
 
+  it('detects Python via requirements.txt', () => {
+    writeFileSync(join(testDir, 'requirements.txt'), 'pytest\n');
+    expect(detectLanguages(testDir)).toEqual(['python']);
+  });
+
   it('detects Go via go.mod', () => {
     writeFileSync(join(testDir, 'go.mod'), 'module x');
     expect(detectLanguages(testDir)).toEqual(['go']);
@@ -103,6 +112,11 @@ describe('detectLanguages', () => {
     writeFileSync(join(testDir, 'tsconfig.json'), '{}');
     const detected = detectLanguages(testDir).sort();
     expect(detected).toEqual(['rust', 'typescript']);
+  });
+
+  it('detects C/C++ via Makefile', () => {
+    writeFileSync(join(testDir, 'Makefile'), 'all:\n\tcc main.c\n');
+    expect(detectLanguages(testDir)).toEqual(['cpp']);
   });
 
   it('returns empty when no markers present', () => {
@@ -193,6 +207,50 @@ describe('executeInit (single language)', () => {
     expect(result.languages).toEqual(['typescript']);
     const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('typescript-source:');
+  });
+
+  it('moves no-init runtime state into the project runtime during adoption', () => {
+    const oldHome = process.env.HOME;
+    process.env.HOME = join(testDir, '.home');
+    try {
+      writeFileSync(join(testDir, 'tsconfig.json'), '{}');
+      const ephemeralRuntime = resolveEphemeralProjectPaths(testDir).runtimeDir;
+      mkdirSync(join(ephemeralRuntime, 'logs'), { recursive: true });
+      writeFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), '{}\n', 'utf8');
+
+      const result = executeInit(makeArgs());
+      const projectRuntime = resolveProjectPaths(testDir).runtimeDir;
+
+      expect(result.created).toBe(true);
+      expect(existsSync(join(projectRuntime, 'logs', 'run.jsonl'))).toBe(true);
+      expect(existsSync(ephemeralRuntime)).toBe(false);
+    } finally {
+      if (oldHome === undefined) delete process.env.HOME;
+      else process.env.HOME = oldHome;
+    }
+  });
+
+  it('does not overwrite existing project runtime state during adoption', () => {
+    const oldHome = process.env.HOME;
+    process.env.HOME = join(testDir, '.home');
+    try {
+      writeFileSync(join(testDir, 'tsconfig.json'), '{}');
+      const ephemeralRuntime = resolveEphemeralProjectPaths(testDir).runtimeDir;
+      mkdirSync(join(ephemeralRuntime, 'logs'), { recursive: true });
+      writeFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), 'ephemeral\n', 'utf8');
+      const projectRuntime = resolveProjectPaths(testDir).runtimeDir;
+      mkdirSync(join(projectRuntime, 'logs'), { recursive: true });
+      writeFileSync(join(projectRuntime, 'logs', 'run.jsonl'), 'project\n', 'utf8');
+
+      const result = executeInit(makeArgs());
+
+      expect(result.created).toBe(true);
+      expect(readFileSync(join(projectRuntime, 'logs', 'run.jsonl'), 'utf8')).toBe('project\n');
+      expect(readFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), 'utf8')).toBe('ephemeral\n');
+    } finally {
+      if (oldHome === undefined) delete process.env.HOME;
+      else process.env.HOME = oldHome;
+    }
   });
 });
 

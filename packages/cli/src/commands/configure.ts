@@ -13,7 +13,6 @@
  * Audit 2026-05-23 M3.
  */
 
-import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { GLOBAL_CONFIG_PATH, readGlobalConfig, writeGlobalConfig } from '@opensip-cli/config';
@@ -59,7 +58,7 @@ export async function verifyConfiguredKey(key: string): Promise<boolean> {
     apiKey: key,
     endpoint: DEFAULT_CLOUD_ENDPOINT,
     now: Date.now(),
-    cacheDir: join(resolveUserPaths().userHomeDir, 'cache'),
+    cacheDir: resolveUserPaths().cacheDir,
   });
   process.stdout.write(
     entitled

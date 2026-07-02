@@ -8,7 +8,14 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isPathInside, resolveProjectPaths, resolveUserPaths, toPosixRelative } from '../paths.js';
+import {
+  ephemeralProjectCacheKey,
+  isPathInside,
+  resolveEphemeralProjectPaths,
+  resolveProjectPaths,
+  resolveUserPaths,
+  toPosixRelative,
+} from '../paths.js';
 
 // eslint-disable-next-line sonarjs/publicly-writable-directories -- string-only fixture; resolver is pure (no fs touch)
 const PROJECT = '/tmp/test-project';
@@ -68,6 +75,8 @@ describe('resolveUserPaths', () => {
     const u = resolveUserPaths();
     expect(u.userHomeDir).toBe(join(homedir(), '.opensip-cli'));
     expect(u.configFile).toBe(join(u.userHomeDir, 'config.yml'));
+    expect(u.cacheDir).toBe(join(u.userHomeDir, 'cache'));
+    expect(u.ephemeralProjectsDir).toBe(join(u.cacheDir, 'ephemeral'));
   });
 
   it('places user-global plugins under ~/.opensip-cli/plugins/<domain>', () => {
@@ -78,6 +87,26 @@ describe('resolveUserPaths', () => {
   it('places global authored Tool sidecars under ~/.opensip-cli/tools (trusted-by-default)', () => {
     const u = resolveUserPaths();
     expect(u.authoredToolsDir).toBe(join(u.userHomeDir, 'tools'));
+  });
+});
+
+describe('resolveEphemeralProjectPaths', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), 'opensip-paths-ephemeral-'));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it('places no-init runtime state under the user cache with a stable project key', () => {
+    const paths = resolveEphemeralProjectPaths(testDir);
+    expect(paths.cacheKey).toBe(ephemeralProjectCacheKey(testDir));
+    expect(paths.runtimeDir).toBe(join(resolveUserPaths().ephemeralProjectsDir, paths.cacheKey));
+    expect(paths.logsDir).toBe(join(paths.runtimeDir, 'logs'));
+    expect(paths.graphCacheDir).toBe(join(paths.runtimeDir, 'cache', 'graph'));
   });
 });
 

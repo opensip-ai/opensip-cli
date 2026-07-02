@@ -19,7 +19,7 @@ import type { ToolScaffold } from '../shared.js';
 
 type TargetTemplate = TargetTemplateInput;
 
-function targetTemplate(lang: SupportedLanguage): TargetTemplate {
+export function targetTemplate(lang: SupportedLanguage): TargetTemplate {
   switch (lang) {
     case 'typescript': {
       return {
@@ -96,6 +96,12 @@ function targetTemplate(lang: SupportedLanguage): TargetTemplate {
   }
 }
 
+export function targetTemplatesForLanguages(
+  languages: readonly SupportedLanguage[],
+): readonly TargetTemplate[] {
+  return languages.map(targetTemplate);
+}
+
 export function generateConfig(
   languages: readonly SupportedLanguage[],
   toolScaffolds: readonly ToolScaffold[],
@@ -108,7 +114,7 @@ export function generateConfig(
   // block (ADR-0038 Decision 2 — fitness owns `fitness:`, sim contributes none).
   const header = renderDocumentHeader({
     schemaVersion: CLI_SUPPORTED_SCHEMA_VERSION,
-    targets: languages.map(targetTemplate),
+    targets: targetTemplatesForLanguages(languages),
   });
 
   const toolBlocks = toolScaffolds

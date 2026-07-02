@@ -200,20 +200,37 @@ export type { RunTimer, RunLifecycle, RunTimingSnapshot } from './lib/run-timer.
 // ~/.opensip-cli/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
 export {
+  ephemeralProjectCacheKey,
   resolveProjectPaths,
+  resolveEphemeralProjectPaths,
   resolveUserPaths,
   isPathInside,
   toPosixRelative,
 } from './lib/paths.js';
-export type { ProjectPaths, UserPaths, PathDomain } from './lib/paths.js';
+export type {
+  EphemeralProjectPaths,
+  ProjectPaths,
+  RuntimePaths,
+  UserPaths,
+  PathDomain,
+} from './lib/paths.js';
 
 // Lib — project-context resolver. One-shot ancestor walk from cwd to
 // the nearest opensip-cli.config.yml. Returns a ProjectContext that
 // every downstream consumer (CLI bootstrap, tool action handlers,
 // uninstall/init/dashboard) reads from instead of re-deriving cwd
 // semantics.
-export { resolveProjectContext } from './lib/project-context.js';
-export type { ProjectContext, ResolveProjectContextInput } from './lib/project-context.js';
+export {
+  hasRuntimeProjectContext,
+  isEphemeralProjectContext,
+  isInitializedProjectContext,
+  resolveProjectContext,
+} from './lib/project-context.js';
+export type {
+  ProjectContext,
+  ProjectContextScope,
+  ResolveProjectContextInput,
+} from './lib/project-context.js';
 
 // Lib — per-invocation presentation settings (banner size + CLI version)
 // read by the render paths off `currentScope()?.ui`. Populated by the CLI
