@@ -337,6 +337,8 @@ export type { AgentFilteredResult, AgentRunFilterOpts } from './agent-filters.js
 // the host `agent-catalog` command renders and `@opensip-cli/mcp` serves.
 export { buildAgentCatalog } from './agent-catalog.js';
 export type { AgentCatalog, CommandTier } from './agent-catalog.js';
+export { summarizeTargetConventions } from './target-conventions.js';
+export type { AgentProjectContext, TargetConventionSummary } from './target-conventions.js';
 export { computeImpact } from './graph-impact-compute.js';
 export type { ImpactComputation, ImpactFunction, ImpactPackage } from './graph-impact-compute.js';
 

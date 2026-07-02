@@ -25,6 +25,9 @@
  *     exported occurrences as entry points. This is conservative — it
  *     only adds reachability (never suppresses a genuine orphan), and it
  *     fires solely on exported symbols of an actually-imported file.
+ *  7. It lives in a file matched by `targets.<name>.conventions.entrypoints`.
+ *     Frameworks often call route/action/config files dynamically, so the
+ *     graph treats those files as project-declared roots.
  *
  * v0.2 ships heuristics 3, 4, 5; 1 and 2 are project-specific and
  * deferred until cross-package call resolution is reliable. Heuristic 6
@@ -32,6 +35,9 @@
  * positive: a CLI command reached only via
  * `const { runReplay } = await import('../commands/.../replay.js')`.
  */
+
+import { currentScope } from '@opensip-cli/core';
+import { minimatch } from 'minimatch';
 
 import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
@@ -47,7 +53,12 @@ const NAME_HEURISTICS = new Set([
 
 export interface EntryPoint {
   readonly bodyHash: string;
-  readonly reason: 'module-init' | 'name-match' | 'no-callers-exported' | 'dynamic-import';
+  readonly reason:
+    | 'module-init'
+    | 'name-match'
+    | 'no-callers-exported'
+    | 'dynamic-import'
+    | 'target-convention';
 }
 
 export function inferEntryPoints(catalog: Catalog, indexes: Indexes): readonly EntryPoint[] {
@@ -70,11 +81,35 @@ export function inferEntryPoints(catalog: Catalog, indexes: Indexes): readonly E
       seen.add(hash);
     }
   }
+  for (const hash of targetConventionEntryHashes(indexes)) {
+    if (!seen.has(hash)) {
+      out.push({ bodyHash: hash, reason: 'target-convention' });
+      seen.add(hash);
+    }
+  }
   // Honor caller-supplied override at the rule level via GraphConfig
   // (handled by the consuming rule). This module returns the inferred
   // set; rules merge it with config.entryPointHashes.
   void catalog;
   return out;
+}
+
+function targetConventionEntryHashes(indexes: Indexes): readonly string[] {
+  const patterns = currentScope()
+    ?.targets?.getAll()
+    .flatMap((target) => target.config.conventions?.entrypoints ?? []);
+  if (!patterns || patterns.length === 0) return [];
+
+  const out: string[] = [];
+  for (const occ of indexes.byBodyHash.values()) {
+    if (!occ.filePath) continue;
+    if (matchesAnyConventionPattern(occ.filePath, patterns)) out.push(occ.bodyHash);
+  }
+  return out;
+}
+
+function matchesAnyConventionPattern(filePath: string, patterns: readonly string[]): boolean {
+  return patterns.some((pattern) => minimatch(filePath, pattern, { dot: true }));
 }
 
 function classify(occ: FunctionOccurrence, indexes: Indexes): EntryPoint['reason'] | null {

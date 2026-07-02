@@ -52,7 +52,17 @@ function schema() {
 const WHOLE_DOCUMENT = {
   schemaVersion: 1,
   globalExcludes: ['dist/**'],
-  targets: { backend: { description: 'Backend', include: ['src/**'] } },
+  targets: {
+    backend: {
+      description: 'Backend',
+      include: ['src/**'],
+      conventions: {
+        entrypoints: ['src/routes/**'],
+        alwaysUsed: ['src/config/runtime.ts'],
+        usedExports: [{ file: 'src/routes/page.ts', names: ['loader'] }],
+      },
+    },
+  },
   checkOverrides: { 'some-check': 'backend' },
   cli: { reportTo: 'https://cloud.test/api' },
   dashboard: { editor: 'vscode' },
@@ -93,6 +103,19 @@ describe('composed whole-document validation', () => {
     [
       'targets (missing description)',
       { ...WHOLE_DOCUMENT, targets: { backend: { include: ['a'] } } },
+    ],
+    [
+      'targets (empty convention export name)',
+      {
+        ...WHOLE_DOCUMENT,
+        targets: {
+          backend: {
+            description: 'x',
+            include: ['a'],
+            conventions: { usedExports: [{ file: 'src/a.ts', names: [''] }] },
+          },
+        },
+      },
     ],
     ['plugins (unknown key)', { ...WHOLE_DOCUMENT, plugins: { scenarioPackagez: ['oops'] } }],
     [

@@ -18,7 +18,14 @@
  * a config-less `toolConfig`.
  */
 
-import { globalExcludesSchema, targetsRecordSchema, type Target } from '@opensip-cli/config';
+import {
+  findUnsafeTargetConventionPaths,
+  freezeTargetConventions,
+  globalExcludesSchema,
+  targetsRecordSchema,
+  type Target,
+  type TargetConventionsConfig,
+} from '@opensip-cli/config';
 import { ConfigurationError, isPlainRecord, type TargetResolver } from '@opensip-cli/core';
 import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-cli/targeting';
 
@@ -44,6 +51,7 @@ function toTarget(
     tags?: readonly string[];
     languages?: readonly string[];
     concerns?: readonly string[];
+    conventions?: TargetConventionsConfig;
   },
 ): Target {
   const config = Object.freeze({
@@ -54,8 +62,26 @@ function toTarget(
     ...(entry.tags && { tags: Object.freeze([...entry.tags]) }),
     ...(entry.languages && { languages: Object.freeze([...entry.languages]) }),
     ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
+    ...(entry.conventions && { conventions: freezeTargetConventions(entry.conventions) }),
   });
   return Object.freeze({ config });
+}
+
+function validateConventionPath(targetName: string, field: string, pattern: string): void {
+  throw new ConfigurationError(
+    `Invalid 'targets.${targetName}.conventions.${field}' glob in opensip-cli.config.yml: ` +
+      `'${pattern}' must be project-relative and must not contain '..' path segments.`,
+    { code: 'CONFIGURATION.TARGETS.INVALID' },
+  );
+}
+
+function rejectUnsafeConventionPathsForTarget(
+  targetName: string,
+  conventions: TargetConventionsConfig | undefined,
+): void {
+  for (const issue of findUnsafeTargetConventionPaths(conventions)) {
+    validateConventionPath(targetName, issue.field, issue.pattern);
+  }
 }
 
 /**
@@ -111,7 +137,9 @@ export function buildTargets(args: { readonly document: unknown }): TargetResolv
 
   const registry = new TargetRegistry();
   for (const [name, entry] of Object.entries(targetsRecord)) {
-    registry.register(toTarget(name, entry as Parameters<typeof toTarget>[1]));
+    const targetEntry = entry as Parameters<typeof toTarget>[1];
+    rejectUnsafeConventionPathsForTarget(name, targetEntry.conventions);
+    registry.register(toTarget(name, targetEntry));
   }
 
   return {

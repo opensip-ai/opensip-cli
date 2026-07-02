@@ -415,6 +415,8 @@ const EXPORT_ALLOWLIST = {
   ScopeContributionWithDisposer: 'run-kernel',
   Span: 'run-kernel',
   SystemError: 'run-kernel',
+  TargetConventionUsedExportView: 'run-kernel',
+  TargetConventionsView: 'run-kernel',
   TargetResolver: 'run-kernel',
   TargetView: 'run-kernel',
   TENANT_OTEL_ATTR: 'run-kernel',

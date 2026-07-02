@@ -7,6 +7,8 @@
 
 import {
   checkOverridesSchema,
+  findUnsafeTargetConventionPaths,
+  freezeTargetConventions,
   globalExcludesSchema,
   pluginsConfigSchema,
   targetsRecordSchema,
@@ -22,7 +24,12 @@ import { z } from 'zod';
 
 import { TargetRegistry } from './target-registry.js';
 
-import type { PluginsConfig, TargetConfig, TargetsConfig } from './types.js';
+import type {
+  PluginsConfig,
+  TargetConfig,
+  TargetConventionsConfig,
+  TargetsConfig,
+} from './types.js';
 
 const YAML_FILENAME = PROJECT_CONFIG_FILENAME;
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
@@ -58,6 +65,7 @@ function buildFromParsed(
       tags?: readonly string[];
       languages?: readonly string[];
       concerns?: readonly string[];
+      conventions?: TargetConventionsConfig;
     }
   >,
   rawGlobalExcludes: readonly string[] | undefined,
@@ -66,6 +74,7 @@ function buildFromParsed(
   rawPlugins?: PluginsConfig,
 ): { registry: TargetRegistry; config: TargetsConfig } {
   const registry = new TargetRegistry();
+  rejectUnsafeConventionPathsInFitnessConfig(targets, sourceLabel);
 
   // ADR-0037 cutover: the host already parsed `targets:` from the single
   // validated config document into `scope.targets` (Phase 1). When that host
@@ -94,6 +103,7 @@ function buildFromParsed(
           languages: Object.freeze([...entry.languages]),
         }),
         ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
+        ...(entry.conventions && { conventions: freezeTargetConventions(entry.conventions) }),
       });
       registry.register(Object.freeze({ config }));
     }
@@ -142,6 +152,22 @@ function buildFromParsed(
   });
 
   return { registry, config };
+}
+
+function rejectUnsafeConventionPathsInFitnessConfig(
+  targets: Record<string, { conventions?: TargetConventionsConfig }>,
+  sourceLabel: string,
+): void {
+  for (const [targetName, entry] of Object.entries(targets)) {
+    for (const issue of findUnsafeTargetConventionPaths(entry.conventions)) {
+      throw new ValidationError(
+        `${sourceLabel}: targets.${targetName}.conventions.${issue.field} contains unsafe glob ` +
+          `'${issue.pattern}'. Convention paths must be project-relative and must not contain ` +
+          `'..' path segments.`,
+        { code: 'ERRORS.TARGETS.VALIDATION_FAILED' },
+      );
+    }
+  }
 }
 
 // =============================================================================

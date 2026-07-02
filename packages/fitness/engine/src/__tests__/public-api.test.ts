@@ -46,6 +46,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'isInsideStringLiteral',
   'isTestFile',
   'makeDisplayHelpers',
+  'matchConventionAlwaysUsed',
+  'matchConventionUsedExport',
   'readPackageVersion',
   'setCurrentRecipeCheckConfig',
   'stripStringLiterals',

@@ -9,9 +9,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import {
+  RunScope,
+  runWithScopeSync,
+  type TargetConventionsView,
+  type TargetResolver,
+} from '@opensip-cli/core';
 import { fileCache } from '@opensip-cli/fitness';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+import { parseKnipOutput } from '../checks/quality/code-structure/dead-code.js';
 import { checks } from '../index.js';
 
 function findCheck(slug: string) {
@@ -29,6 +36,28 @@ function writeFixture(cwd: string, rel: string, content: string): string {
   mkdirSync(dirname(abs), { recursive: true });
   writeFileSync(abs, content);
   return abs;
+}
+
+function targetResolver(conventions: TargetConventionsView): TargetResolver {
+  return {
+    getByName: () => undefined,
+    getAll: () => [
+      {
+        config: {
+          name: 'app',
+          description: 'Application',
+          include: ['src/**/*.ts'],
+          exclude: [],
+          conventions,
+        },
+      },
+    ],
+    getByTag: () => [],
+    has: () => false,
+    resolveTargets: () => [],
+    applyGlobalExcludes: (files) => files,
+    globalExcludes: [],
+  };
 }
 
 afterEach(() => {
@@ -904,6 +933,37 @@ describe('dead-code (command mode)', () => {
       expect(isCleanAbort).toBe(true);
     }
   }, 60_000);
+
+  it('suppresses convention-declared always-used files and used exports', () => {
+    const stdout = JSON.stringify({
+      files: ['src/routes/page.ts', 'src/unused.ts'],
+      issues: [
+        {
+          file: 'src/routes/page.ts',
+          exports: [
+            { name: 'loader', line: 2 },
+            { name: 'helper', line: 3 },
+          ],
+          types: [{ name: 'RouteData', line: 4 }],
+        },
+      ],
+    });
+    const scope = new RunScope();
+    Object.assign(scope, {
+      targets: targetResolver({
+        alwaysUsed: ['src/routes/**'],
+        usedExports: [{ file: 'src/routes/page.ts', names: ['loader'] }],
+      }),
+    });
+
+    const result = runWithScopeSync(scope, () => parseKnipOutput(stdout, cwd));
+
+    expect(result.map((violation) => violation.message)).toEqual([
+      'Unused file: src/unused.ts',
+      "Unused export 'helper'",
+      "Unused type 'RouteData'",
+    ]);
+  });
 });
 
 // =============================================================================

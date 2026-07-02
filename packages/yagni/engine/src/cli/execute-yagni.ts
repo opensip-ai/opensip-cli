@@ -8,6 +8,7 @@ import { filterSignalsBySuppressions, isErrorSignal, yieldToEventLoop } from '@o
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 import { YAGNI_DETECTORS } from '../detectors/registry.js';
 import { YAGNI_LAYOUT_KEY } from '../identity.js';
+import { applyTargetConventionConfidence } from '../lib/target-conventions.js';
 import { buildYagniSessionPayload } from '../persistence/session-payload.js';
 import {
   buildYagniRunSummary,
@@ -184,7 +185,8 @@ export async function executeYagni(
         includeTests,
         ...(opts.pathRoots === undefined ? {} : { pathRoots: opts.pathRoots }),
       });
-      const filtered = filterByMinConfidence(result.signals, minConfidence);
+      const conventionAdjusted = applyTargetConventionConfidence(result.signals, opts.cwd);
+      const filtered = filterByMinConfidence(conventionAdjusted, minConfidence);
       allSignals.push(...filtered);
       const violationCount = filtered.length;
       units.push({

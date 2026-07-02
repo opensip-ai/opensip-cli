@@ -2,7 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, createSignal, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import {
+  RunScope,
+  createSignal,
+  runWithScope,
+  runWithScopeSync,
+  type TargetResolver,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
@@ -11,14 +18,34 @@ import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-cand
 import { buildTsInventory } from '../lib/build-ts-inventory.js';
 
 import type { YagniDetector } from '../detectors/types.js';
-import type { ToolCliContext } from '@opensip-cli/core';
-
 function stubCli(): ToolCliContext {
   return {
     scope: { datastore: () => undefined },
     deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
     reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
+}
+
+function targetResolver(entrypoints: readonly string[]): TargetResolver {
+  return {
+    getByName: () => undefined,
+    getAll: () => [
+      {
+        config: {
+          name: 'app',
+          description: 'Application',
+          include: ['src/**/*.ts'],
+          exclude: [],
+          conventions: { entrypoints },
+        },
+      },
+    ],
+    getByTag: () => [],
+    has: () => false,
+    resolveTargets: () => [],
+    applyGlobalExcludes: (files) => files,
+    globalExcludes: [],
+  };
 }
 
 describe('yagni hardening (H1–H4)', () => {
@@ -123,4 +150,63 @@ describe('yagni hardening (H1–H4)', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('lowers convention-owned candidate confidence before min-confidence filtering', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'yagni-conventions-'));
+    try {
+      mkdirSync(join(dir, 'src/routes'), { recursive: true });
+      mkdirSync(join(dir, 'src/lib'), { recursive: true });
+      writeFileSync(join(dir, 'src/routes/page.ts'), 'export function routeOnly() {}\n');
+      writeFileSync(join(dir, 'src/lib/helper.ts'), 'export function helper() {}\n');
+
+      const detector: YagniDetector = {
+        id: 'fixture-detector',
+        slug: 'yagni:fixture-detector',
+        description: 'test detector',
+        run: () =>
+          Promise.resolve({
+            durationMs: 0,
+            signals: [
+              yagniSignal('src/routes/page.ts', 'route candidate'),
+              yagniSignal('src/lib/helper.ts', 'helper candidate'),
+            ],
+          }),
+      };
+      const scope = new RunScope();
+      Object.assign(scope, { targets: targetResolver(['src/routes/**']) });
+
+      const outcome = await runWithScope(scope, () =>
+        executeYagni({ cwd: dir, minConfidence: 'high' }, stubCli(), [detector]),
+      );
+
+      expect(outcome.envelope.signals.map((signal) => signal.message)).toEqual([
+        'helper candidate',
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
+
+function yagniSignal(filePath: string, message: string) {
+  return createSignal({
+    source: 'yagni:fixture-detector',
+    provider: 'yagni',
+    ruleId: 'yagni:fixture-detector',
+    severity: 'medium',
+    category: 'quality',
+    message,
+    code: { file: filePath, line: 1, column: 0 },
+    metadata: {
+      yagni: {
+        detector: 'fixture-detector',
+        reductionCategory: 'delete',
+        confidence: 'high',
+        preservationArgument: 'test fixture',
+        validationRequired: [],
+        riskTags: [],
+        evidence: [],
+      },
+    },
+  });
+}

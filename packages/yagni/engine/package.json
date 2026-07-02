@@ -171,6 +171,7 @@
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/lang-typescript": "workspace:*",
     "commander": "^15.0.0",
+    "minimatch": "^10.2.5",
     "react": "^19.2.7",
     "typescript": "~6.0.3",
     "zod": "^4.4.3"

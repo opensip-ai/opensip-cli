@@ -178,6 +178,21 @@ plugins:
     expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
   });
 
+  it('throws ValidationError when a convention path escapes the project', () => {
+    writeFileSync(
+      join(testDir, 'opensip-cli.config.yml'),
+      `targets:
+  src:
+    description: x
+    include: ["src/**"]
+    conventions:
+      entrypoints: ["../outside/**"]
+`,
+    );
+    expect(() => loadTargetsConfig(testDir)).toThrow(ValidationError);
+    expect(() => loadTargetsConfig(testDir)).toThrow(/targets\.src\.conventions\.entrypoints/);
+  });
+
   it('throws when the config file is missing', () => {
     expect(() => loadTargetsConfig(testDir)).toThrow();
   });

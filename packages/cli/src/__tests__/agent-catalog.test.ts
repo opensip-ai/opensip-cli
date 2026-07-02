@@ -1,17 +1,22 @@
 /**
- * `agent-catalog` — the self-describing machine surface for AI agents. Both
- * entry points are pure (no scope, no I/O), so they unit-test directly; the
+ * `agent-catalog` — the self-describing machine surface for AI agents. The
+ * catalog builder is pure (no I/O), and the command adapter only reads the
+ * current scope for optional project context, so they unit-test directly; the
  * command was previously only exercised via the subprocess surface, which is
  * coverage-invisible.
  */
 
-import { ToolRegistry } from '@opensip-cli/core';
+import {
+  RunScope,
+  ToolRegistry,
+  runWithScopeSync,
+  type TargetResolver,
+  type Tool,
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
 import { buildAgentCatalog, executeAgentCatalog } from '../commands/agent-catalog.js';
-
-import type { Tool } from '@opensip-cli/core';
 
 /**
  * @throws Error when a public tool command is missing from the agent catalog.
@@ -66,6 +71,40 @@ function assertJsonExamplesMatchToolFlagSurface(
       );
     }
   }
+}
+
+function targetResolver(): TargetResolver {
+  return {
+    getByName: () => undefined,
+    getAll: () => [
+      {
+        config: {
+          name: 'app',
+          description: 'Application',
+          include: ['src/**/*.ts'],
+          exclude: [],
+          conventions: {
+            entrypoints: ['src/routes/**', 'src/actions/**'],
+            alwaysUsed: ['src/config/runtime.ts'],
+            usedExports: [{ file: 'src/routes/page.ts', names: ['loader', 'action'] }],
+          },
+        },
+      },
+      {
+        config: {
+          name: 'plain',
+          description: 'Plain',
+          include: ['packages/**/*.ts'],
+          exclude: [],
+        },
+      },
+    ],
+    getByTag: () => [],
+    has: () => false,
+    resolveTargets: () => [],
+    applyGlobalExcludes: (files) => files,
+    globalExcludes: [],
+  };
 }
 
 async function makeRegistry(): Promise<ToolRegistry> {
@@ -277,6 +316,35 @@ describe('buildAgentCatalog', () => {
     expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
     expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
   });
+
+  it('omits project context when no convention summary is provided', () => {
+    const c = buildAgentCatalog({ tools: new ToolRegistry() });
+    expect(c.projectContext).toBeUndefined();
+  });
+
+  it('includes bounded target convention counts when provided', () => {
+    const c = buildAgentCatalog({
+      tools: new ToolRegistry(),
+      projectContext: {
+        targetConventions: [
+          {
+            target: 'app',
+            entrypointCount: 2,
+            alwaysUsedCount: 1,
+            usedExportCount: 2,
+          },
+        ],
+      },
+    });
+    expect(c.projectContext?.targetConventions).toEqual([
+      {
+        target: 'app',
+        entrypointCount: 2,
+        alwaysUsedCount: 1,
+        usedExportCount: 2,
+      },
+    ]);
+  });
 });
 
 describe('executeAgentCatalog', () => {
@@ -303,5 +371,25 @@ describe('executeAgentCatalog', () => {
 
   it('defaults to the human summary when given no options', () => {
     expect(executeAgentCatalog({}).type).toBe('text-lines');
+  });
+
+  it('adds scoped target convention counts to JSON output when available', () => {
+    const scope = new RunScope();
+    Object.assign(scope, { targets: targetResolver() });
+
+    const out = runWithScopeSync(scope, () => executeAgentCatalog({ json: true }));
+
+    expect(out.type).toBe('agent-catalog');
+    const { catalog } = out as {
+      catalog: ReturnType<typeof buildAgentCatalog>;
+    };
+    expect(catalog.projectContext?.targetConventions).toEqual([
+      {
+        target: 'app',
+        entrypointCount: 2,
+        alwaysUsedCount: 1,
+        usedExportCount: 2,
+      },
+    ]);
   });
 });

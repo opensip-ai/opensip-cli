@@ -17,7 +17,7 @@
  * — which re-enters the scope around every tool dispatch (the EventEmitter ALS
  * fix). It resolves to a clean exit (0) when the transport closes on stdin EOF.
  */
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { EXIT_CODES, summarizeTargetConventions } from '@opensip-cli/contracts';
 import { definePrimaryCommand, readPackageVersion } from '@opensip-cli/core';
 import { runGraph } from '@opensip-cli/graph/internal';
 
@@ -113,10 +113,11 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     const validToolIds = new Set(
       scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
     );
+    const targetConventions = summarizeTargetConventions(scope.targets);
     // `void`: registerMcpTools is synchronous (returns void); the leading `void`
     // marks the discard explicitly so the detached-promises heuristic (which can't
     // see cross-file sync callables) doesn't read this floating call as a promise.
-    void registerMcpTools(server, { graph, results, validToolIds });
+    void registerMcpTools(server, { graph, results, validToolIds, targetConventions });
 
     // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
     await server.serve();

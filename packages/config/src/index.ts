@@ -55,7 +55,11 @@ export {
 } from './document/suites.js';
 export type { SuiteDefinition, SuitesConfig, SuiteStep } from './document/suites.js';
 export {
+  findUnsafeTargetConventionPaths,
   targetDefinitionSchema,
+  targetConventionsSchema,
+  freezeTargetConventions,
+  isUnsafeTargetConventionPath,
   checkTargetValueSchema,
   targetsRecordSchema,
   globalExcludesSchema,
@@ -65,6 +69,10 @@ export {
 } from './document/targeting.js';
 export type {
   TargetConfig,
+  TargetConventionsConfig,
+  TargetConventionPathField,
+  TargetConventionPathIssue,
+  TargetConventionUsedExportConfig,
   Target,
   CheckTargetMap,
   PluginsConfig,

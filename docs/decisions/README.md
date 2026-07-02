@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0115](ADR-0115-target-framework-conventions.md) — Target-scoped `conventions` capture framework/runtime behavior static analysis cannot infer; tools consume them through `RunScope.targets`, and agents see bounded counts.
 - [ADR-0114](ADR-0114-mcp-review-tools.md) — `review_change` and `compare_to_baseline` are read-only MCP tools over persisted suite sessions and baseline rows; they replay evidence and do not re-run tools or import the host output package.
 - [ADR-0113](ADR-0113-oss-github-action-root.md) — The repository root action is OSS-first PR feedback over local CLI evidence; Cloud handoff moves to a nested upload-sarif action path or direct `opensip fit --report-to`.
 - [ADR-0112](ADR-0112-no-init-ephemeral-project-mode.md) — `fit`, `graph`, `graph impact`, and built-in `suite run audit` can run before `opensip init` by using a validated in-memory config and user-cache runtime; `init` migrates that runtime on adoption and project uninstall can clean it up.

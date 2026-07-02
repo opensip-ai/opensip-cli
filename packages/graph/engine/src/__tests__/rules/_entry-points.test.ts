@@ -5,6 +5,7 @@
  * module-init, name-match, no-callers-exported.
  */
 
+import { RunScope, runWithScopeSync, type TargetResolver } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildIndexes } from '../../pipeline/indexes.js';
@@ -104,4 +105,49 @@ describe('inferEntryPoints', () => {
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 'h')).toBeUndefined();
   });
+
+  it('classifies functions in convention entrypoint files as target-convention', () => {
+    const route = occ({
+      bodyHash: 'route-action',
+      simpleName: 'action',
+      filePath: 'src/routes/users/action.ts',
+      visibility: 'module-local',
+    });
+    const helper = occ({
+      bodyHash: 'helper',
+      simpleName: 'helper',
+      filePath: 'src/lib/helper.ts',
+      visibility: 'module-local',
+    });
+    const catalog = makeCatalog([route, helper]);
+    const scope = new RunScope();
+    Object.assign(scope, { targets: targetResolver(['src/routes/**']) });
+
+    const eps = runWithScopeSync(scope, () => inferEntryPoints(catalog, buildIndexes(catalog)));
+
+    expect(eps.find((e) => e.bodyHash === 'route-action')?.reason).toBe('target-convention');
+    expect(eps.find((e) => e.bodyHash === 'helper')).toBeUndefined();
+  });
 });
+
+function targetResolver(entrypoints: readonly string[]): TargetResolver {
+  return {
+    getByName: () => undefined,
+    getAll: () => [
+      {
+        config: {
+          name: 'app',
+          description: 'Application',
+          include: ['src/**/*.ts'],
+          exclude: [],
+          conventions: { entrypoints },
+        },
+      },
+    ],
+    getByTag: () => [],
+    has: () => false,
+    resolveTargets: () => [],
+    applyGlobalExcludes: (files) => files,
+    globalExcludes: [],
+  };
+}

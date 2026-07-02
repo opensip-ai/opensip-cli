@@ -19,8 +19,9 @@ export function registerGetArchitecture(server: McpStdioServer, deps: McpToolDep
       title: 'Architecture overview',
       description:
         'High-level shape of the codebase: function/edge counts, languages, the most-coupled ' +
-        'packages, and the highest blast-radius hotspots. A cheap first call to orient before ' +
-        'drilling in with who_calls/blast_radius. Use `limit` to cap rows.',
+        'packages, the highest blast-radius hotspots, and bounded target convention counts when ' +
+        'configured. A cheap first call to orient before drilling in with who_calls/blast_radius. ' +
+        'Use `limit` to cap rows.',
       inputSchema: {
         limit: limitSchema(),
       },
@@ -28,7 +29,15 @@ export function registerGetArchitecture(server: McpStdioServer, deps: McpToolDep
     ({ limit }) => {
       const outcome = deps.graph.architectureSummary(limit);
       if (!outcome.ok) return errorResult(outcome.error);
-      return jsonResult(outcome.value);
+      const targetConventions = deps.targetConventions ?? [];
+      if (targetConventions.length === 0) return jsonResult(outcome.value);
+      return jsonResult({
+        ...outcome.value,
+        data: {
+          ...outcome.value.data,
+          targetConventions,
+        },
+      });
     },
   );
 }

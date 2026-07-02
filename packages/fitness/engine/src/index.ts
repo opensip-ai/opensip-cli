@@ -76,6 +76,8 @@ export type {
 // ── Authoring helpers — snippet/line extraction, file access ────────
 export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-builder.js';
 export { execAbortable } from './framework/abortable-exec.js';
+export { matchConventionAlwaysUsed, matchConventionUsedExport } from './framework/conventions.js';
+export type { TargetConventionMatch } from './framework/conventions.js';
 // TEST-ONLY re-export — production reads the per-run cache from
 // scope.fitness.fileCache (resolved via currentScope()). Retained for isolated
 // unit tests that seed/clear the singleton; new production imports are forbidden

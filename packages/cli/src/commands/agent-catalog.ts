@@ -8,9 +8,8 @@
  * keeps the host rendering wrapper (`executeAgentCatalog`).
  */
 
-import { buildAgentCatalog } from '@opensip-cli/contracts';
-
-import type { ToolRegistry } from '@opensip-cli/core';
+import { buildAgentCatalog, summarizeTargetConventions } from '@opensip-cli/contracts';
+import { currentScope, type ToolRegistry } from '@opensip-cli/core';
 
 export { buildAgentCatalog } from '@opensip-cli/contracts';
 export type { AgentCatalog, CommandTier } from '@opensip-cli/contracts';
@@ -22,9 +21,11 @@ export function executeAgentCatalog(
     readonly internalCommands?: ReadonlySet<string>;
   } = {},
 ) {
+  const targetConventions = summarizeTargetConventions(currentScope()?.targets);
   const catalog = buildAgentCatalog({
     tools: opts.tools,
     internalCommands: opts.internalCommands,
+    ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
   });
 
   if (opts.json === true) {

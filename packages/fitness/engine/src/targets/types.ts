@@ -13,6 +13,8 @@
 
 export type {
   TargetConfig,
+  TargetConventionsConfig,
+  TargetConventionUsedExportConfig,
   Target,
   CheckTargetMap,
   PluginsConfig,

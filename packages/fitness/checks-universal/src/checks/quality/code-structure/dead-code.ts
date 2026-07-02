@@ -7,7 +7,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  matchConventionAlwaysUsed,
+  matchConventionUsedExport,
+  type CheckViolation,
+} from '@opensip-cli/fitness';
 
 /**
  * Locations Knip does NOT auto-discover but many repos use for tool configs.
@@ -71,11 +76,13 @@ function createUnusedFileViolation(file: string, cwd: string): CheckViolation {
 function processExportsAndTypes(
   issue: NonNullable<KnipOutput['issues']>[number],
   filePath: string,
+  cwd: string,
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
 
   for (const exp of issue.exports ?? []) {
     const exportName = exp.symbol ?? exp.name ?? 'unknown';
+    if (matchConventionUsedExport(filePath, exportName, cwd)) continue;
     violations.push({
       line: exp.line ?? 1,
       message: `Unused export '${exportName}'`,
@@ -190,12 +197,13 @@ function processMembers(
 /**
  * Parse Knip JSON output into violations
  */
-function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
+export function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
   const data = JSON.parse(output) as KnipOutput;
 
   // Process unused files
   for (const file of data.files ?? []) {
+    if (matchConventionAlwaysUsed(file, cwd)) continue;
     violations.push(createUnusedFileViolation(file, cwd));
   }
 
@@ -204,7 +212,7 @@ function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
     const filePath = issue.file.startsWith('/') ? issue.file : `${cwd}/${issue.file}`;
 
     violations.push(
-      ...processExportsAndTypes(issue, filePath),
+      ...processExportsAndTypes(issue, filePath, cwd),
       ...processDependencies(issue, filePath, cwd),
       ...processMembers(issue, filePath),
     );

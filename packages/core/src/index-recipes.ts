@@ -79,6 +79,8 @@ export type {
   ScopeContributionWithDisposer,
   ContributeScopeResult,
   ResolvedToolConfig,
+  TargetConventionUsedExportView,
+  TargetConventionsView,
   TargetResolver,
   TargetView,
 } from './lib/scope-types.js';

@@ -35,6 +35,13 @@ export interface YagniEvidence {
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
+/** Convention context that reduced confidence for a YAGNI candidate. */
+export interface YagniConventionAdjustment {
+  readonly kind: 'entrypoint' | 'alwaysUsed';
+  readonly targetName: string;
+  readonly pattern: string;
+}
+
 /** Metadata payload carried on each YAGNI signal. */
 export interface YagniFindingMetadata {
   readonly detector: string;
@@ -45,6 +52,7 @@ export interface YagniFindingMetadata {
   readonly validationRequired: readonly string[];
   readonly riskTags: readonly string[];
   readonly evidence: readonly YagniEvidence[];
+  readonly conventionAdjustment?: YagniConventionAdjustment;
 }
 
 /** Aggregate summary persisted with a YAGNI run session. */

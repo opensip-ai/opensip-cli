@@ -22,6 +22,7 @@
  *   primary surface excludes internal workers.
  */
 
+import type { AgentProjectContext } from './target-conventions.js';
 import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
 
 /**
@@ -68,6 +69,7 @@ export interface AgentCatalog {
     readonly sessionReplay: string;
     readonly history: string;
   };
+  readonly projectContext?: AgentProjectContext;
   readonly notes: readonly string[];
 }
 
@@ -242,6 +244,7 @@ export function buildAgentCatalog(
   input: {
     readonly tools?: ToolRegistry;
     readonly internalCommands?: ReadonlySet<string>;
+    readonly projectContext?: AgentProjectContext;
   } = {},
 ): AgentCatalog {
   const entryPoints = [
@@ -311,6 +314,9 @@ export function buildAgentCatalog(
       history:
         'For sessions list: { type: "history", sessions: HistorySession[] } where each has showCommand + optional summary.',
     },
+    ...(input.projectContext && input.projectContext.targetConventions.length > 0
+      ? { projectContext: input.projectContext }
+      : {}),
     notes: [
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',

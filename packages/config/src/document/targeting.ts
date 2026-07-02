@@ -28,6 +28,35 @@ import { z } from 'zod';
 // Types (the document shape)
 // =============================================================================
 
+/** One convention-declared export that framework/runtime code reads dynamically. */
+export interface TargetConventionUsedExportConfig {
+  /** Project-relative file glob containing framework-used exports. */
+  readonly file: string;
+  /** Export names considered used even if static analysis cannot see the read. */
+  readonly names: readonly string[];
+}
+
+/** Optional framework/runtime conventions attached to a named target. */
+export interface TargetConventionsConfig {
+  /** Project-relative file globs that are graph roots by convention. */
+  readonly entrypoints?: readonly string[];
+  /** Project-relative file globs that should not be reported as dead files. */
+  readonly alwaysUsed?: readonly string[];
+  /** File/export-name declarations that suppress unused-export findings. */
+  readonly usedExports?: readonly TargetConventionUsedExportConfig[];
+}
+
+/** Convention path field names used in validation diagnostics. */
+export type TargetConventionPathField = 'entrypoints' | 'alwaysUsed' | 'usedExports.file';
+
+/** One unsafe target convention path discovered in a config block. */
+export interface TargetConventionPathIssue {
+  /** Convention field containing the unsafe path. */
+  readonly field: TargetConventionPathField;
+  /** Raw user-authored convention glob or file pattern. */
+  readonly pattern: string;
+}
+
 /** Configuration for a named target (file set with include/exclude globs). */
 export interface TargetConfig {
   /** Kebab-case identifier, e.g. 'backend', 'module-foundation' */
@@ -44,6 +73,8 @@ export interface TargetConfig {
   readonly languages?: readonly string[];
   /** Semantic concerns this target represents (e.g. 'backend', 'server', 'api') */
   readonly concerns?: readonly string[];
+  /** Framework/runtime conventions that static analysis cannot infer reliably. */
+  readonly conventions?: TargetConventionsConfig;
 }
 
 /** A resolved target wrapping its configuration. */
@@ -161,6 +192,74 @@ export interface TargetsConfig {
 
 /** One named target's definition (a `targets.<name>` entry). Non-strict to
  *  match the historical fitness loader (unknown keys are stripped, not rejected). */
+const conventionPathSchema = z.string().trim().min(1, 'convention path is required');
+
+const targetConventionUsedExportSchema = z.object({
+  file: conventionPathSchema,
+  names: z.array(z.string().trim().min(1, 'export name is required')).min(1),
+});
+
+export const targetConventionsSchema = z.object({
+  entrypoints: z.array(conventionPathSchema).optional(),
+  alwaysUsed: z.array(conventionPathSchema).optional(),
+  usedExports: z.array(targetConventionUsedExportSchema).optional(),
+});
+
+/** Return true when a target convention path is absolute or escapes upward. */
+export function isUnsafeTargetConventionPath(pattern: string): boolean {
+  const normalized = pattern.replaceAll('\\', '/');
+  return (
+    normalized.startsWith('/') ||
+    /^[A-Za-z]:/.test(normalized) ||
+    normalized.split('/').includes('..')
+  );
+}
+
+/** Return unsafe target convention paths without expanding globs. */
+export function findUnsafeTargetConventionPaths(
+  conventions: TargetConventionsConfig | undefined,
+): readonly TargetConventionPathIssue[] {
+  if (!conventions) return [];
+
+  const issues: TargetConventionPathIssue[] = [];
+  for (const pattern of conventions.entrypoints ?? []) {
+    if (isUnsafeTargetConventionPath(pattern)) issues.push({ field: 'entrypoints', pattern });
+  }
+  for (const pattern of conventions.alwaysUsed ?? []) {
+    if (isUnsafeTargetConventionPath(pattern)) issues.push({ field: 'alwaysUsed', pattern });
+  }
+  for (const usedExport of conventions.usedExports ?? []) {
+    if (isUnsafeTargetConventionPath(usedExport.file)) {
+      issues.push({ field: 'usedExports.file', pattern: usedExport.file });
+    }
+  }
+  return issues;
+}
+
+/** Return an immutable copy of a target convention config block. */
+export function freezeTargetConventions(
+  conventions: TargetConventionsConfig,
+): TargetConventionsConfig {
+  return Object.freeze({
+    ...(conventions.entrypoints && {
+      entrypoints: Object.freeze([...conventions.entrypoints]),
+    }),
+    ...(conventions.alwaysUsed && {
+      alwaysUsed: Object.freeze([...conventions.alwaysUsed]),
+    }),
+    ...(conventions.usedExports && {
+      usedExports: Object.freeze(
+        conventions.usedExports.map((entry) =>
+          Object.freeze({
+            file: entry.file,
+            names: Object.freeze([...entry.names]),
+          }),
+        ),
+      ),
+    }),
+  });
+}
+
 export const targetDefinitionSchema = z.object({
   description: z.string().min(1, 'description is required'),
   include: z.array(z.string()).min(1, 'at least one include pattern is required'),
@@ -168,6 +267,7 @@ export const targetDefinitionSchema = z.object({
   tags: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   concerns: z.array(z.string()).optional(),
+  conventions: targetConventionsSchema.optional(),
 });
 
 /** A `checkOverrides` value: a single target name or a non-empty list of them. */

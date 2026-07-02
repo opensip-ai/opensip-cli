@@ -21,6 +21,12 @@ function fixture(rel: string): void {
   writeFileSync(abs, '');
 }
 
+function unsafeConventions(pattern: string, field: string) {
+  if (field === 'entrypoints') return { entrypoints: [pattern] };
+  if (field === 'alwaysUsed') return { alwaysUsed: [pattern] };
+  return { usedExports: [{ file: pattern, names: ['loader'] }] };
+}
+
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-build-targets-'));
 });
@@ -62,6 +68,34 @@ describe('buildTargets — toTarget normalization', () => {
     expect(t?.tags).toEqual(['fast']);
     expect(t?.languages).toEqual(['typescript']);
     expect(t?.concerns).toEqual(['backend']);
+  });
+
+  it('preserves convention metadata as frozen nested arrays', () => {
+    const targets = buildTargets({
+      document: {
+        targets: {
+          backend: {
+            description: 'b',
+            include: ['src/**/*.ts'],
+            conventions: {
+              entrypoints: ['src/routes/**'],
+              alwaysUsed: ['src/config/runtime.ts'],
+              usedExports: [{ file: 'src/routes/page.ts', names: ['loader', 'action'] }],
+            },
+          },
+        },
+      },
+    });
+    const conventions = targets?.getByName('backend')?.config.conventions;
+    expect(conventions).toEqual({
+      entrypoints: ['src/routes/**'],
+      alwaysUsed: ['src/config/runtime.ts'],
+      usedExports: [{ file: 'src/routes/page.ts', names: ['loader', 'action'] }],
+    });
+    expect(Object.isFrozen(conventions?.entrypoints)).toBe(true);
+    expect(Object.isFrozen(conventions?.alwaysUsed)).toBe(true);
+    expect(Object.isFrozen(conventions?.usedExports)).toBe(true);
+    expect(Object.isFrozen(conventions?.usedExports?.[0]?.names)).toBe(true);
   });
 });
 
@@ -143,5 +177,41 @@ describe('buildTargets — invalid blocks surface as ConfigurationError', () => 
         },
       }),
     ).toThrow(/Invalid 'globalExcludes:' block/);
+  });
+
+  it('rejects absolute convention paths', () => {
+    expect(() =>
+      buildTargets({
+        document: {
+          targets: {
+            app: {
+              description: 'app',
+              include: ['src/**/*.ts'],
+              conventions: unsafeConventions(join(testDir, 'routes.ts'), 'entrypoints'),
+            },
+          },
+        },
+      }),
+    ).toThrow(/must be project-relative/);
+  });
+
+  it.each([
+    ['../runtime.ts', 'alwaysUsed'],
+    ['src/../runtime.ts', 'usedExports.file'],
+    ['C:\\repo\\runtime.ts', 'entrypoints'],
+  ])('rejects unsafe convention path %s', (pattern, field) => {
+    expect(() =>
+      buildTargets({
+        document: {
+          targets: {
+            app: {
+              description: 'app',
+              include: ['src/**/*.ts'],
+              conventions: unsafeConventions(pattern, field),
+            },
+          },
+        },
+      }),
+    ).toThrow(/CONFIGURATION\.TARGETS\.INVALID|must be project-relative/);
   });
 });

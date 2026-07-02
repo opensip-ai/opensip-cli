@@ -92,4 +92,23 @@ describe('registerMcpTools', () => {
       expect(description).toContain('datastore.sqlite');
     }
   });
+
+  it('describes get_architecture as including bounded target convention counts', () => {
+    const configs = new Map<string, { description?: string }>();
+    const server = {
+      register: (name: string, config: { description?: string }) => {
+        configs.set(name, config);
+        return undefined;
+      },
+    } as unknown as McpStdioServer;
+    const deps: McpToolDeps = {
+      graph: {} as GraphReadPort,
+      results: {} as ResultsReadPort,
+      validToolIds: new Set(),
+    };
+
+    registerMcpTools(server, deps);
+
+    expect(configs.get('get_architecture')?.description ?? '').toMatch(/convention counts/i);
+  });
 });

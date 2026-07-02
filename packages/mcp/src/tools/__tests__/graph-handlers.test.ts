@@ -124,8 +124,13 @@ function snapshot(
   };
 }
 
-function deps(graph: GraphReadPort): McpToolDeps {
-  return { graph, results: {} as McpToolDeps['results'], validToolIds: new Set() };
+function deps(graph: GraphReadPort, over: Partial<McpToolDeps> = {}): McpToolDeps {
+  return {
+    graph,
+    results: {} as McpToolDeps['results'],
+    validToolIds: new Set(),
+    ...over,
+  };
 }
 
 // ── search_symbols ───────────────────────────────────────────────────
@@ -424,6 +429,39 @@ describe('get_architecture handler', () => {
     const out = parseResult(handlers.get('get_architecture')!({}) as CallToolResult);
     expect((out.body.data as ArchitectureSummaryDto).functionCount).toBe(42);
     expect(out.body.freshness).toEqual(FRESH);
+  });
+
+  it('adds bounded target convention summaries when provided', () => {
+    const summary: ArchitectureSummaryDto = {
+      functionCount: 1,
+      edgeCount: 0,
+      languages: ['typescript'],
+      packages: [],
+      hotspots: [],
+    };
+    const { server, handlers } = captureServer();
+    registerGetArchitecture(
+      server,
+      deps(fakeGraph({ architectureSummary: () => ok(wrap(summary)) }), {
+        targetConventions: [
+          {
+            target: 'app',
+            entrypointCount: 2,
+            alwaysUsedCount: 1,
+            usedExportCount: 3,
+          },
+        ],
+      }),
+    );
+    const out = parseResult(handlers.get('get_architecture')!({}) as CallToolResult);
+    expect((out.body.data as ArchitectureSummaryDto).targetConventions).toEqual([
+      {
+        target: 'app',
+        entrypointCount: 2,
+        alwaysUsedCount: 1,
+        usedExportCount: 3,
+      },
+    ]);
   });
 });
 

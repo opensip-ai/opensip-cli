@@ -15,6 +15,7 @@
 
 import type { McpReadError } from './mcp-error.js';
 import type { Freshness, McpToolResult, SymbolRef } from './symbol-dto.js';
+import type { TargetConventionSummary } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
 
 /** Identity of the in-memory catalog generation a read was served from. */
@@ -82,6 +83,8 @@ export interface ArchitectureSummaryDto {
   readonly packages: readonly ArchitecturePackageDto[];
   /** Highest-blast symbols (graph's canonical scoring), capped. */
   readonly hotspots: readonly BlastDto[];
+  /** Bounded project convention counts from target config, when present. */
+  readonly targetConventions?: readonly TargetConventionSummary[];
 }
 
 /** Options for {@link GraphReadPort.searchSymbols}. */

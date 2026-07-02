@@ -10,6 +10,7 @@
 
 import type { GraphReadPort } from '../graph-read-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
+import type { TargetConventionSummary } from '@opensip-cli/contracts';
 
 export interface McpToolDeps {
   /** Pre-built graph read port (graph tools). */
@@ -18,4 +19,6 @@ export interface McpToolDeps {
   readonly results: ResultsReadPort;
   /** The live registered tool ids — `get_latest_findings`/`show_run` validate `tool` against these. */
   readonly validToolIds: ReadonlySet<string>;
+  /** Bounded target convention summaries captured from the served project scope. */
+  readonly targetConventions?: readonly TargetConventionSummary[];
 }

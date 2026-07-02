@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-02
 release: v0.2.4
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -15,6 +15,7 @@ source-files:
   - packages/graph/engine/src/cli/graph-config-schema.ts
   - packages/yagni/engine/src/cli/yagni-config-schema.ts
   - packages/config/src/document/global-config.ts
+  - packages/config/src/document/targeting.ts
   - packages/cli/src/commands/init.ts
 related-docs:
   - ../00-start/06-system-context.md
@@ -93,6 +94,14 @@ targets:
     exclude: ['**/*.test.ts']
     languages: ['typescript']
     concerns: ['backend', 'server']
+    conventions:
+      entrypoints:
+        - 'services/api/src/routes/**'
+      alwaysUsed:
+        - 'services/api/src/config/runtime.ts'
+      usedExports:
+        - file: 'services/api/src/routes/page.ts'
+          names: ['loader', 'action']
 ```
 
 | Field | Type | Required | Effect |
@@ -103,8 +112,31 @@ targets:
 | `languages` | string[] | no | Matched against check `scope.languages`. |
 | `concerns` | string[] | no | Matched against check `scope.concerns`. |
 | `tags` | string[] | no | Free-form tags for grouping. |
+| `conventions.entrypoints` | string[] | no | Project-relative globs treated as graph roots for framework-called files. |
+| `conventions.alwaysUsed` | string[] | no | Project-relative globs suppressed from fitness dead-file findings and downgraded in YAGNI. |
+| `conventions.usedExports` | `{ file, names[] }[]` | no | Project-relative file globs plus export names suppressed from fitness unused-export findings. |
 
 Target names must match `^[a-z0-9]+(-[a-z0-9]+)*$` (kebab-case).
+
+`conventions` document dynamic framework/runtime behavior that static analysis
+cannot infer reliably. Convention paths are always project-relative glob
+patterns; absolute paths and any `..` path segment are rejected with
+`CONFIGURATION.TARGETS.INVALID`.
+
+Tool behavior is intentionally bounded:
+
+- `graph` treats functions in `conventions.entrypoints` files as inferred entry
+  points (`target-convention`) so orphan-subtree reachability starts from those
+  framework roots.
+- `fit`'s `dead-code` check skips `alwaysUsed` files for unused-file findings
+  and skips `usedExports` names for unused-export findings. It does not suppress
+  dependency, type, class-member, or enum-member findings.
+- `yagni` lowers confidence by one level for findings in `entrypoints` or
+  `alwaysUsed` files before applying `--min-confidence`; it does not hide the
+  finding outright.
+- `agent-catalog` and MCP `get_architecture` expose bounded counts by target
+  (entrypoint count, always-used count, used-export-name count). They do not
+  expand matched files.
 
 ## `checkOverrides`
 

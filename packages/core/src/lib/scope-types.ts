@@ -52,6 +52,24 @@ export interface RecipeUnitConfigSlot {
  */
 export type ResolvedToolConfig = Record<string, Record<string, unknown>>;
 
+/** One convention-declared export that framework/runtime code reads dynamically. */
+export interface TargetConventionUsedExportView {
+  /** Project-relative file glob containing framework-used exports. */
+  readonly file: string;
+  /** Export names considered used even if static analysis cannot see the read. */
+  readonly names: readonly string[];
+}
+
+/** Optional framework/runtime conventions attached to a named target. */
+export interface TargetConventionsView {
+  /** Project-relative file globs that are graph roots by convention. */
+  readonly entrypoints?: readonly string[];
+  /** Project-relative file globs that should not be reported as dead files. */
+  readonly alwaysUsed?: readonly string[];
+  /** File/export-name declarations that suppress unused-export findings. */
+  readonly usedExports?: readonly TargetConventionUsedExportView[];
+}
+
 /**
  * The structural shape of one registered target the host hands tools through
  * `scope.targets`. A target is a named file set (`include`/`exclude` globs)
@@ -70,6 +88,7 @@ export interface TargetView {
     readonly tags?: readonly string[];
     readonly languages?: readonly string[];
     readonly concerns?: readonly string[];
+    readonly conventions?: TargetConventionsView;
   };
 }
 
