@@ -294,7 +294,7 @@ describe('init view', () => {
     expect(out).toContain('pass --language');
   });
 
-  it('renders the partial-state refusal with file classifications + flag hints', () => {
+  it('renders the partial-state refusal with file count summary + flag hints', () => {
     const out = text({
       ...base,
       created: false,
@@ -305,7 +305,7 @@ describe('init view', () => {
       },
     });
     expect(out).toContain('opensip-cli/ present but');
-    expect(out).toContain('(custom)');
+    expect(out).toContain('1 file(s) preserved under opensip-cli/.');
     expect(out).toContain('opensip init --keep');
     expect(out).toContain('opensip init --remove');
   });
