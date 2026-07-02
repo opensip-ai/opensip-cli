@@ -11,6 +11,7 @@ import { graphImpactCommandSpec } from '../graph/graph-aux-command-specs.js';
 import { executeImpact } from '../impact.js';
 
 import type { Catalog } from '../../types.js';
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -82,6 +83,7 @@ function mockCli(datastore?: DataStore): ToolCliContext {
     setExitCode: vi.fn(),
     emitJson: vi.fn(),
     emitRaw: vi.fn(),
+    deliverSignals: vi.fn().mockResolvedValue({ cloudAccepted: 0 }),
     render: vi.fn().mockResolvedValue(undefined),
     scope: { datastore: () => datastore },
   } as unknown as ToolCliContext;
@@ -105,6 +107,23 @@ describe('executeImpact', () => {
     expect(result.changedFunctions.some((f) => f.qualifiedName === 'callee')).toBe(true);
     expect(result.recommendedCommands.length).toBeGreaterThan(0);
     expect(cli.emitJson).toHaveBeenCalledWith(result);
+    const delivered = (
+      cli.deliverSignals as unknown as {
+        mock: { calls: [[SignalEnvelope, unknown]] };
+      }
+    ).mock.calls[0]?.[0];
+    expect(delivered?.tool).toBe('graph');
+    expect(delivered?.signals).toHaveLength(1);
+    expect(delivered?.signals[0]?.ruleId).toBe('graph.impact.blast-radius');
+    expect(delivered?.signals[0]?.metadata.blastRadius).toMatchObject({
+      dependents: 1,
+      impactedFiles: 1,
+      confidence: 'high',
+    });
+    expect(delivered?.verdict).toMatchObject({
+      passed: true,
+      summary: { errors: 0, warnings: 1 },
+    });
     datastore.close();
   });
 
@@ -247,5 +266,9 @@ describe('executeImpact', () => {
     expect(filesOption?.arrayDefault).toEqual([]);
     expect(filesOption?.parse?.('src/a.ts', [])).toEqual(['src/a.ts']);
     expect(filesOption?.parse?.('src/b.ts', ['src/a.ts'])).toEqual(['src/a.ts', 'src/b.ts']);
+  });
+
+  it('declares graph impact as a verdict-producing command for suites', () => {
+    expect(graphImpactCommandSpec.producesVerdict).toBe(true);
   });
 });

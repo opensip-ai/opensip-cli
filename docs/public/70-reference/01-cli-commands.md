@@ -907,8 +907,11 @@ cloud/report delivery; individual steps may only set tool-behavior options.
 
 ```
 opensip suite list
+opensip suite run audit
+opensip suite run audit --changed --json
+opensip suite run audit --files src/server.ts --json
 opensip suite run security
-opensip suite add security --tool fitness --command fit --arg recipe=security
+opensip suite add security --tool fitness --command fitness --arg recipe=security
 ```
 
 | Subcommand | Flag | Effect |
@@ -916,6 +919,9 @@ opensip suite add security --tool fitness --command fit --arg recipe=security
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
 | `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
+| `run` | `--changed` | Propagate changed-file selection to compatible steps. Built-in `audit` defaults to changed semantics when no selector is supplied. |
+| `run` | `--since <ref>` | Propagate a git diff base to compatible changed-file steps. |
+| `run` | `--files <path>` | Propagate explicit changed files to compatible steps. Repeat for multiple files. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -926,6 +932,13 @@ Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
 `sessions list --json` and reports can group the step rows from one suite run.
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
+
+`audit` is a built-in suite preset for PR review. It runs fitness `agent-risk`,
+`graph impact`, and high-confidence YAGNI reduction checks through the same suite
+plane as user-authored suites. Define `suites.audit` in config to replace the
+built-in preset. Suite-level selectors (`--changed`, `--since`, `--files`) reach
+only steps whose command declares the matching option; per-step `args` still
+override propagated values.
 
 `suite run --json` keeps the original step fields (`tool`, `stableId`,
 `command`, `exitCode`, `durationMs`, `error`) and additively includes
@@ -949,6 +962,8 @@ emitted in this phase; use the source tools' existing SARIF output.
 
 See [ADR-0100](../../decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md)
 and [ADR-0110](../../decisions/ADR-0110-host-owned-review-brief-contract.md).
+See [ADR-0111](../../decisions/ADR-0111-built-in-audit-suite-preset.md) for the
+built-in `audit` preset decision.
 
 **See also:** [`03-configuration.md#suites`](./03-configuration.md#suites),
 [`04-json-output-schema.md#suite-run-results`](./04-json-output-schema.md#suite-run-results).

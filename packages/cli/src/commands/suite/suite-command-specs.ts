@@ -1,6 +1,6 @@
 import { suitesConfigSchema } from '@opensip-cli/config';
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { currentScope } from '@opensip-cli/core';
+import { currentLogger, currentScope } from '@opensip-cli/core';
 
 import {
   COMMAND_RESULT,
@@ -9,6 +9,7 @@ import {
   type HostSpec,
 } from '../host-subcommand-shared.js';
 
+import { BUILT_IN_AUDIT_SUITE_NAME, listSuites, resolveSuite } from './built-in-suites.js';
 import { runSuite } from './orchestrator.js';
 import { addSuiteStep } from './suite-add.js';
 import { validateSuite } from './validate-suite.js';
@@ -34,6 +35,25 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
     description: 'Run a configured suite in one shared project scope',
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
     args: [{ name: 'name', description: 'Configured suite name' }],
+    options: [
+      {
+        flag: '--changed',
+        description: 'Propagate changed-file selection to compatible suite steps',
+        default: false,
+      },
+      {
+        flag: '--since',
+        value: '<ref>',
+        description: 'Git ref base for compatible changed-file suite steps',
+      },
+      {
+        flag: '--files',
+        value: '<path>',
+        description: 'Explicit changed file for compatible suite steps (repeatable)',
+        arrayDefault: [],
+        parse: parseArg,
+      },
+    ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
     handler: async (rawOpts) => {
@@ -49,8 +69,8 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
         _args?: readonly string[];
       };
       const name = String(opts._args?.[0] ?? '');
-      const suite = configuredSuites()[name];
-      if (suite === undefined) {
+      const resolved = resolveSuite(name, configuredSuites());
+      if (resolved === undefined) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return {
           type: 'error',
@@ -58,6 +78,11 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
           exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         };
       }
+      currentLogger().debug?.({
+        evt: 'cli.suite.resolve.source',
+        suite: name,
+        source: resolved.source,
+      });
       if (ctx.toolRunActionHooks === undefined) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return {
@@ -68,11 +93,12 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
       }
       const result = await runSuite({
         name,
-        suite,
+        suite: resolved.suite,
         tools: currentScope()?.tools.list() ?? [],
         ctx: ctx.toolContext,
         runActionHooks: ctx.toolRunActionHooks,
         suiteOpts: opts,
+        defaultChanged: resolved.source === 'built-in' && name === BUILT_IN_AUDIT_SUITE_NAME,
       });
       ctx.setExitCode(result.exitCode);
       return result;
@@ -90,10 +116,11 @@ function buildSuiteListSpec(): HostSpec {
     handler: () => {
       const tools = currentScope()?.tools.list() ?? [];
       const suites = configuredSuites();
+      const entries = listSuites(suites);
       const result: SuiteListResult = {
         type: 'suite-list',
-        totalCount: Object.keys(suites).length,
-        suites: Object.entries(suites).map(([name, suite]) => {
+        totalCount: entries.length,
+        suites: entries.map(([name, suite]) => {
           const validated = validateSuite({ name, suite, tools });
           return {
             name,

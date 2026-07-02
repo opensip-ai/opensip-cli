@@ -23,29 +23,81 @@ vi.mock('../orchestrator.js', () => ({
   runSuite: runSuiteMock,
 }));
 
-const TOOL_ID = '00000000-0000-4000-8000-000000000501';
+const TOOL_ID = 'afd68bd3-ff3c-4935-a5b6-76d8fc7a5224';
+const GRAPH_ID = '3873f1c2-02a9-4719-930a-bca74b62b706';
+const YAGNI_ID = '3aba9195-2297-4f20-99d5-906945092dfc';
 
-function fixtureTool(): Tool {
+function command(name: string, options: NonNullable<Tool['commandSpecs']>[number]['options'] = []) {
+  return defineCommand<unknown, ToolCliContext>({
+    name,
+    description: 'fixture',
+    commonFlags: [],
+    options,
+    scope: 'project',
+    output: 'command-result',
+    producesVerdict: true,
+    handler: () => ({ type: 'help' }),
+  });
+}
+
+function fixtureTool(
+  id = TOOL_ID,
+  name = 'fitness',
+  specs: Tool['commandSpecs'] = [
+    command('fitness', [
+      { flag: '--recipe', value: '<name>', description: 'recipe' },
+      { flag: '--changed', description: 'changed', default: false },
+      { flag: '--since', value: '<ref>', description: 'since' },
+    ]),
+    command('fit', [
+      { flag: '--recipe', value: '<name>', description: 'recipe' },
+      { flag: '--changed', description: 'changed', default: false },
+      { flag: '--since', value: '<ref>', description: 'since' },
+    ]),
+  ],
+): Tool {
   return {
     metadata: {
-      id: TOOL_ID,
-      name: 'fitness',
+      id,
+      name,
       version: '0.0.0',
       description: 'fixture',
     },
-    commands: [{ name: 'fit', description: 'fixture' }],
-    commandSpecs: [
-      defineCommand<unknown, ToolCliContext>({
-        name: 'fit',
-        description: 'fixture',
-        commonFlags: [],
-        scope: 'project',
-        output: 'command-result',
-        producesVerdict: true,
-        handler: () => ({ type: 'help' }),
-      }),
-    ],
+    commands: (specs ?? []).map((spec) => ({
+      name: spec.name,
+      description: spec.description,
+    })),
+    commandSpecs: specs,
   };
+}
+
+function auditTools(): readonly Tool[] {
+  return [
+    fixtureTool(),
+    fixtureTool(GRAPH_ID, 'graph', [
+      command('impact', [
+        { flag: '--changed', description: 'changed', default: false },
+        { flag: '--since', value: '<ref>', description: 'since' },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ]),
+    ]),
+    fixtureTool(YAGNI_ID, 'yagni', [
+      command('yagni', [
+        {
+          flag: '--min-confidence',
+          value: '<level>',
+          description: 'confidence',
+          choices: ['low', 'medium', 'high'],
+        },
+      ]),
+    ]),
+  ];
 }
 
 let tmp: string;
@@ -88,7 +140,11 @@ function hostCtx(toolContext?: ToolCliContext, toolRunActionHooks = {}) {
   };
 }
 
-function withSuiteScope<T>(fn: () => Promise<T> | T, suites?: Record<string, unknown>): Promise<T> {
+function withSuiteScope<T>(
+  fn: () => Promise<T> | T,
+  suites?: Record<string, unknown>,
+  toolsInput: readonly Tool[] = auditTools(),
+): Promise<T> {
   const resolvedSuites = suites ?? {
     security: {
       description: 'Security suite',
@@ -96,14 +152,17 @@ function withSuiteScope<T>(fn: () => Promise<T> | T, suites?: Record<string, unk
     },
   };
   const tools = new ToolRegistry();
-  tools.register(fixtureTool());
+  for (const tool of toolsInput) tools.register(tool);
   const scope = new RunScope({
     tools,
     languages: new LanguageRegistry(),
   });
   Object.assign(scope, {
     configDocument: { suites: resolvedSuites },
-    projectContext: { projectRoot: tmp, configPath: join(tmp, 'opensip-cli.config.yml') },
+    projectContext: {
+      projectRoot: tmp,
+      configPath: join(tmp, 'opensip-cli.config.yml'),
+    },
   });
   return runWithScope(scope, fn);
 }
@@ -135,9 +194,68 @@ describe('buildSuiteGroupLeaves', () => {
         name: 'security',
         ctx: host.ctx,
         runActionHooks: {},
+        defaultChanged: false,
       }),
     );
     expect(ctx.exitCodes).toContain(0);
+  });
+
+  it('runs the built-in audit suite when no configured audit suite exists', async () => {
+    const host = makeDispatchHostCtx();
+    const ctx = hostCtx(host.ctx);
+    const [runSpec] = buildSuiteGroupLeaves(ctx);
+
+    await withSuiteScope(() => runSpec.handler?.({ _args: ['audit'] }, ctx), {});
+
+    expect(runSuiteMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'audit',
+        defaultChanged: true,
+        suite: expect.objectContaining({
+          steps: [
+            expect.objectContaining({
+              tool: TOOL_ID,
+              command: 'fitness',
+              args: { recipe: 'agent-risk' },
+            }),
+            expect.objectContaining({
+              tool: GRAPH_ID,
+              command: 'impact',
+              args: {},
+            }),
+            expect.objectContaining({
+              tool: YAGNI_ID,
+              command: 'yagni',
+              args: { minConfidence: 'high' },
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('lets configured audit override the built-in suite', async () => {
+    const host = makeDispatchHostCtx();
+    const ctx = hostCtx(host.ctx);
+    const [runSpec] = buildSuiteGroupLeaves(ctx);
+
+    await withSuiteScope(() => runSpec.handler?.({ _args: ['audit'] }, ctx), {
+      audit: {
+        description: 'Custom audit',
+        steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
+      },
+    });
+
+    expect(runSuiteMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'audit',
+        defaultChanged: false,
+        suite: {
+          description: 'Custom audit',
+          steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
+        },
+      }),
+    );
   });
 
   it('lists configured suites with resolved steps', async () => {
@@ -148,7 +266,7 @@ describe('buildSuiteGroupLeaves', () => {
 
     expect(result).toEqual({
       type: 'suite-list',
-      totalCount: 1,
+      totalCount: 2,
       suites: [
         {
           name: 'security',
@@ -162,8 +280,74 @@ describe('buildSuiteGroupLeaves', () => {
             },
           ],
         },
+        {
+          name: 'audit',
+          description:
+            'PR-review workflow: changed-code risk, graph impact, and high-confidence reduction candidates',
+          steps: [
+            {
+              tool: 'fitness',
+              stableId: TOOL_ID,
+              command: 'fitness',
+              args: { recipe: 'agent-risk' },
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'impact',
+              args: {},
+            },
+            {
+              tool: 'yagni',
+              stableId: YAGNI_ID,
+              command: 'yagni',
+              args: { minConfidence: 'high' },
+            },
+          ],
+        },
       ],
     });
+  });
+
+  it('lists configured audit instead of the built-in audit suite', async () => {
+    const ctx = hostCtx();
+    const [, listSpec] = buildSuiteGroupLeaves(ctx);
+
+    const result = await withSuiteScope(() => listSpec.handler?.({}, ctx), {
+      audit: {
+        description: 'Custom audit',
+        steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
+      },
+    });
+
+    expect(result).toEqual({
+      type: 'suite-list',
+      totalCount: 1,
+      suites: [
+        {
+          name: 'audit',
+          description: 'Custom audit',
+          steps: [
+            {
+              tool: 'fitness',
+              stableId: TOOL_ID,
+              command: 'fit',
+              args: { recipe: 'custom' },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('declares suite workflow flags but not suite-level sarif', () => {
+    const [runSpec] = buildSuiteGroupLeaves(hostCtx());
+    const flags = new Set(runSpec.options?.map((option) => option.flag));
+
+    expect(flags.has('--changed')).toBe(true);
+    expect(flags.has('--since')).toBe(true);
+    expect(flags.has('--files')).toBe(true);
+    expect(flags.has('--sarif')).toBe(false);
   });
 
   it('adds a suite step and leaves exit code unchanged when the file is already up to date', async () => {

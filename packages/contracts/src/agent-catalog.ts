@@ -148,8 +148,8 @@ const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
   {
     command: 'suite run',
     description:
-      'Run a configured multi-tool suite. --json yields a command result with reviewBrief when the suite steps emit SignalEnvelopes.',
-    examples: ['opensip suite run security --json'],
+      'Run a configured or built-in multi-tool suite. --json yields a command result with reviewBrief when the suite steps emit SignalEnvelopes.',
+    examples: ['opensip suite run audit --changed --json'],
     tier: 'platform' as const,
   },
   {
@@ -271,10 +271,10 @@ export function buildAgentCatalog(
           'opensip fit --recipe agent-fast --json && opensip graph impact --changed --json && opensip fit --changed --include-impacted --json',
       },
       {
-        name: 'Read suite review brief',
+        name: 'Read audit review brief',
         description:
-          'For configured custom suites, read the host-owned review brief before inspecting individual tool payloads.',
-        example: 'opensip suite run security --json',
+          'For PR review workflows, read the host-owned audit review brief before inspecting individual tool payloads.',
+        example: 'opensip suite run audit --changed --json',
       },
       {
         name: 'Inspect latest fit with focus on errors',

@@ -1,24 +1,37 @@
 /**
  * `opensip graph impact` — read-only changed→impact analysis (ADR-0085, spec §5.3).
  */
-import { computeImpact, EXIT_CODES, type GraphImpactResult } from '@opensip-cli/contracts';
+import {
+  buildSignalEnvelope,
+  computeImpact,
+  EXIT_CODES,
+  type GraphImpactResult,
+  type SignalEnvelope,
+  type UnitResult,
+} from '@opensip-cli/contracts';
 import {
   ConfigurationError,
+  createSignal,
   createToolLogger,
+  currentScope,
   resolveChangedFiles,
+  resolveVerdictPolicy,
   SystemError,
   ToolError,
   toPosixRelative,
+  type Signal,
+  type ToolCliContext,
 } from '@opensip-cli/core';
 
+import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
 import { runGraph } from './orchestrate.js';
 
-import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const log = createToolLogger('graph:cli');
+const IMPACT_RULE_ID = 'graph.impact.blast-radius';
 
 export interface ImpactCommandOptions {
   readonly cwd: string;
@@ -64,6 +77,68 @@ function humanImpactLines(result: GraphImpactResult): readonly string[] {
     lines.push(`  ${cmd}`);
   }
   return lines;
+}
+
+function buildImpactSignals(result: GraphImpactResult): readonly Signal[] {
+  if (result.impactedFunctions.length === 0) return [];
+  const primaryFunction = result.impactedFunctions[0] ?? result.changedFunctions[0];
+  const impactedFiles = new Set(result.impactedFunctions.map((fn) => fn.filePath));
+  return [
+    createSignal({
+      source: 'graph',
+      ruleId: IMPACT_RULE_ID,
+      severity: 'low',
+      category: 'architecture',
+      message:
+        `Graph impact found ${String(result.impactedFunctions.length)} downstream function(s) ` +
+        `for ${String(result.changedFiles.length)} changed file(s).`,
+      suggestion: 'Review impacted callers before relying on the changed-code-only result.',
+      ...(primaryFunction === undefined
+        ? {}
+        : {
+            code: {
+              file: primaryFunction.filePath,
+              line: primaryFunction.line,
+            },
+          }),
+      metadata: {
+        basis: result.basis,
+        changedFiles: result.changedFiles,
+        changedFunctions: result.changedFunctions.length,
+        impactedFunctions: result.impactedFunctions.length,
+        impactedPackages: result.impactedPackages.map((pkg) => pkg.name),
+        recommendedCommands: result.recommendedCommands,
+        truncated: result.truncated,
+        blastRadius: {
+          dependents: result.impactedFunctions.length,
+          impactedFiles: impactedFiles.size,
+          confidence: 'high',
+        },
+      },
+    }),
+  ];
+}
+
+function buildImpactEnvelope(result: GraphImpactResult, durationMs: number): SignalEnvelope {
+  const signals = buildImpactSignals(result);
+  const units: UnitResult[] = [
+    {
+      slug: IMPACT_RULE_ID,
+      passed: true,
+      violationCount: signals.length,
+      durationMs,
+    },
+  ];
+  return buildSignalEnvelope({
+    tool: 'graph',
+    runId: currentScope()?.runId ?? '',
+    createdAt: new Date().toISOString(),
+    units,
+    signals,
+    policy: resolveVerdictPolicy('graph'),
+    runFaulted: false,
+    fingerprintStrategy: graphFingerprintStrategy,
+  });
 }
 
 function resolveImpactBasis(opts: ImpactCommandOptions): {
@@ -133,6 +208,7 @@ export async function executeImpact(
   opts: ImpactCommandOptions,
   cli: ToolCliContext,
 ): Promise<GraphImpactResult> {
+  const startedAt = Date.now();
   log.info({ evt: 'graph.cli.impact.start', module: 'graph:cli' });
   try {
     const datastore = cli.scope.datastore() as DataStore | undefined;
@@ -158,6 +234,11 @@ export async function executeImpact(
     };
 
     cli.setExitCode(EXIT_CODES.SUCCESS);
+    const envelope = buildImpactEnvelope(result, Math.max(0, Date.now() - startedAt));
+    await cli.deliverSignals(envelope, {
+      cwd: opts.cwd,
+      runFailed: !envelope.verdict.passed,
+    });
     log.info({
       evt: 'graph.cli.impact.complete',
       module: 'graph:cli',

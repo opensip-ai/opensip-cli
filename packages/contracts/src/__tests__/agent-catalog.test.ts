@@ -35,9 +35,11 @@ describe('buildAgentCatalog', () => {
       'agent-catalog',
     ]);
     expect(catalog.commonPatterns.length).toBeGreaterThan(0);
-    expect(catalog.commonPatterns.some((pattern) => pattern.example.includes('suite run'))).toBe(
-      true,
-    );
+    expect(
+      catalog.commonPatterns.some((pattern) => pattern.example.includes('suite run audit')),
+    ).toBe(true);
+    expect(JSON.stringify(catalog)).toContain('opensip suite run audit --changed --json');
+    expect(JSON.stringify(catalog)).not.toContain('opensip audit');
     expect(catalog.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(catalog.notes.length).toBeGreaterThan(0);
   });

@@ -18,8 +18,12 @@ import { makeDispatchHostCtx } from '../../../__tests__/harness/dispatch-host-ct
 import { deriveSuiteAggregate, runSuite } from '../orchestrator.js';
 
 const dispatchSpy = vi.hoisted(() => vi.fn());
+const loadCapabilitiesSpy = vi.hoisted(() => vi.fn().mockResolvedValue(0));
 vi.mock('../../../bootstrap/dispatch-external-tool-command.js', () => ({
   dispatchExternalToolCommand: (args: unknown) => dispatchSpy(args),
+}));
+vi.mock('../../../bootstrap/load-tool-capabilities.js', () => ({
+  loadOwningToolCapabilities: (args: unknown) => loadCapabilitiesSpy(args),
 }));
 
 const TOOL_ID = '00000000-0000-4000-8000-000000000111';
@@ -34,7 +38,10 @@ function tool(id: string, name: string, specs: Tool['commandSpecs']): Tool {
       version: '0.0.0',
       description: 'fixture',
     },
-    commands: (specs ?? []).map((spec) => ({ name: spec.name, description: spec.description })),
+    commands: (specs ?? []).map((spec) => ({
+      name: spec.name,
+      description: spec.description,
+    })),
     commandSpecs: specs,
   };
 }
@@ -112,6 +119,8 @@ function externalProvenance(): ToolProvenance {
 
 afterEach(() => {
   dispatchSpy.mockReset();
+  loadCapabilitiesSpy.mockReset();
+  loadCapabilitiesSpy.mockResolvedValue(0);
 });
 
 describe('runSuite', () => {
@@ -171,6 +180,226 @@ describe('runSuite', () => {
         count: 3,
         _args: ['src'],
       },
+    ]);
+  });
+
+  it("loads each step tool's capability domains before handlers run", async () => {
+    const order: string[] = [];
+    loadCapabilitiesSpy.mockImplementation((args: unknown) => {
+      const owningTool = (args as { owningTool: Tool }).owningTool;
+      order.push(`load:${owningTool.metadata.id}`);
+      return Promise.resolve(1);
+    });
+    const fit = helpCommand('fit', () => {
+      order.push('run:fit');
+      return { type: 'help' };
+    });
+    const impact = helpCommand('impact', () => {
+      order.push('run:impact');
+      return { type: 'help' };
+    });
+    const fitness = tool(TOOL_ID, 'fitness', [fit]);
+    const graph = tool(OTHER_TOOL_ID, 'graph', [impact]);
+    const scope = new RunScope();
+    Object.assign(scope, {
+      capabilities: {},
+      projectContext: { projectRoot: '/repo' },
+      configDocument: {
+        plugins: { graphAdapters: ['@opensip-cli/graph-typescript'] },
+      },
+    });
+    const host = makeDispatchHostCtx();
+
+    await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: {
+          steps: [
+            { tool: TOOL_ID, command: 'fit' },
+            { tool: OTHER_TOOL_ID, command: 'impact' },
+            { tool: TOOL_ID, command: 'fit' },
+          ],
+        },
+        tools: [fitness, graph],
+        ctx: host.ctx,
+        runActionHooks: {},
+        suiteOpts: { cwd: '/repo', json: true },
+      }),
+    );
+
+    expect(loadCapabilitiesSpy).toHaveBeenCalledTimes(2);
+    expect(loadCapabilitiesSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        owningTool: fitness,
+        projectDir: '/repo',
+        pluginsConfig: { graphAdapters: ['@opensip-cli/graph-typescript'] },
+      }),
+    );
+    expect(loadCapabilitiesSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        owningTool: graph,
+        projectDir: '/repo',
+        pluginsConfig: { graphAdapters: ['@opensip-cli/graph-typescript'] },
+      }),
+    );
+    expect(order).toEqual([
+      `load:${TOOL_ID}`,
+      `load:${OTHER_TOOL_ID}`,
+      'run:fit',
+      'run:impact',
+      'run:fit',
+    ]);
+  });
+
+  it('propagates suite selectors only to commands that declare them', async () => {
+    const seen: Record<string, unknown>[] = [];
+    const fit = defineCommand<unknown, ToolCliContext>({
+      name: 'fit',
+      description: 'fixture',
+      commonFlags: [],
+      options: [
+        { flag: '--changed', description: 'changed', default: false },
+        { flag: '--since', value: '<ref>', description: 'since' },
+      ],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+    const impact = defineCommand<unknown, ToolCliContext>({
+      name: 'impact',
+      description: 'fixture',
+      commonFlags: [],
+      options: [
+        { flag: '--changed', description: 'changed', default: false },
+        { flag: '--since', value: '<ref>', description: 'since' },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+    const yagni = defineCommand<unknown, ToolCliContext>({
+      name: 'yagni',
+      description: 'fixture',
+      commonFlags: [],
+      options: [
+        {
+          flag: '--min-confidence',
+          value: '<level>',
+          description: 'confidence',
+        },
+      ],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+
+    await runSuite({
+      name: 'audit',
+      suite: {
+        steps: [
+          { tool: TOOL_ID, command: 'fit', args: { changed: false } },
+          { tool: OTHER_TOOL_ID, command: 'impact' },
+          {
+            tool: EXTERNAL_TOOL_ID,
+            command: 'yagni',
+            args: { minConfidence: 'high' },
+          },
+        ],
+      },
+      tools: [
+        tool(TOOL_ID, 'fitness', [fit]),
+        tool(OTHER_TOOL_ID, 'graph', [impact]),
+        tool(EXTERNAL_TOOL_ID, 'yagni', [yagni]),
+      ],
+      ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: {},
+      suiteOpts: { changed: true, since: 'origin/main', files: ['src/a.ts'] },
+    });
+
+    expect(seen).toEqual([
+      { changed: false, since: 'origin/main', _args: [] },
+      {
+        changed: true,
+        since: 'origin/main',
+        files: ['src/a.ts'],
+        _args: [],
+      },
+      { minConfidence: 'high', _args: [] },
+    ]);
+  });
+
+  it('applies default changed only when no explicit selector was supplied', async () => {
+    const seen: Record<string, unknown>[] = [];
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'impact',
+      description: 'fixture',
+      commonFlags: [],
+      options: [
+        { flag: '--changed', description: 'changed', default: false },
+        { flag: '--since', value: '<ref>', description: 'since' },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+    const suite = { steps: [{ tool: TOOL_ID, command: 'impact' }] };
+    const tools = [tool(TOOL_ID, 'graph', [spec])];
+    const ctx = makeDispatchHostCtx().ctx;
+
+    await runSuite({
+      name: 'audit',
+      suite,
+      tools,
+      ctx,
+      runActionHooks: {},
+      suiteOpts: {},
+      defaultChanged: true,
+    });
+    await runSuite({
+      name: 'audit',
+      suite,
+      tools,
+      ctx,
+      runActionHooks: {},
+      suiteOpts: { since: 'origin/main' },
+      defaultChanged: true,
+    });
+
+    expect(seen).toEqual([
+      { changed: true, files: [], _args: [] },
+      { changed: false, since: 'origin/main', files: [], _args: [] },
     ]);
   });
 
@@ -295,7 +524,10 @@ describe('runSuite', () => {
       exitCode: EXIT_CODES.RUNTIME_ERROR,
       error: 'step exploded',
     });
-    expect(result.steps[1]).toMatchObject({ command: 'after', exitCode: EXIT_CODES.SUCCESS });
+    expect(result.steps[1]).toMatchObject({
+      command: 'after',
+      exitCode: EXIT_CODES.SUCCESS,
+    });
   });
 
   it('captures external-dispatch replay through the step context for worst-of aggregation', async () => {
@@ -359,7 +591,9 @@ describe('runSuite', () => {
       args.ctx.emitEnvelope(signalEnvelope({ passed: true, warnings: 1, findings: 1 }));
     });
     const empty = helpCommand('empty', async (_opts, cli) => {
-      await cli.deliverSignals(signalEnvelope({ passed: true, findings: 0 }), { cwd: '/repo' });
+      await cli.deliverSignals(signalEnvelope({ passed: true, findings: 0 }), {
+        cwd: '/repo',
+      });
       return { type: 'help' };
     });
     const error = helpCommand('error', async (_opts, cli) => {
@@ -375,7 +609,9 @@ describe('runSuite', () => {
     const fault = helpCommand('fault', () => {
       throw new Error('step faulted');
     });
-    const missingOutput = helpCommand('missing-output', () => ({ type: 'help' }));
+    const missingOutput = helpCommand('missing-output', () => ({
+      type: 'help',
+    }));
     const externalWarning = helpCommand('external-warning', () => {
       throw new Error('external handler should not run in-process');
     });

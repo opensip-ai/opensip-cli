@@ -11,11 +11,13 @@ import {
 
 import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
 import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
+import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabilities.js';
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
 import { dispatchOutput } from '../mount-command-spec.js';
 
 import { createCapturingContext } from './capturing-context.js';
+import { propagatedSuiteArgs } from './propagated-options.js';
 import { buildReviewBrief } from './review-brief-builder.js';
 import { validateSuite, type ValidatedSuite, type ValidatedSuiteStep } from './validate-suite.js';
 
@@ -36,6 +38,7 @@ export interface RunSuiteInput {
   readonly ctx: ToolCliContext;
   readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
+  readonly defaultChanged?: boolean;
 }
 
 export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
@@ -55,6 +58,8 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     stepCount: suite.steps.length,
   });
 
+  await loadSuiteStepCapabilities(suite);
+
   const internalSteps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
     runStepsSerially({
       suite,
@@ -62,6 +67,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
       ctx: input.ctx,
       runActionHooks: input.runActionHooks,
       suiteOpts: input.suiteOpts,
+      defaultChanged: input.defaultChanged,
     }),
   );
   const steps = internalSteps.map((step) => step.summary);
@@ -136,12 +142,41 @@ export function deriveSuiteAggregate(
   };
 }
 
+async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
+  const loaded = new Set<string>();
+  const scope = currentScope();
+  if (scope?.capabilities === undefined) return;
+  const projectDir = scope?.projectContext?.projectRoot ?? process.cwd();
+  const pluginsConfig = scope?.configDocument?.plugins ?? {};
+  const log = currentLogger();
+
+  for (const step of suite.steps) {
+    const toolId = step.tool.metadata.id;
+    if (loaded.has(toolId)) continue;
+    loaded.add(toolId);
+    const domains = await loadOwningToolCapabilities({
+      owningTool: step.tool,
+      projectDir,
+      pluginsConfig,
+    });
+    if (domains > 0) {
+      log.debug?.({
+        evt: 'cli.suite.step.capabilities.loaded',
+        suite: suite.name,
+        tool: toolId,
+        domains,
+      });
+    }
+  }
+}
+
 async function runStepsSerially(args: {
   readonly suite: ValidatedSuite;
   readonly suiteRunId: string;
   readonly ctx: ToolCliContext;
   readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
+  readonly defaultChanged?: boolean;
 }): Promise<SuiteStepReviewInput[]> {
   const summaries: SuiteStepReviewInput[] = [];
   let chain = Promise.resolve();
@@ -156,6 +191,7 @@ async function runStepsSerially(args: {
           ctx: args.ctx,
           runActionHooks: args.runActionHooks,
           suiteOpts: args.suiteOpts,
+          defaultChanged: args.defaultChanged,
         }),
       );
     });
@@ -172,6 +208,7 @@ async function runStep(args: {
   readonly ctx: ToolCliContext;
   readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
+  readonly defaultChanged?: boolean;
 }): Promise<SuiteStepReviewInput> {
   const started = performance.now();
   const bound = bindToolCliContext(args.step.tool, args.ctx);
@@ -187,7 +224,7 @@ async function runStep(args: {
   // silently aggregated to 0) AND leaked the code into the outer host context — the
   // same isolation the bundled path preserves. (04↔05 regression: external adapter
   // as a suite step.)
-  const opts = stepOpts(args.step, args.suiteOpts);
+  const opts = stepOpts(args.step, args.suiteOpts, args.defaultChanged);
   const hooks: RunActionHooks = {
     ...args.runActionHooks,
     maybeDispatchExternal: buildMaybeDispatchExternal(
@@ -317,11 +354,13 @@ async function runStep(args: {
 function stepOpts(
   step: ValidatedSuiteStep,
   suiteOpts: Readonly<Record<string, unknown>>,
+  defaultChanged?: boolean,
 ): Record<string, unknown> {
   const assembled = assembleOptsFromSpec({
     options: step.spec.options,
     suppliedValues: step.args,
   }).opts;
+  const propagated = propagatedSuiteArgs({ step, suiteOpts, defaultChanged });
   const common: Record<string, unknown> = {};
   for (const key of step.spec.commonFlags) {
     const value = suiteOpts[key];
@@ -330,7 +369,7 @@ function stepOpts(
   if (step.spec.commonFlags.includes('cwd') && common.cwd === undefined) {
     common.cwd = process.cwd();
   }
-  return { ...common, ...assembled, _args: step.positionals };
+  return { ...common, ...assembled, ...propagated, _args: step.positionals };
 }
 
 async function withProcessExitGuard(

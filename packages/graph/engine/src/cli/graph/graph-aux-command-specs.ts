@@ -689,6 +689,7 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   scope: 'project',
   output: RAW_STREAM,
   rawStreamReason: 'runtime-render-dispatch',
+  producesVerdict: true,
   handler: async (rawOpts, cli): Promise<void> => {
     const opts = rawOpts as {
       cwd: string;

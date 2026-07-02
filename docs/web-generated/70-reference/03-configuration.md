@@ -251,16 +251,30 @@ tools:
 
 Host-owned named multi-tool runs. Each step resolves by the tool's stable UUID
 (`metadata.id` / manifest `stableId`), not by display name. `name` is optional
-readability only.
+readability only. `command` is the `CommandSpec` name, not necessarily the
+shortest CLI alias: for example, the fitness primary command is `fitness` here
+even though users normally type `opensip fit`.
+
+`audit` is built in: `opensip suite run audit` works even when config omits a
+`suites.audit` block. Define `suites.audit` only when you want to replace the
+built-in PR-review workflow.
 
 ```yaml
 suites:
+  audit:
+    description: Custom audit override
+    steps:
+      - tool: afd68bd3-ff3c-4935-a5b6-76d8fc7a5224
+        name: fitness
+        command: fitness
+        args:
+          recipe: agent-risk
   security:
     description: Run security checks and graph rules
     steps:
       - tool: 7f3a1b2c-0000-4000-8000-000000000001
         name: fitness
-        command: fit
+        command: fitness
         args:
           recipe: security
       - tool: 9c4d0000-0000-4000-8000-000000000002
@@ -273,6 +287,9 @@ suites:
 `args` are validated against the selected command's declared options. Run-scope
 flags (`cwd`, `config`, `json`, `debug`, `reportTo`, `apiKey`, `open`, targeting)
 are rejected inside a step because the suite invocation owns one shared scope.
+`suite run` workflow selectors (`changed`, `since`, `files`) also belong on the
+suite invocation; the host propagates them only to steps whose command declares
+the matching option.
 
 Reserved keys: `suites.<name>.execution` and per-step `cwd` are reserved for
 future execution modes and rejected in v1.
@@ -281,7 +298,7 @@ Use `opensip tools list --json` to find stable UUIDs, or let the host write the
 step:
 
 ```bash
-opensip suite add security --tool fitness --command fit --arg recipe=security
+opensip suite add security --tool fitness --command fitness --arg recipe=security
 ```
 
 ## `dashboard`

@@ -179,7 +179,10 @@ describe('buildAgentCatalog', () => {
       ],
     } satisfies Tool);
 
-    const c = buildAgentCatalog({ tools, internalCommands: new Set(['hidden-tool']) });
+    const c = buildAgentCatalog({
+      tools,
+      internalCommands: new Set(['hidden-tool']),
+    });
     expect(c.entryPoints.map((entry) => entry.command)).not.toContain('hidden-tool');
   });
 
@@ -255,6 +258,10 @@ describe('buildAgentCatalog', () => {
       expect(p.name).toBeTruthy();
       expect(p.example).toMatch(/^opensip /);
     }
+    expect(
+      c.commonPatterns.some((p) => p.example === 'opensip suite run audit --changed --json'),
+    ).toBe(true);
+    expect(JSON.stringify(c)).not.toContain('opensip audit');
     expect(c.outputShapes.signalEnvelope).toMatch(/SignalEnvelope|schemaVersion/);
     expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(c.outputShapes.sessionReplay).toMatch(/fidelity/);
@@ -266,7 +273,7 @@ describe('buildAgentCatalog', () => {
     const c = buildAgentCatalog({ tools: await makeRegistry() });
     expect(c.commonPatterns.some((p) => p.name.toLowerCase().includes('read-latest'))).toBe(true);
     expect(c.commonPatterns.some((p) => p.example.includes('agent-fast'))).toBe(true);
-    expect(c.commonPatterns.some((p) => p.example.includes('suite run'))).toBe(true);
+    expect(c.commonPatterns.some((p) => p.example.includes('suite run audit'))).toBe(true);
     expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
     expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
   });

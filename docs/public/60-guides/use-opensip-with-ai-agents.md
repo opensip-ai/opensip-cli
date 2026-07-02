@@ -44,11 +44,11 @@ opensip agent-catalog --json
 The catalog lists tool entry points, common patterns, agent recipes, and notes
 about `--filter` / `--raw` / `graph impact`.
 
-For configured multi-tool suites, read the host-owned review brief before
-drilling into individual tool payloads:
+For PR review workflows, read the host-owned audit review brief before drilling
+into individual tool payloads:
 
 ```bash
-opensip suite run security --json
+opensip suite run audit --changed --json
 ```
 
 The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
