@@ -689,6 +689,17 @@
       "purpose": "How opensip-cli release artifacts are checksummed, attested, published, and verified."
     },
     {
+      "file": "docs/web-generated/70-reference/14-detection-quality.md",
+      "path": "/docs/opensip-cli/70-reference/14-detection-quality/",
+      "section": "70-reference",
+      "title": "Detection Quality",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "Reference for the opensip-cli detection-quality measurement lane, labeled corpus, precision/recall/FPR metrics, and triage feedback loop."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -886,7 +897,8 @@
         "/docs/opensip-cli/70-reference/11-performance-slos/",
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
         "/docs/opensip-cli/70-reference/12-tools-command/",
-        "/docs/opensip-cli/70-reference/13-verifiable-releases/"
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/",
+        "/docs/opensip-cli/70-reference/14-detection-quality/"
       ]
     },
     {
@@ -1011,7 +1023,8 @@
         "/docs/opensip-cli/70-reference/10-environment-variables/",
         "/docs/opensip-cli/70-reference/11-performance-slos/",
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
-        "/docs/opensip-cli/70-reference/13-verifiable-releases/"
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/",
+        "/docs/opensip-cli/70-reference/14-detection-quality/"
       ]
     },
     {
@@ -1060,6 +1073,7 @@
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
         "/docs/opensip-cli/70-reference/12-tools-command/",
         "/docs/opensip-cli/70-reference/13-verifiable-releases/",
+        "/docs/opensip-cli/70-reference/14-detection-quality/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
         "/docs/opensip-cli/80-implementation/03-session-and-persistence/",

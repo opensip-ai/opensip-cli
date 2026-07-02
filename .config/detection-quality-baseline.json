@@ -1,0 +1,187 @@
+{
+  "architectureUsefulness": {
+    "contextChangesDecision": 2,
+    "contextDoesNotChangeDecision": 1,
+    "decisionChangeRate": 0.5,
+    "inconclusive": 1,
+    "rows": [
+      {
+        "expected": "context_changes_decision",
+        "id": "wide-impact-raw-warning",
+        "label": "Raw warning becomes a block when graph context shows broad production impact.",
+        "observed": "context_changes_decision",
+        "passed": true,
+        "rationale": "A raw medium warning in a shared production entrypoint affects many callees, so graph context changes the merge decision."
+      },
+      {
+        "expected": "context_does_not_change_decision",
+        "id": "test-only-finding",
+        "label": "Raw warning stays non-blocking when project shape shows test-only scope.",
+        "observed": "context_does_not_change_decision",
+        "passed": true,
+        "rationale": "Architecture context explains scope but does not change the review decision."
+      },
+      {
+        "expected": "inconclusive",
+        "id": "missing-graph-context",
+        "label": "Missing graph context is inconclusive.",
+        "observed": "inconclusive",
+        "passed": true,
+        "rationale": "Without graph/project-shape evidence, the scenario should not count as decision-changing."
+      },
+      {
+        "expected": "context_changes_decision",
+        "id": "generated-entrypoint-context",
+        "label": "A raw warning becomes non-blocking when project shape identifies generated adapter code.",
+        "observed": "context_changes_decision",
+        "passed": true,
+        "rationale": "Project-shape context changes the merge decision by distinguishing generated adapter glue from hand-authored production logic."
+      }
+    ],
+    "total": 4,
+    "verdict": "pass"
+  },
+  "configHash": "55073243fbd85564a4d862ab0379392124891dbc9b7025f1f5a004939ca60f93",
+  "corpus": {
+    "caseCount": 16,
+    "checks": {
+      "go-no-fmt-print": 2,
+      "java-no-print-stack-trace": 2,
+      "no-any-types": 2,
+      "no-todo-comments": 2,
+      "no-unimplemented-markers": 4,
+      "python-no-bare-except": 2,
+      "rust-no-dbg-macro": 2
+    },
+    "decisionCount": 16,
+    "languages": {
+      "cpp": 2,
+      "go": 2,
+      "java": 2,
+      "javascript": 2,
+      "python": 2,
+      "rust": 2,
+      "typescript": 2,
+      "universal": 2
+    }
+  },
+  "generatedAt": "2026-07-02T12:26:40.433Z",
+  "macro": {
+    "fpr": 0,
+    "fprChecks": 7,
+    "precision": 1,
+    "precisionChecks": 7,
+    "recall": 1,
+    "recallChecks": 7
+  },
+  "metricsByCheck": {
+    "go-no-fmt-print": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "go": 2
+      },
+      "pack": "checks-go",
+      "precision": 1,
+      "recall": 1,
+      "slug": "go-no-fmt-print",
+      "support": 2,
+      "tn": 1,
+      "tp": 1
+    },
+    "java-no-print-stack-trace": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "java": 2
+      },
+      "pack": "checks-java",
+      "precision": 1,
+      "recall": 1,
+      "slug": "java-no-print-stack-trace",
+      "support": 2,
+      "tn": 1,
+      "tp": 1
+    },
+    "no-any-types": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "typescript": 2
+      },
+      "pack": "checks-typescript",
+      "precision": 1,
+      "recall": 1,
+      "slug": "no-any-types",
+      "support": 2,
+      "tn": 1,
+      "tp": 1
+    },
+    "no-todo-comments": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "universal": 2
+      },
+      "pack": "checks-universal",
+      "precision": 1,
+      "recall": 1,
+      "slug": "no-todo-comments",
+      "support": 2,
+      "tn": 1,
+      "tp": 1
+    },
+    "no-unimplemented-markers": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "cpp": 2,
+        "javascript": 2
+      },
+      "pack": "checks-universal",
+      "precision": 1,
+      "recall": 1,
+      "slug": "no-unimplemented-markers",
+      "support": 4,
+      "tn": 2,
+      "tp": 2
+    },
+    "python-no-bare-except": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "python": 2
+      },
+      "pack": "checks-python",
+      "precision": 1,
+      "recall": 1,
+      "slug": "python-no-bare-except",
+      "support": 2,
+      "tn": 1,
+      "tp": 1
+    },
+    "rust-no-dbg-macro": {
+      "fn": 0,
+      "fp": 0,
+      "fpr": 0,
+      "languages": {
+        "rust": 2
+      },
+      "pack": "checks-rust",
+      "precision": 1,
+      "recall": 1,
+      "slug": "rust-no-dbg-macro",
+      "support": 2,
+      "tn": 1,
+      "tp": 1
+    }
+  },
+  "profile": "pr",
+  "version": 1
+}

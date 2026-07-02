@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-01
+last_verified: 2026-07-02
 release: v0.2.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -17,12 +17,15 @@ related-docs:
   - ../00-start/02-show-me-the-loops.md
   - ../50-extend/01-plugin-authoring.md
   - ../50-extend/04-check-pack-architecture.md
+  - ./14-detection-quality.md
 ---
 # Checks reference
 
 opensip-cli ships **160 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
+
+Fixture coverage and [detection-quality measurement](./14-detection-quality.md) are complementary. Fixture coverage proves a shipped check has clean/violation examples; the detection-quality lane measures precision, recall, and false-positive rate over a labeled multi-language corpus.
 
 ---
 

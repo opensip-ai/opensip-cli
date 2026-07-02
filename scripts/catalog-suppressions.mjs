@@ -20,6 +20,7 @@ const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BUDGET_PATH = join(REPO_ROOT, '.config/waiver-budget.json');
 const CATALOG_JSON_PATH = join(REPO_ROOT, '.config/suppression-catalog.json');
 const TRIAGE_MD_PATH = join(REPO_ROOT, '.config/suppression-triage.md');
+const DETECTION_QUALITY_BASELINE_PATH = join(REPO_ROOT, '.config/detection-quality-baseline.json');
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'coverage', '.git']);
 
@@ -258,8 +259,34 @@ function sumSlugs(bySlug, slugs) {
   return slugs.reduce((n, s) => n + (bySlug[s] ?? 0), 0);
 }
 
+function loadDetectionQualityBaseline() {
+  try {
+    const baseline = JSON.parse(readFileSync(DETECTION_QUALITY_BASELINE_PATH, 'utf8'));
+    return baseline.version === 1 && baseline.metricsByCheck ? baseline : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildQualityBySlug(baseline) {
+  if (!baseline) return {};
+  return Object.fromEntries(
+    Object.entries(baseline.metricsByCheck ?? {}).map(([slug, metric]) => [
+      slug,
+      {
+        precision: metric.precision ?? null,
+        recall: metric.recall ?? null,
+        fpr: metric.fpr ?? null,
+        support: metric.support ?? 0,
+        languages: metric.languages ?? {},
+      },
+    ]),
+  );
+}
+
 function buildCatalog({ collectRecords = false } = {}) {
   const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf8'));
+  const qualityBySlug = buildQualityBySlug(loadDetectionQualityBaseline());
   const catalog = {
     generatedAt: new Date().toISOString(),
     repoRef: 'main',
@@ -295,6 +322,7 @@ function buildCatalog({ collectRecords = false } = {}) {
       tests: emptyLayer(),
     },
     budget: { safety: {}, cosmetic: {} },
+    qualityBySlug,
     summary: {},
   };
 
@@ -357,12 +385,34 @@ function isPureAcceptedDisposition(disp) {
   return disp === 'b';
 }
 
+function qualityPriority(slug, count, catalog) {
+  const quality = catalog.qualityBySlug?.[slug];
+  if (!quality) return null;
+  const precisionGap = quality.precision === null ? 0 : 1 - quality.precision;
+  const recallGap = quality.recall === null ? 0 : 1 - quality.recall;
+  const fpr = quality.fpr ?? 0;
+  const suppressionScore = count * 0.1;
+  const score = fpr * 2 + recallGap * 2 + precisionGap + suppressionScore;
+  return {
+    slug,
+    count,
+    score,
+    precision: quality.precision,
+    recall: quality.recall,
+    fpr: quality.fpr,
+    support: quality.support,
+  };
+}
+
 function buildPhase4Audit(catalog) {
   const pr = catalog.layers['product-runtime'];
   const reopenCandidates = [];
   const acceptedHighCount = [];
+  const qualityPriorities = [];
 
   const auditSlug = (slug, count, kind) => {
+    const quality = qualityPriority(slug, count, catalog);
+    if (quality) qualityPriorities.push({ ...quality, kind });
     if (count <= PHASE4_REOPEN_THRESHOLD) return;
     const disposition = dispositionForSlug(slug);
     const row = { slug, count, disposition, kind };
@@ -378,6 +428,12 @@ function buildPhase4Audit(catalog) {
   }
   for (const [ruleId, count] of Object.entries(pr.graph.byRuleId)) {
     auditSlug(ruleId, count, 'graph');
+  }
+  const alreadyRanked = new Set(qualityPriorities.map((row) => row.slug));
+  for (const slug of Object.keys(catalog.qualityBySlug ?? {})) {
+    if (alreadyRanked.has(slug)) continue;
+    const quality = qualityPriority(slug, 0, catalog);
+    if (quality) qualityPriorities.push({ ...quality, kind: 'quality' });
   }
 
   reopenCandidates.sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug));
@@ -406,6 +462,9 @@ function buildPhase4Audit(catalog) {
       sc6ProductRuntimeSafetyActual: catalog.summary.productRuntimeSafetyTotal,
       sc6Met: catalog.summary.productRuntimeSafetyTotal <= 143,
     },
+    qualityPriorities: qualityPriorities.sort(
+      (a, b) => b.score - a.score || a.slug.localeCompare(b.slug),
+    ),
   };
 }
 
@@ -456,13 +515,16 @@ function renderTriageMarkdown(catalog) {
     '',
     '## Product-runtime fitness slugs',
     '',
-    '| Slug | Count | Budgeted | Disposition | Taxonomy |',
-    '|------|------:|:--------:|:-----------:|----------|',
+    '| Slug | Count | Budgeted | Precision | Recall | FPR | Support | Disposition | Taxonomy |',
+    '|------|------:|:--------:|----------:|-------:|----:|--------:|:-----------:|----------|',
   );
   for (const [slug, count] of sortedEntries(pr.fitness.bySlug)) {
     const budgeted = BUDGETED_SLUGS.has(slug) ? 'yes' : 'no';
     const disp = dispositionForSlug(slug);
-    lines.push(`| \`${slug}\` | ${count} | ${budgeted} | ${disp} | ${expandDisposition(disp)} |`);
+    const quality = catalog.qualityBySlug[slug];
+    lines.push(
+      `| \`${slug}\` | ${count} | ${budgeted} | ${fmtRate(quality?.precision)} | ${fmtRate(quality?.recall)} | ${fmtRate(quality?.fpr)} | ${quality?.support ?? 'n/a'} | ${disp} | ${expandDisposition(disp)} |`,
+    );
   }
   lines.push(
     '',
@@ -538,6 +600,27 @@ function renderTriageMarkdown(catalog) {
   }
 
   lines.push(
+    '## Detection quality triage',
+    '',
+    'Measured quality metrics come from `.config/detection-quality-baseline.json`; `n/a` means the slug is not yet in the seeded corpus. Rows with kind `quality` are measured slugs with no current product-runtime suppressions.',
+    '',
+  );
+  if (audit.qualityPriorities.length === 0) {
+    lines.push('_No measured product-runtime suppression slugs yet._', '');
+  } else {
+    lines.push(
+      '| Slug | Kind | Suppressions | Score | Precision | Recall | FPR | Support |',
+      '|------|:----:|-------------:|------:|----------:|-------:|----:|--------:|',
+    );
+    for (const row of audit.qualityPriorities.slice(0, 10)) {
+      lines.push(
+        `| \`${row.slug}\` | ${row.kind} | ${row.count} | ${row.score.toFixed(2)} | ${fmtRate(row.precision)} | ${fmtRate(row.recall)} | ${fmtRate(row.fpr)} | ${row.support} |`,
+      );
+    }
+    lines.push('');
+  }
+
+  lines.push(
     '',
     '## Disposition key',
     '',
@@ -556,6 +639,10 @@ function renderTriageMarkdown(catalog) {
 
 function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function fmtRate(value) {
+  return value === null || value === undefined ? 'n/a' : value.toFixed(3);
 }
 
 function digest(content) {
@@ -645,4 +732,14 @@ function main() {
   }
 }
 
-main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
+
+export {
+  buildCatalog,
+  buildQualityBySlug,
+  buildPhase4Audit,
+  renderTriageMarkdown,
+  qualityPriority,
+};

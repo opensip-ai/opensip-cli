@@ -41,7 +41,15 @@ the workflow has already run the repository build step.
 | `pnpm bench:partition`    | `bench-partition-strategies.mjs` | ADR-0045 graph partition-strategy benchmark (cold/warm, shard balance).         |
 | `pnpm bench:slo`          | `bench-slo.mjs`                  | Performance SLO lane over deterministic synthetic corpora.                      |
 | `pnpm bench:slo:ci`       | `bench-slo.mjs`                  | CI form of the SLO lane; uses the already-built CLI dist output.                |
+| `pnpm quality:measure`    | `measure-detection-quality.mjs`  | Detection-quality lane over the seeded labeled corpus; builds first.            |
+| `pnpm quality:measure:ci` | `measure-detection-quality.mjs`  | CI form of the quality lane; uses the already-built workspace dist output.      |
 | `pnpm graph:catalog-diff` | `graph-catalog-diff.mjs`         | Function-set delta between the `exact` and `sharded` graph build engines.       |
+
+The detection-quality corpus lives under `scripts/quality/fixtures/`. It is a
+checked-in, redistributable seed corpus; local generated reports such as
+`detection-quality-report*.json` and temporary `.opensip-quality/` workdirs stay
+untracked. Refresh the committed baseline with `pnpm quality:measure:update`
+after a deliberate check or corpus change.
 
 ## Release lane
 

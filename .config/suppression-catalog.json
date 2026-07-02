@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-02T10:21:09.289Z",
+  "generatedAt": "2026-07-02T12:27:11.536Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -388,6 +388,72 @@
       }
     }
   },
+  "qualityBySlug": {
+    "go-no-fmt-print": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 2,
+      "languages": {
+        "go": 2
+      }
+    },
+    "java-no-print-stack-trace": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 2,
+      "languages": {
+        "java": 2
+      }
+    },
+    "no-any-types": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 2,
+      "languages": {
+        "typescript": 2
+      }
+    },
+    "no-todo-comments": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 2,
+      "languages": {
+        "universal": 2
+      }
+    },
+    "no-unimplemented-markers": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 4,
+      "languages": {
+        "cpp": 2,
+        "javascript": 2
+      }
+    },
+    "python-no-bare-except": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 2,
+      "languages": {
+        "python": 2
+      }
+    },
+    "rust-no-dbg-macro": {
+      "precision": 1,
+      "recall": 1,
+      "fpr": 0,
+      "support": 2,
+      "languages": {
+        "rust": 2
+      }
+    }
+  },
   "summary": {
     "budgetGateFitness": 215,
     "budgetGateFitnessSlugs": 72,
@@ -442,6 +508,78 @@
       "sc6ProductRuntimeSafetyTarget": 143,
       "sc6ProductRuntimeSafetyActual": 0,
       "sc6Met": true
-    }
+    },
+    "qualityPriorities": [
+      {
+        "slug": "go-no-fmt-print",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 2,
+        "kind": "quality"
+      },
+      {
+        "slug": "java-no-print-stack-trace",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 2,
+        "kind": "quality"
+      },
+      {
+        "slug": "no-any-types",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 2,
+        "kind": "quality"
+      },
+      {
+        "slug": "no-todo-comments",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 2,
+        "kind": "quality"
+      },
+      {
+        "slug": "no-unimplemented-markers",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 4,
+        "kind": "quality"
+      },
+      {
+        "slug": "python-no-bare-except",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 2,
+        "kind": "quality"
+      },
+      {
+        "slug": "rust-no-dbg-macro",
+        "count": 0,
+        "score": 0,
+        "precision": 1,
+        "recall": 1,
+        "fpr": 0,
+        "support": 2,
+        "kind": "quality"
+      }
+    ]
   }
 }

@@ -49,6 +49,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | Create your own CLI subcommand | [Create your first Tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/) |
 | Wire the release gate into CI | [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/) |
 | Verify release artifacts | [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/) |
+| Inspect detection-quality methodology | [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) |
 
 ## Command Map
@@ -178,6 +179,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 50. [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/)
 51. [Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/)
 52. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
+53. [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/)
 53. [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/)
 
 ### 80 - Internals

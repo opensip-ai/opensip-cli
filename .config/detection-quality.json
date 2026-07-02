@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "maxFixtureBytes": 16384,
+  "maxCases": 64,
+  "concurrency": 1,
+  "requiredLanguages": [
+    "typescript",
+    "javascript",
+    "python",
+    "go",
+    "java",
+    "rust",
+    "cpp",
+    "universal"
+  ],
+  "profiles": {
+    "pr": {
+      "description": "Fast deterministic seeded corpus for PR and release-regression checks.",
+      "corpora": ["seeded"],
+      "architectureUsefulness": true
+    }
+  },
+  "corpora": {
+    "seeded": {
+      "manifest": "scripts/quality/fixtures/seeded/manifest.json"
+    }
+  },
+  "thresholds": {
+    "minPrecision": 1,
+    "minRecall": 1,
+    "maxFpr": 0,
+    "precisionDropTolerance": 0,
+    "recallDropTolerance": 0,
+    "fprIncreaseTolerance": 0,
+    "supportDropTolerance": 0,
+    "minArchitectureScenarios": 3,
+    "minArchitectureDecisionChangeRate": 0.34
+  },
+  "commandChecks": {
+    "allow": {}
+  },
+  "triage": {
+    "maxQualityRows": 10,
+    "suppressionMultiplier": 0.1,
+    "fprWeight": 2,
+    "recallGapWeight": 2,
+    "precisionGapWeight": 1
+  },
+  "architectureUsefulness": {
+    "scenarios": [
+      {
+        "id": "wide-impact-raw-warning",
+        "label": "Raw warning becomes a block when graph context shows broad production impact.",
+        "rawDecision": "warn",
+        "contextDecision": "block",
+        "expected": "context_changes_decision",
+        "rationale": "A raw medium warning in a shared production entrypoint affects many callees, so graph context changes the merge decision."
+      },
+      {
+        "id": "test-only-finding",
+        "label": "Raw warning stays non-blocking when project shape shows test-only scope.",
+        "rawDecision": "warn",
+        "contextDecision": "warn",
+        "expected": "context_does_not_change_decision",
+        "rationale": "Architecture context explains scope but does not change the review decision."
+      },
+      {
+        "id": "missing-graph-context",
+        "label": "Missing graph context is inconclusive.",
+        "rawDecision": "warn",
+        "contextDecision": "unknown",
+        "expected": "inconclusive",
+        "rationale": "Without graph/project-shape evidence, the scenario should not count as decision-changing."
+      },
+      {
+        "id": "generated-entrypoint-context",
+        "label": "A raw warning becomes non-blocking when project shape identifies generated adapter code.",
+        "rawDecision": "block",
+        "contextDecision": "warn",
+        "expected": "context_changes_decision",
+        "rationale": "Project-shape context changes the merge decision by distinguishing generated adapter glue from hand-authored production logic."
+      }
+    ]
+  }
+}

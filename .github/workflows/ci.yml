@@ -57,6 +57,16 @@ jobs:
           name: performance-slo-report
           path: slo-report.json
 
+      - name: Detection quality measurement
+        run: pnpm quality:measure:ci -- --check --out detection-quality-report.json
+
+      - name: Upload Detection Quality report
+        if: always() && hashFiles('detection-quality-report.json') != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: detection-quality-report
+          path: detection-quality-report.json
+
       - name: Typecheck
         run: pnpm typecheck
 

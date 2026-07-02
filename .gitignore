@@ -31,6 +31,10 @@ coverage/
 .opensip-slo/
 slo-report*.json
 
+# Detection quality measurement artifacts
+.opensip-quality/
+detection-quality-report*.json
+
 # In-repo git worktrees (parallel sessions). Tracked via .git/worktrees;
 # ignoring the checkout dir prevents accidental `git add` of a worktree.
 .worktrees/

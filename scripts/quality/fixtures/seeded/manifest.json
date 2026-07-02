@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "id": "seeded",
+  "description": "Redistributable seeded corpus for detection-quality measurement.",
+  "cases": [
+    {
+      "id": "typescript-no-any-positive",
+      "language": "typescript",
+      "rationale": "A TypeScript annotation using any should be reported.",
+      "files": [
+        {
+          "path": "src/no-any-positive.ts",
+          "content": "export function parsePayload(payload: any): unknown {\n  return payload;\n}\n"
+        }
+      ],
+      "targetPaths": ["src/no-any-positive.ts"],
+      "checks": [{ "slug": "no-any-types", "expectFinding": true }]
+    },
+    {
+      "id": "typescript-no-any-negative",
+      "language": "typescript",
+      "rationale": "An unknown annotation with narrowing should not be reported as any.",
+      "files": [
+        {
+          "path": "src/no-any-negative.ts",
+          "content": "export function parsePayload(payload: unknown): string {\n  return typeof payload === 'string' ? payload : '';\n}\n"
+        }
+      ],
+      "targetPaths": ["src/no-any-negative.ts"],
+      "checks": [{ "slug": "no-any-types", "expectFinding": false }]
+    },
+    {
+      "id": "javascript-unimplemented-positive",
+      "language": "javascript",
+      "rationale": "A JavaScript not-implemented throw should be reported.",
+      "files": [
+        {
+          "path": "src/not-implemented.js",
+          "content": "export function loadSettings() {\n  throw new Error('not implemented');\n}\n"
+        }
+      ],
+      "targetPaths": ["src/not-implemented.js"],
+      "checks": [{ "slug": "no-unimplemented-markers", "expectFinding": true }]
+    },
+    {
+      "id": "javascript-unimplemented-negative",
+      "language": "javascript",
+      "rationale": "A JavaScript implementation without a stub marker should not be reported.",
+      "files": [
+        {
+          "path": "src/implemented.js",
+          "content": "export function loadSettings() {\n  return { enabled: true };\n}\n"
+        }
+      ],
+      "targetPaths": ["src/implemented.js"],
+      "checks": [{ "slug": "no-unimplemented-markers", "expectFinding": false }]
+    },
+    {
+      "id": "python-bare-except-positive",
+      "language": "python",
+      "rationale": "A bare except catches BaseException and should be reported.",
+      "files": [
+        {
+          "path": "src/bare_except.py",
+          "content": "def run():\n    try:\n        work()\n    except:\n        return None\n"
+        }
+      ],
+      "targetPaths": ["src/bare_except.py"],
+      "checks": [{ "slug": "python-no-bare-except", "expectFinding": true }]
+    },
+    {
+      "id": "python-bare-except-negative",
+      "language": "python",
+      "rationale": "A specific exception handler should not be reported.",
+      "files": [
+        {
+          "path": "src/specific_except.py",
+          "content": "def run():\n    try:\n        work()\n    except ValueError:\n        return None\n"
+        }
+      ],
+      "targetPaths": ["src/specific_except.py"],
+      "checks": [{ "slug": "python-no-bare-except", "expectFinding": false }]
+    },
+    {
+      "id": "go-fmt-print-positive",
+      "language": "go",
+      "rationale": "A direct fmt.Println call should be reported.",
+      "files": [
+        {
+          "path": "src/main.go",
+          "content": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n"
+        }
+      ],
+      "targetPaths": ["src/main.go"],
+      "checks": [{ "slug": "go-no-fmt-print", "expectFinding": true }]
+    },
+    {
+      "id": "go-fmt-print-negative",
+      "language": "go",
+      "rationale": "A function that returns a value without fmt.Print should not be reported.",
+      "files": [
+        {
+          "path": "src/main.go",
+          "content": "package main\n\nfunc main() {\n\t_ = 1\n}\n"
+        }
+      ],
+      "targetPaths": ["src/main.go"],
+      "checks": [{ "slug": "go-no-fmt-print", "expectFinding": false }]
+    },
+    {
+      "id": "java-print-stack-trace-positive",
+      "language": "java",
+      "rationale": "printStackTrace bypasses structured logging and should be reported.",
+      "files": [
+        {
+          "path": "src/App.java",
+          "content": "class App {\n  void run(Exception e) {\n    e.printStackTrace();\n  }\n}\n"
+        }
+      ],
+      "targetPaths": ["src/App.java"],
+      "checks": [{ "slug": "java-no-print-stack-trace", "expectFinding": true }]
+    },
+    {
+      "id": "java-print-stack-trace-negative",
+      "language": "java",
+      "rationale": "Logging without printStackTrace should not be reported.",
+      "files": [
+        {
+          "path": "src/App.java",
+          "content": "class App {\n  void run(Exception e) {\n    Logger.error(\"failed\", e);\n  }\n}\n"
+        }
+      ],
+      "targetPaths": ["src/App.java"],
+      "checks": [{ "slug": "java-no-print-stack-trace", "expectFinding": false }]
+    },
+    {
+      "id": "rust-dbg-positive",
+      "language": "rust",
+      "rationale": "dbg! macro calls should not ship.",
+      "files": [
+        {
+          "path": "src/lib.rs",
+          "content": "pub fn run(value: i32) -> i32 {\n    dbg!(value)\n}\n"
+        }
+      ],
+      "targetPaths": ["src/lib.rs"],
+      "checks": [{ "slug": "rust-no-dbg-macro", "expectFinding": true }]
+    },
+    {
+      "id": "rust-dbg-negative",
+      "language": "rust",
+      "rationale": "A normal return without dbg! should not be reported.",
+      "files": [
+        {
+          "path": "src/lib.rs",
+          "content": "pub fn run(value: i32) -> i32 {\n    value + 1\n}\n"
+        }
+      ],
+      "targetPaths": ["src/lib.rs"],
+      "checks": [{ "slug": "rust-no-dbg-macro", "expectFinding": false }]
+    },
+    {
+      "id": "cpp-unimplemented-positive",
+      "language": "cpp",
+      "rationale": "A C++ not-implemented logic_error should be reported by the universal stub check.",
+      "files": [
+        {
+          "path": "src/service.cpp",
+          "content": "#include <stdexcept>\nint run() {\n  throw std::logic_error(\"not implemented\");\n}\n"
+        }
+      ],
+      "targetPaths": ["src/service.cpp"],
+      "checks": [{ "slug": "no-unimplemented-markers", "expectFinding": true }]
+    },
+    {
+      "id": "cpp-unimplemented-negative",
+      "language": "cpp",
+      "rationale": "A C++ implementation without a stub marker should not be reported.",
+      "files": [
+        {
+          "path": "src/service.cpp",
+          "content": "int run() {\n  return 1;\n}\n"
+        }
+      ],
+      "targetPaths": ["src/service.cpp"],
+      "checks": [{ "slug": "no-unimplemented-markers", "expectFinding": false }]
+    },
+    {
+      "id": "universal-todo-positive",
+      "language": "universal",
+      "rationale": "A source comment with a tracked marker should be reported.",
+      "files": [
+        {
+          "path": "src/todo.ts",
+          "content": "export function run() {\n  // FIXME: tracked marker belongs in an issue\n  return 1;\n}\n"
+        }
+      ],
+      "targetPaths": ["src/todo.ts"],
+      "checks": [{ "slug": "no-todo-comments", "expectFinding": true }]
+    },
+    {
+      "id": "universal-todo-negative",
+      "language": "universal",
+      "rationale": "Source without tracked comment markers should not be reported.",
+      "files": [
+        {
+          "path": "src/no-todo.ts",
+          "content": "export function run() {\n  return 1;\n}\n"
+        }
+      ],
+      "targetPaths": ["src/no-todo.ts"],
+      "checks": [{ "slug": "no-todo-comments", "expectFinding": false }]
+    }
+  ]
+}

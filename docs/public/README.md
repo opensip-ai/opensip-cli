@@ -49,6 +49,7 @@ That gets you from a clean shell to a working project scaffold and one passing f
 | Create your own CLI subcommand | [Create your first Tool](./60-guides/07-create-your-first-tool.md) |
 | Wire the release gate into CI | [Wire into CI](./60-guides/03-wire-into-ci.md) |
 | Verify release artifacts | [Verifiable releases](./70-reference/13-verifiable-releases.md) |
+| Inspect detection-quality methodology | [Detection quality](./70-reference/14-detection-quality.md) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 
 ## Command Map
@@ -178,6 +179,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 50. [Performance SLOs](./70-reference/11-performance-slos.md)
 51. [Public benchmarks](./70-reference/12-public-benchmarks.md)
 52. [`tools` command](./70-reference/12-tools-command.md)
+53. [Detection quality](./70-reference/14-detection-quality.md)
 53. [Verifiable releases](./70-reference/13-verifiable-releases.md)
 
 ### 80 - Internals

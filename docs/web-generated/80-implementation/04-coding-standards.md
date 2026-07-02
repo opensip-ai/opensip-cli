@@ -75,6 +75,12 @@ The convention is: **always include a justification after `--`**. A bare `eslint
 
 The `@fitness-ignore-file` directives are OpenSIP CLI's own (eaten by the fitness check framework, not ESLint). They're used to suppress fitness-check violations on the workspace's own source — yes, OpenSIP CLI dogfoods itself.
 
+When a fitness-check change intentionally changes detection behavior, update the
+labeled detection-quality corpus and refresh the baseline with
+`pnpm quality:measure:update`. Fixture coverage proves a check fires on curated
+examples; the detection-quality baseline tracks precision, recall, and
+false-positive rate across releases.
+
 ---
 
 ## Errors
