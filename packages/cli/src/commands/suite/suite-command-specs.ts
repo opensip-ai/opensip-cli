@@ -37,6 +37,11 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
     args: [{ name: 'name', description: 'Configured suite name' }],
     options: [
       {
+        flag: '--config',
+        value: '<path>',
+        description: 'Path to opensip-cli.config.yml (overrides default root discovery)',
+      },
+      {
         flag: '--changed',
         description: 'Propagate changed-file selection to compatible suite steps',
         default: false,

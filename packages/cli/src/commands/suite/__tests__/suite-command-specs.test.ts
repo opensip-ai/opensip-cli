@@ -368,10 +368,11 @@ describe('buildSuiteGroupLeaves', () => {
     });
   });
 
-  it('declares suite workflow flags but not suite-level sarif', () => {
+  it('declares suite workflow flags and config but not suite-level sarif', () => {
     const [runSpec] = buildSuiteGroupLeaves(hostCtx());
     const flags = new Set(runSpec.options?.map((option) => option.flag));
 
+    expect(flags.has('--config')).toBe(true);
     expect(flags.has('--changed')).toBe(true);
     expect(flags.has('--since')).toBe(true);
     expect(flags.has('--files')).toBe(true);

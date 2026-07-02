@@ -2275,6 +2275,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             },
             {
               "choices": undefined,
+              "defaultValue": undefined,
+              "description": "Path to opensip-cli.config.yml (overrides default root discovery)",
+              "flags": "--config <path>",
+              "negate": false,
+              "optional": false,
+              "required": true,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
               "defaultValue": "<cwd>",
               "description": "Target directory",
               "flags": "--cwd <path>",

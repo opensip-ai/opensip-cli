@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0113](ADR-0113-oss-github-action-root.md) — The repository root action is OSS-first PR feedback over local CLI evidence; Cloud handoff moves to a nested upload-sarif action path or direct `opensip fit --report-to`.
 - [ADR-0112](ADR-0112-no-init-ephemeral-project-mode.md) — `fit`, `graph`, `graph impact`, and built-in `suite run audit` can run before `opensip init` by using a validated in-memory config and user-cache runtime; `init` migrates that runtime on adoption and project uninstall can clean it up.
 - [ADR-0111](ADR-0111-built-in-audit-suite-preset.md) — `audit` ships as a CLI-owned built-in suite preset resolved by the host suite plane; config `suites.audit` overrides it, suite selectors propagate only to compatible steps, and aggregate suite SARIF remains deferred.
 - [ADR-0110](ADR-0110-host-owned-review-brief-contract.md) — Review briefs are a versioned contract in `@opensip-cli/contracts` but are built by the CLI host after suite steps finish; tools continue to emit `SignalEnvelope`s and never own cross-tool review aggregation.

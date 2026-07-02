@@ -1,0 +1,99 @@
+name: OpenSIP CLI -- Cloud signal handoff
+description: >-
+  Run `opensip fit` and upload the findings (SARIF) to OpenSIP Cloud's
+  /v1/ingest/sarif endpoint, authenticated with an osk_ API key and
+  attributed to this repository via x-opensip-repo. The next reconciler
+  tick turns the signals into tickets -- no manual `opensip ingest` step.
+author: OpenSIP
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  api-key:
+    description: >-
+      An OpenSIP Cloud API key (osk_...) carrying the `ingest:write` permission
+      (operator/admin role). Store it as a repository/organization secret and
+      pass it as `${{ secrets.OPENSIP_API_KEY }}` -- never inline.
+    required: true
+  cloud-url:
+    description: >-
+      The OpenSIP Cloud ingest base URL. The CLI appends `/sarif`. Must be an
+      https:// URL (a Bearer credential is never sent over plain HTTP).
+    required: false
+    default: https://api.opensip.ai/v1/ingest
+  args:
+    description: >-
+      Extra arguments appended to `opensip fit` (e.g. `--recipe my-recipe`,
+      `--tags security`). Optional.
+    required: false
+    default: ''
+  working-directory:
+    description: >-
+      Directory to run the CLI from. Must be a checked-out git working tree so
+      the CLI can derive `<org>/<repo>` from the origin remote.
+    required: false
+    default: '.'
+  version:
+    description: >-
+      The `opensip-cli` npm version to run via npx (e.g. `0.1.15` or `latest`).
+    required: false
+    default: latest
+  fail-on-upload-error:
+    description: >-
+      When `true` (default), a pure report-UPLOAD failure (CLI exit 4) fails the
+      job. A real findings/gate failure (any other non-zero exit) always fails
+      the job regardless of this input.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+
+    - name: Run opensip fit and upload SARIF to OpenSIP Cloud
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        OPENSIP_API_KEY: ${{ inputs.api-key }}
+        OPENSIP_CLOUD_URL: ${{ inputs.cloud-url }}
+        OPENSIP_CLI_VERSION: ${{ inputs.version }}
+        OPENSIP_EXTRA_ARGS: ${{ inputs.args }}
+        OPENSIP_FAIL_ON_UPLOAD_ERROR: ${{ inputs.fail-on-upload-error }}
+      run: |
+        set -uo pipefail
+        # Run the published CLI via npx. `opensip-cli` exposes the `opensip`
+        # binary; npx resolves the single bin. `--report-to` switches on the
+        # Bearer egress (osk_) + x-opensip-repo (derived from the checked-out
+        # git remote). Local results are unaffected by upload outcome (ADR-0008).
+        set +e
+        npx --yes "opensip-cli@${OPENSIP_CLI_VERSION}" fit \
+          --report-to "${OPENSIP_CLOUD_URL}" \
+          --api-key "${OPENSIP_API_KEY}" \
+          ${OPENSIP_EXTRA_ARGS}
+        code=$?
+        set -e
+
+        if [ "$code" -eq 0 ]; then
+          echo "opensip: fit + cloud upload succeeded."
+          exit 0
+        fi
+
+        # Exit 4 = REPORT_FAILED: the run otherwise passed but the SARIF upload
+        # failed. Honor fail-on-upload-error. Any other non-zero exit is a real
+        # findings/gate failure and always fails the job.
+        if [ "$code" -eq 4 ]; then
+          if [ "${OPENSIP_FAIL_ON_UPLOAD_ERROR}" = "true" ]; then
+            echo "opensip: SARIF upload failed (exit 4); failing the job (fail-on-upload-error=true)." >&2
+            exit 4
+          fi
+          echo "opensip: SARIF upload failed (exit 4); not failing the job (fail-on-upload-error=false)." >&2
+          exit 0
+        fi
+
+        echo "opensip: fit reported a findings/gate failure (exit ${code}); failing the job." >&2
+        exit "$code"

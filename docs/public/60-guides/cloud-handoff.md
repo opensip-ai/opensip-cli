@@ -9,7 +9,7 @@ source-files:
   - packages/output/src/sink/http-egress.ts
   - packages/output/src/sink/repo-slug.ts
   - packages/cli/src/bootstrap/deliver-envelope.ts
-  - action.yml
+  - .github/actions/upload-sarif/action.yml
 related-docs:
   - ./03-wire-into-ci.md
   - ../20-fit/04-output-gate-sarif.md
@@ -55,9 +55,14 @@ What happens:
 > The endpoint must be `https://`. A Bearer credential is never sent over plain
 > HTTP — the CLI refuses an `http://` `--report-to` target when an API key is set.
 
-## In CI: the published GitHub Action
+## In CI
 
-Add one step to a consumer workflow:
+The public root action `opensip-ai/opensip-cli@v1` is the OSS PR-feedback action;
+it does not require an API key and does not upload to OpenSIP Cloud. For Cloud
+handoff, run the CLI directly or use the nested upload-sarif action path in this
+repository.
+
+Direct CLI workflow:
 
 ```yaml
 # .github/workflows/opensip-cloud-handoff.yml
@@ -75,14 +80,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4 # a git tree is required for repo attribution
-      - uses: opensip-ai/opensip-cli@v0
+      - uses: actions/setup-node@v6
         with:
-          api-key: ${{ secrets.OPENSIP_API_KEY }}
+          node-version: 24
+      - run: npx --yes opensip-cli@latest fit --report-to https://api.opensip.ai/v1/ingest --api-key "$OPENSIP_API_KEY"
+        env:
+          OPENSIP_API_KEY: ${{ secrets.OPENSIP_API_KEY }}
 ```
 
 Store the key as the repository/organization secret `OPENSIP_API_KEY`. The full
 input list (`cloud-url`, `args`, `working-directory`, `version`,
 `fail-on-upload-error`) is documented in
+the nested action docs:
 [`.github/actions/upload-sarif/README.md`](../../../.github/actions/upload-sarif/README.md).
 
 ## Exit codes

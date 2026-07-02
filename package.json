@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
+    "test": "turbo run test && pnpm test:scripts",
     "test:coverage": "turbo run test --continue -- --coverage",
     "test:coverage:fresh": "turbo run test --continue --force -- --coverage",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",

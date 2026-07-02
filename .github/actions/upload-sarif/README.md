@@ -5,9 +5,10 @@ tenant on every PR or push. The findings are authenticated with an `osk_` API
 key, attributed to the repository via the `x-opensip-repo` header, and turned
 into tickets by the next reconciler tick — **no manual `opensip ingest` step.**
 
-The composite action lives at the repository root (`action.yml`), so consumers
-reference it as `opensip-ai/opensip-cli@vN`. This directory holds the usage docs
-and a copy-pasteable example workflow.
+The public repository root action (`opensip-ai/opensip-cli@v1`) is the OSS
+PR-feedback action. This Cloud handoff composite lives at
+`.github/actions/upload-sarif/action.yml` for repository-local workflows and for
+consumers that intentionally vendor/reference this nested path.
 
 ## Quick start
 
@@ -24,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4 # a git working tree is required for repo attribution
-      - uses: opensip-ai/opensip-cli@v0
+      - uses: opensip-ai/opensip-cli/.github/actions/upload-sarif@main
         with:
           api-key: ${{ secrets.OPENSIP_API_KEY }}
 ```
@@ -34,10 +35,10 @@ jobs:
 | Input                  | Required | Default                            | Description                                                                                                |
 | ---------------------- | -------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `api-key`              | yes      | —                                  | An OpenSIP Cloud API key (`osk_…`) with the `ingest:write` permission (operator/admin role). Use a secret. |
-| `cloud-url`            | no       | `https://api.opensip.ai/v1/ingest` | Ingest base URL. The CLI appends `/sarif`. Must be `https://`.                                              |
+| `cloud-url`            | no       | `https://api.opensip.ai/v1/ingest` | Ingest base URL. The CLI appends `/sarif`. Must be `https://`.                                             |
 | `args`                 | no       | `''`                               | Extra `opensip fit` args (e.g. `--recipe my-recipe`, `--tags security`).                                   |
 | `working-directory`    | no       | `.`                                | Directory to run from. Must be a checked-out git tree for `<org>/<repo>` derivation.                       |
-| `version`              | no       | `latest`                           | `opensip-cli` npm version to run via npx.                                                                   |
+| `version`              | no       | `latest`                           | `opensip-cli` npm version to run via npx.                                                                  |
 | `fail-on-upload-error` | no       | `true`                             | Fail the job on a pure upload failure (CLI exit 4). Real findings/gate failures always fail the job.       |
 
 ## Prerequisites

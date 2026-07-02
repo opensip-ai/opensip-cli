@@ -8,6 +8,7 @@ purpose: "Task-led: add opensip-cli to your CI pipeline with PR annotations and 
 source-files:
   - packages/fitness/engine/src/cli/fit.ts
   - packages/contracts/src/types.ts
+  - action.yml
 related-docs:
   - ./01-write-your-first-check.md
   - ./04-adopt-in-a-monorepo.md
@@ -15,29 +16,88 @@ related-docs:
 ---
 # Wire into CI
 
-OpenSIP CLI is a CLI that exits with a code. Wiring it into CI is two lines for the basic case and ~15 lines for the full setup with PR annotations and baselines.
+OpenSIP CLI is a CLI that exits with a code. The GitHub Action is the shortest
+path for pull request feedback; direct CLI commands remain available when you
+want to own every baseline and artifact step yourself.
 
 ## The minimal setup
 
 ```yaml
-# .github/workflows/fitness.yml
-name: Fitness
+# .github/workflows/opensip.yml
+name: OpenSIP
 on: [pull_request, push]
 
 jobs:
-  fit:
+  opensip:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24 }
-      - run: curl -fsSL https://opensip.ai/cli/install.sh | bash
-      - run: opensip fit
+      - uses: opensip-ai/opensip-cli@v1
 ```
 
-`opensip fit` exits 0 if every check passed, non-zero otherwise. The build fails on red. No further setup required.
+The action runs `opensip suite run audit --changed --json` by default, so a
+supported repository gets changed-code PR feedback without an
+`opensip-cli.config.yml` or an OpenSIP Cloud account.
 
-That's the floor. The rest of this page is the polish: how to surface findings as PR comments, how to adopt incrementally without blocking PRs on legacy violations, and how to keep CI fast.
+That's the floor. The rest of this page is the polish: PR comments, SARIF upload,
+failure policy, and the lower-level manual baseline flow.
+
+## Full GitHub Action setup
+
+```yaml
+name: OpenSIP
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  opensip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opensip-ai/opensip-cli@v1
+        id: opensip
+        with:
+          suite: audit
+          changed: true
+          annotations: true
+          comment: true
+          sarif: true
+          fail-on: new-errors
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.opensip.outputs.sarif != ''
+        with:
+          sarif_file: ${{ steps.opensip.outputs.sarif }}
+          category: opensip-cli
+```
+
+The action outputs:
+
+| Output | Meaning |
+|---|---|
+| `verdict` | `pass`, `warn`, or `fail` from the review brief. |
+| `issues` | Total issue count from the suite aggregate. |
+| `new-issues` | Net-new count when baseline evidence is available. |
+| `brief` | Path to the review brief JSON. |
+| `sarif` | Path to action-generated SARIF when `sarif: true`. |
+| `degraded` | Comma-separated degraded evidence reasons. |
+
+`fail-on: new-errors` is the default. It fails on net-new error-rung risks when
+baseline evidence is available and falls back to error-rung changed-code risks
+when no baseline delta exists. Use `fail-on: never` for report-only adoption,
+`all-errors` for a hard gate, or `new-warnings` to include warning-rung new
+risks.
+
+The action-generated SARIF is a bounded projection of the audit review brief. For
+full source-tool SARIF and persistent baselines, use the manual flow below.
 
 ## PR annotations via SARIF
 
@@ -79,6 +139,9 @@ Then in CI:
 **The artifact pattern:** the gate baseline is a SQLite store, not a committed file. The standard flow is to run `fit --gate-save` on main-branch builds and upload `opensip-cli/.runtime/datastore.sqlite` as a workflow artifact; PR builds download that artifact into `opensip-cli/.runtime/` before running `fit --gate-compare`. (For a human-readable export — e.g. to inspect the baseline or feed GitHub Code Scanning — use `fit export --format baseline --out baseline.sarif`, which reads the same store.) See [output, gate, SARIF](../20-fit/04-output-gate-sarif.md) and [the architecture-gate CI patterns](../10-concepts/05-architecture-gate.md#ci-integration-patterns) for the full workflow.
 
 ## Recommended full setup
+
+The action setup above is the recommended default. Use the manual shape below
+when you need explicit baseline artifact restore/publish behavior.
 
 ```yaml
 name: Fitness

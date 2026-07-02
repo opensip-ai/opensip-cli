@@ -8,7 +8,7 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["opensip-cli/fit/checks/**/*.mjs"],
+      "entry": ["opensip-cli/fit/checks/**/*.mjs", "scripts/github-action/run.mjs"],
       "ignoreDependencies": [
         "@opensip-cli/checks-cpp",
         "@opensip-cli/checks-go",

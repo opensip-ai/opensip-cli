@@ -103,6 +103,22 @@ opensip fit --gate-save
 opensip fit --gate-compare
 ```
 
+For GitHub Actions, the root action runs the built-in audit suite without an
+OpenSIP Cloud account:
+
+```yaml
+- uses: opensip-ai/opensip-cli@v1
+  id: opensip
+  with:
+    suite: audit
+    comment: true
+    sarif: true
+    fail-on: new-errors
+```
+
+It emits a bounded review brief, workflow annotations, optional SARIF, and stable
+outputs such as `verdict`, `issues`, `new-issues`, `brief`, and `sarif`.
+
 ### Code Graph
 
 Build a static graph of your codebase so reviewers can answer the question

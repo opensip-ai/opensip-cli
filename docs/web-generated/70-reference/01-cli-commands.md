@@ -930,6 +930,7 @@ opensip suite add security --tool fitness --command fitness --arg recipe=securit
 |---|---|---|
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
+| `run` | `--config <path>` | Override the discovered `opensip-cli.config.yml` for the shared suite run scope. |
 | `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
 | `run` | `--changed` | Propagate changed-file selection to compatible steps. Built-in `audit` defaults to changed semantics when no selector is supplied. |
 | `run` | `--since <ref>` | Propagate a git diff base to compatible changed-file steps. |
@@ -971,6 +972,17 @@ signals. `baselineDelta.available` is `false` until a suite step exposes
 baseline-compare evidence; in that case findings are not labeled new unless the
 source signal explicitly carries baseline state. Suite-level brief SARIF is not
 emitted in this phase; use the source tools' existing SARIF output.
+
+## GitHub Action
+
+The root GitHub Action `opensip-ai/opensip-cli@v1` wraps the same suite contract
+for OSS CI. By default it runs `suite run audit --changed --json`, writes a
+review brief JSON file, emits workflow annotations, and exposes `verdict`,
+`issues`, `new-issues`, `brief`, `sarif`, and `degraded` outputs. Optional
+`comment: true` posts or updates one sticky PR comment when pull-request
+permissions are available. Optional `sarif: true` writes SARIF 2.1.0 derived from
+the bounded review brief; source-tool SARIF from `fit` and `graph` remains the
+high-fidelity CLI-owned path.
 
 See [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md)
 and [ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0110-host-owned-review-brief-contract.md).
