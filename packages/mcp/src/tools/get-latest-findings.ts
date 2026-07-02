@@ -24,11 +24,12 @@ export function registerGetLatestFindings(server: McpStdioServer, deps: McpToolD
     {
       title: 'Latest findings for a tool',
       description:
-        'Get the findings from the most recent OpenSIP run of a tool (fit, graph, yagni, sim). ' +
-        'Use this before re-running OpenSIP when the user mentions existing fit, graph, yagni, ' +
-        'sim, errors, warnings, findings, or prior results. Filter by `severity` ' +
-        '(errors/warnings/all) and cap with `limit`. Replays the persisted session; never ' +
-        're-runs the tool.',
+        'Use this OpenSIP MCP result tool first for existing or prior fit/graph/yagni/sim ' +
+        'errors, warnings, findings, scores, sessions, last-run, or current-finding questions. ' +
+        'Gets findings from the most recent stored run of a tool, filterable by `severity` ' +
+        '(errors/warnings/all) and capped with `limit`. Replays the persisted session and ' +
+        'never re-runs fit/graph/yagni/sim. Do not grep .runtime/logs, read datastore.sqlite ' +
+        'directly, or re-run a CLI tool to answer stored-result questions.',
       inputSchema: {
         tool: toolIdSchema(),
         severity: severitySchema(),

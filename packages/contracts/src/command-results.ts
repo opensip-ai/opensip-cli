@@ -58,6 +58,9 @@ export type {
   ReportResult,
 } from './command-results-variants/list-history-results.js';
 export type {
+  AgentGuidanceResult,
+  AgentGuidanceTargetAction,
+  AgentGuidanceTargetResult,
   PreExistingFile,
   InitResult,
   SimNoticeResult,

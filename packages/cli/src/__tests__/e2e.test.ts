@@ -424,17 +424,25 @@ describe('CLI e2e', () => {
 
       // First run creates the layout.
       cli.run(['init', '--language', 'typescript'], { cwd: tempDir });
-      // Second run refuses with exit 2 and surfaces a partialStateError
-      // pointing at --keep / --remove.
+      const configPath = join(tempDir, 'opensip-cli.config.yml');
+      const configBefore = readFileSync(configPath, 'utf8');
+      const examplePath = join(tempDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs');
+      const exampleBefore = readFileSync(examplePath, 'utf8');
+      // Second run refreshes managed guidance and exits 0 without rewriting
+      // config or scaffold examples.
       const { stdout, exitCode } = cli.run(['init', '--language', 'typescript', '--json'], {
         cwd: tempDir,
       });
-      expect(exitCode).toBe(2);
+      expect(exitCode).toBe(0);
       // 2.12.0: the InitResult rides under `.data` of the outcome wrapper.
       const output = JSON.parse(stdout).data;
       expect(output.created).toBe(false);
+      expect(output.refreshed).toBe(true);
       expect(output.state).toBe('fully-initialized');
-      expect(output.partialStateError?.state).toBe('fully-initialized');
+      expect(output.partialStateError).toBeUndefined();
+      expect(output.agentGuidance?.targets?.length).toBeGreaterThan(0);
+      expect(readFileSync(configPath, 'utf8')).toBe(configBefore);
+      expect(readFileSync(examplePath, 'utf8')).toBe(exampleBefore);
     });
 
     it('exits 2 with a prompt when language is ambiguous and --language not passed', () => {

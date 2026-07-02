@@ -605,6 +605,24 @@ describe('init spec — action body', () => {
     expect(setExitCode).toHaveBeenCalledWith(2);
   });
 
+  it('init: does not set exit-code when result is a refresh success', async () => {
+    vi.mocked(executeInit).mockReturnValueOnce({
+      type: 'init',
+      path: '',
+      cwd: process.cwd(),
+      configFilename: 'opensip-cli.config.yml',
+      created: false,
+      refreshed: true,
+      agentGuidance: { changed: false, targets: [] },
+    } as never);
+
+    const { ctx, setExitCode } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['init'], { from: 'user' });
+    expect(setExitCode).not.toHaveBeenCalled();
+  });
+
   it('init --json: short-circuits render and emits JSON', async () => {
     const { ctx, rendered } = makeCtx();
     const program = mount(ctx);

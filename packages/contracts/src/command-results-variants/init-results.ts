@@ -4,6 +4,19 @@ export interface PreExistingFile {
   readonly classification: 'scaffolded' | 'custom' | 'stale-scaffolded';
 }
 
+export type AgentGuidanceTargetAction = 'created' | 'updated' | 'unchanged' | 'skipped';
+
+export interface AgentGuidanceTargetResult {
+  readonly path: string;
+  readonly action: AgentGuidanceTargetAction;
+  readonly reason?: string;
+}
+
+export interface AgentGuidanceResult {
+  readonly changed: boolean;
+  readonly targets: readonly AgentGuidanceTargetResult[];
+}
+
 export interface InitResult {
   type: 'init';
   created: boolean;
@@ -36,9 +49,16 @@ export interface InitResult {
    * when init refused to write anything.
    */
   createdFiles?: readonly string[];
+  /**
+   * True when init refreshed project guidance / runtime ignores without
+   * rewriting config or scaffold examples. Absent means "not a refresh result."
+   */
+  refreshed?: boolean;
   /** True when init appended `opensip-cli/.runtime/` to .gitignore. */
   gitignoreUpdated?: boolean;
-  /** True when init created a new AGENTS playbook file (write-if-absent). */
+  /** Per-target managed guidance actions for supported agent instruction files. */
+  agentGuidance?: AgentGuidanceResult;
+  /** True when init created the default agent playbook. Legacy compatibility field. */
   agentsMdCreated?: boolean;
   /**
    * Files that existed before init ran, classified. Empty (or absent)

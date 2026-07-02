@@ -2,6 +2,21 @@
 
 This is the **START HERE** document for AI agents working on the OpenSIP CLI codebase.
 
+<!-- opensip:agent-guidance start -->
+## OpenSIP MCP First
+
+When answering questions about existing OpenSIP results, prior `fit` / `graph` / `yagni` / `sim` runs, findings, warnings, errors, scores, sessions, or graph relationships, use the OpenSIP MCP server first.
+
+Source precedence:
+
+1. OpenSIP MCP tools: `list_runs`, `show_run`, `get_latest_findings`, `search_symbols`, `who_calls`, `callees_of`, `blast_radius`.
+2. `opensip sessions ...` replay commands when MCP is unavailable.
+3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.
+4. Raw logs or direct datastore inspection only as a last-resort debugging path.
+
+Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result/history questions; logs are event streams and may not match stored session semantics.
+<!-- opensip:agent-guidance end -->
+
 ## What is OpenSIP CLI?
 
 OpenSIP CLI is an **open-source codebase intelligence CLI** — a CLI that
@@ -240,7 +255,7 @@ Subcommands available out of the box:
 - `opensip graph export --format sarif` — Run graph analysis and write SARIF findings
 - `opensip sim` — Run simulation scenarios [experimental]
 - `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--graph build`, `--min-confidence`)
-- `opensip init` — Generate `opensip-cli.config.yml` and `AGENTS.md` (write-if-absent)
+- `opensip init` — Generate `opensip-cli.config.yml`; repeat init refreshes managed MCP-first agent guidance and `.gitignore`
 - `opensip sessions list|show|purge` — Manage stored sessions
 - `opensip agent-catalog` — Machine discovery surface for AI agents
 - `opensip graph impact` — Changed→impact analysis (`--changed`, `--since`, `--files`)

@@ -423,7 +423,12 @@ opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
 | `show_run` | Replay a stored run by id, or `"latest"` (with `tool`); same `filters`/`raw` shape as `opensip sessions show`. |
 | `get_latest_findings` | The findings from the most recent run of a tool, filterable by `severity`. |
 
-The four result tools **replay persisted sessions only** — they never re-run `fit`/`graph`/`sim`/`yagni`. This is enforced by the `mcp-results-no-rerun` fitness check.
+The four result tools **replay persisted sessions only** — they never re-run
+`fit`/`graph`/`sim`/`yagni`. They are the preferred first source for existing
+run/finding/history questions. Agents should not grep `.runtime/logs`, read
+`datastore.sqlite` directly, or re-run a tool to answer a stored-result question
+unless fresh execution is explicitly needed. This is enforced by the
+`mcp-results-no-rerun` and `mcp-first-agent-guidance` fitness checks.
 
 ### The `symbolId` contract
 
@@ -435,7 +440,12 @@ Every graph result carries a `freshness` verdict. A **stale or missing catalog i
 
 ### Result-first guidance
 
-When the user references **existing** findings ("what were the fit errors?", "show the last graph run"), an agent should call `get_latest_findings` (or `show_run` / `list_runs`) to replay the stored result **before** re-running a tool. Re-running is expensive and usually unnecessary; the result tools exist precisely to steer the agent to the persisted result first.
+When the user references **existing** findings ("what were the fit errors?",
+"show the last graph run"), an agent should call `get_latest_findings` (or
+`show_run` / `list_runs`) to replay the stored result **before** re-running a
+tool. Re-running is expensive and usually unnecessary; the result tools exist
+precisely to steer the agent to the persisted result first. See
+[ADR-0109](../../decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
 
 ### MCP client setup
 
@@ -691,9 +701,12 @@ simulation tools, a project gets:
 <cwd>/opensip-cli/sim/recipes/example-recipe.mjs          # TRACKED
 ```
 
-Plus appends `opensip-cli/.runtime/` to `<cwd>/.gitignore`, and writes
-`<cwd>/AGENTS.md` (write-if-absent) — a short agent playbook referencing
-`agent-catalog`, session replay, agent recipes, and `graph impact`.
+Plus appends `opensip-cli/.runtime/` to `<cwd>/.gitignore`, and manages an
+OpenSIP MCP-first guidance block for AI agents. `AGENTS.md` is created when
+absent. Existing `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`,
+`.cursorrules`, `.cursor/rules/opensip.mdc` (when `.cursor/rules/` exists), and
+`.windsurfrules` are updated in place through a delimited managed block that
+preserves custom content.
 
 The scaffolded set equals the **registered** set: a tool that declares no project
 layout (e.g. `graph`) writes no directory, and a tool installed *after* `init`
@@ -719,8 +732,8 @@ After parsing flags init classifies the working directory into one of four state
 | State | `opensip-cli.config.yml` | `opensip-cli/` (excluding `.runtime/`) | Default | `--keep` | `--remove` |
 |---|---|---|---|---|---|
 | `pristine` | absent | absent | scaffold | scaffold | scaffold |
-| `fully-initialized` | present | present | exit 2, partial-state error | re-scaffold; preserve custom | `rm -rf opensip-cli/`; scaffold |
-| `partial-config-only` | present | absent | exit 2, partial-state error | scaffold the dir | scaffold the dir |
+| `fully-initialized` | present | present | refresh `.gitignore` + managed agent guidance | re-scaffold; preserve custom | `rm -rf opensip-cli/`; scaffold |
+| `partial-config-only` | present | absent | refresh `.gitignore` + managed agent guidance | scaffold the dir | scaffold the dir |
 | `partial-dir-only` | absent | present | exit 2, partial-state error | preserve custom; write YAML | `rm -rf opensip-cli/`; write YAML; scaffold |
 
 `--keep` and `--remove` are mutually exclusive. Use `--remove` when you want to
@@ -734,8 +747,10 @@ Each pre-existing file under `opensip-cli/` is classified as:
   `--language typescript`). Preserved by `--keep`.
 - `custom` — anything else (user-authored).
 
-The `InitResult` JSON shape carries `state`, `preExistingFiles[]`, and
-(on refusal) `partialStateError` so machine consumers can branch.
+The `InitResult` JSON shape carries `state`, `preExistingFiles[]`,
+`agentGuidance`, and either `created: true` for scaffolding or `refreshed: true`
+for the non-destructive repeat-init path. On refusal it carries
+`partialStateError` so machine consumers can branch.
 
 Detection markers:
 
@@ -750,7 +765,8 @@ Detection markers:
 
 Ambiguous detection (multiple markers, no `--language`) exits 2 with a prompt to specify `--language`.
 
-**Exit codes:** 0 (created), 0 (already exists, with notice), 2 (ambiguous detection / parse error).
+**Exit codes:** 0 (created or refreshed), 2 (ambiguous detection / parse error /
+unsafe partial state).
 
 ---
 

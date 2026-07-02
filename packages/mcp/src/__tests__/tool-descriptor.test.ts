@@ -64,4 +64,30 @@ describe('registerMcpTools', () => {
       ]),
     );
   });
+
+  it('describes result tools as persisted replay and warns against log/sqlite/rerun fallbacks', () => {
+    const configs = new Map<string, { description?: string }>();
+    const server = {
+      register: (name: string, config: { description?: string }) => {
+        configs.set(name, config);
+        return undefined;
+      },
+    } as unknown as McpStdioServer;
+    const deps: McpToolDeps = {
+      graph: {} as GraphReadPort,
+      results: {} as ResultsReadPort,
+      validToolIds: new Set(),
+    };
+
+    registerMcpTools(server, deps);
+
+    for (const name of ['get_agent_catalog', 'list_runs', 'show_run', 'get_latest_findings']) {
+      const description = configs.get(name)?.description ?? '';
+      expect(description).toMatch(/existing|prior/i);
+      expect(description).toMatch(/persisted|stored/i);
+      expect(description).toMatch(/never re-runs|never re-run/i);
+      expect(description).toContain('.runtime/logs');
+      expect(description).toContain('datastore.sqlite');
+    }
+  });
 });

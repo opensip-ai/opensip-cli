@@ -55,8 +55,8 @@
  * and the `opensip-cli/` directory:
  *
  *   - 'pristine'             — neither present; scaffold everything.
- *   - 'fully-initialized'    — both present; refuse without a flag.
- *   - 'partial-config-only'  — config XOR dir; refuse without a flag.
+ *   - 'fully-initialized'    — both present; refresh guidance without a flag.
+ *   - 'partial-config-only'  — config only; refresh guidance without a flag.
  *   - 'partial-dir-only'     — config XOR dir; refuse without a flag.
  *
  * Two flags express explicit user intent for the non-pristine states:
@@ -75,7 +75,7 @@
  *                             each tool's `scaffoldConfigBlock()`
  *   - file-classifier.ts    — scaffolded / stale / custom tagging
  *   - state-machine.ts      — working-dir state + refusal messages
- *   - scaffold-writer.ts    — disk writes + gitignore patching
+ *   - scaffold-writer.ts    — disk writes, gitignore patching, refresh mode
  *
  * This file is the orchestrator: argument validation → language
  * resolution → state classification → file classification → scaffold
@@ -84,11 +84,11 @@
 
 import { existsSync } from 'node:fs';
 
-import { resolveProjectPaths, type ProjectContext } from '@opensip-cli/core';
+import { resolveProjectPaths, type ProjectContext, type ProjectPaths } from '@opensip-cli/core';
 
 import { classifyFiles } from './init/file-classifier.js';
 import { resolveLanguages } from './init/language-detection.js';
-import { runScaffold } from './init/scaffold-writer.js';
+import { runRefresh, runScaffold } from './init/scaffold-writer.js';
 import {
   buildPartialStateMessage,
   classifyWorkingDir,
@@ -98,17 +98,58 @@ import {
 import type { ToolScaffold } from './shared.js';
 import type { InitOptions, InitResult } from '@opensip-cli/contracts';
 
+type ExecuteInitArgs = InitOptions & {
+  projectContext?: ProjectContext;
+  cwdExplicit?: boolean;
+  toolScaffolds: readonly ToolScaffold[];
+};
+
+type BaseInitResult = Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>;
+
+function maybeRunConfigRefresh(
+  args: ExecuteInitArgs,
+  inputs: {
+    readonly paths: ProjectPaths;
+    readonly baseResult: BaseInitResult;
+    readonly state: ReturnType<typeof classifyWorkingDir>;
+    readonly keep: boolean;
+    readonly remove: boolean;
+  },
+): InitResult | undefined {
+  const { paths, baseResult, state, keep, remove } = inputs;
+  if (keep || remove) return undefined;
+  if (state !== 'fully-initialized' && state !== 'partial-config-only') return undefined;
+
+  const languageExplicit = args.language !== undefined && args.language.length > 0;
+  const resolution = resolveLanguages(args.cwd, args.language);
+  if (!resolution.ok && languageExplicit) {
+    return {
+      ...baseResult,
+      created: false,
+      ambiguousLanguageError: resolution.error,
+    };
+  }
+
+  const languages = resolution.ok ? resolution.languages : undefined;
+  const preExistingFiles =
+    languages === undefined ? [] : classifyFiles(paths, languages, args.toolScaffolds);
+  return runRefresh(
+    {
+      cwd: args.cwd,
+      state,
+      ...(languages === undefined ? {} : { languages }),
+      preExistingFiles,
+      toolScaffolds: args.toolScaffolds,
+    },
+    baseResult,
+  );
+}
+
 /**
  * Run init for the given args. Returns an InitResult — the caller
  * (CLI render layer) prints it.
  */
-export function executeInit(
-  args: InitOptions & {
-    projectContext?: ProjectContext;
-    cwdExplicit?: boolean;
-    toolScaffolds: readonly ToolScaffold[];
-  },
-): InitResult {
+export function executeInit(args: ExecuteInitArgs): InitResult {
   const cwd = args.cwd;
   const keep = args.keep === true;
   const remove = args.remove === true;
@@ -167,6 +208,15 @@ export function executeInit(
     };
   }
 
+  const state = classifyWorkingDir(paths);
+
+  // Config-present projects are already configured. A plain repeat init
+  // refreshes managed guidance and runtime ignores without rewriting config or
+  // scaffold examples. If the user explicitly supplied --language, still
+  // validate it so bad flags fail loud.
+  const refreshResult = maybeRunConfigRefresh(args, { paths, baseResult, state, keep, remove });
+  if (refreshResult !== undefined) return refreshResult;
+
   const resolution = resolveLanguages(cwd, args.language);
   if (!resolution.ok) {
     return {
@@ -177,7 +227,6 @@ export function executeInit(
   }
   const { languages } = resolution;
 
-  const state = classifyWorkingDir(paths);
   const preExistingFiles =
     state === 'pristine' ? [] : classifyFiles(paths, languages, args.toolScaffolds);
 
@@ -198,8 +247,8 @@ export function executeInit(
     );
   }
 
-  // Non-pristine without an explicit flag: refuse with partial-state
-  // error.
+  // Non-pristine without an explicit flag: only dir-without-config remains an
+  // unsafe partial state. Config-present states refresh above.
   if (!keep && !remove) {
     return {
       ...baseResult,

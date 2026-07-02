@@ -277,18 +277,22 @@ describe('executeInit (fully-initialized state)', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
   });
 
-  it('refuses to overwrite without a flag', () => {
+  it('refreshes guidance without overwriting config or examples by default', () => {
     executeInit(makeArgs());
     const before = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
+    const examplePath = join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs');
+    const exampleBefore = readFileSync(examplePath, 'utf8');
 
     const second = executeInit(makeArgs());
     expect(second.created).toBe(false);
+    expect(second.refreshed).toBe(true);
     expect(second.state).toBe('fully-initialized');
-    expect(second.partialStateError).toBeDefined();
-    expect(second.partialStateError?.state).toBe('fully-initialized');
+    expect(second.partialStateError).toBeUndefined();
+    expect(second.agentGuidance?.targets.length).toBeGreaterThan(0);
 
     const after = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(after).toBe(before);
+    expect(readFileSync(examplePath, 'utf8')).toBe(exampleBefore);
   });
 
   it('--remove blows away opensip-cli/ and rewrites everything', () => {
@@ -343,13 +347,16 @@ describe('executeInit (partial-config-only state)', () => {
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# stub');
   });
 
-  it('refuses by default with a partial-state error', () => {
+  it('refreshes guidance by default without scaffolding examples', () => {
     const result = executeInit(makeArgs());
     expect(result.created).toBe(false);
+    expect(result.refreshed).toBe(true);
     expect(result.state).toBe('partial-config-only');
-    expect(result.partialStateError?.state).toBe('partial-config-only');
-    expect(result.partialStateError?.message).toContain('--keep');
-    expect(result.partialStateError?.message).toContain('--remove');
+    expect(result.partialStateError).toBeUndefined();
+    expect(result.agentGuidance?.targets.length).toBeGreaterThan(0);
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
+      false,
+    );
   });
 
   it('--keep scaffolds the missing dir', () => {
@@ -502,6 +509,7 @@ describe('executeInit (AGENTS.md)', () => {
     expect(result.agentsMdCreated).toBe(true);
     expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('Agent Playbook');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('OpenSIP MCP First');
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('agent-fast');
   });
 
@@ -514,19 +522,39 @@ describe('executeInit (AGENTS.md)', () => {
     expect(agents).not.toContain('agent-fast');
   });
 
-  it('does not overwrite an existing AGENTS.md', () => {
+  it('updates an existing AGENTS.md managed block and preserves custom content', () => {
     writeFileSync(join(testDir, 'AGENTS.md'), '# Custom playbook\n', 'utf8');
     const result = executeInit(makeArgs());
     expect(result.agentsMdCreated).toBe(false);
-    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe('# Custom playbook\n');
+    const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
+    expect(agents).toContain('# Custom playbook');
+    expect(agents).toContain('OpenSIP MCP First');
+    expect(
+      result.agentGuidance?.targets.find((target) => target.path.endsWith('AGENTS.md'))?.action,
+    ).toBe('updated');
   });
 
-  it('preserves AGENTS.md on re-init with --keep', () => {
+  it('refreshes AGENTS.md on re-init with --keep without duplicating the block', () => {
     executeInit(makeArgs());
     const first = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     const result = executeInit(makeArgs({ keep: true }));
     expect(result.agentsMdCreated).toBe(false);
-    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe(first);
+    const second = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
+    expect(second).toBe(first);
+    expect(second.split('<!-- opensip:agent-guidance start -->')).toHaveLength(2);
+  });
+
+  it('updates an existing CLAUDE.md during refresh', () => {
+    executeInit(makeArgs());
+    writeFileSync(join(testDir, 'CLAUDE.md'), '# Claude\n\nCustom guidance.\n', 'utf8');
+    const result = executeInit(makeArgs());
+    const claude = readFileSync(join(testDir, 'CLAUDE.md'), 'utf8');
+    expect(result.refreshed).toBe(true);
+    expect(
+      result.agentGuidance?.targets.find((target) => target.path.endsWith('CLAUDE.md'))?.action,
+    ).toBe('updated');
+    expect(claude).toContain('Custom guidance.');
+    expect(claude).toContain('OpenSIP MCP First');
   });
 });
 

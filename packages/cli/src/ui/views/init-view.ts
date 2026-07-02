@@ -6,7 +6,12 @@
 
 import { line, group, type Tone, type ViewNode } from '@opensip-cli/cli-ui';
 
-import type { InitResult, PreExistingFile } from '@opensip-cli/contracts';
+import type {
+  AgentGuidanceTargetAction,
+  AgentGuidanceTargetResult,
+  InitResult,
+  PreExistingFile,
+} from '@opensip-cli/contracts';
 
 function classificationTone(cls: PreExistingFile['classification']): Tone {
   if (cls === 'custom') return 'success';
@@ -50,6 +55,29 @@ function preExistingLines(files: readonly PreExistingFile[], cwd: string): ViewN
         text: `  (${f.classification})`,
         tone: classificationTone(f.classification),
       },
+    ]),
+  );
+}
+
+function guidanceActionTone(action: AgentGuidanceTargetAction): Tone | undefined {
+  if (action === 'created' || action === 'updated') return 'success';
+  if (action === 'skipped') return 'warning';
+  return undefined;
+}
+
+function guidanceLines(
+  targets: readonly AgentGuidanceTargetResult[] | undefined,
+  cwd: string,
+): ViewNode[] {
+  if (targets === undefined || targets.length === 0) return [];
+  return targets.map((target) =>
+    line([
+      { text: `    ${relativize(target.path, cwd)}`, dim: true },
+      { text: '  ' },
+      { text: target.action, tone: guidanceActionTone(target.action) },
+      ...(target.reason === undefined
+        ? []
+        : [{ text: '  ' }, { text: `(${target.reason})`, dim: true }]),
     ]),
   );
 }
@@ -134,10 +162,9 @@ function createdView(result: InitResult): ViewNode {
   if (result.gitignoreUpdated === true) {
     children.push(line([{ text: '    .gitignore (added opensip-cli/.runtime/)', dim: true }]));
   }
-  if (result.agentsMdCreated === true) {
-    children.push(line([{ text: '    AGENTS.md (agent playbook)', dim: true }]));
-  } else if (result.created) {
-    children.push(line([{ text: '    AGENTS.md preserved (already present)', dim: true }]));
+  const guidance = guidanceLines(result.agentGuidance?.targets, cwd);
+  if (guidance.length > 0) {
+    children.push(line([{ text: '    Agent guidance:', dim: true }]), ...guidance);
   }
   if (result.preExistingFiles && result.preExistingFiles.length > 0) {
     children.push(
@@ -155,6 +182,38 @@ function createdView(result: InitResult): ViewNode {
   return group(children, 2);
 }
 
+function refreshView(result: InitResult): ViewNode {
+  const children: ViewNode[] = [
+    line([
+      { text: '✓', tone: 'success' },
+      { text: ' Already initialized; refreshed OpenSIP agent guidance in ' },
+      { text: result.cwd, dim: true },
+    ]),
+  ];
+  if (result.gitignoreUpdated === true) {
+    children.push(line([{ text: '    .gitignore (added opensip-cli/.runtime/)', dim: true }]));
+  }
+  const guidance = guidanceLines(result.agentGuidance?.targets, result.cwd);
+  if (guidance.length > 0) {
+    children.push(
+      { kind: 'spacer' },
+      line([{ text: '  Agent guidance:', dim: true }]),
+      ...guidance,
+    );
+  }
+  if (result.state === 'partial-config-only') {
+    children.push(
+      { kind: 'spacer' },
+      line([
+        { text: '  Run ' },
+        { text: 'opensip init --keep', tone: 'brand' },
+        { text: ' to re-scaffold examples.', dim: true },
+      ]),
+    );
+  }
+  return group(children, 2);
+}
+
 export function viewInit(result: InitResult): ViewNode {
   if (result.insideExistingProject !== undefined)
     return verbatim(result.insideExistingProject.message);
@@ -163,6 +222,7 @@ export function viewInit(result: InitResult): ViewNode {
   if (result.partialStateError !== undefined)
     return partialStateView(result.partialStateError, result.cwd, result.configFilename);
   if (result.created) return createdView(result);
+  if (result.refreshed === true) return refreshView(result);
   return group(
     [
       line([
