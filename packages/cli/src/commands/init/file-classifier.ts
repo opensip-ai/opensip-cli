@@ -7,7 +7,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename as pathBasename, join } from 'node:path';
 
 import { ALL_LANGUAGES } from './language-detection.js';
@@ -16,6 +16,8 @@ import type { SupportedLanguage } from './language-detection.js';
 import type { ToolScaffold } from '../shared.js';
 import type { PreExistingFile } from '@opensip-cli/contracts';
 import type { ProjectPaths } from '@opensip-cli/core';
+
+const GENERATED_DIR_NAMES = new Set(['node_modules', 'dist', 'coverage', '.turbo']);
 
 /**
  * Build the full set of scaffold templates that init would write for the given
@@ -46,8 +48,8 @@ function sha256(content: string): string {
 }
 
 /**
- * Walk every file under `opensip-cli/` (excluding `.runtime/`, which
- * is gitignored runtime state and not user-authored) and tag each one.
+ * Walk every authored file under `opensip-cli/` (excluding runtime, dependency,
+ * and generated-output directories) and tag each one.
  *
  * Classification rules:
  *
@@ -59,9 +61,10 @@ function sha256(content: string): string {
  *                           language not in the current set.
  *   - 'custom'            — anything else (user-authored).
  *
- * The walk is bounded to the `opensip-cli/` subtree (kilobytes in
- * practice). The `.runtime/` subdir is skipped so caches/logs/sessions
- * don't pollute the file list.
+ * The walk is bounded to the `opensip-cli/` subtree and deliberately avoids
+ * following symlinks. The `.runtime/` subdir is skipped so caches/logs/sessions
+ * don't pollute the file list; generated directories such as node_modules,
+ * dist, coverage, and .turbo are skipped for the same reason.
  *
  * Note on hash-based scaffolded detection: a scaffolded file that has
  * been line-ending normalized (CRLF↔LF) or stripped of a trailing
@@ -101,7 +104,7 @@ export function classifyFiles(
 
   const out: PreExistingFile[] = [];
 
-  // Walk the dir, skipping `.runtime/`.
+  // Walk the dir, skipping runtime/dependency/generated subtrees.
   const visit = (dir: string): void => {
     let entries: string[];
     try {
@@ -111,12 +114,20 @@ export function classifyFiles(
     }
     for (const name of entries) {
       const full = join(dir, name);
-      // Skip runtime state (gitignored, tool-managed).
-      if (full === paths.runtimeDir) continue;
       let st;
       try {
-        st = statSync(full);
+        st = lstatSync(full);
       } catch {
+        continue;
+      }
+      if (
+        (st.isDirectory() || st.isSymbolicLink()) &&
+        (full === paths.runtimeDir || GENERATED_DIR_NAMES.has(name))
+      ) {
+        continue;
+      }
+      if (st.isSymbolicLink()) {
+        out.push({ path: full, classification: 'custom' });
         continue;
       }
       if (st.isDirectory()) {

@@ -14,7 +14,7 @@
  *   5. no fit/sim/checks/recipes/scenarios literal survives in `scaffold-writer.ts`.
  */
 
-import { existsSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -180,6 +180,36 @@ describe('init — stale-detection over the aggregated full-language id universe
       scaffoldsFor([fitnessTool, simulationTool]),
     );
     expect(classified.find((f) => f.path === custom)?.classification).toBe('custom');
+  });
+
+  it('skips generated dependency and build output dirs while classifying', () => {
+    initTsOnly();
+    const fitDir = join(testDir, 'opensip-cli/fit');
+    const generatedFiles = [
+      join(fitDir, 'node_modules/pkg/index.js'),
+      join(fitDir, 'dist/index.js'),
+      join(fitDir, 'coverage/lcov.info'),
+      join(fitDir, '.turbo/turbo-build.log'),
+    ];
+    for (const file of generatedFiles) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, 'generated\n', 'utf8');
+    }
+    const authored = join(testDir, 'opensip-cli/fit/checks/custom.mjs');
+    writeFileSync(authored, 'custom\n', 'utf8');
+
+    const paths = resolveProjectPaths(testDir);
+    const classified = classifyFiles(
+      paths,
+      ['typescript'],
+      scaffoldsFor([fitnessTool, simulationTool]),
+    );
+    const classifiedPaths = classified.map((f) => f.path);
+
+    expect(classifiedPaths).toContain(authored);
+    for (const generated of generatedFiles) {
+      expect(classifiedPaths).not.toContain(generated);
+    }
   });
 
   it('--keep preserves a stale-scaffolded file', () => {

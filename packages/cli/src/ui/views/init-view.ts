@@ -13,6 +13,8 @@ import type {
   PreExistingFile,
 } from '@opensip-cli/contracts';
 
+const PRE_EXISTING_FILE_DISPLAY_LIMIT = 40;
+
 function classificationTone(cls: PreExistingFile['classification']): Tone {
   if (cls === 'custom') return 'success';
   if (cls === 'stale-scaffolded') return 'warning';
@@ -57,6 +59,16 @@ function preExistingLines(files: readonly PreExistingFile[], cwd: string): ViewN
       },
     ]),
   );
+}
+
+function preExistingPreviewLines(files: readonly PreExistingFile[], cwd: string): ViewNode[] {
+  const visible = files.slice(0, PRE_EXISTING_FILE_DISPLAY_LIMIT);
+  const nodes = preExistingLines(visible, cwd);
+  const hidden = files.length - visible.length;
+  if (hidden > 0) {
+    nodes.push(line([{ text: `    ... ${String(hidden)} more file(s) not shown`, dim: true }]));
+  }
+  return nodes;
 }
 
 function guidanceActionTone(action: AgentGuidanceTargetAction): Tone | undefined {
@@ -112,6 +124,7 @@ function partialStateView(
     ]),
   ];
   if (err.preExistingFiles.length > 0) {
+    const fileLines = preExistingPreviewLines(err.preExistingFiles, cwd);
     children.push(
       { kind: 'spacer' },
       line([
@@ -120,8 +133,8 @@ function partialStateView(
           dim: true,
         },
       ]),
-      ...preExistingLines(err.preExistingFiles, cwd),
     );
+    for (const node of fileLines) children.push(node);
   }
   children.push(
     { kind: 'spacer' },
@@ -167,11 +180,9 @@ function createdView(result: InitResult): ViewNode {
     children.push(line([{ text: '    Agent guidance:', dim: true }]), ...guidance);
   }
   if (result.preExistingFiles && result.preExistingFiles.length > 0) {
-    children.push(
-      { kind: 'spacer' },
-      line([{ text: '  Pre-existing files:', dim: true }]),
-      ...preExistingLines(result.preExistingFiles, cwd),
-    );
+    const fileLines = preExistingPreviewLines(result.preExistingFiles, cwd);
+    children.push({ kind: 'spacer' }, line([{ text: '  Pre-existing files:', dim: true }]));
+    for (const node of fileLines) children.push(node);
   }
   children.push(
     { kind: 'spacer' },

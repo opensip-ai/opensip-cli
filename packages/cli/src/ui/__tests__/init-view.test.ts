@@ -87,6 +87,26 @@ describe('viewInit — partial-state report', () => {
     );
     expect(full).toContain('Already initialized');
   });
+
+  it('caps large pre-existing-file lists instead of rendering every file', () => {
+    const files = Array.from({ length: 45 }, (_, index) => ({
+      path: `/proj/opensip-cli/fit/checks/file-${String(index).padStart(2, '0')}.mjs`,
+      classification: 'custom' as const,
+    }));
+    const out = text(
+      result({
+        partialStateError: {
+          state: 'partial-dir-only',
+          preExistingFiles: files,
+        },
+      } as Partial<InitResult>),
+    );
+
+    expect(out).toContain('Found 45 file(s) under opensip-cli/');
+    expect(out).toContain('opensip-cli/fit/checks/file-39.mjs');
+    expect(out).not.toContain('opensip-cli/fit/checks/file-40.mjs');
+    expect(out).toContain('... 5 more file(s) not shown');
+  });
 });
 
 describe('viewInit — created success', () => {
