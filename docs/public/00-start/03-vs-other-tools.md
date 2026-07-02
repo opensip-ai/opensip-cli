@@ -1,106 +1,202 @@
 ---
 status: current
-last_verified: 2026-06-14
-release: v0.2.4
+last_verified: 2026-07-02
+release: v0.2.x
 title: "vs. other tools"
 audience: [getting-started]
-purpose: "Honest comparison: what opensip-cli does that ESLint, Semgrep, Sonarqube, and Snyk don't — and what it deliberately doesn't try to do."
+purpose: "Honest comparison: where opensip-cli complements linters, dead-code tools, architecture gates, Semgrep, Fallow, Sonarqube, and Snyk."
 source-files:
   - README.md
+  - docs/public/70-reference/12-public-benchmarks.md
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./04-faq.md
+  - ../70-reference/12-public-benchmarks.md
   - ../60-guides/use-opensip-with-ai-agents.md
   - ../../decisions/ADR-0095-ai-native-guardrail-platform-posture.md
 ---
 # vs. other tools
 
-OpenSIP CLI is not a replacement for ESLint, Semgrep, or Sonarqube — it complements them. This page lays out what's overlapping, what's distinct, and when each tool is the right call. No marketing — just the honest shape.
+OpenSIP CLI is not a replacement for the specialized tools already in a mature
+repo. It is the local guardrail layer around architecture, graph evidence,
+fitness checks, suites, baselines, SARIF, and agent-readable review evidence.
+This page lays out the overlap and the tradeoffs.
+
+For measured OpenSIP CLI timings, see
+[Public benchmarks](../70-reference/12-public-benchmarks.md). Those numbers are
+not competitor benchmarks.
 
 ## At a glance
 
-| | opensip-cli | ESLint / Ruff / golangci-lint | Semgrep | Sonarqube | Snyk |
-|---|---|---|---|---|---|
-| **Polyglot in one run** | ✓ TS, Python, Rust, Go, Java, C/C++ | ✗ (one per language) | ✓ | ✓ | ✓ (security focus) |
-| **User-authored architectural rules** | ✓ (`defineCheck` in 15 lines) | partial (custom rules per linter) | ✓ (Semgrep YAML) | partial (XPath-ish) | ✗ |
-| **Static call-graph rules** (orphan code, dead paths, structural) | ✓ (11 built-in, `defineRule`) | ✗ | partial | ✓ | ✗ |
-| **Load / chaos simulation** | ✓ (`sim`) | ✗ | ✗ | ✗ | ✗ |
-| **CI gate with baselines** | ✓ (`--gate-save` / `--gate-compare`) | partial (snapshot files) | ✓ | ✓ | ✓ |
-| **SARIF output for PR annotations** | ✓ | partial | ✓ | ✓ | ✓ |
-| **Runs offline (no SaaS required)** | ✓ | ✓ | ✓ | partial | ✗ |
-| **Free / open source** | ✓ Apache-2.0 | ✓ | ✓ (OSS engine + paid cloud) | partial (Community Edition) | ✗ (commercial) |
-| **Per-project plugins via `.mjs` files** | ✓ | partial | ✗ | ✗ | ✗ |
-| **Marketplace of rules** | partial (npm packages) | ✓ (huge) | ✓ (large registry) | partial | partial |
+| Capability | opensip-cli | ESLint/Ruff/golangci-lint | Knip | dependency-cruiser | Semgrep | Fallow |
+|---|---|---|---|---|---|---|
+| Language-specific lint style | partial | yes | no | no | partial | JS/TS-focused |
+| Dead-code / unused export evidence | yes, via graph and checks | partial | yes, JS/TS-focused | no | partial | yes, JS/TS-focused |
+| Dependency graph policy | yes, through checks and docs gates | no | partial | yes | partial | partial |
+| Static call graph rules | yes | no | partial | no | partial | yes, JS/TS-focused |
+| Polyglot analysis in one CLI | yes | no | no | JS/TS dependencies | yes | no |
+| SARIF and PR annotations | yes | partial | no | no | yes | varies by integration |
+| Agent-readable review evidence | yes, JSON, sessions, MCP, review brief | no | no | no | JSON/SARIF | yes, narrower scope |
+| Runs offline without SaaS | yes | yes | yes | yes | yes for OSS engine | yes |
+| Plugin/tool platform | yes | rule/plugin ecosystems vary | no | no | rule registry | no |
 
----
+## ESLint, Ruff, golangci-lint, clang-tidy
 
-## Should I use opensip-cli or X?
+### What these tools do well
 
-### vs. ESLint, Ruff, golangci-lint, clang-tidy
+Language linters are excellent at file-local syntax, style, and idiom checks:
+`no-unused-vars`, import ordering, formatting, language-specific correctness, and
+fast editor feedback.
 
-**Use linters for what they're good at:** language-specific syntactic patterns and stylistic preferences inside one file. `no-unused-vars`, `prefer-const`, formatting, AST-level idiom enforcement. These are exactly what linters were designed for.
+### When these tools are the better choice
 
-**Use opensip-cli above them**, for things linters can't express:
+Use them when the rule is file-local, language-specific, and should run in the
+editor on every save. OpenSIP CLI should not own formatting, style rules, or the
+large ecosystem of per-language lint plugins.
 
-- *Architectural rules* — "no module under `packages/cli/` may import from `packages/fitness/checks-*`". This is a project-shape rule, not a syntactic one.
-- *Cross-file constraints* — "every package directory must have a README.md and a tsconfig.json".
-- *Cross-language rules* — "no console.log in production code", but applied uniformly to TypeScript and Python and Rust.
-- *Things that need to look at multiple files at once* — duplicated function bodies, orphan call-graph subtrees, drift from a stored baseline.
+### Where opensip-cli is different
 
-Linters and opensip-cli coexist. They answer different questions; you run both in CI.
+OpenSIP CLI is stronger for repo-shaped rules: target-aware fitness checks,
+cross-file constraints, graph rules, baselines, SARIF export, suites, session
+history, and agent-readable review briefs. Most teams run both.
 
-### vs. Semgrep
+## Knip
 
-This is the closest comparison — both are polyglot rule runners aimed above traditional linters. The differences:
+### What Knip does well
 
-- **Rule format.** Semgrep rules are YAML pattern-matching expressions. OpenSIP CLI checks are TypeScript/JS functions. Semgrep's YAML is more compact for syntactic patterns; opensip-cli's code is more flexible for arbitrary logic (multi-file analysis, custom data structures, fetching the package graph). If your rules are mostly "match this pattern with these variables", Semgrep is sharper. If your rules need to walk the call graph or check that a specific file exists, OpenSIP CLI is sharper.
-- **Sim and graph loops.** opensip-cli also ships `sim` (load / chaos simulation) and `graph` (static call-graph rules, authored the same way `fit` checks are via `defineRule`). These don't have Semgrep equivalents. If you want one tool for "is the code clean" + "does it behave under load" + "what's reachable", opensip-cli covers all three.
-- **Hosting.** Semgrep's OSS engine is free; their cloud product (App / Pro) is paid and where most of the rule library lives. OpenSIP CLI is fully open-source — no separate cloud product is required. The optional `--report-to` endpoint posts to OpenSIP Cloud for dashboards, but the CLI works fully offline.
+Knip is focused on unused files, exports, and dependencies in JavaScript and
+TypeScript projects. It is sharp when the question is "what JS/TS code can I
+delete?" and when a project follows framework conventions Knip understands.
 
-Many teams use both: Semgrep for the security-rule library, opensip-cli for project-shape and architecture rules.
+### When Knip is the better choice
 
-### vs. Sonarqube
+Use Knip when your main problem is JS/TS unused export detection and you want a
+dedicated tool with deep ecosystem-specific heuristics. It is also the better
+choice if you do not need polyglot analysis, SARIF, sessions, suites, or graph
+rule composition.
 
-Sonarqube is the closest in *scope* — multi-language code quality with rule customization and baseline tracking — but the operating model is different:
+### Where opensip-cli is different
 
-- **Sonarqube is a server.** You run an analyzer (sonar-scanner) that posts to a Sonarqube instance, and gates happen in the server. OpenSIP CLI is a CLI that exits with a code. No server, no database (beyond a local SQLite file for sessions).
-- **Rules.** Sonarqube ships thousands of pre-built rules; customizing them requires the (paid) Developer Edition or higher. opensip-cli ships 151 checks across seven packs and assumes you'll author project-specific ones in 15-line files.
-- **Architecture rules.** Sonarqube has limited architecture-rule support (some via XPath in Java). OpenSIP CLI is designed *around* architectural rules — that's the central use case.
+OpenSIP CLI treats dead-code evidence as one part of a broader guardrail loop:
+fitness checks, graph reachability, advisory YAGNI findings, baselines, SARIF,
+and review evidence. It is less specialized than Knip for JS/TS unused export
+heuristics, but broader across languages and workflows.
 
-If you want a managed server with a UI for triage, Sonarqube fits. If you want a CLI that exits with an exit code and lives entirely in your repo, OpenSIP CLI fits.
+## dependency-cruiser
 
-### vs. Snyk
+### What dependency-cruiser does well
 
-Snyk is a security platform — vulnerability scanning, dependency CVE checks, secret detection, IaC misconfiguration. OpenSIP CLI is not in that category. The categories overlap only in the "fail CI on bad code" gate model; the content is completely different.
+dependency-cruiser is purpose-built for JavaScript/TypeScript dependency graph
+policy. It is a strong choice for "this layer must not import that layer" rules
+with clear visualizations and mature dependency-specific configuration.
 
-- Use Snyk for: CVE scanning, license compliance, container/IaC security.
-- Use opensip-cli for: code quality, architectural rules, project shape, static analysis findings.
+### When dependency-cruiser is the better choice
 
-They coexist comfortably in the same CI pipeline.
+Use dependency-cruiser when dependency graph policy is the main job and you want
+the dedicated JS/TS dependency-analysis surface. OpenSIP CLI should not replace
+that tool in repos that already have a well-maintained depcruise gate.
 
----
+### Where opensip-cli is different
 
-## What opensip-cli deliberately isn't trying to be
+OpenSIP CLI can enforce architecture constraints as part of a larger local
+evidence plane. It combines dependency policy with fitness checks, call-graph
+rules, suite orchestration, baselines, and machine-readable session evidence.
+This repo itself still uses dependency-cruiser in `pnpm lint`.
 
-A short anti-claims list, since "what we don't do" is often more useful than "what we do":
+## Semgrep
 
-- **Not a linter replacement.** ESLint, Ruff, golangci-lint, and clang-tidy still belong in your toolchain.
-- **Not a service.** No daemon. No API server. The optional OpenSIP Cloud dashboard is a separate product that opensip-cli can post to, not require.
-- **Not opinionated about your bar.** The built-in checks (151 across seven packs) are a starting point. The point is *your* rules — the constraints that matter to your codebase.
-- **Not a CI runner.** It runs *under* GitHub Actions / GitLab CI / Buildkite. Produces an exit code and SARIF; doesn't replace your CI orchestrator.
-- **Not an AI runtime.** No model calls, no embeddings, no autonomous code
-  changes. It is deliberately AI-agent friendly through JSON, sessions,
-  `agent-catalog`, MCP, filters, and recipes — guardrails that external agents
-  can consume.
-- **Not a security scanner.** Limited security checks (no-eval, no-hardcoded-secrets, sql-injection patterns) ship in `checks-universal`, but Snyk / Dependabot / GitHub Advanced Security are the right call for CVE-scale work.
+### What Semgrep does well
 
----
+Semgrep is excellent for pattern matching across many languages. Its YAML rule
+format is compact for "match this code shape" policies, and its ecosystem has a
+large security-rule footprint.
+
+### When Semgrep is the better choice
+
+Use Semgrep when your rule is primarily syntactic pattern matching, especially
+security patterns backed by Semgrep's rule ecosystem. It is the better choice
+when you need Semgrep App/Pro workflows or a mature rule registry.
+
+### Where opensip-cli is different
+
+OpenSIP CLI checks are TypeScript/JavaScript functions and can use project files,
+targeting, call-graph evidence, suites, and host-owned baselines. It is better
+for project-specific guardrails that need arbitrary repo logic rather than
+compact code-pattern matching.
+
+## Fallow
+
+### What Fallow does well
+
+Fallow presents a polished JS/TS-focused developer experience around codebase
+cleanup and framework-aware evidence. Its Rust implementation and narrower scope
+can be a better fit for teams that want a focused JS/TS cleanup workflow.
+
+### When Fallow is the better choice
+
+Use Fallow when your adoption target is mostly JavaScript/TypeScript cleanup and
+you value its specific framework coverage, UX, or performance profile more than
+polyglot analysis and plugin/tool extensibility.
+
+### Where opensip-cli is different
+
+OpenSIP CLI is deliberately broader: polyglot fitness checks, graph adapters,
+simulation, YAGNI audit, Tool plugins, suites, SARIF, MCP tools, and review
+briefs for agents. It is a guardrail layer for humans and agents, not a Rust
+speed claim against Fallow.
+
+## Sonarqube
+
+### What Sonarqube does well
+
+Sonarqube is a broad code-quality server with many rules, dashboards, quality
+gates, and enterprise governance workflows.
+
+### When Sonarqube is the better choice
+
+Use Sonarqube when you want a central server, UI-based triage, organization-wide
+quality profiles, and managed governance workflows.
+
+### Where opensip-cli is different
+
+OpenSIP CLI is local-first: a CLI that runs in a repo, exits with a code, stores
+local evidence, and can work without a server. The optional OpenSIP platform is a
+separate product; the CLI core calls no models and does not require Cloud.
+
+## Snyk
+
+### What Snyk does well
+
+Snyk is a security platform for dependency CVEs, license compliance, container
+and IaC scanning, secret detection, and security triage workflows.
+
+### When Snyk is the better choice
+
+Use Snyk for CVE-scale vulnerability management, dependency/license policy, and
+security product workflows. OpenSIP CLI is not a replacement for that category.
+
+### Where opensip-cli is different
+
+OpenSIP CLI focuses on codebase intelligence and guardrails: architecture,
+project shape, graph evidence, fitness checks, suites, and agent-readable
+evidence. It can coexist with Snyk in the same CI pipeline.
+
+## What opensip-cli deliberately is not
+
+- Not a linter replacement.
+- Not a Semgrep replacement.
+- Not a dependency-cruiser replacement.
+- Not a security platform.
+- Not a CI runner.
+- Not an AI runtime. The CLI calls no models and performs no autonomous code
+  mutation.
+- Not a service requirement. It works locally and offline.
 
 ## What's next
 
-| If you want to … | Go to … |
+| If you want to ... | Go to ... |
 |---|---|
+| See measured OpenSIP CLI timings | [Public benchmarks](../70-reference/12-public-benchmarks.md) |
 | See concrete code samples for each loop | [Show me each loop](./02-show-me-the-loops.md) |
-| Common questions about adoption + edge cases | [FAQ](./04-faq.md) |
 | Run the first smoke test right now | [Quick start](./00-quick-start.md) |
 | Browse the built-in checks | [Checks reference](../70-reference/05-checks-index.md) |

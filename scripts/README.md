@@ -22,6 +22,13 @@ is built.
   into memory and fails on drift instead of writing. CI runs the `--check`
   variant; you run the writing variant locally and commit the result.
 
+## Docs generators
+
+| Alias                        | Script                            | What it updates                                                                                                                                                                                                                |
+| ---------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm docs:performance-slos` | `build-performance-slo-doc.mjs`   | Renders SLO tiers and budgets from `.config/performance-slos.json` into `docs/public/70-reference/11-performance-slos.md`.                                                                                                     |
+| `pnpm docs:benchmarks`       | `build-public-benchmarks-doc.mjs` | Renders public benchmark tables from `docs/public/70-reference/benchmark-snapshot.json` into `docs/public/70-reference/12-public-benchmarks.md`. Refresh the snapshot with `pnpm docs:benchmarks -- --report slo-report.json`. |
+
 ## Benchmark entrypoints
 
 These drive the **real** built CLI end-to-end, so they require a fresh build. The

@@ -1,0 +1,537 @@
+{
+  "version": 1,
+  "source": "pnpm bench:slo -- --profile pr --out slo-report.json",
+  "createdAt": "2026-07-02T11:31:24.608Z",
+  "profile": "pr",
+  "quick": false,
+  "verdict": "pass",
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "darwin",
+    "release": "25.5.0",
+    "cpuCount": 18,
+    "ci": false
+  },
+  "corpora": [
+    {
+      "tier": "small",
+      "fileCount": 120,
+      "changedFileCount": 1,
+      "gitReady": true
+    },
+    {
+      "tier": "medium",
+      "fileCount": 750,
+      "changedFileCount": 1,
+      "gitReady": true
+    }
+  ],
+  "scenarios": [
+    {
+      "tier": "small",
+      "scenario": "fit-full",
+      "label": "Fit full run",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 3506,
+      "maxRssBytes": 417169408,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-changed",
+      "label": "Fit changed run",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 1125,
+      "maxRssBytes": 391528448,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-cold",
+      "label": "Graph cold build",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 1171,
+      "maxRssBytes": 450822144,
+      "graphProfile": {
+        "mode": "graph"
+      },
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-warm",
+      "label": "Graph warm build",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 845,
+      "maxRssBytes": 375603200,
+      "graphProfile": {
+        "mode": "graph"
+      },
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-impact-files",
+      "label": "Graph impact files",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 829,
+      "maxRssBytes": 373964800,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "small",
+      "scenario": "audit-changed",
+      "label": "Audit changed suite",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 1464,
+      "maxRssBytes": 555008000,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-full",
+      "label": "Fit full run",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 1333,
+      "maxRssBytes": 456769536,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-changed",
+      "label": "Fit changed run",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 1276,
+      "maxRssBytes": 387530752,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-cold",
+      "label": "Graph cold build",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 2014,
+      "maxRssBytes": 511426560,
+      "graphProfile": {
+        "mode": "graph"
+      },
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-warm",
+      "label": "Graph warm build",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 977,
+      "maxRssBytes": 374652928,
+      "graphProfile": {
+        "mode": "graph"
+      },
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-impact-files",
+      "label": "Graph impact files",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 840,
+      "maxRssBytes": 375472128,
+      "skipped": false,
+      "skipReason": ""
+    },
+    {
+      "tier": "medium",
+      "scenario": "audit-changed",
+      "label": "Audit changed suite",
+      "status": 0,
+      "timedOut": false,
+      "durationMs": 1841,
+      "maxRssBytes": 553697280,
+      "skipped": false,
+      "skipReason": ""
+    }
+  ],
+  "budgets": [
+    {
+      "tier": "small",
+      "scenario": "fit-full",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-full",
+      "metric": "durationMs",
+      "actual": 3506,
+      "budget": 20000,
+      "ratio": 0.1753,
+      "status": "pass",
+      "message": "durationMs 3506 / 20000"
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-full",
+      "metric": "maxRssBytes",
+      "actual": 417169408,
+      "budget": 1610612736,
+      "ratio": 0.2590128580729167,
+      "status": "pass",
+      "message": "maxRssBytes 417169408 / 1610612736"
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-changed",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-changed",
+      "metric": "durationMs",
+      "actual": 1125,
+      "budget": 8000,
+      "ratio": 0.140625,
+      "status": "pass",
+      "message": "durationMs 1125 / 8000"
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-changed",
+      "metric": "maxRssBytes",
+      "actual": 391528448,
+      "budget": 1073741824,
+      "ratio": 0.3646392822265625,
+      "status": "pass",
+      "message": "maxRssBytes 391528448 / 1073741824"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-cold",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-cold",
+      "metric": "durationMs",
+      "actual": 1171,
+      "budget": 30000,
+      "ratio": 0.03903333333333334,
+      "status": "pass",
+      "message": "durationMs 1171 / 30000"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-cold",
+      "metric": "maxRssBytes",
+      "actual": 450822144,
+      "budget": 2147483648,
+      "ratio": 0.209930419921875,
+      "status": "pass",
+      "message": "maxRssBytes 450822144 / 2147483648"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-warm",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-warm",
+      "metric": "durationMs",
+      "actual": 845,
+      "budget": 12000,
+      "ratio": 0.07041666666666667,
+      "status": "pass",
+      "message": "durationMs 845 / 12000"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-warm",
+      "metric": "maxRssBytes",
+      "actual": 375603200,
+      "budget": 1610612736,
+      "ratio": 0.23320515950520834,
+      "status": "pass",
+      "message": "maxRssBytes 375603200 / 1610612736"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-impact-files",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-impact-files",
+      "metric": "durationMs",
+      "actual": 829,
+      "budget": 8000,
+      "ratio": 0.103625,
+      "status": "pass",
+      "message": "durationMs 829 / 8000"
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-impact-files",
+      "metric": "maxRssBytes",
+      "actual": 373964800,
+      "budget": 1073741824,
+      "ratio": 0.3482818603515625,
+      "status": "pass",
+      "message": "maxRssBytes 373964800 / 1073741824"
+    },
+    {
+      "tier": "small",
+      "scenario": "audit-changed",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "small",
+      "scenario": "audit-changed",
+      "metric": "durationMs",
+      "actual": 1464,
+      "budget": 18000,
+      "ratio": 0.08133333333333333,
+      "status": "pass",
+      "message": "durationMs 1464 / 18000"
+    },
+    {
+      "tier": "small",
+      "scenario": "audit-changed",
+      "metric": "maxRssBytes",
+      "actual": 555008000,
+      "budget": 1610612736,
+      "ratio": 0.3445943196614583,
+      "status": "pass",
+      "message": "maxRssBytes 555008000 / 1610612736"
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-full",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-full",
+      "metric": "durationMs",
+      "actual": 1333,
+      "budget": 60000,
+      "ratio": 0.022216666666666666,
+      "status": "pass",
+      "message": "durationMs 1333 / 60000"
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-full",
+      "metric": "maxRssBytes",
+      "actual": 456769536,
+      "budget": 3221225472,
+      "ratio": 0.1417999267578125,
+      "status": "pass",
+      "message": "maxRssBytes 456769536 / 3221225472"
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-changed",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-changed",
+      "metric": "durationMs",
+      "actual": 1276,
+      "budget": 18000,
+      "ratio": 0.07088888888888889,
+      "status": "pass",
+      "message": "durationMs 1276 / 18000"
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-changed",
+      "metric": "maxRssBytes",
+      "actual": 387530752,
+      "budget": 2147483648,
+      "ratio": 0.18045806884765625,
+      "status": "pass",
+      "message": "maxRssBytes 387530752 / 2147483648"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-cold",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-cold",
+      "metric": "durationMs",
+      "actual": 2014,
+      "budget": 90000,
+      "ratio": 0.022377777777777778,
+      "status": "pass",
+      "message": "durationMs 2014 / 90000"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-cold",
+      "metric": "maxRssBytes",
+      "actual": 511426560,
+      "budget": 4294967296,
+      "ratio": 0.11907577514648438,
+      "status": "pass",
+      "message": "maxRssBytes 511426560 / 4294967296"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-warm",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-warm",
+      "metric": "durationMs",
+      "actual": 977,
+      "budget": 25000,
+      "ratio": 0.03908,
+      "status": "pass",
+      "message": "durationMs 977 / 25000"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-warm",
+      "metric": "maxRssBytes",
+      "actual": 374652928,
+      "budget": 3221225472,
+      "ratio": 0.11630757649739583,
+      "status": "pass",
+      "message": "maxRssBytes 374652928 / 3221225472"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-impact-files",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-impact-files",
+      "metric": "durationMs",
+      "actual": 840,
+      "budget": 15000,
+      "ratio": 0.056,
+      "status": "pass",
+      "message": "durationMs 840 / 15000"
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-impact-files",
+      "metric": "maxRssBytes",
+      "actual": 375472128,
+      "budget": 2147483648,
+      "ratio": 0.17484283447265625,
+      "status": "pass",
+      "message": "maxRssBytes 375472128 / 2147483648"
+    },
+    {
+      "tier": "medium",
+      "scenario": "audit-changed",
+      "metric": "exitCode",
+      "actual": 0,
+      "budget": 0,
+      "ratio": 0,
+      "status": "pass",
+      "message": "command exited successfully"
+    },
+    {
+      "tier": "medium",
+      "scenario": "audit-changed",
+      "metric": "durationMs",
+      "actual": 1841,
+      "budget": 45000,
+      "ratio": 0.04091111111111111,
+      "status": "pass",
+      "message": "durationMs 1841 / 45000"
+    },
+    {
+      "tier": "medium",
+      "scenario": "audit-changed",
+      "metric": "maxRssBytes",
+      "actual": 553697280,
+      "budget": 3221225472,
+      "ratio": 0.1718902587890625,
+      "status": "pass",
+      "message": "maxRssBytes 553697280 / 3221225472"
+    }
+  ]
+}

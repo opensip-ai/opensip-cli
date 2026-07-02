@@ -86,7 +86,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 | Role | Path |
 |---|---|
-| Evaluating opensip-cli | [What is opensip-cli?](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) -> [vs. other tools](/docs/opensip-cli/00-start/03-vs-other-tools/) -> [FAQ](/docs/opensip-cli/00-start/04-faq/) |
+| Evaluating opensip-cli | [What is opensip-cli?](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) -> [vs. other tools](/docs/opensip-cli/00-start/03-vs-other-tools/) -> [Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/) -> [FAQ](/docs/opensip-cli/00-start/04-faq/) |
 | Understanding the two products | [What is opensip-cli?](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) -> [OpenSIP and OpenSIP CLI](/docs/opensip-cli/00-start/08-opensip-and-opensip-cli/) |
 | New user | [Quick start](/docs/opensip-cli/00-start/00-quick-start/) -> [Initialize your first repo](/docs/opensip-cli/60-guides/00-initialize-your-first-repo/) -> [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/) |
 | CI owner | [Output, gate, SARIF](/docs/opensip-cli/20-fit/04-output-gate-sarif/) -> [Wire into CI](/docs/opensip-cli/60-guides/03-wire-into-ci/) -> [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/) |
@@ -175,17 +175,18 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 48. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
 49. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
 50. [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/)
-51. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
+51. [Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/)
+52. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
 
 ### 80 - Internals
 
-52. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-53. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-54. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-55. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
-55. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
-56. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
-57. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
+53. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+54. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+55. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+56. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+57. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
+58. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
+59. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
 
 ## Factual Baseline
 

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "opensip-cli github action",
+          "informationUri": "https://github.com/opensip-ai/opensip-cli",
+          "rules": [
+            {
+              "id": "no-console-log",
+              "shortDescription": {
+                "text": "no-console-log"
+              },
+              "fullDescription": {
+                "text": "fitness finding"
+              }
+            },
+            {
+              "id": "high-blast-untested",
+              "shortDescription": {
+                "text": "high-blast-untested"
+              },
+              "fullDescription": {
+                "text": "graph finding"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "no-console-log",
+          "level": "error",
+          "message": {
+            "text": "Console logging should not ship in production code."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/index.ts"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 3
+                }
+              }
+            }
+          ],
+          "properties": {
+            "source": "fitness",
+            "severity": "high",
+            "isNew": true
+          }
+        },
+        {
+          "ruleId": "high-blast-untested",
+          "level": "warning",
+          "message": {
+            "text": "Changed function has broad downstream reach without matching tests."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/service.ts"
+                },
+                "region": {
+                  "startLine": 42,
+                  "startColumn": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "source": "graph",
+            "severity": "medium",
+            "isNew": false
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -12,6 +12,7 @@ source-files:
 related-docs:
   - ../60-guides/03-wire-into-ci.md
   - ./01-cli-commands.md
+  - ./12-public-benchmarks.md
 ---
 # Performance SLOs
 
@@ -35,6 +36,9 @@ pnpm bench:slo:ci -- --profile pr --require-memory --out slo-report.json
 The benchmark never reads `.runtime` logs or datastore internals. It treats the
 CLI as a black box, and each scenario runs in a generated project with its own
 `opensip-cli.config.yml`.
+
+For published measurements from this lane, see
+[Public benchmarks](/docs/opensip-cli/70-reference/12-public-benchmarks/).
 
 ## Corpus Tiers
 

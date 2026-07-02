@@ -86,7 +86,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 | Role | Path |
 |---|---|
-| Evaluating opensip-cli | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [FAQ](./00-start/04-faq.md) |
+| Evaluating opensip-cli | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [vs. other tools](./00-start/03-vs-other-tools.md) -> [Public benchmarks](./70-reference/12-public-benchmarks.md) -> [FAQ](./00-start/04-faq.md) |
 | Understanding the two products | [What is opensip-cli?](./00-start/01-what-is-opensip-cli.md) -> [OpenSIP and OpenSIP CLI](./00-start/08-opensip-and-opensip-cli.md) |
 | New user | [Quick start](./00-start/00-quick-start.md) -> [Initialize your first repo](./60-guides/00-initialize-your-first-repo.md) -> [Write your first check](./60-guides/01-write-your-first-check.md) |
 | CI owner | [Output, gate, SARIF](./20-fit/04-output-gate-sarif.md) -> [Wire into CI](./60-guides/03-wire-into-ci.md) -> [Adopt in a monorepo](./60-guides/04-adopt-in-a-monorepo.md) |
@@ -175,17 +175,18 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 48. [Supply-chain security](./70-reference/08-supply-chain-security.md)
 49. [Environment variables](./70-reference/10-environment-variables.md)
 50. [Performance SLOs](./70-reference/11-performance-slos.md)
-51. [`tools` command](./70-reference/12-tools-command.md)
+51. [Public benchmarks](./70-reference/12-public-benchmarks.md)
+52. [`tools` command](./70-reference/12-tools-command.md)
 
 ### 80 - Internals
 
-52. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-53. [Plugin loader](./80-implementation/02-plugin-loader.md)
-54. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-55. [Coding standards](./80-implementation/04-coding-standards.md)
-55. [Layer policy](./80-implementation/05-layer-policy.md)
-56. [Doc conventions](./80-implementation/06-doc-conventions.md)
-57. [Website integration](./80-implementation/07-website-integration.md)
+53. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+54. [Plugin loader](./80-implementation/02-plugin-loader.md)
+55. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+56. [Coding standards](./80-implementation/04-coding-standards.md)
+57. [Layer policy](./80-implementation/05-layer-policy.md)
+58. [Doc conventions](./80-implementation/06-doc-conventions.md)
+59. [Website integration](./80-implementation/07-website-integration.md)
 
 ## Factual Baseline
 
