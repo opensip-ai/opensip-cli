@@ -174,14 +174,15 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 47. [Report](/docs/opensip-cli/70-reference/06-dashboard/)
 48. [Supply-chain security](/docs/opensip-cli/70-reference/08-supply-chain-security/)
 49. [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
-50. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
+50. [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/)
+51. [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
 
 ### 80 - Internals
 
-51. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-52. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-53. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-54. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+52. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+53. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+54. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+55. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
 55. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
 56. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
 57. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)

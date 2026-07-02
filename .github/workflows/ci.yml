@@ -47,6 +47,16 @@ jobs:
       - name: Build
         run: node scripts/build-ci.mjs
 
+      - name: Performance SLO benchmark
+        run: pnpm bench:slo:ci -- --profile pr --require-memory --out slo-report.json
+
+      - name: Upload Performance SLO report
+        if: always() && hashFiles('slo-report.json') != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: performance-slo-report
+          path: slo-report.json
+
       - name: Typecheck
         run: pnpm typecheck
 

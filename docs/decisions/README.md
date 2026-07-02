@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0118](ADR-0118-scale-and-performance-slos.md) — opensip-cli performance SLOs are measured by a root-level benchmark script over deterministic synthetic corpora; CI enforces `.config/performance-slos.json` budgets and uploads `slo-report.json`.
 - [ADR-0117](ADR-0117-host-owned-analysis-run-pipeline.md) — `defineAnalysisRunCommand` in `@opensip-cli/contracts` is the approved host-owned analysis-run helper; tools provide domain adapters while the helper owns output, gates, delivery, SARIF, report opening, lifecycle diagnostics, and session contribution return.
 - [ADR-0116](ADR-0116-safe-repair-preview-actions.md) — `signal.repair.actions[]` carries typed deterministic actions; `opensip repair preview|apply` is host-owned over stored session replay with path, git, and stale-hash safety.
 - [ADR-0115](ADR-0115-target-framework-conventions.md) — Target-scoped `conventions` capture framework/runtime behavior static analysis cannot infer; tools consume them through `RunScope.targets`, and agents see bounded counts.

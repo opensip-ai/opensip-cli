@@ -290,7 +290,8 @@ function graphEligibleCandidates(projectRoot: string): CloneCandidate[] {
     files: discovery.files,
   });
   expect(walked.parseErrors).toEqual([]);
-  return Object.values(walked.occurrences)
+  const occurrences = walked.occurrences as Record<string, readonly GraphOccurrenceLike[]>;
+  return Object.values(occurrences)
     .flatMap((occs) => occs.map((occ) => graphOccurrenceToCandidate(projectRoot, occ)))
     .filter(isEligibleKind);
 }

@@ -174,14 +174,15 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 47. [Report](./70-reference/06-dashboard.md)
 48. [Supply-chain security](./70-reference/08-supply-chain-security.md)
 49. [Environment variables](./70-reference/10-environment-variables.md)
-50. [`tools` command](./70-reference/12-tools-command.md)
+50. [Performance SLOs](./70-reference/11-performance-slos.md)
+51. [`tools` command](./70-reference/12-tools-command.md)
 
 ### 80 - Internals
 
-51. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-52. [Plugin loader](./80-implementation/02-plugin-loader.md)
-53. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-54. [Coding standards](./80-implementation/04-coding-standards.md)
+52. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+53. [Plugin loader](./80-implementation/02-plugin-loader.md)
+54. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+55. [Coding standards](./80-implementation/04-coding-standards.md)
 55. [Layer policy](./80-implementation/05-layer-policy.md)
 56. [Doc conventions](./80-implementation/06-doc-conventions.md)
 57. [Website integration](./80-implementation/07-website-integration.md)

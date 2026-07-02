@@ -208,6 +208,12 @@ Typical timings on the opensip-cli self-graph (~300 files, ~145 checks):
 - `graph` (cold) — ~15s
 - `graph` (incremental, one file changed) — ~2.5s
 
+The opensip-cli repository also runs a synthetic performance SLO lane in CI:
+`pnpm bench:slo:ci -- --profile pr --require-memory --out slo-report.json`. It
+uploads `slo-report.json` as a workflow artifact with command timings, RSS
+measurements, graph profile summaries, and any `performance-slo:*` signals. The
+budgets are documented in [Performance SLOs](/docs/opensip-cli/70-reference/11-performance-slos/).
+
 If `fit` is slow on a large repo, the usual culprits:
 
 - A specific check has an `O(n²)` scan. Run with `--verbose` locally to see per-check timing.

@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "sampleIntervalMs": 250,
+  "tailBytes": {
+    "stdout": 8192,
+    "stderr": 8192
+  },
+  "profiles": {
+    "pr": {
+      "description": "CI pull-request SLO lane over bounded synthetic corpora.",
+      "tiers": ["small", "medium"],
+      "scenarios": [
+        "fit-full",
+        "fit-changed",
+        "graph-cold",
+        "graph-warm",
+        "graph-impact-files",
+        "audit-changed"
+      ]
+    },
+    "reference": {
+      "description": "Manual reference lane including the large corpus tier.",
+      "tiers": ["small", "medium", "large"],
+      "scenarios": [
+        "fit-full",
+        "fit-changed",
+        "graph-cold",
+        "graph-warm",
+        "graph-impact-files",
+        "audit-changed"
+      ]
+    }
+  },
+  "tiers": {
+    "small": {
+      "maxFiles": 150,
+      "maxLoc": 30000,
+      "fileCount": 120,
+      "quickFileCount": 24
+    },
+    "medium": {
+      "maxFiles": 1000,
+      "maxLoc": 250000,
+      "fileCount": 750,
+      "quickFileCount": 80
+    },
+    "large": {
+      "maxFiles": 3000,
+      "maxLoc": 750000,
+      "fileCount": 3000,
+      "quickFileCount": 260
+    }
+  },
+  "scenarios": {
+    "fit-full": {
+      "label": "Fit full run",
+      "description": "Run all enabled fitness checks over the full corpus."
+    },
+    "fit-changed": {
+      "label": "Fit changed run",
+      "description": "Run fitness checks over the changed-file target set."
+    },
+    "graph-cold": {
+      "label": "Graph cold build",
+      "description": "Build the graph catalog from an empty runtime cache."
+    },
+    "graph-warm": {
+      "label": "Graph warm build",
+      "description": "Build the graph catalog with the previous catalog available."
+    },
+    "graph-impact-files": {
+      "label": "Graph impact files",
+      "description": "Run changed-to-impact analysis with explicit changed files."
+    },
+    "audit-changed": {
+      "label": "Audit changed suite",
+      "description": "Run the built-in audit suite in changed-file mode."
+    }
+  },
+  "budgets": [
+    {
+      "tier": "small",
+      "scenario": "fit-full",
+      "maxDurationMs": 20000,
+      "maxRssBytes": 1610612736
+    },
+    {
+      "tier": "small",
+      "scenario": "fit-changed",
+      "maxDurationMs": 8000,
+      "maxRssBytes": 1073741824
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-cold",
+      "maxDurationMs": 30000,
+      "maxRssBytes": 2147483648
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-warm",
+      "maxDurationMs": 12000,
+      "maxRssBytes": 1610612736
+    },
+    {
+      "tier": "small",
+      "scenario": "graph-impact-files",
+      "maxDurationMs": 8000,
+      "maxRssBytes": 1073741824
+    },
+    {
+      "tier": "small",
+      "scenario": "audit-changed",
+      "maxDurationMs": 18000,
+      "maxRssBytes": 1610612736
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-full",
+      "maxDurationMs": 60000,
+      "maxRssBytes": 3221225472
+    },
+    {
+      "tier": "medium",
+      "scenario": "fit-changed",
+      "maxDurationMs": 18000,
+      "maxRssBytes": 2147483648
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-cold",
+      "maxDurationMs": 90000,
+      "maxRssBytes": 4294967296
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-warm",
+      "maxDurationMs": 25000,
+      "maxRssBytes": 3221225472
+    },
+    {
+      "tier": "medium",
+      "scenario": "graph-impact-files",
+      "maxDurationMs": 15000,
+      "maxRssBytes": 2147483648
+    },
+    {
+      "tier": "medium",
+      "scenario": "audit-changed",
+      "maxDurationMs": 45000,
+      "maxRssBytes": 3221225472
+    },
+    {
+      "tier": "large",
+      "scenario": "fit-changed",
+      "maxDurationMs": 40000,
+      "maxRssBytes": 3221225472
+    },
+    {
+      "tier": "large",
+      "scenario": "graph-cold",
+      "maxDurationMs": 240000,
+      "maxRssBytes": 8589934592
+    },
+    {
+      "tier": "large",
+      "scenario": "graph-warm",
+      "maxDurationMs": 60000,
+      "maxRssBytes": 6442450944
+    },
+    {
+      "tier": "large",
+      "scenario": "graph-impact-files",
+      "maxDurationMs": 30000,
+      "maxRssBytes": 3221225472
+    }
+  ]
+}

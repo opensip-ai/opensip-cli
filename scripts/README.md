@@ -22,19 +22,19 @@ is built.
   into memory and fails on drift instead of writing. CI runs the `--check`
   variant; you run the writing variant locally and commit the result.
 
-## Manual-only entrypoints (NOT CI-wired, by design)
+## Benchmark entrypoints
 
-These are reachable only via their npm alias and are intentionally **not** run in
-CI — do not mistake them for dead aliases. They are diagnostic/perf tools that
-drive the **real** built CLI end-to-end, so they require a **fresh** `pnpm build`
-first (a stale `dist/` silently runs old behavior; the scripts warn but cannot
-detect it):
+These drive the **real** built CLI end-to-end, so they require a fresh build. The
+local aliases that start with `pnpm bench:` build first; CI-only aliases assume
+the workflow has already run the repository build step.
 
-| Alias                     | Script                           | What it's for                                                             |
-| ------------------------- | -------------------------------- | ------------------------------------------------------------------------- |
+| Alias                     | Script                           | What it's for                                                                   |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
 | `pnpm bench:fork-cost`    | `bench-fork-cost.mjs`            | Spec-02 subprocess-all evidence: real fit/graph worker vs in-process wall time. |
-| `pnpm bench:partition`    | `bench-partition-strategies.mjs` | ADR-0045 graph partition-strategy benchmark (cold/warm, shard balance).   |
-| `pnpm graph:catalog-diff` | `graph-catalog-diff.mjs`         | Function-set delta between the `exact` and `sharded` graph build engines. |
+| `pnpm bench:partition`    | `bench-partition-strategies.mjs` | ADR-0045 graph partition-strategy benchmark (cold/warm, shard balance).         |
+| `pnpm bench:slo`          | `bench-slo.mjs`                  | Performance SLO lane over deterministic synthetic corpora.                      |
+| `pnpm bench:slo:ci`       | `bench-slo.mjs`                  | CI form of the SLO lane; uses the already-built CLI dist output.                |
+| `pnpm graph:catalog-diff` | `graph-catalog-diff.mjs`         | Function-set delta between the `exact` and `sharded` graph build engines.       |
 
 ## Release lane
 

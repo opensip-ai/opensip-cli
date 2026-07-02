@@ -440,9 +440,7 @@ host process with import-error isolation only — no worker boundary. The extern
 worker fork does **not** cover them.
 
 For the full extension trust-tier matrix, see
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
-(canonical) and the contributor reference
-[`docs/internal/plugin-isolation-surface.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/internal/plugin-isolation-surface.md).
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
 What is enforced at admission:
 

@@ -619,6 +619,17 @@
       "purpose": "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
     },
     {
+      "file": "docs/web-generated/70-reference/11-performance-slos.md",
+      "path": "/docs/opensip-cli/70-reference/11-performance-slos/",
+      "section": "70-reference",
+      "title": "Performance SLOs",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "Reference for the opensip-cli synthetic performance SLO lane, corpus tiers, budgets, and report artifact."
+    },
+    {
       "file": "docs/web-generated/70-reference/12-tools-command.md",
       "path": "/docs/opensip-cli/70-reference/12-tools-command/",
       "section": "70-reference",
@@ -820,6 +831,7 @@
         "/docs/opensip-cli/70-reference/06-dashboard/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
         "/docs/opensip-cli/70-reference/10-environment-variables/",
+        "/docs/opensip-cli/70-reference/11-performance-slos/",
         "/docs/opensip-cli/70-reference/12-tools-command/"
       ]
     },
@@ -940,7 +952,8 @@
         "/docs/opensip-cli/70-reference/04-json-output-schema/",
         "/docs/opensip-cli/70-reference/05-checks-index/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
-        "/docs/opensip-cli/70-reference/10-environment-variables/"
+        "/docs/opensip-cli/70-reference/10-environment-variables/",
+        "/docs/opensip-cli/70-reference/11-performance-slos/"
       ]
     },
     {
@@ -981,6 +994,7 @@
         "/docs/opensip-cli/70-reference/02-package-catalog/",
         "/docs/opensip-cli/70-reference/06-dashboard/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
+        "/docs/opensip-cli/70-reference/11-performance-slos/",
         "/docs/opensip-cli/70-reference/12-tools-command/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",

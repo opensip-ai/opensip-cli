@@ -440,9 +440,7 @@ host process with import-error isolation only — no worker boundary. The extern
 worker fork does **not** cover them.
 
 For the full extension trust-tier matrix, see
-[ADR-0061](../../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
-(canonical) and the contributor reference
-[`docs/internal/plugin-isolation-surface.md`](../../internal/plugin-isolation-surface.md).
+[ADR-0061](../../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
 What is enforced at admission:
 
