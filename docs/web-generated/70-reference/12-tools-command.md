@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-12
-release: v0.2.2
+release: v0.2.3
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
@@ -125,7 +125,7 @@ Project-local tools remain deny-by-default unless the project config lists their
 tool id under `tools.trusted`. `tools create` adds that entry for the scaffolded
 tool. See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/) and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## `tools install <spec>`
 
@@ -191,7 +191,7 @@ group level deep).
 `tools list` and `tools validate` surface trust tier and install provenance
 metadata where available. **Enforcement** of consumption-side provenance
 (install/load verification for non-bundled npm packages) is defined in
-[ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0068-consumption-side-verification-policy.md) but
+[ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/docs/decisions/ADR-0068-consumption-side-verification-policy.md) but
 **not active** in the loader yet — enterprise strict mode will deny missing or
 mismatched provenance unless an approved exception exists. Bundled first-party
 tools remain trusted TCB verified by the release provenance lane.

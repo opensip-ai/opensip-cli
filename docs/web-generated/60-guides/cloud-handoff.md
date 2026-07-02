@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.2.2
+release: v0.2.3
 title: "Send CLI findings to OpenSIP Cloud"
 audience: [ci-integrators, cloud-adopters]
 purpose: "Task-led: hand opensip fit findings to OpenSIP Cloud over --report-to (or the published GitHub Action) so they become tickets — with no manual ingest step."
@@ -83,7 +83,7 @@ jobs:
 Store the key as the repository/organization secret `OPENSIP_API_KEY`. The full
 input list (`cloud-url`, `args`, `working-directory`, `version`,
 `fail-on-upload-error`) is documented in
-[`.github/actions/upload-sarif/README.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/.github/actions/upload-sarif/README.md).
+[`.github/actions/upload-sarif/README.md`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/.github/actions/upload-sarif/README.md).
 
 ## Exit codes
 

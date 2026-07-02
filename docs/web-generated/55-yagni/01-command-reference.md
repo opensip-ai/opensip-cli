@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-25
-release: v0.2.2
+release: v0.2.3
 title: "YAGNI command reference"
 audience: [contributors, ci-integrators]
 purpose: "How to run the advisory YAGNI reduction audit and interpret its output."
@@ -23,7 +23,7 @@ related-docs:
 
 `opensip yagni` is an **advisory** audit that surfaces evidence-backed opportunities to reduce code while preserving behavior. It emits ranked candidates with proof strength, preservation arguments, and validation steps — not automatic rewrites.
 
-> **Scope (ADR-0064):** yagni ships two bundled detectors: `unused-config-surface` (config-surface reduction) and `duplicate-body-candidate` (exact-duplicate TypeScript function bodies). Duplicate detection uses the shared [`@opensip-cli/clone-detection`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/packages/clone-detection/src/index.ts) substrate — yagni builds its own TypeScript inventory (`buildTsInventory`, no `@opensip-cli/graph` dependency) and stays complete with graph uninstalled. Near-duplicate analysis remains graph-only (`graph:near-duplicate-function-body`). See [ADR-0064](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0064-shared-clone-detection-substrate.md).
+> **Scope (ADR-0064):** yagni ships two bundled detectors: `unused-config-surface` (config-surface reduction) and `duplicate-body-candidate` (exact-duplicate TypeScript function bodies). Duplicate detection uses the shared [`@opensip-cli/clone-detection`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/packages/clone-detection/src/index.ts) substrate — yagni builds its own TypeScript inventory (`buildTsInventory`, no `@opensip-cli/graph` dependency) and stays complete with graph uninstalled. Near-duplicate analysis remains graph-only (`graph:near-duplicate-function-body`). See [ADR-0064](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/docs/decisions/ADR-0064-shared-clone-detection-substrate.md).
 
 ## Quick start
 

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-29
-release: v0.2.2
+release: v0.2.3
 title: "OpenSIP and OpenSIP CLI"
 audience: [getting-started, contributors, ci-integrators]
 purpose: "The product family — what OpenSIP (the autonomous platform) and opensip-cli (the open-source guardrail layer) each are, how they fit together, and the shared origin that explains why both exist."
@@ -96,7 +96,7 @@ and humans (via the dashboard / SARIF in GitHub) are others.
 opensip-cli is deliberately **not an AI runtime** — it has no model dependency,
 creates no embeddings, and applies no autonomous changes. It is *built for*
 AI-assisted development without *being* the AI. That posture is recorded in
-[ADR-0095](https://github.com/opensip-ai/opensip-cli/blob/v0.2.2/docs/decisions/ADR-0095-ai-native-guardrail-platform-posture.md).
+[ADR-0095](https://github.com/opensip-ai/opensip-cli/blob/v0.2.3/docs/decisions/ADR-0095-ai-native-guardrail-platform-posture.md).
 
 ## For AI agents working in either repository
 

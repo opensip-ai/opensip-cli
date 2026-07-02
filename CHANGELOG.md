@@ -2,6 +2,23 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.2.3] - 2026-07-01
+
+A config-discovery simplification release. Project config resolves from
+`--config` or the root `opensip-cli.config.yml` only — the
+`package.json#opensip-cli.configPath` indirection is removed so init and
+runtime discovery stay aligned.
+
+### Changed
+
+- Config resolution drops `package.json#opensip-cli.configPath`; the canonical
+  path is `<project-root>/opensip-cli.config.yml` unless `--config` overrides.
+- `opensip init` and related docs now describe root-only config discovery.
+
+### Fixed
+
+- Init and bootstrap paths no longer diverge on where project config is found.
+
 ## [0.2.2] - 2026-07-01
 
 An `opensip init` hardening release. File classification skips generated
