@@ -1,7 +1,5 @@
-import { pathToFileURL } from 'node:url';
-
 import {
-  resolvePackageEntryPoint,
+  importCapabilityPackageModule,
   type CapabilityBridgeContribution,
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
@@ -49,22 +47,6 @@ interface GraphProjectHandle {
   readonly parseInput: ParseInput;
 }
 
-/**
- * Import an isolated graph-adapter module from its declared package entry point.
- *
- * @throws {Error} when the package has no readable entry point.
- */
-async function importPackageModule(
-  packageDir: string,
-  packageName: string,
-): Promise<Record<string, unknown>> {
-  const resolved = resolvePackageEntryPoint(packageDir, packageName);
-  if (resolved === undefined) {
-    throw new Error(`package ${packageName} has no readable entry point`);
-  }
-  return (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
-}
-
 function isGraphAdapter(value: unknown): value is GraphLanguageAdapter {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
@@ -87,7 +69,10 @@ function isGraphAdapter(value: unknown): value is GraphLanguageAdapter {
 async function loadAdapter(
   args: Parameters<CapabilityIsolationBridge['runInWorker']>[0],
 ): Promise<GraphLanguageAdapter> {
-  const mod = await importPackageModule(args.pkg.packageDir, args.pkg.name);
+  const mod = await importCapabilityPackageModule({
+    ...args.pkg,
+    errorConstructor: Error,
+  });
   const value = mod[args.descriptor.exportName];
   if (!isGraphAdapter(value)) {
     throw new Error(

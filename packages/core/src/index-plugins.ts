@@ -34,6 +34,9 @@ export {
   currentCapabilityRegistry,
   loadCapabilityDomain,
   checkCapabilityContributionCompatibility,
+  capabilityCoContributionValues,
+  importCapabilityPackageModule,
+  readCapabilityArrayExport,
 } from './plugins/index.js';
 export type {
   AdmissionResult,
@@ -74,4 +77,5 @@ export type {
   RegisterCtx,
   RegisteredCounts,
   RegisterExportsFn,
+  ImportCapabilityPackageModuleOptions,
 } from './plugins/index.js';

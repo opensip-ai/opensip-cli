@@ -88,10 +88,16 @@ export type { CapabilityRegistrar } from './capability-registry.js';
 export { loadCapabilityDomain } from './capability-loader.js';
 export type { LoadCapabilityDomainOptions } from './capability-loader.js';
 export { checkCapabilityContributionCompatibility } from './capability-compatibility.js';
+export {
+  capabilityCoContributionValues,
+  importCapabilityPackageModule,
+  readCapabilityArrayExport,
+} from './capability-bridge-helpers.js';
 export type {
   CapabilityCompatibilityVerdict,
   CheckCapabilityContributionCompatibilityArgs,
 } from './capability-compatibility.js';
+export type { ImportCapabilityPackageModuleOptions } from './capability-bridge-helpers.js';
 export { registerRecipesFromMod } from './recipe-loader.js';
 export type { RegisterRecipesOptions, RegisterRecipesResult } from './recipe-loader.js';
 export type {

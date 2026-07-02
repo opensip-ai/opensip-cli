@@ -1,7 +1,7 @@
-import { pathToFileURL } from 'node:url';
-
 import {
-  resolvePackageEntryPoint,
+  capabilityCoContributionValues,
+  importCapabilityPackageModule,
+  readCapabilityArrayExport,
   type CapabilityBridgeContribution,
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
@@ -34,41 +34,6 @@ interface SimDiscoverResult {
     readonly targetDomainId: string;
     readonly contribution: unknown;
   }[];
-}
-
-/**
- * Import an isolated sim-pack module from its declared package entry point.
- *
- * @throws {TypeError} when the package has no readable entry point.
- */
-async function importPackageModule(
-  packageDir: string,
-  packageName: string,
-): Promise<Record<string, unknown>> {
-  const resolved = resolvePackageEntryPoint(packageDir, packageName);
-  if (resolved === undefined) {
-    throw new TypeError(`package ${packageName} has no readable entry point`);
-  }
-  return (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
-}
-
-/**
- * Read an array-shaped export from a sim-pack module.
- *
- * @throws {TypeError} when the export is missing or not an array.
- */
-function asArrayExport(mod: Record<string, unknown>, exportName: string): readonly unknown[] {
-  const value = mod[exportName];
-  if (!Array.isArray(value)) {
-    throw new TypeError(`capability pack export '${exportName}' must be an array`);
-  }
-  return value;
-}
-
-function coContributionValues(value: unknown, exportShape: 'array' | 'single'): readonly unknown[] {
-  if (value === undefined) return [];
-  if (exportShape === 'single') return [value];
-  return Array.isArray(value) ? value : [];
 }
 
 function isScenario(value: unknown): value is RunnableScenario {
@@ -111,11 +76,11 @@ function createProxyScenario(
 async function discoverWorkerContributions(
   args: Parameters<CapabilityIsolationBridge['runInWorker']>[0],
 ): Promise<SimDiscoverResult> {
-  const mod = await importPackageModule(args.pkg.packageDir, args.pkg.name);
-  const scenarios = asArrayExport(mod, args.descriptor.exportName).filter(isScenario);
+  const mod = await importCapabilityPackageModule(args.pkg);
+  const scenarios = readCapabilityArrayExport(mod, args.descriptor.exportName).filter(isScenario);
   const coContributions = (args.descriptor.coContributions ?? []).flatMap((co) => {
     const value = mod[co.exportName];
-    const values = coContributionValues(value, co.exportShape);
+    const values = capabilityCoContributionValues(value, co.exportShape);
     return values.map((contribution) => ({ targetDomainId: co.domainId, contribution }));
   });
   return {
@@ -133,8 +98,8 @@ async function runWorkerScenario(
   args: Parameters<CapabilityIsolationBridge['runInWorker']>[0],
   request: SimRunRequest,
 ): Promise<ScenarioExecutorResult> {
-  const mod = await importPackageModule(args.pkg.packageDir, args.pkg.name);
-  const scenarios = asArrayExport(mod, args.descriptor.exportName).filter(isScenario);
+  const mod = await importCapabilityPackageModule(args.pkg);
+  const scenarios = readCapabilityArrayExport(mod, args.descriptor.exportName).filter(isScenario);
   const scenario = scenarios.find((candidate) => candidate.id === request.scenarioId);
   if (scenario === undefined) {
     throw new Error(`capability pack ${args.pkg.name} has no scenario '${request.scenarioId}'`);

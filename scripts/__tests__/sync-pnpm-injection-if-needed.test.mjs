@@ -18,7 +18,7 @@ test('syncPnpmInjectionIfNeeded is a no-op when injected content is fresh', () =
 
   assert.deepEqual(result, { checked: 2, synced: false });
   assert.deepEqual(calls, []);
-  assert.match(logs.join('\n'), /OK/);
+  assert.deepEqual(logs, []);
 });
 
 test('syncPnpmInjectionIfNeeded removes workspace state and reinstalls when stale', () => {

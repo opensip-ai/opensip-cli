@@ -22,6 +22,8 @@
  * Per the prior graph emitter's Phase 0 audit Q1, every finding emits a
  * SINGLE canonical physical location; `relatedLocations` is not populated.
  */
+import { boundedJson, type JsonLike } from './bounded-json.js';
+
 import type { Formatter } from './types.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, SignalSeverity } from '@opensip-cli/core';
@@ -123,10 +125,6 @@ export interface SarifDriver {
 const DEFAULT_DRIVER_VERSION = '1.0.0';
 const OPEN_SIP_SARIF_RESULT_SCHEMA = 'opensip.signal-result.v1';
 const OPEN_SIP_SARIF_RUN_SCHEMA = 'opensip.signal-run.v1';
-const MAX_PROPERTY_STRING_LENGTH = 500;
-const MAX_PROPERTY_ARRAY_ITEMS = 10;
-const MAX_PROPERTY_OBJECT_KEYS = 16;
-const MAX_PROPERTY_DEPTH = 3;
 
 const ALLOWLISTED_METADATA_KEYS = new Set([
   'baselineState',
@@ -143,51 +141,6 @@ const ALLOWLISTED_METADATA_KEYS = new Set([
 
 interface BuildOpenSipSarifOptions {
   readonly runProperties?: Record<string, unknown>;
-}
-
-type JsonLike =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly JsonLike[]
-  | { readonly [key: string]: JsonLike };
-
-interface BoundedJson {
-  readonly value: JsonLike;
-}
-
-function boundedJson(value: unknown, depth = 0): JsonLike | undefined {
-  return boundedJsonValue(value, depth)?.value;
-}
-
-function boundedJsonValue(value: unknown, depth = 0): BoundedJson | undefined {
-  if (value === null) return { value: null };
-  if (typeof value === 'string') return { value: value.slice(0, MAX_PROPERTY_STRING_LENGTH) };
-  if (typeof value === 'number') return Number.isFinite(value) ? { value } : undefined;
-  if (typeof value === 'boolean') return { value };
-  if (depth >= MAX_PROPERTY_DEPTH) return undefined;
-  if (Array.isArray(value)) return boundedJsonArray(value, depth);
-  if (typeof value === 'object') return boundedJsonObject(value, depth);
-  return undefined;
-}
-
-function boundedJsonArray(value: readonly unknown[], depth: number): BoundedJson | undefined {
-  const items = value
-    .slice(0, MAX_PROPERTY_ARRAY_ITEMS)
-    .map((item) => boundedJsonValue(item, depth + 1))
-    .filter((item): item is BoundedJson => item !== undefined)
-    .map((item) => item.value);
-  return items.length > 0 ? { value: items } : undefined;
-}
-
-function boundedJsonObject(value: object, depth: number): BoundedJson | undefined {
-  const output: Record<string, JsonLike> = {};
-  for (const [key, nested] of Object.entries(value).slice(0, MAX_PROPERTY_OBJECT_KEYS)) {
-    const safe = boundedJson(nested, depth + 1);
-    if (safe !== undefined) output[key] = safe;
-  }
-  return Object.keys(output).length > 0 ? { value: output } : undefined;
 }
 
 function selectedMetadata(metadata: Record<string, unknown>): Record<string, JsonLike> | undefined {

@@ -1,7 +1,7 @@
-import { pathToFileURL } from 'node:url';
-
 import {
-  resolvePackageEntryPoint,
+  capabilityCoContributionValues,
+  importCapabilityPackageModule,
+  readCapabilityArrayExport,
   type CapabilityBridgeContribution,
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
@@ -41,35 +41,6 @@ type SerializableRunOptions = Pick<
 >;
 
 /**
- * Import an isolated fit-pack module from its declared package entry point.
- *
- * @throws {TypeError} when the package has no readable entry point.
- */
-async function importPackageModule(
-  packageDir: string,
-  packageName: string,
-): Promise<Record<string, unknown>> {
-  const resolved = resolvePackageEntryPoint(packageDir, packageName);
-  if (resolved === undefined) {
-    throw new TypeError(`package ${packageName} has no readable entry point`);
-  }
-  return (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
-}
-
-/**
- * Read an array-shaped export from a fit-pack module.
- *
- * @throws {TypeError} when the export is missing or not an array.
- */
-function asArrayExport(mod: Record<string, unknown>, exportName: string): readonly unknown[] {
-  const value = mod[exportName];
-  if (!Array.isArray(value)) {
-    throw new TypeError(`capability pack export '${exportName}' must be an array`);
-  }
-  return value;
-}
-
-/**
  * Prevent the legacy `execute` path from running an isolated check in-process.
  *
  * @throws {TypeError} always; isolated checks must go through `check.run()`.
@@ -82,12 +53,6 @@ function serializableConfig(check: Check): SerializableCheckConfig {
   const { execute, ...config } = check.config;
   void execute;
   return config;
-}
-
-function coContributionValues(value: unknown, exportShape: 'array' | 'single'): readonly unknown[] {
-  if (value === undefined) return [];
-  if (exportShape === 'single') return [value];
-  return Array.isArray(value) ? value : [];
 }
 
 function serializableRunOptions(
@@ -134,11 +99,11 @@ function createProxyCheck(
 async function discoverWorkerContributions(
   args: Parameters<CapabilityIsolationBridge['runInWorker']>[0],
 ): Promise<FitnessDiscoverResult> {
-  const mod = await importPackageModule(args.pkg.packageDir, args.pkg.name);
-  const checks = asArrayExport(mod, args.descriptor.exportName).filter(isCheck);
+  const mod = await importCapabilityPackageModule(args.pkg);
+  const checks = readCapabilityArrayExport(mod, args.descriptor.exportName).filter(isCheck);
   const coContributions = (args.descriptor.coContributions ?? []).flatMap((co) => {
     const value = mod[co.exportName];
-    const values = coContributionValues(value, co.exportShape);
+    const values = capabilityCoContributionValues(value, co.exportShape);
     return values.map((contribution) => ({ targetDomainId: co.domainId, contribution }));
   });
   return {
@@ -156,8 +121,8 @@ async function runWorkerCheck(
   args: Parameters<CapabilityIsolationBridge['runInWorker']>[0],
   request: FitnessRunRequest,
 ): Promise<CheckResult> {
-  const mod = await importPackageModule(args.pkg.packageDir, args.pkg.name);
-  const checks = asArrayExport(mod, args.descriptor.exportName).filter(isCheck);
+  const mod = await importCapabilityPackageModule(args.pkg);
+  const checks = readCapabilityArrayExport(mod, args.descriptor.exportName).filter(isCheck);
   const check = checks.find((candidate) => candidate.config.id === request.checkId);
   if (check === undefined) {
     throw new Error(`capability pack ${args.pkg.name} has no check '${request.checkId}'`);

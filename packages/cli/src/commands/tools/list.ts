@@ -72,6 +72,15 @@ interface ProjectTrustContext {
   readonly projectTrustedTools: ReadonlySet<string>;
 }
 
+interface LoadedRowsContext {
+  readonly opts: ToolsListOptions;
+  readonly projectHostDir: string;
+  readonly globalHostDir: string;
+  readonly loadedPackageNames: Set<string>;
+  readonly trustContext: ProjectTrustContext;
+  readonly env: NodeJS.ProcessEnv;
+}
+
 /**
  * Map a loaded tool's provenance to the user-facing source label. Installed
  * tools resolve their scope by which host dir their package landed in
@@ -108,7 +117,14 @@ export function toolsList(opts: ToolsListOptions): ToolsListResult {
     { dir: globalHostDir, source: 'global' },
   ];
   const rows = [
-    ...loadedRows(opts, projectHostDir, globalHostDir, loadedPackageNames, trustContext, env),
+    ...loadedRows({
+      opts,
+      projectHostDir,
+      globalHostDir,
+      loadedPackageNames,
+      trustContext,
+      env,
+    }),
     ...manifestOnlyRows(hosts, loadedPackageNames, env, trustContext, opts.policy),
   ];
 
@@ -138,14 +154,14 @@ function projectTrustContext(cwd: string): ProjectTrustContext {
   }
 }
 
-function loadedRows(
-  opts: ToolsListOptions,
-  projectHostDir: string,
-  globalHostDir: string,
-  loadedPackageNames: Set<string>,
-  trustContext: ProjectTrustContext,
-  env: NodeJS.ProcessEnv,
-): ToolsListRow[] {
+function loadedRows({
+  opts,
+  projectHostDir,
+  globalHostDir,
+  loadedPackageNames,
+  trustContext,
+  env,
+}: LoadedRowsContext): ToolsListRow[] {
   const rows: ToolsListRow[] = [];
   const provenance = opts.provenance ?? [];
   const manifests = opts.manifests ?? [];

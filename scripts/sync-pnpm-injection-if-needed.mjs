@@ -47,7 +47,6 @@ export function syncPnpmInjectionIfNeeded(options = {}) {
 
   const before = check();
   if (before.issuesByPkg.size === 0) {
-    logger(`OK — ${before.checked} injected packages match source`);
     return { checked: before.checked, synced: false };
   }
 
