@@ -18,19 +18,22 @@ import { verifyReleaseArtifacts } from '../verify-release-artifacts.mjs';
 
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const ACTIONS_ATTEST_SHA = 'f6bf1532d7d6793fce74eac584813a8eee607999';
+const WORKSPACE_VERSION = JSON.parse(
+  readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'),
+).version;
 
 test('release artifact generator writes a verifiable manifest, checksums, and SBOM', async () => {
-  const dir = makeReleaseDir('0.2.4');
+  const dir = makeReleaseDir(WORKSPACE_VERSION);
   try {
     const result = await buildReleaseArtifacts({
       artifactDir: dir,
-      expectedVersion: '0.2.4',
-      gitTag: 'v0.2.4',
+      expectedVersion: WORKSPACE_VERSION,
+      gitTag: `v${WORKSPACE_VERSION}`,
       gitSha: 'abc123',
       now: new Date('2026-07-02T00:00:00.000Z'),
     });
 
-    assert.equal(result.manifest.releaseVersion, '0.2.4');
+    assert.equal(result.manifest.releaseVersion, WORKSPACE_VERSION);
     assert.equal(result.manifest.artifacts.length, RELEASE_PACKAGE_ORDER.length + 1);
     assert.equal(
       result.manifest.artifacts.filter((entry) => entry.kind === 'npm-tarball').length,
@@ -65,8 +68,8 @@ test('release artifact generator writes a verifiable manifest, checksums, and SB
     assert.ok(
       sbom.dependencies.some(
         (entry) =>
-          entry.ref === 'npm:opensip-cli@0.2.4' &&
-          entry.dependsOn.includes('npm:@opensip-cli/core@0.2.4'),
+          entry.ref === `npm:opensip-cli@${WORKSPACE_VERSION}` &&
+          entry.dependsOn.includes(`npm:@opensip-cli/core@${WORKSPACE_VERSION}`),
       ),
       'release-set SBOM must include inter-package dependency edges',
     );
@@ -74,7 +77,7 @@ test('release artifact generator writes a verifiable manifest, checksums, and SB
     const verified = await verifyReleaseArtifacts({
       artifactDir: dir,
       manifestPath: join(dir, RELEASE_MANIFEST_NAME),
-      expectedVersion: 'v0.2.4',
+      expectedVersion: `v${WORKSPACE_VERSION}`,
     });
     assert.equal(verified.ok, true, verified.failures.join('\n'));
   } finally {
@@ -83,24 +86,24 @@ test('release artifact generator writes a verifiable manifest, checksums, and SB
 });
 
 test('release artifact verifier rejects tampered tarballs', async () => {
-  const dir = makeReleaseDir('0.2.4');
+  const dir = makeReleaseDir(WORKSPACE_VERSION);
   try {
     await buildReleaseArtifacts({
       artifactDir: dir,
-      expectedVersion: '0.2.4',
-      gitTag: 'v0.2.4',
+      expectedVersion: WORKSPACE_VERSION,
+      gitTag: `v${WORKSPACE_VERSION}`,
       gitSha: 'abc123',
       sbomFile: writeSbomFixture(dir),
       now: new Date('2026-07-02T00:00:00.000Z'),
     });
 
-    const firstTarball = expectedTarballName(RELEASE_PACKAGE_ORDER[0], '0.2.4');
+    const firstTarball = expectedTarballName(RELEASE_PACKAGE_ORDER[0], WORKSPACE_VERSION);
     writeFileSync(join(dir, firstTarball), '\nmodified after manifest\n', { flag: 'a' });
 
     const verified = await verifyReleaseArtifacts({
       artifactDir: dir,
       manifestPath: join(dir, RELEASE_MANIFEST_NAME),
-      expectedVersion: 'v0.2.4',
+      expectedVersion: `v${WORKSPACE_VERSION}`,
     });
     assert.equal(verified.ok, false);
     assert.match(verified.failures.join('\n'), /sha256 mismatch|size mismatch/u);
@@ -110,18 +113,18 @@ test('release artifact verifier rejects tampered tarballs', async () => {
 });
 
 test('release artifact verifier rejects incomplete checksum subject lists', async () => {
-  const dir = makeReleaseDir('0.2.4');
+  const dir = makeReleaseDir(WORKSPACE_VERSION);
   try {
     await buildReleaseArtifacts({
       artifactDir: dir,
-      expectedVersion: '0.2.4',
-      gitTag: 'v0.2.4',
+      expectedVersion: WORKSPACE_VERSION,
+      gitTag: `v${WORKSPACE_VERSION}`,
       gitSha: 'abc123',
       sbomFile: writeSbomFixture(dir),
       now: new Date('2026-07-02T00:00:00.000Z'),
     });
 
-    const firstTarball = expectedTarballName(RELEASE_PACKAGE_ORDER[0], '0.2.4');
+    const firstTarball = expectedTarballName(RELEASE_PACKAGE_ORDER[0], WORKSPACE_VERSION);
     const checksumsPath = join(dir, RELEASE_CHECKSUMS_NAME);
     const checksums = readFileSync(checksumsPath, 'utf8')
       .split('\n')
@@ -132,7 +135,7 @@ test('release artifact verifier rejects incomplete checksum subject lists', asyn
     const verified = await verifyReleaseArtifacts({
       artifactDir: dir,
       manifestPath: join(dir, RELEASE_MANIFEST_NAME),
-      expectedVersion: 'v0.2.4',
+      expectedVersion: `v${WORKSPACE_VERSION}`,
     });
     assert.equal(verified.ok, false);
     assert.match(
