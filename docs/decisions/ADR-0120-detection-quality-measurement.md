@@ -57,6 +57,6 @@ artifacts but should not become product commands.
 
 **Related specs / ADRs:**
 
-- `docs/plans/specs/17-detection-quality-measurement.md`
+- `docs/plans/completed/17-detection-quality-measurement.md`
 - [ADR-0118](./ADR-0118-scale-and-performance-slos.md)
 - [Detection Quality](../public/70-reference/14-detection-quality.md)

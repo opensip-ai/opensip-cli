@@ -113,8 +113,8 @@ artifact/capability belongs in Cloud iff it needs >1 repo, >1 run, or >1 actor).
   remediation is the platform moat — see spec 21). Those affect *when*, not *whether*,
   the authority model holds.
 
-**Related specs / ADRs:** Implemented by `docs/plans/specs/20-platform-evidence-authority-and-egress-contract.md`
-and `docs/plans/specs/09-enterprise-trust-policy-plane.md` (local-only). Builds on
+**Related specs / ADRs:** Implemented by `docs/plans/completed/20-platform-evidence-authority-and-egress-contract.md`
+and `docs/plans/completed/09-enterprise-trust-policy-plane.md` (local-only). Builds on
 [ADR-0008](./ADR-0008-opensip-cloud-signal-sync.md) (Cloud signal sink + open-core
 boundary), [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (output
 plane), [ADR-0036](./ADR-0036-host-owned-baseline-ratchet-plane.md) (fingerprint

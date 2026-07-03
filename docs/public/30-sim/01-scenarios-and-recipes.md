@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-07-02
 release: v0.3.0
 title: "Scenarios and recipes (sim)"
 audience: [contributors, plugin-authors]
@@ -58,8 +58,8 @@ explicitly.
 ```ts
 import { defineLoadScenario, httpTarget, ASSERTIONS } from '@opensip-cli/simulation';
 
-export default defineLoadScenario({
-  id: '...',                            // UUID
+export const scenarios = [defineLoadScenario({
+  id: 'api-checkout-burst',
   name: 'api-checkout-burst',
   description: 'Sustain 200 RPS checkout traffic for 30s',
   tags: ['load', 'checkout'],
@@ -71,7 +71,7 @@ export default defineLoadScenario({
     ASSERTIONS.lowLatency('p99', 200),   // p99 latency < 200ms
     ASSERTIONS.lowErrorRate(0.01),       // error rate < 1%
   ],
-});
+})];
 ```
 
 The driver issues real requests to the `target` at `workload.rps` (bounded by
@@ -79,14 +79,14 @@ The driver issues real requests to the `target` at `workload.rps` (bounded by
 measures real latency and success/failure per request, then evaluates each
 assertion against the measured metrics. Pass/fail is the AND of all assertions.
 Assertions are built with the `ASSERTIONS` factories over a fixed set of metric
-keys (`p50/p95/p99_latency`, `error_rate`, `success_rate`, `requests_per_second`, …).
+keys (`p50/p95/p99_latency_ms`, `error_rate`, `success_rate`, `requests_per_second`, …).
 
 ### `defineChaosScenario`
 
 ```ts
 import { defineChaosScenario, httpTarget, fault, ASSERTIONS } from '@opensip-cli/simulation';
 
-export default defineChaosScenario({
+export const scenarios = [defineChaosScenario({
   id: 'checkout-resilient-under-fault',
   name: 'checkout-resilient-under-fault',
   description: 'Checkout stays within SLO under client-side faults, recovers after',
@@ -108,7 +108,7 @@ export default defineChaosScenario({
   steadyStateAssertions: [ASSERTIONS.lowErrorRate(0.05), ASSERTIONS.lowLatency('p95', 1500)],
   recoveryAssertions:    [ASSERTIONS.lowErrorRate(0.01), ASSERTIONS.lowLatency('p95', 500)],
   recoveryWindowMs: 10_000,           // ms after faults lift
-});
+})];
 ```
 
 The chaos kind drives the same real load window with the fault model active,
@@ -145,18 +145,19 @@ Kind-specific authoring plus a shared runtime contract keeps the engine extensib
 
 ## Sim recipes
 
-A sim recipe is the same shape as a fit recipe: a named selection of scenarios + execution options + reporting options. Defined in [`packages/simulation/engine/src/recipes/types.ts`](../../../packages/simulation/engine/src/recipes/types.ts) and constructed via [`defineRecipe`](../../../packages/simulation/engine/src/recipes/define-recipe.ts).
+A sim recipe is the same shape as a fit recipe: a named selection of scenarios + execution options + reporting options. Defined in [`packages/simulation/engine/src/recipes/types.ts`](../../../packages/simulation/engine/src/recipes/types.ts) and constructed via [`defineSimulationRecipe`](../../../packages/simulation/engine/src/recipes/define-recipe.ts).
 
 ```ts
 import { defineSimulationRecipe } from '@opensip-cli/simulation';
 
-export default defineSimulationRecipe({
+export const recipes = [defineSimulationRecipe({
+  id: 'URCP_sim_pre_deploy',
   name: 'pre-deploy',
   displayName: 'Pre-deploy',
   description: 'Load + chaos suite before each deploy',
   scenarios: { type: 'tags', include: ['load', 'chaos'] },
   execution: { mode: 'sequential', timeout: 300_000 },
-});
+})];
 ```
 
 (The fitness-side helper is named `defineRecipe`. Sim's helper is namespaced as `defineSimulationRecipe` so a project that imports both into one module doesn't have to alias.)
@@ -165,7 +166,7 @@ Selectors are similar to fit's but with a slightly different set: `all`, `tags`,
 
 `sequential` mode is the typical shape for sim recipes — load scenarios contend for resources, so running them in parallel is rarely correct. `parallel` is available for scenarios that fan out across independent inputs.
 
-The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](../../../packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in sequential order. Project-local recipes live as `.js`/`.mjs` files under `<project>/opensip-cli/sim/recipes/`, including nested category directories.
+The default recipe ([`packages/simulation/engine/src/recipes/built-in-recipes.ts`](../../../packages/simulation/engine/src/recipes/built-in-recipes.ts)) selects every registered scenario in parallel. Project-local recipes live as `.js`/`.mjs` files under `<project>/opensip-cli/sim/recipes/`, including nested category directories.
 
 ---
 

@@ -66,7 +66,7 @@ SARIF/native delivery, and output formatting remains in `@opensip-cli/output`.
 fingerprint/property mapping and the native `SignalBatch.evidence` header.
 
 **Related specs / ADRs:** Implements the CLI-local portion of
-`docs/plans/specs/20-platform-evidence-authority-and-egress-contract.md` and the
+`docs/plans/completed/20-platform-evidence-authority-and-egress-contract.md` and the
 ready plan under
 `docs/plans/ready/platform-evidence-authority-and-egress-contract/`. Builds on
 [ADR-0094](./ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md),

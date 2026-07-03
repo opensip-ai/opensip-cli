@@ -58,7 +58,7 @@ rechecks file hashes immediately before writing.
 
 **Related specs / ADRs:**
 
-- `docs/plans/specs/07-agent-apply-verify-loop.md`
+- `docs/plans/completed/07-agent-apply-verify-loop.md`
 - `docs/plans/ready/safe-fix-preview-actions/`
 - [ADR-0086](ADR-0086-signal-repair-metadata.md)
 - [ADR-0084](ADR-0084-mcp-server-surface.md)

@@ -80,7 +80,7 @@ CLI. The new tools preserve those decisions:
 
 **Related specs / ADRs:**
 
-- `docs/plans/specs/07-agent-apply-verify-loop.md`
+- `docs/plans/completed/07-agent-apply-verify-loop.md`
 - `docs/plans/ready/mcp-review-tools/`
 - [ADR-0084](ADR-0084-mcp-server-surface.md)
 - [ADR-0110](ADR-0110-host-owned-review-brief-contract.md)

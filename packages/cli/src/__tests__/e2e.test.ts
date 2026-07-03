@@ -455,6 +455,22 @@ describe('CLI e2e', () => {
       );
       expect(existsSync(join(tempDir, '.gitignore'))).toBe(true);
 
+      const fit = cli.run(['fit', '--recipe', 'example', '--json'], {
+        cwd: tempDir,
+        timeout: 120_000,
+      });
+      expect(fit.exitCode).toBe(0);
+      const fitOutcome = JSON.parse(fit.stdout) as {
+        kind?: string;
+        envelope?: {
+          recipe?: string;
+          units?: { slug?: string }[];
+        };
+      };
+      expect(fitOutcome.kind).toBe('fit.run');
+      expect(fitOutcome.envelope?.recipe).toBe('example');
+      expect(fitOutcome.envelope?.units?.[0]?.slug).toBe('example-check');
+
       const sim = cli.run(['sim', '--recipe', 'example', '--json'], {
         cwd: tempDir,
         timeout: 120_000,

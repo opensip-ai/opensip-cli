@@ -23,7 +23,8 @@ describe('fitness scaffold contributions', () => {
       ['checks', 'example-check.mjs', EXAMPLE_CHECK_IDS.typescript],
       ['recipes', 'example-recipe.mjs', 'URCP_example'],
     ]);
-    expect(files[0]?.content).toContain("slug: 'example-check'");
+    expect(files[0]?.content).toContain("const CHECK_SLUG = 'example-check'");
+    expect(files[0]?.content).not.toContain('@opensip-cli/fitness');
     expect(files[0]?.content).toContain(EXAMPLE_CHECK_IDS.typescript);
     expect(files[1]?.content).toContain("checkIds: ['example-check']");
   });
@@ -36,14 +37,14 @@ describe('fitness scaffold contributions', () => {
       'example-check-python.mjs',
       'example-recipe.mjs',
     ]);
-    expect(files[0]?.content).toContain("slug: 'example-check-go'");
-    expect(files[1]?.content).toContain("scope: { languages: ['python']");
+    expect(files[0]?.content).toContain("const CHECK_SLUG = 'example-check-go'");
+    expect(files[1]?.content).toContain("const CHECK_SCOPE = { languages: ['python']");
     expect(files[2]?.content).toContain("checkIds: ['example-check-go', 'example-check-python']");
   });
 
   it('defaults unknown languages to an empty example id while keeping source valid', () => {
-    expect(exampleCheckSource('unknown')).toContain("id: ''");
-    expect(exampleCheckSource('rust', 'rust')).toContain("slug: 'example-check-rust'");
+    expect(exampleCheckSource('unknown')).toContain("const CHECK_ID = ''");
+    expect(exampleCheckSource('rust', 'rust')).toContain("const CHECK_SLUG = 'example-check-rust'");
     expect(exampleRecipeSource(['a', 'b'])).toContain("checkIds: ['a', 'b']");
     expect(fitStableExampleIds().sort()).toEqual(Object.values(EXAMPLE_CHECK_IDS).sort());
   });

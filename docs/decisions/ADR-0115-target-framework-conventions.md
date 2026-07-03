@@ -62,7 +62,7 @@ the documented `RunScope.targets` seam.
 
 **Related specs / ADRs:**
 
-- `docs/plans/specs/27-framework-convention-config.md`
+- `docs/plans/completed/27-framework-convention-config.md`
 - `docs/plans/ready/framework-convention-config/`
 - [ADR-0023](ADR-0023-config-package-and-schema-registry.md)
 - [ADR-0037](ADR-0037-generic-targeting-runtime.md)

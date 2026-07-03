@@ -56,7 +56,7 @@ reviewers one place to inspect compatibility classes, while `config migrate
 
 **Related specs / docs:**
 
-- `docs/plans/specs/11-platform-compatibility-lts-and-migration.md`
+- `docs/plans/completed/11-platform-compatibility-lts-and-migration.md`
 - [Compatibility policy](../public/70-reference/15-compatibility-policy.md)
 - [Configuration](../public/70-reference/03-configuration.md)
 - [JSON output schema](../public/70-reference/04-json-output-schema.md)

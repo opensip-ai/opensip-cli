@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-07-02
 release: v0.3.0
 title: "Show me each loop"
 audience: [getting-started]
@@ -86,30 +86,21 @@ A scenario describes a load (or chaos) workload and the assertions that should h
 
 ```js
 // opensip-cli/sim/scenarios/checkout-burst.mjs
-import { defineLoadScenario } from '@opensip-cli/simulation';
+import { ASSERTIONS, defineLoadScenario, httpTarget } from '@opensip-cli/simulation';
 
-export default defineLoadScenario({
-  id: '11111111-1111-4111-8111-111111111111',
+export const scenarios = [defineLoadScenario({
+  id: 'checkout-burst',
   name: 'checkout-burst',
   description: 'Sustain 200 RPS checkout traffic for 30s',
   tags: ['load', 'checkout'],
-  duration: { value: 30, unit: 'seconds' },
-  rampUp: { value: 5, unit: 'seconds' },
-  targetRps: 200,
-  personas: [
-    {
-      name: 'shopper',
-      weight: 1.0,
-      action: async () => {
-        await fetch('http://localhost:3000/checkout', { method: 'POST', body: '{}' });
-      },
-    },
-  ],
+  target: httpTarget({ url: 'http://localhost:3000/checkout', method: 'POST', body: '{}' }),
+  workload: { rps: 200, rampUp: 5 },
+  duration: 30,
   assertions: [
-    { name: 'p99-under-500ms', assert: (r) => r.p99LatencyMs < 500 },
-    { name: 'error-rate-under-1pct', assert: (r) => r.errorRate < 0.01 },
+    ASSERTIONS.lowLatency('p99', 500),
+    ASSERTIONS.lowErrorRate(0.01),
   ],
-});
+})];
 ```
 
 The two scenario kinds — `defineLoadScenario`, `defineChaosScenario` — each emit the same `RunnableScenario` shape with a different `kind:` discriminator. Recipes compose scenarios the same way fit recipes compose checks. Deeper detail: [scenarios and recipes](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/).

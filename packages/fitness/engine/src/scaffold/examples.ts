@@ -39,30 +39,179 @@ export function exampleCheckSource(language: string, polyglotSuffix = ''): strin
 // you confirm the wiring works, delete or replace it with a real check.
 //
 // Docs: https://github.com/opensip-ai/opensip-cli#authoring-a-check-package
-import { defineCheck } from '@opensip-cli/fitness';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
-export const checks = [
-  defineCheck({
-    id: '${EXAMPLE_CHECK_IDS[language] ?? ''}',
-    slug: '${slug}',
-    description: 'Demo check — flags any file containing the literal EXAMPLE_TODO',
-    scope: { languages: ['${language}'], concerns: ['backend'] },
-    tags: ['example'],
-    analyze: (content, filePath) => {
-      const i = content.indexOf('EXAMPLE_TODO');
-      if (i < 0) return [];
-      return [{
-        line: content.slice(0, i).split('\\n').length,
-        message: 'Found the example trigger string.',
-        severity: 'warning',
-        suggestion:
-          'This is just a demo. Delete opensip-cli/fit/checks/example-check.mjs ' +
-          'once you have your own checks.',
-        filePath,
-      }];
-    },
-  }),
+const CHECK_ID = '${EXAMPLE_CHECK_IDS[language] ?? ''}';
+const CHECK_SLUG = '${slug}';
+const CHECK_DESCRIPTION = 'Demo check — flags any file containing the literal EXAMPLE_TODO';
+const CHECK_SCOPE = { languages: ['${language}'], concerns: ['backend'] };
+const CHECK_TAGS = ['example'];
+const SKIP_DIRS = new Set([
+  '.git',
+  '.hg',
+  '.svn',
+  '.turbo',
+  '.next',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+  'opensip-cli',
+]);
+const SOURCE_EXTENSIONS = [
+  '.c',
+  '.cc',
+  '.cpp',
+  '.cxx',
+  '.go',
+  '.java',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.py',
+  '.rs',
+  '.ts',
+  '.tsx',
 ];
+
+function normalizePath(filePath) {
+  return filePath.replaceAll(String.fromCharCode(92), '/');
+}
+
+function hasSourceExtension(filePath) {
+  return SOURCE_EXTENSIONS.some((extension) => filePath.endsWith(extension));
+}
+
+function projectPluginRoot(cwd) {
+  return normalizePath(cwd).replace(/\\/+$/, '') + '/opensip-cli/';
+}
+
+function isCandidateFile(filePath, cwd) {
+  const normalized = normalizePath(filePath);
+  return !normalized.startsWith(projectPluginRoot(cwd)) && hasSourceExtension(normalized);
+}
+
+async function walkFiles(dir, cwd = dir) {
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      files.push(...(await walkFiles(fullPath, cwd)));
+    } else if (entry.isFile() && isCandidateFile(fullPath, cwd)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function warningSignal(filePath, line) {
+  return {
+    id: 'sig_' + hashString(CHECK_ID + filePath + String(line)),
+    source: 'fitness',
+    provider: 'opensip-cli',
+    severity: 'medium',
+    category: 'quality',
+    ruleId: 'fit:' + CHECK_SLUG,
+    message: 'Found the example trigger string.',
+    suggestion:
+      'This is just a demo. Delete this scaffolded example check once you have your own checks.',
+    filePath,
+    line,
+    code: { file: filePath, line },
+    metadata: { checkSlug: CHECK_SLUG, checkTags: CHECK_TAGS.join(',') },
+    createdAt: new Date().toISOString(),
+  };
+}
+
+async function analyzeFiles(files, read, signal) {
+  const findings = [];
+  for (const filePath of files) {
+    if (signal?.aborted) throw new Error('Check aborted');
+    const content = await read(filePath).catch(() => '');
+    const index = content.indexOf('EXAMPLE_TODO');
+    if (index < 0) continue;
+    findings.push(warningSignal(filePath, content.slice(0, index).split('\\n').length));
+  }
+  return findings;
+}
+
+function result(signals, totalItems, durationMs) {
+  const errors = signals.filter((s) => s.severity === 'critical' || s.severity === 'high').length;
+  const warnings = signals.filter((s) => s.severity === 'medium').length;
+  return {
+    passed: errors === 0,
+    errors,
+    warnings,
+    signals,
+    info: {
+      label: signals.length === 0 ? 'No EXAMPLE_TODO markers' : String(signals.length) + ' EXAMPLE_TODO marker(s)',
+    },
+    metadata: {
+      totalItems,
+      signals,
+      durationMs,
+      filesScanned: totalItems,
+      itemType: 'files',
+    },
+  };
+}
+
+function emptyMatcher(cwd) {
+  return {
+    cwd,
+    includePatterns: [],
+    excludePatterns: [],
+    files: async () => [],
+    match: async () => ({ files: [], excluded: [], durationMs: 0 }),
+    matches: () => false,
+    withExcludes: () => emptyMatcher(cwd),
+    typescriptOnly: () => emptyMatcher(cwd),
+    noTests: () => emptyMatcher(cwd),
+  };
+}
+
+const exampleCheck = {
+  config: {
+    id: CHECK_ID,
+    slug: CHECK_SLUG,
+    tags: CHECK_TAGS,
+    description: CHECK_DESCRIPTION,
+    analysisMode: 'analyze',
+    scope: { include: [], exclude: [], description: 'target-based scope' },
+    itemType: 'files',
+    scansFiles: true,
+    checkScope: CHECK_SCOPE,
+    execute: async (ctx) => {
+      const start = Date.now();
+      const files = (await ctx.matchFiles()).filter((filePath) => isCandidateFile(filePath, ctx.cwd));
+      const signals = await analyzeFiles(files, (filePath) => ctx.readFile(filePath), ctx.signal);
+      return result(signals, files.length, Date.now() - start);
+    },
+  },
+  getScope: () => ({ include: [], exclude: [], description: 'target-based scope' }),
+  getMatcher: (cwd) => emptyMatcher(cwd),
+  run: async (cwd, options = {}) => {
+    const start = Date.now();
+    const files = (options.targetFiles ? [...options.targetFiles] : await walkFiles(cwd)).filter(
+      (filePath) => isCandidateFile(filePath, cwd),
+    );
+    const signals = await analyzeFiles(files, (filePath) => readFile(filePath, 'utf8'), options.signal);
+    return result(signals, files.length, Date.now() - start);
+  },
+};
+
+export const checks = [exampleCheck];
 `;
 }
 
