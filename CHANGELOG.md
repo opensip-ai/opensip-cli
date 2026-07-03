@@ -2,6 +2,24 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.3.1] - 2026-07-03
+
+An init scaffold reliability release. Freshly initialized projects can now run
+both generated example loops immediately, and the public docs describe the
+project-local plugin and repeat-init behavior consistently.
+
+### Changed
+
+- Public init, sim, and project-local plugin docs now describe managed agent
+  guidance updates, summarized repeat-init output, and the generated example
+  recipe workflow.
+
+### Fixed
+
+- Scaffolded fit checks no longer import `@opensip-cli/fitness`, so
+  `opensip fit --recipe example` works out of the box after `opensip init`.
+- Init e2e coverage now verifies both generated fit and sim example recipes.
+
 ## [0.3.0] - 2026-07-02
 
 An agent-workflow and release-hardening release. It adds first-party review,

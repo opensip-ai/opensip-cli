@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.3.0
+release: v0.3.1
 title: "OpenSIP and OpenSIP CLI"
 audience: [getting-started, contributors, ci-integrators]
 purpose: "The product family — what OpenSIP (the autonomous platform) and opensip-cli (the open-source guardrail layer) each are, how they fit together, and the shared origin that explains why both exist."
@@ -38,7 +38,7 @@ The post-hardening product wedge is **agent workflow**:
 deterministic evidence and guardrails that let coding agents review, edit,
 verify, and hand off changes without unbounded blast radius. That decision is
 recorded in
-[ADR-0122](https://github.com/opensip-ai/opensip-cli/blob/v0.3.0/docs/decisions/ADR-0122-agent-workflow-product-wedge.md).
+[ADR-0122](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0122-agent-workflow-product-wedge.md).
 
 This does not make opensip-cli an AI runtime. The CLI stays local-first and
 deterministic; the platform remains the autonomous layer that consumes CLI
@@ -111,7 +111,7 @@ and humans (via the dashboard / SARIF in GitHub) are others.
 opensip-cli is deliberately **not an AI runtime** — it has no model dependency,
 creates no embeddings, and applies no autonomous changes. It is *built for*
 AI-assisted development without *being* the AI. That posture is recorded in
-[ADR-0095](https://github.com/opensip-ai/opensip-cli/blob/v0.3.0/docs/decisions/ADR-0095-ai-native-guardrail-platform-posture.md).
+[ADR-0095](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0095-ai-native-guardrail-platform-posture.md).
 
 ## For AI agents working in either repository
 

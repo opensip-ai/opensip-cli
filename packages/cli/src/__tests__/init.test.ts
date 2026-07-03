@@ -194,7 +194,7 @@ describe('executeInit (single language)', () => {
       join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'),
       'utf8',
     );
-    expect(check).toContain("scope: { languages: ['rust']");
+    expect(check).toContain("const CHECK_SCOPE = { languages: ['rust']");
 
     // .gitignore was created/appended
     expect(result.gitignoreUpdated).toBe(true);
