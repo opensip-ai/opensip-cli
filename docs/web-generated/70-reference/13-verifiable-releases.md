@@ -65,7 +65,7 @@ release asset upload list.
 To verify a full release set from a checkout of this repository:
 
 ```bash
-VERSION=0.2.4
+VERSION=0.3.0
 TAG="v$VERSION"
 mkdir -p "/tmp/opensip-cli-$TAG"
 

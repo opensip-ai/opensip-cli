@@ -142,12 +142,76 @@ describe('repair verification classifier', () => {
     expect(result.notes?.join('\n')).toContain('impact-trust');
   });
 
+  it('classifies missing checks, check errors, and partial trust as unverifiable evidence', () => {
+    const missingCheck = classifyVerification({
+      tool: 'fit',
+      ruleId: SELECTED.ruleId,
+      files: ['', 'src/example.ts', 'src/example.ts'],
+      envelope: envelope({ units: [] }),
+      signal: SELECTED,
+      command: COMMAND,
+      exitCode: 0,
+      durationMs: 42,
+    });
+    expect(missingCheck.status).toBe('partial');
+    expect(missingCheck.failure?.code).toBe('verification-check-not-run');
+    expect(missingCheck.scope.files).toEqual(['src/example.ts']);
+
+    const unitError = classifyVerification({
+      tool: 'fit',
+      ruleId: SELECTED.ruleId,
+      files: ['src/example.ts'],
+      envelope: envelope({ units: [unit({ passed: false, error: 'parser failed' })] }),
+      signal: SELECTED,
+      command: COMMAND,
+      exitCode: 1,
+      durationMs: 42,
+    });
+    expect(unitError.status).toBe('unverified');
+    expect(unitError.failure?.code).toBe('verification-check-error');
+
+    const partialTrust = classifyVerification({
+      tool: 'fit',
+      ruleId: SELECTED.ruleId,
+      files: ['src/example.ts'],
+      envelope: envelope({
+        verification: buildImpactTrust({
+          fallback: 'full-run',
+          uncertainties: [{ code: 'git-shallow', source: 'git', message: 'shallow clone' }],
+        }),
+      }),
+      signal: SELECTED,
+      command: COMMAND,
+      exitCode: 1,
+      durationMs: 42,
+    });
+    expect(partialTrust.status).toBe('partial');
+    expect(partialTrust.notes?.join('\n')).toContain('impact verification was partial');
+    expect(partialTrust.notes?.join('\n')).toContain('verification command exited 1');
+  });
+
   it('rejects malformed verification JSON', () => {
     const result = parseVerificationEnvelope('{not json');
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.code).toBe('verification-json-invalid');
+  });
+
+  it('rejects verification output with no envelope shape', () => {
+    for (const raw of ['[]', '{}', JSON.stringify({ envelope: { signals: [] } })]) {
+      const result = parseVerificationEnvelope(raw);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.failure.code).toMatch(/^verification-/);
+    }
+  });
+
+  it('parses a direct envelope output shape', () => {
+    const expected = envelope({ verification: buildImpactTrust() });
+    const result = parseVerificationEnvelope(JSON.stringify({ envelope: expected }));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.envelope.runId).toBe('run-1');
   });
 
   it('parses the current command outcome data envelope shape', () => {
@@ -220,5 +284,85 @@ describe('repair verification classifier', () => {
     ]);
     expect(result.status).toBe('verified');
     expect(result.scope.files).toEqual(['src/example.ts']);
+  });
+
+  it('returns unverified results for unsupported tools and missing entrypoints', async () => {
+    const applyResult: RepairApplyResult = {
+      type: 'repair-apply',
+      status: 'applied',
+      session: { id: 'sess-1', tool: 'graph', cwd: '/repo' },
+      signal: SELECTED,
+      action: ACTION,
+      changes: [],
+    };
+
+    const unsupported = await verifyRepair({ projectRoot: '/repo', applyResult });
+    expect(unsupported.status).toBe('unverified');
+    expect(unsupported.failure?.code).toBe('verification-tool-unsupported');
+
+    const missingEntrypoint = await verifyRepair({
+      projectRoot: '/repo',
+      applyResult: { ...applyResult, session: { id: 'sess-1', tool: 'fitness', cwd: '/repo' } },
+      cliEntrypoint: '',
+    });
+    expect(missingEntrypoint.status).toBe('unverified');
+    expect(missingEntrypoint.failure?.code).toBe('verification-entrypoint-unavailable');
+  });
+
+  it('returns unverified results for process timeout, truncation, and invalid output', async () => {
+    const applyResult: RepairApplyResult = {
+      type: 'repair-apply',
+      status: 'applied',
+      session: { id: 'sess-1', tool: 'fit', cwd: '/repo' },
+      signal: SELECTED,
+      action: ACTION,
+      changes: [],
+    };
+
+    for (const [processResult, code] of [
+      [
+        {
+          exitCode: null,
+          stdout: '',
+          stderr: '',
+          durationMs: 1,
+          timedOut: true,
+          truncated: false,
+        },
+        'verification-timeout',
+      ],
+      [
+        {
+          exitCode: null,
+          stdout: '',
+          stderr: '',
+          durationMs: 1,
+          timedOut: false,
+          truncated: true,
+        },
+        'verification-output-too-large',
+      ],
+      [
+        {
+          exitCode: 0,
+          stdout: 'not json',
+          stderr: '',
+          durationMs: 1,
+          timedOut: false,
+          truncated: false,
+        },
+        'verification-json-invalid',
+      ],
+    ] as const) {
+      const result = await verifyRepair({
+        projectRoot: '/repo',
+        applyResult,
+        cliEntrypoint: '/repo/packages/cli/dist/index.js',
+        timeoutMs: 5,
+        runner: () => Promise.resolve(processResult),
+      });
+      expect(result.status).toBe('unverified');
+      expect(result.failure?.code).toBe(code);
+    }
   });
 });

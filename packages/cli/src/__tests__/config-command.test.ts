@@ -14,7 +14,9 @@ import {
 } from '@opensip-cli/config';
 import {
   ConfigurationError,
+  RunScope,
   ToolRegistry,
+  runWithScope,
   type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
@@ -26,7 +28,10 @@ import { buildConfigDeclarations } from '../bootstrap/config-declarations.js';
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
 import { executeConfigMigrate } from '../commands/config-migrate.js';
 import { executeConfigSchema, executeConfigValidate } from '../commands/config.js';
+import { buildConfigGroupLeaves } from '../commands/host-subcommand-config.js';
 import { buildHostCommandInventory } from '../commands/host-subcommand-groups.js';
+
+import type { CliCommandsContext } from '../commands/shared.js';
 
 async function makeRegistry(): Promise<{
   readonly tools: ToolRegistry;
@@ -38,6 +43,22 @@ async function makeRegistry(): Promise<{
   const provenance: ToolProvenance[] = [];
   await registerFirstPartyTools(tools, provenance, manifests);
   return { tools, manifests, provenance };
+}
+
+function makeConfigContext(overrides: Partial<CliCommandsContext> = {}): CliCommandsContext {
+  return {
+    setExitCode: (code) => {
+      void code;
+    },
+    render: () => Promise.resolve(),
+    emitJson: () => undefined,
+    emitRaw: () => undefined,
+    emitError: () => undefined,
+    pluginLayouts: [],
+    toolScaffolds: [],
+    datastore: () => undefined,
+    ...overrides,
+  };
 }
 
 let dir: string;
@@ -403,5 +424,59 @@ describe('host config group inventory', () => {
   it('includes config validate, config schema, and config migrate', () => {
     const inventory = buildHostCommandInventory();
     expect(inventory.groupSubcommands.config).toEqual(['validate', 'schema', 'migrate']);
+  });
+});
+
+describe('config command specs', () => {
+  it('routes validate, schema, and migrate through their shared command base', async () => {
+    const { tools, manifests, provenance } = await makeRegistry();
+    const ctx = makeConfigContext({ tools, manifests, provenance });
+    const [validate, schema, migrate] = buildConfigGroupLeaves(ctx);
+    const configPath = join(dir, 'opensip-cli.config.yml');
+    const projectContext = { scope: 'project' as const, projectRoot: dir, configPath };
+
+    const valid = await validate.handler({ projectContext }, ctx);
+    expect(valid).toMatchObject({ type: 'config-validate', valid: true });
+
+    const schemaOut = join(dir, 'schema-from-spec.json');
+    const schemaResult = await schema.handler({ projectContext, out: schemaOut }, ctx);
+    expect(schemaResult).toMatchObject({ type: 'config-schema', outPath: schemaOut });
+    expect(readFileSync(schemaOut, 'utf8')).toContain('"fitness"');
+
+    writeFileSync(configPath, 'targets: {}\n', 'utf8');
+    const exitCodes: number[] = [];
+    const migrateCtx = makeConfigContext({
+      tools,
+      manifests,
+      provenance,
+      setExitCode: (code) => {
+        exitCodes.push(code);
+      },
+    });
+    const migrated = await migrate.handler({ projectContext, check: true }, migrateCtx);
+    expect(migrated).toMatchObject({ type: 'config-migrate', check: true, changed: true });
+    expect(exitCodes).toEqual([2]);
+  });
+
+  it('falls back to the entered scope for tool registries and rejects missing registries', async () => {
+    const { tools, manifests, provenance } = await makeRegistry();
+    const [validate] = buildConfigGroupLeaves(makeConfigContext());
+    const scope = new RunScope({
+      tools,
+      toolManifests: manifests,
+      toolProvenance: provenance,
+      projectContext: {
+        scope: 'project',
+        projectRoot: dir,
+        configPath: join(dir, 'opensip-cli.config.yml'),
+      },
+    });
+
+    const valid = await runWithScope(scope, () =>
+      validate.handler({ cwd: dir }, makeConfigContext()),
+    );
+    expect(valid).toMatchObject({ type: 'config-validate', valid: true });
+
+    expect(() => validate.handler({ cwd: dir }, makeConfigContext())).toThrow(/tool registry/);
   });
 });

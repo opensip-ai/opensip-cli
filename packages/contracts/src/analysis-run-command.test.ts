@@ -293,4 +293,91 @@ describe('defineAnalysisRunCommand', () => {
       'analysis.sarif',
     );
   });
+
+  it('returns empty live completions without delivery when no envelope is emitted', async () => {
+    const cli = makeCli();
+    cli._calls.renderLive.mockResolvedValue({});
+
+    const completion = (await command().handler(
+      { cwd: '/repo', live: true },
+      cli,
+    )) as ToolRunCompletion;
+
+    expect(completion).toEqual({});
+    expect(cli._calls.deliverSignals).not.toHaveBeenCalled();
+  });
+
+  it('runs static hooks, passes delivery options, and skips render when no presentation exists', async () => {
+    const events: string[] = [];
+    const spec = defineAnalysisRunCommand<TestOptions, TestRequest, TestResult>({
+      description: 'Run headless analysis',
+      normalize: (options) => ({ cwd: options.cwd, live: false }),
+      execute: () => testResult(),
+      envelope: (result) => result.envelope,
+      beforeOutput: () => {
+        events.push('before');
+      },
+      afterDelivery: () => {
+        events.push('after');
+      },
+    });
+    const cli = makeCli();
+
+    const completion = await spec.handler(
+      { cwd: '/repo', apiKey: 'sk-test', open: true, reportTo: 'https://reports.test' },
+      cli,
+    );
+
+    expect(completion).toEqual({});
+    expect(events).toEqual(['before', 'after']);
+    expect(cli._calls.render).not.toHaveBeenCalled();
+    expect(cli._calls.deliverSignals).toHaveBeenCalledWith(
+      expect.objectContaining({ tool: 'test-tool' }),
+      {
+        cwd: '/repo',
+        reportTo: 'https://reports.test',
+        apiKey: 'sk-test',
+      },
+    );
+    expect(cli._calls.maybeOpenReport).toHaveBeenCalledWith({
+      openRequested: true,
+      jsonOutput: false,
+    });
+  });
+
+  it('surfaces delivery failures after emitting the failure lifecycle path', async () => {
+    const cli = makeCli();
+    cli._calls.deliverSignals.mockRejectedValue(new Error('egress down'));
+
+    await expect(command().handler({ cwd: '/repo' }, cli)).rejects.toThrow('egress down');
+    expect(cli._calls.writeSarif).not.toHaveBeenCalled();
+  });
+
+  it('lets live adapters add a session contribution after host delivery', async () => {
+    const envelope = signalEnvelope();
+    const spec = defineAnalysisRunCommand<TestOptions, TestRequest, TestResult>({
+      description: 'Run live analysis',
+      normalize: (options) => ({ cwd: options.cwd, live: true }),
+      execute: () => testResult(envelope),
+      envelope: (result) => result.envelope,
+      live: {
+        key: 'test-live',
+        shouldUse: () => true,
+        args: ({ request }) => ({ cwd: request.cwd }),
+        session: ({ envelope: completedEnvelope }) => ({
+          tool: 'graph',
+          cwd: '/repo',
+          score: completedEnvelope.verdict.score,
+          passed: completedEnvelope.verdict.passed,
+        }),
+      },
+    });
+    const cli = makeCli();
+    cli._calls.renderLive.mockResolvedValue({ envelope });
+
+    const completion = (await spec.handler({ cwd: '/repo', live: true }, cli)) as ToolRunCompletion;
+
+    expect(completion.session).toMatchObject({ tool: 'graph', cwd: '/repo' });
+    expect(cli._calls.deliverSignals).toHaveBeenCalledWith(envelope, { cwd: '/repo' });
+  });
 });

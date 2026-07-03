@@ -452,6 +452,30 @@ describe('discoverCapabilityContributions — preferences', () => {
       },
     ]);
   });
+
+  it('diagnoses an explicit package whose package.json cannot be read as metadata', async () => {
+    const dir = join(testDir, 'node_modules/@acme/bad-json');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'package.json'), '{ invalid json', 'utf8');
+    const diags: CapabilityDiscoveryDiagnostic[] = [];
+
+    const out = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+      preferences: { packages: ['@acme/bad-json'] },
+      shouldLoadPackage: ADMIT_ALL,
+      onDiagnostic: (d) => diags.push(d),
+    });
+
+    expect(out).toEqual([]);
+    expect(diags).toEqual([
+      {
+        evt: 'capability.discovery.unreadable_package',
+        packageName: '@acme/bad-json',
+        message: 'package @acme/bad-json has no readable package.json — skipping',
+      },
+    ]);
+  });
 });
 
 describe('discoverCapabilityContributions — co-contributions (§5.3)', () => {
@@ -564,6 +588,72 @@ describe('discoverCapabilityContributions — explicit list mode', () => {
 });
 
 describe('discoverCapabilityContributions — per-package isolation', () => {
+  it('diagnoses worker isolation requests when no isolated loader is wired', async () => {
+    writeFixturePackage({
+      relDir: 'node_modules/@acme/items-worker-no-loader',
+      name: '@acme/items-worker-no-loader',
+      markerKind: 'items-pack',
+      exportName: 'items',
+      exportSource: "[{ id: 'must-not-import' }]",
+    });
+    const diags: CapabilityDiscoveryDiagnostic[] = [];
+
+    const out = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+      shouldLoadPackage: () => ({
+        admit: true,
+        resourceDecision: {
+          isolation: 'worker',
+          allowedResources: [],
+          denyUndeclared: true,
+          reasons: ['fixture requires worker isolation'],
+        },
+      }),
+      onDiagnostic: (d) => diags.push(d),
+    });
+
+    expect(out).toEqual([]);
+    expect(diags).toEqual([
+      {
+        evt: 'capability.discovery.isolation_unsupported',
+        packageName: '@acme/items-worker-no-loader',
+        message:
+          'package @acme/items-worker-no-loader requires worker isolation but no isolated capability loader is wired',
+      },
+    ]);
+  });
+
+  it('diagnoses contribution-loader failures without falling back to host import', async () => {
+    writeFixturePackage({
+      relDir: 'node_modules/@acme/items-loader-throws',
+      name: '@acme/items-loader-throws',
+      markerKind: 'items-pack',
+      exportName: 'items',
+      exportSource: "[{ id: 'must-not-import' }]",
+    });
+    const diags: CapabilityDiscoveryDiagnostic[] = [];
+
+    const out = await discoverCapabilityContributions({
+      descriptor: MARKER_DESCRIPTOR,
+      projectDir: testDir,
+      shouldLoadPackage: ADMIT_ALL,
+      contributionLoader: () => {
+        throw new Error('loader failed');
+      },
+      onDiagnostic: (d) => diags.push(d),
+    });
+
+    expect(out).toEqual([]);
+    expect(diags).toEqual([
+      {
+        evt: 'capability.discovery.load_failed',
+        packageName: '@acme/items-loader-throws',
+        message: 'failed to load package @acme/items-loader-throws: loader failed',
+      },
+    ]);
+  });
+
   it('skips a package whose array export is the wrong shape, with a diagnostic', async () => {
     writeFixturePackage({
       relDir: 'node_modules/@acme/items-bad',

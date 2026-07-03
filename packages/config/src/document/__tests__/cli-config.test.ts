@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { loadCliDefaults } from '../cli-config.js';
+import { loadCliDefaults, readProjectTrustPolicy } from '../cli-config.js';
 
 let testDir: string;
 
@@ -218,5 +218,40 @@ describe('loadCliDefaults', () => {
 
     writeConfig('cli:\n  sessions:\n    keep: 5\n    maxAgeDayz: 10\n');
     expect(loadCliDefaults(testDir).sessions).toBeUndefined();
+  });
+});
+
+describe('readProjectTrustPolicy', () => {
+  it('returns empty when no config path or no policy block is present', () => {
+    expect(readProjectTrustPolicy(undefined)).toEqual({});
+    const configPath = writeConfig('cli:\n  verbose: true\n');
+    expect(readProjectTrustPolicy(configPath)).toEqual({});
+  });
+
+  it('returns parsed project policy blocks and summarizes invalid ones', () => {
+    const validPath = writeConfig(`policy:
+  mode: strict
+  exceptions:
+    - id: temp
+      subject: installed-tool:demo
+      action: load
+      reason: temporary
+      expiresAt: 2026-09-01T00:00:00.000Z
+`);
+
+    expect(readProjectTrustPolicy(validPath).policy).toMatchObject({
+      mode: 'strict',
+      exceptions: [{ id: 'temp' }],
+    });
+
+    const invalidPath = writeConfig(`policy:
+  mode: strict
+  exceptions:
+    - id: bad
+      subject: installed-tool:demo
+      action: load
+`);
+
+    expect(readProjectTrustPolicy(invalidPath).error).toContain('reason');
   });
 });

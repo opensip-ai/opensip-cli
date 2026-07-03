@@ -161,4 +161,93 @@ describe('evaluateTrustPolicy', () => {
     expect(decision.resourceDecision).toBeUndefined();
     expect(decision.auditEvent.metadata.resourceDecision).toBeUndefined();
   });
+
+  it('applies CI strict mode, optional org conditions, and expired exceptions', () => {
+    const policy = resolveTrustPolicySources(
+      [
+        {
+          tier: 'project',
+          policy: {
+            ci: 'strict',
+            exceptions: [
+              {
+                id: 'expired',
+                subject: 'installed-tool:demo',
+                action: 'load',
+                reason: 'expired rollout',
+                expiresAt: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          },
+        },
+        { tier: 'org', orgStatus: { state: 'optional-unavailable', reason: 'cache stale' } },
+      ],
+      NOW,
+    );
+
+    const load = evaluateTrustPolicy(policy, {
+      subject: { kind: 'installed-tool', id: 'demo' },
+      action: 'load',
+      evidence: { legacyTrusted: true, provenanceStatus: 'unavailable', ci: true },
+      now: NOW,
+    });
+    expect(load.outcome).toBe('deny');
+    expect(load.matchedExceptionIds).toEqual([]);
+    expect(load.reasons.join(' ')).toContain('optional org policy unavailable');
+
+    const runtimeExclude = evaluateTrustPolicy(policy, {
+      subject: { kind: 'runtime', id: 'paths' },
+      action: 'runtime-exclude',
+      evidence: { ci: false },
+      now: NOW,
+    });
+    expect(runtimeExclude.outcome).toBe('allow-with-conditions');
+    expect(runtimeExclude.reasons.join(' ')).toContain('runtime exclude is per-run');
+  });
+
+  it('denies locally untrusted executables and sanitizes metadata', () => {
+    const policy = resolveTrustPolicySources([], NOW);
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'user-global-tool', id: 'demo' },
+      action: 'install',
+      evidence: {
+        legacyTrusted: false,
+        provenanceStatus: 'failed',
+        token: 'token=secret-value',
+        nested: { apiKey: 'api_key=abc123', ignored: Symbol('skip') },
+      },
+      now: NOW,
+    });
+
+    expect(decision.outcome).toBe('deny');
+    expect(decision.provenanceStatus).toBe('failed');
+    expect(decision.auditEvent.metadata).toMatchObject({
+      provenanceStatus: 'failed',
+      token: 'token=<redacted>',
+      nested: { 'apiKey=<redacted>': 'api_key=<redacted>' },
+    });
+  });
+
+  it('normalizes capability resources defensively', () => {
+    const policy = resolveTrustPolicySources([], NOW);
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'capability-pack', id: '@acme/fit-pack' },
+      action: 'load',
+      evidence: {
+        legacyTrusted: true,
+        declaredResources: [
+          { resource: 'filesystem', scope: 'src/**' },
+          { resource: 'not-real', scope: 'ignored' },
+          null,
+          { resource: 'subprocess', reason: 'run scanner' },
+        ],
+      },
+      now: NOW,
+    });
+
+    expect(decision.resourceDecision?.allowedResources).toEqual([
+      { resource: 'filesystem', scope: 'src/**' },
+      { resource: 'subprocess', reason: 'run scanner' },
+    ]);
+  });
 });

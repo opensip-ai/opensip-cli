@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.2.4
+release: v0.3.0
 title: "Compatibility policy"
 audience: [ci-integrators, plugin-authors, contributors]
 purpose: "The public compatibility contract classes, version markers, deprecation posture, and migration/check lanes for opensip-cli."
@@ -37,7 +37,7 @@ so the CLI records them as named compatibility contract classes in
 | `datastore-payload` | 1 | `@opensip-cli/datastore` | Generic session rows stay host-owned; payload additions must be optional or migrated. |
 
 The registry lives in
-[`packages/core/src/lib/compatibility-policy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.2.4/packages/core/src/lib/compatibility-policy.ts)
+[`packages/core/src/lib/compatibility-policy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.0/packages/core/src/lib/compatibility-policy.ts)
 and is re-exported from `@opensip-cli/contracts` for public consumers.
 
 ## Project config migration

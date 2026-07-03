@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.2.4
+release: v0.3.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
@@ -753,11 +753,11 @@ without bumping that version.
       "fingerprintStrategyVersion": 1
     },
     "declaredInputs": {
-      "cliVersion": "0.2.4",
+      "cliVersion": "0.3.0",
       "nodeVersion": "24.16.0",
       "platform": "darwin/arm64",
       "tool": "fit",
-      "engineVersion": "0.2.4"
+      "engineVersion": "0.3.0"
     },
     "divergenceContractVersion": 1
   },

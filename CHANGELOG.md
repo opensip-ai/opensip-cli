@@ -2,6 +2,42 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.3.0] - 2026-07-02
+
+An agent-workflow and release-hardening release. It adds first-party review,
+repair, impact, audit-suite, and GitHub Action surfaces; strengthens extension
+trust and isolated capability loading; and makes releases more verifiable with
+compatibility, quality, performance, and artifact checks.
+
+### Added
+
+- Review-result MCP tools, review-brief correlation, impact-analysis trust
+  foundations, and a safe repair preview/apply/verify loop for agent-assisted
+  changes.
+- Built-in audit suite presets, no-init first-run support, and the OSS GitHub
+  Action for repository CI adoption.
+- Target framework conventions and a host-owned analysis run pipeline for more
+  consistent tool execution.
+- Detection-quality measurement, performance SLO benchmarking, public benchmark
+  docs, compatibility/LTS policy, and verifiable release artifacts.
+- Trust policy and evidence-authority egress contracts for extension and
+  downstream evidence workflows.
+
+### Changed
+
+- External capability resources now load through isolated bridge paths with
+  shared core helpers instead of duplicated per-tool loaders.
+- The product documentation now centers the agent workflow wedge and refreshes
+  generated package and web docs for v0.3.0.
+
+### Fixed
+
+- Dogfood `graph`, `yagni`, and `fit` runs are clean after consolidating
+  duplicate bridge helpers, removing SARIF traversal recursion from the graph
+  call graph, and simplifying a wide `tools list` helper.
+- Local workspace package injection refreshes automatically before dogfood runs
+  when needed, and stays silent when the injected packages already match source.
+
 ## [0.2.4] - 2026-07-01
 
 An init UX and onboarding release. Repeat-init diagnostics summarize

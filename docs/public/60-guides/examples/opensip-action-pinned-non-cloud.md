@@ -21,7 +21,7 @@ jobs:
       - uses: opensip-ai/opensip-cli@0123456789abcdef0123456789abcdef01234567
         id: opensip
         with:
-          version: 0.2.4
+          version: 0.3.0
           suite: audit
           changed: true
           annotations: true

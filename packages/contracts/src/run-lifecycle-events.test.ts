@@ -60,4 +60,37 @@ describe('analysis lifecycle events', () => {
       }),
     );
   });
+
+  it('routes config and run events to the correct diagnostic phases', () => {
+    const { cli, diagnostics } = stubCli();
+
+    emitAnalysisLifecycleEvent(cli, configLifecycleEvent('analysis.config.rejected'));
+    emitAnalysisLifecycleEvent(cli, configLifecycleEvent('analysis.config.defaulted'));
+    emitAnalysisLifecycleEvent(cli, runLifecycleEvent('analysis.run.failed'));
+
+    expect(diagnostics.event).toHaveBeenNthCalledWith(
+      1,
+      'error',
+      'debug',
+      'analysis.config.rejected',
+      {},
+    );
+    expect(diagnostics.event).toHaveBeenNthCalledWith(
+      2,
+      'load',
+      'debug',
+      'analysis.config.defaulted',
+      {},
+    );
+    expect(diagnostics.event).toHaveBeenNthCalledWith(
+      3,
+      'execute',
+      'debug',
+      'analysis.run.failed',
+      {},
+    );
+    expect(() =>
+      emitAnalysisLifecycleEvent({} as ToolCliContext, runLifecycleEvent('analysis.run.completed')),
+    ).not.toThrow();
+  });
 });

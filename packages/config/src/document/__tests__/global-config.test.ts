@@ -132,6 +132,49 @@ describe('readGlobalConfig (missing / malformed paths)', () => {
   });
 });
 
+describe('readGlobalTrustPolicy', () => {
+  it('returns empty when no user policy exists and parses valid policy blocks', async () => {
+    const { readGlobalTrustPolicy, writeGlobalConfig } = await loadModule();
+
+    expect(readGlobalTrustPolicy()).toEqual({});
+
+    writeGlobalConfig({
+      policy: {
+        mode: 'strict',
+        ci: 'strict',
+        exceptions: [
+          {
+            id: 'temp',
+            subject: 'baseline:fit',
+            action: 'baseline-save',
+            reason: 'temporary rollout',
+            expiresAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    expect(readGlobalTrustPolicy().policy).toMatchObject({
+      mode: 'strict',
+      ci: 'strict',
+      exceptions: [{ id: 'temp' }],
+    });
+  });
+
+  it('summarizes invalid user policy blocks without throwing', async () => {
+    const { readGlobalTrustPolicy, writeGlobalConfig } = await loadModule();
+
+    writeGlobalConfig({
+      policy: {
+        mode: 'strict',
+        exceptions: [{ id: 'bad', subject: 'baseline:fit', action: 'baseline-save' }],
+      },
+    });
+
+    expect(readGlobalTrustPolicy().error).toContain('reason');
+  });
+});
+
 describe('resolveApiKey', () => {
   const originalEnv = { ...process.env };
 

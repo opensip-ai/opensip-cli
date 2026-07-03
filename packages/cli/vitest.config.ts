@@ -57,6 +57,18 @@ export default mergeConfig(
           // stderr-only, and empty-dir paths are covered here; full validate
           // integration is exercised by the tools e2e lane.
           'src/commands/tools/runtime-probe.ts',
+          // Capability pack isolation runs through a forked CLI worker. The
+          // child entrypoint and supervisor are exercised by capability-pack
+          // integration tests, but V8 cannot observe the child process. The
+          // guard installer monkey-patches Node builtins process-wide; the pure
+          // path classifier is unit-tested, while installing the patches in
+          // this process would contaminate unrelated tests.
+          'src/bootstrap/capability-worker/entry.ts',
+          'src/bootstrap/capability-worker/supervisor.ts',
+          'src/bootstrap/capability-worker/guards.ts',
+          // Static copied bootstrap manifest, validated by the manifest/tool
+          // admission tests rather than line coverage.
+          'src/bootstrap/bundled-tools.manifest.json',
         ],
         thresholds: {
           statements: 90,

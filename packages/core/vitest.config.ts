@@ -32,8 +32,11 @@ export default mergeConfig(
           'src/tools/tool-sessions.ts',
           'src/tools/report-failure.ts',
           'src/tools/manifest-config.ts',
+          'src/tools/resource-requirement.ts',
           'src/lib/ui-context.ts',
+          'src/lib/run-diagnostics.ts',
           'src/lib/execution/options.ts',
+          'src/plugins/capability-discovery-types.ts',
           // Re-export shim — executable code lives in lib/json-guards.ts.
           'src/plugins/json-guards.ts',
           // Progress transport contract — interfaces and type aliases only.

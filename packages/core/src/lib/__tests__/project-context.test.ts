@@ -15,7 +15,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ValidationError } from '../errors.js';
 import { logger } from '../logger.js';
-import { resolveProjectContext } from '../project-context.js';
+import {
+  hasRuntimeProjectContext,
+  isEphemeralProjectContext,
+  isInitializedProjectContext,
+  resolveProjectContext,
+  type ProjectContext,
+} from '../project-context.js';
 
 let testDir: string;
 
@@ -230,6 +236,52 @@ describe('resolveProjectContext', () => {
       });
       expect(ctx.cwd).toBe(resolve('some/relative/path'));
       expect(ctx.cwd.startsWith('/')).toBe(true);
+    });
+  });
+
+  describe('project context predicates', () => {
+    it('classifies initialized, ephemeral, and absent runtime contexts', () => {
+      const initialized: ProjectContext = {
+        cwd: testDir,
+        cwdExplicit: false,
+        projectRoot: testDir,
+        configPath: join(testDir, 'opensip-cli.config.yml'),
+        walkedUp: 0,
+        scope: 'project',
+      };
+      const missingConfig: ProjectContext = {
+        ...initialized,
+        configPath: undefined,
+      };
+      const ephemeral: ProjectContext = {
+        ...initialized,
+        configPath: undefined,
+        scope: 'ephemeral',
+        ephemeralConfigDocument: { targets: {} },
+      };
+      const emptyEphemeral: ProjectContext = {
+        ...initialized,
+        configPath: undefined,
+        scope: 'ephemeral',
+      };
+      const none: ProjectContext = {
+        ...initialized,
+        configPath: undefined,
+        scope: 'none',
+      };
+
+      expect(isInitializedProjectContext(initialized)).toBe(true);
+      expect(isInitializedProjectContext(missingConfig)).toBe(false);
+      expect(isInitializedProjectContext(undefined)).toBe(false);
+
+      expect(isEphemeralProjectContext(ephemeral)).toBe(true);
+      expect(isEphemeralProjectContext(emptyEphemeral)).toBe(false);
+      expect(isEphemeralProjectContext(undefined)).toBe(false);
+
+      expect(hasRuntimeProjectContext(initialized)).toBe(true);
+      expect(hasRuntimeProjectContext(ephemeral)).toBe(true);
+      expect(hasRuntimeProjectContext(none)).toBe(false);
+      expect(hasRuntimeProjectContext(undefined)).toBe(false);
     });
   });
 

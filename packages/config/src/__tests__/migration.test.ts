@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -74,5 +74,36 @@ describe('config migration', () => {
     expect(result.dryRun).toBe(true);
     expect(result.wrote).toBe(false);
     expect(readFileSync(configPath, 'utf8')).toBe(original);
+  });
+
+  it('writes changed file migrations when dry-run is disabled', () => {
+    const dir = makeTmpDir();
+    const configPath = join(dir, 'opensip-cli.config.yml');
+    writeFileSync(configPath, 'targets: {}\n', 'utf8');
+
+    const result = migrateConfigFile({ configPath });
+
+    expect(result.changed).toBe(true);
+    expect(result.dryRun).toBe(false);
+    expect(result.wrote).toBe(true);
+    expect(readFileSync(configPath, 'utf8')).toContain('schemaVersion: 1');
+  });
+
+  it('refuses missing and oversized config files', () => {
+    const dir = makeTmpDir();
+    const missingPath = join(dir, 'missing.yml');
+    expect(existsSync(missingPath)).toBe(false);
+    expect(() => migrateConfigFile({ configPath: missingPath })).toThrow(ConfigurationError);
+
+    const configPath = join(dir, 'opensip-cli.config.yml');
+    writeFileSync(configPath, 'schemaVersion: 1\n', 'utf8');
+    expect(() => migrateConfigFile({ configPath, maxBytes: 1 })).toThrow(ConfigurationError);
+  });
+
+  it('rejects invalid migration text targets and non-map YAML documents', () => {
+    expect(() => migrateConfigText({ text: 'targets: {}\n', targetVersion: 0 })).toThrow(
+      ConfigurationError,
+    );
+    expect(() => migrateConfigText({ text: '- nope\n' })).toThrow(ConfigurationError);
   });
 });

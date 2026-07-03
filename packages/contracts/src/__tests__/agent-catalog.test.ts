@@ -169,4 +169,48 @@ describe('buildAgentCatalog', () => {
     expect(mcp?.examples).toEqual(['opensip mcp']);
     expect(mcp?.description).toMatch(/Raw-stream transport/);
   });
+
+  it('includes project context only when target conventions are present and describes non-json command output', () => {
+    const tools = new ToolRegistry();
+    tools.register({
+      identity: { name: 'plain' },
+      metadata: {
+        id: '00000000-0000-4000-8000-000000000206',
+        name: 'plain',
+        version: '0.0.0',
+        description: 'plain tool',
+      },
+      commands: [],
+      commandSpecs: [
+        defineCommand({
+          name: 'plain',
+          description: 'Run plain output',
+          commonFlags: ['cwd'],
+          scope: 'project',
+          output: 'command-result',
+          handler: noopHandler,
+        }),
+      ],
+    });
+
+    expect(
+      buildAgentCatalog({
+        projectContext: { targetConventions: [] },
+      }).projectContext,
+    ).toBeUndefined();
+
+    const catalog = buildAgentCatalog({
+      tools,
+      projectContext: {
+        targetConventions: [
+          { target: 'src', entrypointCount: 0, alwaysUsedCount: 1, usedExportCount: 0 },
+        ],
+      },
+    });
+
+    const plain = catalog.entryPoints.find((entry) => entry.command === 'plain');
+    expect(plain?.examples).toEqual(['opensip plain']);
+    expect(plain?.description).toContain('does not declare --json');
+    expect(catalog.projectContext?.targetConventions).toHaveLength(1);
+  });
 });
