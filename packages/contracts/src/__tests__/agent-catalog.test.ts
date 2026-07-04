@@ -46,6 +46,9 @@ describe('buildAgentCatalog', () => {
     expect(JSON.stringify(catalog)).not.toContain('opensip audit');
     expect(JSON.stringify(catalog)).toContain('opensip policy explain installed-tool:audit-sec');
     expect(catalog.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
+    expect(catalog.outputShapes.reviewBrief).toContain(
+      'scope?: { mode, source, ref?, changedFiles?, notice? }',
+    );
     expect(catalog.notes.length).toBeGreaterThan(0);
   });
 

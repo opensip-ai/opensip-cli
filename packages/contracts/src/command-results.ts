@@ -48,6 +48,9 @@ export type {
   SuiteListResult,
   SuiteListStep,
   SuiteRunResult,
+  SuiteRunScope,
+  SuiteRunScopeMode,
+  SuiteRunScopeSource,
   SuiteStepSummary,
 } from './command-results-variants/suite-results.js';
 export type { ReviewBrief } from './review-brief.js';

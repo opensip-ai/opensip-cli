@@ -58,6 +58,18 @@ describe('suite view builders', () => {
         }),
       ),
     ).toContain('Exit: 0');
+    expect(
+      renderToText(
+        viewSuiteRun({
+          type: 'suite-run',
+          suite: 'security',
+          suiteRunId: 'run-1',
+          exitCode: 0,
+          durationMs: 900,
+          steps: [],
+        }),
+      ),
+    ).not.toContain('Scope:');
 
     expect(
       renderToText(
@@ -131,5 +143,74 @@ describe('suite view builders', () => {
     expect(out).toContain('E:0 W:1 F:1');
     expect(out).toContain('E:2 W:0 F:2');
     expect(out).toContain('scenario faulted');
+  });
+
+  it('renders suite run scope variants', () => {
+    const base = {
+      type: 'suite-run' as const,
+      suite: 'audit',
+      suiteRunId: 'run-1',
+      exitCode: 0,
+      durationMs: 10,
+      steps: [],
+    };
+
+    expect(
+      renderToText(
+        viewSuiteRun({
+          ...base,
+          scope: { mode: 'changed', source: 'default', changedFiles: 14 },
+        }),
+      ),
+    ).toContain('Scope: changed (working tree, 14 files)');
+
+    expect(
+      renderToText(
+        viewSuiteRun({
+          ...base,
+          scope: { mode: 'changed', source: 'explicit', ref: 'main', changedFiles: 1 },
+        }),
+      ),
+    ).toContain('Scope: changed since main (1 file)');
+
+    expect(
+      renderToText(
+        viewSuiteRun({
+          ...base,
+          scope: { mode: 'changed', source: 'explicit' },
+        }),
+      ),
+    ).toContain('Scope: changed');
+
+    expect(
+      renderToText(
+        viewSuiteRun({
+          ...base,
+          scope: { mode: 'full', source: 'explicit' },
+        }),
+      ),
+    ).toContain('Scope: full (--full)');
+
+    const fallback = renderToText(
+      viewSuiteRun({
+        ...base,
+        scope: {
+          mode: 'full',
+          source: 'fallback',
+          notice: 'not a git repository; running the full scope',
+        },
+      }),
+    );
+    expect(fallback).toContain('Scope: full');
+    expect(fallback).toContain('not a git repository; running the full scope');
+
+    expect(
+      renderToText(
+        viewSuiteRun({
+          ...base,
+          scope: { mode: 'full', source: 'default' },
+        }),
+      ),
+    ).toContain('Scope: full');
   });
 });

@@ -197,7 +197,7 @@ opensip graph   # call-graph shape
 opensip yagni   # advisory reduction candidates
 ```
 
-`fit`, `graph`, and `sim` exit non-zero when the bar breaks (with baseline/compare gates for incremental adoption). `yagni` is advisory by default (exit `0`). Each can emit JSON (`SignalEnvelope`) for agents and CI. The CLI doesn't know what any of them do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes.
+`fit`, `graph`, and `sim` exit non-zero when the bar breaks (with baseline/compare gates for incremental adoption). `yagni` is advisory by default (exit `0`). Each can emit JSON (`SignalEnvelope`) for agents and CI. The CLI doesn't know what any of them do internally — they're tools registered against a shared dispatcher. Same model lets future `lint`, `bench`, or domain-specific tools slot in without CLI changes.
 
 ## What's next
 

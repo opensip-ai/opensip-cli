@@ -25,6 +25,9 @@
     "url": "https://github.com/opensip-ai/opensip-cli/issues"
   },
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "bin": {
     "opensip": "./dist/index.js"
   },

@@ -344,7 +344,8 @@ even though users normally type `opensip fit`.
 
 `audit` is built in: `opensip suite run audit` works even when config omits a
 `suites.audit` block. Define `suites.audit` only when you want to replace the
-built-in PR-review workflow.
+built-in PR-review workflow. The built-in preset runs changed-scope by default
+when git scope resolves; pass `--full` for a whole-repo run.
 
 ```yaml
 suites:

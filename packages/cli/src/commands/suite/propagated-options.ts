@@ -12,12 +12,16 @@ export interface PropagatedSuiteArgsInput {
   readonly defaultChanged?: boolean;
 }
 
-function hasSelector(input: Readonly<Record<string, unknown>>): boolean {
+export function hasSelector(input: Readonly<Record<string, unknown>>): boolean {
   return (
     input.changed === true ||
     (typeof input.since === 'string' && input.since !== '') ||
     (Array.isArray(input.files) && input.files.length > 0)
   );
+}
+
+export function hasRuntimeSelector(input: Readonly<Record<string, unknown>>): boolean {
+  return input.full === true ? false : hasSelector(input);
 }
 
 function selectedValue(
@@ -47,11 +51,12 @@ export function declaredOptionKeys(step: ValidatedSuiteStep): ReadonlySet<string
 
 export function propagatedSuiteArgs(input: PropagatedSuiteArgsInput): Record<string, unknown> {
   const declared = declaredOptionKeys(input.step);
+  const suiteOpts = input.suiteOpts.full === true ? {} : input.suiteOpts;
   const propagated: Record<string, unknown> = {};
   for (const key of PROPAGATABLE_SUITE_OPTION_KEYS) {
     if (!declared.has(key)) continue;
     if (Object.prototype.hasOwnProperty.call(input.step.args, key)) continue;
-    const value = selectedValue(key, input.suiteOpts, input.defaultChanged === true);
+    const value = selectedValue(key, suiteOpts, input.defaultChanged === true);
     if (value !== undefined) propagated[key] = value;
   }
   return propagated;

@@ -105,7 +105,10 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
 
   if (hasFitDomain(toolScaffolds)) {
     lines.push(
+      'Start PR review with the composed audit suite. It runs changed-code risk, graph impact, and high-confidence reduction candidates in one command.',
+      '',
       '```bash',
+      'opensip suite run audit --json',
       'opensip fit --recipe agent-fast --json --filter errors-only',
       'opensip graph impact --changed --json --top 20',
       'opensip fit --changed --include-impacted --json',
@@ -115,7 +118,10 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
     );
   } else {
     lines.push(
+      'Start PR review with the composed audit suite. It runs changed-code risk, graph impact, and high-confidence reduction candidates in one command.',
+      '',
       '```bash',
+      'opensip suite run audit --json',
       'opensip graph impact --changed --json --top 20',
       '```',
       '',

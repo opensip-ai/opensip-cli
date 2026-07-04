@@ -55,9 +55,19 @@ opensip init --language typescript,python
 Before you scaffold, the built-in analysis commands can still run:
 
 ```bash
+opensip suite run audit
+```
+
+In a git repo, the built-in audit suite runs changed-scope by default and prints
+the resolved scope, for example `Scope: changed (working tree, 14 files)`. Use
+`opensip suite run audit --full` when you want the whole repo. Outside git, the
+same command falls back to full scope with one suite-level notice.
+
+For lower-level inspection:
+
+```bash
 opensip fit
 opensip graph --list-files
-opensip suite run audit --changed
 ```
 
 In that no-init mode, the CLI synthesizes a validated in-memory config from the

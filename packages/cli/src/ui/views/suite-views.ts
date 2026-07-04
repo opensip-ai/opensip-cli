@@ -138,6 +138,49 @@ function aggregateLine(aggregate: NonNullable<SuiteRunResult['aggregate']>): Vie
   ]);
 }
 
+function fileCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'file' : 'files'}`;
+}
+
+function changedScopeText(scope: NonNullable<SuiteRunResult['scope']>): string {
+  if (scope.ref !== undefined) {
+    const count =
+      scope.changedFiles === undefined ? '' : ` (${fileCountLabel(scope.changedFiles)})`;
+    return `changed since ${scope.ref}${count}`;
+  }
+
+  if (scope.source === 'explicit') {
+    return scope.changedFiles === undefined
+      ? 'changed'
+      : `changed (${fileCountLabel(scope.changedFiles)})`;
+  }
+
+  const count = scope.changedFiles === undefined ? '' : `, ${fileCountLabel(scope.changedFiles)}`;
+  return `changed (working tree${count})`;
+}
+
+function scopeLine(result: SuiteRunResult): ViewNode[] {
+  const scope = result.scope;
+  if (scope === undefined) return [];
+
+  if (scope.mode === 'changed') {
+    return [line([{ text: 'Scope: ', dim: true }, { text: changedScopeText(scope) }])];
+  }
+
+  if (scope.source === 'explicit') {
+    return [line([{ text: 'Scope: ', dim: true }, { text: 'full (--full)' }])];
+  }
+
+  if (scope.source === 'fallback') {
+    return [
+      line([{ text: 'Scope: ', dim: true }, { text: 'full' }]),
+      ...(scope.notice === undefined ? [] : [line([{ text: scope.notice, tone: 'warning' }])]),
+    ];
+  }
+
+  return [line([{ text: 'Scope: ', dim: true }, { text: 'full' }])];
+}
+
 function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
   const nodes: ViewNode[] = [
     line([
@@ -196,6 +239,7 @@ export function viewSuiteRun(result: SuiteRunResult): ViewNode {
       { text: String(result.exitCode), tone: result.exitCode === 0 ? 'success' : 'error' },
       { text: `  Run: ${result.suiteRunId}`, dim: true },
     ]),
+    ...scopeLine(result),
   ];
 
   if (result.aggregate !== undefined) {

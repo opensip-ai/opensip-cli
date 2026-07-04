@@ -54,8 +54,18 @@ Run OpenSIP in your project:
 
 ```bash
 cd your-project
-opensip fit       # first look; no config required for supported languages
-opensip graph     # optional: inspect graph analysis before scaffolding
+opensip suite run audit   # changed-code risk, impact, and cleanup candidates
+```
+
+The built-in audit suite composes `fit`'s `agent-risk` recipe, `graph impact`,
+and high-confidence `yagni` candidates into one PR-review pass. In a git repo it
+runs changed-scope by default; add `--full` when you want the whole repo.
+
+Going further:
+
+```bash
+opensip fit
+opensip graph
 opensip init
 opensip fit
 opensip graph

@@ -349,7 +349,7 @@ export function buildAgentCatalog(
         'The canonical cross-tool currency (schemaVersion, tool, runId, verdict, units, signals). ' +
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
-        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
+        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, scope?: { mode, source, ref?, changedFiles?, notice? }, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
       repairApplyVerify:
         'For repair apply --verify: { type: "repair-apply-verify", status, session, signal, action, changes, force, verification: { status: "verified" | "partial" | "unverified" | "skipped", coverage, scope: { tool, ruleId, files, checkRan, fallback }, commands, remainingFindings, trust? } }',
       sessionReplay:

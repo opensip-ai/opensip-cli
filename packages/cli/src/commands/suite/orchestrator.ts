@@ -9,32 +9,16 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
-import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
-import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
 import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabilities.js';
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
-import { assembleOptsFromSpec } from '../assemble-opts.js';
-import { dispatchOutput } from '../mount-command-spec.js';
 
-import { createCapturingContext } from './capturing-context.js';
-import { propagatedSuiteArgs } from './propagated-options.js';
 import { buildReviewBrief } from './review-brief-builder.js';
-import { validateSuite, type ValidatedSuite, type ValidatedSuiteStep } from './validate-suite.js';
+import { resolveSuiteScope } from './suite-scope.js';
+import { runStepsSerially } from './suite-step-runner.js';
+import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
-import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
-import type {
-  ImpactTrust,
-  SignalEnvelope,
-  SuiteRunResult,
-  SuiteStepSummary,
-} from '@opensip-cli/contracts';
-
-class DirectProcessExit extends Error {
-  constructor(readonly code: number) {
-    super(`process.exit(${code})`);
-  }
-}
+import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
 
 export interface RunSuiteInput {
   readonly name: string;
@@ -55,6 +39,12 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   const suiteRunId = generatePrefixedId('suite');
   const started = performance.now();
   const log = currentLogger();
+  const cwd = typeof input.suiteOpts.cwd === 'string' ? input.suiteOpts.cwd : process.cwd();
+  const scope = resolveSuiteScope({
+    cwd,
+    suiteOpts: input.suiteOpts,
+    defaultChanged: input.defaultChanged === true,
+  });
 
   log.info?.({
     evt: 'cli.suite.run.start',
@@ -62,6 +52,23 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     suiteRunId,
     stepCount: suite.steps.length,
   });
+  log.debug?.({
+    evt: 'cli.suite.scope.resolved',
+    suite: suite.name,
+    suiteRunId,
+    mode: scope.mode,
+    source: scope.source,
+    ...(scope.changedFiles === undefined ? {} : { changedFiles: scope.changedFiles }),
+    ...(scope.ref === undefined ? {} : { ref: scope.ref }),
+  });
+  if (scope.source === 'fallback') {
+    log.warn?.({
+      evt: 'cli.suite.scope.fallback',
+      suite: suite.name,
+      suiteRunId,
+      reason: scope.notice,
+    });
+  }
 
   await loadSuiteStepCapabilities(suite);
 
@@ -72,7 +79,11 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
       ctx: input.ctx,
       runActionHooks: input.runActionHooks,
       suiteOpts: input.suiteOpts,
-      defaultChanged: input.defaultChanged,
+      defaultChanged: scope.mode === 'changed' && scope.source === 'default',
+      fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
+        defaultChanged: input.defaultChanged === true,
+        fullScope: scope.mode === 'full',
+      }),
     }),
   );
   const steps = internalSteps.map((step) => step.summary);
@@ -82,6 +93,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     suite: suite.name,
     suiteRunId,
     steps: internalSteps,
+    changedFiles: scope.mode === 'changed' ? (scope.changedFiles ?? null) : null,
   });
   const durationMs = Math.max(0, performance.now() - started);
 
@@ -110,6 +122,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     suiteRunId,
     exitCode,
     durationMs,
+    scope,
     aggregate,
     steps,
     reviewBrief,
@@ -148,26 +161,6 @@ export function deriveSuiteAggregate(
   };
 }
 
-function isImpactTrust(value: unknown): value is ImpactTrust {
-  const maybe = value as Partial<ImpactTrust> | undefined;
-  return (
-    maybe !== undefined &&
-    (maybe.coverage === 'full' || maybe.coverage === 'partial' || maybe.coverage === 'unknown') &&
-    (maybe.fallback === 'targeted' || maybe.fallback === 'full-run') &&
-    typeof maybe.fullyVerified === 'boolean' &&
-    Array.isArray(maybe.uncertainties)
-  );
-}
-
-function verificationFromEnvelope(envelope: SignalEnvelope | undefined): ImpactTrust | undefined {
-  if (envelope === undefined) return undefined;
-  if (isImpactTrust(envelope.verification)) return envelope.verification;
-  for (const signal of envelope.signals) {
-    if (isImpactTrust(signal.metadata.trust)) return signal.metadata.trust;
-  }
-  return undefined;
-}
-
 async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
   const loaded = new Set<string>();
   const scope = currentScope();
@@ -196,229 +189,15 @@ async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
   }
 }
 
-async function runStepsSerially(args: {
-  readonly suite: ValidatedSuite;
-  readonly suiteRunId: string;
-  readonly ctx: ToolCliContext;
-  readonly runActionHooks: RunActionHooks;
-  readonly suiteOpts: Readonly<Record<string, unknown>>;
-  readonly defaultChanged?: boolean;
-}): Promise<SuiteStepReviewInput[]> {
-  const summaries: SuiteStepReviewInput[] = [];
-  let chain = Promise.resolve();
-
-  for (const step of args.suite.steps) {
-    chain = chain.then(async () => {
-      summaries.push(
-        await runStep({
-          suite: args.suite,
-          suiteRunId: args.suiteRunId,
-          step,
-          ctx: args.ctx,
-          runActionHooks: args.runActionHooks,
-          suiteOpts: args.suiteOpts,
-          defaultChanged: args.defaultChanged,
-        }),
-      );
-    });
-  }
-
-  await chain;
-  return summaries;
-}
-
-async function runStep(args: {
-  readonly suite: ValidatedSuite;
-  readonly suiteRunId: string;
-  readonly step: ValidatedSuiteStep;
-  readonly ctx: ToolCliContext;
-  readonly runActionHooks: RunActionHooks;
-  readonly suiteOpts: Readonly<Record<string, unknown>>;
-  readonly defaultChanged?: boolean;
-}): Promise<SuiteStepReviewInput> {
-  const started = performance.now();
-  const bound = bindToolCliContext(args.step.tool, args.ctx);
-  const capture = createCapturingContext(bound);
-  // ADR-0054 out-of-process dispatch must run through the CAPTURING context, not
-  // the raw bound ctx. For an external-provenance step the worker replay
-  // (`replayResult`) calls `ctx.setExitCode` with the tool's verdict exit code;
-  // binding the hook to `capture.context` routes that into the capture's exit slot
-  // (`capture.getExitCode()`) so the external step participates in the suite
-  // worst-of aggregation exactly like the in-process handler (which already runs
-  // against `capture.context`). Binding to `bound` instead dropped the external
-  // step's exit code (it never reached the slot, so a findings/regression verdict
-  // silently aggregated to 0) AND leaked the code into the outer host context — the
-  // same isolation the bundled path preserves. (04↔05 regression: external adapter
-  // as a suite step.)
-  const opts = stepOpts(args.step, args.suiteOpts, args.defaultChanged);
-  const hooks: RunActionHooks = {
-    ...args.runActionHooks,
-    maybeDispatchExternal: buildMaybeDispatchExternal(
-      args.step.tool,
-      capture.context,
-      args.runActionHooks,
-    ),
-  };
-  const diagnostics = currentScope()?.diagnostics;
-  const log = currentLogger();
-  let errorMessage: string | undefined;
-  let exitCode: number = EXIT_CODES.SUCCESS;
-  try {
-    diagnostics?.event('execute', 'debug', `suite step '${args.step.spec.name}' started`, {
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-    });
-    exitCode = await withProcessExitGuard(
-      async () => {
-        hooks.resetRun?.();
-        hooks.beginRun?.();
-        const dispatched = await hooks.maybeDispatchExternal?.(
-          args.step.spec.name,
-          opts,
-          args.step.positionals,
-        );
-        if (dispatched === true) return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
-        const result = await args.step.spec.handler(opts, capture.context);
-        hooks.completeRun?.(result);
-        await dispatchOutput(result, args.step.spec, opts, args.step.positionals, capture.context);
-        return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
-      },
-      (code) => {
-        // A bundled step called `process.exit(code)` directly: route the code into
-        // the capture's last-write-wins slot (the single per-step exit source of
-        // truth) just as `setExitCode` would, then record it.
-        capture.context.setExitCode(code);
-        log.warn?.({
-          evt: 'cli.suite.run.step',
-          suite: args.suite.name,
-          suiteRunId: args.suiteRunId,
-          tool: args.step.tool.metadata.id,
-          command: args.step.spec.name,
-          exitCode: code,
-          msg: 'Bundled step called process.exit directly; captured as step verdict.',
-        });
-      },
-    );
-    diagnostics?.event('execute', 'debug', `suite step '${args.step.spec.name}' completed`, {
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-      exitCode,
-    });
-    diagnostics?.counter('suite.steps.completed', 1);
-    // @fitness-ignore-next-line exit-code-correctness -- suite steps convert thrown step failures into a non-zero step summary; runSuite later returns the max step exit code.
-  } catch (error) {
-    exitCode = EXIT_CODES.RUNTIME_ERROR;
-    errorMessage = error instanceof Error ? error.message : String(error);
-    diagnostics?.event('execute', 'error', `suite step '${args.step.spec.name}' failed`, {
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-      exitCode,
-      error: errorMessage,
-    });
-    log.error?.({
-      evt: 'cli.suite.run.step.error',
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-      error: errorMessage,
-    });
-  }
-  const durationMs = Math.max(0, performance.now() - started);
-  const envelopeStats = capture.getEnvelopeStats();
-  const capturedEnvelope = capture.getEnvelope();
-  const verification = verificationFromEnvelope(capturedEnvelope);
-  const verdict =
-    envelopeStats === undefined
-      ? undefined
-      : {
-          passed: envelopeStats.verdict.passed,
-          errors: envelopeStats.verdict.summary.errors,
-          warnings: envelopeStats.verdict.summary.warnings,
-          findings: envelopeStats.findings,
-        };
-
-  log.info?.({
-    evt: 'cli.suite.run.step',
-    suite: args.suite.name,
-    suiteRunId: args.suiteRunId,
-    tool: args.step.tool.metadata.id,
-    command: args.step.spec.name,
-    exitCode,
-    durationMs,
-    ...(verdict === undefined
-      ? {}
-      : {
-          verdict: {
-            passed: verdict.passed,
-            findings: verdict.findings,
-          },
-        }),
-  });
-
-  const summary: SuiteStepSummary = {
-    tool: args.step.tool.metadata.name,
-    stableId: args.step.tool.metadata.id,
-    command: args.step.spec.name,
-    exitCode,
-    durationMs,
-    ...(errorMessage === undefined ? {} : { error: errorMessage }),
-    ...(verdict === undefined ? {} : { verdict }),
-    ...(verification === undefined ? {} : { verification }),
-  };
-  return {
-    stepIndex: args.step.index,
-    summary,
-    ...(capturedEnvelope === undefined ? {} : { capturedEnvelope }),
-  };
-}
-
-function stepOpts(
-  step: ValidatedSuiteStep,
-  suiteOpts: Readonly<Record<string, unknown>>,
-  defaultChanged?: boolean,
-): Record<string, unknown> {
-  const assembled = assembleOptsFromSpec({
-    options: step.spec.options,
-    suppliedValues: step.args,
-  }).opts;
-  const propagated = propagatedSuiteArgs({ step, suiteOpts, defaultChanged });
-  const common: Record<string, unknown> = {};
-  for (const key of step.spec.commonFlags) {
-    const value = suiteOpts[key];
-    if (value !== undefined) common[key] = value;
-  }
-  if (step.spec.commonFlags.includes('cwd') && common.cwd === undefined) {
-    common.cwd = process.cwd();
-  }
-  return { ...common, ...assembled, ...propagated, _args: step.positionals };
-}
-
-async function withProcessExitGuard(
-  fn: () => Promise<number>,
-  onDirectExit: (code: number) => void,
-): Promise<number> {
-  // eslint-disable-next-line @typescript-eslint/unbound-method -- process.exit has no `this` contract; identity must be restored after the guard.
-  const original = process.exit;
-  // @fitness-ignore-next-line throws-documentation -- this private guard intentionally throws a sentinel so direct process.exit calls become suite step exit codes.
-  (process as unknown as { exit: (code?: number) => never }).exit = (code?: number) => {
-    throw new DirectProcessExit(typeof code === 'number' ? code : 0);
-  };
-  try {
-    return await fn();
-  } catch (error) {
-    if (error instanceof DirectProcessExit) {
-      onDirectExit(error.code);
-      return error.code;
-    }
-    throw error;
-  } finally {
-    (process as unknown as { exit: typeof process.exit }).exit = original;
-  }
+function resolveBuiltInAuditFullScopeFiles(
+  cwd: string,
+  opts: { readonly defaultChanged: boolean; readonly fullScope: boolean },
+): readonly string[] | undefined {
+  if (!opts.defaultChanged || !opts.fullScope) return undefined;
+  const targets = currentScope()?.targets;
+  if (targets === undefined) return undefined;
+  const names = targets.getAll().map((target) => target.config.name);
+  if (names.length === 0) return undefined;
+  const files = targets.resolveTargets(names, cwd);
+  return files.length === 0 ? undefined : files;
 }

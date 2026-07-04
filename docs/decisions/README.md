@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0129](ADR-0129-audit-suite-scope-defaults.md) — The built-in audit suite runs changed-scope by default when git scope resolves, `--full` opts into full-repo scope, non-git directories fall back once at the suite layer, and suite results stamp the resolved scope.
 - [ADR-0128](ADR-0128-capability-resource-isolation.md) — External capability packs run through worker bridges after trust-policy admission; bundled first-party packs may run in-host, and resource decisions fail closed.
 - [ADR-0127](ADR-0127-evidence-authority-and-egress-fidelity.md) — SARIF now preserves OpenSIP fingerprints/properties and native `SignalBatch` carries an optional evidence authority header; incomplete local provenance downgrades to `external-untrusted`.
 - [ADR-0126](ADR-0126-cli-local-trust-policy-plane.md) — The CLI owns one offline trust-policy PDP in `@opensip-cli/config`, with thin host enforcement points and bounded local policy audit persistence.

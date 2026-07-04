@@ -53,8 +53,11 @@ For PR review workflows, read the host-owned audit review brief before drilling
 into individual tool payloads:
 
 ```bash
-opensip suite run audit --changed --json
+opensip suite run audit --json
 ```
+
+In a git repo this is changed-scope by default; use `--full` only when the
+review needs whole-repo evidence.
 
 The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
 optional `correlatedRisks[]`, baseline/degradation notes, and `signalRef`

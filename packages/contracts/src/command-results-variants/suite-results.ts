@@ -1,6 +1,21 @@
 import type { ImpactTrust } from '../impact-trust.js';
 import type { ReviewBrief } from '../review-brief.js';
 
+export type SuiteRunScopeMode = 'changed' | 'full';
+export type SuiteRunScopeSource = 'default' | 'explicit' | 'fallback';
+
+export interface SuiteRunScope {
+  readonly mode: SuiteRunScopeMode;
+  /** Why this mode applies: built-in default, user flag, or no-git fallback. */
+  readonly source: SuiteRunScopeSource;
+  /** Git ref base when running with --since. */
+  readonly ref?: string;
+  /** Changed-file count from the host-side resolution (display/brief only). */
+  readonly changedFiles?: number;
+  /** Human-readable notice, e.g. the no-git fallback explanation. */
+  readonly notice?: string;
+}
+
 export interface SuiteStepSummary {
   readonly tool: string;
   readonly stableId: string;
@@ -24,6 +39,7 @@ export interface SuiteRunResult {
   readonly suiteRunId: string;
   readonly exitCode: number;
   readonly durationMs: number;
+  readonly scope?: SuiteRunScope;
   readonly aggregate?: {
     readonly steps: number;
     /** Steps with a passing emitted verdict and a successful step exit. */

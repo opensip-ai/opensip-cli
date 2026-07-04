@@ -11,6 +11,7 @@ import {
 
 import { BUILT_IN_AUDIT_SUITE_NAME, listSuites, resolveSuite } from './built-in-suites.js';
 import { runSuite } from './orchestrator.js';
+import { hasSelector } from './propagated-options.js';
 import { addSuiteStep } from './suite-add.js';
 import { validateSuite } from './validate-suite.js';
 
@@ -58,6 +59,11 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
         arrayDefault: [],
         parse: parseArg,
       },
+      {
+        flag: '--full',
+        description: 'Run the whole repo (disable the built-in audit changed-scope default)',
+        default: false,
+      },
     ],
     scope: PROJECT_SCOPE,
     output: COMMAND_RESULT,
@@ -73,6 +79,14 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
       const opts = rawOpts as Record<string, unknown> & {
         _args?: readonly string[];
       };
+      if (opts.full === true && hasSelector(opts)) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return {
+          type: 'error',
+          message: '--full conflicts with --changed/--since/--files.',
+          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+        };
+      }
       const name = String(opts._args?.[0] ?? '');
       if (
         currentScope()?.projectContext?.scope === 'ephemeral' &&

@@ -104,71 +104,7 @@ export {
 } from './impact-trust.js';
 
 // Command result types (the CommandResult union + per-command variants)
-export type {
-  CommandResult,
-  ClearDoneResult,
-  ConfigureDoneResult,
-  UninstallDoneResult,
-  GateDoneResult,
-  GraphStatusResult,
-  TextLinesResult,
-  ToolsListResult,
-  ToolsDoctorResult,
-  ToolsCreateResult,
-  ToolsListRow,
-  ToolsValidateResult,
-  ToolsValidateSection,
-  ToolsInstallResult,
-  ToolsUninstallResult,
-  ToolsDataPurgeResult,
-  SuiteAddResult,
-  SuiteListEntry,
-  SuiteListResult,
-  SuiteListStep,
-  SuiteRunResult,
-  SuiteStepSummary,
-  ListChecksResult,
-  ListRecipesResult,
-  HistorySession,
-  HistorySuiteGroup,
-  HistoryResult,
-  ReportResult,
-  AgentGuidanceResult,
-  AgentGuidanceTargetAction,
-  AgentGuidanceTargetResult,
-  InitResult,
-  PreExistingFile,
-  SimNoticeResult,
-  PluginResult,
-  PluginInfo,
-  SyncEntry,
-  SessionReplayResult,
-  RepairActionRef,
-  RepairApplyVerifyResult,
-  RepairApplyResult,
-  RepairFileChange,
-  RepairPreviewResult,
-  RepairRefusal,
-  RepairSessionRef,
-  RepairSignalRef,
-  RepairVerificationCommand,
-  RepairVerificationCoverage,
-  RepairVerificationFailure,
-  RepairVerificationFindingMatch,
-  RepairVerificationResult,
-  RepairVerificationScope,
-  RepairVerificationStatus,
-  HelpResult,
-  ErrorResult,
-  GraphLookupMatch,
-  GraphLookupResult,
-  GraphImpactBasis,
-  GraphImpactResult,
-  ConfigMigrateResult,
-  ConfigValidateResult,
-  ConfigSchemaResult,
-} from './command-results.js';
-export type * from './command-results-variants/policy-results.js';
+export type * from './command-results.js';
 
 // Render-only run-presentation adjunct (envelope-first-presentation plan). The
 // single run variant on `CommandResult`: it carries the SignalEnvelope (the
@@ -252,10 +188,6 @@ export type {
   ToolCapabilityDeclaration,
   CapabilityContributionKind,
 } from '@opensip-cli/core';
-
-// The `cli:` block loader (`loadCliDefaults` / `CliDefaults`) moved to
-// `@opensip-cli/config` in ADR-0023. Its runtime YAML projection was outside
-// the contracts facade charter: importers now take it from the config layer.
 
 // Command-plane types (launch, §5.4) — the declarative CommandSpec a
 // tool exports for the host to mount, replacing raw-Commander access. DEFINED in

@@ -2686,6 +2686,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             {
               "choices": undefined,
               "defaultValue": false,
+              "description": "Run the whole repo (disable the built-in audit changed-scope default)",
+              "flags": "--full",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
               "description": "Output structured JSON",
               "flags": "--json",
               "negate": false,

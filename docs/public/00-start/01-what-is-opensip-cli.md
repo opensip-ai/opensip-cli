@@ -134,7 +134,7 @@ bodies (via graph `bodyHash` evidence), and future detectors — with confidence
 preservation arguments, and validation steps. Exit code is 0 by default; findings
 are recommendations, not gate failures. See [`../55-yagni/01-command-reference.md`](../55-yagni/01-command-reference.md).
 
-The CLI doesn't know what any of these four do internally — they're tools registered against a shared dispatcher. Same model lets a future `audit` or `lint` tool slot in without CLI changes. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
+The CLI doesn't know what any of these four do internally — they're tools registered against a shared dispatcher. Same model lets future `lint`, `bench`, or domain-specific tools slot in without CLI changes. The `audit` name is already used by the built-in suite preset. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
 
 ---
 

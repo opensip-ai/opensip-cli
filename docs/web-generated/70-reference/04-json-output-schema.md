@@ -66,6 +66,11 @@ per-step verdict fields are additive; older fields keep their names and types.
     "suiteRunId": "suite_3c4e8a1b9d21",
     "exitCode": 1,
     "durationMs": 1842,
+    "scope": {
+      "mode": "changed",
+      "source": "default",
+      "changedFiles": 14
+    },
     "aggregate": {
       "steps": 3,
       "passed": 1,
@@ -268,9 +273,20 @@ per-step verdict fields are additive; older fields keep their names and types.
 | `suiteRunId` | string | yes | Host-generated id shared by the step sessions produced in the run. |
 | `exitCode` | number | yes | Worst step exit code. |
 | `durationMs` | number | yes | Host-measured suite duration. |
+| `scope` | `SuiteRunScope` | no | Host-resolved suite scope. Present on current suite runs; absent on older stored payloads means "not recorded". |
 | `aggregate` | object | no | Additive roll-up over step summaries. Present on current CLI output; optional for compatibility. |
 | `steps` | `SuiteStepSummary[]` | yes | One summary per configured step, in execution order. |
 | `reviewBrief` | `ReviewBrief` | no | Host-owned v1 review aggregate. Present on current suite runs; optional for compatibility. |
+
+### `SuiteRunScope`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `mode` | `"changed"` \| `"full"` | yes | Whether the suite ran changed-scope or whole-repo scope. |
+| `source` | `"default"` \| `"explicit"` \| `"fallback"` | yes | Why the mode applies: built-in default, user flag/selector, or suite-level fallback. |
+| `ref` | string | no | Git ref base from `--since`. |
+| `changedFiles` | number | no | Host-resolved changed-file count for display and review brief context. The file list is not persisted here. |
+| `notice` | string | no | Human-readable fallback notice, for example when the built-in audit default runs outside a git work tree. |
 
 ### `SuiteAggregate`
 

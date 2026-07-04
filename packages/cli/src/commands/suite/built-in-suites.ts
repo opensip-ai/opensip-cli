@@ -1,6 +1,7 @@
 import type { SuiteDefinition, SuitesConfig } from '@opensip-cli/config';
 
 export const BUILT_IN_AUDIT_SUITE_NAME = 'audit';
+export const BUILT_IN_GRAPH_TOOL_ID = '3873f1c2-02a9-4719-930a-bca74b62b706';
 
 export const BUILT_IN_AUDIT_SUITE = {
   description:
@@ -13,7 +14,7 @@ export const BUILT_IN_AUDIT_SUITE = {
       args: { recipe: 'agent-risk' },
     },
     {
-      tool: '3873f1c2-02a9-4719-930a-bca74b62b706',
+      tool: BUILT_IN_GRAPH_TOOL_ID,
       name: 'graph',
       command: 'impact',
       args: {},

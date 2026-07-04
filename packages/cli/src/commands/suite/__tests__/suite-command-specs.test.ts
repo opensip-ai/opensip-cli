@@ -202,6 +202,43 @@ describe('buildSuiteGroupLeaves', () => {
     expect(ctx.exitCodes).toContain(0);
   });
 
+  it.each([
+    ['--changed', { changed: true }],
+    ['--since', { since: 'main' }],
+    ['--files', { files: ['src/a.ts'] }],
+  ])('rejects --full with %s', async (_label, selector) => {
+    const host = makeDispatchHostCtx();
+    const ctx = hostCtx(host.ctx);
+    const [runSpec] = buildSuiteGroupLeaves(ctx);
+
+    const result = await withSuiteScope(() =>
+      runSpec.handler?.({ _args: ['security'], full: true, ...selector }, ctx),
+    );
+
+    expect(result).toEqual({
+      type: 'error',
+      message: '--full conflicts with --changed/--since/--files.',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    });
+    expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(runSuiteMock).not.toHaveBeenCalled();
+  });
+
+  it('passes --full through to the suite orchestrator', async () => {
+    const host = makeDispatchHostCtx();
+    const ctx = hostCtx(host.ctx);
+    const [runSpec] = buildSuiteGroupLeaves(ctx);
+
+    await withSuiteScope(() => runSpec.handler?.({ _args: ['security'], full: true }, ctx));
+
+    expect(runSuiteMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'security',
+        suiteOpts: expect.objectContaining({ full: true }),
+      }),
+    );
+  });
+
   it('runs the built-in audit suite when no configured audit suite exists', async () => {
     const host = makeDispatchHostCtx();
     const ctx = hostCtx(host.ctx);
@@ -376,6 +413,7 @@ describe('buildSuiteGroupLeaves', () => {
     expect(flags.has('--changed')).toBe(true);
     expect(flags.has('--since')).toBe(true);
     expect(flags.has('--files')).toBe(true);
+    expect(flags.has('--full')).toBe(true);
     expect(flags.has('--sarif')).toBe(false);
   });
 

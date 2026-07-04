@@ -66,9 +66,8 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 # 2. Enter your project
 cd your-project
 
-# 3. Try the built-in checks before writing project files
-opensip fit
-opensip graph --list-files
+# 3. Try the built-in audit suite before writing project files
+opensip suite run audit
 
 # 4. Scaffold config + example check/scenario (language auto-detected)
 opensip init
@@ -81,9 +80,11 @@ opensip sim --recipe example
 ```
 
 `fit`, `graph`, `graph impact`, and `suite run audit` work in supported projects
-before `init`. The CLI uses a validated in-memory config and stores rebuildable
-runtime state in your user cache. `init` makes the setup explicit by writing the
-config, examples, `.gitignore`, and agent guidance into the project.
+before `init`. In a git repo, `suite run audit` is changed-scope by default and
+prints the resolved scope; pass `--full` for a whole-repo run. The CLI uses a
+validated in-memory config and stores rebuildable runtime state in your user
+cache. `init` makes the setup explicit by writing the config, examples,
+`.gitignore`, and agent guidance into the project.
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
 

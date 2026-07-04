@@ -710,7 +710,7 @@ fresh. The flags are mutually exclusive. See
 `docs/public/70-reference/01-cli-commands.md#init---scaffold-the-project-layout`
 for the full state table.
 
-Future tool ideas (not implemented): `audit`, `lint`, `bench`. `yagni` is
-bundled as of the reduction-audit rollout; see ADR-0057 and
-`docs/public/55-yagni/`. Any new tool slots in by writing a Tool
-implementation and shipping a package.
+Future tool ideas (not implemented): `lint`, `bench` (`audit` is taken by the
+built-in suite preset - ADR-0111). `yagni` is bundled as of the
+reduction-audit rollout; see ADR-0057 and `docs/public/55-yagni/`. Any new tool
+slots in by writing a Tool implementation and shipping a package.

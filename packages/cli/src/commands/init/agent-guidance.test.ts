@@ -108,7 +108,11 @@ describe('ensureOpenSipAgentGuidance', () => {
     );
     expect(agents).toContain('OpenSIP MCP First');
     expect(agents).toContain('list_runs');
+    expect(agents).toContain('opensip suite run audit --json');
     expect(agents).toContain('agent-fast');
+    expect(agents.indexOf('opensip suite run audit --json')).toBeLessThan(
+      agents.indexOf('opensip fit --recipe agent-fast'),
+    );
   });
 
   it('updates existing AGENTS.md and preserves custom content', () => {

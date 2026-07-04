@@ -1023,7 +1023,8 @@ cloud/report delivery; individual steps may only set tool-behavior options.
 ```
 opensip suite list
 opensip suite run audit
-opensip suite run audit --changed --json
+opensip suite run audit --full
+opensip suite run audit --since main --json
 opensip suite run audit --files src/server.ts --json
 opensip suite run security
 opensip suite add security --tool fitness --command fitness --arg recipe=security
@@ -1034,10 +1035,11 @@ opensip suite add security --tool fitness --command fitness --arg recipe=securit
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
 | `run` | `--config <path>` | Override the discovered `opensip-cli.config.yml` for the shared suite run scope. |
-| `run` | `--json` | Emit the suite summary as JSON, including additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
-| `run` | `--changed` | Propagate changed-file selection to compatible steps. Built-in `audit` defaults to changed semantics when no selector is supplied. |
+| `run` | `--json` | Emit the suite summary as JSON, including `scope`, additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
+| `run` | `--changed` | Propagate changed-file selection to compatible steps. Built-in `audit` defaults to changed semantics when no selector is supplied and git scope resolves. |
 | `run` | `--since <ref>` | Propagate a git diff base to compatible changed-file steps. |
 | `run` | `--files <path>` | Propagate explicit changed files to compatible steps. Repeat for multiple files. |
+| `run` | `--full` | Run the whole repo. This disables the built-in `audit` changed-scope default and conflicts with `--changed`, `--since`, and `--files`. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
@@ -1051,13 +1053,17 @@ tools must scan different roots or target sets.
 
 `audit` is a built-in suite preset for PR review. It runs fitness `agent-risk`,
 `graph impact`, and high-confidence YAGNI reduction checks through the same suite
-plane as user-authored suites. Define `suites.audit` in config to replace the
-built-in preset. Suite-level selectors (`--changed`, `--since`, `--files`) reach
-only steps whose command declares the matching option; per-step `args` still
-override propagated values.
+plane as user-authored suites. In a git repo, `opensip suite run audit` runs
+changed-scope by default and prints a line such as `Scope: changed (working
+tree, 14 files)`. Use `--full` for a whole-repo run; outside git, the default
+falls back to full scope with one suite-level notice. Define `suites.audit` in
+config to replace the built-in preset. Suite-level selectors (`--changed`,
+`--since`, `--files`) reach only steps whose command declares the matching
+option; per-step `args` still override propagated values.
 
 `suite run --json` keeps the original step fields (`tool`, `stableId`,
 `command`, `exitCode`, `durationMs`, `error`) and additively includes
+`data.scope` (`mode`, `source`, optional `ref`, `changedFiles`, and `notice`) plus
 `data.aggregate` (`steps`, `passed`, `failed`, `faulted`, `errors`, `warnings`).
 Each `data.steps[].verdict` is present only when that step emitted a
 `SignalEnvelope`; it carries counts only (`passed`, `errors`, `warnings`,
@@ -1080,7 +1086,8 @@ emitted in this phase; use the source tools' existing SARIF output.
 ## GitHub Action
 
 The root GitHub Action `opensip-ai/opensip-cli@v1` wraps the same suite contract
-for OSS CI. By default it runs `suite run audit --changed --json`, writes a
+for OSS CI. By default its `changed` input is true, so it runs
+`suite run audit --changed --json`, writes a
 review brief JSON file, emits workflow annotations, and exposes `verdict`,
 `issues`, `new-issues`, `brief`, `sarif`, and `degraded` outputs. Optional
 `comment: true` posts or updates one sticky PR comment when pull-request
@@ -1091,7 +1098,8 @@ high-fidelity CLI-owned path.
 See [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md)
 and [ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0110-host-owned-review-brief-contract.md).
 See [ADR-0111](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0111-built-in-audit-suite-preset.md) for the
-built-in `audit` preset decision.
+built-in `audit` preset decision and [ADR-0129](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0129-audit-suite-scope-defaults.md)
+for the changed-scope default, `--full`, and fallback semantics.
 
 **See also:** [`03-configuration.md#suites`](/docs/opensip-cli/70-reference/03-configuration/#suites),
 [`04-json-output-schema.md#suite-run-results`](/docs/opensip-cli/70-reference/04-json-output-schema/#suite-run-results).

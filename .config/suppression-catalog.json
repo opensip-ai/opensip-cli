@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-02T20:02:03.940Z",
+  "generatedAt": "2026-07-03T21:53:09.117Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -28,9 +28,9 @@
         "total": 218,
         "bySlug": {
           "no-markdown-references": 5,
-          "exit-code-correctness": 1,
-          "throws-documentation": 4,
           "dogfood-one-config-document-ratchet": 2,
+          "throws-documentation": 4,
+          "exit-code-correctness": 1,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 6,
@@ -128,9 +128,9 @@
         "total": 46,
         "bySlug": {
           "no-markdown-references": 3,
-          "exit-code-correctness": 1,
-          "throws-documentation": 1,
           "dogfood-one-config-document-ratchet": 2,
+          "throws-documentation": 1,
+          "exit-code-correctness": 1,
           "one-outcome-shape": 1,
           "context-leakage": 1,
           "duplicate-utility-functions": 2,

@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
 import {
   DEFAULT_BASELINE_IDENTITY,
   EXIT_CODES,
@@ -15,6 +20,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeDispatchHostCtx } from '../../../__tests__/harness/dispatch-host-ctx.js';
+import { BUILT_IN_GRAPH_TOOL_ID } from '../built-in-suites.js';
 import { deriveSuiteAggregate, runSuite } from '../orchestrator.js';
 
 const dispatchSpy = vi.hoisted(() => vi.fn());
@@ -29,6 +35,7 @@ vi.mock('../../../bootstrap/load-tool-capabilities.js', () => ({
 const TOOL_ID = '00000000-0000-4000-8000-000000000111';
 const OTHER_TOOL_ID = '00000000-0000-4000-8000-000000000222';
 const EXTERNAL_TOOL_ID = '00000000-0000-4000-8000-000000000333';
+const tempDirs: string[] = [];
 
 function tool(id: string, name: string, specs: Tool['commandSpecs']): Tool {
   return {
@@ -124,7 +131,37 @@ afterEach(() => {
   dispatchSpy.mockReset();
   loadCapabilitiesSpy.mockReset();
   loadCapabilitiesSpy.mockResolvedValue(0);
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+function makeTempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+
+function git(cwd: string, args: readonly string[]): void {
+  execFileSync('git', args, { cwd, stdio: 'ignore' });
+}
+
+function write(cwd: string, relative: string, content: string): void {
+  const path = join(cwd, relative);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content);
+}
+
+function makeChangedGitFixture(): string {
+  const dir = makeTempDir('suite-orchestrator-git-');
+  git(dir, ['init', '-q']);
+  git(dir, ['config', 'user.email', 'suite-orchestrator@example.test']);
+  git(dir, ['config', 'user.name', 'Suite Orchestrator Test']);
+  write(dir, 'src/a.ts', 'export const a = 1;\n');
+  git(dir, ['add', '.']);
+  git(dir, ['commit', '-qm', 'initial']);
+  write(dir, 'src/a.ts', 'export const a = 2;\n');
+  write(dir, 'src/b.ts', 'export const b = 1;\n');
+  return dir;
+}
 
 describe('runSuite', () => {
   it('assembles step opts from CommandSpec options plus shared suite flags', async () => {
@@ -449,6 +486,210 @@ describe('runSuite', () => {
       { changed: true, files: [], _args: [] },
       { changed: false, since: 'origin/main', files: [], _args: [] },
     ]);
+  });
+
+  it('gates the changed default on git scope and stamps the result', async () => {
+    const cwd = makeChangedGitFixture();
+    const seen: Record<string, unknown>[] = [];
+    const debug = vi.fn();
+    const warn = vi.fn();
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'impact',
+      description: 'fixture',
+      commonFlags: [],
+      options: [
+        { flag: '--changed', description: 'changed', default: false },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+    const scope = new RunScope({ logger: { info: vi.fn(), debug, warn, error: vi.fn() } });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: { steps: [{ tool: TOOL_ID, command: 'impact' }] },
+        tools: [tool(TOOL_ID, 'graph', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: { cwd },
+        defaultChanged: true,
+      }),
+    );
+
+    expect(seen).toEqual([{ changed: true, files: [], _args: [] }]);
+    expect(result.scope).toEqual({ mode: 'changed', source: 'default', changedFiles: 2 });
+    expect(result.reviewBrief?.changedFiles).toBe(2);
+    expect(debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.suite.scope.resolved',
+        mode: 'changed',
+        source: 'default',
+        changedFiles: 2,
+      }),
+    );
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.suite.scope.fallback' }),
+    );
+  });
+
+  it('falls the changed default back to full scope outside git', async () => {
+    const cwd = makeTempDir('suite-orchestrator-nongit-');
+    const seen: Record<string, unknown>[] = [];
+    const debug = vi.fn();
+    const warn = vi.fn();
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'impact',
+      description: 'fixture',
+      commonFlags: [],
+      options: [{ flag: '--changed', description: 'changed', default: false }],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+    const scope = new RunScope({ logger: { info: vi.fn(), debug, warn, error: vi.fn() } });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: { steps: [{ tool: TOOL_ID, command: 'impact' }] },
+        tools: [tool(TOOL_ID, 'graph', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: { cwd },
+        defaultChanged: true,
+      }),
+    );
+
+    expect(seen).toEqual([{ changed: false, _args: [] }]);
+    expect(result.scope).toMatchObject({ mode: 'full', source: 'fallback' });
+    expect(result.reviewBrief?.changedFiles).toBeNull();
+    expect(debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.suite.scope.resolved',
+        mode: 'full',
+        source: 'fallback',
+      }),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.suite.scope.fallback',
+        suite: 'audit',
+        reason: expect.stringContaining('running the full scope'),
+      }),
+    );
+  });
+
+  it('keeps --full as an explicit full-scope suite run', async () => {
+    const cwd = makeChangedGitFixture();
+    const seen: Record<string, unknown>[] = [];
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'impact',
+      description: 'fixture',
+      commonFlags: [],
+      options: [{ flag: '--changed', description: 'changed', default: false }],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+
+    const result = await runSuite({
+      name: 'audit',
+      suite: { steps: [{ tool: TOOL_ID, command: 'impact' }] },
+      tools: [tool(TOOL_ID, 'graph', [spec])],
+      ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: {},
+      suiteOpts: { cwd, full: true },
+      defaultChanged: true,
+    });
+
+    expect(seen).toEqual([{ changed: false, _args: [] }]);
+    expect(result.scope).toEqual({ mode: 'full', source: 'explicit' });
+  });
+
+  it('feeds full target files to built-in graph impact when audit is full-scoped', async () => {
+    const cwd = makeChangedGitFixture();
+    const fullFile = join(cwd, 'src/a.ts');
+    const seen: Record<string, unknown>[] = [];
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'impact',
+      description: 'fixture',
+      commonFlags: ['cwd'],
+      options: [
+        { flag: '--changed', description: 'changed', default: false },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: (opts) => {
+        seen.push(opts as Record<string, unknown>);
+        return { type: 'help' };
+      },
+    });
+    const scope = new RunScope();
+    Object.assign(scope, {
+      targets: {
+        getByName: () => undefined,
+        getAll: () => [
+          {
+            config: {
+              name: 'src',
+              description: 'source',
+              include: ['src/**/*.ts'],
+              exclude: [],
+            },
+          },
+        ],
+        getByTag: () => [],
+        has: () => true,
+        resolveTargets: () => [fullFile],
+        applyGlobalExcludes: (files: readonly string[]) => files,
+        globalExcludes: [],
+      },
+    });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: { steps: [{ tool: BUILT_IN_GRAPH_TOOL_ID, command: 'impact' }] },
+        tools: [tool(BUILT_IN_GRAPH_TOOL_ID, 'graph', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: { cwd, full: true, changed: true },
+        defaultChanged: true,
+      }),
+    );
+
+    expect(seen).toEqual([{ cwd, changed: false, files: [fullFile], _args: [] }]);
+    expect(result.scope).toEqual({ mode: 'full', source: 'explicit' });
+    expect(result.aggregate?.faulted).toBe(0);
   });
 
   it('captures per-step exit codes without mutating the outer host context', async () => {
