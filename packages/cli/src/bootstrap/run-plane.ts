@@ -38,8 +38,8 @@ import { SessionRepo } from '@opensip-cli/session-store';
 
 import {
   enforceSessionRetention,
-  resolveSessionRetentionPolicy,
-  type SessionRetentionPolicy,
+  resolveCurrentSessionRetentionPolicy,
+  type ResolvedSessionRetentionPolicy,
 } from './session-retention.js';
 
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
@@ -66,7 +66,7 @@ export function runWithSuiteRunContext<T>(ctx: SuiteRunContext, fn: () => T): T 
 export interface RunPlaneDeps {
   /** Resolve the project datastore, or undefined when none is in scope. Must not throw. */
   readonly getDatastore: () => DataStore | undefined;
-  readonly sessionRetentionPolicy?: SessionRetentionPolicy;
+  readonly sessionRetentionPolicy?: () => ResolvedSessionRetentionPolicy;
   readonly logger?: Logger;
 }
 
@@ -172,6 +172,10 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     }
   }
 
+  function resolveRetentionPolicy(): ResolvedSessionRetentionPolicy {
+    return deps.sessionRetentionPolicy?.() ?? resolveCurrentSessionRetentionPolicy();
+  }
+
   function makeInvocation(): RunPlaneInvocation {
     const lifecycle = createRunLifecycle();
     let sessionId: string | undefined;
@@ -218,11 +222,16 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           durationMs: snapshot.durationMs,
         });
         try {
-          enforceSessionRetention(
-            datastore,
-            deps.sessionRetentionPolicy ?? resolveSessionRetentionPolicy(),
-            { logger: log },
-          );
+          const policy = resolveRetentionPolicy();
+          log.debug?.({
+            evt: 'session.retention.policy_resolved',
+            module: MODULE_TAG,
+            source: policy.source,
+            keep: policy.keep,
+            maxAgeDays: policy.maxAgeDays,
+            maxSizeMb: policy.maxSizeMb,
+          });
+          enforceSessionRetention(datastore, policy, { logger: log });
         } catch (error) {
           log.warn?.({
             evt: 'cli.run-session.retention_failed',

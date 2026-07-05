@@ -71,12 +71,43 @@ function resolveCoreFromAnchor(anchor: string): string | undefined {
   }
 }
 
-/** Resolve `@opensip-cli/fitness` from a createRequire anchor (undefined when absent). */
-function resolveFitnessFromAnchor(anchor: string): string | undefined {
+/** Resolve a package from a createRequire anchor (undefined when absent). */
+function resolvePackageFromAnchor(anchor: string, packageName: string): string | undefined {
   try {
-    return createRequire(anchor).resolve('@opensip-cli/fitness');
+    return createRequire(anchor).resolve(packageName);
   } catch {
     return undefined;
+  }
+}
+
+/** Package manifest fields used by the guard. */
+interface PackageRuntimeDepsManifest {
+  readonly dependencies?: Record<string, unknown>;
+  readonly peerDependencies?: Record<string, unknown>;
+}
+
+/**
+ * Read a discovered pack's declared `@opensip-cli/*` runtime deps.
+ *
+ * The guard runs before trust admission, so this is deliberately data-only:
+ * read `package.json` and inspect `dependencies`/`peerDependencies`. It never
+ * imports or requires the pack or any engine entry module. Malformed or missing
+ * manifests fall back to the direct-core probe only.
+ */
+function scopedRuntimeDepsFromPackageManifest(packageDir: string): readonly string[] {
+  try {
+    const json: unknown = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'));
+    const manifest =
+      typeof json === 'object' && json !== null ? (json as PackageRuntimeDepsManifest) : {};
+    const deps = [
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.peerDependencies ?? {}),
+    ];
+    return [...new Set(deps)]
+      .filter((dep) => dep.startsWith('@opensip-cli/') && dep !== '@opensip-cli/core')
+      .sort();
+  } catch {
+    return [];
   }
 }
 
@@ -182,27 +213,36 @@ function isSameCore(coreEntry: string): boolean {
 }
 
 /**
- * The pack's resolved `@opensip-cli/core` if it differs from {@link selfCore}; else
- * undefined. Probes both the pack's direct core dep and the core that
- * `@opensip-cli/fitness` resolves when the pack depends on fitness — fit-packs
- * execute `check.run()` through fitness's `define-check`, which reads
- * `currentScope()` from fitness's core copy, not the pack's direct one.
+ * The pack's resolved `@opensip-cli/core` if it differs from {@link selfCore};
+ * else undefined. Probes the pack's direct core dep, then each declared
+ * `@opensip-cli/*` runtime dep's resolved core. This keeps the kernel
+ * domain-agnostic: fit packs walk through fitness, sim packs through simulation,
+ * graph adapters through graph, and future engines need no core-side map.
+ *
+ * Hardening: this executes no foreign code. It reads the pack's `package.json`
+ * and uses `createRequire(...).resolve(...)` only. Missing or malformed package
+ * manifests fall back to the direct-core probe.
  */
 export function foreignCorePath(packageDir: string): string | undefined {
   if (selfCorePath === undefined) return undefined;
   // The anchor file need not exist — createRequire only uses its directory as
   // the resolution base, walking up node_modules from the pack.
   const anchor = pathToFileURL(join(packageDir, 'noop.js')).href;
+  const probedCorePaths = new Set<string>();
 
   const directCore = resolveCoreFromAnchor(anchor);
+  if (directCore !== undefined) probedCorePaths.add(directCore);
   if (directCore !== undefined && !isSameCore(directCore)) {
     return directCore;
   }
 
-  const fitnessEntry = resolveFitnessFromAnchor(anchor);
-  if (fitnessEntry !== undefined) {
-    const transitiveCore = resolveCoreFromAnchor(fitnessEntry);
-    if (transitiveCore !== undefined && !isSameCore(transitiveCore)) {
+  for (const depName of scopedRuntimeDepsFromPackageManifest(packageDir)) {
+    const depEntry = resolvePackageFromAnchor(anchor, depName);
+    if (depEntry === undefined) continue;
+    const transitiveCore = resolveCoreFromAnchor(depEntry);
+    if (transitiveCore === undefined || probedCorePaths.has(transitiveCore)) continue;
+    probedCorePaths.add(transitiveCore);
+    if (!isSameCore(transitiveCore)) {
       return transitiveCore;
     }
   }

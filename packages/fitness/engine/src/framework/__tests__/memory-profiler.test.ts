@@ -7,13 +7,15 @@
  */
 
 import { RunScope, applyToolContributeScope, runWithScope } from '@opensip-cli/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';
-import { memoryProfiler } from '../memory-profiler.js';
+import { MemoryProfiler } from '../memory-profiler.js';
 
-afterEach(() => {
-  memoryProfiler.reset();
+let memoryProfiler: MemoryProfiler;
+
+beforeEach(() => {
+  memoryProfiler = new MemoryProfiler();
 });
 
 describe('memoryProfiler — basics', () => {

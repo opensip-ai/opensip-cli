@@ -20,11 +20,11 @@
  *   - `currentFitnessLoadState()` — reads `scope.fitness.load`; same throws.
  */
 
-import { currentScope } from '@opensip-cli/core';
+import { SystemError, currentScope } from '@opensip-cli/core';
 
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
-import { MemoryProfiler, memoryProfiler } from './memory-profiler.js';
+import { MemoryProfiler } from './memory-profiler.js';
 import { CheckRegistry } from './registry.js';
 
 import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js';
@@ -60,25 +60,27 @@ export function createFitnessLoadState(): FitnessLoadState {
  * caller is running outside the CLI's pre-action-hook (or the test
  * fixture forgot to construct + enter a scope).
  *
- * @throws {Error} When called outside `runWithScope(...)`, or when the
+ * @throws {SystemError} When called outside `runWithScope(...)`, or when the
  *   active scope has no fitness subscope.
  */
 function currentFitnessSubscope(): FitnessSubscope {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw new SystemError(
       'fitness: scope read attempted outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
         'this; tests: use makeTestScope + fitnessTool.contributeScope or construct ' +
         'the registries directly).',
+      { code: 'SYSTEM.SCOPE.FITNESS_SUBSCOPE_MISSING' },
     );
   }
   if (!scope.fitness) {
-    throw new Error(
+    throw new SystemError(
       'fitness: scope.fitness is missing. The fitness tool must be ' +
         'registered and its contributeScope hook must run before check/recipe reads. ' +
         '(production: bootstrap registers fitnessTool; tests: call ' +
         'fitnessTool.contributeScope() after makeTestScope.)',
+      { code: 'SYSTEM.SCOPE.FITNESS_SUBSCOPE_MISSING' },
     );
   }
   return scope.fitness;
@@ -104,10 +106,7 @@ export function createMemoryProfiler(): MemoryProfiler {
   return new MemoryProfiler();
 }
 
-/**
- * Resolve the active memory profiler: scope-bound in production, falling back
- * to the test-only module singleton when no fitness subscope is present.
- */
+/** Resolve the active, scope-bound memory profiler. */
 export function resolveMemoryProfiler(): MemoryProfiler {
-  return currentScope()?.fitness?.memoryProfiler ?? memoryProfiler;
+  return currentFitnessSubscope().memoryProfiler;
 }

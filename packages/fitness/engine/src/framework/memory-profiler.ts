@@ -140,14 +140,3 @@ export class MemoryProfiler {
     this.peakMemoryMB = 0;
   }
 }
-
-/**
- * TEST-ONLY shared memory profiler instance.
- *
- * Production resolves the per-run profiler from
- * `currentScope()?.fitness?.memoryProfiler` (created once per run by the
- * fitness tool's `contributeScope()`). Retained solely for isolated unit tests
- * that exercise the profiler without a scope. New production imports are
- * forbidden by the `no-module-level-run-state` dogfood check.
- */
-export const memoryProfiler = new MemoryProfiler();

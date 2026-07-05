@@ -52,6 +52,47 @@ function plantCore(dir: string, opts: { version: string; scopeAbi?: number }): v
   writeFileSync(join(coreDir, 'index.js'), 'module.exports = {};');
 }
 
+function packageInstallDir(root: string, packageName: string): string {
+  const [scope, name] = packageName.split('/');
+  if (scope === undefined || name === undefined) {
+    throw new Error(`expected scoped package name, got ${packageName}`);
+  }
+  return join(root, 'node_modules', scope, name);
+}
+
+function writePackManifest(
+  dir: string,
+  deps: Record<string, string>,
+  extra: Record<string, unknown> = {},
+): void {
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({
+      name: 'fixture-pack',
+      version: '0.0.0',
+      main: 'index.js',
+      dependencies: deps,
+      ...extra,
+    }),
+  );
+}
+
+function plantScopedRuntimePackage(root: string, packageName: string): string {
+  const packageDir = packageInstallDir(root, packageName);
+  mkdirSync(packageDir, { recursive: true });
+  writeFileSync(
+    join(packageDir, 'package.json'),
+    JSON.stringify({
+      name: packageName,
+      version: '0.0.0-foreign',
+      main: 'index.js',
+      dependencies: { '@opensip-cli/core': 'workspace:*' },
+    }),
+  );
+  writeFileSync(join(packageDir, 'index.js'), 'module.exports = {};');
+  return packageDir;
+}
+
 describe('selfCore', () => {
   it('resolves a concrete path to the running @opensip-cli/core', () => {
     const self = selfCore();
@@ -79,23 +120,72 @@ describe('foreignCorePath', () => {
   });
 
   it('returns the foreign core path when fitness transitively resolves a different core', () => {
-    const fitnessDir = join(testDir, 'node_modules', '@opensip-cli', 'fitness');
-    mkdirSync(fitnessDir, { recursive: true });
-    writeFileSync(
-      join(fitnessDir, 'package.json'),
-      JSON.stringify({
-        name: '@opensip-cli/fitness',
-        version: '0.0.0-foreign',
-        main: 'index.js',
-        dependencies: { '@opensip-cli/core': 'workspace:*' },
-      }),
-    );
-    writeFileSync(join(fitnessDir, 'index.js'), 'module.exports = {};');
+    writePackManifest(testDir, { '@opensip-cli/fitness': 'workspace:*' });
+    const fitnessDir = plantScopedRuntimePackage(testDir, '@opensip-cli/fitness');
     plantForeignCore(fitnessDir);
     const foreign = foreignCorePath(testDir);
     expect(foreign).toBeDefined();
     expect(foreign).toContain('@opensip-cli');
     expect(foreign).not.toBe(selfCore());
+  });
+
+  it('returns the foreign core path when a simulation pack walks through simulation', () => {
+    writePackManifest(testDir, { '@opensip-cli/simulation': 'workspace:*' });
+    const simulationDir = plantScopedRuntimePackage(testDir, '@opensip-cli/simulation');
+    plantForeignCore(simulationDir);
+
+    const foreign = foreignCorePath(testDir);
+
+    expect(foreign).toBeDefined();
+    expect(foreign).toContain('@opensip-cli');
+    expect(foreign).not.toBe(selfCore());
+  });
+
+  it('returns the foreign core path when a graph adapter walks through graph', () => {
+    writePackManifest(testDir, { '@opensip-cli/graph': 'workspace:*' });
+    const graphDir = plantScopedRuntimePackage(testDir, '@opensip-cli/graph');
+    plantForeignCore(graphDir);
+
+    const foreign = foreignCorePath(testDir);
+
+    expect(foreign).toBeDefined();
+    expect(foreign).toContain('@opensip-cli');
+    expect(foreign).not.toBe(selfCore());
+  });
+
+  it('falls back to the direct-core probe when a pack declares no scoped runtime deps', () => {
+    writePackManifest(testDir, { leftpad: '0.0.0' });
+    plantForeignCore(testDir);
+
+    const foreign = foreignCorePath(testDir);
+
+    expect(foreign).toBeDefined();
+    expect(foreign).toContain('@opensip-cli');
+    expect(foreign).not.toBe(selfCore());
+  });
+
+  it('does not execute a discovered pack entry module while probing scoped deps', () => {
+    const marker = '__opensipSingleCoreGuardEntryExecuted';
+    delete (globalThis as Record<string, unknown>)[marker];
+    writePackManifest(testDir, { '@opensip-cli/simulation': 'workspace:*' });
+    writeFileSync(
+      join(testDir, 'index.js'),
+      `globalThis.${marker} = true; throw new Error('entry executed');`,
+    );
+    const simulationDir = plantScopedRuntimePackage(testDir, '@opensip-cli/simulation');
+    plantForeignCore(simulationDir);
+
+    expect(foreignCorePath(testDir)).toBeDefined();
+    expect((globalThis as Record<string, unknown>)[marker]).toBeUndefined();
+  });
+
+  it('falls back to direct-probe-only when the pack package.json is malformed', () => {
+    writeFileSync(join(testDir, 'package.json'), '{not json', 'utf8');
+    const simulationDir = plantScopedRuntimePackage(testDir, '@opensip-cli/simulation');
+    plantForeignCore(simulationDir);
+
+    expect(() => foreignCorePath(testDir)).not.toThrow();
+    expect(foreignCorePath(testDir)).toBeUndefined();
   });
 });
 

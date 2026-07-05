@@ -43,7 +43,7 @@ import {
   type RunActionHooks,
 } from './bootstrap/run-plane.js';
 import { createDatastoreResolver, readScope } from './bootstrap/scope-access.js';
-import { resolveSessionRetentionPolicy } from './bootstrap/session-retention.js';
+import { resolveCurrentSessionRetentionPolicy } from './bootstrap/session-retention.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
 
 import type { CommandResult } from '@opensip-cli/contracts';
@@ -93,20 +93,13 @@ export interface ToolCliContextHandle {
  * Resolve the configured artifact-retention keep count (`cli.artifacts.keep`)
  * from the project's CLI defaults, to parametrize the host `writeArtifact` seam.
  *
- * Read at context-build time: from the entered scope's project root when one is
- * available (host-command / hook-dispatch contexts are built inside a run), else
- * from the process cwd (the primary path builds its context once at startup,
- * before the per-run scope is entered). `undefined` when unset — the seam then
- * falls back to its own default keep count.
+ * Evaluated by the artifact seam at write/prune time: from the entered scope's
+ * project root when available, else from the process cwd. `undefined` when
+ * unset — the seam then falls back to its own default keep count.
  */
 function resolveArtifactRetentionKeep(): number | undefined {
   const projectRoot = currentScope()?.projectContext?.projectRoot;
   return loadCliDefaults(projectRoot ?? process.cwd()).artifacts?.keep;
-}
-
-function resolveSessionRetentionDefaults() {
-  const projectRoot = currentScope()?.projectContext?.projectRoot;
-  return resolveSessionRetentionPolicy(loadCliDefaults(projectRoot ?? process.cwd()).sessions);
 }
 
 export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliContextHandle {
@@ -128,7 +121,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     logger: log,
   });
   const writeArtifact = createWriteArtifactSeam(log, {
-    retentionKeep: resolveArtifactRetentionKeep(),
+    retentionKeep: resolveArtifactRetentionKeep,
   });
   const ensureArtifactDir = createEnsureArtifactDirSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });
@@ -143,7 +136,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // after RunScope entry, before the handler) or lazily on first `timing` read.
   const runPlane = createRunPlaneFactory({
     getDatastore: createDatastoreResolver('best-effort', log),
-    sessionRetentionPolicy: resolveSessionRetentionDefaults(),
+    sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
     logger: log,
   });
 
@@ -237,7 +230,7 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
     logger: log,
   });
   const writeArtifact = createWriteArtifactSeam(log, {
-    retentionKeep: resolveArtifactRetentionKeep(),
+    retentionKeep: resolveArtifactRetentionKeep,
   });
   const ensureArtifactDir = createEnsureArtifactDirSeam(log);
   const stateSeams = buildStateSeams({ getDatastore: projectDatastore });

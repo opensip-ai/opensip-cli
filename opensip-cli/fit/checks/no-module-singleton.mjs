@@ -9,10 +9,9 @@
  * (`defaultRegistry` / `defaultRecipeRegistry`, the `CheckRegistry` /
  * `RecipeRegistry` / `CapabilityRegistry` shapes), hardcodes the first-party
  * `packages/**\/src/**` package layout in its path guard, and allowlists the two
- * ADR-0023-exempt run-scoped utilities by first-party file (`framework/
- * file-cache.ts` → `fileCache`, `framework/memory-profiler.ts` →
- * `memoryProfiler`). A consumer repo has none of those facts, so the rule is
- * opensip-internal, not universal. Inert for adopters per
+ * ADR-0023-exempt run-scoped utility by first-party file (`framework/
+ * file-cache.ts` → `fileCache`). A consumer repo has none of those facts, so
+ * the rule is opensip-internal, not universal. Inert for adopters per
  * `opensip-cli/fit/checks/README.md` (the package-source path guard makes the
  * check inert outside this workspace's layout).
  *
@@ -40,9 +39,9 @@
  * matched (the constructor-name allowlist is deliberately narrow).
  *
  * EXEMPTIONS (ADR-0023):
- *   - `fileCache` (`framework/file-cache.ts`) and `memoryProfiler`
- *     (`framework/memory-profiler.ts`) — run-scoped utilities explicitly
- *     exempted; they are reset per run and carry no cross-run identity.
+ *   - `fileCache` (`framework/file-cache.ts`) — a legacy run-scoped utility
+ *     exemption. Memory profiling is scope-owned and has no module-singleton
+ *     exemption.
  *   - An inline `// @allow-module-singleton <reason>` marker on the export line
  *     (or the line above) — an escape hatch that REQUIRES a written reason, so
  *     any new exemption is reviewable in the diff rather than silent.
@@ -98,7 +97,6 @@ const MUTABLE_LET_TYPE_RE =
 /** Allowlisted singleton identifiers, by basename → id (ADR-0023). */
 const EXEMPT_BY_FILE = {
   'file-cache.ts': 'fileCache',
-  'memory-profiler.ts': 'memoryProfiler',
 };
 
 /** Inline escape-hatch marker (requires a trailing reason after the slug). */
@@ -154,7 +152,7 @@ function matchConstSingleton(line, i, filePath, exemptId, suppressed) {
     suggestion:
       `Replace with a factory + scope read: 'export function create${id[0]?.toUpperCase()}${id.slice(1)}() { return new ${ctor}() }' ` +
       `attached to scope, read via current<Registry>(). If this is a genuinely ` +
-      `run-scoped utility like fileCache/memoryProfiler, add it to the ADR-0023 ` +
+      `run-scoped utility like fileCache, add it to the ADR-0023 ` +
       `exemption allowlist or annotate with '// ${ALLOW_MARKER} <reason>'.`,
     type: 'no-module-singleton',
   };
@@ -216,7 +214,7 @@ export const checks = [
     id: '19da4d0d-e933-40f0-87ba-ce4ab554a88e',
     slug: 'no-module-singleton',
     description:
-      'No module-level mutable registry/loaded-state singleton; per-run state lives on RunScope via a factory (ADR-0023). fileCache/memoryProfiler are exempt.',
+      'No module-level mutable registry/loaded-state singleton; per-run state lives on RunScope via a factory (ADR-0023). fileCache is exempt.',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture'],
     fileTypes: ['ts'],

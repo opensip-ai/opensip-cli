@@ -15,6 +15,7 @@ import {
   ConfigurationError,
   RunScope,
   SystemError,
+  currentScope,
   resolveProjectPaths,
   runWithScope,
 } from '@opensip-cli/core';
@@ -118,10 +119,15 @@ describe('createWriteArtifactSeam', () => {
     };
     const scope = new RunScope({ logger: makeLogger(), runId: 'run-new', projectContext });
     const target = join(toolDir, 'run-new', 'gitleaks.json');
-    const writeArtifact = createWriteArtifactSeam(makeLogger(), { retentionKeep: 1 });
+    const retentionKeep = vi.fn(() => {
+      expect(currentScope()?.projectContext?.projectRoot).toBe(dir);
+      return 1;
+    });
+    const writeArtifact = createWriteArtifactSeam(makeLogger(), { retentionKeep });
 
     await runWithScope(scope, () => writeArtifact(target, '[]\n'));
 
+    expect(retentionKeep).toHaveBeenCalledTimes(1);
     // Only the just-written (newest) run dir survives.
     expect(readdirSync(toolDir).sort()).toEqual(['run-new']);
   });
@@ -142,11 +148,13 @@ describe('createWriteArtifactSeam', () => {
     const scope = new RunScope({ logger: makeLogger(), runId: 'r-outside', projectContext });
     // A generic write outside `.runtime/artifacts` (e.g. graph --catalog-output).
     const target = join(dir, 'catalog.json');
-    const writeArtifact = createWriteArtifactSeam(makeLogger(), { retentionKeep: 1 });
+    const retentionKeep = vi.fn(() => 1);
+    const writeArtifact = createWriteArtifactSeam(makeLogger(), { retentionKeep });
 
     await runWithScope(scope, () => writeArtifact(target, '{}\n'));
 
     expect(readFileSync(target, 'utf8')).toBe('{}\n');
+    expect(retentionKeep).not.toHaveBeenCalled();
     // The unrelated artifact-store run dir is untouched.
     expect(readdirSync(toolDir)).toEqual(['run-old']);
   });

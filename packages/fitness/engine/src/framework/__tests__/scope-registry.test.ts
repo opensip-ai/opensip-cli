@@ -5,7 +5,7 @@
  * `runWithScope` contexts must carry INDEPENDENT check/recipe registries.
  */
 
-import { RunScope, runWithScope, applyToolContributeScope } from '@opensip-cli/core';
+import { RunScope, SystemError, runWithScope, applyToolContributeScope } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { defineRecipe } from '../../recipes/types.js';
@@ -18,6 +18,7 @@ import {
   currentCheckRegistry,
   currentFitnessLoadState,
   currentRecipeRegistry,
+  resolveMemoryProfiler,
 } from '../scope-registry.js';
 
 import type { Check } from '../check-types.js';
@@ -85,6 +86,16 @@ describe('fitness scope-registry — readers throw outside a scope', () => {
 
   it('currentFitnessLoadState throws when no scope is active', () => {
     expect(() => currentFitnessLoadState()).toThrow(/outside a RunScope/);
+  });
+
+  it('resolveMemoryProfiler throws a typed scope-misuse error when no scope is active', () => {
+    try {
+      resolveMemoryProfiler();
+      throw new Error('expected resolveMemoryProfiler to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SystemError);
+      expect((error as SystemError).code).toBe('SYSTEM.SCOPE.FITNESS_SUBSCOPE_MISSING');
+    }
   });
 
   it('readers throw when the scope has no fitness subscope', async () => {
@@ -185,5 +196,30 @@ describe('fitness scope-registry — scope isolation', () => {
       expect(currentFitnessLoadState().loadedFor).toBeNull();
       return Promise.resolve();
     });
+  });
+
+  it('two scopes carry INDEPENDENT memory profiler profiles through the resolver', async () => {
+    const scopeA = fitnessScope();
+    const scopeB = fitnessScope();
+
+    const [summaryA, summaryB] = await Promise.all([
+      runWithScope(scopeA, () => {
+        const profiler = resolveMemoryProfiler();
+        profiler.recordCheckComplete('scope-a-check', 0, 0, 1);
+        return Promise.resolve(profiler.getSummary());
+      }),
+      runWithScope(scopeB, () => {
+        const profiler = resolveMemoryProfiler();
+        profiler.recordCheckComplete('scope-b-check-1', 0, 0, 1);
+        profiler.recordCheckComplete('scope-b-check-2', 0, 0, 1);
+        return Promise.resolve(profiler.getSummary());
+      }),
+    ]);
+
+    expect(summaryA.allProfiles.map((profile) => profile.checkId)).toEqual(['scope-a-check']);
+    expect(summaryB.allProfiles.map((profile) => profile.checkId)).toEqual([
+      'scope-b-check-1',
+      'scope-b-check-2',
+    ]);
   });
 });

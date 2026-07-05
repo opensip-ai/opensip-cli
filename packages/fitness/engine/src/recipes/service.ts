@@ -19,7 +19,12 @@ import {
 
 import { FileCache } from '../framework/file-cache.js';
 import { type CheckRegistry } from '../framework/registry.js';
-import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js';
+import {
+  createCheckRegistry,
+  createFitnessLoadState,
+  createMemoryProfiler,
+  createRecipeRegistry,
+} from '../framework/scope-registry.js';
 
 import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from './check-config.js';
 import {
@@ -71,8 +76,10 @@ export class FitnessRecipeService {
     // run executes inside the pre-action-hook's RunScope). An explicit
     // `checkRegistry`/`recipeRegistry` in config overrides — tests and
     // programmatic callers can inject their own without a scope.
-    this.checkRegistry = config?.checkRegistry ?? currentCheckRegistry();
-    this.recipeRegistry = config?.recipeRegistry ?? currentRecipeRegistry();
+    this.checkRegistry =
+      config?.checkRegistry ?? currentScope()?.fitness?.checks ?? createCheckRegistry();
+    this.recipeRegistry =
+      config?.recipeRegistry ?? currentScope()?.fitness?.recipes ?? createRecipeRegistry();
     // NOTE: `this.fileCache` is intentionally NOT assigned here. It is resolved
     // per-run at `executeRecipeInScope` entry from the scope (the canonical
     // per-run cache is `scope.fitness.fileCache`); a constructor default would
@@ -136,11 +143,32 @@ export class FitnessRecipeService {
     // its lifecycle — dispose() frees the per-run parseCache + recipe config so
     // an ad-hoc execution does not leak per-run state (esp. in long-lived hosts).
     const adhoc = new RunScope();
+    this.installAdHocFitnessSubscope(adhoc);
     try {
       return await runWithScope(adhoc, () => this.executeRecipeInScope(recipe, adhoc));
     } finally {
       adhoc.dispose();
     }
+  }
+
+  private installAdHocFitnessSubscope(scope: RunScope): void {
+    if (scope.fitness) return;
+    const fileCache = this.config.fileCache ?? new FileCache();
+    const memoryProfiler = createMemoryProfiler();
+    const tsProgram: { value: unknown } = { value: undefined };
+    scope.fitness = {
+      checks: this.checkRegistry,
+      recipes: this.recipeRegistry,
+      load: createFitnessLoadState(),
+      fileCache,
+      memoryProfiler,
+      tsProgram,
+    };
+    scope.onDispose(() => {
+      fileCache.clear();
+      memoryProfiler.reset();
+      tsProgram.value = undefined;
+    });
   }
 
   private async executeRecipeInScope(

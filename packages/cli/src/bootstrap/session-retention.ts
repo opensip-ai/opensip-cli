@@ -1,5 +1,12 @@
-import { formatUnknownErrorMessage, logger as defaultLogger, type Logger } from '@opensip-cli/core';
+import {
+  currentScope,
+  formatUnknownErrorMessage,
+  logger as defaultLogger,
+  type Logger,
+} from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
+
+import { loadCliDefaults } from './cli-defaults.js';
 
 import type { DataStore, DatastoreMaintenance } from '@opensip-cli/datastore';
 
@@ -16,6 +23,12 @@ export interface SessionRetentionPolicy {
   readonly keep: number;
   readonly maxAgeDays: number;
   readonly maxSizeMb: number;
+}
+
+export type SessionRetentionPolicySource = 'scope' | 'cwd-fallback';
+
+export interface ResolvedSessionRetentionPolicy extends SessionRetentionPolicy {
+  readonly source: SessionRetentionPolicySource;
 }
 
 export interface EnforceSessionRetentionDeps {
@@ -36,6 +49,15 @@ export function resolveSessionRetentionPolicy(
       configured?.maxSizeMb,
       DEFAULT_SESSION_RETENTION_MAX_SIZE_MB,
     ),
+  };
+}
+
+export function resolveCurrentSessionRetentionPolicy(): ResolvedSessionRetentionPolicy {
+  const projectRoot = currentScope()?.projectContext?.projectRoot;
+  const source: SessionRetentionPolicySource = projectRoot === undefined ? 'cwd-fallback' : 'scope';
+  return {
+    source,
+    ...resolveSessionRetentionPolicy(loadCliDefaults(projectRoot ?? process.cwd()).sessions),
   };
 }
 

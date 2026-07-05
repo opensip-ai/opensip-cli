@@ -12,8 +12,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  RunScope,
   createSignal,
+  runWithScope,
   type Logger,
+  type ProjectContext,
   type ToolCliContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -31,6 +34,7 @@ import {
   runWithSuiteRunContext,
   type RunPlaneFactory,
 } from '../run-plane.js';
+import { resolveCurrentSessionRetentionPolicy } from '../session-retention.js';
 
 type ExecuteYagniDetector = NonNullable<Parameters<typeof executeYagni>[2]>[number];
 
@@ -51,6 +55,40 @@ function contribution(overrides: Partial<ToolSessionContribution> = {}): ToolSes
     payload: { summary: { total: 3 } },
     ...overrides,
   };
+}
+
+function writeRetentionConfig(root: string, keep: number): void {
+  writeFileSync(
+    join(root, 'opensip-cli.config.yml'),
+    `cli:
+  sessions:
+    keep: ${keep}
+    maxAgeDays: 0
+    maxSizeMb: 0
+`,
+    'utf8',
+  );
+}
+
+function projectContext(root: string): ProjectContext {
+  return {
+    cwd: root,
+    cwdExplicit: true,
+    projectRoot: root,
+    configPath: join(root, 'opensip-cli.config.yml'),
+    walkedUp: 0,
+    scope: 'project',
+  };
+}
+
+function withCwd<T>(cwd: string, fn: () => T): T {
+  const previous = process.cwd();
+  process.chdir(cwd);
+  try {
+    return fn();
+  } finally {
+    process.chdir(previous);
+  }
 }
 
 function warningYagniDetector(): ExecuteYagniDetector {
@@ -256,6 +294,103 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
     expect(row?.hostMetrics?.egressMs).toBe(3);
     // persistMs from the original write survives the upsert merge.
     expect(row?.hostMetrics?.persistMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('resolves session retention from the entered scope project, not the invoking cwd', () => {
+    const invokingRoot = mkdtempSync(join(tmpdir(), 'opensip-retention-invoking-'));
+    const projectRoot = mkdtempSync(join(tmpdir(), 'opensip-retention-project-'));
+    const scopedDatastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      writeRetentionConfig(invokingRoot, 1);
+      writeRetentionConfig(projectRoot, 3);
+      const debug = vi.fn();
+      const log: Logger = { ...SILENT, debug };
+      const repo = new SessionRepo(scopedDatastore);
+      for (let i = 0; i < 3; i += 1) {
+        repo.save({
+          ...contribution({ cwd: projectRoot }),
+          id: `seed-${i}`,
+          startedAt: `2026-01-0${i + 1}T00:00:00.000Z`,
+          completedAt: `2026-01-0${i + 1}T00:00:00.000Z`,
+          durationMs: 1,
+        });
+      }
+
+      withCwd(invokingRoot, () => {
+        const scopedFactory = createRunPlaneFactory({
+          getDatastore: () => scopedDatastore,
+          sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
+          logger: log,
+        });
+        const scope = new RunScope({
+          logger: log,
+          runId: 'run-retention-scope',
+          projectContext: projectContext(projectRoot),
+          datastore: () => scopedDatastore,
+        });
+        void runWithScope(scope, () => {
+          scopedFactory.current().completeAndPersist(contribution({ cwd: projectRoot }));
+        });
+      });
+
+      expect(repo.count()).toBe(3);
+      expect(debug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'session.retention.policy_resolved',
+          source: 'scope',
+          keep: 3,
+          maxAgeDays: 0,
+          maxSizeMb: 0,
+        }),
+      );
+    } finally {
+      scopedDatastore.close();
+      rmSync(invokingRoot, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves session retention from process.cwd() when no scope is entered', () => {
+    const cwdRoot = mkdtempSync(join(tmpdir(), 'opensip-retention-cwd-'));
+    const fallbackDatastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      writeRetentionConfig(cwdRoot, 2);
+      const debug = vi.fn();
+      const log: Logger = { ...SILENT, debug };
+      const repo = new SessionRepo(fallbackDatastore);
+      for (let i = 0; i < 3; i += 1) {
+        repo.save({
+          ...contribution({ cwd: cwdRoot }),
+          id: `fallback-seed-${i}`,
+          startedAt: `2026-02-0${i + 1}T00:00:00.000Z`,
+          completedAt: `2026-02-0${i + 1}T00:00:00.000Z`,
+          durationMs: 1,
+        });
+      }
+
+      withCwd(cwdRoot, () => {
+        const fallbackFactory = createRunPlaneFactory({
+          getDatastore: () => fallbackDatastore,
+          sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
+          logger: log,
+        });
+        fallbackFactory.current().completeAndPersist(contribution({ cwd: cwdRoot }));
+      });
+
+      expect(repo.count()).toBe(2);
+      expect(debug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'session.retention.policy_resolved',
+          source: 'cwd-fallback',
+          keep: 2,
+          maxAgeDays: 0,
+          maxSizeMb: 0,
+        }),
+      );
+    } finally {
+      fallbackDatastore.close();
+      rmSync(cwdRoot, { recursive: true, force: true });
+    }
   });
 });
 

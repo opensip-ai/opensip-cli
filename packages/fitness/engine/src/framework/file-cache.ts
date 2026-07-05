@@ -233,9 +233,9 @@ export class FileCache {
  * It is retained solely for isolated unit tests that exercise the cache without
  * a scope (they seed/clear it directly, or pass it explicitly as
  * `options.fileCache`). New production imports are forbidden by the
- * `no-module-level-run-state` dogfood check (Phase 3). Note that
- * `no-module-singleton.mjs` still allowlists this symbol by file
- * (`EXEMPT_BY_FILE`).
+ * `no-module-level-run-state` dogfood check (Phase 3).
+ * `no-module-singleton.mjs` keeps a definition-file exemption for this symbol
+ * only (`EXEMPT_BY_FILE`).
  */
 export const fileCache = new FileCache();
 

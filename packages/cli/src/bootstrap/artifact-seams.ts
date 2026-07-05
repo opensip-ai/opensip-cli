@@ -24,11 +24,13 @@ import { resolveStateLockPolicy } from './state-lock-policy.js';
 /** Options for {@link createWriteArtifactSeam}. */
 export interface WriteArtifactSeamOptions {
   /**
-   * Number of per-tool run-dirs to retain under `.runtime/artifacts/<tool>/`
-   * (`cli.artifacts.keep`). Undefined → {@link DEFAULT_ARTIFACT_RETENTION_KEEP}.
-   * The host prunes the store after each write whose target lives inside it.
+   * Resolves the number of per-tool run-dirs to retain under
+   * `.runtime/artifacts/<tool>/` (`cli.artifacts.keep`). Evaluated at
+   * write/prune time so `--cwd` runs read the entered scope's project config.
+   * Undefined → {@link DEFAULT_ARTIFACT_RETENTION_KEEP}. The host prunes the
+   * store after each write whose target lives inside it.
    */
-  readonly retentionKeep?: number;
+  readonly retentionKeep?: () => number | undefined;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface WriteArtifactSeamOptions {
 function maybePruneArtifactStore(
   target: string,
   scope: RunScope | undefined,
-  retentionKeep: number,
+  resolveRetentionKeep: () => number,
   log: Logger,
 ): void {
   try {
@@ -58,7 +60,9 @@ function maybePruneArtifactStore(
     if (tool === undefined || tool === '' || tool === '..') return;
     // A12: pass the current run id so its own dir is never pruned, and let the
     // grace-window floor protect concurrent in-flight peers.
-    pruneArtifactRetention(tool, artifactsDir, retentionKeep, { currentRunId: scope?.runId });
+    pruneArtifactRetention(tool, artifactsDir, resolveRetentionKeep(), {
+      currentRunId: scope?.runId,
+    });
   } catch (error) {
     log.debug({
       evt: 'state.artifact.retention.prune.skipped',
@@ -134,7 +138,6 @@ export function createWriteArtifactSeam(
   logger: Logger = defaultLogger,
   options: WriteArtifactSeamOptions = {},
 ): (path: string, bytes: string) => Promise<void> {
-  const retentionKeep = options.retentionKeep ?? DEFAULT_ARTIFACT_RETENTION_KEEP;
   return (path, bytes) =>
     Promise.resolve().then(() => {
       const target = resolve(path);
@@ -159,6 +162,11 @@ export function createWriteArtifactSeam(
       }
       // Retention runs AFTER the write succeeds and covers worker writes too (the
       // worker RPC routes through this same host seam). Never fails the run.
-      maybePruneArtifactStore(target, scope, retentionKeep, scope?.logger ?? logger);
+      maybePruneArtifactStore(
+        target,
+        scope,
+        () => options.retentionKeep?.() ?? DEFAULT_ARTIFACT_RETENTION_KEEP,
+        scope?.logger ?? logger,
+      );
     });
 }
