@@ -22,8 +22,25 @@
  *   primary surface excludes internal workers.
  */
 
+import { ValidationError } from '@opensip-cli/core';
+
+import {
+  INTERNAL_COMMAND_NAME_RE,
+  agentCatalogPlatformEntryPoints,
+  assertAgentCatalogOverlayKeys,
+  compareCodePoint,
+  overlayForTool,
+  publicPrimaryCommand,
+} from './agent-catalog-entries.js';
+
 import type { AgentProjectContext } from './target-conventions.js';
-import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
+import type { Tool, ToolRegistry } from '@opensip-cli/core';
+
+export {
+  agentCatalogOverlayKeys,
+  agentCatalogPlatformEntryPoints,
+  assertAgentCatalogOverlayKeys,
+} from './agent-catalog-entries.js';
 
 /**
  * The command-taxonomy tier an entry point belongs to
@@ -77,27 +94,13 @@ export interface AgentCatalog {
 type EntryPoint = AgentCatalog['entryPoints'][number];
 
 /**
- * Internal (Tier-3) command-name shapes the agent-catalog must NEVER surface:
- * the IPC/CI workers and the equivalence gate. The guard checks both the name
- * shape AND an explicit `tier: 'internal'` so a future edit can't slip one in by
- * either route. This is the by-construction complement to the Phase 4 test.
- */
-const INTERNAL_COMMAND_NAME_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
-
-/**
  * Throw if any entry point is a Tier-3 internal command (by name shape or by an
  * explicit `tier: 'internal'`). Called at catalog-build time so a regression that
  * pastes an internal command into `entryPoints` fails loudly the first time the
  * catalog is built, not silently at the agent boundary.
  *
- * @throws {Error} When an entry point is a Tier-3 internal command — by an
- *   explicit `tier: 'internal'` or by an internal command-name shape
+ * @throws {ValidationError} When an entry point is a Tier-3 internal command —
+ *   by an explicit `tier: 'internal'` or by an internal command-name shape
  *   (`*-run-worker` / `*-shard-worker` / `*-equivalence-check`).
  */
 function assertNoInternalEntryPoints(
@@ -110,118 +113,12 @@ function assertNoInternalEntryPoints(
     (e) => e.tier === 'internal' || INTERNAL_COMMAND_NAME_RE.test(e.command),
   );
   if (leaked !== undefined) {
-    throw new Error(
+    throw new ValidationError(
       `agent-catalog: Tier-3 internal command '${leaked.command}' must not appear in the ` +
         'agent-catalog primary surface (tool-command-surface-taxonomy). Remove it from entryPoints.',
+      { code: 'AGENT_CATALOG.INTERNAL_ENTRY_POINT' },
     );
   }
-}
-
-const TOOL_ENTRY_OVERLAYS: Readonly<Record<string, Partial<EntryPoint>>> = {
-  fitness: {
-    description:
-      'Run fitness checks. Use --json for machine output (SignalEnvelope). Agent recipes: agent-fast, agent-risk, agent-final.',
-    examples: [
-      'opensip fit --recipe agent-fast --json --filter errors-only',
-      'opensip fit --changed --include-impacted --json',
-      'opensip fit --recipe agent-final --gate-compare',
-    ],
-  },
-  graph: {
-    description:
-      'Build static call graph + rules. --json yields SignalEnvelope. Use graph impact for change-aware blast radius.',
-    examples: [
-      'opensip graph --json',
-      'opensip graph impact --changed --json --top 20',
-      'opensip graph --recipe agent-risk --json --filter high-impact',
-    ],
-  },
-  sim: {
-    description: 'Run simulation scenarios. Use --json for machine output (SignalEnvelope).',
-    examples: ['opensip sim --json', 'opensip sim --scenario default --json'],
-  },
-  yagni: {
-    description:
-      'Run YAGNI reduction audit detectors. Advisory findings; --json yields SignalEnvelope.',
-    examples: ['opensip yagni --json', 'opensip yagni --json packages/yagni/engine'],
-  },
-};
-
-const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
-  {
-    command: 'suite run',
-    description:
-      'Run a configured or built-in multi-tool suite. --json yields a command result with reviewBrief when the suite steps emit SignalEnvelopes.',
-    examples: ['opensip suite run audit --changed --json'],
-    tier: 'platform' as const,
-  },
-  {
-    command: 'sessions list',
-    description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
-    examples: [
-      'opensip sessions list --json --summary-only',
-      'opensip sessions list --json --tool fitness --limit 5',
-    ],
-    tier: 'platform' as const,
-  },
-  {
-    command: 'sessions show',
-    description:
-      'Retrieve a prior run as SessionReplayResult (includes projected SignalEnvelope). ' +
-      'Supports latest + --tool and rich filtering.',
-    examples: [
-      'opensip sessions show latest --tool fitness --json',
-      'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
-      'opensip sessions show GRAPH_01... --json --raw',
-      'opensip sessions show previous --tool graph --json',
-    ],
-    tier: 'platform' as const,
-  },
-  {
-    command: 'agent-catalog',
-    description: 'This command. Self-describing catalog for agents (JSON preferred).',
-    examples: ['opensip agent-catalog --json'],
-    tier: 'platform' as const,
-  },
-  {
-    command: 'policy status',
-    description:
-      'Inspect the effective local trust-policy mode, source tiers, org-cache state, and active exceptions.',
-    examples: ['opensip policy status --json'],
-    tier: 'platform' as const,
-  },
-  {
-    command: 'policy explain',
-    description:
-      'Explain the policy decision for a local subject/action pair without running the target command.',
-    examples: [
-      'opensip policy explain installed-tool:audit-sec --action load --json',
-      'opensip policy explain baseline:fit --action baseline-save --json',
-    ],
-    tier: 'platform' as const,
-  },
-  {
-    command: 'policy audit',
-    description: 'Read or export the durable local trust-policy audit event log.',
-    examples: [
-      'opensip policy audit --json --limit 50',
-      'opensip policy audit --out opensip-policy-audit.json',
-    ],
-    tier: 'platform' as const,
-  },
-];
-
-function publicPrimaryCommand(
-  tool: Tool,
-  internalCommands: ReadonlySet<string>,
-): CommandSpec<unknown, unknown> | undefined {
-  return (tool.commandSpecs ?? []).find(
-    (spec) =>
-      spec.parent === undefined &&
-      spec.visibility !== 'internal' &&
-      !internalCommands.has(spec.name) &&
-      !INTERNAL_COMMAND_NAME_RE.test(spec.name),
-  ) as CommandSpec<unknown, unknown> | undefined;
 }
 
 function entryPointForTool(
@@ -230,7 +127,7 @@ function entryPointForTool(
 ): EntryPoint | undefined {
   const primary = publicPrimaryCommand(tool, internalCommands);
   if (primary === undefined) return undefined;
-  const overlay = TOOL_ENTRY_OVERLAYS[primary.name] ?? TOOL_ENTRY_OVERLAYS[tool.metadata.name];
+  const overlay = overlayForTool(tool, primary);
   const supportsJson = primary.commonFlags?.includes('json') === true;
   let defaultDescription: string;
   if (supportsJson) {
@@ -272,11 +169,15 @@ export function buildAgentCatalog(
     readonly tools?: ToolRegistry;
     readonly internalCommands?: ReadonlySet<string>;
     readonly projectContext?: AgentProjectContext;
+    readonly validateOverlays?: boolean;
   } = {},
 ): AgentCatalog {
+  if (input.validateOverlays === true && input.tools !== undefined) {
+    assertAgentCatalogOverlayKeys(input.tools, input.internalCommands ?? new Set());
+  }
   const entryPoints = [
     ...deriveToolEntryPoints(input.tools, input.internalCommands ?? new Set()),
-    ...PLATFORM_ENTRY_POINTS,
+    ...agentCatalogPlatformEntryPoints(),
   ];
   assertNoInternalEntryPoints(entryPoints);
   return {

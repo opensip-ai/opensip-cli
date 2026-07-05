@@ -93,6 +93,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       buildAgentCatalog({
         ...(this.tools ? { tools: this.tools } : {}),
         ...(this.internalCommands ? { internalCommands: this.internalCommands } : {}),
+        validateOverlays: true,
       }),
     );
   }

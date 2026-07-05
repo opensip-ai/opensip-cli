@@ -7,9 +7,16 @@
  */
 
 import {
+  agentCatalogOverlayKeys,
+  agentCatalogPlatformEntryPoints,
+  assertAgentCatalogOverlayKeys,
+  commonFlags,
+} from '@opensip-cli/contracts';
+import {
   RunScope,
   ToolRegistry,
   runWithScopeSync,
+  type CommandSpec,
   type TargetResolver,
   type Tool,
 } from '@opensip-cli/core';
@@ -17,6 +24,12 @@ import { describe, expect, it } from 'vitest';
 
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
 import { buildAgentCatalog, executeAgentCatalog } from '../commands/agent-catalog.js';
+import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
+import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
+
+import { BUNDLED_TOOLS } from './test-utils/bundled-tools.js';
+
+import type { CliCommandsContext } from '../commands/shared.js';
 
 /**
  * @throws Error when a public tool command is missing from the agent catalog.
@@ -138,6 +151,126 @@ async function makeRegistry(): Promise<ToolRegistry> {
   return tools;
 }
 
+interface CatalogCommandSurface {
+  readonly spec: CommandSpec<unknown, unknown>;
+  readonly flags: ReadonlySet<string>;
+}
+
+function longFlags(flags: string): readonly string[] {
+  return flags.match(/--[a-z0-9-]+/g) ?? [];
+}
+
+function declaredFlags(spec: CommandSpec<unknown, unknown>): ReadonlySet<string> {
+  const flags = new Set<string>();
+  const commonFlagKeys = (spec as { readonly commonFlags?: readonly (keyof typeof commonFlags)[] })
+    .commonFlags;
+  for (const key of commonFlagKeys ?? []) {
+    for (const flag of longFlags(commonFlags[key].flags)) flags.add(flag);
+  }
+  for (const option of spec.options ?? []) {
+    for (const flag of longFlags(option.flag)) flags.add(flag);
+  }
+  return flags;
+}
+
+function addSurface(
+  surfaces: Map<string, CatalogCommandSurface>,
+  path: string,
+  spec: CommandSpec<unknown, unknown>,
+): void {
+  surfaces.set(path, { spec, flags: declaredFlags(spec) });
+}
+
+function toolCommandSurfaces(tools: readonly Tool[]): Map<string, CatalogCommandSurface> {
+  const surfaces = new Map<string, CatalogCommandSurface>();
+  for (const tool of tools) {
+    const specs = (tool.commandSpecs ?? []) as readonly CommandSpec<unknown, unknown>[];
+    const primarySpecs = specs.filter((spec) => spec.parent === undefined);
+    const primaryNames = new Map<string, readonly string[]>();
+    for (const primary of primarySpecs) {
+      const names = [
+        primary.name,
+        ...(primary.aliases ?? []),
+        ...(tool.identity.name === primary.name ? (tool.identity.aliases ?? []) : []),
+      ];
+      primaryNames.set(primary.name, [...new Set(names)]);
+      for (const name of names) addSurface(surfaces, name, primary);
+    }
+
+    for (const spec of specs.filter((candidate) => candidate.parent !== undefined)) {
+      const parentNames = primaryNames.get(spec.parent ?? '') ?? [spec.parent ?? ''];
+      const leafNames = [spec.name, ...(spec.aliases ?? [])];
+      for (const parent of parentNames) {
+        for (const leaf of leafNames) addSurface(surfaces, `${parent} ${leaf}`, spec);
+      }
+    }
+  }
+  return surfaces;
+}
+
+function hostCtx(tools?: ToolRegistry): CliCommandsContext {
+  return {
+    setExitCode: () => undefined,
+    render: () => Promise.resolve(),
+    emitJson: () => undefined,
+    emitRaw: () => undefined,
+    emitError: () => undefined,
+    pluginLayouts: [],
+    toolScaffolds: [],
+    datastore: () => undefined,
+    ...(tools === undefined ? {} : { tools }),
+  };
+}
+
+function hostCommandSurfaces(ctx: CliCommandsContext): Map<string, CatalogCommandSurface> {
+  const surfaces = new Map<string, CatalogCommandSurface>();
+  for (const spec of buildTopLevelHostSpecs(ctx)) {
+    addSurface(surfaces, spec.name, spec as CommandSpec<unknown, unknown>);
+    for (const alias of spec.aliases ?? []) {
+      addSurface(surfaces, alias, spec as CommandSpec<unknown, unknown>);
+    }
+  }
+  for (const group of buildHostSubcommandGroups(ctx)) {
+    for (const leaf of group.leaves) {
+      addSurface(surfaces, `${group.name} ${leaf.name}`, leaf as CommandSpec<unknown, unknown>);
+      for (const alias of leaf.aliases ?? []) {
+        addSurface(surfaces, `${group.name} ${alias}`, leaf as CommandSpec<unknown, unknown>);
+      }
+    }
+  }
+  return surfaces;
+}
+
+function combinedCommandSurfaces(tools: ToolRegistry): Map<string, CatalogCommandSurface> {
+  return new Map([...toolCommandSurfaces(tools.list()), ...hostCommandSurfaces(hostCtx(tools))]);
+}
+
+function exampleSegments(example: string): readonly string[] {
+  return example.split('&&').map((segment) => segment.trim());
+}
+
+function resolveExampleCommand(
+  segment: string,
+  surfaces: ReadonlyMap<string, CatalogCommandSurface>,
+): {
+  readonly command: string;
+  readonly surface: CatalogCommandSurface;
+  readonly tokens: readonly string[];
+} {
+  const tokens = segment.split(/\s+/);
+  expect(tokens[0], `catalog example must start with opensip: ${segment}`).toBe('opensip');
+  for (let length = Math.min(3, tokens.length - 1); length >= 1; length--) {
+    const command = tokens.slice(1, 1 + length).join(' ');
+    const surface = surfaces.get(command);
+    if (surface !== undefined) return { command, surface, tokens };
+  }
+  throw new Error(`catalog example does not name a mounted command: ${segment}`);
+}
+
+function exampleFlags(tokens: readonly string[]): readonly string[] {
+  return tokens.filter((token) => token.startsWith('--'));
+}
+
 describe('buildAgentCatalog', () => {
   it('returns a stable, fully-populated catalog from the live registry', async () => {
     const tools = await makeRegistry();
@@ -170,6 +303,50 @@ describe('buildAgentCatalog', () => {
     expect(c.entryPoints.find((entry) => entry.command === 'mcp')?.examples).toEqual([
       'opensip mcp',
     ]);
+  });
+
+  it('keeps curated tool overlay keys matched to bundled public primaries or aliases', () => {
+    const tools = new ToolRegistry();
+    for (const tool of BUNDLED_TOOLS) tools.register(tool);
+
+    expect(agentCatalogOverlayKeys()).toEqual(['fitness', 'graph', 'sim', 'yagni']);
+    expect(() => assertAgentCatalogOverlayKeys(tools)).not.toThrow();
+    const c = buildAgentCatalog({ tools, validateOverlays: true });
+    expect(c.entryPoints.find((entry) => entry.command === 'simulation')?.examples).toEqual([
+      'opensip sim --json',
+      'opensip sim --recipe default --json',
+    ]);
+  });
+
+  it('keeps platform catalog entries backed by mounted host command specs', () => {
+    const mounted = hostCommandSurfaces(hostCtx());
+    for (const entry of agentCatalogPlatformEntryPoints()) {
+      expect(mounted.has(entry.command), `missing mounted host spec for '${entry.command}'`).toBe(
+        true,
+      );
+    }
+  });
+
+  it('keeps catalog examples within declared command flag surfaces', async () => {
+    const tools = await makeRegistry();
+    const surfaces = combinedCommandSurfaces(tools);
+    const catalog = buildAgentCatalog({ tools, validateOverlays: true });
+    const examples = [
+      ...catalog.entryPoints.flatMap((entry) => entry.examples),
+      ...catalog.commonPatterns.map((pattern) => pattern.example),
+    ];
+
+    for (const example of examples) {
+      for (const segment of exampleSegments(example)) {
+        const { command, surface, tokens } = resolveExampleCommand(segment, surfaces);
+        for (const flag of exampleFlags(tokens)) {
+          expect(
+            surface.flags.has(flag),
+            `example '${segment}' uses undeclared flag '${flag}' for '${command}'`,
+          ).toBe(true);
+        }
+      }
+    }
   });
 
   it('omits tools without a public primary command', () => {

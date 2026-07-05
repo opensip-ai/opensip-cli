@@ -25,6 +25,7 @@ export function executeAgentCatalog(
   const catalog = buildAgentCatalog({
     tools: opts.tools,
     internalCommands: opts.internalCommands,
+    validateOverlays: true,
     ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
   });
 
