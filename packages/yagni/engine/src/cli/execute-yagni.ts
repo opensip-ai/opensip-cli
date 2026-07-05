@@ -238,7 +238,7 @@ export async function executeYagni(
       tool: YAGNI_LAYOUT_KEY,
       cwd: opts.cwd,
       score: envelope.verdict.score,
-      passed: true,
+      passed: envelope.verdict.passed,
       payload: sessionPayload,
     },
   };

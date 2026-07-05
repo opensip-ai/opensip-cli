@@ -7,8 +7,20 @@
  * `createRunActionHooks`) the assembler wires into the context.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import {
+  createSignal,
+  type Logger,
+  type ToolCliContext,
+  type ToolRunCompletion,
+  type ToolSessionContribution,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { SessionRepo } from '@opensip-cli/session-store';
+import { listSessionSummaries, SessionRepo } from '@opensip-cli/session-store';
+import { executeYagni } from '@opensip-cli/yagni';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { disposeCurrentScope } from '../pre-action-hook.js';
@@ -20,7 +32,7 @@ import {
   type RunPlaneFactory,
 } from '../run-plane.js';
 
-import type { Logger, ToolRunCompletion, ToolSessionContribution } from '@opensip-cli/core';
+type ExecuteYagniDetector = NonNullable<Parameters<typeof executeYagni>[2]>[number];
 
 /** Silent logger so the best-effort warn/info paths don't spam test output. */
 const SILENT: Logger = {
@@ -38,6 +50,29 @@ function contribution(overrides: Partial<ToolSessionContribution> = {}): ToolSes
     passed: true,
     payload: { summary: { total: 3 } },
     ...overrides,
+  };
+}
+
+function warningYagniDetector(): ExecuteYagniDetector {
+  return {
+    id: 'warning-detector',
+    slug: 'yagni:warning-detector',
+    description: 'fixture warning detector',
+    run: () =>
+      Promise.resolve({
+        durationMs: 1,
+        signals: [
+          createSignal({
+            source: 'yagni:warning-detector',
+            provider: 'yagni',
+            severity: 'medium',
+            category: 'architecture',
+            ruleId: 'yagni:warning-detector',
+            message: 'warning policy should fail this run',
+            code: { file: 'subject.ts', line: 1, column: 1 },
+          }),
+        ],
+      }),
   };
 }
 
@@ -298,6 +333,45 @@ describe('createRunActionHooks', () => {
     const hooks = createRunActionHooks(factory);
     hooks.completeRun?.({ type: 'help' });
     expect(factory.current().sessionId()).toBeUndefined();
+  });
+
+  it('round-trips a failing YAGNI verdict through host persistence into session summaries', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'opensip-yagni-run-plane-'));
+    try {
+      writeFileSync(join(cwd, 'subject.ts'), 'export const subject = true;\n', 'utf8');
+      const result = await executeYagni(
+        {
+          cwd,
+          config: { failOnErrors: 0, failOnWarnings: 1 },
+        },
+        {} as ToolCliContext,
+        [warningYagniDetector()],
+      );
+
+      expect(result.session.passed).toBe(false);
+
+      const hooks = createRunActionHooks(factory);
+      hooks.beginRun?.();
+      hooks.completeRun?.(result);
+
+      const summaries = listSessionSummaries(datastore, { summaryOnly: true });
+      expect(summaries.sessions).toHaveLength(1);
+      expect(summaries.sessions[0]).toMatchObject({
+        tool: 'yagni',
+        cwd,
+        passed: false,
+        runOutcome: 'failed',
+        summary: {
+          total: 1,
+          passed: 1,
+          failed: 0,
+          errors: 0,
+          warnings: 1,
+        },
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
 
