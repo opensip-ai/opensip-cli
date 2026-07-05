@@ -29,7 +29,6 @@ import {
 } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from '../../baseline-strategy.js';
-import { violationToSignal } from '../../signalers/violation-to-signal.js';
 
 import { buildFitVerboseDetail } from './envelope-view.js';
 import { resolvedFitnessConfig } from './resolved-fitness-config.js';
@@ -66,6 +65,16 @@ export function resolveFitVerdictPolicy(signalersConfig: SignalersConfig): Verdi
 // Envelope builder (ADR-0011, Phase 6) — the canonical post-run transform
 // ---------------------------------------------------------------------------
 
+function normalizeFitnessSignalIdentity(signal: Signal, checkSlug: string): Signal {
+  const unstamped = { ...signal };
+  delete unstamped.fingerprint;
+  return {
+    ...unstamped,
+    source: checkSlug,
+    ruleId: checkSlug,
+  };
+}
+
 /** Per-check error string for the unit sidecar: the check's own error, or a timeout marker. */
 function unitError(cr: RecipeCheckResult): string | undefined {
   if (cr.error !== undefined) return cr.error;
@@ -78,12 +87,15 @@ function unitError(cr: RecipeCheckResult): string | undefined {
  * currency the composition root renders (table), emits (`--json`), and
  * delivers (cloud + `--report-to`).
  *
- * Each check violation becomes one {@link Signal} (`source === ruleId ===
- * checkSlug`) via {@link violationToSignal}; every check that ran produces one
+ * Each check's original effective {@link Signal}s are carried into the envelope,
+ * with wire identity normalized to the historical bare check slug
+ * (`source === ruleId === checkSlug`) before fingerprint stamping. This preserves
+ * existing baseline identity while retaining each signal's category, metadata,
+ * severity, repair, and fix fields. Every check that ran produces one
  * {@link UnitResult} row (so a clean check still appears in the table). The
  * fitness-only `Validated`/`Ignores` columns ride on the unit as
- * `filesValidated`/`itemType`/`ignoredCount` (per-unit facts a flat signal
- * list cannot express). The verdict/summary are computed centrally by
+ * `filesValidated`/`itemType`/`ignoredCount` (per-unit facts a flat signal list
+ * cannot express). The verdict/summary are computed centrally by
  * {@link buildSignalEnvelope} so all three tools agree on "passed ⇔ no
  * critical/high".
  *
@@ -101,8 +113,8 @@ export function buildFitEnvelope(
   const signals: Signal[] = [];
   const units: UnitResult[] = [];
   for (const cr of checkResults) {
-    for (const violation of cr.violations ?? []) {
-      signals.push(violationToSignal(cr.checkSlug, violation));
+    for (const signal of cr.effectiveSignals) {
+      signals.push(normalizeFitnessSignalIdentity(signal, cr.checkSlug));
     }
     units.push({
       slug: cr.checkSlug,

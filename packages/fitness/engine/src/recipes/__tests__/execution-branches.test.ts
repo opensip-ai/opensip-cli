@@ -3,7 +3,7 @@
  * engines and the check-result-processor.
  *
  * Targets the conditional branches that the headline integration tests
- * skip — fileFilter, memory warnings, includeViolations, retry exhaustion,
+ * skip — fileFilter, memory warnings, effective signal detail, retry exhaustion,
  * stopOnFirstFailure mid-run, target file overrides, and global excludes.
  */
 
@@ -552,7 +552,6 @@ describe('check-result-processor — fileFilter', () => {
       checkRegistry,
       recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
-      includeViolations: true,
     });
 
     // First: without fileFilter — should fail because a.ts fails.
@@ -568,8 +567,8 @@ describe('check-result-processor — fileFilter', () => {
   });
 });
 
-describe('check-result-processor — includeViolations carries detail', () => {
-  it('exposes violations with file/line/severity when enabled', async () => {
+describe('check-result-processor — effectiveSignals carries detail', () => {
+  it('exposes signals with file/line/severity', async () => {
     const checkRegistry = new CheckRegistry();
     checkRegistry.register(
       defineCheck({
@@ -609,15 +608,15 @@ describe('check-result-processor — includeViolations carries detail', () => {
       checkRegistry,
       recipeRegistry: new FitnessRecipeRegistry(),
       prewarmCache: true,
-      includeViolations: true,
     });
 
     const result = await svc.start(makeRecipe());
-    const v = result.checkResults[0]?.violations?.[0];
-    expect(v?.file).toBeDefined();
+    const v = result.checkResults[0]?.effectiveSignals[0];
+    expect(v?.filePath).toBeDefined();
     expect(v?.line).toBe(1);
-    expect(v?.severity).toBe('warning');
+    expect(v?.severity).toBe('medium');
     expect(v?.suggestion).toBe('remove X');
+    expect(v?.metadata.checkSlug).toBe('detail');
   });
 });
 

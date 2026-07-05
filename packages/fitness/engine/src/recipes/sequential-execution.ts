@@ -33,7 +33,6 @@ export async function executeSequential(
     session,
     callbacks,
     recipe,
-    includeViolations: ctx.includeViolations ?? false,
   };
 
   await scheduleUnits<Check>({

@@ -83,7 +83,6 @@ function makeProcessorContext(callbacks: FitnessRecipeServiceCallbacks = {}): Pr
     session: makeSession(),
     callbacks,
     recipe: makeRecipe(),
-    includeViolations: true,
   };
 }
 

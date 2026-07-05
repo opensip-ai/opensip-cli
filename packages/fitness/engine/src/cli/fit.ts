@@ -231,7 +231,6 @@ export async function executeFit(
     checkTargetFiles,
     callbacks: buildFitCallbacks(opts.onProgress),
     disabledChecks: runtimeExcludes,
-    includeViolations: true,
     globalExcludes: targetsConfig.globalExcludes,
   });
 

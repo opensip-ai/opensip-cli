@@ -81,8 +81,6 @@ export interface FitnessRecipeServiceConfig {
   recipeRegistry?: FitnessRecipeRegistry;
   /** Check slugs disabled via opensip.config.yml — these checks are skipped unless force-included by a recipe. */
   disabledChecks?: readonly string[];
-  /** When true, carry violation details on RecipeCheckResult. */
-  includeViolations?: boolean;
   /**
    * Run-wide file exclusion patterns from `opensip-cli.config.yml`'s
    * top-level `globalExcludes`. Threaded into each check's RunOptions

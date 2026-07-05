@@ -5,7 +5,7 @@
  * builds check summaries, and determines whether execution should stop.
  */
 
-import { logger, SeverityPolicy, SystemError } from '@opensip-cli/core';
+import { logger, SystemError } from '@opensip-cli/core';
 
 import { type CheckMemoryProfile } from '../framework/memory-profiler.js';
 import { resolveMemoryProfiler } from '../framework/scope-registry.js';
@@ -53,7 +53,6 @@ export interface ProcessorContext {
   session: FitnessRecipeSession;
   callbacks: FitnessRecipeServiceCallbacks;
   recipe: FitnessRecipe;
-  includeViolations: boolean;
 }
 
 /** Output from processing a check result, including whether execution should stop */
@@ -214,25 +213,9 @@ export function processSuccessResult(
     totalItems: result.metadata.totalItems,
     itemType: result.metadata.itemType,
     skipped: false,
+    effectiveSignals,
     ...(result.appliedDirectives && result.appliedDirectives.length > 0
       ? { appliedDirectives: result.appliedDirectives }
-      : {}),
-    ...(ctx.includeViolations
-      ? {
-          violations: effectiveSignals.map((s) => ({
-            file: s.code?.file ?? 'unknown',
-            line: s.code?.line ?? 0,
-            column: s.code?.column,
-            message: s.message,
-            severity: SeverityPolicy.isError(s.severity)
-              ? ('error' as const)
-              : ('warning' as const),
-            suggestion: s.suggestion,
-            ...(s.fixAction === undefined ? {} : { fixAction: s.fixAction }),
-            ...(s.fixConfidence === undefined ? {} : { fixConfidence: s.fixConfidence }),
-            ...(s.repair === undefined ? {} : { repair: s.repair }),
-          })),
-        }
       : {}),
   };
 
@@ -313,6 +296,7 @@ export function processErrorResult(
     skipped: false,
     error: errMsg,
     timedOut,
+    effectiveSignals: [],
   };
 
   updateSessionForError(session, checkResult);

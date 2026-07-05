@@ -44,7 +44,6 @@ export interface ExecutionServiceContext {
   session: FitnessRecipeSession;
   callbacks: FitnessRecipeServiceCallbacks;
   abortController?: AbortController;
-  includeViolations?: boolean;
 }
 
 // =============================================================================
@@ -68,7 +67,6 @@ export async function executeParallel(
     session,
     callbacks,
     recipe,
-    includeViolations: ctx.includeViolations ?? false,
   };
 
   // Release 2.13.0 (§5.8): the sliding-window scheduling shape now lives in the

@@ -665,11 +665,11 @@ describe('FitnessRecipeService — timeout', () => {
 });
 
 // =============================================================================
-// includeViolations CONFIG
+// EFFECTIVE SIGNALS
 // =============================================================================
 
-describe('FitnessRecipeService — includeViolations', () => {
-  it('omits per-violation detail by default', async () => {
+describe('FitnessRecipeService — effectiveSignals', () => {
+  it('carries filtered signal detail by default', async () => {
     const checkRegistry = new CheckRegistry();
     checkRegistry.register(makeMarkerCheck('flag-x', 'X'));
     writeFixture('a.ts', 'const a = "X";');
@@ -683,26 +683,10 @@ describe('FitnessRecipeService — includeViolations', () => {
 
     const result = await svc.start(makeRecipe());
     const cr = result.checkResults[0];
-    expect(cr?.violations).toBeUndefined();
-  });
-
-  it('carries violation detail when includeViolations is true', async () => {
-    const checkRegistry = new CheckRegistry();
-    checkRegistry.register(makeMarkerCheck('flag-x', 'X'));
-    writeFixture('a.ts', 'const a = "X";');
-
-    const svc = new FitnessRecipeService({
-      cwd: testDir,
-      checkRegistry,
-      recipeRegistry: new FitnessRecipeRegistry(),
-      prewarmCache: true,
-      includeViolations: true,
-    });
-
-    const result = await svc.start(makeRecipe());
-    const cr = result.checkResults[0];
-    expect(cr?.violations).toBeDefined();
-    expect(cr?.violations?.length).toBeGreaterThan(0);
+    expect(cr?.effectiveSignals).toHaveLength(1);
+    expect(cr?.effectiveSignals[0]?.ruleId).toBe('fit:flag-x');
+    expect(cr?.effectiveSignals[0]?.line).toBe(1);
+    expect(cr?.effectiveSignals[0]?.metadata.checkSlug).toBe('flag-x');
   });
 });
 

@@ -11,7 +11,7 @@ import os from 'node:os';
 import { deriveRecipeId } from '@opensip-cli/core';
 
 import type { DirectiveEntry } from '../framework/directive-inventory.js';
-import type { RecipeUnitConfigMap, SignalRepair } from '@opensip-cli/core';
+import type { RecipeUnitConfigMap, Signal } from '@opensip-cli/core';
 
 // =============================================================================
 // CHECK SELECTOR TYPES
@@ -112,19 +112,6 @@ export interface FitnessRecipe {
 // RECIPE RUN RESULT
 // =============================================================================
 
-/** A single violation detail from a fitness check. */
-interface RecipeViolation {
-  readonly file: string;
-  readonly line: number;
-  readonly column?: number;
-  readonly message: string;
-  readonly severity: 'error' | 'warning';
-  readonly suggestion?: string;
-  readonly fixAction?: string;
-  readonly fixConfidence?: number;
-  readonly repair?: SignalRepair;
-}
-
 /** Result of a single check within a recipe execution */
 export interface RecipeCheckResult {
   readonly checkId: string;
@@ -142,8 +129,8 @@ export interface RecipeCheckResult {
   readonly error?: string;
   readonly timedOut?: boolean;
   appliedDirectives?: readonly DirectiveEntry[] | undefined;
-  /** Violation details. Populated when includeViolations is true. */
-  readonly violations?: readonly RecipeViolation[];
+  /** Signals after recipe-level filtering, before envelope identity normalization. */
+  readonly effectiveSignals: readonly Signal[];
 }
 
 /** Aggregated summary of a complete recipe run */

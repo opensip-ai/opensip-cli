@@ -255,7 +255,6 @@ export class FitnessRecipeService {
         session: this.activeSession,
         callbacks: this.callbacks,
         abortController: this.abortController,
-        includeViolations: this.config.includeViolations ?? false,
       };
 
       // Deliberate two-mode dispatch (see audit 2026-05-23 F5): when a
