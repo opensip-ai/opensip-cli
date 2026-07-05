@@ -2,7 +2,6 @@ export { javaAdapter, adapters } from './adapter.js';
 export { parseJava, type JavaTree } from './parse.js';
 export { getSharedTree } from './shared-tree.js';
 export { stripStrings, stripComments } from './strip.js';
-export { javaQuery } from './query.js';
 export {
   isFunction,
   isMethod,

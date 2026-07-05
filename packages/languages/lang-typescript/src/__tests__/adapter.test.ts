@@ -22,29 +22,6 @@ describe('typescriptAdapter', () => {
     expect(tree).not.toBeNull();
   });
 
-  it('query.findFunctions returns named and anonymous functions', () => {
-    const tree = typescriptAdapter.parse('function a(){} const b = () => {}', 'foo.ts')!;
-    const fns = typescriptAdapter.query!.findFunctions(tree);
-    expect(fns.length).toBe(2);
-    const names = fns.map((f) => f.name).sort();
-    expect(names).toEqual([null, 'a'].sort());
-  });
-
-  it('query.findImports returns named imports and specifier', () => {
-    const tree = typescriptAdapter.parse("import { x, y } from './foo'", 'foo.ts')!;
-    const imports = typescriptAdapter.query!.findImports(tree);
-    expect(imports.length).toBe(1);
-    expect(imports[0].specifier).toBe('./foo');
-    expect([...imports[0].names].sort()).toEqual(['x', 'y']);
-  });
-
-  it('query.findCallsTo matches the leaf call name', () => {
-    const tree = typescriptAdapter.parse('foo(); bar.baz();', 'foo.ts')!;
-    expect(typescriptAdapter.query!.findCallsTo(tree, 'foo').length).toBe(1);
-    expect(typescriptAdapter.query!.findCallsTo(tree, 'baz').length).toBe(1);
-    expect(typescriptAdapter.query!.findCallsTo(tree, 'absent').length).toBe(0);
-  });
-
   it('stripStrings replaces string content but preserves length', () => {
     const original = 'const x = "abc"; const y = 1';
     const stripped = typescriptAdapter.stripStrings(original);

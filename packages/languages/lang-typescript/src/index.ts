@@ -10,7 +10,6 @@ export { ts };
 
 export { typescriptAdapter, adapters } from './adapter.js';
 export { parseSource } from './parse.js';
-export { typescriptQuery } from './query.js';
 export { stripStrings, stripComments } from './strip.js';
 export { filterContent } from './filter.js';
 export type { FilteredContent } from './filter.js';

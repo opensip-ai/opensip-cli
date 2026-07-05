@@ -1,5 +1,4 @@
 import { parseRust, type RustTree } from './parse.js';
-import { rustQuery } from './query.js';
 import { stripComments, stripStrings } from './strip.js';
 
 import type { LanguageAdapter } from '@opensip-cli/core';
@@ -12,7 +11,6 @@ export const rustAdapter: LanguageAdapter<RustTree, Node> = {
   parse: parseRust,
   stripStrings,
   stripComments,
-  query: rustQuery,
 };
 
 /** Plugin contract — exported as the lang plugin's `adapters` array. */

@@ -2,7 +2,6 @@ export { pythonAdapter, adapters } from './adapter.js';
 export { parsePython, type PythonTree } from './parse.js';
 export { getSharedTree } from './shared-tree.js';
 export { stripStrings, stripComments } from './strip.js';
-export { pythonQuery } from './query.js';
 export {
   isFunction,
   isMethod,

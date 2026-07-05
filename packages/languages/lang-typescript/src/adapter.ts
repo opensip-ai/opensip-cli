@@ -1,5 +1,4 @@
 import { parseSource } from './parse.js';
-import { typescriptQuery } from './query.js';
 import { stripComments, stripStrings } from './strip.js';
 import { discoverTypescriptWorkspaceUnits } from './workspace-units.js';
 
@@ -13,7 +12,6 @@ export const typescriptAdapter: LanguageAdapter<ts.SourceFile, ts.Node> = {
   parse: parseSource,
   stripStrings,
   stripComments,
-  query: typescriptQuery,
   discoverWorkspaceUnits: discoverTypescriptWorkspaceUnits,
 };
 

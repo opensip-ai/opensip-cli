@@ -1,5 +1,4 @@
 import { parsePython, type PythonTree } from './parse.js';
-import { pythonQuery } from './query.js';
 import { stripComments, stripStrings } from './strip.js';
 
 import type { LanguageAdapter } from '@opensip-cli/core';
@@ -12,7 +11,6 @@ export const pythonAdapter: LanguageAdapter<PythonTree, Node> = {
   parse: parsePython,
   stripStrings,
   stripComments,
-  query: pythonQuery,
 };
 
 /** Plugin contract — exported as the lang plugin's `adapters` array. */
