@@ -16,6 +16,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 2 | `@opensip-cli/tree-sitter` | grammar-agnostic parser substrate |
 | 2 | `@opensip-cli/cli-ui` | shared Ink/React presentational primitives |
 | 2 | `@opensip-cli/clone-detection` | shared function-body clone-detection substrate (node:crypto only; ADR-0064) |
+| 2 | `@opensip-cli/tool-test-kit` | public test helpers for tool authors |
 | 3 | `@opensip-cli/cli-live` | shared live-run runtime (state machine + produce seam) |
 | 3 | `@opensip-cli/session-store` | session persistence over datastore/contracts |
 | 3 | `@opensip-cli/output` | signal-envelope formatters + sinks |
@@ -27,6 +28,9 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 4 | `@opensip-cli/fitness` | fitness engine + cli/* commands |
 | 4 | `@opensip-cli/simulation` | simulation engine + cli/* commands |
 | 4 | `@opensip-cli/graph` | graph engine + cli/* commands |
+| 4 | `@opensip-cli/yagni` | YAGNI advisory engine |
+| 4 | `@opensip-cli/mcp` | MCP tool/server over graph + stored evidence |
+| 4 | `@opensip-cli/tool-*` | external scanner Tool adapters |
 | 5 | `@opensip-cli/checks-*` | fitness check packs (depend on fitness) |
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |

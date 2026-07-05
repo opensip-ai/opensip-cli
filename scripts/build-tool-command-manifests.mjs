@@ -148,6 +148,31 @@ const ADAPTER_TOOL_DIRS = [
 /** Every tool dir whose static manifest carries a generated command shell. */
 const TOOL_DIRS = [...BUNDLED_TOOL_DIRS, ...ADAPTER_TOOL_DIRS];
 
+const BUILD_ONLY_DEPENDENCIES = ['typescript'];
+const BUILD_ONLY_RUNTIME_DEP_CHECK_DIRS = [
+  'packages/external-tool-adapter',
+  'packages/mcp',
+  ...ADAPTER_TOOL_DIRS,
+];
+
+function assertNoBuildOnlyRuntimeDependencies() {
+  const violations = [];
+  for (const toolDir of BUILD_ONLY_RUNTIME_DEP_CHECK_DIRS) {
+    const pjPath = join(REPO_ROOT, toolDir, 'package.json');
+    const pkg = JSON.parse(readFileSync(pjPath, 'utf8'));
+    for (const dependencyName of BUILD_ONLY_DEPENDENCIES) {
+      if (pkg.dependencies?.[dependencyName] !== undefined) {
+        violations.push(`${relative(REPO_ROOT, pjPath)}#dependencies.${dependencyName}`);
+      }
+    }
+  }
+
+  if (violations.length === 0) return;
+  log('build-only tooling must not be listed in runtime dependencies:');
+  for (const violation of violations) log(`  - ${violation}`);
+  process.exit(1);
+}
+
 /**
  * Derive the serializable command SHELL from a runtime `CommandSpec`. Mirrors the
  * fields `ToolCommandManifest` carries (ADR-0054 M4-G) — everything `mountCommandSpec`
@@ -208,6 +233,8 @@ async function loadBundledTool(toolDir) {
 }
 
 async function main() {
+  assertNoBuildOnlyRuntimeDependencies();
+
   const drift = [];
   let written = 0;
 

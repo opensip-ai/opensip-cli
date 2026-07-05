@@ -20,10 +20,11 @@ Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result
 ## What is OpenSIP CLI?
 
 OpenSIP CLI is an **open-source codebase intelligence CLI** — a CLI that
-hosts pluggable tools for static analysis. Today it ships with four: `fit`
-(fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
-(static call-graph analysis), `sim` (simulation scenarios, experimental), and
-`yagni` (advisory YAGNI reduction audit).
+hosts pluggable tools for static analysis and evidence serving. Today it ships
+with five bundled tools: `fit` (fitness checks across TypeScript, Rust, Python,
+Java, Go, C/C++), `graph` (static call-graph analysis), `sim` (simulation
+scenarios, experimental), `yagni` (advisory YAGNI reduction audit), and `mcp`
+(stored results + graph evidence over stdio for MCP clients).
 Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Product Origin And Intent
@@ -79,6 +80,9 @@ opensip-cli/
 │   │                            #   persistence layer: DataStore interface,
 │   │                            #   sqlite/memory backends, factory, schema
 │   │                            #   migrations
+│   ├── clone-detection/         # @opensip-cli/clone-detection — shared
+│   │                            #   function-body clone-detection substrate
+│   │                            #   used by graph and yagni (ADR-0064)
 │   ├── dashboard/               # @opensip-cli/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by the CLI-owned `report` command
@@ -97,8 +101,8 @@ opensip-cli/
 │   │                            #   UI kit without pulling in the dispatcher.
 │   ├── cli-live/                # @opensip-cli/cli-live — shared live-run
 │   │                            #   runtime: runToolLiveView state machine +
-│   │                            #   produce() seam; all four tools render through
-│   │                            #   it (ADR-0058).
+│   │                            #   produce() seam; live-capable tools render
+│   │                            #   through it (ADR-0058).
 │   ├── output/                  # @opensip-cli/output — machine output layer
 │   │                            #   (ADR-0011): pure format/ formatters (json,
 │   │                            #   sarif, table) + effectful sink/ delivery
@@ -116,9 +120,21 @@ opensip-cli/
 │   │                            #   scaffolding (RunScope test sugar + the
 │   │                            #   per-check fixture-coverage harness). Only
 │   │                            #   test files may import it (depcruise rule)
+│   ├── tool-test-kit/           # @opensip-cli/tool-test-kit — public test
+│   │                            #   helpers for external tool authors
 │   ├── tree-sitter/             # @opensip-cli/tree-sitter — grammar-agnostic
 │   │                            #   web-tree-sitter substrate shared by lang-*
 │   │                            #   and the graph tree-sitter adapters
+│   ├── external-tool-adapter/   # @opensip-cli/external-tool-adapter —
+│   │                            #   substrate for wrapping external scanners
+│   ├── mcp/                     # @opensip-cli/mcp — bundled MCP stdio server
+│   │                            #   over graph catalogs and stored sessions
+│   ├── tool-gitleaks/           # @opensip-cli/tool-gitleaks — external
+│   │                            #   scanner adapter for committed secrets
+│   ├── tool-osv-scanner/        # @opensip-cli/tool-osv-scanner — external
+│   │                            #   scanner adapter for dependency vulns
+│   ├── tool-trivy/              # @opensip-cli/tool-trivy — external scanner
+│   │                            #   adapter for vulnerabilities/misconfig
 │   │
 │   ├── fitness/                 # fitness namespace
 │   │   ├── engine/              # @opensip-cli/fitness — fitness engine,
@@ -151,8 +167,8 @@ opensip-cli/
 │   │
 │   ├── yagni/                   # yagni namespace
 │   │   └── engine/              # @opensip-cli/yagni — advisory reduction
-│   │                            #   audit; graph evidence via one allowlisted
-│   │                            #   internal import in graph-evidence.ts
+│   │                            #   audit; duplicate evidence via
+│   │                            #   @opensip-cli/clone-detection, no graph edge
 │   │
 │   └── languages/               # language adapters
 │       ├── lang-typescript/
@@ -219,7 +235,7 @@ tool dispatcher:
    C/C++) into it.
 2. Constructs a fresh per-invocation `ToolRegistry` and registers the
    bundled tool packages (`@opensip-cli/fitness`, `@opensip-cli/simulation`,
-   `@opensip-cli/graph`, `@opensip-cli/yagni`) through the manifest → compatibility gate → dynamic
+   `@opensip-cli/graph`, `@opensip-cli/yagni`, `@opensip-cli/mcp`) through the manifest → compatibility gate → dynamic
    import path in `bootstrap/register-tools.ts`. Both registries are passed into
    `new RunScope({ tools, languages })` — there are no module-singleton
    registries (see the RunScope section below).
@@ -254,7 +270,8 @@ Subcommands available out of the box:
 - `opensip graph export --format catalog` — Write graph catalog JSON for downstream tooling
 - `opensip graph export --format sarif` — Run graph analysis and write SARIF findings
 - `opensip sim` — Run simulation scenarios [experimental]
-- `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--graph build`, `--min-confidence`)
+- `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--min-confidence`)
+- `opensip mcp` — Serve stored OpenSIP results + graph evidence to MCP clients over stdio
 - `opensip init` — Generate `opensip-cli.config.yml`; repeat init refreshes managed MCP-first agent guidance and `.gitignore`
 - `opensip sessions list|show|purge` — Manage stored sessions
 - `opensip agent-catalog` — Machine discovery surface for AI agents
@@ -476,11 +493,11 @@ This is the mechanical realization of "only use documented seams".
 ```
 core (kernel)
   ↑
-contracts / cli-ui / datastore / tree-sitter (layer 2)
+contracts / cli-ui / datastore / tree-sitter / clone-detection / tool-test-kit (layer 2)
   ↑
-cli-live / output / config / targeting / lang-* / dashboard (layer 3)
+cli-live / output / config / targeting / lang-* / dashboard / external-tool-adapter (layer 3)
   ↑
-fitness / graph / simulation / yagni (layer 4 — tool engines)
+fitness / graph / simulation / yagni / mcp / tool-* scanner adapters (layer 4 — tool engines)
   ↑
 checks-* / graph-* (layer 5)
   ↑
@@ -491,9 +508,10 @@ cli (layer 6 — composition root; depends on every tool)
 - contracts must NOT import from cli, fitness, simulation, lang-_, or checks-_.
 - `cli-ui` is presentational only (layer 2): Banner, Spinner, `<LiveRun>`,
   `liveRunTable`, theme — no `core` or `contracts`.
-- `cli-live` (layer 3) owns `runToolLiveView`; all four bundled tools render
-  through it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
-- fitness / graph / simulation / yagni must NOT import from cli (would create a cycle).
+- `cli-live` (layer 3) owns `runToolLiveView`; live-capable tools render through
+  it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
+- fitness / graph / simulation / yagni / mcp / tool-* adapters must NOT import
+  from cli (would create a cycle).
 - check packs must NOT import from cli or contracts.
 - lang-\* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`
@@ -684,13 +702,15 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 **v0.3.1 (initial production launch)** — OpenSIP CLI is a tool-plugin
 platform: `core` is a strict kernel, and `fitness`, `graph`,
-`simulation`, and `yagni` are peer tools implementing a shared Tool
-contract, with
-`cli` as a generic dispatcher. Adding a new tool requires zero CLI
-changes: tools declare `commandSpecs`, ship a manifest, and load through
-the same dynamic-import plugin path whether bundled, installed, or
-project-local. The npm package is `opensip-cli`; the installed command is
-`opensip`.
+`simulation`, `yagni`, and `mcp` are bundled peer tools implementing a
+shared Tool contract, with `cli` as a generic dispatcher. Installed and
+project-local tools require zero CLI code changes: tools declare
+`commandSpecs`, ship a manifest, and load through the same dynamic-import
+plugin path. Bundling a first-party tool is a sanctioned host change:
+update `packages/cli/src/bootstrap/bundled-tools.manifest.json`, add the
+CLI package dependency, refresh the bundled-tool test utilities, and
+regenerate the command-surface parity snapshot. The npm package is
+`opensip-cli`; the installed command is `opensip`.
 
 The new-customer flow is three commands: `init` (language detection
 

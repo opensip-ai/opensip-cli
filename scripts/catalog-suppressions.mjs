@@ -92,8 +92,13 @@ const TRIAGE_DISPOSITION = {
   'unsafe-secret-comparison': 'b',
   'array-validation': 'b',
   'clean-code-naming-quality': 'b',
+  'context-leakage': 'b',
+  'dogfood-one-config-document-ratchet': 'b',
   'eslint-backend': 'b',
+  'hot-paths-require-spans': 'b',
   'interface-implementation-consistency': 'b',
+  'missing-type-exports': 'b',
+  'no-hardcoded-timeouts': 'b',
   'no-raw-fetch': 'b',
   'no-unbounded-concurrency': 'b',
   'one-outcome-shape': 'b',
@@ -699,6 +704,17 @@ function checkStale(catalog) {
   log('suppression catalog outputs OK (fresh)');
 }
 
+function checkNoTbdDispositions(catalog) {
+  const slugs = Object.keys(catalog.layers['product-runtime'].fitness.bySlug)
+    .filter((slug) => dispositionForSlug(slug) === 'TBD')
+    .sort();
+  if (slugs.length === 0) return;
+  log('untriaged product-runtime suppression disposition(s):');
+  for (const slug of slugs) log(`  - ${slug}`);
+  log('assign a TRIAGE_DISPOSITION entry before committing suppression catalog changes');
+  process.exit(1);
+}
+
 function main() {
   const args = new Set(process.argv.slice(2));
   const catalog = buildCatalog({ collectRecords: args.has('--include-records') });
@@ -709,6 +725,7 @@ function main() {
   }
 
   if (args.has('--check')) {
+    checkNoTbdDispositions(catalog);
     checkStale(catalog);
     return;
   }

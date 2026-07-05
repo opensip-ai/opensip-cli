@@ -105,13 +105,13 @@
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
-    "typescript": "~6.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@opensip-cli/graph-typescript": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
     "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
     "vitest": "^4.1.9"
   }
 }

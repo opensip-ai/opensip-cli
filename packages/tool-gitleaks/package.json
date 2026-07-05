@@ -133,12 +133,12 @@
   "dependencies": {
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
-    "@opensip-cli/external-tool-adapter": "workspace:*",
-    "typescript": "~6.0.3"
+    "@opensip-cli/external-tool-adapter": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
     "opensip-cli": "workspace:*",
+    "typescript": "~6.0.3",
     "vitest": "^4.1.9"
   }
 }

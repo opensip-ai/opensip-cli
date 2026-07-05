@@ -11,6 +11,7 @@
  *   2. @opensip-cli/tree-sitter    — grammar-agnostic parser substrate
  *   2. @opensip-cli/cli-ui         — shared Ink/React presentational primitives
  *   2. @opensip-cli/clone-detection — shared function-body clone-detection substrate (node:crypto only; ADR-0064)
+ *   2. @opensip-cli/tool-test-kit  — public test helpers for tool authors
  *   3. @opensip-cli/cli-live        — shared live-run runtime (state machine + produce seam)
  *   3. @opensip-cli/session-store  — session persistence over datastore/contracts
  *   3. @opensip-cli/output         — signal-envelope formatters + sinks
@@ -22,6 +23,9 @@
  *   4. @opensip-cli/fitness        — fitness engine + cli/* commands
  *   4. @opensip-cli/simulation     — simulation engine + cli/* commands
  *   4. @opensip-cli/graph          — graph engine + cli/* commands
+ *   4. @opensip-cli/yagni          — YAGNI advisory engine
+ *   4. @opensip-cli/mcp            — MCP tool/server over graph + stored evidence
+ *   4. @opensip-cli/tool-*         — external scanner Tool adapters
  *   5. @opensip-cli/checks-*       — fitness check packs (depend on fitness)
  *   5. @opensip-cli/graph-*        — graph adapter packs (depend on graph)
  *   6. opensip-cli                 — CLI composition root (depends on tools)
@@ -151,6 +155,34 @@ module.exports = {
       },
     },
     {
+      name: 'mcp-imports-allowlist',
+      severity: 'error',
+      comment:
+        '@opensip-cli/mcp is a bundled Tool/server surface (ADR-0084). Production ' +
+        'source may import core, contracts, datastore, session-store, and the graph ' +
+        'engine (including the scoped graph/internal edge above) only. It must not ' +
+        'reach into cli, tool engines other than graph, check packs, language packs, ' +
+        'or graph adapter packs.',
+      from: {
+        path: '^packages/mcp/src/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: '^packages/(?!core/|contracts/|datastore/|session-store/|graph/engine/|mcp/)',
+      },
+    },
+    {
+      name: 'tool-test-kit-imports-core-contracts-only',
+      severity: 'error',
+      comment:
+        '@opensip-cli/tool-test-kit is the published public test-helper package ' +
+        'for tool authors. It may depend on core + contracts only; importing cli, ' +
+        'datastore, tools, language packs, check packs, output, or UI packages would ' +
+        'pull runtime implementation details into the helper surface.',
+      from: { path: '^packages/tool-test-kit/src/' },
+      to: { path: '^packages/(?!core/|contracts/|tool-test-kit/)' },
+    },
+    {
       name: 'no-prod-import-of-test-support',
       severity: 'error',
       comment:
@@ -250,19 +282,7 @@ module.exports = {
         'graph-free is the whole point of the package (lang-* could not otherwise ' +
         'reach the parser without an illegal lang→graph edge).',
       from: { path: '^packages/tree-sitter/src/' },
-      to: {
-        path: [
-          '^packages/datastore/',
-          '^packages/contracts/',
-          '^packages/config/',
-          '^packages/cli/',
-          '^packages/fitness/',
-          '^packages/simulation/',
-          '^packages/graph/',
-          '^packages/languages/lang-',
-          '^packages/output/',
-        ],
-      },
+      to: { path: '^packages/(?!core/|tree-sitter/)' },
     },
 
     // -------------------------------------------------------------------
@@ -276,18 +296,7 @@ module.exports = {
         '(logger, errors) only. It must not import from contracts, cli, or any ' +
         'tool/lang/checks pack — domain schemas live with their owning packages.',
       from: { path: '^packages/datastore/src/' },
-      to: {
-        path: [
-          '^packages/contracts/',
-          '^packages/config/',
-          '^packages/cli/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-          '^packages/graph/',
-        ],
-      },
+      to: { path: '^packages/(?!core/|datastore/)' },
     },
 
     // -------------------------------------------------------------------
@@ -302,17 +311,7 @@ module.exports = {
         'datastore, and contracts (StoredSession type) only — never a tool, ' +
         'cli, lang, check pack, graph, or simulation.',
       from: { path: '^packages/session-store/src/' },
-      to: {
-        path: [
-          '^packages/config/',
-          '^packages/cli/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/graph/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-        ],
-      },
+      to: { path: '^packages/(?!core/|datastore/|contracts/|session-store/)' },
     },
 
     // -------------------------------------------------------------------
@@ -327,18 +326,7 @@ module.exports = {
         '(withRetry, logger) and contracts (SignalEnvelope type) only — never ' +
         'datastore, a tool, cli, lang, check pack, graph, or simulation.',
       from: { path: '^packages/output/src/' },
-      to: {
-        path: [
-          '^packages/datastore/',
-          '^packages/config/',
-          '^packages/cli/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/graph/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-        ],
-      },
+      to: { path: '^packages/(?!core/|contracts/|output/)' },
     },
     // -------------------------------------------------------------------
     // Layer enforcement — external-tool-adapter depends on core + contracts only
@@ -445,18 +433,7 @@ module.exports = {
         'contracts config type — nothing else. It must not import datastore, a ' +
         'tool engine, cli, lang, check pack, graph, simulation, or output.',
       from: { path: '^packages/config/src/' },
-      to: {
-        path: [
-          '^packages/datastore/',
-          '^packages/cli/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/graph/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-          '^packages/output/',
-        ],
-      },
+      to: { path: '^packages/(?!core/|contracts/|config/)' },
     },
 
     // -------------------------------------------------------------------
@@ -483,20 +460,7 @@ module.exports = {
         'not import datastore, contracts, a tool engine, cli, lang, check ' +
         'pack, graph, simulation, session-store, or output.',
       from: { path: '^packages/targeting/src/' },
-      to: {
-        path: [
-          '^packages/datastore/',
-          '^packages/contracts/',
-          '^packages/cli/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/graph/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-          '^packages/session-store/',
-          '^packages/output/',
-        ],
-      },
+      to: { path: '^packages/(?!core/|config/|targeting/)' },
     },
 
     // -------------------------------------------------------------------
@@ -616,21 +580,7 @@ module.exports = {
         'cli-ui edge is forbidden so render-only types (RunPresentation) cannot ' +
         'silently start importing UI primitives (envelope-first-presentation, RP-0).',
       from: { path: '^packages/contracts/src/' },
-      to: {
-        path: [
-          '^packages/cli/',
-          '^packages/cli-ui/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/dashboard/',
-          '^packages/datastore/',
-          '^packages/session-store/',
-          '^packages/output/',
-          '^packages/config/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-        ],
-      },
+      to: { path: '^packages/(?!core/|contracts/)' },
     },
 
     // -------------------------------------------------------------------
@@ -646,17 +596,7 @@ module.exports = {
         'It must not depend on any tool engine, the CLI, language adapters, ' +
         'or check packs.',
       from: { path: '^packages/dashboard/src/' },
-      to: {
-        path: [
-          '^packages/cli/',
-          '^packages/config/',
-          '^packages/fitness/engine/',
-          '^packages/simulation/engine/',
-          '^packages/graph/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-        ],
-      },
+      to: { path: '^packages/(?!core/|contracts/|dashboard/)' },
     },
 
     // -------------------------------------------------------------------
@@ -694,24 +634,7 @@ module.exports = {
         '(SignalEnvelope), and cli-ui (LiveRun shell) plus ink/react — never ' +
         'a tool engine, the CLI, datastore, output, or lang/check packs.',
       from: { path: '^packages/cli-live/src/' },
-      to: {
-        path: [
-          '^packages/cli/',
-          '^packages/datastore/',
-          '^packages/session-store/',
-          '^packages/output/',
-          '^packages/config/',
-          '^packages/targeting/',
-          '^packages/dashboard/',
-          '^packages/fitness/',
-          '^packages/simulation/',
-          '^packages/graph/',
-          '^packages/yagni/',
-          '^packages/languages/lang-',
-          '^packages/fitness/checks-',
-          '^packages/tree-sitter/',
-        ],
-      },
+      to: { path: '^packages/(?!core/|contracts/|cli-ui/|cli-live/)' },
     },
 
     // -------------------------------------------------------------------
@@ -847,37 +770,41 @@ module.exports = {
     // languages/* and test-utils/*.
 
     // -------------------------------------------------------------------
-    // Layer enforcement — lang-* must not depend on cli/contracts/checks-*
-    // and must not reach UP into fitness/simulation. The previous
+    // Layer enforcement — lang-* depends on core + tree-sitter + own package
+    // only, and must not reach UP into fitness/simulation. The previous
     // `lang-no-fitness-except-typescript` exception was paid down by
     // moving filterContent / clearFilterCache / FilteredContent into
     // @opensip-cli/lang-typescript itself (Wave 3 Chain E / Phase D3).
     // -------------------------------------------------------------------
     {
-      name: 'lang-no-cli-or-contracts',
+      name: 'lang-imports-core-tree-sitter-own-only',
       severity: 'error',
       comment:
         'Language adapter packages depend only on core (for the LanguageAdapter ' +
-        'contract). They must not reach into the CLI, contracts, or check packs.',
-      from: { path: '^packages/languages/lang-' },
+        'contract), tree-sitter (parser substrate helpers), and their own package. ' +
+        'They must not reach into CLI, contracts, config, tools, check packs, or ' +
+        'sibling language adapters.',
+      from: { path: '^packages/languages/(lang-[a-z0-9-]+)/src/' },
       to: {
-        path: [
-          '^packages/cli/',
-          '^packages/contracts/',
-          '^packages/config/',
-          '^packages/fitness/checks-',
-        ],
+        path: '^packages/(?!core/|tree-sitter/)',
+        pathNot: '^packages/languages/$1/',
       },
     },
     {
-      name: 'lang-no-fitness',
+      name: 'lang-adapters-disjoint',
       severity: 'error',
       comment:
-        'Language adapters live below fitness in the layer order and must not ' +
-        'reach up into it. (The historical lang-typescript exception for ' +
-        'filterContent was paid down by moving the symbol into lang-typescript.)',
-      from: { path: '^packages/languages/lang-' },
-      to: { path: '^packages/fitness/engine/' },
+        'Language adapter packages (@opensip-cli/lang-*) must not depend on ' +
+        'each other from production source. Each package owns one parser ecosystem; ' +
+        'shared helpers belong in core or tree-sitter.',
+      from: {
+        path: '^packages/languages/(lang-[a-z0-9-]+)/src/',
+        pathNot: '^packages/languages/lang-[a-z0-9-]+/src/__tests__/',
+      },
+      to: {
+        path: '^packages/languages/lang-[a-z0-9-]+/',
+        pathNot: '^packages/languages/$1/',
+      },
     },
 
     // -------------------------------------------------------------------
