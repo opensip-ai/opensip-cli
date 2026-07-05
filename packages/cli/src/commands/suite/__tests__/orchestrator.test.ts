@@ -823,6 +823,7 @@ describe('runSuite', () => {
         command: 'typed-error',
         exitCode: mapToolErrorToExitCode(thrown),
         error: thrown.message,
+        errorCode: thrown.code,
       });
       expect(result.exitCode).toBe(mapToolErrorToExitCode(thrown));
     }

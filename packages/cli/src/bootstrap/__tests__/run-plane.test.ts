@@ -305,6 +305,7 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
       writeRetentionConfig(projectRoot, 3);
       const debug = vi.fn();
       const log: Logger = { ...SILENT, debug };
+      let scope: RunScope | undefined;
       const repo = new SessionRepo(scopedDatastore);
       for (let i = 0; i < 3; i += 1) {
         repo.save({
@@ -322,7 +323,7 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
           sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
           logger: log,
         });
-        const scope = new RunScope({
+        scope = new RunScope({
           logger: log,
           runId: 'run-retention-scope',
           projectContext: projectContext(projectRoot),
@@ -341,6 +342,20 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
           keep: 3,
           maxAgeDays: 0,
           maxSizeMb: 0,
+        }),
+      );
+      expect(scope?.diagnostics.snapshot().events).toContainEqual(
+        expect.objectContaining({
+          phase: 'persist',
+          level: 'debug',
+          message: 'session.retention.policy_resolved',
+          data: expect.objectContaining({
+            evt: 'session.retention.policy_resolved',
+            source: 'scope',
+            keep: 3,
+            maxAgeDays: 0,
+            maxSizeMb: 0,
+          }),
         }),
       );
     } finally {

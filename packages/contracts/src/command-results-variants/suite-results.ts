@@ -23,6 +23,8 @@ export interface SuiteStepSummary {
   readonly exitCode: number;
   readonly durationMs: number;
   readonly error?: string;
+  /** Machine-readable ToolError/reportFailure code when the step failed before a verdict. */
+  readonly errorCode?: string;
   /** Present iff the step emitted a SignalEnvelope; absent means no envelope output. */
   readonly verdict?: {
     readonly passed: boolean;

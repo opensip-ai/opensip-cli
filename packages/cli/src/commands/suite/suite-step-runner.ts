@@ -91,6 +91,7 @@ async function runStep(args: {
   const diagnostics = currentScope()?.diagnostics;
   const log = currentLogger();
   let errorMessage: string | undefined;
+  let errorCode: string | undefined;
   let exitCode: number = EXIT_CODES.SUCCESS;
   try {
     diagnostics?.event('execute', 'debug', `suite step '${args.step.spec.name}' started`, {
@@ -135,7 +136,9 @@ async function runStep(args: {
       exitCode,
     });
     diagnostics?.counter('suite.steps.completed', 1);
-    errorMessage = capture.getReportedFailure()?.message;
+    const reportedFailure = capture.getReportedFailure();
+    errorMessage = reportedFailure?.message;
+    errorCode = reportedFailure?.code;
   } catch (error) {
     exitCode = EXIT_CODES.RUNTIME_ERROR;
     errorMessage = truncateDerivedMessage(error instanceof Error ? error.message : String(error));
@@ -195,6 +198,7 @@ async function runStep(args: {
     exitCode,
     durationMs,
     ...(errorMessage === undefined ? {} : { error: errorMessage }),
+    ...(errorCode === undefined ? {} : { errorCode }),
     ...(verdict === undefined ? {} : { verdict }),
     ...(verification === undefined ? {} : { verification }),
   };

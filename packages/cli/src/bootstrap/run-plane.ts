@@ -23,6 +23,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
   createRunLifecycle,
+  currentScope,
   deriveRunOutcome,
   generatePrefixedId,
   logger as defaultLogger,
@@ -231,6 +232,19 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
             maxAgeDays: policy.maxAgeDays,
             maxSizeMb: policy.maxSizeMb,
           });
+          currentScope()?.diagnostics?.event(
+            'persist',
+            'debug',
+            'session.retention.policy_resolved',
+            {
+              evt: 'session.retention.policy_resolved',
+              module: MODULE_TAG,
+              source: policy.source,
+              keep: policy.keep,
+              maxAgeDays: policy.maxAgeDays,
+              maxSizeMb: policy.maxSizeMb,
+            },
+          );
           enforceSessionRetention(datastore, policy, { logger: log });
         } catch (error) {
           log.warn?.({
