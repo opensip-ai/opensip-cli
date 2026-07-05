@@ -78,7 +78,7 @@ interface ClientGlobals {
   // name in generator.ts's render block when external-adapter sessions exist.
   renderExternalTab: typeof renderExternalTab;
   // Code Paths panel entry (L4): `renderCodePathsTab` is invoked by name in
-  // generator.ts's render block (the registry-derived `renderCodePathsTab();`
+  // generator.ts's render block (the descriptor-derived `renderCodePathsTab();`
   // call), and `openCodePathsSession` is read by the end-to-end validation test
   // through the booted page scope.
   renderCodePathsTab: typeof renderCodePathsTab;

@@ -16,8 +16,7 @@ import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js
 import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
-import { listToolTabs } from './tool-tab-registry.js';
-import './tool-tabs-registrations.js'; // side-effect: registers fit/sim/graph
+import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
 import type { StoredSession, GraphCatalog, DeclaredInputs } from '@opensip-cli/contracts';
 
@@ -64,15 +63,13 @@ export interface DashboardInput {
 }
 
 // Host-owned catch-all tab for sessions whose `tool` is NOT claimed by any
-// registered tool tab (external-adapter scans — gitleaks / osv-scanner / trivy).
-// Their worker-forked runtimes are never loaded in-host, so they structurally
-// cannot register a `defineToolTab` tab; the four per-tool tabs only bucket their
-// own same-tool sessions, leaving adapter findings rendered nowhere. This id /
-// label / icon is the single source of truth: the generator emits the tab,
-// panel, and render-call, and injects `externalTabId` as a page global so the
-// bundled overview row-click handler (client/overview.ts) routes unclaimed-tool
-// rows here and the catch-all renderer (client/tool-tabs.ts → renderExternalTab)
-// resolves the panel id.
+// first-party tab (external-adapter scans — gitleaks / osv-scanner / trivy).
+// External tool sessions render here; named dashboard tabs are first-party-only
+// today. This id / label / icon is the single source of truth: the generator
+// emits the tab, panel, and render-call, and injects `externalTabId` as a page
+// global so the bundled overview row-click handler (client/overview.ts) routes
+// unclaimed-tool rows here and the catch-all renderer (client/tool-tabs.ts →
+// renderExternalTab) resolves the panel id.
 const EXTERNAL_TAB_ID = 'external';
 const EXTERNAL_TAB_LABEL = 'External Tools';
 // Shield icon (lucide) — external adapters are typically secret/vuln scanners.
@@ -199,16 +196,14 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
 
-  // Tool tabs are registered into a single registry; Overview is a
-  // cross-tool aggregate kept fixed at position 0. The HTML tab
-  // buttons, panel containers, and the renderXxxTab() invocation list
-  // all derive from the same iteration so adding a new tab is a single
-  // defineToolTab() call (see tool-tabs-registrations.ts).
-  const toolTabs = listToolTabs();
-  // Bucket every session whose tool is NOT claimed by a registered tab into the
+  // Overview is a cross-tool aggregate kept fixed at position 0. The HTML tab
+  // buttons, panel containers, renderXxxTab() invocation list, and overview maps
+  // all derive from the same explicit first-party descriptor list.
+  const toolTabs = FIRST_PARTY_TOOL_TABS;
+  // Bucket every session whose tool is NOT claimed by a first-party tab into the
   // host-owned catch-all "External Tools" tab. Emitted ONLY when such sessions
   // exist so a fit-only repo never shows an empty External Tools tab.
-  const claimedTools = new Set(toolTabs.map((t) => t.tool));
+  const claimedTools = new Set<string>(toolTabs.map((t) => t.tool));
   const hasExternalSessions = sessions.some((s) => !claimedTools.has(s.tool));
   const toolTabButtons = [
     ...toolTabs.map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`),
@@ -227,8 +222,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
     ...(hasExternalSessions ? ['renderExternalTab();'] : []),
   ].join('\n');
   // Overview's `tool → badge style` and `tool → tab id` maps, derived from the
-  // same registry and injected as page globals so the bundled overview renderer
-  // (src/client/overview.ts) reads them as ambient data — the registry
+  // same descriptors and injected as page globals so the bundled overview renderer
+  // (src/client/overview.ts) reads them as ambient data — the descriptor
   // derivation stays type-checked Node code rather than a string template (F1/F8).
   const toolBadgeStylesJson = JSON.stringify(
     Object.fromEntries(toolTabs.map((t) => [t.tool, t.badgeStyle])),
@@ -282,8 +277,8 @@ ${editorProtocolJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
 const yagniSessions = sessions.filter(s => s.tool === 'yagni');
-// Registry-derived Overview maps (tool → badge style / tab id), consumed as page
-// globals by the bundled overview renderer (src/client/overview.ts).
+// Descriptor-derived Overview maps (tool → badge style / tab id), consumed as
+// page globals by the bundled overview renderer (src/client/overview.ts).
 const toolBadgeStyles = ${toolBadgeStylesJson};
 const tabMap = ${tabMapJson};
 // Host-owned catch-all: sessions whose tool is not claimed by a registered tab

@@ -6,9 +6,9 @@
  * two external-adapter dashboard defects.
  *
  * Adapter scans (gitleaks / osv-scanner / trivy) persist sessions whose `tool`
- * is NOT one of the four registered tool tabs (fit / sim / graph / yagni). Their
- * worker-forked runtimes are never loaded in-host, so they structurally cannot
- * register a `defineToolTab` tab. Before the host-owned catch-all tab:
+ * is NOT one of the four first-party tool tabs (fit / sim / graph / yagni).
+ * External tool runtimes never contribute named dashboard tabs. Before the
+ * host-owned catch-all tab:
  *
  *   Defect #3 — the grouped `payload.checks[]` detail (rule + filePath + masked
  *   secret preview) rendered NOWHERE: no per-tool bucket matched an adapter tool,

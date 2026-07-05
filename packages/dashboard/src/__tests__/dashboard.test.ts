@@ -143,11 +143,12 @@ describe('generateDashboardHtml', () => {
     expect(html).toMatch(/<title>OpenSIP CLI — Pass Rate: 0%<\/title>/);
   });
 
-  it('renders all three tab panels (overview, fitness, simulation)', () => {
+  it('renders first-party tab panels in descriptor order', () => {
     const html = generateDashboardHtml({ sessions: [] });
-    expect(html).toContain('id="panel-overview"');
-    expect(html).toContain('id="panel-fitness"');
-    expect(html).toContain('id="panel-simulation"');
+    const ids = [...html.matchAll(/class="tab(?: active)?" data-tab="([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    expect(ids).toEqual(['overview', 'fitness', 'simulation', 'code-paths', 'yagni']);
   });
 
   it('includes inline CSS', () => {

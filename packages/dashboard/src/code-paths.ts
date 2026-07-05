@@ -15,7 +15,7 @@
  *
  * The graph catalog / view-model JSON blobs are emitted by generator.ts as
  * `<script type="application/json">` elements; the render calls (including
- * `renderCodePathsTab()`) are emitted by generator.ts's registry-derived render
+ * `renderCodePathsTab()`) are emitted by generator.ts's descriptor-derived render
  * block.
  */
 

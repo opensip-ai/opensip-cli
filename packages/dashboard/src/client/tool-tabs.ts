@@ -10,7 +10,7 @@
  * Migrated out of the legacy String.raw emitter (L4): real, type-checked
  * TypeScript (DOM lib) bundled into the inlined client `<script>`. The per-tool
  * `renderFitnessTab` / `renderSimulationTab` stay exposed as page globals because
- * generator.ts invokes them by bare name (the registry's `renderFunctionName`).
+ * generator.ts invokes them by bare name (each descriptor's `renderFunctionName`).
  */
 
 import { renderChecksCatalog } from './checks.js';
@@ -106,11 +106,10 @@ export function renderFitnessTab(): void {
 
 /**
  * Host-owned catch-all tab — renders every session whose tool is NOT claimed by a
- * registered tool tab (external-adapter scans: gitleaks / osv-scanner / trivy).
- * Those tools fork their runtime in a worker and are never loaded in-host, so they
- * structurally cannot register a `defineToolTab` tab — yet they persist the SAME
- * grouped `{summary, checks[]}` payload the per-tool tabs use. We therefore render
- * them through the SAME tool-agnostic `renderSessionTable` → `renderSessionDetail`
+ * first-party tool tab (external-adapter scans: gitleaks / osv-scanner / trivy).
+ * Named tabs are first-party-only today; external tools persist the SAME grouped
+ * `{summary, checks[]}` payload the per-tool tabs use. We therefore render them
+ * through the SAME tool-agnostic `renderSessionTable` → `renderSessionDetail`
  * path, which already falls back to a "Check" column for unknown tools. No subtab
  * bar (no catalog/recipes for adapters) — just the flat session table.
  *

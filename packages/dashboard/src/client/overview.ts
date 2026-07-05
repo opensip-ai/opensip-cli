@@ -2,10 +2,10 @@
  * Overview tab — cross-tool recent activity table.
  *
  * The `toolBadgeStyles` (tool → inline badge style) and `tabMap` (tool → tab id)
- * maps are derived from the `defineToolTab` registry in `generator.ts` and
- * injected as page globals (see globals.d.ts) — every registered tool tab
- * contributes one entry to each. Adding a new tool is a `defineToolTab` call;
- * the maps update automatically (F1/F8).
+ * maps are derived from the first-party tab descriptors in `generator.ts` and
+ * injected as page globals (see globals.d.ts) — every named tool tab contributes
+ * one entry to each. Adding a first-party tab changes the descriptor list; the
+ * maps update automatically (F1/F8).
  *
  * Migrated out of the legacy String.raw emitter (L4): real, type-checked
  * TypeScript (DOM lib) bundled into the inlined client `<script>`.

@@ -2,9 +2,9 @@
 /**
  * @vitest-environment jsdom
  *
- * YAGNI tab renderer (`renderYagniTab`). The yagni tool ships a tab via the
- * `defineToolTab` registry (tool-tabs-registrations.ts); this exercises the
- * client-side renderer it points at:
+ * YAGNI tab renderer (`renderYagniTab`). The yagni tool ships a first-party
+ * descriptor in `tool-tabs-registrations.ts`; this exercises the client-side
+ * renderer it points at:
  *   1. Two subtabs — Sessions (id 'overview', stable for routing) + Detectors.
  *   2. The detector catalog renders one row per detector with a static Evidence badge.
  *   3. An empty catalog falls back to a graceful empty state.

@@ -2,7 +2,7 @@
  * Ambient declarations for the dashboard client bundle (L4 migration).
  *
  * The generated report `<script>` opens with a const block emitted by
- * `generator.ts` (sessions, the tool catalogs, the registry-derived Overview
+ * `generator.ts` (sessions, the tool catalogs, the descriptor-derived Overview
  * maps, the per-tool session splits). The bundled client modules — which run in
  * that same `<script>` scope — read those as free identifiers. Declaring them in
  * a `declare global` block lets the client `tsconfig.json` type-check the modules
@@ -65,7 +65,7 @@ declare global {
    * Host-owned catch-all session bucket + tab id, emitted by generator.ts as
    * `const externalSessions = sessions.filter(s => !(s.tool in tabMap));` /
    * `const externalTabId = 'external';`. Sessions whose tool is not claimed by any
-   * registered tool tab (external-adapter scans — gitleaks / osv-scanner / trivy)
+   * first-party tool tab (external-adapter scans — gitleaks / osv-scanner / trivy)
    * render in the "External Tools" tab via `renderExternalTab`, and the overview
    * row-click handler routes their rows to `externalTabId`.
    */
@@ -101,8 +101,8 @@ declare global {
 
   /**
    * Overview's `tool → inline badge style` and `tool → tab id` maps. Derived
-   * from the `defineToolTab` registry in `generator.ts` and emitted as page
-   * globals so the registry derivation stays type-checked Node code rather than a
+   * from the first-party tab descriptors in `generator.ts` and emitted as page
+   * globals so the descriptor derivation stays type-checked Node code rather than a
    * string template (F1/F8).
    */
   const toolBadgeStyles: Readonly<Record<string, string>>;
