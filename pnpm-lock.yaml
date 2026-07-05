@@ -1286,9 +1286,6 @@ importers:
 
   packages/tree-sitter:
     dependencies:
-      '@opensip-cli/core':
-        specifier: workspace:*
-        version: link:../core
       web-tree-sitter:
         specifier: 0.26.10
         version: 0.26.10
@@ -6314,7 +6311,6 @@ snapshots:
 
   '@opensip-cli/tree-sitter@file:packages/tree-sitter':
     dependencies:
-      '@opensip-cli/core': file:packages/core
       web-tree-sitter: 0.26.10
 
   '@opentelemetry/api-logs@0.219.0':

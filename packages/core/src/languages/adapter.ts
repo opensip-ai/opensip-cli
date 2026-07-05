@@ -4,7 +4,7 @@ import type { WorkspaceUnit } from './workspace-unit.js';
  * A LanguageAdapter is the contract that every language pack implements.
  * TTree/TNode are opaque to core — passed through to checks.
  */
-export interface LanguageAdapter<TTree = unknown, TNode = unknown> {
+export interface LanguageAdapter<TTree = unknown, _TNode = unknown> {
   /** Stable identifier matched against scope.languages in checks and languages: in targets. */
   readonly id: string;
   /** Lowercase extensions including the leading dot, e.g. ['.rs'] or ['.ts', '.tsx']. */
