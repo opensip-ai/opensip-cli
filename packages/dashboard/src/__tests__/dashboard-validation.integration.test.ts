@@ -84,7 +84,7 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   beforeAll(() => {
     reportHtml = readReportOrSkip();
     if (reportHtml) env = bootDashboard(reportHtml);
-  });
+  }, 120_000);
 
   // Strip transient overlays/drawers between tests so the single shared boot
   // doesn't leak UI state across `it` blocks.

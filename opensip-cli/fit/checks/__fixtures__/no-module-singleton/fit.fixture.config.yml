@@ -1,0 +1,27 @@
+# Fixture-only fit config for the no-module-singleton dogfood check.
+#
+# The repo-level config excludes `**/__fixtures__/**`, so this fixture config
+# deliberately re-includes only this check's synthetic pass/fail tree.
+#
+# Run from the repo root:
+#   node packages/cli/dist/index.js fit \
+#     --check no-module-singleton \
+#     --config opensip-cli/fit/checks/__fixtures__/no-module-singleton/fit.fixture.config.yml
+#
+# Expected result: exactly ONE finding, on the violation memory-profiler.ts file.
+
+globalExcludes: []
+
+targets:
+  fixtures:
+    description: no-module-singleton fixtures
+    languages: [typescript]
+    concerns: [backend]
+    include:
+      - 'opensip-cli/fit/checks/__fixtures__/no-module-singleton/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+
+checkOverrides:
+  no-module-singleton: [fixtures]

@@ -56,6 +56,7 @@ import { defineCheck } from '@opensip-cli/fitness';
 
 /** A first-party package source file (excludes tests + build output). */
 const PACKAGE_SRC_PATH = /packages\/[^/]+\/(?:[^/]+\/)?src\//;
+const SELF_FIXTURE_PATH = /opensip-cli\/fit\/checks\/__fixtures__\/no-module-singleton\//;
 
 /** Constructor-name shapes that denote mutable shared state. */
 const MUTABLE_CTOR_RE =
@@ -200,7 +201,7 @@ export async function analyzeAllNoModuleSingleton(files) {
       PACKAGE_SRC_PATH.test(p) &&
       p.endsWith('.ts') &&
       !p.endsWith('.test.ts') &&
-      !p.includes('/__fixtures__/'), // fixtures carry DELIBERATE violations for other checks
+      (!p.includes('/__fixtures__/') || SELF_FIXTURE_PATH.test(p)),
   );
   const contents = await files.readMany(candidates);
   for (const [filePath, content] of contents) {
