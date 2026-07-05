@@ -50,6 +50,8 @@ const SKIP_DIRS = new Set([
 export interface VitestConfigFsPort {
   /** True if `filePath` exists. */
   exists(filePath: string): boolean;
+  /** Read a config file, returning `null` when it cannot be read. */
+  read(filePath: string): string | null;
   /**
    * True if at least one `*.test.ts` / `*.test.tsx` file exists anywhere
    * under `packageDir` (excluding nested package roots, node_modules,
@@ -103,6 +105,14 @@ function hasTestFilesIn(dir: string, isRoot: boolean): boolean {
 /** Default filesystem port backed by `node:fs`. */
 export const nodeFsPort: VitestConfigFsPort = {
   exists: (filePath) => fs.existsSync(filePath),
+  read: (filePath) => {
+    try {
+      return fs.readFileSync(filePath, 'utf8');
+    } catch {
+      // @swallow-ok unreadable config -> not a satisfying coverage config
+      return null;
+    }
+  },
   hasTestFiles: (packageDir) => hasTestFilesIn(packageDir, true),
 };
 
@@ -141,6 +151,37 @@ function workspaceRootCandidates(packageDirs: readonly string[]): string[] {
   return parent === ancestor ? [ancestor] : [ancestor, parent];
 }
 
+/** Simple structural assertion: configs must declare `test.coverage.thresholds`. */
+function hasCoverageThresholds(source: string): boolean {
+  return /\btest\s*:\s*\{[\s\S]*\bcoverage\s*:\s*\{[\s\S]*\bthresholds\s*:/m.test(source);
+}
+
+function firstExistingConfig(
+  dir: string,
+  names: readonly string[],
+  port: VitestConfigFsPort,
+): string | undefined {
+  return names.map((f) => path.join(dir, f)).find((candidate) => port.exists(candidate));
+}
+
+function configHasCoverageThresholds(configPath: string, port: VitestConfigFsPort): boolean {
+  const source = port.read(configPath);
+  return source !== null && hasCoverageThresholds(source);
+}
+
+function missingThresholdViolation(configPath: string): CheckViolation {
+  return {
+    filePath: configPath,
+    line: 1,
+    message: `Vitest config '${path.basename(configPath)}' declares tests but no test.coverage.thresholds block`,
+    severity: 'error',
+    suggestion:
+      'Add test.coverage.thresholds to the vitest config so packages with tests keep an explicit coverage floor.',
+    match: path.basename(configPath),
+    type: 'missing-vitest-coverage-thresholds',
+  };
+}
+
 /**
  * Pure detector. Given the discovered package-root `package.json` paths and
  * a filesystem port, returns one violation per package that has tests but no
@@ -158,11 +199,13 @@ export function detectMissingVitestConfig(
 
   // A centralized workspace-root config satisfies every package.
   const rootCandidates = workspaceRootCandidates(packageDirs);
-  const workspaceConfigSatisfies = rootCandidates.some((root) =>
-    WORKSPACE_CONFIG_FILES.some((f) => port.exists(path.join(root, f))),
-  );
-  if (workspaceConfigSatisfies) {
-    return [];
+  const workspaceConfigPath = rootCandidates
+    .map((root) => firstExistingConfig(root, WORKSPACE_CONFIG_FILES, port))
+    .find((configPath) => configPath !== undefined);
+  if (workspaceConfigPath !== undefined) {
+    return configHasCoverageThresholds(workspaceConfigPath, port)
+      ? []
+      : [missingThresholdViolation(workspaceConfigPath)];
   }
 
   const violations: CheckViolation[] = [];
@@ -183,10 +226,11 @@ export function detectMissingVitestConfig(
       continue;
     }
 
-    const hasPackageConfig = PACKAGE_CONFIG_FILES.some((f) =>
-      port.exists(path.join(packageDir, f)),
-    );
-    if (hasPackageConfig) {
+    const packageConfigPath = firstExistingConfig(packageDir, PACKAGE_CONFIG_FILES, port);
+    if (packageConfigPath !== undefined) {
+      if (!configHasCoverageThresholds(packageConfigPath, port)) {
+        violations.push(missingThresholdViolation(packageConfigPath));
+      }
       continue;
     }
 
@@ -222,6 +266,7 @@ export const vitestConfigRequiredWithTests = defineCheck({
   },
 
   confidence: 'high',
+  contentFilter: 'raw',
   description: 'Ensures packages with tests have a vitest.config at the package root',
   longDescription: `**Purpose:** Ensures every workspace package that contains test files (\`*.test.ts\` / \`*.test.tsx\`) ships a \`vitest.config.ts\` (or \`vitest.config.mts\`) at its package root, so per-package coverage thresholds are actually applied.
 

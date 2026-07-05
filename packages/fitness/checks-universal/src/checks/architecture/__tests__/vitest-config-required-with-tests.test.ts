@@ -37,8 +37,20 @@ const FIXTURES = path.join(
  * package dirs that contain test files.
  */
 function fakePort(existing: Set<string>, withTests: Set<string>): VitestConfigFsPort {
+  return fakePortWithContents(existing, withTests, new Map());
+}
+
+const CONFIG_WITH_THRESHOLDS =
+  'export default { test: { coverage: { thresholds: { statements: 90, branches: 80, functions: 90, lines: 90 } } } }';
+
+function fakePortWithContents(
+  existing: Set<string>,
+  withTests: Set<string>,
+  contents: Map<string, string>,
+): VitestConfigFsPort {
   return {
     exists: (p) => existing.has(p),
+    read: (p) => (existing.has(p) ? (contents.get(p) ?? CONFIG_WITH_THRESHOLDS) : null),
     hasTestFiles: (dir) => withTests.has(dir),
   };
 }
@@ -122,6 +134,23 @@ describe('detectMissingVitestConfig (pure detector)', () => {
     expect(violations[0]?.match).toBe('bad');
   });
 
+  it('flags a package vitest config whose coverage block lacks thresholds', () => {
+    const pkg = `${ROOT}/packages/bad/package.json`;
+    const config = `${ROOT}/packages/bad/vitest.config.ts`;
+    const port = fakePortWithContents(
+      new Set([config]),
+      new Set([`${ROOT}/packages/bad`]),
+      new Map([[config, 'export default { test: { include: ["src/**/*.test.ts"] } }']]),
+    );
+
+    const violations = detectMissingVitestConfig([pkg], port);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.filePath).toBe(config);
+    expect(violations[0]?.type).toBe('missing-vitest-coverage-thresholds');
+    expect(violations[0]?.severity).toBe('error');
+  });
+
   it('skips the workspace-root package.json itself (multi-package repo)', () => {
     // The repo-root package.json reports tests but no config; it is not a
     // leaf package and must not self-flag.
@@ -155,6 +184,17 @@ describe('nodeFsPort against on-disk fixtures', () => {
     expect(violations).toHaveLength(1);
     expect(violations[0]?.filePath).toBe(pkg);
     expect(violations[0]?.match).toBe('x');
+  });
+
+  it('violation fixture (config without thresholds) yields exactly one violation', () => {
+    const pkg = path.join(FIXTURES, 'violation-no-thresholds', 'packages', 'x', 'package.json');
+    expect(nodeFsPort.hasTestFiles(path.dirname(pkg))).toBe(true);
+    const violations = detectMissingVitestConfig([pkg], nodeFsPort);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.filePath).toBe(
+      path.join(FIXTURES, 'violation-no-thresholds', 'packages', 'x', 'vitest.config.ts'),
+    );
+    expect(violations[0]?.type).toBe('missing-vitest-coverage-thresholds');
   });
 
   it('hasTestFiles finds nested tests and exists() reflects real files', () => {

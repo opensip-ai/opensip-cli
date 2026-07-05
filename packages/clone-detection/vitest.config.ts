@@ -7,6 +7,14 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['src/**/*.test.ts'],
+      coverage: {
+        thresholds: {
+          statements: 91,
+          branches: 76,
+          functions: 98,
+          lines: 96,
+        },
+      },
     },
   }),
 );
