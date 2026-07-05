@@ -104,7 +104,7 @@ function makeGitleaksProject(): string {
 }
 
 /** Parse the `--json` outcome wrapper (`{ kind, status, exitCode, envelope?, data? }`). */
-function parseOutcome(stdout: string): Record<string, unknown> {
+function parseGitleaksOutcome(stdout: string): Record<string, unknown> {
   return JSON.parse(stdout) as Record<string, unknown>;
 }
 
@@ -174,7 +174,7 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
 
   beforeAll(() => {
     scan = runCli(['gitleaks', '--json']);
-    const outcome = parseOutcome(scan.stdout);
+    const outcome = parseGitleaksOutcome(scan.stdout);
     envelope = outcome.envelope as typeof envelope;
   });
 
@@ -239,7 +239,7 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
   it('persists a session row with the gitleaks tool + provenance payload', () => {
     const list = runCli(['sessions', 'list', '--json']);
     expect(list.status).toBe(0);
-    const outcome = parseOutcome(list.stdout);
+    const outcome = parseGitleaksOutcome(list.stdout);
     const data = outcome.data as { sessions?: Record<string, unknown>[] } | undefined;
     const sessions = data?.sessions ?? [];
     const gitleaksRow = sessions.find((s) => s.tool === 'gitleaks');
@@ -256,7 +256,7 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
   // `payload.summary` for its clean/dirty decision).
   it('persists a grouped session payload (checks[] + summary) so the report is NOT falsely clean', () => {
     const list = runCli(['sessions', 'list', '--json']);
-    const data = parseOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const data = parseGitleaksOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
     const gitleaksRow = (data.sessions ?? []).find((s) => s.tool === 'gitleaks');
     const payload = gitleaksRow?.payload as {
       summary?: { errors?: number; warnings?: number };
@@ -277,7 +277,7 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
   // envelope/payload build — prove it holds through to the persisted row).
   it('NEVER persists a raw Secret/Match into the session payload (only the masked preview)', () => {
     const list = runCli(['sessions', 'list', '--json']);
-    const data = parseOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const data = parseGitleaksOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
     const gitleaksRow = (data.sessions ?? []).find((s) => s.tool === 'gitleaks');
     const payloadBlob = JSON.stringify(gitleaksRow?.payload ?? {});
     for (const raw of RAW_SECRETS) expect(payloadBlob).not.toContain(raw);
@@ -292,7 +292,7 @@ describe('gitleaks worker E2E — doctor / version diagnostics', () => {
   it('doctor --json reports a ready, resolved binary (exit 0)', () => {
     const run = runCli(['gitleaks', 'doctor', '--json']);
     expect(run.status).toBe(0);
-    const report = parseOutcome(run.stdout).data as {
+    const report = parseGitleaksOutcome(run.stdout).data as {
       tool: string;
       ready: boolean;
       binary: { found: boolean };
@@ -315,7 +315,10 @@ describe('gitleaks worker E2E — doctor / version diagnostics', () => {
       OPENSIP_CLI_TOOL_ENV_PASSTHROUGH: 'FAKE_GITLEAKS_GOLDEN OPENSIP_GITLEAKS_BIN',
     });
     expect(run.status).toBe(2);
-    const report = parseOutcome(run.stdout).data as { ready: boolean; binary: { found: boolean } };
+    const report = parseGitleaksOutcome(run.stdout).data as {
+      ready: boolean;
+      binary: { found: boolean };
+    };
     expect(report.ready).toBe(false);
     expect(report.binary.found).toBe(false);
   });
@@ -323,7 +326,7 @@ describe('gitleaks worker E2E — doctor / version diagnostics', () => {
   it('version --json prints the resolved gitleaks binary version', () => {
     const run = runCli(['gitleaks', 'version', '--json']);
     expect(run.status).toBe(0);
-    const report = parseOutcome(run.stdout).data as { found: boolean; version?: string };
+    const report = parseGitleaksOutcome(run.stdout).data as { found: boolean; version?: string };
     expect(report.found).toBe(true);
     expect(report.version).toBe('8.18.4');
   });
@@ -441,7 +444,7 @@ describe('gitleaks worker E2E — full gate ratchet (§4.12)', () => {
     // but the baseline IS written — proven by the clean compare below.
     expect(save.status).toBe(1);
     const list = runCli(['sessions', 'list', '--json'], {}, gateProject);
-    const data = parseOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const data = parseGitleaksOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
     const gitleaksRows = (data.sessions ?? []).filter((s) => s.tool === 'gitleaks');
     expect(gitleaksRows.length).toBeGreaterThanOrEqual(1);
   });
