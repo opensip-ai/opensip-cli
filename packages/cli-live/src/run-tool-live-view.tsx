@@ -30,8 +30,6 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { scrubErrorMessage } from './scrub-error-message.js';
 
-import type { SignalEnvelope } from '@opensip-cli/contracts';
-
 /** Open string so new tools can contribute live views without editing cli-live. */
 // eslint-disable-next-line sonarjs/redundant-type-aliases -- semantic boundary name (P1-F7)
 export type LiveRunTool = string;
@@ -78,7 +76,6 @@ export interface LiveRunSpec {
 export interface HostGlue {
   readonly setExitCode?: (code: number) => void;
   readonly liveContext?: LiveViewContext;
-  readonly onEnvelope?: (envelope: SignalEnvelope) => void | Promise<void>;
 }
 
 interface LiveRunnerProps {
@@ -159,10 +156,6 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
         }
 
         logger.info({ evt: 'cli.liveview.run.complete', tool: spec.tool });
-
-        if (outcome.envelope !== undefined) {
-          await glue.onEnvelope?.(outcome.envelope);
-        }
 
         const completion: ToolRunCompletion = {
           ...(outcome.envelope === undefined ? {} : { envelope: outcome.envelope }),

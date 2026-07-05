@@ -65,34 +65,29 @@ describe('runToolLiveView', () => {
   });
   it('returns session and envelope from a successful produce()', async () => {
     const scope = makeScope();
-    const onEnvelope = vi.fn();
     const completion = await runWithScope(scope, () =>
-      runToolLiveView(
-        {
-          tool: 'yagni',
-          meta: { title: 'Test', description: 'Running' },
-          surface: { shape: 'pool', label: 'Working...' },
-          verbose: false,
-          quiet: true,
-          produce: () =>
-            Promise.resolve({
-              kind: 'done',
-              done: { summary: { passed: true, errors: 0, warnings: 0 } },
-              session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
-              envelope: {
-                signals: [],
-                units: [],
-                verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
-              },
-            }),
-        },
-        { onEnvelope },
-      ),
+      runToolLiveView({
+        tool: 'yagni',
+        meta: { title: 'Test', description: 'Running' },
+        surface: { shape: 'pool', label: 'Working...' },
+        verbose: false,
+        quiet: true,
+        produce: () =>
+          Promise.resolve({
+            kind: 'done',
+            done: { summary: { passed: true, errors: 0, warnings: 0 } },
+            session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
+            envelope: {
+              signals: [],
+              units: [],
+              verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
+            },
+          }),
+      }),
     );
 
     expect(completion.session?.tool).toBe('yagni');
     expect(completion.envelope?.signals).toEqual([]);
-    expect(onEnvelope).toHaveBeenCalledWith(completion.envelope);
   }, 10_000);
 
   it('invokes setExitCode on produce error outcomes', async () => {

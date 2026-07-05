@@ -243,7 +243,6 @@ describe('yagni duplicate detection — extraction + shared policy parity', () =
       duplicateBodyCandidateDetector.run({
         cwd: root,
         config: {},
-        graphCatalog: null,
         includeTests: false,
       }),
     );

@@ -89,7 +89,6 @@ describe('yagni hardening (H1–H4)', () => {
         duplicateBodyCandidateDetector.run({
           cwd: dir,
           config: {},
-          graphCatalog: null,
           includeTests: true,
         }),
       );

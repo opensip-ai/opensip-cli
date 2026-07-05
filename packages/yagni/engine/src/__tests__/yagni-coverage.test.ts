@@ -451,7 +451,6 @@ describe('yagni detectors and scoring helpers', () => {
     const outcome = await unusedConfigSurfaceDetector.run({
       cwd: FIXTURE_ROOT,
       config: {},
-      graphCatalog: null,
       includeTests: true,
       pathRoots: [join(FIXTURE_ROOT, 'src')],
     });
@@ -466,7 +465,6 @@ describe('yagni detectors and scoring helpers', () => {
     const skipped = await unusedConfigSurfaceDetector.run({
       cwd: dir,
       config: {},
-      graphCatalog: null,
       includeTests: false,
       pathRoots: [join(dir, 'src')],
     });

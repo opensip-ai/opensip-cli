@@ -58,7 +58,6 @@ describe('yagni golden snapshots', () => {
     const result = await unusedConfigSurfaceDetector.run({
       cwd: FIXTURE_ROOT,
       config: { defaultMinConfidence: 'low' },
-      graphCatalog: null,
       includeTests: true,
     });
     expect(result.signals).toHaveLength(1);

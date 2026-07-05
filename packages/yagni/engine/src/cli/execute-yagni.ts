@@ -181,7 +181,6 @@ export async function executeYagni(
       const result = await detector.run({
         cwd: opts.cwd,
         config,
-        graphCatalog: null,
         includeTests,
         ...(opts.pathRoots === undefined ? {} : { pathRoots: opts.pathRoots }),
       });
