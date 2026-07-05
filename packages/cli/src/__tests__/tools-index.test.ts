@@ -36,6 +36,7 @@ vi.mock('../commands/tools/uninstall.js', () => ({
   toolsUninstall: (...a: unknown[]) => toolsUninstall(...a),
 }));
 vi.mock('../commands/tools/data-purge.js', () => ({
+  deriveToolDataPurgeIdForms: (toolId: string) => [toolId],
   toolsDataPurge: (...a: unknown[]) => toolsDataPurge(...a),
 }));
 
@@ -210,7 +211,7 @@ describe('tools uninstall handler', () => {
       purgeData: true,
     })) as { success: boolean };
     expect(result.success).toBe(true);
-    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds);
+    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds, ['demo']);
   });
 
   it('skips the purge when --purge-data is not set even on a project uninstall', async () => {
@@ -284,6 +285,6 @@ describe('tools data-purge handler', () => {
       type: string;
     };
     expect(result.type).toBe('tools-data-purge');
-    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds);
+    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds, ['demo']);
   });
 });

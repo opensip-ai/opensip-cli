@@ -237,8 +237,8 @@ try {
 } finally {
   // Flush batched spans before the short-lived process exits — on normal
   // completion and on handled error exits alike. No-op when telemetry was
-  // never started (standalone), so standalone runs pay nothing. The early
-  // welcome-screen `process.exit(0)` above runs no commands and emits no
-  // spans, so skipping the flush there is harmless.
+  // never started (standalone), so standalone runs pay nothing. The zero-arg
+  // welcome-screen return above runs no commands and emits no spans; keeping the
+  // flush path uniform is harmless.
   await shutdownTelemetry();
 }

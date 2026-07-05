@@ -19,7 +19,7 @@ import {
 import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
 
 import { toolsCreate } from './create.js';
-import { toolsDataPurge } from './data-purge.js';
+import { deriveToolDataPurgeIdForms, toolsDataPurge } from './data-purge.js';
 import { toolsDoctor } from './doctor.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
@@ -248,7 +248,8 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
         if (datastore !== undefined) {
           // Purge AFTER a successful project uninstall; counts ride stderr so
           // the uninstall result stays the command's one payload.
-          const purge = toolsDataPurge(result.removed.id, datastore);
+          const purgeForms = deriveToolDataPurgeIdForms(result.removed.id, currentScope()?.tools);
+          const purge = toolsDataPurge(result.removed.id, datastore, purgeForms);
           process.stderr.write(
             `opensip: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
               `${purge.stateRows} state row(s) for '${purge.toolId}'\n`,
@@ -327,7 +328,14 @@ function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
           error: 'tools data-purge requires the project datastore (run inside a project)',
         } satisfies CommandResult);
       }
-      return Promise.resolve(toolsDataPurge(opts._args[0] ?? '', datastore));
+      const toolId = opts._args[0] ?? '';
+      return Promise.resolve(
+        toolsDataPurge(
+          toolId,
+          datastore,
+          deriveToolDataPurgeIdForms(toolId, currentScope()?.tools),
+        ),
+      );
     },
   });
 }

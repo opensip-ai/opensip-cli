@@ -7,5 +7,5 @@
 import type { CheckDisplayEntry } from '@opensip-cli/fitness';
 
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
-  'no-print-stack-trace': ['🧵', 'No printStackTrace'],
+  'java-no-print-stack-trace': ['🧵', 'No printStackTrace'],
 };

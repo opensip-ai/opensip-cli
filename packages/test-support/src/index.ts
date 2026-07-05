@@ -7,7 +7,7 @@
  * never import it (enforced by dependency-cruiser); it must never appear in
  * a publishable package's `dependencies`.
  *
- * Two scaffolding families live here:
+ * Three scaffolding families live here:
  *
  * - Scope helpers (`makeTestScope` / `withScope` / `withScopeSync`) — sugar
  *   over `@opensip-cli/core`'s public `RunScope` API for tests that
@@ -17,6 +17,8 @@
  *   `planCoverageCases`, `buildFixtureManifest`, ...) — the manifest +
  *   fixture runners each check pack's `fixture-coverage.test.ts` consumes.
  *   Formerly exposed through `@opensip-cli/fitness/internal`.
+ * - Pure display-map parity helpers — structural assertions that display maps
+ *   do not carry keys for checks a pack no longer exports.
  *
  * NOTE: because this package depends on `@opensip-cli/fitness`, the fitness
  * engine's own tests must NOT import it (the package graph would go cyclic);
@@ -25,6 +27,8 @@
 
 export { makeTestScope, makeFitnessTestScope, withScope, withScopeSync } from './with-scope.js';
 export { runTwoScopesConcurrently } from './concurrent-scopes.js';
+export { findOrphanedDisplayKeys } from './display-parity.js';
+export type { DisplayParityCheck } from './display-parity.js';
 
 export {
   buildFixtureManifest,

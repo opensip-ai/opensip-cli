@@ -14,33 +14,36 @@
  * `data-purge`. Recorded as a plan deviation.
  */
 
-import {
-  isBundledToolShortId,
-  isToolLongId,
-  TOOL_LONG_TO_SHORT,
-  TOOL_SHORT_TO_LONG,
-} from '@opensip-cli/core';
+import { buildToolIdentityIndex, type ToolRegistry } from '@opensip-cli/core';
 import { BaselineRepo, ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 
 import type { ToolsDataPurgeResult } from '@opensip-cli/contracts';
 
 /**
- * Every id form one user-supplied tool id may appear under across the stores.
- * The stores key inconsistently for historical reasons (`core/tools/ids.ts`):
- * sessions key the SHORT form (`fit`); the baseline plane keys the LONG form
- * (`fitness`); tool-state keys whatever the tool passed. Purging clears every
- * form — a per-store key namespace makes clearing an absent form a 0-count
- * no-op, so this is robust rather than wasteful.
+ * Every id form one user-supplied tool id may appear under across the stores,
+ * derived from the live tool registry when available. The stores key
+ * inconsistently for historical reasons: sessions key the layout form (`fit`);
+ * the baseline plane keys the identity name (`fitness`); tool-state keys
+ * whatever the tool passed. Purging clears every derived form — a per-store key
+ * namespace makes clearing an absent form a 0-count no-op.
  */
-function idFormsFor(toolId: string): readonly string[] {
-  if (isToolLongId(toolId)) return [...new Set([toolId, TOOL_LONG_TO_SHORT[toolId]])];
-  if (isBundledToolShortId(toolId)) return [...new Set([toolId, TOOL_SHORT_TO_LONG[toolId]])];
-  return [toolId];
+export function deriveToolDataPurgeIdForms(
+  toolId: string,
+  registry: ToolRegistry | undefined,
+): readonly string[] {
+  const binding =
+    registry === undefined ? undefined : buildToolIdentityIndex(registry).resolveInput(toolId);
+  if (binding === undefined) return [toolId];
+  return [...new Set([binding.canonicalName, binding.layoutKey])];
 }
 
 /** Purge one tool's rows from the project datastore; reports counts. */
-export function toolsDataPurge(toolId: string, datastore: DataStore): ToolsDataPurgeResult {
+export function toolsDataPurge(
+  toolId: string,
+  datastore: DataStore,
+  idForms: readonly string[] = [toolId],
+): ToolsDataPurgeResult {
   const sessionRepo = new SessionRepo(datastore);
   const baselineRepo = new BaselineRepo(datastore);
   const stateRepo = new ToolStateRepo(datastore);
@@ -49,7 +52,7 @@ export function toolsDataPurge(toolId: string, datastore: DataStore): ToolsDataP
   let baselineEntries = 0;
   let baselineMeta = false;
   let stateRows = 0;
-  for (const form of idFormsFor(toolId)) {
+  for (const form of idForms) {
     sessions += sessionRepo.clearForTool(form);
     const baseline = baselineRepo.clear(form);
     baselineEntries += baseline.entries;

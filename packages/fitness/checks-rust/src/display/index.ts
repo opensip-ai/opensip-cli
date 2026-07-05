@@ -7,5 +7,5 @@
 import type { CheckDisplayEntry } from '@opensip-cli/fitness';
 
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
-  'no-dbg-macro': ['🦀', 'No dbg! Macro'],
+  'rust-no-dbg-macro': ['🦀', 'No dbg! Macro'],
 };

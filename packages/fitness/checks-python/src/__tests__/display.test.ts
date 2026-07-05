@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { checkDisplay } from '../display/index.js';
 
 describe('checkDisplay metadata', () => {
-  it('maps the no-bare-except slug to its [icon, name] tuple', () => {
-    expect(checkDisplay['no-bare-except']).toEqual(['🐍', 'No Bare Except']);
+  it('maps the python-no-bare-except slug to its [icon, name] tuple', () => {
+    expect(checkDisplay['python-no-bare-except']).toEqual(['🐍', 'No Bare Except']);
   });
 
   it('every entry is a non-empty [icon, displayName] string tuple', () => {

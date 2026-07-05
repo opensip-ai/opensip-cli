@@ -7,5 +7,5 @@
 import type { CheckDisplayEntry } from '@opensip-cli/fitness';
 
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
-  'clang-tidy-passthrough': ['🧹', 'Clang-Tidy Passthrough'],
+  'cpp-clang-tidy': ['🧹', 'Clang-Tidy Passthrough'],
 };

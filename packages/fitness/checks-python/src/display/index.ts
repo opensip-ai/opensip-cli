@@ -7,5 +7,6 @@
 import type { CheckDisplayEntry } from '@opensip-cli/fitness';
 
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
-  'no-bare-except': ['🐍', 'No Bare Except'],
+  'python-no-bare-except': ['🐍', 'No Bare Except'],
+  'python-function-too-long': ['🐍', 'Python Function Too Long'],
 };

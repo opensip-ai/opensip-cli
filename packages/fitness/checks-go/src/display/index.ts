@@ -7,5 +7,5 @@
 import type { CheckDisplayEntry } from '@opensip-cli/fitness';
 
 export const checkDisplay: Readonly<Record<string, CheckDisplayEntry>> = {
-  'no-fmt-print': ['🖨️', 'No fmt.Print'],
+  'go-no-fmt-print': ['🖨️', 'No fmt.Print'],
 };

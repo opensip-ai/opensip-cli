@@ -1,11 +1,11 @@
 /**
- * @opensip-cli/contracts — public Tool↔runner contract facade.
+ * @opensip-cli/contracts — public Tool↔runner contract and host-run runtime.
  *
  * Tool packages and host surfaces share this package for option/result types,
- * SignalEnvelope helpers, StoredSession shapes, graph catalog types, and the
- * small tool-facing helpers re-exported from @opensip-cli/core. Host/runtime
- * services such as config loading, persistence, delivery, and tool execution
- * stay outside this facade.
+ * SignalEnvelope helpers, StoredSession shapes, graph catalog types, and shared
+ * host-run runtime helpers that coordinate command delivery without depending
+ * on the CLI composition root. Config loading, persistence implementations, and
+ * effectful output delivery stay outside this package.
  */
 
 // CLI option / argument types

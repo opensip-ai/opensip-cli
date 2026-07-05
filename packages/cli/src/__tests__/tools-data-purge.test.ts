@@ -5,16 +5,17 @@
  * live: purging 'fitness' missed a 'fit' session.
  */
 
+import { TOOL_LONG_TO_SHORT, ToolRegistry, type Tool, type ToolIdentity } from '@opensip-cli/core';
 import {
-  DataStoreFactory,
   BaselineRepo,
+  DataStoreFactory,
   DEFAULT_TEST_BASELINE_IDENTITY,
   ToolStateRepo,
 } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { toolsDataPurge } from '../commands/tools/data-purge.js';
+import { deriveToolDataPurgeIdForms, toolsDataPurge } from '../commands/tools/data-purge.js';
 
 import type { StoredSession } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -47,13 +48,49 @@ function fitSession(id: string): StoredSession {
   };
 }
 
+function testTool(identity: ToolIdentity): Tool {
+  return {
+    identity,
+    metadata: {
+      id: `stable-${identity.name}`,
+      name: identity.name,
+      version: '0.0.0-test',
+      description: 'test tool',
+    },
+  };
+}
+
+function registryWithBundledTools(): ToolRegistry {
+  const registry = new ToolRegistry();
+  for (const [name, layoutKey] of Object.entries(TOOL_LONG_TO_SHORT)) {
+    registry.register(
+      testTool({
+        name,
+        aliases: layoutKey === name ? [] : [layoutKey],
+        layoutKey,
+      }),
+    );
+  }
+  return registry;
+}
+
 describe('toolsDataPurge', () => {
+  it('derives bundled id forms from registered tool identity', () => {
+    const registry = registryWithBundledTools();
+
+    expect(deriveToolDataPurgeIdForms('fitness', registry)).toEqual(['fitness', 'fit']);
+    expect(deriveToolDataPurgeIdForms('fit', registry)).toEqual(['fitness', 'fit']);
+    expect(deriveToolDataPurgeIdForms('simulation', registry)).toEqual(['simulation', 'sim']);
+    expect(deriveToolDataPurgeIdForms('sim', registry)).toEqual(['simulation', 'sim']);
+    expect(deriveToolDataPurgeIdForms('graph', registry)).toEqual(['graph']);
+  });
+
   it('purging the LONG id clears the SHORT-keyed sessions + LONG-keyed baselines + state', () => {
     new SessionRepo(ds).save(fitSession('FIT_A'));
     new BaselineRepo(ds).save('fitness', [], DEFAULT_TEST_BASELINE_IDENTITY);
     new ToolStateRepo(ds).put('fitness', 'k', { v: 1 });
 
-    const result = toolsDataPurge('fitness', ds);
+    const result = toolsDataPurge('fitness', ds, ['fitness', 'fit']);
     expect(result.sessions).toBe(1);
     expect(result.baselineMeta).toBe(true);
     expect(result.stateRows).toBe(1);
@@ -64,10 +101,14 @@ describe('toolsDataPurge', () => {
   it('purging the SHORT id clears the same set', () => {
     new SessionRepo(ds).save(fitSession('FIT_B'));
     new BaselineRepo(ds).save('fitness', [], DEFAULT_TEST_BASELINE_IDENTITY);
+    new ToolStateRepo(ds).put('fit', 'short', { v: 1 });
+    new ToolStateRepo(ds).put('fitness', 'long', { v: 2 });
 
-    const result = toolsDataPurge('fit', ds);
+    const result = toolsDataPurge('fit', ds, ['fitness', 'fit']);
     expect(result.sessions).toBe(1);
     expect(result.baselineMeta).toBe(true);
+    expect(result.stateRows).toBe(2);
+    expect(new BaselineRepo(ds).exists('fitness')).toBe(false);
   });
 
   it('third-party ids purge under their own single form, never touching others', () => {

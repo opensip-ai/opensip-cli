@@ -29,10 +29,10 @@
  *
  * The bundled three remain a closed literal union ({@link
  * BundledToolShortId}) for genuinely first-party, type-safe internal
- * use — most importantly the {@link TOOL_LONG_TO_SHORT} /
- * {@link TOOL_SHORT_TO_LONG} maps and the {@link isBundledToolShortId}
- * guard that narrows a value to a key of those maps. Widening those to
- * `string` would be wrong: they only know fit/sim/graph.
+ * use — including the {@link TOOL_LONG_TO_SHORT} / {@link TOOL_SHORT_TO_LONG}
+ * public constants and the {@link isBundledToolShortId} guard that narrows a
+ * value to a first-party id. Widening those to `string` would be wrong: they
+ * only know fit/sim/graph.
  *
  * Prior to audit-round-3 Finding H, the same literal union appeared
  * inline in 5+ places with no shared source of truth; centralizing it
@@ -94,10 +94,8 @@ export const TOOL_SHORT_TO_LONG = {
 /**
  * Runtime predicate for the BUNDLED short ids — narrows a value to a key
  * of {@link TOOL_SHORT_TO_LONG}. Use when a value must be one of the
- * first-party three (e.g. indexing the bundled-only long/short maps in
- * `tools data-purge`). For the open storage discriminant use
- * {@link isToolShortId} (structural) or {@link isRegisteredToolId}
- * (registry-validated).
+ * first-party three. For the open storage discriminant use {@link isToolShortId}
+ * (structural) or {@link isRegisteredToolId} (registry-validated).
  */
 export function isBundledToolShortId(value: unknown): value is BundledToolShortId {
   return typeof value === 'string' && (TOOL_SHORT_IDS as readonly string[]).includes(value);
