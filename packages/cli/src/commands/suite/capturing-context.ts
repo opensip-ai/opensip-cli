@@ -1,7 +1,20 @@
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import {
+  currentLogger,
+  currentScope,
+  type ReportFailureDetail,
+  type ResolvedReportFailure,
+  type SignalDeliveryResult,
+  type ToolCliContext,
+} from '@opensip-cli/core';
+
+import { createEgressPlane, type EgressPlane } from '../../bootstrap/io-plane.js';
+import {
+  createReportFailure,
+  resolveReportFailure,
+  truncateDerivedMessage,
+} from '../../bootstrap/report-failure.js';
 
 import type { RunVerdict, SignalEnvelope } from '@opensip-cli/contracts';
-import type { SignalDeliveryResult, ToolCliContext } from '@opensip-cli/core';
 
 export interface StepEnvelopeStats {
   readonly verdict: RunVerdict;
@@ -32,6 +45,7 @@ export interface StepCapture {
    * value before returning the final command result.
    */
   readonly getEnvelope: () => SignalEnvelope | undefined;
+  readonly getReportedFailure: () => ResolvedReportFailure | undefined;
   readonly signalDeliveries: readonly SignalDeliveryResult[];
   readonly context: ToolCliContext;
 }
@@ -57,7 +71,10 @@ function captureEnvelopeStats(envelope: unknown): StepEnvelopeStats | undefined 
   };
 }
 
-export function createCapturingContext(base: ToolCliContext): StepCapture {
+export function createCapturingContext(
+  base: ToolCliContext,
+  deps: { readonly egress?: (setExitCode: (code: number) => void) => EgressPlane } = {},
+): StepCapture {
   // Single mutable last-write-wins exit slot — the per-step mirror of the host's
   // `outputPlane` holder. ALL exit sources for the step (the tool's `setExitCode`,
   // the `deliverSignals` findings/report mirror below, and a direct `process.exit`
@@ -66,7 +83,33 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
   let exitCode: number | undefined;
   let lastEnvelopeStats: StepEnvelopeStats | undefined;
   let lastEnvelope: SignalEnvelope | undefined;
+  let reportedFailure: ResolvedReportFailure | undefined;
   const signalDeliveries: SignalDeliveryResult[] = [];
+  const writeExit = (code: number): void => {
+    exitCode = code;
+  };
+  const egress =
+    deps.egress?.(writeExit) ??
+    createEgressPlane({
+      setExitCode: writeExit,
+      logger: currentLogger(),
+    });
+  const reportFailure = createReportFailure({
+    getLogger: () => currentLogger(),
+    setExitCode: writeExit,
+    render: (result) => base.render(result),
+    emitError: (detail) => {
+      writeExit(detail.exitCode);
+      reportedFailure = {
+        message: truncateDerivedMessage(detail.message),
+        exitCode: detail.exitCode,
+        ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
+        ...(detail.code === undefined ? {} : { code: detail.code }),
+        ...(detail.diagnostic === undefined ? {} : { diagnostic: detail.diagnostic }),
+      };
+    },
+    getDiagnostics: () => currentScope()?.diagnostics,
+  });
   const context = Object.defineProperties(
     {},
     Object.getOwnPropertyDescriptors(base as object),
@@ -79,7 +122,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
         // `applyAdvisoryExitCode` re-affirming exit 0 after nested graph evidence
         // raised the code — must be able to LOWER the step exit, exactly as the host
         // holder does. The old append-then-`Math.max` could never lower.
-        exitCode = code;
+        writeExit(code);
       },
     },
     getExitCode: {
@@ -96,33 +139,19 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
         envelope: Parameters<ToolCliContext['deliverSignals']>[0],
         opts: Parameters<ToolCliContext['deliverSignals']>[1],
       ) => {
-        const result = await base.deliverSignals(envelope, opts);
+        const result = await egress.deliverSignals(envelope, opts);
         signalDeliveries.push(result);
         lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
         lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
-        // Mirror the host's `deliverEnvelope` exit precedence
-        // (`bootstrap/deliver-envelope.ts` → `deriveReportExitDecision`). The host
-        // applies the findings/report exit through ITS OWN `outputPlane.setExitCode`,
-        // bypassing this wrapper's override — so without this mirror the step's
-        // verdict / report-upload exit would be invisible to the capture. Replicate
-        // the SAME precedence here, last-write-wins (SET, not push), and like
-        // `deliverEnvelope` only ever SET a failure code — never reset to 0 on a pass
-        // (a passing, no-`--report-to` run leaves the slot untouched):
-        //   - runFailed (verdict failed, or an explicit gate-compare override)
-        //     DOMINATES → RUNTIME_ERROR (1);
-        //   - else a `--report-to` upload failure (`reportSuccess === false`)
-        //     → REPORT_FAILED (4).
-        // `reportSuccess` is `undefined` on the no-`--report-to` path, so the strict
-        // `=== false` is exact and never fires there.
-        const runFailed =
-          opts.runFailed ??
-          (envelope as Partial<SignalEnvelope> | undefined)?.verdict?.passed === false;
-        if (runFailed) {
-          exitCode = EXIT_CODES.RUNTIME_ERROR;
-        } else if (result.reportSuccess === false) {
-          exitCode = EXIT_CODES.REPORT_FAILED;
-        }
         return result;
+      },
+    },
+    reportFailure: {
+      value: async (detail: ReportFailureDetail) => {
+        const resolved = resolveReportFailure(detail);
+        const boundedMessage = truncateDerivedMessage(resolved.message);
+        reportedFailure = { ...resolved, message: boundedMessage };
+        await reportFailure({ ...detail, message: boundedMessage });
       },
     },
     emitEnvelope: {
@@ -138,6 +167,7 @@ export function createCapturingContext(base: ToolCliContext): StepCapture {
     getExitCode: () => exitCode,
     getEnvelopeStats: () => lastEnvelopeStats,
     getEnvelope: () => lastEnvelope,
+    getReportedFailure: () => reportedFailure,
     signalDeliveries,
     context,
   };

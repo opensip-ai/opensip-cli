@@ -14,22 +14,8 @@
  * `ctx.emitEnvelope`), so the handler contract stayed byte-identical (§5.5).
  */
 
-import {
-  applyCommonFlags,
-  mapToolErrorToExitCode,
-  type CliProgram,
-  type CommandResult,
-} from '@opensip-cli/contracts';
-import {
-  SystemError,
-  ToolError,
-  currentScope,
-  type CommandMountContext,
-  type LiveViewContext,
-  type ReportFailureDetail,
-  type CommandSpec,
-  type ToolCliContext,
-} from '@opensip-cli/core';
+import { applyCommonFlags, type CliProgram } from '@opensip-cli/contracts';
+import { type CommandMountContext, type CommandSpec, type ToolCliContext } from '@opensip-cli/core';
 
 import { type RunActionHooks } from '../bootstrap/run-plane.js';
 
@@ -38,7 +24,7 @@ export type { CommandMountContext } from '@opensip-cli/core';
 import { showInternalCommands } from './internal-command-visibility.js';
 import { splitActionArgs } from './mount-command-action.js';
 import { buildOption, formatArgUsage } from './mount-command-spec-wiring.js';
-import { emitCommandResult } from './mount-result-command.js';
+import { runCommandSpecAction } from './run-command-spec-action.js';
 
 import type { CliCommandsContext } from './shared.js';
 
@@ -150,159 +136,9 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
   cmd.action(async (...actionArgs: unknown[]) => {
     const { opts, positionals } = splitActionArgs(actionArgs);
     const optsWithArgs = { ...opts, _args: positionals };
-    let failureReported = false;
-    const actionCtx =
-      ctx.reportFailure === undefined
-        ? ctx
-        : (Object.assign(Object.create(ctx), {
-            reportFailure: async (detail: ReportFailureDetail) => {
-              failureReported = true;
-              await ctx.reportFailure?.(detail);
-            },
-          }) as TCtx);
-    // Lifecycle diagnostics (§5.10): bracket the handler with `execute` events so
-    // every CommandOutcome carries a record that this command ran. Scope-bound via
-    // the pre-action hook's enterScope; a no-op when no scope is present (tests).
-    const diagnostics = currentScope()?.diagnostics;
-    diagnostics?.event('execute', 'debug', `command '${spec.name}' started`);
-    // Host run lifecycle (host-owned-run-timing): mark the start boundary at the
-    // command-action entry — after RunScope is entered, before the tool handler
-    // runs. No-op for host commands whose leaner context carries no run plane.
-    hooks.beginRun?.();
-    try {
-      // ADR-0054 out-of-process dispatch: for an EXTERNAL-provenance tool the
-      // host forks a worker that imports the untrusted runtime and runs the
-      // handler, instead of importing + invoking it in-process. The hook (bound
-      // per-tool by `mountOneTool`) returns `true` when it dispatched — the
-      // action then skips the in-process handler + output dispatch entirely (the
-      // hook already replayed the worker's result through the host seams).
-      // Bundled tools (and host commands with no hook) fall through to the
-      // in-process path below, byte-identical to before.
-      const dispatched = await hooks.maybeDispatchExternal?.(spec.name, optsWithArgs, positionals);
-      if (dispatched === true) {
-        diagnostics?.event('execute', 'debug', `command '${spec.name}' dispatched out-of-process`);
-        return;
-      }
-      const result = await spec.handler(optsWithArgs, actionCtx);
-      diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
-      // Static-path completion: if the handler returned a ToolRunCompletion with
-      // a session contribution, the host freezes the lifecycle and persists it.
-      // A plain CommandResult (no session) is a no-op — there is no tool-side
-      // generic-session writer. The live-view path persists after renderLive.
-      hooks.completeRun?.(result);
-      if (failureReported && result === undefined) {
-        return;
-      }
-      await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
-    } catch (error) {
-      if (error instanceof ToolError) {
-        if (ctx.reportFailure !== undefined) {
-          await ctx.reportFailure({
-            error,
-            jsonRequested: (optsWithArgs as Record<string, unknown>).json === true,
-          });
-          return;
-        }
-        ctx.setExitCode(mapToolErrorToExitCode(error));
-        return;
-      }
-      throw error;
-    }
+    await runCommandSpecAction(spec, optsWithArgs, positionals, ctx, hooks);
   });
   return cmd;
 }
 
-/**
- * The SINGLE output-dispatch seam. The launch `CommandOutcome` wrap is LANDED:
- * the host emit seams this delegates to (`emitCommandResult`, `ctx.emitEnvelope`)
- * now build a `CommandOutcome` and serialize it through the one `renderOutcome`
- * seam. The handler contract and the mounter above stayed byte-identical — all
- * the outer-shape change landed in those seams (north-star §5.5), so the handler
- * keeps returning its pure-domain `CommandResult` / `SignalEnvelope`.
- *
- * Routes the handler's return value by the command's declared
- * {@link CommandSpec.output} mode:
- *   - `command-result`  — the existing `emitCommandResult` seam (json
- *                         short-circuit / `ctx.render`), shared verbatim with
- *                         {@link mountResultCommand}.
- *   - `signal-envelope` — the run-envelope machine-output path: `--json` emits
- *                         through `ctx.emitEnvelope` (the shared ADR-0011
- *                         formatter), otherwise `ctx.render`.
- *   - `raw-stream`      — explicit raw output (no Ink): the handler already
- *                         wrote its file + line; the host renders nothing.
- *   - `live-view`       — the interactive Ink path: `ctx.renderLive(key, args)`
- *                         against the tool's registered renderer.
- *
- * @throws {Error} When a command declares `signal-envelope` / `live-view` output
- *   but the mount context provides no `emitEnvelope` / `renderLive` emitter — a
- *   mis-declared host spec fails loudly here rather than silently no-op'ing.
- */
-
-export async function dispatchOutput<TCtx extends CommandMountContext>(
-  result: unknown,
-  spec: CommandSpec<unknown, TCtx>,
-  opts: Record<string, unknown>,
-  positionals: readonly unknown[],
-  ctx: TCtx,
-): Promise<void> {
-  const jsonRequested = opts.json === true;
-  switch (spec.output) {
-    case 'command-result': {
-      if (result === undefined) {
-        throw new SystemError(
-          `mountCommandSpec: command '${spec.name}' declares output 'command-result' but its handler returned undefined. Return a CommandResult, throw a ToolError, or call reportFailure and return.`,
-          { code: 'SYSTEM.COMMAND_RESULT.UNDEFINED' },
-        );
-      }
-      await emitCommandResult(result as CommandResult, {
-        render: (r) => ctx.render(r),
-        jsonRequested,
-      });
-      return;
-    }
-    case 'signal-envelope': {
-      if (jsonRequested) {
-        if (ctx.emitEnvelope === undefined) {
-          throw new Error(
-            `mountCommandSpec: command '${spec.name}' declares output 'signal-envelope' ` +
-              'but the mount context provides no emitEnvelope (host commands are ' +
-              "'command-result' / 'raw-stream' only).",
-          );
-        }
-        ctx.emitEnvelope(result);
-      } else {
-        await ctx.render(result);
-      }
-      return;
-    }
-    case 'raw-stream': {
-      // The handler is responsible for its own stdout / file IO (a documented
-      // exception: completion scripts, baseline/SARIF exports). Nothing to
-      // render — the host does not touch the stream.
-      return;
-    }
-    case 'live-view': {
-      // Dispatch to the tool's registered Ink renderer, keyed by the command
-      // NAME (the tool registers its renderer under that key in its setup
-      // hook — sim under 'sim', graph under 'graph'). The host forwards the
-      // parsed opts + trailing positionals as the args payload; the handler's
-      // return value is unused for this mode (the Ink app owns rendering).
-      if (ctx.renderLive === undefined) {
-        throw new Error(
-          `mountCommandSpec: command '${spec.name}' declares output 'live-view' ` +
-            'but the mount context provides no renderLive (host commands are ' +
-            "'command-result' / 'raw-stream' only).",
-        );
-      }
-      // Thread the host-owned runSession (via LiveViewContext) so the live
-      // renderer receives the *same* timer the static path used. Only full
-      // ToolCliContext (tool live-view commands) will have runSession; lean
-      // host contexts won't reach here.
-      const liveContext: LiveViewContext | undefined = ctx.runSession
-        ? { runSession: ctx.runSession }
-        : undefined;
-      await ctx.renderLive(spec.name, { ...opts, _args: positionals }, liveContext);
-      return;
-    }
-  }
-}
+export { dispatchOutput, runCommandSpecAction } from './run-command-spec-action.js';

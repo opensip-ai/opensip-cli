@@ -21,7 +21,7 @@ const DEFAULT_FAILURE_EVT = 'tool.command.failed';
 const MODULE_TAG = 'cli:report-failure';
 const MAX_DERIVED_ERROR_MESSAGE_LENGTH = 1000;
 
-function truncateDerivedMessage(message: string): string {
+export function truncateDerivedMessage(message: string): string {
   if (message.length <= MAX_DERIVED_ERROR_MESSAGE_LENGTH) return message;
   return `${message.slice(0, MAX_DERIVED_ERROR_MESSAGE_LENGTH - 3)}...`;
 }

@@ -30,6 +30,7 @@ import type { CliCommandsContext } from './shared.js';
 import type { Command } from 'commander';
 
 export type { CliCommandsContext } from './shared.js';
+export { runCommandSpecAction } from './run-command-spec-action.js';
 
 /**
  * Mount the CLI-owned host commands onto the supplied Commander program.

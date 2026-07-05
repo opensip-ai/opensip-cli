@@ -1,21 +1,49 @@
 import { DEFAULT_BASELINE_IDENTITY, EXIT_CODES, type SignalEnvelope } from '@opensip-cli/contracts';
+import {
+  ConfigurationError,
+  type SignalDeliveryResult,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCapturingContext } from '../capturing-context.js';
 
-import type { SignalDeliveryResult, ToolCliContext } from '@opensip-cli/core';
-
 /**
- * Build a capturing context whose `base.deliverSignals` resolves a caller-chosen
- * {@link SignalDeliveryResult}. The mirror under test reads `result.reportSuccess`,
- * so this is the real host-deliver seam (NOT the mirror) being stubbed — the
- * capturing-context exit derivation itself stays fully exercised.
+ * Build a capturing context whose step-scoped egress resolves a caller-chosen
+ * {@link SignalDeliveryResult}. The fake egress mirrors only the host-owned
+ * deliverEnvelope exit writes so unit tests avoid real network I/O.
  */
 function captureWith(deliveryResult?: Partial<SignalDeliveryResult>) {
   const result = deliveryResult ?? { cloudAccepted: 0 };
-  const deliverSignals = vi.fn(() => Promise.resolve(result));
-  const base = { deliverSignals, setExitCode: vi.fn() } as unknown as ToolCliContext;
-  return createCapturingContext(base);
+  const deliverSignals = vi.fn(
+    (
+      envelopeArg: Parameters<ToolCliContext['deliverSignals']>[0],
+      opts: Parameters<ToolCliContext['deliverSignals']>[1],
+      setExitCode: (code: number) => void,
+    ) => {
+      const runFailed =
+        opts.runFailed ??
+        (envelopeArg as Partial<SignalEnvelope> | undefined)?.verdict?.passed === false;
+      if (runFailed) {
+        setExitCode(EXIT_CODES.RUNTIME_ERROR);
+      } else if (result.reportSuccess === false) {
+        setExitCode(EXIT_CODES.REPORT_FAILED);
+      }
+      return Promise.resolve(result);
+    },
+  );
+  const base = {
+    deliverSignals: vi.fn(),
+    setExitCode: vi.fn(),
+    render: vi.fn(() => Promise.resolve()),
+  } as unknown as ToolCliContext;
+  const capture = createCapturingContext(base, {
+    egress: (setExitCode) => ({
+      deliverSignals: (envelopeArg, opts) => deliverSignals(envelopeArg, opts, setExitCode),
+      writeSarif: vi.fn(),
+    }),
+  });
+  return Object.assign(capture, { deliverSignals, base });
 }
 
 function envelope(input: {
@@ -62,13 +90,28 @@ function envelope(input: {
 
 describe('createCapturingContext', () => {
   it('captures setExitCode and deliverSignals side effects (last-write-wins)', async () => {
-    const deliverSignals = vi.fn(() => Promise.resolve({ cloudAccepted: 1 }));
+    const deliverSignals = vi.fn(
+      (
+        _envelopeArg: Parameters<ToolCliContext['deliverSignals']>[0],
+        _opts: Parameters<ToolCliContext['deliverSignals']>[1],
+        setExitCode: (code: number) => void,
+      ) => {
+        setExitCode(EXIT_CODES.RUNTIME_ERROR);
+        return Promise.resolve({ cloudAccepted: 1 });
+      },
+    );
     const base = {
-      deliverSignals,
+      deliverSignals: vi.fn(),
       setExitCode: vi.fn(),
+      render: vi.fn(() => Promise.resolve()),
     } as unknown as ToolCliContext;
 
-    const capture = createCapturingContext(base);
+    const capture = createCapturingContext(base, {
+      egress: (setExitCode) => ({
+        deliverSignals: (envelopeArg, opts) => deliverSignals(envelopeArg, opts, setExitCode),
+        writeSarif: vi.fn(),
+      }),
+    });
     capture.context.setExitCode(2);
     await capture.context.deliverSignals({}, { runFailed: true });
 
@@ -150,6 +193,64 @@ describe('createCapturingContext', () => {
     const capture = captureWith();
     await capture.context.deliverSignals({ verdict: { passed: true } }, { cwd: '/x' });
     expect(capture.getExitCode()).toBeUndefined();
+  });
+
+  it('captures reportFailure exit and detail without mutating the host exit holder', async () => {
+    const capture = captureWith();
+
+    await capture.context.reportFailure?.({
+      error: new ConfigurationError('bad suite step config'),
+      jsonRequested: false,
+    });
+
+    expect(capture.getExitCode()).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(capture.getReportedFailure()).toMatchObject({
+      message: 'bad suite step config',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      code: 'CONFIGURATION_ERROR',
+    });
+    expect(capture.base.setExitCode).not.toHaveBeenCalled();
+  });
+
+  it('suppresses host CommandOutcome emission for json reportFailure', async () => {
+    const emitError = vi.fn();
+    const capture = createCapturingContext(
+      {
+        deliverSignals: vi.fn(),
+        setExitCode: vi.fn(),
+        render: vi.fn(() => Promise.resolve()),
+        emitError,
+      } as unknown as ToolCliContext,
+      {
+        egress: () => ({
+          deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
+          writeSarif: vi.fn(),
+        }),
+      },
+    );
+
+    await capture.context.reportFailure?.({
+      error: new ConfigurationError('json config failure'),
+      jsonRequested: true,
+    });
+
+    expect(capture.getExitCode()).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(capture.getReportedFailure()?.message).toBe('json config failure');
+    expect(emitError).not.toHaveBeenCalled();
+  });
+
+  it('bounds explicit reportFailure messages before they reach the step summary', async () => {
+    const capture = captureWith();
+    const longMessage = 'x'.repeat(1500);
+
+    await capture.context.reportFailure?.({
+      message: longMessage,
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+      jsonRequested: true,
+    });
+
+    expect(capture.getReportedFailure()?.message).toHaveLength(1000);
+    expect(capture.getReportedFailure()?.message.endsWith('...')).toBe(true);
   });
 
   it('captures the last emitted envelope verdict and signal count', async () => {

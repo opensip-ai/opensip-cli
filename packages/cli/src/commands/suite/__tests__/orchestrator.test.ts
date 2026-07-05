@@ -6,15 +6,24 @@ import { dirname, join } from 'node:path';
 import {
   DEFAULT_BASELINE_IDENTITY,
   EXIT_CODES,
+  mapToolErrorToExitCode,
   type SignalEnvelope,
   type SuiteStepSummary,
 } from '@opensip-cli/contracts';
 import {
+  ConfigurationError,
+  NetworkError,
+  NotFoundError,
+  PluginIncompatibleError,
   RunScope,
+  SystemError,
+  TimeoutError,
+  ValidationError,
   defineCommand,
   runWithScope,
   type Tool,
   type ToolCliContext,
+  type ToolError,
   type ToolProvenance,
 } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -721,6 +730,104 @@ describe('runSuite', () => {
     expect(host.exitCodes).toEqual([]);
   });
 
+  it('aggregates reportFailure steps into the suite exit and summary', async () => {
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'reported',
+      description: 'fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: async (_opts, cli) => {
+        await cli.reportFailure?.({
+          error: new ConfigurationError('suite step config is invalid'),
+          jsonRequested: true,
+        });
+      },
+    });
+    const host = makeDispatchHostCtx();
+    const info = vi.fn();
+    const warn = vi.fn();
+    const error = vi.fn();
+    const scope = new RunScope({ logger: { info, warn, error, debug: vi.fn() } });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'security',
+        suite: { steps: [{ tool: TOOL_ID, command: 'reported' }] },
+        tools: [tool(TOOL_ID, 'fitness', [spec])],
+        ctx: host.ctx,
+        runActionHooks: {},
+        suiteOpts: { json: true },
+      }),
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(result.steps[0]).toMatchObject({
+      command: 'reported',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      error: 'suite step config is invalid',
+    });
+    expect(host.exitCodes).toEqual([]);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.suite.run.step',
+        command: 'reported',
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      }),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'tool.command.failed',
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      }),
+    );
+    expect(error).not.toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.suite.run.step.error' }),
+    );
+  });
+
+  it('preserves ToolError taxonomy for suite step failures', async () => {
+    const errors: ToolError[] = [
+      new NotFoundError('missing check'),
+      new ConfigurationError('bad config'),
+      new ValidationError('bad input'),
+      new NetworkError('network failed'),
+      new PluginIncompatibleError('bad plugin'),
+      new TimeoutError('too slow'),
+      new SystemError('system failed'),
+    ];
+
+    for (const thrown of errors) {
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'typed-error',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        producesVerdict: true,
+        handler: () => {
+          throw thrown;
+        },
+      });
+      const result = await runSuite({
+        name: 'security',
+        suite: { steps: [{ tool: TOOL_ID, command: 'typed-error' }] },
+        tools: [tool(TOOL_ID, 'fitness', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: {},
+      });
+
+      expect(result.steps[0]).toMatchObject({
+        command: 'typed-error',
+        exitCode: mapToolErrorToExitCode(thrown),
+        error: thrown.message,
+      });
+      expect(result.exitCode).toBe(mapToolErrorToExitCode(thrown));
+    }
+  });
+
   it('captures process.exit from a bundled step and restores process.exit afterward', async () => {
     // eslint-disable-next-line @typescript-eslint/unbound-method -- process.exit has no `this` contract; this test preserves identity for restoration.
     const originalExit = process.exit;
@@ -817,6 +924,33 @@ describe('runSuite', () => {
       command: 'after',
       exitCode: EXIT_CODES.SUCCESS,
     });
+  });
+
+  it('bounds non-ToolError fault messages in step summaries', async () => {
+    const longMessage = 'x'.repeat(1500);
+    const fault = defineCommand<unknown, ToolCliContext>({
+      name: 'fault',
+      description: 'fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      producesVerdict: true,
+      handler: () => {
+        throw new Error(longMessage);
+      },
+    });
+
+    const result = await runSuite({
+      name: 'security',
+      suite: { steps: [{ tool: TOOL_ID, command: 'fault' }] },
+      tools: [tool(TOOL_ID, 'fitness', [fault])],
+      ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: {},
+      suiteOpts: {},
+    });
+
+    expect(result.steps[0]?.error).toHaveLength(1000);
+    expect(result.steps[0]?.error?.endsWith('...')).toBe(true);
   });
 
   it('captures external-dispatch replay through the step context for worst-of aggregation', async () => {

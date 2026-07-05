@@ -5,8 +5,9 @@ import { currentLogger, currentScope, type ToolCliContext } from '@opensip-cli/c
 
 import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
 import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
+import { truncateDerivedMessage } from '../../bootstrap/report-failure.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
-import { dispatchOutput } from '../mount-command-spec.js';
+import { runCommandSpecAction } from '../run-command-spec-action.js';
 
 import { BUILT_IN_GRAPH_TOOL_ID } from './built-in-suites.js';
 import { createCapturingContext } from './capturing-context.js';
@@ -101,16 +102,13 @@ async function runStep(args: {
     exitCode = await withProcessExitGuard(
       async () => {
         hooks.resetRun?.();
-        hooks.beginRun?.();
-        const dispatched = await hooks.maybeDispatchExternal?.(
-          args.step.spec.name,
+        await runCommandSpecAction(
+          args.step.spec,
           opts,
           args.step.positionals,
+          capture.context,
+          hooks,
         );
-        if (dispatched === true) return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
-        const result = await args.step.spec.handler(opts, capture.context);
-        hooks.completeRun?.(result);
-        await dispatchOutput(result, args.step.spec, opts, args.step.positionals, capture.context);
         return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
       },
       (code) => {
@@ -137,10 +135,10 @@ async function runStep(args: {
       exitCode,
     });
     diagnostics?.counter('suite.steps.completed', 1);
-    // @fitness-ignore-next-line exit-code-correctness -- suite steps convert thrown step failures into a non-zero step summary; runSuite later returns the max step exit code.
+    errorMessage = capture.getReportedFailure()?.message;
   } catch (error) {
     exitCode = EXIT_CODES.RUNTIME_ERROR;
-    errorMessage = error instanceof Error ? error.message : String(error);
+    errorMessage = truncateDerivedMessage(error instanceof Error ? error.message : String(error));
     diagnostics?.event('execute', 'error', `suite step '${args.step.spec.name}' failed`, {
       suite: args.suite.name,
       suiteRunId: args.suiteRunId,
