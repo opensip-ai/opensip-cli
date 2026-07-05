@@ -212,6 +212,20 @@ async function writeSarifIfRequested(
   }
 }
 
+function toVoid(): void {
+  return;
+}
+
+function runAfterDeliveryHooks<TOptions extends AnalysisRunCommandOptions, TRequest, TResult>(
+  input: AnalysisRunCommandInput<TOptions, TRequest, TResult>,
+  hookInput: AnalysisRunHookInput<TOptions, TRequest, TResult>,
+  beforeSarif?: () => void | Promise<void>,
+): Promise<void> {
+  return Promise.resolve(input.afterDelivery?.(hookInput))
+    .then(() => beforeSarif?.())
+    .then(toVoid);
+}
+
 async function runOrderedStaticDeliveryEffects<
   TOptions extends AnalysisRunCommandOptions,
   TRequest,
@@ -225,9 +239,7 @@ async function runOrderedStaticDeliveryEffects<
 ): Promise<void> {
   // @fitness-ignore-next-line async-waterfall-detection -- Delivery, hooks, optional JSON emit, and SARIF are ordered host side effects.
   await deliverSignalsAndMaybeOpenReport(cli, hookInput);
-  await input.afterDelivery?.(hookInput);
-  // @fitness-ignore-next-line async-waterfall-detection -- The pre-SARIF hook intentionally runs after delivery hooks and before SARIF export.
-  await beforeSarif?.();
+  await runAfterDeliveryHooks(input, hookInput, beforeSarif);
   await writeSarifIfRequested(cli, hookInput.envelope, options.sarif);
 }
 
