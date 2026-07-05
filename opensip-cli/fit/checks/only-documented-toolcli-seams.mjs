@@ -60,10 +60,10 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { isSeamExempt } from '../../../scripts/load-seam-exemptions.mjs';
-import { toolEnginePathRe } from './tool-engine-paths.mjs';
+import { toolSeamPathRe } from './tool-engine-paths.mjs';
 
 /** Paths that are tool engines or host command handlers (the code that must go through seams). */
-const TOOL_ENGINE_PATH = toolEnginePathRe();
+const TOOL_ENGINE_PATH = toolSeamPathRe();
 const HOST_COMMAND_PATH = /packages\/cli\/src\/commands\//;
 
 /** Bootstrap / composition root that are allowed to touch the low-level seams or build contexts. */

@@ -447,7 +447,12 @@ export default tseslint.config(
   // (dogfood fit:ci gate).
   // ---------------------------------------------------------------------------
   {
-    files: ['packages/cli/src/commands/**/*.ts', 'packages/cli/src/**/*.ts'],
+    files: [
+      'packages/cli/src/commands/**/*.ts',
+      'packages/cli/src/**/*.ts',
+      'packages/external-tool-adapter/src/**/*.ts',
+      'packages/tool-*/src/**/*.ts',
+    ],
     ignores: [
       'packages/cli/src/**/__tests__/**',
       'packages/cli/src/**/*.test.ts',

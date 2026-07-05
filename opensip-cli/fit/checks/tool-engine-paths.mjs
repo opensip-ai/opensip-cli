@@ -14,6 +14,20 @@ export const bundledToolPackageSegments = Object.freeze(
     .filter((segment) => typeof segment === 'string' && segment.length > 0),
 );
 
+// ADR-0090 adapter/scanner packages are tool-shaped, but their production code
+// lives directly under package-root src/ rather than <tool>/engine/src/.
+const adr0090AdapterPackageSegments = Object.freeze([
+  'external-tool-adapter',
+  'tool-gitleaks',
+  'tool-osv-scanner',
+  'tool-trivy',
+]);
+
+export const toolSeamPackageSegments = Object.freeze([
+  ...bundledToolPackageSegments,
+  ...adr0090AdapterPackageSegments,
+]);
+
 function escapeRe(value) {
   return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 }
@@ -23,9 +37,17 @@ const bundledToolEngineRoots = bundledToolPackageSegments.map((segment) =>
   segment === 'mcp' ? 'packages/mcp/src/' : `packages/${segment}/engine/src/`,
 );
 const bundledToolEngineRootAlternation = bundledToolEngineRoots.map(escapeRe).join('|');
+const adapterToolRoots = adr0090AdapterPackageSegments.map((segment) => `packages/${segment}/src/`);
+const toolSeamRootAlternation = [...bundledToolEngineRoots, ...adapterToolRoots]
+  .map(escapeRe)
+  .join('|');
 
 export function toolEnginePathRe(suffix = '') {
   return new RegExp(`(?:${bundledToolEngineRootAlternation})${suffix}`);
+}
+
+export function toolSeamPathRe(suffix = '') {
+  return new RegExp(`(?:${toolSeamRootAlternation})${suffix}`);
 }
 
 export function toolEngineCliPathRe(suffix = '') {
