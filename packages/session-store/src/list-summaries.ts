@@ -25,6 +25,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 export interface ListSessionSummariesOptions {
   readonly tool?: ToolShortId;
   readonly limit?: number;
+  readonly cwdWithin?: string;
   readonly summaryOnly?: boolean;
   /** When set, the session list displays canonical tool names. */
   readonly registry?: ToolRegistry;

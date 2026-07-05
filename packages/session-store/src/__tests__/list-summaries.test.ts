@@ -100,6 +100,50 @@ describe('listSessionSummaries', () => {
     expect(result.sessions[0]?.tool).toBe('fitness');
   });
 
+  it('leaves sessions unfiltered when cwdWithin is absent', () => {
+    repo.save(makeSession({ id: 'LOCAL', cwd: '/repo' }));
+    repo.save(makeSession({ id: 'FOREIGN', cwd: '/other' }));
+
+    const result = listSessionSummaries(datastore);
+
+    expect(result.sessions.map((session) => session.id).sort()).toEqual(['FOREIGN', 'LOCAL']);
+  });
+
+  it('applies cwdWithin before limit', () => {
+    repo.save(
+      makeSession({
+        id: 'LOCAL_OLD',
+        cwd: '/repo',
+        startedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FOREIGN_MID',
+        cwd: '/other',
+        startedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'LOCAL_NEW',
+        cwd: '/repo/packages/app',
+        startedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FOREIGN_NEWEST',
+        cwd: '/other',
+        startedAt: '2026-05-04T00:00:00.000Z',
+      }),
+    );
+
+    const result = listSessionSummaries(datastore, { cwdWithin: '/repo', limit: 2 });
+
+    expect(result.sessions.map((session) => session.id)).toEqual(['LOCAL_NEW', 'LOCAL_OLD']);
+  });
+
   it('includes suiteGroups when sessions carry suiteRunId', () => {
     repo.save(
       makeSession({

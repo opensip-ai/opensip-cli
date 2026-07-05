@@ -20,6 +20,7 @@
  */
 
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
+export { isSessionCwdWithin } from './session-cwd-scope.js';
 export {
   resolveSession,
   type SessionReference,

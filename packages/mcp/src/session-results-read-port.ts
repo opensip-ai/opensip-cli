@@ -12,11 +12,13 @@
  */
 
 import { buildAgentCatalog } from '@opensip-cli/contracts';
-import { err, ok } from '@opensip-cli/core';
+import { err, logger, ok } from '@opensip-cli/core';
 import { BaselineRepo } from '@opensip-cli/datastore';
 import {
   bundledReplayResolver,
+  isSessionCwdWithin,
   listSessionSummaries,
+  resolveSession,
   resolveAndReplaySession,
   type SessionReplayFn,
 } from '@opensip-cli/session-store';
@@ -61,6 +63,8 @@ const noReplay = (): undefined => undefined;
 export interface SessionResultsReadPortDeps {
   /** The datastore handle the long-lived server captured at construction. */
   readonly store: DataStore;
+  /** Project root that scopes session result reads. Omitted keeps reads unscoped. */
+  readonly projectRoot?: string;
   /** Live tool registry — for the agent catalog + the bundled replay resolver. */
   readonly tools?: ToolRegistry;
   /** Override the per-tool replay resolver (defaults to the bundled in-host one). */
@@ -71,12 +75,14 @@ export interface SessionResultsReadPortDeps {
 
 export class SessionResultsReadPort implements ResultsReadPort {
   private readonly store: DataStore;
+  private readonly projectRoot?: string;
   private readonly tools?: ToolRegistry;
   private readonly replayFor: (tool: ToolShortId) => SessionReplayFn | undefined;
   private readonly internalCommands?: ReadonlySet<string>;
 
   constructor(deps: SessionResultsReadPortDeps) {
     this.store = deps.store;
+    this.projectRoot = deps.projectRoot;
     this.tools = deps.tools;
     this.replayFor = deps.replayFor ?? (deps.tools ? bundledReplayResolver(deps.tools) : noReplay);
     this.internalCommands = deps.internalCommands;
@@ -95,6 +101,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     const history = listSessionSummaries(this.store, {
       ...(opts.tool ? { tool: opts.tool } : {}),
       ...(opts.limit === undefined ? {} : { limit: opts.limit }),
+      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
       // Default to the lean projection — agents want pointers, not heavy payloads.
       summaryOnly: opts.summaryOnly ?? true,
       ...(this.tools ? { registry: this.tools } : {}),
@@ -103,6 +110,8 @@ export class SessionResultsReadPort implements ResultsReadPort {
   }
 
   async showRun(opts: ShowRunOptions): Promise<Result<McpResultReplay<ShowRunData>, McpReadError>> {
+    const scoped = this.resolveScopedSession(opts.ref, opts.tool);
+    if (!scoped.ok) return err(scoped.error);
     const outcome = await resolveAndReplaySession(this.store, {
       ref: opts.ref,
       ...(opts.tool ? { tool: opts.tool } : {}),
@@ -111,6 +120,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref, session);
     return ok({
       data: { fidelity: replay.fidelity, envelope: replay.envelope },
       session: runSummaryFromReplay(session, replay.envelope),
@@ -123,6 +133,8 @@ export class SessionResultsReadPort implements ResultsReadPort {
     opts: LatestFindingsOptions,
   ): Promise<Result<McpResultReplay<readonly McpFinding[]>, McpReadError>> {
     const filters = severityFilters(opts);
+    const scoped = this.resolveScopedSession('latest', opts.tool);
+    if (!scoped.ok) return err(scoped.error);
     const outcome = await resolveAndReplaySession(this.store, {
       ref: 'latest',
       tool: opts.tool,
@@ -131,6 +143,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound('latest', session);
     const findings = replay.envelope.signals.map(toMcpFinding);
     return ok({
       data: findings,
@@ -287,6 +300,33 @@ export class SessionResultsReadPort implements ResultsReadPort {
       );
     }
   }
+
+  private isSessionInScope(session: StoredSession): boolean {
+    return this.projectRoot === undefined || isSessionCwdWithin(session.cwd, this.projectRoot);
+  }
+
+  private resolveScopedSession(
+    ref: string,
+    tool: ToolShortId | undefined,
+  ): Result<StoredSession, McpReadError> {
+    const resolved = resolveSession(this.store, { ref, ...(tool === undefined ? {} : { tool }) });
+    if (!resolved.ok) return err(readError(resolved.reason, resolved.detail));
+    if (!this.isSessionInScope(resolved.session)) {
+      return this.foreignSessionNotFound(ref, resolved.session);
+    }
+    return ok(resolved.session);
+  }
+
+  private foreignSessionNotFound<T>(ref: string, session: StoredSession): Result<T, McpReadError> {
+    logger.info({
+      evt: 'mcp.results.scope.rejected',
+      module: 'mcp:results-read-port',
+      ref,
+      sessionCwd: session.cwd,
+      projectRoot: this.projectRoot,
+    });
+    return err(readError('not-found', `session ${ref} was not found`));
+  }
 }
 
 /** Map a `sessions list` row to the lean {@link RunSummary} agent shape. */
@@ -296,6 +336,7 @@ function toRunSummary(s: HistorySession): RunSummary {
     tool: s.tool,
     startedAt: s.startedAt,
     completedAt: s.completedAt,
+    cwd: s.cwd,
     score: s.score,
     passed: s.passed,
     showCommand: s.showCommand,
@@ -310,6 +351,7 @@ function runSummaryFromReplay(session: StoredSession, envelope: SignalEnvelope):
     tool: session.tool,
     startedAt: session.startedAt,
     completedAt: session.completedAt,
+    cwd: session.cwd,
     score: session.score,
     passed: session.passed,
     showCommand: `opensip sessions show ${session.id} --json`,

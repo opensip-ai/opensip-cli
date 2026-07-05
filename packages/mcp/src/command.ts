@@ -127,7 +127,7 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       freshnessContext: workingTreeContextFromCatalog,
       rebuild,
     });
-    const results = new SessionResultsReadPort({ store, tools: scope.tools });
+    const results = new SessionResultsReadPort({ store, projectRoot, tools: scope.tools });
     const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
     const repairWrite = mutationEnabled
       ? new CliRepairWritePort({

@@ -26,6 +26,8 @@ export interface RunSummary {
   readonly tool: string;
   readonly startedAt: string;
   readonly completedAt: string;
+  /** Project root/cwd recorded for the run. Optional for pre-scoping producers. */
+  readonly cwd?: string;
   readonly score: number;
   readonly passed: boolean;
   /** The `opensip sessions show … --json` command that replays this run. */

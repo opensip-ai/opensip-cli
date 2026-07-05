@@ -2,6 +2,7 @@ import { logger, type ToolShortId } from '@opensip-cli/core';
 import { count, desc, eq, inArray } from 'drizzle-orm';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
+import { isSessionCwdWithin } from './session-cwd-scope.js';
 import { buildSession, type StoredPayloadRow } from './session-hydrator.js';
 import { hostMetricsBySessionId, readHostMetrics } from './session-repo-host-metrics.js';
 
@@ -14,6 +15,7 @@ const MODULE_NAME = 'session-store:session-repo';
 export interface SessionListOptions {
   readonly tool?: ToolShortId;
   readonly limit?: number;
+  readonly cwdWithin?: string;
 }
 
 /** Read side of the session store: list/get/latest/count with hydration. */
@@ -26,7 +28,14 @@ export class SessionReadRepo {
         ? this.datastore.db.select().from(sessions).where(eq(sessions.tool, opts.tool))
         : this.datastore.db.select().from(sessions);
       const ordered = baseQuery.orderBy(desc(sessions.timestamp));
-      const sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
+      let sessionRows: (typeof sessions.$inferSelect)[];
+      if (opts.cwdWithin === undefined) {
+        sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
+      } else {
+        const root = opts.cwdWithin;
+        const filteredRows = ordered.all().filter((row) => isSessionCwdWithin(row.cwd, root));
+        sessionRows = opts.limit === undefined ? filteredRows : filteredRows.slice(0, opts.limit);
+      }
 
       const ids = sessionRows.map((row) => row.id);
       const payloadsById = this.payloadsBySessionId(ids);

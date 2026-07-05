@@ -157,6 +157,7 @@ export class McpStdioServer {
       module: LOG_MODULE,
       server: SERVER_NAME,
       version: this.version,
+      projectRoot: this.scope.projectContext?.projectRoot ?? process.cwd(),
     });
 
     const closed = new Promise<void>((resolve) => {
