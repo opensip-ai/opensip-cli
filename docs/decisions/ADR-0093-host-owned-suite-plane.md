@@ -67,3 +67,4 @@ UUID, and `suite add` resolves a name or UUID into the canonical YAML shape.
 
 **Related specs / ADRs:** Implements local plan `docs/plans/ready/05-tool-suites/`.
 Extended by ADR-0100 for suite per-step verdict and aggregate output.
+Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.

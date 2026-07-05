@@ -87,3 +87,4 @@ seams and single options assembly path introduced by ADR-0093.
 
 **Related specs / ADRs:** Extends ADR-0093. Builds on ADR-0011
 (`SignalEnvelope` as output currency) and ADR-0035 (verdict policy).
+Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.

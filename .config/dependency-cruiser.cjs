@@ -35,6 +35,8 @@
  *
  * Forbidden edges pin these import boundaries package by package; adjacent
  * packages at the same displayed layer can still have stricter allowlists.
+ * Rule authoring convention: from-side layer rules are negative-lookahead
+ * allowlists — see docs/decisions/ADR-0133-allowlist-form-layer-rules.md.
  *
  * The previous lang-typescript → fitness back-edge for filterContent was
  * paid down (Wave 3 Chain E / Phase D3): filterContent / clearFilterCache /
