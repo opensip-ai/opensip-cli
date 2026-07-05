@@ -28,7 +28,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. This is the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. The top-level `exitCode` always equals the process exit code ([ADR-0132](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0132-command-outcome-exit-parity.md)). This is the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -51,9 +51,12 @@ The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contr
 `opensip suite run <name> --json` emits a `CommandOutcome` whose `.data` is a
 `SuiteRunResult` ([ADR-0093](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0093-host-owned-suite-plane.md),
 [ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md),
+[ADR-0131](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0131-shared-dispatch-pipeline-suite-exit-capture.md),
 [ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0110-host-owned-review-brief-contract.md)).
-The suite exit code remains the worst step exit code. The aggregate and
-per-step verdict fields are additive; older fields keep their names and types.
+Suite steps dispatch through the same command-action pipeline as normal mounted
+commands, and the suite exit code remains the numeric worst step exit code. The
+aggregate, per-step verdict, and per-step `errorCode` fields are additive; older
+fields keep their names and types.
 
 ```jsonc
 {
@@ -112,7 +115,8 @@ per-step verdict fields are additive; older fields keep their names and types.
         "command": "sim",
         "exitCode": 1,
         "durationMs": 490,
-        "error": "scenario faulted"
+        "error": "scenario faulted",
+        "errorCode": "scenario-fault"
       }
     ],
     "reviewBrief": {
@@ -308,7 +312,8 @@ per-step verdict fields are additive; older fields keep their names and types.
 | `command` | string | yes | Command run for this step. |
 | `exitCode` | number | yes | Captured step exit code. |
 | `durationMs` | number | yes | Host-measured step duration. |
-| `error` | string | no | Error message when the step faulted. |
+| `error` | string | no | Error or reported-failure message when the step did not produce a normal verdict. Truncated to 1000 characters. |
+| `errorCode` | string | no | Machine-readable `ToolError` or `reportFailure` code for the step failure, when available. |
 | `verdict` | object | no | Counts-only projection of the step's last emitted `SignalEnvelope`. Absent means the step emitted no envelope. |
 
 `steps[].verdict` contains only `passed`, `errors`, `warnings`, and `findings`

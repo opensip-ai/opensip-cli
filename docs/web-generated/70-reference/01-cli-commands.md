@@ -435,6 +435,13 @@ run/finding/history questions. Agents should not grep `.runtime/logs`, read
 unless fresh execution is explicitly needed. This is enforced by the
 `mcp-results-no-rerun` and `mcp-first-agent-guidance` fitness checks.
 
+Result tools are repo-scoped to the server's captured project root
+([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)). A
+`list_runs` summary includes the run's recorded `cwd`; foreign-root rows in a
+shared datastore are hidden from `list_runs`, and `show_run` on a foreign id
+returns not-found. The operator-facing `opensip sessions list` command remains
+unscoped over the selected datastore.
+
 ### The `symbolId` contract
 
 `search_symbols` and `get_symbol` return a stable `symbolId = "<filePath>:<line>:<column>"` plus a `bodyHash`. Every downstream graph tool (`who_calls`, `callees_of`, `trace_path`, `blast_radius`) accepts that **`symbolId`, not a bare name** — so an agent resolves a name once, then traverses. A query that names an ambiguous symbol returns a **structured candidate list or error**, never a silent pick.

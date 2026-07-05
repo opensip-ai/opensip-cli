@@ -67,7 +67,7 @@ Production code can't import test files, and source code can't import undeclared
 
 ## Layer enforcement rules
 
-The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). Several runtime packages carry their own narrow allowlist rules in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058 — shared live-run state machine; tools must not import `ink` directly), and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit. They read exactly like the ones below — a `from` package, a forbidden `to` path-list.
+The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). From-side layer rules are authored as negative-lookahead allowlists ([ADR-0133](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0133-allowlist-form-layer-rules.md)): a rule names the package family it governs and the workspace packages it may import, then forbids every other `packages/` target by construction. Several runtime packages carry their own narrow allowlists in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058), `mcp-imports-allowlist`, `tool-test-kit-imports-core-contracts-only`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit.
 
 ### `core-imports-nothing-workspace`
 
@@ -95,15 +95,7 @@ The rule is future-proof by shape: any target under `packages/` is forbidden unl
 {
   from: { path: '^packages/datastore/src/' },
   to: {
-    path: [
-      '^@opensip-cli/contracts',
-      '^opensip-cli($|/)',
-      '^@opensip-cli/fitness',
-      '^@opensip-cli/simulation',
-      '^@opensip-cli/lang-',
-      '^@opensip-cli/checks-',
-      '^@opensip-cli/graph',
-    ],
+    path: '^packages/(?!core/|datastore/)',
   },
 }
 ```
@@ -120,20 +112,29 @@ For the deeper rationale (why a separate package, why not core, why not contract
 {
   from: { path: '^packages/contracts/src/' },
   to: {
-    path: [
-      '^opensip-cli($|/)',
-      '^@opensip-cli/fitness',
-      '^@opensip-cli/simulation',
-      '^@opensip-cli/lang-',
-      '^@opensip-cli/checks-',
-    ],
+    path: '^packages/(?!core/|contracts/)',
   },
 }
 ```
 
-`contracts` depends only on `core`. It can't reach up to a tool, the CLI, or check packs.
+`contracts` depends only on `core`. It can't reach up to a tool, the CLI, check packs, language packs, dashboard, datastore, session-store, output, or future workspace packages.
 
 The reasoning: contracts exists to define the contract facade (`SignalEnvelope`, `CommandResult`, `EXIT_CODES`, `StoredSession`, and small tool-facing helpers such as `defineCommand`) that *every* Tool consumes. If it took a dep on one Tool, it'd be coupled to that Tool's lifecycle. Runtime services such as persistence, rendering, config loading, and tool execution stay outside contracts.
+
+### Other from-side allowlists
+
+These rules follow the same negative-lookahead form and are intentionally
+future-proof:
+
+- **`mcp-imports-allowlist`** — MCP production source may import only core,
+  contracts, datastore, session-store, graph engine internals, and itself. It
+  must not reach into the CLI composition root, other tool engines, check packs,
+  language packs, or graph adapter packs.
+- **`tool-test-kit-imports-core-contracts-only`** — the published test-helper
+  package for tool authors may import only core, contracts, and itself.
+- **`lang-adapters-disjoint`** — `@opensip-cli/lang-*` packages may not import
+  sibling `lang-*` packages from production source; shared parser helpers belong
+  in core or tree-sitter.
 
 ### `fitness-no-cli` and `simulation-no-cli`
 

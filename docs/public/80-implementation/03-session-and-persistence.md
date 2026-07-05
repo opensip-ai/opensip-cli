@@ -184,6 +184,13 @@ larger than `maxSizeMb`, the host logs a warning, runs one full vacuum, and may
 prune to a smaller bounded keep count before a final full vacuum. It does not
 loop.
 
+The retention policy is resolved from the entered run scope's project config:
+`opensip fit --cwd <project>` uses `<project>/opensip-cli.config.yml`, never the
+invoking directory's config. Only scope-less fallback paths consult
+`process.cwd()`. The host emits `session.retention.policy_resolved` as a debug
+diagnostic in the `persist` phase with `source`, `keep`, `maxAgeDays`, and
+`maxSizeMb`.
+
 Retention is best-effort. A prune, file-lock, size-check, or vacuum failure is
 logged under `session.retention.*`, but it never changes the primary tool
 verdict, session write result, or process exit code. Tools do not call this

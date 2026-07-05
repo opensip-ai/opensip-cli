@@ -25,7 +25,7 @@ related-docs:
 
 > **Two adapter contracts, one ambiguous word.** opensip-cli has two distinct language-adapter interfaces, used by different subsystems:
 >
-> - **`LanguageAdapter`** (this doc) lives in [`@opensip-cli/core`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus an optional query API. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-cli/lang-*` packages.
+> - **`LanguageAdapter`** (this doc) lives in [`@opensip-cli/core`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/core/src/languages/adapter.ts). Used by the **fitness** engine. Three required methods (`parse`, `stripStrings`, `stripComments`) plus optional workspace-unit discovery. Lets fitness checks operate on filtered (comment- and string-stripped) source. Implemented by the six `@opensip-cli/lang-*` packages.
 > - **`GraphLanguageAdapter`** (separate, [`@opensip-cli/graph`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/graph/engine/src/lang-adapter/types.ts)) is used by the **graph** engine. Six methods (`discoverFiles`, `parseProject`, `walkProject`, `resolveCallSites`, `cacheKey`, optional `ruleHints`). Lets graph build call catalogs across languages. Implemented by the **five publishable `@opensip-cli/graph-*` packages** under `packages/graph/graph-{typescript,python,rust,go,java}/`, each marked with `opensipTools.kind: "graph-adapter"`, `targetDomain: "graph-adapter"`, and `targetDomainApiVersion: 1`. The four tree-sitter adapters (python, rust, go, java) load **vendored `web-tree-sitter` WASM grammars** (a `.wasm` file in each adapter's `wasm/` dir) and share scaffolding from [`@opensip-cli/graph-adapter-common`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/graph/graph-adapter-common/src/parse.ts); `graph-typescript` is TypeScript-compiler-backed (not tree-sitter). There is no native build step — no node-gyp, no prebuilt `.node`.
 >
 > They are siblings, not the same thing. A given language has one of each (e.g. TypeScript has both a fitness `typescriptAdapter` shipped by `@opensip-cli/lang-typescript` and a graph `typescriptGraphAdapter` shipped by `@opensip-cli/graph-typescript`). For graph adapters, see [`40-graph/03-adding-a-language.md`](/docs/opensip-cli/40-graph/03-adding-a-language/). The rest of this doc covers the fitness `LanguageAdapter` only.
@@ -43,7 +43,9 @@ Fitness adapters are always required for check execution (string/comment strippi
 
 A check is a regex over `console.log`. The naive run flags `// console.log("debug")` (a comment) and `"console.log"` (a string literal). A `LanguageAdapter` is what makes the regex correct — it strips comments and string literals before the check sees the content.
 
-That's the load-bearing part. Adapters also expose a richer query API (functions, imports, call sites) for AST-shaped checks, but that surface is opt-in. The minimum viable adapter is "given source, produce filtered source."
+That's the load-bearing part. Adapters may also expose workspace-unit discovery
+for commands that fan out over language-native workspace boundaries. The minimum
+viable adapter is "given source, produce filtered source."
 
 > **What you'll understand after this:**
 > - The `LanguageAdapter` interface, in full.
@@ -58,7 +60,7 @@ That's the load-bearing part. Adapters also expose a richer query API (functions
 [`packages/core/src/languages/adapter.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/core/src/languages/adapter.ts):
 
 ```ts
-interface LanguageAdapter<TTree = unknown, TNode = unknown> {
+interface LanguageAdapter<TTree = unknown, _TNode = unknown> {
   readonly id: string;                                // 'typescript', 'rust', 'python', …
   readonly fileExtensions: readonly string[];          // ['.ts', '.tsx']
   readonly aliases?: readonly string[];                // ['c'] → canonicalized to this id
@@ -67,14 +69,15 @@ interface LanguageAdapter<TTree = unknown, TNode = unknown> {
   stripStrings(content: string): string;
   stripComments(content: string): string;
 
-  readonly query?: LanguageQueryAPI<TTree, TNode>;
-  warmup?(): Promise<void>;
+  discoverWorkspaceUnits?(rootDir: string): Promise<readonly WorkspaceUnit[]>;
 }
 ```
 
-Three required methods: `parse`, `stripStrings`, `stripComments`. Two optional surfaces: a `query` API for AST-shaped queries, and a `warmup` hook for adapters with one-time initialization (tree-sitter WASM, etc.).
+Three methods are required: `parse`, `stripStrings`, and `stripComments`.
+`discoverWorkspaceUnits` is optional and used only by workspace fan-out paths.
 
-The `TTree` and `TNode` generics are *opaque to core*. The adapter chooses its native tree representation; downstream consumers (checks that opt into the query API) receive the tree by reference and operate on it through `query`. Core never inspects the tree itself.
+The `TTree` generic is *opaque to core*. The adapter chooses its native tree
+representation; core stores and passes the value but never inspects it.
 
 ### `stripStrings` and `stripComments`
 
@@ -96,30 +99,14 @@ The framework's content-filter dispatcher ([`packages/core/src/languages/content
 
 If no adapter is registered for the file's extension, the framework falls back to passing content through unchanged — a fail-safe that matches "raw" mode rather than crashing the check.
 
-### The query API
+### Workspace-unit discovery
 
-```ts
-interface LanguageQueryAPI<TTree, TNode> {
-  findFunctions(tree: TTree): readonly GenericFunction<TNode>[];
-  findImports(tree: TTree): readonly Import[];
-  findCallsTo(tree: TTree, name: string): readonly TNode[];
-  findStringLiterals(tree: TTree): readonly { value: string; location: Location }[];
-  getLocation(tree: TTree, node: TNode): Location;
-  getText(tree: TTree, node: TNode): string;
-}
-```
-
-The query API is for AST-shaped checks. A check that wants "every function with cyclomatic complexity > 25" calls `adapter.query.findFunctions(tree)` and inspects each function's body. The shapes (`GenericFunction`, `Import`, `Location`) are language-neutral — see [`packages/core/src/languages/generic-types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/core/src/languages/generic-types.ts).
-
-The query API is **optional**. An adapter that only implements `parse` + `stripStrings` + `stripComments` is fully functional for regex-shaped checks. Implementing `query` is what unlocks the cross-language check pattern — `@opensip-cli/checks-universal`'s complexity check calls `adapter.query?.findFunctions(...)` and runs against any language whose adapter ships a query API.
-
-`lang-typescript` is currently the only bundled adapter with a full `query` implementation. The other five (rust, python, java, go, cpp) ship `parse` + the strip operations; query is on the roadmap.
-
-### `warmup`
-
-Reserved on the interface for adapters that will eventually need async initialization — tree-sitter WASM modules, for instance, would benefit from a single instantiate-once pass at process start. Adapters that don't need warmup leave the field undefined.
-
-Today **no bundled adapter declares `warmup`** and the CLI does not invoke it. The field is part of the contract so a future adapter that needs eager init can opt in without a contract change; until that adapter exists, treat it as forward-compatible metadata.
+`discoverWorkspaceUnits(rootDir)` is optional. Adapters that understand a
+language-native workspace format can return absolute unit roots for fan-out
+execution: TypeScript packages, Cargo workspace members, and similar boundaries.
+Adapters that do not implement workspace discovery simply omit the method; the
+CLI treats absence as an empty list and reports a clear error when the user asks
+for `--workspace` on a language with no discovery support.
 
 ---
 

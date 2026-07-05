@@ -247,7 +247,11 @@ CLI flags always override config — `--no-json` overrides a `cli.json: true` se
 Session retention is host-owned. After a run writes its session row, the host
 applies `cli.sessions` as best-effort maintenance: count pruning, age pruning,
 then SQLite reclaim/size guard. A retention or vacuum failure is logged but does
-not change the tool verdict or exit code. See
+not change the tool verdict or exit code. The policy is resolved from the
+entered run scope's project config, so `opensip fit --cwd <project>` uses
+`<project>/opensip-cli.config.yml`, not the invoking directory. The debug
+diagnostics event `session.retention.policy_resolved` records the provenance
+(`source: "scope"` or `source: "cwd-fallback"`). See
 [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/).
 
 ## `plugins`

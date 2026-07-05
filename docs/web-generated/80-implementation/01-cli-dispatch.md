@@ -123,6 +123,13 @@ register path an installed or project-local tool travels. "Bundled" is a trust
 posture, not a privileged load path — a guardrail (`no-bootstrap-tool-import`)
 fails CI if a static `import { fitnessTool }` creeps back in.
 
+Every mounted command action runs through
+[`runCommandSpecAction`](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/packages/cli/src/commands/run-command-spec-action.ts).
+`suite run` re-dispatches each step through that same pipeline with a
+step-scoped exit capture; steps do not write the host exit holder directly. This
+keeps standalone and in-suite parsing, output, delivery, typed errors, and exit
+taxonomy aligned ([ADR-0131](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0131-shared-dispatch-pipeline-suite-exit-capture.md)).
+
 ### Why this order
 
 A few of the constraints that pinned the order:
@@ -286,7 +293,7 @@ For `acme-api` running `opensip fit --gate-compare` from CI on 2026-05-17:
    `graph recipes` / `graph lookup` / `graph index` / `graph export` (and its
    internal workers); yagni's spec mounts `yagni`. `commandSpecs` is the only
    command surface.
-4. `mountHostCommands()`: host-owned `CommandSpec`s mount `init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, and `uninstall`, then `mountToolPluginGroups()` hangs each per-tool `<tool> plugin` group under its tool primary.
+4. `mountHostCommands()`: host-owned `CommandSpec`s mount `init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, `configure`, `agent-catalog`, `completion`, and `uninstall`, then `mountToolPluginGroups()` hangs each per-tool `<tool> plugin` group under its tool primary. Host-owned suite steps later call the same `runCommandSpecAction` action body through a step-scoped capture context.
 5. `argv = ['node', 'opensip-cli', 'fit', '--gate-compare']` — there's a subcommand, so the welcome banner is skipped.
 6. `parseAsync()` runs. The `preAction` hook enters a fresh `RunScope`, reads the `fit` command's `opts.debug` (false), and leaves the log level at `info`. It also runs the once-per-day update check and records the result on the scope for the banner / stderr nag (no-op when up-to-date or offline; never blocks). A runId like `RUN_01HXYZG9V8K1J7P3M2N0RQS5T6W` is generated (uppercase prefix + ULID); the day-level log file `<project>/opensip-cli/.runtime/logs/2026-05-17.jsonl` is opened on first write. Commander dispatches to `fitnessTool`'s `fit` action handler with `--gate-compare = true`. The Tool runs `executeFit` and the gate diff. Exit code 1 (regression detected).
 

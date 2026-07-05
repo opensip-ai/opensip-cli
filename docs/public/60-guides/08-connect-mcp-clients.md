@@ -69,7 +69,8 @@ until the client closes stdin:
 | Flags | Only `--cwd` matters for MCP — graph/result parameters are MCP tool args, not CLI flags |
 
 Use an **absolute path** for `--cwd` unless the client provides a project-root
-variable (Claude Code's `${CLAUDE_PROJECT_DIR}`).
+variable (Claude Code's `${CLAUDE_PROJECT_DIR}`). MCP result tools are scoped to
+that project root: runs recorded under another root are treated as not found.
 
 ---
 
@@ -292,6 +293,7 @@ Discover → Edit → Final CLI loops.
 | Server won't start | `opensip` not on `PATH` | Install the CLI or use the `node …/dist/index.js` form |
 | `MCP.DATASTORE_UNAVAILABLE` | Project not initialized | `opensip init` then `opensip graph` in that `--cwd` |
 | Connected but no useful data | Empty catalog / no sessions | Run `opensip graph` and at least one `opensip fit` |
+| Run exists but `list_runs` does not show it | The run was recorded under a different project root | Verify with `opensip sessions list --json`, then restart MCP with the right `--cwd` |
 | `refresh_graph` times out | Large repo, default client timeout | Raise `tool_timeout_sec` (Codex) or per-server `timeout` in `.mcp.json` (Claude) |
 | Tools missing after connect | Server still starting | Wait and recheck `/mcp`; Codex/Claude retry transient failures |
 | Claude ignores `.mcp.json` | Untrusted workspace | Run `claude` interactively and approve project MCP servers |
