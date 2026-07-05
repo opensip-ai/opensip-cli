@@ -45,6 +45,7 @@ export interface ToolScaffold {
  */
 export interface CliCommandsContext {
   readonly setExitCode: (code: number) => void;
+  readonly getExitCode?: () => number | undefined;
   readonly render: (result: CommandResult) => Promise<void>;
   /**
    * Success machine-output seam — wraps the value in a `CommandOutcome` via the

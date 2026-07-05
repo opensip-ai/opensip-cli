@@ -117,7 +117,7 @@ async function main(): Promise<void> {
       argv: userArgv,
     });
 
-  const { ctx, runActionHooks } = buildToolCliContext({
+  const { ctx, runActionHooks, getExitCode } = buildToolCliContext({
     render: renderResult,
     liveViews: createLiveViewRegistry(logger),
     maybeOpenReport,
@@ -135,6 +135,7 @@ async function main(): Promise<void> {
   });
   const commandCtx = {
     setExitCode: ctx.setExitCode,
+    getExitCode,
     render: renderResult,
     emitJson: ctx.emitJson,
     emitRaw: ctx.emitRaw,

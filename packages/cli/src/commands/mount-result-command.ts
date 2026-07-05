@@ -90,6 +90,7 @@ async function emit<TOpts>(
   await emitCommandResult(result, {
     render: opts.ctx.render,
     jsonRequested: opts.jsonFlag?.(parsedOpts) ?? false,
+    exitCode: opts.ctx.getExitCode?.(),
   });
 }
 
@@ -111,9 +112,10 @@ export async function emitCommandResult(
   opts: {
     readonly render: (result: CommandResult) => Promise<void>;
     readonly jsonRequested: boolean;
+    readonly exitCode?: number;
   },
 ): Promise<void> {
-  await renderOutcome(outcomeFromResult(result, 0), {
+  await renderOutcome(outcomeFromResult(result, opts.exitCode ?? 0), {
     jsonRequested: opts.jsonRequested,
     render: opts.render,
   });

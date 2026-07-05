@@ -190,6 +190,7 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     },
     reportFailure,
     setExitCode: outputPlane.setExitCode,
+    getExitCode: outputPlane.getExitCode,
     ...outputPlane.emits, // emitJson / emitEnvelope / emitError / emitRaw
     deliverSignals: ioPlane.deliverSignals,
     writeSarif: ioPlane.writeSarif,

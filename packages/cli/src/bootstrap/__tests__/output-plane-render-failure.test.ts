@@ -9,6 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Logger } from '@opensip-cli/core';
 
 const renderOutcome = vi.fn();
@@ -47,6 +48,20 @@ async function tick(): Promise<void> {
   await Promise.resolve();
 }
 
+const CLEAN_ENVELOPE: SignalEnvelope = {
+  schemaVersion: 2,
+  tool: 'fit',
+  runId: 'run-render-failure',
+  createdAt: '2026-07-05T00:00:00.000Z',
+  verdict: {
+    score: 100,
+    passed: true,
+    summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+  },
+  units: [],
+  signals: [],
+};
+
 describe('output-plane — render failure forces exit when the run had not failed', () => {
   it('emitJson logs and forces exit 1 from a clean run', async () => {
     renderOutcome.mockRejectedValue(new Error('render boom'));
@@ -66,7 +81,7 @@ describe('output-plane — render failure forces exit when the run had not faile
       render: () => Promise.resolve(),
       logger,
     });
-    plane.emits.emitEnvelope({ schemaVersion: 2 });
+    plane.emits.emitEnvelope(CLEAN_ENVELOPE);
     await tick();
     expect(plane.getExitCode()).toBe(1);
     expect(logged[0]).toMatchObject({ evt: 'cli.emit_envelope.render_failed' });
@@ -104,7 +119,7 @@ describe('output-plane — render failure forces exit when the run had not faile
       logger,
     });
     plane.setExitCode(4);
-    plane.emits.emitEnvelope({ schemaVersion: 2 });
+    plane.emits.emitEnvelope(CLEAN_ENVELOPE);
     await tick();
     expect(plane.getExitCode()).toBe(4);
   });

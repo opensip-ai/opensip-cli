@@ -181,7 +181,9 @@ export async function deliverGraphResult(
   const isReportTo = typeof opts.reportTo === 'string' && opts.reportTo.length > 0;
   const session =
     opts.json !== true && !isReportTo ? buildGraphSessionContribution(opts, finalized) : undefined;
-  cli.setExitCode(EXIT_CODES.SUCCESS);
+  if (opts.json !== true) {
+    cli.setExitCode(EXIT_CODES.SUCCESS);
+  }
   log.info({
     evt: EVT_GRAPH_COMPLETE,
     module: MODULE_GRAPH_CLI,
@@ -228,6 +230,11 @@ async function renderGraphResult(
     log.info({
       evt: 'graph.render.json.start',
       module: MODULE_GRAPH_RENDER,
+    });
+    await cli.deliverSignals(envelope, {
+      cwd: opts.cwd,
+      reportTo: opts.reportTo,
+      apiKey: opts.apiKey,
     });
     emitAgentFilteredJsonOutput(cli, envelope, opts);
     log.info({

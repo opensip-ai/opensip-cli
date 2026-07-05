@@ -196,9 +196,6 @@ export async function runJsonMode(
     await cli.reportFailure({ ...fitResult.result, jsonRequested: true });
     return undefined;
   }
-  // ADR-0085: agent filters are presentation-only — egress/session use the
-  // unfiltered envelope; filtered output goes through emitJson/emitRaw.
-  emitAgentFilteredJsonOutput(cli, fitResult.envelope, args);
   // Warnings collected during the run go to stderr so JSON consumers still
   // see them without contaminating the structured stdout payload. They ride on
   // the executeFit result bundle now (a sibling field), not on the render-only
@@ -206,8 +203,12 @@ export async function runJsonMode(
   emitWarningsToStderr(fitResult);
   // ADR-0011/ADR-0035: the composition root owns effectful egress (cloud +
   // `--report-to`, exit 4) AND the findings exit code (derived from the
-  // envelope verdict). Called once, after the JSON is on stdout.
+  // envelope verdict). Called before JSON emission so CommandOutcome.exitCode
+  // reads the already-decided process-exit holder.
   await deliverFitSignals(cli, fitResult.envelope, args);
+  // ADR-0085: agent filters are presentation-only — egress/session use the
+  // unfiltered envelope; filtered output goes through emitJson/emitRaw.
+  emitAgentFilteredJsonOutput(cli, fitResult.envelope, args);
   // Host-owned persistence (host-owned-run-timing Phases 3 + 5): RETURN the
   // session + dashboard contribution; the host persists both after the handler
   // resolves.

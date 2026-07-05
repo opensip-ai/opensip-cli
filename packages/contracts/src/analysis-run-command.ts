@@ -93,7 +93,21 @@ export interface AnalysisRunGateAdapter<TOptions, TRequest> {
   readonly compareRunFailed?: RunHostGateDispatchInput['compareRunFailed'];
 }
 
-/** Complete definition for one host-owned analysis run command. */
+/**
+ * Complete definition for one host-owned analysis run command.
+ *
+ * Hook matrix:
+ * - static human render: `beforeOutput` → render/presentation →
+ *   host delivery/report-open → `afterDelivery` → optional SARIF write.
+ * - static JSON: `beforeOutput` → host delivery/report-open →
+ *   `afterDelivery` → JSON/raw emission → optional SARIF write, so the emitted
+ *   `CommandOutcome.exitCode` observes the host-owned delivery verdict.
+ * - gate save/compare: host gate dispatch (including delivery/SARIF/gate render)
+ *   → `afterDelivery`; `beforeOutput` is skipped because gate mode has no
+ *   normal presentation/JSON emission branch.
+ * - live: host live renderer → host delivery/report-open → `afterDelivery` →
+ *   optional SARIF write when the live completion carries an envelope.
+ */
 export interface AnalysisRunCommandInput<
   TOptions extends AnalysisRunCommandOptions,
   TRequest,
@@ -198,6 +212,24 @@ async function writeSarifIfRequested(
   }
 }
 
+async function runOrderedStaticDeliveryEffects<
+  TOptions extends AnalysisRunCommandOptions,
+  TRequest,
+  TResult,
+>(
+  input: AnalysisRunCommandInput<TOptions, TRequest, TResult>,
+  cli: ToolCliContext,
+  hookInput: AnalysisRunHookInput<TOptions, TRequest, TResult>,
+  options: TOptions,
+  beforeSarif?: () => void,
+): Promise<void> {
+  // @fitness-ignore-next-line async-waterfall-detection -- Delivery, hooks, optional JSON emit, and SARIF are ordered host side effects.
+  await deliverSignalsAndMaybeOpenReport(cli, hookInput);
+  await input.afterDelivery?.(hookInput);
+  beforeSarif?.();
+  await writeSarifIfRequested(cli, hookInput.envelope, options.sarif);
+}
+
 async function runStaticAnalysis<TOptions extends AnalysisRunCommandOptions, TRequest, TResult>(
   input: AnalysisRunCommandInput<TOptions, TRequest, TResult>,
   options: TOptions,
@@ -224,12 +256,16 @@ async function runStaticAnalysis<TOptions extends AnalysisRunCommandOptions, TRe
       ...(gate.saveRunFailed === undefined ? {} : { saveRunFailed: gate.saveRunFailed }),
       ...(gate.compareRunFailed === undefined ? {} : { compareRunFailed: gate.compareRunFailed }),
     });
+    await input.afterDelivery?.(hookInput);
     return completionWithSession(input.session?.(result, request, options));
   }
 
   await input.beforeOutput?.(hookInput);
   if (options.json === true) {
-    emitAgentFilteredJsonOutput(cli, envelope, options);
+    await runOrderedStaticDeliveryEffects(input, cli, hookInput, options, () => {
+      emitAgentFilteredJsonOutput(cli, envelope, options);
+    });
+    return completionWithSession(input.session?.(result, request, options));
   } else if (input.presentation !== undefined) {
     await cli.render(
       await input.presentation({
@@ -242,10 +278,7 @@ async function runStaticAnalysis<TOptions extends AnalysisRunCommandOptions, TRe
     );
   }
 
-  // @fitness-ignore-next-line async-waterfall-detection -- Delivery, report-open, hooks, and SARIF are ordered host side effects.
-  await deliverSignalsAndMaybeOpenReport(cli, hookInput);
-  await input.afterDelivery?.(hookInput);
-  await writeSarifIfRequested(cli, envelope, options.sarif);
+  await runOrderedStaticDeliveryEffects(input, cli, hookInput, options);
 
   return completionWithSession(input.session?.(result, request, options));
 }

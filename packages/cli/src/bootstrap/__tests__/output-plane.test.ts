@@ -5,11 +5,15 @@
  * seam, so these assert the JSON shape that reaches stdout.
  */
 
+import {
+  EXIT_CODES,
+  type CommandOutcome,
+  type CommandResult,
+  type SignalEnvelope,
+} from '@opensip-cli/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createOutputPlane } from '../output-plane.js';
-
-import type { CommandResult } from '@opensip-cli/contracts';
 
 function captureStdout(): { out: string[]; restore: () => void } {
   const out: string[] = [];
@@ -18,6 +22,35 @@ function captureStdout(): { out: string[]; restore: () => void } {
     return true;
   });
   return { out, restore: () => spy.mockRestore() };
+}
+
+function envelope(passed: boolean): SignalEnvelope {
+  return {
+    schemaVersion: 2,
+    tool: 'fit',
+    runId: 'run-test',
+    createdAt: '2026-07-05T00:00:00.000Z',
+    verdict: {
+      score: passed ? 100 : 0,
+      passed,
+      summary: {
+        total: 1,
+        passed: passed ? 1 : 0,
+        failed: passed ? 0 : 1,
+        errors: passed ? 0 : 1,
+        warnings: 0,
+      },
+    },
+    units: [
+      {
+        slug: 'unit',
+        passed,
+        violationCount: passed ? 0 : 1,
+        durationMs: 1,
+      },
+    ],
+    signals: [],
+  };
 }
 
 describe('createOutputPlane — exit code (single write path)', () => {
@@ -60,7 +93,21 @@ describe('createOutputPlane — emit seams', () => {
     expect(out).toHaveLength(1);
     const parsed = JSON.parse(out[0]) as { data?: { foo?: string } };
     expect(parsed.data?.foo).toBe('bar');
+    expect((parsed as CommandOutcome).exitCode).toBe(0);
     expect(out[0]).toMatch(/\n$/);
+  });
+
+  it('emitJson echoes the live exit holder when set', () => {
+    const plane = createOutputPlane({ render: () => Promise.resolve() });
+    plane.setExitCode(3);
+    const { out, restore } = captureStdout();
+    try {
+      plane.emits.emitJson({ foo: 'bar' });
+    } finally {
+      restore();
+    }
+    const parsed = JSON.parse(out[0]) as CommandOutcome;
+    expect(parsed.exitCode).toBe(3);
   });
 
   it('emitError sets the exit code and serializes a status:error outcome', () => {
@@ -104,13 +151,39 @@ describe('createOutputPlane — emit seams', () => {
     });
     const { out, restore } = captureStdout();
     try {
-      plane.emits.emitEnvelope({ schemaVersion: 1, tool: 'fit', signals: [] });
+      plane.emits.emitEnvelope(envelope(true));
     } finally {
       restore();
     }
     // --json path serializes; the human renderer is inert here.
     expect(rendered).toHaveLength(0);
-    const parsed = JSON.parse(out[0]) as { envelope?: { tool?: string } };
+    const parsed = JSON.parse(out[0]) as CommandOutcome;
     expect(parsed.envelope?.tool).toBe('fit');
+    expect(parsed.exitCode).toBe(0);
+  });
+
+  it('emitEnvelope echoes the live exit holder when set', () => {
+    const plane = createOutputPlane({ render: () => Promise.resolve() });
+    plane.setExitCode(4);
+    const { out, restore } = captureStdout();
+    try {
+      plane.emits.emitEnvelope(envelope(false));
+    } finally {
+      restore();
+    }
+    const parsed = JSON.parse(out[0]) as CommandOutcome;
+    expect(parsed.exitCode).toBe(4);
+  });
+
+  it('emitEnvelope derives a failing exit when the holder is unset', () => {
+    const plane = createOutputPlane({ render: () => Promise.resolve() });
+    const { out, restore } = captureStdout();
+    try {
+      plane.emits.emitEnvelope(envelope(false));
+    } finally {
+      restore();
+    }
+    const parsed = JSON.parse(out[0]) as CommandOutcome;
+    expect(parsed.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
   });
 });

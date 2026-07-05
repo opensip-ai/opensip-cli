@@ -28,6 +28,7 @@ import {
 import { renderOutcome, renderRaw } from '../commands/render-outcome.js';
 
 import { stampDeclaredInputs } from './declared-inputs.js';
+import { deriveFindingsExitCode } from './deliver-envelope.js';
 
 /** Structured-log `module` tag for the output plane. */
 const MODULE_TAG = 'cli:output-plane';
@@ -91,10 +92,13 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
     },
     emitEnvelope: (envelope) => {
       const outputEnvelope = stampDeclaredInputs(envelope as SignalEnvelope);
-      renderOutcome(outcomeFromEnvelope(outputEnvelope, exitCode ?? EXIT_CODES.SUCCESS), {
-        jsonRequested: true,
-        render: deps.render,
-      }).catch((error) => {
+      renderOutcome(
+        outcomeFromEnvelope(outputEnvelope, exitCode ?? deriveFindingsExitCode(outputEnvelope)),
+        {
+          jsonRequested: true,
+          render: deps.render,
+        },
+      ).catch((error) => {
         if ((exitCode ?? EXIT_CODES.SUCCESS) === EXIT_CODES.SUCCESS) {
           setExitCode(EXIT_CODES.RUNTIME_ERROR);
         }

@@ -191,9 +191,6 @@ export function buildYagniAnalysisRunCommand(setUpLiveView: (cli: ToolCliContext
           : [`YAGNI baseline saved (${String(envelope.signals.length)} signal(s))`],
       renderCompareLines: ({ result }) => renderGateCompareLines(result),
     },
-    beforeOutput: ({ cli, request }) => {
-      applyAdvisoryExitCode(cli, request.config);
-    },
     afterDelivery: ({ cli, request }) => {
       applyAdvisoryExitCode(cli, request.config);
     },

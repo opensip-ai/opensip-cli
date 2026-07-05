@@ -107,6 +107,7 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       await emitCommandResult(result as CommandResult, {
         render: (r) => ctx.render(r),
         jsonRequested,
+        exitCode: ctx.getExitCode?.(),
       });
       return;
     }

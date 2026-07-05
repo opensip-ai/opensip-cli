@@ -22,6 +22,7 @@ import type { ToolCliContext } from './cli-context.js';
 export interface CommandMountContext {
   readonly render: ToolCliContext['render'];
   readonly setExitCode: ToolCliContext['setExitCode'];
+  readonly getExitCode?: ToolCliContext['getExitCode'];
   readonly reportFailure?: ToolCliContext['reportFailure'];
   readonly emitEnvelope?: ToolCliContext['emitEnvelope'];
   readonly emitJson?: ToolCliContext['emitJson'];

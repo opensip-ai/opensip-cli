@@ -161,6 +161,15 @@ async function emitToCloud(
 }
 
 /**
+ * Pure host-owned findings exit policy (ADR-0035). Tools never derive this
+ * themselves; they hand the host an envelope, and the host maps the single
+ * verdict to the process exit.
+ */
+export function deriveFindingsExitCode(envelope: SignalEnvelope): number {
+  return envelope.verdict.passed ? EXIT_CODES.SUCCESS : EXIT_CODES.RUNTIME_ERROR;
+}
+
+/**
  * Pure seam for the report-upload vs findings-failure exit precedence (ADR-0008 / Task 1).
  * Extracted so the matrix is unit-testable without IO / full deliverEnvelope.
  * A report failure (exit 4) is only honoured when the run otherwise passed
@@ -247,7 +256,8 @@ export async function deliverEnvelope(
   // computes its own exit; gate-compare overrides with its baseline-diff verdict.
   // Set RUNTIME_ERROR first; the `--report-to` exit-4 below only applies when the
   // run otherwise passed, so a real failure always dominates (last-write-wins).
-  const runFailed = opts.runFailed ?? !stampedEnvelope.verdict.passed;
+  const findingsExit = deriveFindingsExitCode(stampedEnvelope);
+  const runFailed = opts.runFailed ?? findingsExit !== EXIT_CODES.SUCCESS;
   if (runFailed) opts.setExitCode?.(EXIT_CODES.RUNTIME_ERROR);
 
   const cloud = await emitToCloud(stampedEnvelope, repo, log);

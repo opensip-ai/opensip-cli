@@ -34,6 +34,7 @@ function mockCli(): ToolCliContext {
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
+    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
     logger: console,
     scope: { signalSink: { emit: vi.fn() }, datastore: () => undefined },
     reportFailure: vi.fn(() => Promise.resolve()),
@@ -88,7 +89,9 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
     const cli = mockCli();
     const outcome = await dispatchGraphResult(opts, result, cli, STARTED, '/x');
     expect(outcome).toBeUndefined();
-    // --json still emits the envelope to stdout via the seam.
+    // --json first delivers the unfiltered envelope so the host-owned findings
+    // exit is decided before stdout JSON emission, then emits the envelope.
+    expect(cli.deliverSignals).toHaveBeenCalledTimes(1);
     expect(cli.emitEnvelope).toHaveBeenCalledTimes(1);
   });
 });

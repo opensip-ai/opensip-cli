@@ -145,7 +145,7 @@ describe('graph command spec', () => {
 });
 
 describe('graph handler — end-to-end via the real typescript adapter', () => {
-  it('runs --json against a real fixture and exits with code 0', async () => {
+  it('runs --json against a real fixture without forcing a success exit', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-'));
     try {
       mkdirSync(dir, { recursive: true });
@@ -193,10 +193,12 @@ describe('graph handler — end-to-end via the real typescript adapter', () => {
       const parsed = JSON.parse(stdout) as {
         tool: string;
         schemaVersion: number;
+        verdict: { passed: boolean };
       };
       expect(parsed.tool).toBe('graph');
       expect(parsed.schemaVersion).toBe(2);
-      expect(setExitCode).toHaveBeenCalledWith(0);
+      expect(parsed.verdict.passed).toBe(true);
+      expect(setExitCode).not.toHaveBeenCalled();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

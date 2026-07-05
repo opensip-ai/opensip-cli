@@ -345,6 +345,85 @@ describe('defineAnalysisRunCommand', () => {
     });
   });
 
+  it('runs the documented per-mode hook order', async () => {
+    const events: string[] = [];
+    const spec = defineAnalysisRunCommand<TestOptions, TestRequest, TestResult>({
+      description: 'Run hook matrix analysis',
+      normalize: (options) => ({ cwd: options.cwd, live: options.live === true }),
+      execute: () => testResult(),
+      envelope: (result) => result.envelope,
+      presentation: () => {
+        events.push('presentation');
+        return { type: 'text-lines', lines: ['done'] };
+      },
+      live: {
+        key: 'test-live',
+        shouldUse: ({ request }) => request.live,
+        args: ({ request }) => ({ cwd: request.cwd }),
+      },
+      gate: {
+        tool: 'fitness',
+        mode: ({ options }) => {
+          if (options.gateSave === true) return 'save';
+          if (options.gateCompare === true) return 'compare';
+          return undefined;
+        },
+        renderSaveLines: ({ envelope }) => [`saved ${String(envelope.signals.length)}`],
+        renderCompareLines: ({ result }) => [`degraded ${String(result.degraded)}`],
+      },
+      beforeOutput: () => {
+        events.push('before');
+      },
+      afterDelivery: () => {
+        events.push('after');
+      },
+    });
+
+    const humanCli = makeCli();
+    humanCli._calls.render.mockImplementation(() => {
+      events.push('render');
+    });
+    humanCli._calls.deliverSignals.mockImplementation(() => {
+      events.push('deliver');
+    });
+    await spec.handler({ cwd: '/repo' }, humanCli);
+    expect(events.splice(0)).toEqual(['before', 'presentation', 'render', 'deliver', 'after']);
+
+    const jsonCli = makeCli();
+    jsonCli._calls.deliverSignals.mockImplementation(() => {
+      events.push('deliver');
+    });
+    jsonCli._calls.emitEnvelope.mockImplementation(() => {
+      events.push('emit-json');
+    });
+    await spec.handler({ cwd: '/repo', json: true }, jsonCli);
+    expect(events.splice(0)).toEqual(['before', 'deliver', 'after', 'emit-json']);
+
+    const gateCli = makeCli();
+    gateCli._calls.saveBaseline.mockImplementation(() => {
+      events.push('save');
+    });
+    gateCli._calls.render.mockImplementation(() => {
+      events.push('render');
+    });
+    gateCli._calls.deliverSignals.mockImplementation(() => {
+      events.push('deliver');
+    });
+    await spec.handler({ cwd: '/repo', gateSave: true }, gateCli);
+    expect(events.splice(0)).toEqual(['save', 'render', 'deliver', 'after']);
+
+    const liveCli = makeCli();
+    liveCli._calls.renderLive.mockImplementation(() => {
+      events.push('live');
+      return { envelope: signalEnvelope() };
+    });
+    liveCli._calls.deliverSignals.mockImplementation(() => {
+      events.push('deliver');
+    });
+    await spec.handler({ cwd: '/repo', live: true }, liveCli);
+    expect(events.splice(0)).toEqual(['live', 'deliver', 'after']);
+  });
+
   it('surfaces delivery failures after emitting the failure lifecycle path', async () => {
     const cli = makeCli();
     cli._calls.deliverSignals.mockRejectedValue(new Error('egress down'));
