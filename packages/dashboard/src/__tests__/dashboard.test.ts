@@ -101,7 +101,9 @@ describe('generateDashboardHtml', () => {
     const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
     expect(html).toContain('href="https://github.com/opensip-ai/opensip-cli/releases/tag/v0.1.19"');
     expect(html).toContain('target="_blank" rel="noopener noreferrer"');
+    expect(html).toContain('<span class="report-details-version">CLI 0.1.19</span>');
     expect(html).toContain('<dt>CLI</dt><dd><a class="report-details-link"');
+    expect(html).not.toContain('<span class="report-details-version">CLI <a');
   });
 
   it('leaves dev CLI versions as plain text', () => {

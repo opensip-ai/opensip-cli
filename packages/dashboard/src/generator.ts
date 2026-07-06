@@ -139,7 +139,7 @@ function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
   const rows = pairs
     .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${value}</dd>`)
     .join('');
-  return `<details class="report-details"><summary><span class="report-details-version">CLI ${renderCliVersionValue(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
+  return `<details class="report-details"><summary><span class="report-details-version">CLI ${escapeHtml(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
 }
 
 /**
