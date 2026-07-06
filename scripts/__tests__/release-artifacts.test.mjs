@@ -17,7 +17,7 @@ import { RELEASE_PACKAGE_ORDER } from '../release-package-order.mjs';
 import { verifyReleaseArtifacts } from '../verify-release-artifacts.mjs';
 
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-const ACTIONS_ATTEST_SHA = 'f6bf1532d7d6793fce74eac584813a8eee607999';
+const ACTIONS_ATTEST_SHA = 'a1948c3f048ba23858d222213b7c278aabede763';
 const WORKSPACE_VERSION = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version;
 
 test('release artifact generator writes a verifiable manifest, checksums, and SBOM', async () => {
