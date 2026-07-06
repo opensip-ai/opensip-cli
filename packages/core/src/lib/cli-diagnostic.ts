@@ -20,12 +20,7 @@ export type CliDiagnosticSeverity = 'error' | 'warning';
  * whether a buffered diagnostic belongs on the selected command's surface.
  */
 export type CliDiagnosticCategory =
-  | 'configuration'
-  | 'compatibility'
-  | 'integrity'
-  | 'runtime'
-  | 'discovery'
-  | 'degraded';
+  'configuration' | 'compatibility' | 'integrity' | 'runtime' | 'discovery' | 'degraded';
 
 /**
  * Identity join keys stamped by producers so the host can scope bootstrap

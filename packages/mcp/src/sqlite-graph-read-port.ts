@@ -77,12 +77,10 @@ export class SqliteGraphReadPort implements GraphReadPort {
   // is deliberately NOT memoized: a long-lived server must re-verify the working
   // tree on each read so a mid-session file mutation flips `fresh` to false.
   private blastCache:
-    | ReadonlyMap<string, { direct: number; transitive: number; score: number }>
-    | undefined;
+    ReadonlyMap<string, { direct: number; transitive: number; score: number }> | undefined;
   /** In-flight rebuild — serializes concurrent `refresh()` to a single build. */
   private inFlightRefresh:
-    | Promise<Result<McpToolResult<GraphGeneration>, McpReadError>>
-    | undefined;
+    Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> | undefined;
 
   constructor(private readonly deps: SqliteGraphReadPortDeps) {
     this.store = deps.store;

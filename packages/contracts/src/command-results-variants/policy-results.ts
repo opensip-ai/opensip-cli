@@ -15,10 +15,7 @@ export interface PolicyStatusResult {
   readonly ci: PolicyMode;
   readonly orgStatus: {
     readonly state:
-      | 'available'
-      | 'not-configured'
-      | 'optional-unavailable'
-      | 'required-unavailable';
+      'available' | 'not-configured' | 'optional-unavailable' | 'required-unavailable';
     readonly reason?: string;
   };
   readonly sources: readonly string[];

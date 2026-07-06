@@ -10,10 +10,7 @@ import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-cl
 // =============================================================================
 
 type IssueType =
-  | 'unvalidated-access'
-  | 'missing-default'
-  | 'type-coercion'
-  | 'direct-access-outside-config';
+  'unvalidated-access' | 'missing-default' | 'type-coercion' | 'direct-access-outside-config';
 
 interface EnvVarIssue {
   file: string;

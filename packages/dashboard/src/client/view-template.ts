@@ -238,9 +238,11 @@ export function defineRankedView(config: RankedViewConfig): void {
           return;
         }
         renderFunctionRows(rowsHost, {
-          occurrences: filtered.map(
-            (r): RankedOcc => ({ ...r.occ, __metric: r.metric, ...rowExtras(r.occ, r.metric) }),
-          ),
+          occurrences: filtered.map((r): RankedOcc => ({
+            ...r.occ,
+            __metric: r.metric,
+            ...rowExtras(r.occ, r.metric),
+          })),
           columns: config.columns,
           heading: config.headingText,
           viewId: config.id,

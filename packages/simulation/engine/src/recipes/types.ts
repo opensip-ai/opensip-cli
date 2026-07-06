@@ -50,10 +50,7 @@ export interface KindScenarioSelector {
  * every arm is supplied as a predicate and core never names `ScenarioKind`.
  */
 export type ScenarioSelector =
-  | ExplicitScenarioSelector
-  | AllScenarioSelector
-  | TagsScenarioSelector
-  | KindScenarioSelector;
+  ExplicitScenarioSelector | AllScenarioSelector | TagsScenarioSelector | KindScenarioSelector;
 
 // =============================================================================
 // EXECUTION OPTIONS

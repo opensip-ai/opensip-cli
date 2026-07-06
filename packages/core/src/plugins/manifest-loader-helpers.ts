@@ -130,8 +130,7 @@ function layoutMatchesIdentity(
 }
 
 type ConfigParseResult =
-  | { readonly ok: true; readonly config?: ToolConfigManifestDescriptor }
-  | { readonly ok: false };
+  { readonly ok: true; readonly config?: ToolConfigManifestDescriptor } | { readonly ok: false };
 
 type OptionalParseResult<T> = { readonly ok: true; readonly value?: T } | { readonly ok: false };
 

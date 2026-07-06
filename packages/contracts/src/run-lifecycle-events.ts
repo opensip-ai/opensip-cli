@@ -1,38 +1,22 @@
 import type { ToolCliContext } from '@opensip-cli/core';
 
 export type RunLifecycleEvent =
-  | 'analysis.run.started'
-  | 'analysis.run.completed'
-  | 'analysis.run.failed';
+  'analysis.run.started' | 'analysis.run.completed' | 'analysis.run.failed';
 
 export type UnitLifecycleEvent =
-  | 'analysis.unit.started'
-  | 'analysis.unit.completed'
-  | 'analysis.unit.failed';
+  'analysis.unit.started' | 'analysis.unit.completed' | 'analysis.unit.failed';
 
 export type DeliveryLifecycleEvent =
-  | 'analysis.delivery.started'
-  | 'analysis.delivery.completed'
-  | 'analysis.delivery.failed';
+  'analysis.delivery.started' | 'analysis.delivery.completed' | 'analysis.delivery.failed';
 
 export type ConfigLifecycleEvent =
-  | 'analysis.config.read'
-  | 'analysis.config.defaulted'
-  | 'analysis.config.rejected';
+  'analysis.config.read' | 'analysis.config.defaulted' | 'analysis.config.rejected';
 
 export type AnalysisLifecycleEvent =
-  | RunLifecycleEvent
-  | UnitLifecycleEvent
-  | DeliveryLifecycleEvent
-  | ConfigLifecycleEvent;
+  RunLifecycleEvent | UnitLifecycleEvent | DeliveryLifecycleEvent | ConfigLifecycleEvent;
 
 export type LifecycleMetadataValue =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | readonly (string | number | boolean | null)[];
+  string | number | boolean | null | undefined | readonly (string | number | boolean | null)[];
 
 export type LifecycleMetadata = Readonly<Record<string, LifecycleMetadataValue>>;
 

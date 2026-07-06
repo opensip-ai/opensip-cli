@@ -32,11 +32,7 @@ import { logger as defaultLogger, type Logger } from './logger.js';
  *   use per-call `{ internal: true }` against a strict default.
  */
 export type DuplicatePolicy =
-  | 'warn-first-wins'
-  | 'throw'
-  | 'overwrite'
-  | 'silent-skip'
-  | 'allow-internal';
+  'warn-first-wins' | 'throw' | 'overwrite' | 'silent-skip' | 'allow-internal';
 
 /** Minimum shape any registry item must satisfy. */
 export interface Registerable {

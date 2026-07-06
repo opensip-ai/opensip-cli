@@ -28,13 +28,7 @@
  * phase to answer "what happened during config load?" or "did delivery run?".
  */
 export type DiagnosticPhase =
-  | 'discover'
-  | 'load'
-  | 'validate'
-  | 'execute'
-  | 'render'
-  | 'deliver'
-  | 'persist';
+  'discover' | 'load' | 'validate' | 'execute' | 'render' | 'deliver' | 'persist';
 
 /** Severity of a single diagnostic event. Independent of signal severity. */
 export type DiagnosticLevel = 'debug' | 'info' | 'warn' | 'error';

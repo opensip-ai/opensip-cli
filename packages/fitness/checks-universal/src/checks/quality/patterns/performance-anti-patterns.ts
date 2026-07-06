@@ -20,11 +20,7 @@ import {
  * Performance anti-pattern types
  */
 type AntiPatternType =
-  | 'sequential-await'
-  | 'spread-in-loop'
-  | 'string-concat-in-loop'
-  | 'nested-loop'
-  | 'sync-in-async';
+  'sequential-await' | 'spread-in-loop' | 'string-concat-in-loop' | 'nested-loop' | 'sync-in-async';
 
 interface PatternConfig {
   pattern: RegExp;

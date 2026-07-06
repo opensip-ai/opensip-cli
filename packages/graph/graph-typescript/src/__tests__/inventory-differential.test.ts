@@ -38,13 +38,7 @@ interface CallableSite {
   readonly filePath: string;
   /** A coarse classification mirroring graph's FunctionKind. */
   readonly kind:
-    | 'function'
-    | 'method'
-    | 'arrow'
-    | 'constructor'
-    | 'getter'
-    | 'setter'
-    | 'function-expression';
+    'function' | 'method' | 'arrow' | 'constructor' | 'getter' | 'setter' | 'function-expression';
 }
 
 /**

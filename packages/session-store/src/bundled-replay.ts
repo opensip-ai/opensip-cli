@@ -32,8 +32,7 @@ export function bundledReplayResolver(
       contribution.tool,
       (stored) =>
         contribution.replaySession(stored) as
-          | ToolSessionReplay<CommandResult>
-          | Promise<ToolSessionReplay<CommandResult>>,
+          ToolSessionReplay<CommandResult> | Promise<ToolSessionReplay<CommandResult>>,
     );
   }
   return (tool) => byTool.get(tool);

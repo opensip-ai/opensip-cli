@@ -40,13 +40,7 @@ export interface ImpactComputation {
 export interface ComputeImpactChangedFileEntry {
   readonly path: string;
   readonly status?:
-    | 'added'
-    | 'modified'
-    | 'copied'
-    | 'renamed'
-    | 'deleted'
-    | 'untracked'
-    | 'unknown';
+    'added' | 'modified' | 'copied' | 'renamed' | 'deleted' | 'untracked' | 'unknown';
   readonly previousPath?: string;
 }
 

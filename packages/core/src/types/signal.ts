@@ -102,12 +102,7 @@ export interface SignalRepairAction {
 /** Structured repair contract for AI agents (ADR-0086, spec §5.5). */
 export interface SignalRepair {
   readonly repairKind?:
-    | 'add-test'
-    | 'split-function'
-    | 'extract-module'
-    | 'fix-import'
-    | 'manual'
-    | 'unknown';
+    'add-test' | 'split-function' | 'extract-module' | 'fix-import' | 'manual' | 'unknown';
   readonly autofixable?: boolean;
   readonly suggestedCommand?: string;
   readonly docsRef?: string;

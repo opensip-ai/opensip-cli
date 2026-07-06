@@ -34,11 +34,7 @@ export interface FileLockMetadata {
 
 /** Lock lifecycle event kinds emitted through {@link WithFileLockOptions.onEvent}. */
 export type FileLockEventKind =
-  | 'acquire.start'
-  | 'acquire.wait'
-  | 'acquire.complete'
-  | 'acquire.timeout'
-  | 'stale.recovered';
+  'acquire.start' | 'acquire.wait' | 'acquire.complete' | 'acquire.timeout' | 'stale.recovered';
 
 /** Lock lifecycle event emitted through the injected callback. */
 export interface FileLockEvent {

@@ -23,12 +23,7 @@ export interface ToolsListRow {
   readonly status: 'loaded' | 'manifest-only';
   /** Why the host trusted or denied this tool. */
   readonly trustReason?:
-    | 'bundled'
-    | 'managed-install'
-    | 'project-config'
-    | 'env'
-    | 'user-global'
-    | 'denied';
+    'bundled' | 'managed-install' | 'project-config' | 'env' | 'user-global' | 'denied';
   /** Effective trust-policy decision for this row, when evaluated by this run. */
   readonly policyOutcome?: 'allow' | 'allow-with-conditions' | 'deny';
   /** Bounded policy reasons for user and agent inspection. */

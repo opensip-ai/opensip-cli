@@ -6,10 +6,7 @@ import * as ts from 'typescript';
 
 /** Function-like node types that can have TOCTOU patterns */
 export type FunctionLikeNode =
-  | ts.FunctionDeclaration
-  | ts.MethodDeclaration
-  | ts.ArrowFunction
-  | ts.FunctionExpression;
+  ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression;
 
 /** Check if node is a function-like node */
 export function isFunctionLikeNode(node: ts.Node): node is FunctionLikeNode {

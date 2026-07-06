@@ -174,11 +174,7 @@ export async function importToolRuntime(
 
 /** The named conformance sections of the admission pipeline, in run order. */
 export type AdmissionSection =
-  | 'manifest'
-  | 'compatibility'
-  | 'runtime-load'
-  | 'tool-shape'
-  | 'manifest-runtime-coherence';
+  'manifest' | 'compatibility' | 'runtime-load' | 'tool-shape' | 'manifest-runtime-coherence';
 
 /** One section's verdict. `diagnostic` is present on failure (and only then). */
 export interface AdmissionSectionResult {
