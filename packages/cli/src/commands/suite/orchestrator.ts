@@ -87,6 +87,12 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     }),
   );
   const steps = internalSteps.map((step) => step.summary);
+  // Worst-of suite exit is deliberately a numeric `Math.max` over the ADR-0020
+  // code space (ratified in ADR-0093 / ADR-0100 — see ADR-0131): any failing
+  // step fails the suite. After Tasks 1.2/1.3 every step exit source (setExitCode,
+  // deliverSignals, reportFailure, emitError, process.exit) writes the per-step
+  // capture slot, so `step.exitCode` is the single source of truth here — no step
+  // touches the host holder mid-run for this aggregate to miss.
   const exitCode = Math.max(0, ...steps.map((step) => step.exitCode));
   const aggregate = deriveSuiteAggregate(steps);
   const reviewBrief = buildReviewBrief({

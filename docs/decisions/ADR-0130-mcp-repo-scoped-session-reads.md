@@ -44,9 +44,9 @@ limits; `RunSummary` carries optional `cwd` so agents can see the evidence root.
 re-running tools. That evidence must be scoped to the project the MCP server was
 started for, or an agent can unknowingly reason over a different repository's
 findings. The shipped implementation captures `projectRoot` in
-[`packages/mcp/src/command.ts`](../../../packages/mcp/src/command.ts), threads it
+[`packages/mcp/src/command.ts`](../../packages/mcp/src/command.ts), threads it
 to `SessionResultsReadPort`, and uses
-[`isSessionCwdWithin`](../../../packages/session-store/src/session-cwd-scope.ts)
+[`isSessionCwdWithin`](../../packages/session-store/src/session-cwd-scope.ts)
 through `SessionReadRepo.list({ cwdWithin })`.
 
 **Consequences:**

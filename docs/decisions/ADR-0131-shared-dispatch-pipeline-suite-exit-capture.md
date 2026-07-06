@@ -43,9 +43,9 @@ maximum step exit code over the ADR-0020 code space.
 **Rationale:** `CommandSpec` is the CLI's single command contract. Maintaining a
 separate suite-only dispatcher meant parser, output, delivery, failure, and exit
 behavior could drift from the mounted command surface. The shipped pipeline in
-[`packages/cli/src/commands/run-command-spec-action.ts`](../../../packages/cli/src/commands/run-command-spec-action.ts)
+[`packages/cli/src/commands/run-command-spec-action.ts`](../../packages/cli/src/commands/run-command-spec-action.ts)
 is now the common action body, while
-[`suite-step-runner.ts`](../../../packages/cli/src/commands/suite/suite-step-runner.ts)
+[`suite-step-runner.ts`](../../packages/cli/src/commands/suite/suite-step-runner.ts)
 wraps the host seams with a step-local capture context and reports `errorCode`
 when a typed/reportFailure code is available.
 
