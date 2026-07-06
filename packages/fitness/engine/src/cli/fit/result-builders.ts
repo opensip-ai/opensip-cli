@@ -65,6 +65,14 @@ export function resolveFitVerdictPolicy(signalersConfig: SignalersConfig): Verdi
 // Envelope builder (ADR-0011, Phase 6) — the canonical post-run transform
 // ---------------------------------------------------------------------------
 
+// The historical wire `provider` for every fitness signal. Before the
+// signal-fidelity refactor the envelope was rebuilt via `createSignal`, whose
+// default (`'opensip-cli'`) overrode `defineCheck`'s `toSignal` default
+// (`'opensip'`). Consumers (fit --json, dashboard, MCP, agent --filter) key on
+// this value, so the normalized envelope pins it to stay byte-stable — the same
+// reason `source`/`ruleId` are normalized to the bare slug.
+const FITNESS_WIRE_PROVIDER = 'opensip-cli';
+
 function normalizeFitnessSignalIdentity(signal: Signal, checkSlug: string): Signal {
   const unstamped = { ...signal };
   delete unstamped.fingerprint;
@@ -72,6 +80,7 @@ function normalizeFitnessSignalIdentity(signal: Signal, checkSlug: string): Sign
     ...unstamped,
     source: checkSlug,
     ruleId: checkSlug,
+    provider: FITNESS_WIRE_PROVIDER,
   };
 }
 

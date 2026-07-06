@@ -72,7 +72,12 @@ describe('buildFitEnvelope', () => {
     expect(signal?.fingerprint).toBe(
       '2ba1046533d9ab506c1dd6ef5f9047ec54cc4e452257850de70042710ec1d074',
     );
-    expect(signal?.provider).toBe('rich-provider');
+    // Wire `provider` is pinned to the historical value for EVERY fitness signal
+    // (the pre-refactor re-lift forced `createSignal`'s 'opensip-cli' default,
+    // overriding any check-supplied provider). The fixture sets 'rich-provider';
+    // the normalized envelope must still report 'opensip-cli' so consumers
+    // keying on it keep working — byte-stable, like source/ruleId.
+    expect(signal?.provider).toBe('opensip-cli');
     expect(signal?.category).toBe('architecture');
     expect(signal?.metadata).toEqual({ checkSlug: 'rich-check', custom: 'preserved' });
     expect(signal?.severity).toBe('high');
