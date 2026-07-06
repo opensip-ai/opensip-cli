@@ -98,6 +98,25 @@ describe('generateDashboardHtml', () => {
     expect(html).not.toContain('<div class="card" style="margin:16px 24px 0;padding:12px 16px">');
   });
 
+  it('links released CLI versions to the matching GitHub release tag', () => {
+    const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
+    expect(html).toContain(
+      'href="https://github.com/opensip-ai/opensip-cli/releases/tag/v0.1.19"',
+    );
+    expect(html).toContain('target="_blank" rel="noopener noreferrer"');
+    expect(html).toContain('<dt>CLI</dt><dd><a class="report-details-link"');
+  });
+
+  it('leaves dev CLI versions as plain text', () => {
+    const html = generateDashboardHtml({
+      sessions: [makeSession()],
+      declaredInputs: { ...declaredInputs, cliVersion: '0.4.0-dev' },
+    });
+    expect(html).toContain('<span class="report-details-version">CLI 0.4.0-dev</span>');
+    expect(html).toContain('<dt>CLI</dt><dd>0.4.0-dev</dd>');
+    expect(html).not.toContain('releases/tag/v0.4.0-dev');
+  });
+
   it('escapes < and > in inlined JSON to prevent script injection', () => {
     // A session whose cwd contains a fake </script> tag must not break out
     const evil = makeSession({ cwd: '</script><script>alert(1)</script>' });

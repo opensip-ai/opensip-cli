@@ -35,6 +35,8 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .report-details[open] summary::after { transform: rotate(-135deg); margin-top: 3px; }
 .report-details-version { color: var(--text-dim); font-weight: 500; white-space: nowrap; }
 .report-details-label { color: var(--accent); white-space: nowrap; }
+.report-details-link { color: inherit; text-decoration: underline; text-decoration-color: currentColor; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.report-details-link:hover { color: var(--accent); }
 .report-details-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(560px, calc(100vw - 48px)); padding: 16px; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius); box-shadow: 0 18px 48px rgba(0,0,0,0.35); }
 .report-details-title { color: var(--text-dim); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
 .report-details-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; }

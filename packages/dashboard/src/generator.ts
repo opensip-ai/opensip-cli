@@ -74,6 +74,8 @@ const EXTERNAL_TAB_ID = 'external';
 const EXTERNAL_TAB_LABEL = 'External Tools';
 // Shield icon (lucide) — external adapters are typically secret/vuln scanners.
 const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
+const OPENSIP_CLI_REPOSITORY_URL = 'https://github.com/opensip-ai/opensip-cli';
+const RELEASE_VERSION_RE = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 
 // Escape all < and > to prevent script injection in HTML <script> context
 function escapeForScriptContext(json: string): string {
@@ -97,6 +99,20 @@ function escapeHtml(value: unknown): string {
     .replaceAll('"', '&quot;');
 }
 
+function githubReleaseUrlForCliVersion(cliVersion: string): string | undefined {
+  const version = cliVersion.trim();
+  if (!RELEASE_VERSION_RE.test(version)) return undefined;
+  const tagName = `v${version}`;
+  return `${OPENSIP_CLI_REPOSITORY_URL}/releases/tag/${encodeURIComponent(tagName)}`;
+}
+
+function renderCliVersionValue(cliVersion: string): string {
+  const escapedVersion = escapeHtml(cliVersion);
+  const releaseUrl = githubReleaseUrlForCliVersion(cliVersion);
+  if (releaseUrl === undefined) return escapedVersion;
+  return `<a class="report-details-link" href="${escapeHtml(releaseUrl)}" target="_blank" rel="noopener noreferrer" title="View OpenSIP CLI v${escapedVersion} on GitHub">${escapedVersion}</a>`;
+}
+
 function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
   if (input === undefined) return '';
   const pairs: readonly (readonly [string, string])[] = [
@@ -114,9 +130,12 @@ function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
     ],
   ];
   const rows = pairs
-    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+    .map(([label, value]) => {
+      const valueHtml = label === 'CLI' ? renderCliVersionValue(value) : escapeHtml(value);
+      return `<dt>${escapeHtml(label)}</dt><dd>${valueHtml}</dd>`;
+    })
     .join('');
-  return `<details class="report-details"><summary><span class="report-details-version">CLI ${escapeHtml(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
+  return `<details class="report-details"><summary><span class="report-details-version">CLI ${renderCliVersionValue(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
 }
 
 /**
