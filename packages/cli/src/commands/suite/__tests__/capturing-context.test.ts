@@ -239,6 +239,43 @@ describe('createCapturingContext', () => {
     expect(emitError).not.toHaveBeenCalled();
   });
 
+  it('isolates a direct emitError call into the slot without touching the host seams', () => {
+    const emitError = vi.fn();
+    const setExitCode = vi.fn();
+    const capture = createCapturingContext(
+      {
+        deliverSignals: vi.fn(),
+        setExitCode,
+        render: vi.fn(() => Promise.resolve()),
+        emitError,
+      } as unknown as ToolCliContext,
+      {
+        egress: () => ({
+          deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
+          writeSarif: vi.fn(),
+        }),
+      },
+    );
+
+    // The ADR-0054 worker replay path reaches the public seam via
+    // `ctx.emitError(result.error)`; in a suite step it must land in the slot,
+    // not the host holder, and must emit no CommandOutcome of its own.
+    capture.context.emitError({
+      message: 'external worker step failed',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      code: 'not-found',
+    });
+
+    expect(capture.getExitCode()).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(capture.getReportedFailure()).toMatchObject({
+      message: 'external worker step failed',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      code: 'not-found',
+    });
+    expect(emitError).not.toHaveBeenCalled();
+    expect(setExitCode).not.toHaveBeenCalled();
+  });
+
   it('bounds explicit reportFailure messages before they reach the step summary', async () => {
     const capture = captureWith();
     const longMessage = 'x'.repeat(1500);

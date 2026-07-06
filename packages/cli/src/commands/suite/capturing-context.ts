@@ -76,10 +76,14 @@ export function createCapturingContext(
   deps: { readonly egress?: (setExitCode: (code: number) => void) => EgressPlane } = {},
 ): StepCapture {
   // Single mutable last-write-wins exit slot — the per-step mirror of the host's
-  // `outputPlane` holder. ALL exit sources for the step (the tool's `setExitCode`,
-  // the `deliverSignals` findings/report mirror below, and a direct `process.exit`
-  // routed in by `withProcessExitGuard`) write THIS slot, so `getExitCode()` is the
-  // single source of truth for the step's verdict.
+  // `outputPlane` holder. ALL exit sources for the step write THIS slot, so
+  // `getExitCode()` is the single source of truth for the step's verdict: the
+  // tool's `setExitCode`, the `deliverSignals` findings/report mirror below, a
+  // direct `process.exit` routed in by `withProcessExitGuard`, `reportFailure`,
+  // and the public `emitError` seam (which the host implements as an exit source
+  // + a `CommandOutcome` write — the ADR-0054 worker replay path reaches it via
+  // `ctx.emitError(result.error)`, so it must be captured, not left to the host
+  // holder or it would false-green the step and emit a stray outcome mid-suite).
   let exitCode: number | undefined;
   let lastEnvelopeStats: StepEnvelopeStats | undefined;
   let lastEnvelope: SignalEnvelope | undefined;
@@ -87,6 +91,20 @@ export function createCapturingContext(
   const signalDeliveries: SignalDeliveryResult[] = [];
   const writeExit = (code: number): void => {
     exitCode = code;
+  };
+  // Route an error detail into the slot + reported-failure record, emitting
+  // nothing to the host (the suite renders one CommandOutcome from the
+  // aggregate). Shared by `createReportFailure`'s emit seam and the context's
+  // own `emitError` override so both stay in lockstep.
+  const captureErrorDetail = (detail: Parameters<ToolCliContext['emitError']>[0]): void => {
+    writeExit(detail.exitCode);
+    reportedFailure = {
+      message: truncateDerivedMessage(detail.message),
+      exitCode: detail.exitCode,
+      ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
+      ...(detail.code === undefined ? {} : { code: detail.code }),
+      ...(detail.diagnostic === undefined ? {} : { diagnostic: detail.diagnostic }),
+    };
   };
   const egress =
     deps.egress?.(writeExit) ??
@@ -98,16 +116,7 @@ export function createCapturingContext(
     getLogger: () => currentLogger(),
     setExitCode: writeExit,
     render: (result) => base.render(result),
-    emitError: (detail) => {
-      writeExit(detail.exitCode);
-      reportedFailure = {
-        message: truncateDerivedMessage(detail.message),
-        exitCode: detail.exitCode,
-        ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
-        ...(detail.code === undefined ? {} : { code: detail.code }),
-        ...(detail.diagnostic === undefined ? {} : { diagnostic: detail.diagnostic }),
-      };
-    },
+    emitError: captureErrorDetail,
     getDiagnostics: () => currentScope()?.diagnostics,
   });
   const context = Object.defineProperties(
@@ -159,6 +168,14 @@ export function createCapturingContext(
         lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
         lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
         base.emitEnvelope(envelope);
+      },
+    },
+    // Isolate the public error seam: an external (ADR-0054 worker) step whose
+    // replay calls `ctx.emitError(result.error)` must land its exit in the slot,
+    // not the host holder — and must NOT print a second CommandOutcome mid-suite.
+    emitError: {
+      value: (detail: Parameters<ToolCliContext['emitError']>[0]) => {
+        captureErrorDetail(detail);
       },
     },
   });
