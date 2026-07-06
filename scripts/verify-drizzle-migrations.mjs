@@ -212,14 +212,18 @@ function snapshotTableSummary(snapshot) {
 }
 
 // The drizzle-kit snapshot serialization version this gate is written against.
-// Pinned deliberately (plan Task 6.3, option 2): the copy-journal-then-generate
-// mechanism the plan first prescribed does NOT work with drizzle-kit 0.31.x — an
-// incremental `generate` over the committed multi-snapshot journal aborts with a
-// "parent snapshot collision" AND exits 0, so a count-based check silently
-// passes. We therefore compare a fresh empty-dir squash against the committed
-// snapshot's table structure (which correctly bites on drift), and pin the
-// snapshot `version` so a drizzle-kit upgrade that changes the format fails here
-// with a clear "re-pin + regenerate" message instead of a spurious table diff.
+// This gate compares a fresh empty-dir squash against the committed snapshot's
+// table structure (which bites cleanly on drift) rather than the plan's
+// copy-journal-then-generate approach — the empty-dir squash is simpler and
+// immune to the migration-chain state. The snapshot `version` is pinned so a
+// drizzle-kit upgrade that changes the format fails here with a clear
+// "re-pin + regenerate" message instead of a spurious table diff.
+//
+// (Historical note: the copy-journal approach used to abort with a "parent
+// snapshot collision" because migrations 0001/0002 shared a snapshot id and 0003
+// carried a placeholder id — which also broke `db:generate`. That chain was
+// re-linked with unique ids; `db:generate` and the snapshot chain are now
+// healthy, guarded by the chain-integrity test in migration-integrity.test.ts.)
 const EXPECTED_SNAPSHOT_VERSION = '6';
 
 function assertSnapshotVersion(label, snapshot) {

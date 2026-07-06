@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "6223554c-d84a-4d2d-93c2-bf5817c0fbe2",
-  "prevId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "prevId": "7e72c978-6dce-43dc-86ca-65fd88919b06",
   "tables": {
     "session_host_metrics": {
       "name": "session_host_metrics",

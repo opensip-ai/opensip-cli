@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "prevId": "99119f58-0ff5-462e-ab14-cccc23f6f92d",
+  "id": "7e72c978-6dce-43dc-86ca-65fd88919b06",
+  "prevId": "985def1c-5a32-4265-b05b-88adaf68e652",
   "tables": {
     "session_host_metrics": {
       "name": "session_host_metrics",

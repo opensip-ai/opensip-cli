@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -78,6 +78,42 @@ describe('migration journal ↔ SQL file parity', () => {
       missing,
       'journal entries without a drizzle snapshot (breaks future db:generate)',
     ).toEqual([]);
+  });
+});
+
+/** Read each committed snapshot's chain metadata (id/prevId), in migration order. */
+function snapshotChain(): { tag: string; id: string; prevId: string }[] {
+  return sqlMigrationTags()
+    .map((tag) => tag.slice(0, 4))
+    .map((prefix) => {
+      const snap = JSON.parse(readFileSync(`${META_DIR}/${prefix}_snapshot.json`, 'utf8')) as {
+        id: string;
+        prevId: string;
+      };
+      return { tag: prefix, id: snap.id, prevId: snap.prevId };
+    });
+}
+
+describe('snapshot chain integrity (drizzle-kit generate prerequisite)', () => {
+  // drizzle-kit walks the snapshot chain by id/prevId. A duplicate id or a
+  // prevId that does not point at the predecessor makes `db:generate` abort with
+  // a "parent snapshot collision" (and exit 0, so it fails silently). This test
+  // pins the chain so that regression can never merge again.
+  const ZERO = '00000000-0000-0000-0000-000000000000';
+
+  it('every snapshot id is unique', () => {
+    const ids = snapshotChain().map((s) => s.id);
+    const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+    expect(duplicates, 'duplicate snapshot ids break the drizzle chain').toEqual([]);
+  });
+
+  it('every prevId points to the predecessor snapshot id', () => {
+    const chain = snapshotChain();
+    const broken = chain
+      .map((s, i) => ({ s, expected: i === 0 ? ZERO : chain[i - 1].id }))
+      .filter(({ s, expected }) => s.prevId !== expected)
+      .map(({ s, expected }) => `${s.tag}: prevId ${s.prevId} ≠ expected ${expected}`);
+    expect(broken, 'snapshot prevId links must form an unbroken chain').toEqual([]);
   });
 });
 
