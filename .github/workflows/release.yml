@@ -203,17 +203,17 @@ jobs:
             --expected-version "$RELEASE_TAG"
 
       - name: Attest release artifact provenance
-        uses: actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999 # v4
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
         with:
           subject-checksums: /tmp/tarballs/SHA256SUMS
 
       - name: Attest release checksum file
-        uses: actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999 # v4
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
         with:
           subject-path: /tmp/tarballs/SHA256SUMS
 
       - name: Attest release SBOM
-        uses: actions/attest@f6bf1532d7d6793fce74eac584813a8eee607999 # v4
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
         with:
           subject-checksums: /tmp/tarballs/SHA256SUMS
           sbom-path: /tmp/tarballs/opensip-cli-sbom.cyclonedx.json
