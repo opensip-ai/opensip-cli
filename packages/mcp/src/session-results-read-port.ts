@@ -23,9 +23,14 @@ import {
   type SessionReplayFn,
 } from '@opensip-cli/session-store';
 
-import { compareSignalsToBaseline } from './baseline-comparison.js';
 import { readError } from './mcp-error.js';
 import { buildPersistedReviewBrief, type PersistedReviewStep } from './persisted-review-brief.js';
+import {
+  baselineComparisonReplay,
+  missingBaselineReplay,
+  recommendedNext,
+  runSummaryFromReplay,
+} from './session-reply-builders.js';
 import {
   latestCompleted,
   missingSuiteGroupMessage,
@@ -47,12 +52,7 @@ import type {
   ShowRunData,
 } from './result-dto.js';
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from './results-read-port.js';
-import type {
-  AgentCatalog,
-  HistorySession,
-  SignalEnvelope,
-  StoredSession,
-} from '@opensip-cli/contracts';
+import type { AgentCatalog, HistorySession, StoredSession } from '@opensip-cli/contracts';
 import type { Result, ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -157,7 +157,10 @@ export class SessionResultsReadPort implements ResultsReadPort {
   async reviewChange(
     opts: ReviewChangeOptions,
   ): Promise<Result<McpResultReplay<McpReviewChangeData>, McpReadError>> {
-    const history = listSessionSummaries(this.store, { summaryOnly: false });
+    const history = listSessionSummaries(this.store, {
+      summaryOnly: false,
+      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
+    });
     const group = selectSuiteGroup(history.suiteGroups ?? [], opts);
     if (group === undefined) {
       const detail = missingSuiteGroupMessage(opts);
@@ -220,6 +223,11 @@ export class SessionResultsReadPort implements ResultsReadPort {
   async compareToBaseline(
     opts: CompareToBaselineOptions,
   ): Promise<Result<McpResultReplay<McpBaselineComparisonData>, McpReadError>> {
+    // Scope the session BEFORE replaying it: a foreign-repo run must be
+    // reported as not-found, and must not be compared against this project's
+    // baseline (the evidence-corruption class Phase 0 / ADR-0130 closes).
+    const scoped = this.resolveScopedSession(opts.ref ?? 'latest', opts.tool);
+    if (!scoped.ok) return err(scoped.error);
     const outcome = await resolveAndReplaySession(this.store, {
       ref: opts.ref ?? 'latest',
       tool: opts.tool,
@@ -227,74 +235,16 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay } = outcome;
+    if (!this.isSessionInScope(session))
+      return this.foreignSessionNotFound(opts.ref ?? 'latest', session);
 
-    let repo: BaselineRepo;
     try {
-      repo = new BaselineRepo(this.store);
-      if (!repo.exists(opts.tool)) {
-        return ok({
-          data: {
-            tool: opts.tool,
-            baseline: { available: false },
-            delta: {
-              added: 0,
-              resolved: 0,
-              unchanged: 0,
-              missingFingerprint: replay.envelope.signals.filter((signal) => !signal.fingerprint)
-                .length,
-            },
-            addedFindings: [],
-            degraded: [
-              {
-                code: 'missing-baseline',
-                message:
-                  `No stored baseline exists for ${opts.tool}. Run opensip ${opts.tool} ` +
-                  '--gate-save to capture one.',
-              },
-            ],
-          },
-          session: runSummaryFromReplay(session, replay.envelope),
-          recommendedNext: {
-            ...recommendedNext(session),
-            saveBaselineCommand: `opensip ${opts.tool} --gate-save`,
-          },
-        });
-      }
-    } catch (error) {
-      return err(
-        readError('baseline-error', error instanceof Error ? error.message : String(error)),
+      const repo = new BaselineRepo(this.store);
+      return ok(
+        repo.exists(opts.tool)
+          ? baselineComparisonReplay(repo, opts, session, replay.envelope)
+          : missingBaselineReplay(opts.tool, session, replay.envelope),
       );
-    }
-
-    try {
-      const rows = repo.load(opts.tool);
-      const capturedAt = repo.capturedAt(opts.tool);
-      const identity = repo.loadMeta(opts.tool);
-      const projection = compareSignalsToBaseline({
-        current: replay.envelope.signals,
-        baselineRows: rows,
-        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
-        ...(opts.includeResolved === undefined ? {} : { includeResolved: opts.includeResolved }),
-      });
-      return ok({
-        data: {
-          tool: opts.tool,
-          baseline: {
-            available: true,
-            rowCount: rows.length,
-            ...(capturedAt === undefined ? {} : { capturedAt: new Date(capturedAt).toISOString() }),
-            ...(identity === undefined ? {} : { identity }),
-          },
-          delta: projection.delta,
-          addedFindings: projection.addedFindings,
-          ...(projection.resolvedFindings === undefined
-            ? {}
-            : { resolvedFindings: projection.resolvedFindings }),
-          ...(projection.degraded === undefined ? {} : { degraded: projection.degraded }),
-        },
-        session: runSummaryFromReplay(session, replay.envelope),
-        recommendedNext: recommendedNext(session),
-      });
     } catch (error) {
       return err(
         readError('baseline-error', error instanceof Error ? error.message : String(error)),
@@ -310,7 +260,10 @@ export class SessionResultsReadPort implements ResultsReadPort {
     ref: string,
     tool: ToolShortId | undefined,
   ): Result<StoredSession, McpReadError> {
-    const resolved = resolveSession(this.store, { ref, ...(tool === undefined ? {} : { tool }) });
+    const resolved = resolveSession(this.store, {
+      ref,
+      ...(tool === undefined ? {} : { tool }),
+    });
     if (!resolved.ok) return err(readError(resolved.reason, resolved.detail));
     if (!this.isSessionInScope(resolved.session)) {
       return this.foreignSessionNotFound(ref, resolved.session);
@@ -345,21 +298,6 @@ function toRunSummary(s: HistorySession): RunSummary {
   };
 }
 
-/** Build a {@link RunSummary} for a replayed run (summary from the envelope verdict). */
-function runSummaryFromReplay(session: StoredSession, envelope: SignalEnvelope): RunSummary {
-  return {
-    id: session.id,
-    tool: session.tool,
-    startedAt: session.startedAt,
-    completedAt: session.completedAt,
-    cwd: session.cwd,
-    score: session.score,
-    passed: session.passed,
-    showCommand: `opensip sessions show ${session.id} --json`,
-    summary: envelope.verdict.summary,
-  };
-}
-
 /** The `--filter` vocabulary for a {@link LatestFindingsOptions} request. */
 function severityFilters(opts: LatestFindingsOptions): string[] {
   const filters: string[] = [];
@@ -380,15 +318,4 @@ function filterMeta(
 > {
   if (!filters?.length) return {};
   return { filtersApplied: filters, originalSignalCount, returnedSignalCount };
-}
-
-/** Follow-up commands an agent should prefer over re-running the tool. */
-function recommendedNext(session: StoredSession): Record<string, string> {
-  const tool = session.tool;
-  return {
-    showLatestErrorsCommand: `opensip sessions show latest --tool ${tool} --json --filter errors-only`,
-    showLatestWarningsCommand: `opensip sessions show latest --tool ${tool} --json --filter warnings-only`,
-    showRawEnvelopeCommand: `opensip sessions show ${session.id} --json --raw`,
-    rerunCommand: `opensip ${tool}`,
-  };
 }

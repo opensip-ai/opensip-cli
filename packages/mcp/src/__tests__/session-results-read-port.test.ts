@@ -402,6 +402,25 @@ describe('SessionResultsReadPort — reviewChange', () => {
     const out = await port().reviewChange({ suiteRunId: 'missing' });
     expect(out.ok).toBe(false);
   });
+
+  it('does not surface a foreign-repo suite group when project-scoped', async () => {
+    new SessionRepo(store).save(
+      makeSession({
+        id: 'foreign-fit',
+        tool: 'fit',
+        cwd: '/other',
+        suiteRunId: 'suite-foreign',
+        suiteName: 'audit',
+      }),
+    );
+    const out = await new SessionResultsReadPort({
+      store,
+      projectRoot: '/proj',
+      replayFor: reviewSuiteResolver,
+    }).reviewChange({ suiteRunId: 'suite-foreign' });
+    expect(out.ok).toBe(false);
+    expect(replayCalls).toEqual([]);
+  });
 });
 
 describe('SessionResultsReadPort — compareToBaseline', () => {
@@ -466,6 +485,19 @@ describe('SessionResultsReadPort — compareToBaseline', () => {
       expect(out.value.data.baseline).toMatchObject({ available: true, rowCount: 0 });
       expect(out.value.data.delta.added).toBe(1);
     }
+  });
+
+  it('returns not-found for a foreign-repo latest session without replaying it', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'foreign-fit', tool: 'fit', cwd: '/other' }));
+    new BaselineRepo(store).save('fit', [], DEFAULT_TEST_BASELINE_IDENTITY);
+    const out = await new SessionResultsReadPort({
+      store,
+      projectRoot: '/proj',
+      replayFor: compareBaselineResolver,
+    }).compareToBaseline({ tool: 'fit' });
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.error.code).toBe('not-found');
+    expect(replayCalls).toEqual([]);
   });
 });
 
