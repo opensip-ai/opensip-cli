@@ -40,6 +40,16 @@ export const GRAPH_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'of every production decline/phantom divergence (owner, resolved targets, and the ' +
       'call edge on both engines) to that path. Diagnostic-only; unset in normal runs.',
   },
+  {
+    canonical: 'OPENSIP_GRAPH_WORKSPACE_CHILD',
+    coerce: (raw) => raw === '1',
+    default: false,
+    docs:
+      'Internal sentinel set by `graph --workspace` on each spawned `graph <unit> --json` ' +
+      "child. When set, the child's plain --json path skips inline signal delivery so only " +
+      'the workspace parent aggregates (no per-unit cloud egress, no per-unit verdict exit — ' +
+      'audit P1-2). Never set it by hand.',
+  },
 ];
 
 /**

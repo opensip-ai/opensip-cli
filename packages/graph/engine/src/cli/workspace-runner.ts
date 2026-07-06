@@ -202,7 +202,15 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     const child = spawn(process.execPath, args, {
       cwd: input.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+      // Mark the child as an internal workspace unit: its plain `--json` path
+      // must NOT egress per unit or exit per verdict (the parent owns the
+      // aggregate — audit P1-2). Read via readGraphEnv in renderGraphResult.
+      // Multi-line spread mirrors heap-preflight.ts (the env object is passed to
+      // spawn, never logged).
+      env: {
+        ...process.env,
+        OPENSIP_GRAPH_WORKSPACE_CHILD: '1',
+      },
     });
     let stdout = '';
     let stderr = '';

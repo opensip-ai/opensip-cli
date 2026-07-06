@@ -78,6 +78,7 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 |---|---|
 | `OPENSIP_HEAP_NO_MONITOR` | Set to `1` to disable the V8 heap-pressure monitor (REPL embedding / custom allocators). |
 | `GRAPH_EQUIV_DIAG` | File path. When set, the graph `graph-equivalence-check` writes a structured JSON diagnostic of every production decline/phantom divergence (owner, resolved targets, and the call edge on both engines) to that path. Diagnostic-only; unset in normal runs. |
+| `OPENSIP_GRAPH_WORKSPACE_CHILD` | Internal sentinel set by `graph --workspace` on each spawned `graph <unit> --json` child so the child's plain `--json` path skips inline signal delivery (no per-unit cloud egress or verdict exit — the parent owns the aggregate). Never set by hand. |
 
 ## YAGNI audit
 

@@ -94,4 +94,25 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
     expect(cli.deliverSignals).toHaveBeenCalledTimes(1);
     expect(cli.emitEnvelope).toHaveBeenCalledTimes(1);
   });
+
+  it('suppresses inline delivery for a --workspace child (still emits, no egress/verdict exit)', async () => {
+    const prior = process.env.OPENSIP_GRAPH_WORKSPACE_CHILD;
+    process.env.OPENSIP_GRAPH_WORKSPACE_CHILD = '1';
+    try {
+      const opts = { json: true, cwd: '/x' } as unknown as Parameters<
+        typeof dispatchGraphResult
+      >[0];
+      const cli = mockCli();
+      const outcome = await dispatchGraphResult(opts, result, cli, STARTED, '/x');
+      expect(outcome).toBeUndefined();
+      // The parent owns the aggregate (audit P1-2): the child must NOT deliver
+      // (no per-unit cloud egress, no per-verdict exit) but still emits its JSON
+      // so the parent can parse per-unit signals from stdout.
+      expect(cli.deliverSignals).not.toHaveBeenCalled();
+      expect(cli.emitEnvelope).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prior === undefined) delete process.env.OPENSIP_GRAPH_WORKSPACE_CHILD;
+      else process.env.OPENSIP_GRAPH_WORKSPACE_CHILD = prior;
+    }
+  });
 });

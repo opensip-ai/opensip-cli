@@ -6,6 +6,7 @@ import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
 import { buildGraphSessionContribution } from './graph-session-contribution.js';
+import { readGraphEnv } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
@@ -190,11 +191,13 @@ export async function deliverGraphResult(
     signals: result.signals.length,
     suppressed: suppressedCount,
   });
-  // Plain `--json` is the workspace-child carrier: it returns `undefined` so
-  // the root does not cloud-emit per child (the parent owns the dashboard
-  // aggregate, not per-unit signal batches — audit P1-2). Every other mode
-  // (default render, `--report-to`) returns the outcome for root delivery; only
-  // the non-export render path carries a `session`.
+  // Plain `--json` delivers INLINE in `renderGraphResult` (H2 exit parity) and
+  // returns `undefined` here so the composition root does not deliver a second
+  // time. A `--workspace` child (`graph <unit> --json`) is additionally marked
+  // by the OPENSIP_GRAPH_WORKSPACE_CHILD sentinel, which suppresses that inline
+  // delivery so only the parent aggregates (no per-unit egress/verdict — audit
+  // P1-2). Every other mode (default render, `--report-to`) returns the outcome
+  // for root delivery; only the non-export render path carries a `session`.
   return opts.json === true ? undefined : { envelope, ...(session ? { session } : {}) };
 }
 
@@ -231,11 +234,19 @@ async function renderGraphResult(
       evt: 'graph.render.json.start',
       module: MODULE_GRAPH_RENDER,
     });
-    await cli.deliverSignals(envelope, {
-      cwd: opts.cwd,
-      reportTo: opts.reportTo,
-      apiKey: opts.apiKey,
-    });
+    // Standalone `graph --json` delivers inline so the machine outcome's
+    // exitCode matches the process exit (H2 parity, matching fit). A
+    // `--workspace` child (`graph <unit> --json`, marked by the sentinel) must
+    // NOT egress per unit or set a per-verdict exit — the parent owns the
+    // aggregate (audit P1-2) — so it skips delivery and exits 0 like before.
+    const isWorkspaceChild = readGraphEnv<boolean>('OPENSIP_GRAPH_WORKSPACE_CHILD') === true;
+    if (!isWorkspaceChild) {
+      await cli.deliverSignals(envelope, {
+        cwd: opts.cwd,
+        reportTo: opts.reportTo,
+        apiKey: opts.apiKey,
+      });
+    }
     emitAgentFilteredJsonOutput(cli, envelope, opts);
     log.info({
       evt: 'graph.render.json.complete',
