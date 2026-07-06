@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload Performance SLO report
         if: always() && hashFiles('slo-report.json') != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: performance-slo-report
           path: slo-report.json
@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload Detection Quality report
         if: always() && hashFiles('detection-quality-report.json') != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: detection-quality-report
           path: detection-quality-report.json
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload Compatibility Matrix report
         if: always() && hashFiles('compatibility-matrix-report.json') != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: compatibility-matrix-report
           path: compatibility-matrix-report.json
