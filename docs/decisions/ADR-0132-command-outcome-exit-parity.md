@@ -55,6 +55,16 @@ keeps a host-owned fallback in `emitEnvelope` for paths that still need it.
 **Fitness check:** No new check warranted. This is a runtime ordering contract,
 enforced by `command-outcome-exit-parity.test.ts`.
 
+**Follow-up (2026-07-06):** Making `afterDelivery` run on the gate path — the
+uniform per-mode hook semantics adopted alongside this contract — let yagni's
+`applyAdvisoryExitCode` re-affirmation run on `--gate-compare`/`--gate-save`,
+where under the default advisory config it reset the host-derived
+`RUNTIME_ERROR` back to `SUCCESS` (a degraded ratchet gate that printed FAILED
+but exited 0). Fixed by having yagni's `afterDelivery` skip the advisory reset
+in gate mode (the host owns the gate exit, ADR-0035), pinned by an un-mocked
+`yagni --gate-compare` row in `command-outcome-exit-parity.test.ts`. Any future
+adopter whose hooks mutate the exit code must respect the gate-owns-exit rule.
+
 **Related specs / ADRs:** Builds on the public JSON wrapper in
 [ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md), the signal
 currency in [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md), and

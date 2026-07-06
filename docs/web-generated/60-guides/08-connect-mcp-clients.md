@@ -70,7 +70,8 @@ until the client closes stdin:
 
 Use an **absolute path** for `--cwd` unless the client provides a project-root
 variable (Claude Code's `${CLAUDE_PROJECT_DIR}`). MCP result tools are scoped to
-that project root: runs recorded under another root are treated as not found.
+that project root: runs recorded under another root are treated as not found
+([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)).
 
 ---
 

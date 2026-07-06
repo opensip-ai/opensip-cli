@@ -75,7 +75,13 @@ export class FitnessRecipeService {
     // Default to the current scope's registries (the production path: a fit
     // run executes inside the pre-action-hook's RunScope). An explicit
     // `checkRegistry`/`recipeRegistry` in config overrides — tests and
-    // programmatic callers can inject their own without a scope.
+    // programmatic callers can inject their own without a scope. The trailing
+    // `createCheckRegistry()`/`createRecipeRegistry()` fallback is deliberate:
+    // it lets a scope-free programmatic construction resolve empty registries
+    // (the ad-hoc subscope path) rather than throwing in the constructor; a
+    // misconfigured in-scope run without a fitness slice yields a 0-check run,
+    // not a hard error. Fail-loud for genuine scope misuse lives at the
+    // `currentFitnessSubscope()` accessor (typed SYSTEM.SCOPE error), not here.
     this.checkRegistry =
       config?.checkRegistry ?? currentScope()?.fitness?.checks ?? createCheckRegistry();
     this.recipeRegistry =
