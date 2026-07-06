@@ -134,6 +134,10 @@ describe('buildYagniCommandSpec', () => {
         lines: ['YAGNI gate FAILED: 1 new finding(s) since baseline.'],
       }),
     );
+    // The advisory-exit reaffirmation must NOT run on the gate path — the host
+    // owns the gate exit (ADR-0035); running it would reset the RUNTIME_ERROR
+    // the degraded compare set back to SUCCESS (silent ratchet bypass).
+    expect(applyAdvisoryExitCodeMock).not.toHaveBeenCalled();
   });
 
   it('reports mutually exclusive gate flags before execution', async () => {

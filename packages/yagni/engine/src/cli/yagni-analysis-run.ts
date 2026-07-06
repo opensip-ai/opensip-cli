@@ -191,7 +191,13 @@ export function buildYagniAnalysisRunCommand(setUpLiveView: (cli: ToolCliContext
           : [`YAGNI baseline saved (${String(envelope.signals.length)} signal(s))`],
       renderCompareLines: ({ result }) => renderGateCompareLines(result),
     },
-    afterDelivery: ({ cli, request }) => {
+    afterDelivery: ({ cli, options, request }) => {
+      // Advisory re-affirmation exists ONLY to undo an exit code a nested graph
+      // evidence build may have raised on the json/human path. On the gate path
+      // the host owns the exit (ADR-0035): `--gate-save`/`--gate-compare` derive
+      // RUNTIME_ERROR from the baseline verdict / `failOnDegraded`, and resetting
+      // it to SUCCESS here would silently green a failed ratchet gate. Skip it.
+      if (options.gateSave === true || options.gateCompare === true) return;
       applyAdvisoryExitCode(cli, request.config);
     },
   });

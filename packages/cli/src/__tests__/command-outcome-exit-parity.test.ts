@@ -268,4 +268,54 @@ describe('CommandOutcome.exitCode parity', () => {
     const compare = cli.run(['graph', '--gate-compare'], { cwd: root, timeout: 90_000 });
     expect(compare.exitCode).toBe(1);
   });
+
+  it('pins the yagni gate-compare degraded exit under default advisory config', () => {
+    // Regression for the advisory-exit clobber: with yagni's DEFAULT config
+    // (failOnErrors/failOnWarnings = 0) a degraded --gate-compare must still exit
+    // non-zero. The host derives RUNTIME_ERROR from failOnDegraded; the advisory
+    // reaffirmation must NOT reset it to SUCCESS on the gate path (ADR-0035).
+    const root = tmpProject('yagni-gate');
+    cpSync(YAGNI_FIXTURE, root, { recursive: true });
+    writeFileSync(
+      join(root, 'opensip-cli.config.yml'),
+      [
+        'schemaVersion: 1',
+        'targets:',
+        '  backend:',
+        '    description: YAGNI gate fixture',
+        '    languages: [typescript]',
+        '    concerns: [backend]',
+        '    include:',
+        "      - 'src/**/*.ts'",
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const save = cli.run(['yagni', '--gate-save'], { cwd: root, timeout: 90_000 });
+    expect(save.exitCode).toBe(0);
+
+    // Introduce a net-new unused-config finding so the compare degrades.
+    writeFileSync(
+      join(root, 'src', 'app-config.ts'),
+      [
+        'export interface AppConfig {',
+        '  readonly usedKnob: string;',
+        '  readonly orphanKnob: string;',
+        '  readonly secondOrphanKnob: string;',
+        '}',
+        '',
+        'export const DEFAULT_APP_CONFIG: AppConfig = {',
+        "  usedKnob: 'yes',",
+        "  orphanKnob: 'never-read',",
+        "  secondOrphanKnob: 'also-never-read',",
+        '};',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const compare = cli.run(['yagni', '--gate-compare'], { cwd: root, timeout: 90_000 });
+    expect(compare.exitCode).not.toBe(0);
+  });
 });
