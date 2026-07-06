@@ -115,25 +115,29 @@ function renderCliVersionValue(cliVersion: string): string {
 
 function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
   if (input === undefined) return '';
-  const pairs: readonly (readonly [string, string])[] = [
-    ['CLI', input.cliVersion],
-    ['Node', input.nodeVersion],
-    ['Package manager', input.packageManager ?? 'unknown'],
-    ['Platform', input.platform],
-    ['Tool', input.tool],
-    ['Engine', input.engineVersion ?? 'unknown'],
-    [
-      'Baseline',
-      input.baselineIdentity === undefined
-        ? 'unknown'
-        : `${input.baselineIdentity.fingerprintStrategyId}@${input.baselineIdentity.fingerprintStrategyVersion}`,
-    ],
+  // Only Engine (a tool's manifest version) and Baseline (a gate's fingerprint
+  // identity) are meaningful for a TOOL run. The report itself is a host command
+  // with neither, so those rows are omitted rather than rendered as "unknown".
+  // Package manager is likewise omitted when it can't be resolved.
+  const pairs: (readonly [string, string])[] = [
+    ['CLI', renderCliVersionValue(input.cliVersion)],
+    ['Node', escapeHtml(input.nodeVersion)],
   ];
+  if (input.packageManager !== undefined) {
+    pairs.push(['Package manager', escapeHtml(input.packageManager)]);
+  }
+  pairs.push(['Platform', escapeHtml(input.platform)], ['Tool', escapeHtml(input.tool)]);
+  if (input.engineVersion !== undefined) pairs.push(['Engine', escapeHtml(input.engineVersion)]);
+  if (input.baselineIdentity !== undefined) {
+    pairs.push([
+      'Baseline',
+      escapeHtml(
+        `${input.baselineIdentity.fingerprintStrategyId}@${input.baselineIdentity.fingerprintStrategyVersion}`,
+      ),
+    ]);
+  }
   const rows = pairs
-    .map(([label, value]) => {
-      const valueHtml = label === 'CLI' ? renderCliVersionValue(value) : escapeHtml(value);
-      return `<dt>${escapeHtml(label)}</dt><dd>${valueHtml}</dd>`;
-    })
+    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${value}</dd>`)
     .join('');
   return `<details class="report-details"><summary><span class="report-details-version">CLI ${renderCliVersionValue(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
 }

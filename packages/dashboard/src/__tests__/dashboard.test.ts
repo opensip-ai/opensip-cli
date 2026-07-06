@@ -52,7 +52,6 @@ const declaredInputs: DeclaredInputs = {
   packageManager: 'pnpm@10.0.0+sha512.deadbeef',
   platform: 'darwin/arm64',
   tool: 'report',
-  engineVersion: 'unknown',
 };
 
 describe('generateDashboardHtml', () => {
@@ -100,9 +99,7 @@ describe('generateDashboardHtml', () => {
 
   it('links released CLI versions to the matching GitHub release tag', () => {
     const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
-    expect(html).toContain(
-      'href="https://github.com/opensip-ai/opensip-cli/releases/tag/v0.1.19"',
-    );
+    expect(html).toContain('href="https://github.com/opensip-ai/opensip-cli/releases/tag/v0.1.19"');
     expect(html).toContain('target="_blank" rel="noopener noreferrer"');
     expect(html).toContain('<dt>CLI</dt><dd><a class="report-details-link"');
   });
@@ -115,6 +112,33 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain('<span class="report-details-version">CLI 0.4.0-dev</span>');
     expect(html).toContain('<dt>CLI</dt><dd>0.4.0-dev</dd>');
     expect(html).not.toContain('releases/tag/v0.4.0-dev');
+  });
+
+  it('omits Engine and Baseline rows when they do not apply (host report run)', () => {
+    // The report command is a host command with no tool engine and no baseline,
+    // so those rows are omitted rather than rendered as a confusing "unknown".
+    const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
+    expect(html).not.toContain('<dt>Engine</dt>');
+    expect(html).not.toContain('<dt>Baseline</dt>');
+    // No environment row should render an "unknown" value cell.
+    expect(html).not.toContain('<dd>unknown</dd>');
+  });
+
+  it('renders Engine and Baseline rows when the inputs carry them', () => {
+    const html = generateDashboardHtml({
+      sessions: [makeSession()],
+      declaredInputs: {
+        ...declaredInputs,
+        tool: 'fit',
+        engineVersion: '0.4.0',
+        baselineIdentity: {
+          fingerprintStrategyId: 'fitness.message-hash',
+          fingerprintStrategyVersion: 1,
+        },
+      },
+    });
+    expect(html).toContain('<dt>Engine</dt><dd>0.4.0</dd>');
+    expect(html).toContain('<dt>Baseline</dt><dd>fitness.message-hash@1</dd>');
   });
 
   it('escapes < and > in inlined JSON to prevent script injection', () => {
