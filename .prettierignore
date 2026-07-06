@@ -37,3 +37,13 @@ pnpm-lock.yaml
 
 # Generated client bundle (esbuild output inlined into the dashboard report)
 **/client-bundle.generated.ts
+
+# Generated report artifacts written to the repo root by CI / the lint lane
+# (bench:slo → slo-report.json, compat:matrix:check → compatibility-matrix-report.json,
+# detection-quality → detection-quality-report.json). They are gitignored, but CI
+# generates slo-report.json BEFORE `pnpm lint`, so without this exclusion
+# `format:check` (which globs **/*.json) trips on the unformatted output and
+# reddens build-and-test. These are tool output, not authored source.
+slo-report.json
+compatibility-matrix-report.json
+detection-quality-report.json
