@@ -260,9 +260,14 @@ export const vitestConfigRequiredWithTests = defineCheck({
   id: 'b7363db9-c3f7-47bc-8c25-1ddeebf53904',
   slug: 'vitest-config-required-with-tests',
   itemType: 'packages',
+  // `config` is REQUIRED: package.json is the discovery seed for analyzeAll, and
+  // the only target that includes `**/package.json` declares concern `config`.
+  // Without it this check never receives a package.json and runs inert in the
+  // dogfood gate (findByScope intersects concern sets). backend/frontend/cli keep
+  // it matching source-bearing targets too.
   scope: {
     languages: ['typescript'],
-    concerns: ['backend', 'frontend', 'cli'],
+    concerns: ['backend', 'frontend', 'cli', 'config'],
   },
 
   confidence: 'high',
