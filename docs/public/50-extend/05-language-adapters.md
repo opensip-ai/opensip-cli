@@ -9,7 +9,6 @@ source-files:
   - packages/core/src/languages/adapter.ts
   - packages/core/src/languages/registry.ts
   - packages/core/src/languages/content-filter-dispatch.ts
-  - packages/core/src/languages/generic-types.ts
   - packages/languages/lang-typescript/src/adapter.ts
   - packages/languages/lang-typescript/src/filter.ts
   - packages/languages/lang-rust/src/adapter.ts
