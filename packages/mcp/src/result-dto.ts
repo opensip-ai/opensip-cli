@@ -30,6 +30,10 @@ export interface RunSummary {
   readonly cwd?: string;
   readonly score: number;
   readonly passed: boolean;
+  /** opensip-cli version that produced the run. Absent on legacy rows. */
+  readonly cliVersion?: string;
+  /** Producing tool's engine (manifest) version. Absent when unversioned / legacy. */
+  readonly engineVersion?: string;
   /** The `opensip sessions show … --json` command that replays this run. */
   readonly showCommand: string;
   /** Verdict counts when the stored payload carried a summary. */

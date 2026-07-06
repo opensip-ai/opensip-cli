@@ -149,8 +149,16 @@ function detailSubline(
   if (totalWarnings > 0)
     countParts.push(totalWarnings + ' warning' + (totalWarnings === 1 ? '' : 's'));
   const countsStr = countParts.length > 0 ? ' — ' + countParts.join(', ') : '';
+  // Run provenance: which opensip-cli (and tool engine) produced this session.
+  let versionStr = '';
+  if (session.cliVersion) {
+    versionStr = ' — CLI ' + session.cliVersion;
+    if (session.engineVersion && session.engineVersion !== session.cliVersion) {
+      versionStr += ' · engine ' + session.engineVersion;
+    }
+  }
   sub.textContent =
-    session.cwd + (session.recipe ? ' — recipe: ' + session.recipe : '') + countsStr;
+    session.cwd + (session.recipe ? ' — recipe: ' + session.recipe : '') + countsStr + versionStr;
   return sub;
 }
 

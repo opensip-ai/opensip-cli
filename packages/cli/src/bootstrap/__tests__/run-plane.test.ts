@@ -246,6 +246,22 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
     expect(row?.completedAt).toBe(recorded?.completedAt);
     expect(row?.durationMs).toBe(recorded?.durationMs);
     expect(row?.payload).toEqual({ summary: { total: 3 } });
+    // The host stamps the real opensip-cli version as run provenance.
+    expect(row?.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it('stamps engineVersion from the entered scope tool manifest', () => {
+    const scope = new RunScope({
+      toolManifests: [
+        { id: 'fit', identity: { name: 'fit' }, version: '9.9.9' },
+      ] as unknown as ConstructorParameters<typeof RunScope>[0]['toolManifests'],
+    });
+    const recorded = runWithScope(scope, () =>
+      factory.current().completeAndPersist(contribution()),
+    );
+    const row = new SessionRepo(datastore).get(recorded.id);
+    expect(row?.engineVersion).toBe('9.9.9');
+    expect(row?.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('records persistMs on the sibling host-metrics row', () => {

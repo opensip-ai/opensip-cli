@@ -27,6 +27,8 @@ export function runSummaryFromReplay(session: StoredSession, envelope: SignalEnv
     cwd: session.cwd,
     score: session.score,
     passed: session.passed,
+    ...(session.cliVersion === undefined ? {} : { cliVersion: session.cliVersion }),
+    ...(session.engineVersion === undefined ? {} : { engineVersion: session.engineVersion }),
     showCommand: `opensip sessions show ${session.id} --json`,
     summary: envelope.verdict.summary,
   };

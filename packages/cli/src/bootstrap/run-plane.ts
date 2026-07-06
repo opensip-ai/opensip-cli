@@ -27,6 +27,7 @@ import {
   deriveRunOutcome,
   generatePrefixedId,
   logger as defaultLogger,
+  readPackageVersion,
   type Logger,
   type RecordedToolRunSession,
   type RunLifecycle,
@@ -37,11 +38,17 @@ import {
 } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
+import { manifestVersionFor } from './declared-inputs.js';
 import {
   enforceSessionRetention,
   resolveCurrentSessionRetentionPolicy,
   type ResolvedSessionRetentionPolicy,
 } from './session-retention.js';
+
+// The opensip-cli version, resolved once from this package's package.json. An
+// immutable build fact (not per-run state); host-stamped onto every session row
+// as run provenance.
+const CLI_VERSION = readPackageVersion(import.meta.url);
 
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -207,6 +214,14 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           passed: contribution.passed,
           runOutcome,
           durationMs: snapshot.durationMs,
+          // Run provenance (host-stamped, like timing/id): the CLI version that
+          // produced the run and the producing tool's engine version. engineVersion
+          // is undefined for a tool with no manifest version.
+          cliVersion: CLI_VERSION,
+          ...((): { engineVersion?: string } => {
+            const engineVersion = manifestVersionFor(contribution.tool);
+            return engineVersion === undefined ? {} : { engineVersion };
+          })(),
           payload: contribution.payload,
         });
         sessionId = id;

@@ -30,6 +30,10 @@ export const sessions = sqliteTable(
     /** Persisted run health (ADR-0060): passed | failed | degraded | error. Nullable for legacy rows. */
     run_outcome: text('run_outcome'),
     durationMs: integer('duration_ms').notNull(),
+    /** opensip-cli version that produced the run (host-stamped). Nullable for legacy rows. */
+    cli_version: text('cli_version'),
+    /** Producing tool's engine (manifest) version. Nullable when the tool has none / legacy rows. */
+    engine_version: text('engine_version'),
   },
   (table) => [index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`)],
 );

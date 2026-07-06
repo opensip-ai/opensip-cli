@@ -220,6 +220,16 @@ describe('SessionResultsReadPort — listRuns', () => {
     const out = port().listRuns({ tool: 'graph' });
     expect(out.ok && out.value.map((r) => r.id)).toEqual(['graph-x']);
   });
+
+  it('carries cli/engine version provenance into the RunSummary', () => {
+    new SessionRepo(store).save(
+      makeSession({ id: 'ver-x', cliVersion: '0.4.0', engineVersion: '0.4.0' }),
+    );
+    const out = port().listRuns();
+    const summary = out.ok ? out.value.find((r) => r.id === 'ver-x') : undefined;
+    expect(summary?.cliVersion).toBe('0.4.0');
+    expect(summary?.engineVersion).toBe('0.4.0');
+  });
 });
 
 describe('SessionResultsReadPort — latestFindings (severity/limit → replay filters)', () => {

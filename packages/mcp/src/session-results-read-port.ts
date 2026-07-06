@@ -293,6 +293,8 @@ function toRunSummary(s: HistorySession): RunSummary {
     cwd: s.cwd,
     score: s.score,
     passed: s.passed,
+    ...(s.cliVersion === undefined ? {} : { cliVersion: s.cliVersion }),
+    ...(s.engineVersion === undefined ? {} : { engineVersion: s.engineVersion }),
     showCommand: s.showCommand,
     ...(s.summary ? { summary: s.summary } : {}),
   };

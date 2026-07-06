@@ -51,7 +51,12 @@ function resolvePackageManager(opts: CollectDeclaredInputsOptions): string | und
   );
 }
 
-function manifestVersionFor(tool: ToolShortId): string | undefined {
+/**
+ * The engine (manifest) version of a tool, read from the entered scope's tool
+ * manifests. `undefined` for a host command or a tool that declares no version.
+ * Shared by the report env panel and the per-session version stamp (run-plane).
+ */
+export function manifestVersionFor(tool: ToolShortId): string | undefined {
   const manifests = currentScope()?.toolManifests ?? [];
   return manifests.find((manifest) => manifest.id === tool || manifest.identity.name === tool)
     ?.version;

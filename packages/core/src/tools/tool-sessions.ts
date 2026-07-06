@@ -37,6 +37,18 @@ export interface ToolSessionRecord {
    */
   readonly runOutcome?: ToolRunOutcome;
   readonly durationMs: number;
+  /**
+   * The opensip-cli version that produced this run — provenance for
+   * reproducing/explaining a finding. Host-stamped at persist (like timing/id);
+   * tools never supply it. Absent on legacy rows written before it existed.
+   */
+  readonly cliVersion?: string;
+  /**
+   * The producing tool's engine (manifest) version. Host-stamped from the
+   * scope's tool manifests. Absent when the tool declares no manifest version
+   * or on legacy rows.
+   */
+  readonly engineVersion?: string;
   readonly payload?: unknown;
 }
 

@@ -101,6 +101,12 @@ export function buildSession(
     passed,
     ...(runOutcome === undefined ? {} : { runOutcome }),
     durationMs: row.durationMs,
+    ...(row.cli_version === null || row.cli_version === undefined
+      ? {}
+      : { cliVersion: row.cli_version }),
+    ...(row.engine_version === null || row.engine_version === undefined
+      ? {}
+      : { engineVersion: row.engine_version }),
     ...(hostMetrics ? { hostMetrics } : {}),
     payload: payloadRow?.payload,
   };

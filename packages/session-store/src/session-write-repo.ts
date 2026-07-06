@@ -49,6 +49,8 @@ export class SessionWriteRepo {
               passed: session.passed,
               run_outcome: session.runOutcome ?? null,
               durationMs: session.durationMs,
+              cli_version: session.cliVersion ?? null,
+              engine_version: session.engineVersion ?? null,
             })
             .run();
           if (session.payload !== undefined) {

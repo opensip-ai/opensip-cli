@@ -41,6 +41,10 @@ declare global {
     runOutcome?: 'passed' | 'failed' | 'degraded' | 'error';
     durationMs: number;
     cwd: string;
+    /** opensip-cli version that produced the run (host-stamped). Legacy rows omit. */
+    cliVersion?: string;
+    /** Producing tool's engine (manifest) version. Absent when unversioned / legacy. */
+    engineVersion?: string;
     /** Tool-owned opaque payload (fitness/sim/graph carry their own shapes). */
     payload?: {
       summary?: {
