@@ -2,6 +2,50 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.4.0] - 2026-07-06
+
+An architecture-remediation and agent-workflow release. It hardens the layered
+kernel after the July 2026 audit, makes the built-in audit suite changed-scope
+by default, and tightens suite dispatch, MCP session reads, and gate verdict
+fidelity across tools.
+
+### Added
+
+- Built-in `audit` suite runs changed-scope by default when git resolves,
+  exposes `--full` for whole-repo scans, and stamps the resolved scope on suite
+  results (ADR-0129).
+- MCP session review helpers and repo-scoped reads so result tools serve only
+  sessions recorded under the server's project root (ADR-0130).
+- Shared suite step dispatch pipeline with worst-of exit capture and JSON
+  outcome exit parity (ADR-0131, ADR-0132).
+- Drizzle migration drift verification and activated vitest coverage-threshold
+  enforcement in release preflight.
+
+### Changed
+
+- July 2026 architecture audit remediation: deleted the core language-query
+  surface, removed unbound live and YAGNI glue, re-chartered contracts, and made
+  dashboard tool tabs explicit (ADR-0105).
+- Per-run scope now owns retention and profiler state instead of leaking across
+  invocations.
+- Suite steps share one host dispatch path; YAGNI verdict outcome persists and
+  no longer clobbers gate results.
+
+### Fixed
+
+- Fitness check signals preserve fidelity; the wire provider stays byte-stable at
+  `opensip-cli`.
+- Graph suppresses per-unit egress on `--workspace` children.
+- CLI outcome exits align with delivery; suite step errors are isolated in
+  capture.
+- Agent catalog parity validation and tool seam enforcement widened in config.
+- Dogfood warning regressions cleaned after surface deletion.
+
+### Breaking
+
+- The core language-query surface is removed; consumers must use language
+  adapters through the supported registry paths instead.
+
 ## [0.3.1] - 2026-07-03
 
 An init scaffold reliability release. Freshly initialized projects can now run

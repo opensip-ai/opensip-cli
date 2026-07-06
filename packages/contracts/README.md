@@ -4,7 +4,7 @@
 
 # @opensip-cli/contracts
 
-> Public Tool↔runner contract facade for OpenSIP CLI — envelopes, command results, exit codes, manifests
+> Public Tool↔runner contracts and shared host-run runtime for OpenSIP CLI
 
 This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.
 
@@ -25,8 +25,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.3.1/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.3.1/packages/contracts
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.4.0/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.4.0/packages/contracts
 
 ## License
 
