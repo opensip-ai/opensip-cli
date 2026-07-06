@@ -10,6 +10,7 @@ const DATASTORE_DIR = join(REPO_ROOT, 'packages', 'datastore');
 const MIGRATIONS_DIR = join(DATASTORE_DIR, 'migrations');
 const JOURNAL_PATH = join(MIGRATIONS_DIR, 'meta', '_journal.json');
 const SCHEMA_VERSION_PATH = join(DATASTORE_DIR, 'src', 'schema-version.ts');
+const DRIZZLE_CONFIG_PATH = join(DATASTORE_DIR, 'drizzle.config.ts');
 
 function fail(message) {
   throw new Error(message);
@@ -97,14 +98,32 @@ function tail(text, max = 4000) {
   return text.slice(text.length - max);
 }
 
+/**
+ * The authoritative schema list lives in drizzle.config.ts. Parse it (rather
+ * than duplicate it) so this gate can never drift from the config it protects:
+ * a schema source added/removed there is picked up here automatically.
+ */
+function parseConfigSchemaPaths() {
+  // Strip line comments FIRST: the config's comments contain apostrophes
+  // (e.g. "fitness's") that would otherwise be read as string delimiters and
+  // swallow the real `./src/schema/*.ts` entries. Block comments aren't used.
+  const source = readFileSync(DRIZZLE_CONFIG_PATH, 'utf8').replaceAll(/\/\/[^\n]*/g, '');
+  const block = /schema\s*:\s*\[([\s\S]*?)\]/m.exec(source);
+  if (block === null) {
+    fail('Could not locate the `schema: [ ... ]` array in packages/datastore/drizzle.config.ts');
+  }
+  // Match only quoted paths ending in `.ts` — belt-and-braces against any
+  // remaining prose so the parsed list can never silently drop a schema source.
+  const paths = [...block[1].matchAll(/['"]([^'"]+\.ts)['"]/g)].map((match) => match[1]);
+  if (paths.length === 0) {
+    fail('packages/datastore/drizzle.config.ts declares an empty schema list');
+  }
+  // The config's paths are relative to the datastore package dir.
+  return paths.map((p) => resolve(DATASTORE_DIR, p));
+}
+
 function writeTempDrizzleConfig(tempConfigPath, tempMigrationsDir) {
-  const schema = [
-    join(REPO_ROOT, 'packages', 'session-store', 'src', 'schema', 'sessions.ts'),
-    join(REPO_ROOT, 'packages', 'graph', 'engine', 'src', 'persistence', 'schema.ts'),
-    join(DATASTORE_DIR, 'src', 'schema', 'baseline.ts'),
-    join(DATASTORE_DIR, 'src', 'schema', 'tool-state.ts'),
-    join(DATASTORE_DIR, 'src', 'schema', 'policy-audit.ts'),
-  ];
+  const schema = parseConfigSchemaPaths();
   const out = relative(DATASTORE_DIR, tempMigrationsDir).replaceAll('\\', '/');
   writeFileSync(
     tempConfigPath,
@@ -192,6 +211,39 @@ function snapshotTableSummary(snapshot) {
     .sort();
 }
 
+// The drizzle-kit snapshot serialization version this gate is written against.
+// Pinned deliberately (plan Task 6.3, option 2): the copy-journal-then-generate
+// mechanism the plan first prescribed does NOT work with drizzle-kit 0.31.x — an
+// incremental `generate` over the committed multi-snapshot journal aborts with a
+// "parent snapshot collision" AND exits 0, so a count-based check silently
+// passes. We therefore compare a fresh empty-dir squash against the committed
+// snapshot's table structure (which correctly bites on drift), and pin the
+// snapshot `version` so a drizzle-kit upgrade that changes the format fails here
+// with a clear "re-pin + regenerate" message instead of a spurious table diff.
+const EXPECTED_SNAPSHOT_VERSION = '6';
+
+function assertSnapshotVersion(label, snapshot) {
+  const version = String(snapshot.version ?? '');
+  if (version !== EXPECTED_SNAPSHOT_VERSION) {
+    fail(
+      [
+        `Drizzle ${label} snapshot format version is '${version}', expected '${EXPECTED_SNAPSHOT_VERSION}'.`,
+        'drizzle-kit changed its snapshot serialization. Regenerate the committed migrations',
+        '(pnpm --filter @opensip-cli/datastore db:generate), confirm they are correct, then',
+        'update EXPECTED_SNAPSHOT_VERSION in scripts/verify-drizzle-migrations.mjs to match.',
+      ].join('\n'),
+    );
+  }
+}
+
+/**
+ * Detect schema/migrations drift by regenerating a fresh squash of the current
+ * schema into an EMPTY temp folder and comparing its single snapshot's table
+ * structure (canonicalized: id/prevId stripped) against the latest committed
+ * snapshot. A clean tree matches; a schema edit without a committed regeneration
+ * diverges. See EXPECTED_SNAPSHOT_VERSION for why this is used over the
+ * copy-journal-then-generate approach the plan first prescribed.
+ */
 function verifyMigrationDrift() {
   const drizzleKitBin = resolveDrizzleKitBin();
   const tempRoot = mkdtempSync(join(DATASTORE_DIR, '.verify-drizzle-'));
@@ -204,8 +256,14 @@ function verifyMigrationDrift() {
     if (!existsSync(generatedSnapshotPath)) {
       fail('drizzle-kit generate did not produce meta/0000_snapshot.json in the temp folder');
     }
-    const committed = canonicalSnapshot(readJson(latestCommittedSnapshotPath()));
-    const generated = canonicalSnapshot(readJson(generatedSnapshotPath));
+    const committedSnapshot = readJson(latestCommittedSnapshotPath());
+    const generatedSnapshot = readJson(generatedSnapshotPath);
+    // Pin the format first: a version mismatch would otherwise surface as a
+    // confusing table diff on a clean tree after a drizzle-kit upgrade.
+    assertSnapshotVersion('committed', committedSnapshot);
+    assertSnapshotVersion('generated', generatedSnapshot);
+    const committed = canonicalSnapshot(committedSnapshot);
+    const generated = canonicalSnapshot(generatedSnapshot);
     if (stableStringify(committed) !== stableStringify(generated)) {
       fail(
         [
