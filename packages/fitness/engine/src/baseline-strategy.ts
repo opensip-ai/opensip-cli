@@ -14,6 +14,13 @@
  * `GateViolation` — the same three fields `extractViolationsFromEnvelope` read.
  * A `fingerprint-parity.test.ts` pins byte-equality against that oracle before
  * the old gate is deleted.
+ *
+ * Version 2 (ADR-0036 amendment, 2026-07-07): the hash formula is unchanged; the
+ * bump records that baselines produced under this strategy are now disambiguated
+ * by the host occurrence-ordinal in `stampFingerprints` (two distinct findings
+ * sharing filePath+ruleId+message no longer collapse to one baseline row). The
+ * id/version mismatch forces a one-time `--gate-save` re-capture; the fitness DB
+ * baseline is CI-ephemeral so this is drop-and-recapture, not a data migration.
  */
 
 import { createHash } from 'node:crypto';
@@ -23,7 +30,7 @@ import { defineFingerprintStrategy } from '@opensip-cli/core';
 /** fitness's message-hash baseline identity: `sha256(filePath\nruleId\nmessage)`. */
 export const fitnessFingerprintStrategy = defineFingerprintStrategy({
   id: 'fitness.sha256-file-rule-message',
-  version: 1,
+  version: 2,
   fingerprint: (s) =>
     createHash('sha256').update(`${s.filePath}\n${s.ruleId}\n${s.message}`).digest('hex'),
 });

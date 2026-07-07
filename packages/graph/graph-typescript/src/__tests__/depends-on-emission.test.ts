@@ -134,7 +134,12 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(dependenciesByOwner, 'dependenciesByOwner').toBeDefined();
 
     const greetDeps = dependenciesByOwner!.get(
-      ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath),
+      ownerEdgeKey(
+        greetModuleInit!.bodyHash,
+        greetModuleInit!.filePath,
+        greetModuleInit!.line,
+        greetModuleInit!.column,
+      ),
     );
     expect(greetDeps, 'greet has dependency edges').toHaveLength(1);
     expect(greetDeps![0].specifier).toBe('./format.js');
@@ -153,7 +158,12 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(greetModuleInit).toBeDefined();
 
     const greetDeps = dependenciesByOwner!.get(
-      ownerEdgeKey(greetModuleInit!.bodyHash, greetModuleInit!.filePath),
+      ownerEdgeKey(
+        greetModuleInit!.bodyHash,
+        greetModuleInit!.filePath,
+        greetModuleInit!.line,
+        greetModuleInit!.column,
+      ),
     );
     expect(greetDeps).toHaveLength(1);
     expect(greetDeps![0].specifier).toBe('@opensip-cli/nonexistent-pkg');
@@ -179,7 +189,12 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
     expect(mainModuleInit).toBeDefined();
 
     const deps = dependenciesByOwner!.get(
-      ownerEdgeKey(mainModuleInit!.bodyHash, mainModuleInit!.filePath),
+      ownerEdgeKey(
+        mainModuleInit!.bodyHash,
+        mainModuleInit!.filePath,
+        mainModuleInit!.line,
+        mainModuleInit!.column,
+      ),
     );
     expect(deps).toHaveLength(3);
 
@@ -202,7 +217,12 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
 
     // No dependency edges → owner not in the map at all.
     const deps = dependenciesByOwner?.get(
-      ownerEdgeKey(standaloneModuleInit!.bodyHash, standaloneModuleInit!.filePath),
+      ownerEdgeKey(
+        standaloneModuleInit!.bodyHash,
+        standaloneModuleInit!.filePath,
+        standaloneModuleInit!.line,
+        standaloneModuleInit!.column,
+      ),
     );
     expect(deps).toBeUndefined();
   });
@@ -222,7 +242,14 @@ describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
 
     const { catalog, dependenciesByOwner } = await runAdapter();
     const moduleInit = findModuleInit(catalog, 'src/multiline.ts');
-    const deps = dependenciesByOwner!.get(ownerEdgeKey(moduleInit!.bodyHash, moduleInit!.filePath));
+    const deps = dependenciesByOwner!.get(
+      ownerEdgeKey(
+        moduleInit!.bodyHash,
+        moduleInit!.filePath,
+        moduleInit!.line,
+        moduleInit!.column,
+      ),
+    );
     expect(deps).toHaveLength(1);
     expect(deps![0].line).toBe(3);
   });

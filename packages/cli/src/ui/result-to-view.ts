@@ -21,6 +21,7 @@ import {
   group,
   liveRunTable,
   viewRunSummary,
+  viewResultSummary,
   viewFooterHints,
   viewVerboseLines,
   viewFindingsGroups,
@@ -30,6 +31,7 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
+import { envelopeToResultSummary } from '@opensip-cli/contracts';
 import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
 import { viewConfigMigrate, viewConfigSchema, viewConfigValidate } from './views/config-views.js';
@@ -224,21 +226,31 @@ export function envelopeToTableView(
   durationOverride?: number,
   showTable = true,
 ): ViewNode {
-  const rows = formatSignalTableRows(envelope);
   const summary = formatSignalTableSummary(envelope);
   const children: ViewNode[] = [];
   if (verboseDetail !== undefined) {
     children.push(renderVerboseDetail(verboseDetail), SPACER);
   }
   if (showTable) {
-    const table = liveRunTable(rows);
+    const table = liveRunTable(formatSignalTableRows(envelope));
     if (table !== null) children.push(table);
+  } else {
+    // Compact default surface: the attention-only unit bullets (Option C — the
+    // failed + faulted units, with finding locations / the faulted check's error
+    // message). The full per-unit table is the `--verbose` surface above. Absent
+    // for a clean run (envelopeToResultSummary returns undefined), so a pass stays
+    // headline-only — no redundant "all passed" block.
+    const attention = envelopeToResultSummary(envelope);
+    if (attention !== undefined) {
+      children.push(viewResultSummary({ counts: attention.counts, items: attention.items }));
+    }
   }
   children.push(
     viewRunSummary({
-      // ADR-0035: the headline is the run's single verdict; the per-unit
-      // passed/failed counts live in the table rows above.
+      // ADR-0035: the headline is the run's single 3-way verdict; the per-unit
+      // outcomes live in the bullets/table above. A fault reads FAULT, not FAIL.
       passed: envelope.verdict.passed,
+      faulted: envelope.verdict.faulted,
       errors: summary.totalErrors,
       warnings: summary.totalWarnings,
       durationMs: resolveSummaryDuration(durationOverride ?? summary.durationMs),

@@ -54,6 +54,15 @@ export const SIGNAL_ENVELOPE_SCHEMA_VERSION = 2 as const;
 export interface RunVerdict {
   readonly score: number;
   readonly passed: boolean;
+  /**
+   * True when the run was a RUNTIME FAULT (a unit threw/timed-out — `runFaulted`
+   * or any `units[].error`) rather than a findings failure. A fault means the
+   * result is UNKNOWN, not that the code failed the gate, so it is a distinct
+   * outcome (see {@link deriveOutcome}). When `faulted` is true, `passed` is
+   * always false. Optional for forward-compat: legacy envelopes (pre-tri-state)
+   * omit it and degrade to the binary passed/failed.
+   */
+  readonly faulted?: boolean;
   readonly summary: {
     readonly total: number;
     readonly passed: number;
@@ -226,10 +235,14 @@ export function buildSignalEnvelope(input: BuildEnvelopeInput): SignalEnvelope {
   // finding — it FAILs the run regardless of the findings policy. Pre-unit
   // faults (e.g. fit plugin-load) arrive on `runFaulted` since no unit exists.
   const unitFaulted = input.units.some((u) => u.error !== undefined);
+  const faulted = input.runFaulted || unitFaulted;
 
   const verdict: RunVerdict = {
     score: passRate(summary),
-    passed: !input.runFaulted && !unitFaulted && policyPasses({ errors, warnings }, input.policy),
+    // A fault dominates: `passed` stays false, and `faulted` carries the
+    // authoritative tri-state bit that `deriveOutcome` reads.
+    passed: !faulted && policyPasses({ errors, warnings }, input.policy),
+    faulted,
     summary,
   };
 

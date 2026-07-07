@@ -314,12 +314,19 @@ export function resolveCrossBoundaryCalls(
   // (unresolved-vs-absent) divergence partition. Bucket ONLY resolved edges; a
   // declined site contributes nothing, so its intra placeholder is left intact
   // (matching exact) rather than replaced by a crossShard placeholder.
-  // Keyed by OCCURRENCE via the shared identity module — `ownerEdgeKey(ownerHash,
-  // ownerFile)`, never `ownerHash` alone (ADR-0003: body-twins share a hash; an
-  // owner-hash bucket would union their edges into phantom cross-package coupling).
+  // Keyed by OCCURRENCE via the shared identity module —
+  // `ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn)`, never `ownerHash`
+  // alone (ADR-0003: body-twins share a hash; an owner-hash bucket would union
+  // their edges into phantom cross-package coupling) and never the 2-tuple
+  // (ADR-0136: full occurrence identity also de-unions same-file twins).
   const edgesByOwnerKey = bucketEdgesByOwner(
     resolvedCalls.filter(({ edge }) => edge.to.length > 0),
-    ({ bc }) => ({ bodyHash: bc.ownerHash, filePath: bc.ownerFile }),
+    ({ bc }) => ({
+      bodyHash: bc.ownerHash,
+      filePath: bc.ownerFile,
+      line: bc.ownerLine,
+      column: bc.ownerColumn,
+    }),
     ({ edge }) => edge,
   );
 
@@ -516,9 +523,10 @@ function buildNameIndex(catalog: Catalog): ReadonlyMap<string, readonly Function
 
 /**
  * Stitch cross-shard edges onto each owner occurrence, via the shared identity
- * module keyed by `ownerEdgeKey(o.bodyHash, o.filePath)` — so ONLY the owning
- * occurrence receives its recovered edges (body-twins in different files never
- * smear; ADR-0003). A recovered edge REPLACES the unresolved (`to: []`)
+ * module keyed by `ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column)` — so
+ * ONLY the owning occurrence receives its recovered edges (body-twins, across
+ * files or on one line, never smear; ADR-0003/0136). A recovered edge REPLACES
+ * the unresolved (`to: []`)
  * intra-shard placeholder the local resolver left at the same call site —
  * otherwise the site would carry two edges (one unresolved, one recovered) and
  * double-count. Resolved intra-shard edges are always kept.
@@ -699,10 +707,12 @@ export interface CatalogEdgeDiff {
 }
 
 /**
- * One owner-attributed edge difference. `key` is the same `ownerHash@line:col`
- * the partition arrays use. `ownerFilePath` is the project-relative path of the
- * owner occurrence (resolved from whichever catalog holds it — the two catalogs
- * share occurrence identities, so the owner file is the same on both sides).
+ * One owner-attributed edge difference. `key` is the same
+ * `filePath:line:column@line:col` (owner OCCURRENCE identity + call-site
+ * position) the partition arrays use. `ownerFilePath` is the project-relative
+ * path of the owner occurrence (resolved from whichever catalog holds it — the
+ * two catalogs share occurrence identities, so the owner file is the same on
+ * both sides).
  * `toA` / `toB` are the sorted-joined target sets on each side (one is `''` when
  * the edge is present only on one side). `cross` mirrors the partition split.
  */
@@ -719,7 +729,9 @@ export interface EdgeDifference {
 /**
  * Diff two catalogs by edge, partitioned into intra-shard mismatches and
  * cross-package (boundary-linked) differences. An edge is keyed by
- * `ownerHash@line:col → sorted(to)`; a key is a difference when the two
+ * `filePath:line:column@line:col → sorted(to)` — the owner OCCURRENCE identity
+ * (ADR-0136), NOT `ownerHash`, so two same-file body-twins' differing edges are
+ * no longer collapsed last-writer-wins; a key is a difference when the two
  * catalogs disagree on its target set. Both partitions MUST be empty for a
  * correct sharded build vs single-program build: intra-package edges are exact
  * in both, and semantic boundary linking reproduces the single-program build's
@@ -778,7 +790,11 @@ function indexEdges(catalog: Catalog): ReadonlyMap<string, IndexedEdge> {
     if (!occs) continue;
     for (const o of occs) {
       for (const e of o.calls) {
-        const key = `${o.bodyHash}@${String(e.line)}:${String(e.column)}`;
+        // Key on the owner OCCURRENCE identity (filePath:line:column), NOT
+        // `bodyHash` (ADR-0136): a bodyHash can appear twice in one file, and a
+        // hash-keyed edge map would collapse the two twins' distinct edges
+        // last-writer-wins, hiding a collision-class divergence from the gate.
+        const key = `${o.filePath}:${String(o.line)}:${String(o.column)}@${String(e.line)}:${String(e.column)}`;
         map.set(key, {
           to: [...e.to].sort().join(','),
           crossShard: e.crossShard ?? false,

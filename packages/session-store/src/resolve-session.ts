@@ -7,10 +7,15 @@ import type { DataStore } from '@opensip-cli/datastore';
 /**
  * A reference to one stored session: an explicit `ref` id, or the sentinel
  * `'latest'` (which requires a `tool` to disambiguate across tools).
+ *
+ * `cwdWithin` scopes the `'latest'` SELECTION to sessions whose stored `cwd` is
+ * inside that root — the newest in-scope session wins over a newer foreign one.
+ * It is IGNORED for an explicit id: explicit ids resolve globally, and enforcing
+ * their scope is the caller's fail-closed responsibility.
  */
 export type SessionReference =
-  | { readonly ref: 'latest'; readonly tool?: ToolShortId }
-  | { readonly ref: string; readonly tool?: ToolShortId };
+  | { readonly ref: 'latest'; readonly tool?: ToolShortId; readonly cwdWithin?: string }
+  | { readonly ref: string; readonly tool?: ToolShortId; readonly cwdWithin?: string };
 
 /**
  * The outcome of {@link resolveSession}: either the resolved `session`, or a
@@ -26,9 +31,11 @@ export type SessionResolveResult =
 
 /**
  * Resolve a {@link SessionReference} against the datastore. `'latest'` returns
- * the most recent session for the given `tool` (and is ambiguous without one);
- * an explicit id is looked up directly and optionally tool-checked. Never
- * throws — every failure is a `{ ok: false, reason, detail }` result.
+ * the most recent session for the given `tool` (and is ambiguous without one),
+ * scoped to `cwdWithin` when provided; an explicit id is looked up directly and
+ * optionally tool-checked, and IGNORES `cwdWithin` (its scoping is the caller's
+ * fail-closed responsibility). Never throws — every failure is a
+ * `{ ok: false, reason, detail }` result.
  */
 export function resolveSession(
   datastore: DataStore,
@@ -43,7 +50,7 @@ export function resolveSession(
         detail: 'latest requires --tool fit|graph|sim',
       };
     }
-    const session = repo.latest({ tool: reference.tool });
+    const session = repo.latest({ tool: reference.tool, cwdWithin: reference.cwdWithin });
     if (session === null) {
       return {
         ok: false,

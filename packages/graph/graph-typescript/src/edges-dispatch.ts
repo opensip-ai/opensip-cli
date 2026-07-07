@@ -196,7 +196,7 @@ export function rebuildCatalog(
     if (!occs) continue;
     functions[name] = occs.map((o) => ({
       ...o,
-      calls: callsByHash.get(ownerEdgeKey(o.bodyHash, o.filePath)) ?? [],
+      calls: callsByHash.get(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column)) ?? [],
     }));
   }
   return { ...catalog, functions };

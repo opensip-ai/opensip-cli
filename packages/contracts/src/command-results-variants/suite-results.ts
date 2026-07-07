@@ -1,5 +1,6 @@
 import type { ImpactTrust } from '../impact-trust.js';
 import type { ReviewBrief } from '../review-brief.js';
+import type { RunOutcome } from '../run-outcome.js';
 
 export type SuiteRunScopeMode = 'changed' | 'full';
 export type SuiteRunScopeSource = 'default' | 'explicit' | 'fallback';
@@ -22,6 +23,16 @@ export interface SuiteStepSummary {
   readonly command: string;
   readonly exitCode: number;
   readonly durationMs: number;
+  /**
+   * The step's authoritative 3-way outcome — the single source of truth shared
+   * with single-tool runs (via {@link deriveOutcome} over the step's
+   * `RunVerdict`). A UNIT-level fault (a check that threw, surfaced as
+   * `verdict.faulted` in the emitted envelope) reads `faulted` here even when
+   * `error` (a run-LEVEL throw) is absent — the old `error`-only heuristic
+   * mislabeled that case `failed`. Prefer this over re-deriving from
+   * `exitCode`/`verdict`/`error`.
+   */
+  readonly outcome: RunOutcome;
   readonly error?: string;
   /** Machine-readable ToolError/reportFailure code when the step failed before a verdict. */
   readonly errorCode?: string;

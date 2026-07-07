@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-06-11
+last_verified: 2026-07-07
 owner: opensip-cli
 ---
 
@@ -127,3 +127,55 @@ ratchet — this plane generalizes the ratchet to every tool). The implementing 
 is `docs/plans/specs/host-baseline-ratchet-plane.md` (local-only), which carries
 the divergence table, the data model, the seam surface, and the per-tool no-flap +
 byte-identical verification matrix.
+
+---
+
+## Amendment — 2026-07-07: occurrence-ordinal fingerprint disambiguation
+
+The decision above is unchanged: the plane keys on the opaque `Signal.fingerprint`
+and treats it as an identity it never re-derives. This amendment closes a
+correctness hole in that identity — it does not reverse the decision.
+
+**(a) Problem.** The plane keys entirely on the opaque `Signal.fingerprint`. A
+per-tool `FingerprintStrategy.fingerprint` is a `(signal) => string` — it cannot
+see its siblings — so two *distinct* findings that map to the same base
+fingerprint collapse to a single entry. This happens for the two message-hash
+strategies that deliberately drop line/col: two identical Python `except:` lines
+under fitness's `sha256(filePath\nruleId\nmessage)`, or two vulns with the same
+file+rule+message under a scanner's message-hash. The collapse occurs at BOTH host
+consumption points — `diffBaseline` (a `Map` keyed by fingerprint, last-wins) and
+`BaselineRepo.save` (fingerprint dedupe + the composite PK `(tool, fingerprint)`) —
+so one real finding is silently dropped from the ratchet (the motivating `except:`
+bug).
+
+**(b) Decision.** Compute a per-run **occurrence ordinal** in the host
+`stampFingerprints` (`core/src/baseline/fingerprint-strategy.ts`) — the single
+production stamping point, which already receives the whole `Signal[]`. The tool's
+per-signal strategy is untouched and still opaque. When 2+ un-stamped signals share
+a base under `strategy`, the FIRST occurrence (array order) keeps the exact base
+hash and each subsequent occurrence gets an `#<n>` suffix
+(`OCCURRENCE_ORDINAL_SEPARATOR`). Singletons and the no-collision common case are
+byte-identical to the bare base hash → **zero migration** for the common case, and
+the golden per-strategy tests are unaffected because they call
+`strategy.fingerprint()` directly, not through `stampFingerprints`. Pre-stamped
+signals are opaque: they are excluded from grouping and returned by identity, so
+idempotency is preserved.
+
+**(c) Version surface.** Bump the two message-hash strategies —
+`fitness.sha256-file-rule-message` and
+`external-tool-adapter.sha256-file-rule-message` — to **version 2**, so a
+pre-upgrade baseline that held a collapsed duplicate produces a clean
+baseline-identity mismatch (`isBaselineIdentityCompatible`) → an explicit
+re-capture prompt instead of a silent one-time spurious `degraded`. The hash
+formulas are unchanged; only the descriptor `version` moves.
+`graph.rule-file-line-col` (byte-preserved, git-tracked JSON baseline),
+`opensip.default.rule-file-line-col`, and `yagni.sha256-detector-locations` stay
+**version 1**: they carry positional/richer keys, never collide in practice, and
+the ordinal is a no-op for them, so their byte/inheritance contracts are preserved
+and no re-capture is forced.
+
+**(d) Migration.** DB baselines are CI-ephemeral drop-and-recapture — one
+`--gate-save` re-writes them. The graph git-tracked JSON fingerprint baseline file
+is untouched (graph stayed at version 1). No `BASELINE_FORMAT_VERSION` change, no
+datastore migration, and no `SignalEnvelope.schemaVersion` change: the
+`tool_baseline_entries` / `tool_baseline_meta` tables are unchanged.

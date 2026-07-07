@@ -537,6 +537,7 @@ describe('suite views', () => {
           command: 'fit',
           exitCode: 0,
           durationMs: 400,
+          outcome: 'passed',
           verdict: { passed: true, errors: 0, warnings: 0, findings: 0 },
         },
         {
@@ -545,6 +546,7 @@ describe('suite views', () => {
           command: 'graph',
           exitCode: 1,
           durationMs: 500,
+          outcome: 'faulted',
           error: 'gate failed',
         },
       ],
@@ -638,7 +640,11 @@ describe('suite views', () => {
             reasons: [
               {
                 kind: 'same-symbol',
-                key: { kind: 'symbol', value: 'src/a.ts#handler', confidence: 'high' },
+                key: {
+                  kind: 'symbol',
+                  value: 'src/a.ts#handler',
+                  confidence: 'high',
+                },
                 confidence: 'high',
                 message: 'Risks share symbol correlation key.',
               },

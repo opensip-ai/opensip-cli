@@ -69,6 +69,8 @@ const RESULT: ShardBuildResult = {
     {
       ownerHash: 'h1',
       ownerFile: 'core/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'dep',
       importSpecifier: '@scope/dep',
       line: 3,

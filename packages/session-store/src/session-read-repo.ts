@@ -66,7 +66,13 @@ export class SessionReadRepo {
     return row ? this.hydrateSession(row) : null;
   }
 
-  latest(opts: { tool?: ToolShortId } = {}): StoredSession | null {
+  /**
+   * The most recent session. With `cwdWithin`, returns the newest session
+   * whose stored `cwd` is inside that root — `list` applies the containment
+   * filter BEFORE the limit, so this is the newest in-scope row, not the
+   * global newest filtered down to nothing.
+   */
+  latest(opts: { tool?: ToolShortId; cwdWithin?: string } = {}): StoredSession | null {
     const rows = this.list({ ...opts, limit: 1 });
     return rows[0] ?? null;
   }

@@ -1,2 +1,5 @@
-FAIL  (0 Errors, 1 Warnings) | Duration 3ms
+0/2 passed · 1/2 failed · 1/2 faulted (runtime error)
+⚠ loader  fault  failed to load
+✗ naming  fail  b.ts
+FAULT  (0 Errors, 1 Warnings) | Duration 3ms
   Use --verbose for detailed results | opensip report for HTML report

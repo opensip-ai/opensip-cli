@@ -1,4 +1,12 @@
-import { group, line, viewTable, type Span, type ViewNode } from '@opensip-cli/cli-ui';
+import {
+  group,
+  line,
+  viewResultSummary,
+  viewTable,
+  type ResultSummaryItem,
+  type Span,
+  type ViewNode,
+} from '@opensip-cli/cli-ui';
 
 import type {
   ReviewBrief,
@@ -15,13 +23,22 @@ import type {
 
 const SPACER: ViewNode = { kind: 'spacer' };
 
+const OUTCOME_WORD: Record<SuiteStepSummary['outcome'], string> = {
+  passed: 'pass',
+  failed: 'fail',
+  faulted: 'fault',
+};
+
+const OUTCOME_TONE: Record<SuiteStepSummary['outcome'], Span['tone']> = {
+  passed: 'success',
+  failed: 'error',
+  faulted: 'warning',
+};
+
 function verdictText(step: SuiteStepSummary): Span {
-  const verdict = step.verdict;
-  if (verdict === undefined) return { text: '-', dim: true };
-  return {
-    text: verdict.passed ? 'pass' : 'fail',
-    tone: verdict.passed ? 'success' : 'error',
-  };
+  // Render the authoritative 3-way outcome (a fault reads `fault`, not `fail`),
+  // not the binary `verdict.passed` — that collapsed a runtime fault into `fail`.
+  return { text: OUTCOME_WORD[step.outcome], tone: OUTCOME_TONE[step.outcome] };
 }
 
 function countsText(step: SuiteStepSummary): Span {
@@ -45,7 +62,10 @@ function stepSummaryRow(step: SuiteStepSummary): Span[] {
   return [
     { text: step.tool, tone: 'brand' },
     { text: step.command },
-    { text: String(step.exitCode), tone: step.exitCode === 0 ? 'success' : 'error' },
+    {
+      text: String(step.exitCode),
+      tone: step.exitCode === 0 ? 'success' : 'error',
+    },
     verdictText(step),
     countsText(step),
     { text: `${Math.round(step.durationMs)}ms`, dim: true },
@@ -70,7 +90,10 @@ function riskRow(risk: ReviewBriefRisk): Span[] {
     { text: risk.ruleId },
     { text: risk.severity, tone: errorTone ? 'error' : 'warning' },
     { text: riskLocation(risk), dim: risk.file === '' },
-    { text: risk.isNew ? 'yes' : 'no', tone: risk.isNew ? 'warning' : undefined },
+    {
+      text: risk.isNew ? 'yes' : 'no',
+      tone: risk.isNew ? 'warning' : undefined,
+    },
     { text: risk.message },
   ];
 }
@@ -81,7 +104,10 @@ function correlatedRiskRow(group: ReviewBriefCorrelationGroup): Span[] {
   const errorTone = group.severity === 'critical' || group.severity === 'high';
   return [
     { text: group.primary.ruleId },
-    { text: String(group.members.length), tone: group.members.length > 1 ? 'warning' : undefined },
+    {
+      text: String(group.members.length),
+      tone: group.members.length > 1 ? 'warning' : undefined,
+    },
     { text: tools },
     { text: group.severity, tone: errorTone ? 'error' : 'warning' },
     { text: reason },
@@ -124,18 +150,46 @@ function reviewVerdictTone(verdict: ReviewBrief['verdict']): Span['tone'] {
   }
 }
 
-function aggregateLine(aggregate: NonNullable<SuiteRunResult['aggregate']>): ViewNode {
-  return line([
-    { text: 'Aggregate: ', dim: true },
-    { text: `${aggregate.steps} steps`, dim: true },
-    { text: `  ${aggregate.passed} passed`, tone: aggregate.passed > 0 ? 'success' : undefined },
-    { text: `  ${aggregate.failed} failed`, tone: aggregate.failed > 0 ? 'error' : undefined },
-    { text: `  ${aggregate.faulted} faulted`, tone: aggregate.faulted > 0 ? 'error' : undefined },
-    {
-      text: `  E:${aggregate.errors} W:${aggregate.warnings}`,
-      dim: aggregate.errors === 0 && aggregate.warnings === 0,
+/** A concise per-step bullet detail: the fault message, or the finding counts. */
+function stepBulletDetail(step: SuiteStepSummary): string | undefined {
+  if (step.outcome === 'faulted') return step.error ?? 'runtime error';
+  if (step.outcome === 'failed' && step.verdict !== undefined) {
+    const parts: string[] = [];
+    const { errors, warnings } = step.verdict;
+    if (errors > 0) parts.push(`${errors} error${errors === 1 ? '' : 's'}`);
+    if (warnings > 0) parts.push(`${warnings} warning${warnings === 1 ? '' : 's'}`);
+    return parts.length > 0 ? parts.join(', ') : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The suite's 3-way result block — the count line + one bullet per step. Keyed on
+ * the aggregate's authoritative counts and each step's `outcome`, so a runtime
+ * fault reads as `fault`, distinct from a findings `fail`. A suite lists every
+ * step (`showAll`), per the fault-taxonomy display contract.
+ */
+function resultSummaryNode(
+  aggregate: NonNullable<SuiteRunResult['aggregate']>,
+  steps: readonly SuiteStepSummary[],
+): ViewNode {
+  const items: ResultSummaryItem[] = steps.map((step) => {
+    const detail = stepBulletDetail(step);
+    return {
+      label: `${step.tool} ${step.command}`,
+      outcome: step.outcome,
+      ...(detail === undefined ? {} : { detail }),
+    };
+  });
+  return viewResultSummary({
+    counts: {
+      passed: aggregate.passed,
+      failed: aggregate.failed,
+      faulted: aggregate.faulted,
     },
-  ]);
+    items,
+    showAll: true,
+  });
 }
 
 function fileCountLabel(count: number): string {
@@ -185,13 +239,23 @@ function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
   const nodes: ViewNode[] = [
     line([
       { text: 'Review: ', dim: true },
-      { text: brief.verdict.toUpperCase(), tone: reviewVerdictTone(brief.verdict), bold: true },
-      { text: `  risks:${brief.topRisks.length}`, dim: brief.topRisks.length === 0 },
+      {
+        text: brief.verdict.toUpperCase(),
+        tone: reviewVerdictTone(brief.verdict),
+        bold: true,
+      },
+      {
+        text: `  risks:${brief.topRisks.length}`,
+        dim: brief.topRisks.length === 0,
+      },
       {
         text: `  correlated:${brief.correlatedRisks?.length ?? 0}`,
         dim: (brief.correlatedRisks?.length ?? 0) === 0,
       },
-      { text: `  degraded:${brief.degraded.length}`, dim: brief.degraded.length === 0 },
+      {
+        text: `  degraded:${brief.degraded.length}`,
+        dim: brief.degraded.length === 0,
+      },
     ]),
   ];
 
@@ -232,18 +296,24 @@ export function viewSuiteRun(result: SuiteRunResult): ViewNode {
     line([
       { text: 'Suite ', bold: true },
       { text: result.suite, tone: 'brand', bold: true },
-      { text: ` (${result.steps.length} steps, ${Math.round(result.durationMs)}ms)`, dim: true },
+      {
+        text: ` (${result.steps.length} steps, ${Math.round(result.durationMs)}ms)`,
+        dim: true,
+      },
     ]),
     line([
       { text: 'Exit: ', dim: true },
-      { text: String(result.exitCode), tone: result.exitCode === 0 ? 'success' : 'error' },
+      {
+        text: String(result.exitCode),
+        tone: result.exitCode === 0 ? 'success' : 'error',
+      },
       { text: `  Run: ${result.suiteRunId}`, dim: true },
     ]),
     ...scopeLine(result),
   ];
 
   if (result.aggregate !== undefined) {
-    children.push(aggregateLine(result.aggregate));
+    children.push(resultSummaryNode(result.aggregate, result.steps));
   }
 
   if (result.reviewBrief !== undefined) {
@@ -281,7 +351,10 @@ export function viewSuiteList(result: SuiteListResult): ViewNode {
 export function viewSuiteAdd(result: SuiteAddResult): ViewNode {
   return group([
     line([
-      { text: result.changed ? '✓' : '•', tone: result.changed ? 'success' : 'muted' },
+      {
+        text: result.changed ? '✓' : '•',
+        tone: result.changed ? 'success' : 'muted',
+      },
       { text: result.changed ? ' Added ' : ' Suite already contained ' },
       { text: result.tool, tone: 'brand', bold: true },
       { text: ` ${result.command}` },

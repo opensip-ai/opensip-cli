@@ -1,8 +1,11 @@
 /**
- * JSON golden snapshots for the YAGNI tool envelope + session payload.
+ * Vitest snapshots for the YAGNI tool envelope + session payload. Uses
+ * `toMatchSnapshot` (the repo convention, e.g. output's signal-json test) so a
+ * schema change is regenerated with `vitest -u` + a reviewed diff rather than a
+ * hand-edited JSON fixture. `stableJson` normalizes volatile fields (ids, run id,
+ * timestamps, durations, fingerprints, fixture paths) so the snapshot is stable.
  */
 
-import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,7 +18,6 @@ import type { ToolCliContext } from '@opensip-cli/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = join(HERE, 'fixtures', 'unused-config-surface', 'pkg');
-const GOLDEN_PATH = join(HERE, '__fixtures__', 'yagni-golden.json');
 
 function normalizeFixturePath(value: string): string {
   if (!value.startsWith(FIXTURE_ROOT)) return value;
@@ -75,7 +77,7 @@ describe('yagni golden snapshots', () => {
     });
   });
 
-  it('executeYagni matches the checked-in golden envelope', async () => {
+  it('executeYagni matches its envelope + session snapshot', async () => {
     const outcome = await executeYagni(
       {
         cwd: FIXTURE_ROOT,
@@ -113,8 +115,7 @@ describe('yagni golden snapshots', () => {
       },
     });
 
-    const expected = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
-    expect(actual).toEqual(expected);
+    expect(actual).toMatchSnapshot();
   });
 
   it('executeYagni is deterministic on the fixture', async () => {

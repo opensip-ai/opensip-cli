@@ -96,13 +96,28 @@ function collectRisks(input: {
       continue;
     }
 
-    if (!envelope.verdict.passed && envelope.signals.length === 0) {
+    // A runtime FAULT (a unit threw/timed-out) must surface as a degradation so
+    // the brief raises "result unverified", distinct from a findings failure. The
+    // authoritative signal is `verdict.faulted`; the legacy `!passed && 0 signals`
+    // clause is kept as a fallback for a pre-tri-state captured envelope (algebra:
+    // 0 signals ⟹ policyPasses, so `!passed` there already means faulted). Keying
+    // on `faulted` also catches a fault that emitted OTHER units' signals
+    // (`signals.length > 0`) — invisible to the old zero-signal-only clause.
+    const stepFaulted =
+      envelope.verdict.faulted === true ||
+      (!envelope.verdict.passed && envelope.signals.length === 0);
+    if (stepFaulted) {
+      const hasSignals = envelope.signals.length > 0;
       pushReviewBriefDegradation(
         degraded,
         {
           source: envelope.tool,
-          reason: `Step '${step.summary.command}' reported a failing verdict without signals.`,
-          code: 'failing-verdict-without-signals',
+          reason: hasSignals
+            ? `Step '${step.summary.command}' faulted at runtime; its findings may be incomplete.`
+            : `Step '${step.summary.command}' reported a failing verdict without signals.`,
+          // Reuse the established codes (no contract change): a fault alongside
+          // findings is a `step-fault`; the signal-less case keeps its historical code.
+          code: hasSignals ? 'step-fault' : 'failing-verdict-without-signals',
           stepIndex: step.stepIndex,
         },
         input.degradationLimit,

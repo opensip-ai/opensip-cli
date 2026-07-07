@@ -148,6 +148,8 @@ describe('cross-shard merge determinism (characterization)', () => {
       {
         ownerHash: 'A',
         ownerFile: 'packages/pkg-a/index.ts',
+        ownerLine: 1,
+        ownerColumn: 0,
         calleeName: 'helperB',
         importSpecifier: '@scope/pkgb',
         line: 2,

@@ -55,6 +55,15 @@ export interface CallSiteRecord {
    */
   readonly ownerHash: string;
   /**
+   * The owning occurrence's declaration position — its 1-based `line` and
+   * 0-based `column`, byte-identical to the owner `FunctionOccurrence`. Paired
+   * with `ownerHash` so edges bucket by FULL occurrence identity
+   * (`ownerEdgeKey(ownerHash, filePath, ownerLine, ownerColumn)`) and same-file
+   * body-twins never union their edges (ADR-0136).
+   */
+  readonly ownerLine: number;
+  readonly ownerColumn: number;
+  /**
    * 'call' for resolver dispatch (call/new/jsx/identifier-ref/
    * shorthand). 'creation' for parent → nested-callable creation
    * edges (arrows, function-expressions, methods, accessors,
@@ -84,6 +93,12 @@ export interface DependencySiteRecord {
   readonly sourceFile: ts.SourceFile;
   /** bodyHash of the file's synthesized module-init occurrence. */
   readonly ownerHash: string;
+  /** The module-init occurrence's declaration position (1-based line / 0-based
+   *  column, byte-identical to its `FunctionOccurrence`) — paired with
+   *  `ownerHash` so dependency edges bucket by full occurrence identity via
+   *  `ownerEdgeKey` (ADR-0136). Module-init is always at line 1, column 0. */
+  readonly ownerLine: number;
+  readonly ownerColumn: number;
   /** Raw import specifier — `'./foo'`, `'@opensip/core'`, etc. */
   readonly specifier: string;
   /** 1-based line of the import statement. */
@@ -186,7 +201,7 @@ export function walkProgram(input: WalkInput): WalkOutput {
  */
 function collectDependencySites(
   sourceFile: ts.SourceFile,
-  moduleInitHash: string,
+  moduleInit: FunctionOccurrence,
   out: DependencySiteRecord[],
 ): void {
   for (const stmt of sourceFile.statements) {
@@ -208,7 +223,9 @@ function collectDependencySites(
     out.push({
       node: stmt,
       sourceFile,
-      ownerHash: moduleInitHash,
+      ownerHash: moduleInit.bodyHash,
+      ownerLine: moduleInit.line,
+      ownerColumn: moduleInit.column,
       specifier: specifierNode.text,
       line: lineChar.line + 1,
       column: lineChar.character,
@@ -330,14 +347,28 @@ function walkFile(
   record(out, moduleInit);
 
   // Phase 4 (DEC-498): walk top-level imports as dependency sites.
-  collectDependencySites(sourceFile, moduleInit.bodyHash, dependencySites);
+  collectDependencySites(sourceFile, moduleInit, dependencySites);
 
-  function descend(node: ts.Node, ctx: VisitorContext, ownerHash: string): void {
+  // The owner threaded through the descent is the FULL occurrence identity
+  // (hash + declaration line/column), not just the hash, so call/creation sites
+  // key by `ownerEdgeKey(ownerHash, filePath, ownerLine, ownerColumn)` and
+  // same-file body-twins never union their edges (ADR-0136).
+  function descend(
+    node: ts.Node,
+    ctx: VisitorContext,
+    ownerHash: string,
+    ownerLine: number,
+    ownerColumn: number,
+  ): void {
     const occ = dispatchVisitor(node, ctx);
     let childOwnerHash = ownerHash;
+    let childOwnerLine = ownerLine;
+    let childOwnerColumn = ownerColumn;
     if (occ) {
       record(out, occ);
       childOwnerHash = occ.bodyHash;
+      childOwnerLine = occ.line;
+      childOwnerColumn = occ.column;
       // Inline-callable creation edge from the parent owner. Function
       // declarations are deliberately excluded — they need a real
       // call edge to be reachable, which is what makes the orphan
@@ -347,6 +378,8 @@ function walkFile(
           node,
           sourceFile,
           ownerHash,
+          ownerLine,
+          ownerColumn,
           kind: 'creation',
           childHash: childOwnerHash,
         });
@@ -354,7 +387,7 @@ function walkFile(
     }
 
     if (isResolverCandidate(node)) {
-      callSites.push({ node, sourceFile, ownerHash, kind: 'call' });
+      callSites.push({ node, sourceFile, ownerHash, ownerLine, ownerColumn, kind: 'call' });
     }
 
     if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
@@ -363,7 +396,7 @@ function walkFile(
       const childCtx: VisitorContext = { ...ctx, enclosingClass: className };
       // @graph-ignore-next-line graph:cycle -- intentional recursive descent; forEachChild re-enters the visitor (descend)
       ts.forEachChild(node, (c) => {
-        descend(c, childCtx, childOwnerHash);
+        descend(c, childCtx, childOwnerHash, childOwnerLine, childOwnerColumn);
       });
       return;
     }
@@ -376,15 +409,15 @@ function walkFile(
     // `enclosingClass` via the branch above.
     const childCtx: VisitorContext = occ ? { ...ctx, enclosingClass: null } : ctx;
     ts.forEachChild(node, (c) => {
-      descend(c, childCtx, childOwnerHash);
+      descend(c, childCtx, childOwnerHash, childOwnerLine, childOwnerColumn);
     });
   }
 
   // SourceFile itself isn't function-shaped or a resolver candidate.
   // Descend its children directly with module-init as the initial
-  // owner.
+  // owner (line 1, column 0).
   ts.forEachChild(sourceFile, (c) => {
-    descend(c, baseCtx, moduleInit.bodyHash);
+    descend(c, baseCtx, moduleInit.bodyHash, moduleInit.line, moduleInit.column);
   });
 }
 

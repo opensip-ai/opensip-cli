@@ -53,6 +53,7 @@ describe('suite view builders', () => {
               command: 'fit',
               exitCode: 0,
               durationMs: 900,
+              outcome: 'passed',
             },
           ],
         }),
@@ -109,6 +110,7 @@ describe('suite view builders', () => {
             command: 'fit',
             exitCode: 0,
             durationMs: 500,
+            outcome: 'passed',
             verdict: { passed: true, errors: 0, warnings: 1, findings: 1 },
           },
           {
@@ -117,6 +119,7 @@ describe('suite view builders', () => {
             command: 'graph',
             exitCode: 1,
             durationMs: 400,
+            outcome: 'failed',
             verdict: { passed: false, errors: 2, warnings: 0, findings: 2 },
           },
           {
@@ -125,24 +128,25 @@ describe('suite view builders', () => {
             command: 'sim',
             exitCode: 1,
             durationMs: 300,
+            outcome: 'faulted',
             error: 'scenario faulted',
           },
         ],
       }),
     );
 
-    expect(out).toContain('Aggregate:');
-    expect(out).toContain('3 steps');
-    expect(out).toContain('1 passed');
-    expect(out).toContain('1 failed');
-    expect(out).toContain('1 faulted');
+    // The 3-way count line (N/M fractions), with the fault class named.
+    expect(out).toContain('1/3 passed · 1/3 failed · 1/3 faulted (runtime error)');
+    // All-step bullets (suite `showAll`): a fault reads `fault`, not `fail`.
+    expect(out).toContain('✓ fitness fit  pass');
+    expect(out).toContain('✗ graph graph  fail  2 errors');
+    expect(out).toContain('⚠ sim sim  fault  scenario faulted');
+    // The detail table is retained; its Verdict column is now 3-way.
     expect(out).toContain('Verdict');
     expect(out).toContain('Counts');
-    expect(out).toContain('pass');
-    expect(out).toContain('fail');
+    expect(out).toContain('fault');
     expect(out).toContain('E:0 W:1 F:1');
     expect(out).toContain('E:2 W:0 F:2');
-    expect(out).toContain('scenario faulted');
   });
 
   it('renders suite run scope variants', () => {
@@ -168,7 +172,12 @@ describe('suite view builders', () => {
       renderToText(
         viewSuiteRun({
           ...base,
-          scope: { mode: 'changed', source: 'explicit', ref: 'main', changedFiles: 1 },
+          scope: {
+            mode: 'changed',
+            source: 'explicit',
+            ref: 'main',
+            changedFiles: 1,
+          },
         }),
       ),
     ).toContain('Scope: changed since main (1 file)');

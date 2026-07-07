@@ -93,6 +93,65 @@ describe('<LiveRun>', () => {
     expect(lastFrame()).not.toContain('secret detail');
   });
 
+  it('renders a FAULT headline + attention bullets on the compact done surface', () => {
+    // Parity with the static (pipe) surface: the live done-body must read FAULT
+    // (not FAIL) and list the failed/faulted units with their detail.
+    const { lastFrame } = mount(
+      <LiveRun
+        meta={{ title: 'Test Tool', description: 'Running test' }}
+        surface={{ shape: 'pool', label: 'Working...' }}
+        state={{
+          phase: 'done',
+          data: {
+            summary: { passed: false, faulted: true, errors: 2, warnings: 1, durationMs: 5 },
+            attention: {
+              counts: { passed: 2, failed: 1, faulted: 1 },
+              items: [
+                { label: 'no-console', outcome: 'failed', detail: 'src/api.ts:42' },
+                { label: 'complexity', outcome: 'faulted', detail: 'threw RangeError' },
+              ],
+            },
+          },
+        }}
+        verbose={false}
+        quiet={false}
+      />,
+    );
+    const out = lastFrame() ?? '';
+    expect(out).toContain('FAULT');
+    expect(out).not.toContain('FAIL');
+    expect(out).toContain('2/4 passed');
+    expect(out).toContain('1/4 faulted');
+    expect(out).toContain('no-console');
+    expect(out).toContain('src/api.ts:42');
+    expect(out).toContain('complexity');
+    expect(out).toContain('threw RangeError');
+  });
+
+  it('suppresses attention bullets under --verbose (the full table is shown instead)', () => {
+    const { lastFrame } = mount(
+      <LiveRun
+        meta={{ title: 'Test Tool', description: 'Running test' }}
+        surface={{ shape: 'pool', label: 'Working...' }}
+        state={{
+          phase: 'done',
+          data: {
+            summary: { passed: false, faulted: false, errors: 1, warnings: 0, durationMs: 5 },
+            attention: {
+              counts: { passed: 0, failed: 1, faulted: 0 },
+              items: [{ label: 'no-console', outcome: 'failed', detail: 'src/api.ts:42' }],
+            },
+          },
+        }}
+        verbose
+        quiet={false}
+      />,
+    );
+    // Under --verbose the attention block is suppressed (the per-unit table owns
+    // the detail); the count-line fraction must not appear.
+    expect(lastFrame() ?? '').not.toContain('1/1 failed');
+  });
+
   it('omits verbose lines when quiet is true', () => {
     const { lastFrame } = mount(
       <LiveRun

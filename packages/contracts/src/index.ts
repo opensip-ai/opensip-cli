@@ -27,6 +27,10 @@ export {
   DEFAULT_BASELINE_IDENTITY,
   SIGNAL_ENVELOPE_SCHEMA_VERSION,
 } from './signal-envelope.js';
+export type { RunOutcome } from './run-outcome.js';
+export { deriveOutcome } from './run-outcome.js';
+export type { EnvelopeResultSummary, ResultSummaryItem } from './result-summary.js';
+export { envelopeToResultSummary, unitOutcome } from './result-summary.js';
 export * from './evidence.js';
 
 // Platform compatibility/LTS policy registry. Defined in core so lower layers can

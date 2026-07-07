@@ -1,6 +1,5 @@
 import { performance } from 'node:perf_hooks';
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
@@ -93,7 +92,20 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   // deliverSignals, reportFailure, emitError, process.exit) writes the per-step
   // capture slot, so `step.exitCode` is the single source of truth here — no step
   // touches the host holder mid-run for this aggregate to miss.
-  const exitCode = Math.max(0, ...steps.map((step) => step.exitCode));
+  //
+  // A CHECK-level runtime fault (a unit threw but the tool still produced an
+  // envelope — `verdict` present) is "result unknown" and NON-blocking by default
+  // (#2 fault taxonomy): its exit is excluded from the worst-of so a crashed check
+  // doesn't fail the suite like a findings failure does — the fault is still
+  // raised in the aggregate counts + review brief. A STEP/APP-level failure (NO
+  // envelope: a thrown command, ConfigurationError, or ToolError before results,
+  // ADR-0060) keeps its ADR-0020 exit taxonomy and still blocks. `failOnFault`
+  // (suite execution policy, default false) opts every fault back into blocking.
+  const failOnFault = input.suite.execution?.failOnFault === true;
+  const isNonBlockingFault = (step: SuiteStepSummary): boolean =>
+    step.outcome === 'faulted' && step.verdict !== undefined;
+  const blockingSteps = failOnFault ? steps : steps.filter((step) => !isNonBlockingFault(step));
+  const exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
   const aggregate = deriveSuiteAggregate(steps);
   const reviewBrief = buildReviewBrief({
     suite: suite.name,
@@ -145,16 +157,28 @@ export function deriveSuiteAggregate(
   let warnings = 0;
 
   for (const step of steps) {
-    const verdict = step.verdict;
-    if (step.error !== undefined) {
-      faulted += 1;
-    } else if (step.exitCode !== EXIT_CODES.SUCCESS || verdict?.passed === false) {
-      failed += 1;
-    } else if (verdict?.passed === true) {
-      passed += 1;
+    // `step.outcome` is the single source of truth (deriveOutcome over the step's
+    // RunVerdict, unioned with host-caught runtime issues). A UNIT-level fault (a
+    // check that threw, surfaced as `verdict.faulted`) now counts `faulted`, not
+    // `failed` — the old `step.error`-only heuristic only saw run-LEVEL throws.
+    // Every step lands in exactly one bucket (the old shape silently dropped a
+    // success-exit step that emitted no envelope from all three counts).
+    switch (step.outcome) {
+      case 'faulted': {
+        faulted += 1;
+        break;
+      }
+      case 'failed': {
+        failed += 1;
+        break;
+      }
+      case 'passed': {
+        passed += 1;
+        break;
+      }
     }
-    errors += verdict?.errors ?? 0;
-    warnings += verdict?.warnings ?? 0;
+    errors += step.verdict?.errors ?? 0;
+    warnings += step.verdict?.warnings ?? 0;
   }
 
   return {

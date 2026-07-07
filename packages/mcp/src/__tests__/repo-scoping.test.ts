@@ -132,34 +132,89 @@ describe('SessionResultsReadPort repo scoping', () => {
     );
   });
 
-  it('returns not-found for latestFindings when the latest row is foreign', async () => {
+  it('latestFindings selects the newest in-root session over a newer foreign one', async () => {
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const repo = new SessionRepo(store);
     repo.save(
-      makeSession({ id: 'FIT_LOCAL', cwd: '/repo', startedAt: '2026-05-01T00:00:00.000Z' }),
+      makeSession({ id: 'FIT_LOCAL_OLD', cwd: '/repo', startedAt: '2026-05-01T00:00:00.000Z' }),
     );
     repo.save(
       makeSession({
-        id: 'FIT_FOREIGN',
-        cwd: '/other',
+        id: 'FIT_LOCAL_NEW',
+        cwd: '/repo/packages/app',
         startedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FIT_FOREIGN_NEW',
+        cwd: '/other',
+        startedAt: '2026-05-03T00:00:00.000Z',
       }),
     );
 
     const out = await port().latestFindings({ tool: 'fit' });
 
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      // The 'latest' sentinel SELECTS the newest in-scope row, skipping the
+      // newer foreign one — it is not resolved-then-rejected.
+      expect(out.value.session?.id).toBe('FIT_LOCAL_NEW');
+      expect(out.value.data[0]?.ruleId).toBe('FIT_LOCAL_NEW-rule');
+    }
+    // Only the in-scope session is ever replayed; the foreign row is filtered
+    // out before resolution, so it never reaches the replay closure.
+    expect(replayed).toEqual(['FIT_LOCAL_NEW']);
+    expect(info).not.toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'mcp.results.scope.rejected' }),
+    );
+  });
+
+  it('latestFindings returns not-found when only foreign sessions exist, without replaying', async () => {
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    new SessionRepo(store).save(makeSession({ id: 'FIT_FOREIGN', cwd: '/other' }));
+
+    const out = await port().latestFindings({ tool: 'fit' });
+
     expect(out.ok).toBe(false);
     if (!out.ok) expect(out.error.code).toBe('not-found');
+    // The foreign row is filtered out pre-resolution, so nothing replays and the
+    // per-row scope.rejected log does NOT fire on the latest path (that log is
+    // reserved for explicit ids that resolve globally then fail the scope check).
     expect(replayed).toEqual([]);
-    expect(info).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'mcp.results.scope.rejected',
-        module: 'mcp:results-read-port',
-        ref: 'latest',
-        sessionCwd: '/other',
-        projectRoot: '/repo',
+    expect(info).not.toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'mcp.results.scope.rejected' }),
+    );
+  });
+
+  it('showRun({ ref: latest }) scope-selects the newest in-root session', async () => {
+    const repo = new SessionRepo(store);
+    repo.save(
+      makeSession({ id: 'FIT_LOCAL_OLD', cwd: '/repo', startedAt: '2026-05-01T00:00:00.000Z' }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FIT_LOCAL_NEW',
+        cwd: '/repo/packages/app',
+        startedAt: '2026-05-02T00:00:00.000Z',
       }),
     );
+    repo.save(
+      makeSession({
+        id: 'FIT_FOREIGN_NEW',
+        cwd: '/other',
+        startedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
+
+    const out = await port().showRun({ ref: 'latest', tool: 'fit' });
+
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.session?.id).toBe('FIT_LOCAL_NEW');
+      expect(out.value.data.envelope.signals[0]?.ruleId).toBe('FIT_LOCAL_NEW-rule');
+    }
+    expect(replayed).toEqual(['FIT_LOCAL_NEW']);
   });
 
   it('replays an in-root showRun and carries cwd in the replay summary', async () => {
