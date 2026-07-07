@@ -6,7 +6,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '..');
 const DEFAULT_CONFIG = '.config/compatibility-matrix.json';
-const DEFAULT_REPORT = 'compatibility-matrix-report.json';
 
 export async function runCompatibilityMatrix(argv = process.argv.slice(2), deps = {}) {
   const options = parseArgs(argv);
@@ -36,9 +35,11 @@ export async function runCompatibilityMatrix(argv = process.argv.slice(2), deps 
   }
 
   finalizeReport(report);
-  const outPath = resolve(repoRoot, options.out);
-  await (deps.writeFile ?? writeFile)(outPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  printSummary(report, relative(repoRoot, outPath), deps);
+  const outPath = options.out === undefined ? null : resolve(repoRoot, options.out);
+  if (outPath !== null) {
+    await (deps.writeFile ?? writeFile)(outPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  }
+  printSummary(report, outPath === null ? null : relative(repoRoot, outPath), deps);
   return { exitCode: report.verdict === 'pass' ? 0 : 1, report, outPath };
 }
 
@@ -256,7 +257,7 @@ function validateSignalBatch(value, expectedVersion) {
 function parseArgs(argv) {
   const out = {
     configPath: DEFAULT_CONFIG,
-    out: DEFAULT_REPORT,
+    out: undefined,
     check: false,
     help: false,
   };
@@ -296,7 +297,7 @@ function printHelp() {
 
 Options:
   --config <path>  Compatibility matrix config (default: ${DEFAULT_CONFIG})
-  --out <path>     JSON report path (default: ${DEFAULT_REPORT})
+  --out <path>     Write a JSON report to the provided path
   --check          Mark report as CI/check mode
   --help           Show this help
 `);
@@ -306,7 +307,7 @@ function printSummary(report, outPath, deps) {
   const log = deps.consoleLog ?? console.log;
   log(`Compatibility matrix verdict: ${report.verdict}`);
   log(`Checks: ${String(report.counts.pass)} passed, ${String(report.counts.fail)} failed`);
-  log(`Report: ${outPath}`);
+  if (outPath !== null) log(`Report: ${outPath}`);
 }
 
 function requireValue(argv, index, flag) {

@@ -40,6 +40,36 @@ test('runCompatibilityMatrix passes with matching policies, constants, and fixtu
   await rm(repoRoot, { recursive: true, force: true });
 });
 
+test('runCompatibilityMatrix does not write a report unless --out is provided', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'opensip-compat-matrix-'));
+  const files = fixtureFiles(repoRoot, { signalEnvelopeVersion: 2 });
+  const logs = [];
+  let writeCalled = false;
+  const result = await runCompatibilityMatrix(['--check'], {
+    repoRoot,
+    runtime: fakeRuntime(),
+    loadMatrixConfig: async () => matrixConfig(),
+    readFile: async (path) => {
+      const value = files.get(String(path));
+      if (value === undefined) throw new Error(`missing fixture ${String(path)}`);
+      return value;
+    },
+    writeFile: async () => {
+      writeCalled = true;
+    },
+    consoleLog: (line) => logs.push(line),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.outPath, null);
+  assert.equal(writeCalled, false);
+  assert.equal(
+    logs.some((line) => line.startsWith('Report:')),
+    false,
+  );
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
 test('runCompatibilityMatrix fails when a fixture drifts from the contract version', async () => {
   const repoRoot = mkdtempSync(join(tmpdir(), 'opensip-compat-matrix-'));
   const files = fixtureFiles(repoRoot, { signalEnvelopeVersion: 99 });
