@@ -30,6 +30,12 @@ export {
 export { RunHeader, type RunHeaderProps, type RunHeaderMeta } from './run-header.js';
 export { RunSummary, viewRunSummary, type RunSummaryProps } from './run-summary.js';
 export {
+  viewResultSummary,
+  type ResultOutcome,
+  type ResultSummaryItem,
+  type ResultSummaryProps,
+} from './result-summary.js';
+export {
   RunTimingProvider,
   useRunTiming,
   useRunDuration,
