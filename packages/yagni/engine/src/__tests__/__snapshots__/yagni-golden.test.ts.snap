@@ -1,0 +1,98 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`yagni golden snapshots > executeYagni matches its envelope + session snapshot 1`] = `
+{
+  "sessionSummary": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 1,
+    "skippedDetectors": [],
+    "total": 1,
+    "warnings": 1,
+    "yagni": {
+      "byConfidence": {
+        "high": 1,
+        "low": 0,
+        "medium": 0,
+      },
+      "estimatedTotalLocReduction": 1,
+      "skippedDetectors": [],
+      "totalCandidates": 1,
+    },
+  },
+  "signals": [
+    {
+      "filePath": "<fixture>/src/app-config.ts",
+      "line": 3,
+      "message": "Unused public config key 'orphanKnob' in AppConfig (high confidence)",
+      "metadata": {
+        "yagni": {
+          "confidence": "high",
+          "detector": "unused-config-surface",
+          "evidence": [
+            {
+              "data": {
+                "filePath": "src/app-config.ts",
+                "interfaceName": "AppConfig",
+                "line": 3,
+                "property": "orphanKnob",
+                "publicApiSurface": true,
+              },
+              "id": "unused-config:src/app-config.ts:3:orphanKnob",
+              "kind": "unused-config-property",
+              "summary": "Required property 'orphanKnob' on AppConfig has no read sites.",
+            },
+          ],
+          "locDelta": {
+            "add": 0,
+            "estimateKind": "exact",
+            "netEstimate": 1,
+            "remove": 1,
+          },
+          "preservationArgument": "The property is declared on a public config interface but has zero read sites in the project.",
+          "reductionCategory": "config",
+          "riskTags": [
+            "public-api-surface",
+          ],
+          "validationRequired": [
+            "Confirm no dynamic property access reads this key.",
+            "Run the package test suite after removal.",
+          ],
+        },
+      },
+      "repair": {
+        "autofixable": false,
+        "confidence": 0.9,
+        "patchHint": {
+          "kind": "text",
+          "summary": "Remove unused key \`orphanKnob\` from AppConfig.",
+          "target": "<fixture>/src/app-config.ts",
+        },
+        "repairKind": "manual",
+      },
+      "ruleId": "yagni:unused-config-surface",
+      "severity": "medium",
+    },
+  ],
+  "units": [
+    {
+      "durationMs": 0,
+      "passed": true,
+      "slug": "yagni:unused-config-surface",
+      "violationCount": 1,
+    },
+  ],
+  "verdict": {
+    "faulted": false,
+    "passed": true,
+    "score": 100,
+    "summary": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 1,
+      "total": 1,
+      "warnings": 1,
+    },
+  },
+}
+`;
