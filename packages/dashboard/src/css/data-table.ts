@@ -35,6 +35,13 @@ export function dashboardCssDataTable(): string {
 .data-table tr:hover { background: var(--bg-hover); }
 .data-table tr.clickable { cursor: pointer; }
 .data-table tr.selected { background: var(--bg-hover); border-left: 2px solid var(--accent); }
+.overview-row-control { width: 28px; min-width: 28px; text-align: center; color: var(--text-dim); }
+.overview-suite-arrow { display: inline-block; width: 14px; font-size: 11px; color: var(--accent); }
+.overview-suite-expander-content { padding: 0 12px 10px 40px; background: var(--bg); }
+.overview-suite-child-table { margin: 0; }
+.overview-suite-child-table td { background: transparent; }
+.overview-suite-child-row td { font-size: 12px; color: var(--text-muted); }
+.data-table td.overview-suite-child-tool { padding-left: 20px; }
 
 /* Check rows and findings */
 .check-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
