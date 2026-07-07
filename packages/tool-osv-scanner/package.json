@@ -6,7 +6,12 @@
   "keywords": [
     "opensip-cli",
     "static-analysis",
-    "code-quality"
+    "code-quality",
+    "external-tool-adapter",
+    "scanner",
+    "security",
+    "osv",
+    "vulnerabilities"
   ],
   "repository": {
     "type": "git",

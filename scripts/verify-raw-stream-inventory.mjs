@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * verify-raw-stream-inventory — committed budget for bundled tool command
+ * verify-raw-stream-inventory — committed budget for packaged tool command
  * shells declaring `output: 'raw-stream'`. Every entry must carry
  * `rawStreamReason`.
  */
@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const BUDGET = 24;
+const BUDGET = 63;
 
 const RAW_STREAM_REASONS = [
   'completion-script',

@@ -35,7 +35,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |
 
-## Workspace packages (43)
+## Workspace packages (56)
 
 - `@opensip-cli/checks-cpp`
 - `@opensip-cli/checks-go`
@@ -73,8 +73,21 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/simulation`
 - `@opensip-cli/targeting`
 - `@opensip-cli/test-support`
+- `@opensip-cli/tool-ast-grep`
+- `@opensip-cli/tool-bandit`
+- `@opensip-cli/tool-cargo-clippy`
+- `@opensip-cli/tool-cargo-deny`
+- `@opensip-cli/tool-cppcheck`
+- `@opensip-cli/tool-dependency-check`
 - `@opensip-cli/tool-gitleaks`
+- `@opensip-cli/tool-golangci-lint`
+- `@opensip-cli/tool-govulncheck`
 - `@opensip-cli/tool-osv-scanner`
+- `@opensip-cli/tool-pip-audit`
+- `@opensip-cli/tool-pmd`
+- `@opensip-cli/tool-ruff`
+- `@opensip-cli/tool-semgrep`
+- `@opensip-cli/tool-spotbugs`
 - `@opensip-cli/tool-test-kit`
 - `@opensip-cli/tool-trivy`
 - `@opensip-cli/tree-sitter`

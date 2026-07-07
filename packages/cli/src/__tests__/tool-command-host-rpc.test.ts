@@ -22,10 +22,14 @@ import { createWorkerRpcClient } from '../bootstrap/tool-command-worker-rpc.js';
 
 import { makeDispatchHostCtx } from './harness/dispatch-host-ctx.js';
 
-import type { HostRpcRequest, RpcReply } from '../bootstrap/tool-command-dispatch-types.js';
+import type {
+  DispatchProgressEvent,
+  HostRpcRequest,
+  RpcReply,
+} from '../bootstrap/tool-command-dispatch-types.js';
 import type { WorkerMessage } from '@opensip-cli/core';
 
-type Outbound = WorkerMessage<HostRpcRequest, unknown>;
+type Outbound = WorkerMessage<DispatchProgressEvent, unknown>;
 
 /**
  * A fake IPC duplex: captures the worker's outbound `progress` posts and lets a
@@ -54,11 +58,17 @@ function makeFakeChannel(): {
   };
 }
 
-/** Pull the rpcId off the most recently sent request (always a `progress` arm). */
-function lastRpcId(sent: Outbound[]): number {
+/** Pull the request off the most recently sent host-RPC progress event. */
+function lastRpcRequest(sent: Outbound[]): HostRpcRequest {
   const last = sent.at(-1);
   if (last?.kind !== 'progress') throw new Error('expected a progress (request) message');
-  return last.event.rpcId;
+  if (last.event.kind !== 'host-rpc') throw new Error('expected a host-RPC progress event');
+  return last.event.request;
+}
+
+/** Pull the rpcId off the most recently sent host-RPC request. */
+function lastRpcId(sent: Outbound[]): number {
+  return lastRpcRequest(sent).rpcId;
 }
 
 describe('createWorkerRpcClient — worker-side rpc-reply round-trip', () => {
@@ -71,8 +81,10 @@ describe('createWorkerRpcClient — worker-side rpc-reply round-trip', () => {
     const first = ch.sent[0];
     expect(first?.kind).toBe('progress');
     if (first?.kind !== 'progress') throw new Error('expected progress');
-    expect(first.event.seam).toBe('toolState.list');
-    const id = first.event.rpcId;
+    expect(first.event.kind).toBe('host-rpc');
+    if (first.event.kind !== 'host-rpc') throw new Error('expected host-RPC progress');
+    expect(first.event.request.seam).toBe('toolState.list');
+    const id = first.event.request.rpcId;
 
     ch.reply({ kind: 'rpc-reply', rpcId: id, ok: true, value: ['a', 'b'] });
     await expect(p).resolves.toEqual(['a', 'b']);

@@ -688,7 +688,7 @@ All envelope-producing tools emit the **same envelope**; the differences are con
   `error` set when a scenario errored).
 - **`yagni`** — `tool: "yagni"`; each unit is a detector and findings carry `metadata.yagni` evidence such as confidence, preservation argument, and validation steps.
 - **Installed external adapters** — `tool` is the adapter verb (`"gitleaks"`,
-  `"osv-scanner"`, `"trivy"`, or another installed Tool); the envelope is the
+  `"semgrep"`, `"ruff"`, `"osv-scanner"`, `"trivy"`, or another installed Tool); the envelope is the
   same contract after the adapter normalizes native scanner output to `Signal`s.
 
 > **Per-kind sim detail** (load p99, chaos recovery time) is **not** in the envelope. It lives in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record for the deeper view.

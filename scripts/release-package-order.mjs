@@ -315,6 +315,100 @@ export const RELEASE_PACKAGE_ORDER = [
     publishReason:
       'Trivy external tool adapter; SARIF vulnerability + misconfiguration scanning (opensip trivy)',
   },
+  {
+    unscoped: 'tool-semgrep',
+    name: '@opensip-cli/tool-semgrep',
+    dir: 'packages/tool-semgrep',
+    filter: '@opensip-cli/tool-semgrep',
+    publishReason: 'Semgrep external tool adapter; SAST scanning (opensip semgrep)',
+  },
+  {
+    unscoped: 'tool-ast-grep',
+    name: '@opensip-cli/tool-ast-grep',
+    dir: 'packages/tool-ast-grep',
+    filter: '@opensip-cli/tool-ast-grep',
+    publishReason:
+      'ast-grep external tool adapter; structural search scanning (opensip ast-grep / sg)',
+  },
+  {
+    unscoped: 'tool-ruff',
+    name: '@opensip-cli/tool-ruff',
+    dir: 'packages/tool-ruff',
+    filter: '@opensip-cli/tool-ruff',
+    publishReason: 'Ruff external tool adapter; Python lint scanning (opensip ruff)',
+  },
+  {
+    unscoped: 'tool-golangci-lint',
+    name: '@opensip-cli/tool-golangci-lint',
+    dir: 'packages/tool-golangci-lint',
+    filter: '@opensip-cli/tool-golangci-lint',
+    publishReason:
+      'golangci-lint external tool adapter; Go lint aggregation (opensip golangci-lint / golangci)',
+  },
+  {
+    unscoped: 'tool-govulncheck',
+    name: '@opensip-cli/tool-govulncheck',
+    dir: 'packages/tool-govulncheck',
+    filter: '@opensip-cli/tool-govulncheck',
+    publishReason: 'govulncheck external tool adapter; Go vulnerability scanning',
+  },
+  {
+    unscoped: 'tool-cargo-deny',
+    name: '@opensip-cli/tool-cargo-deny',
+    dir: 'packages/tool-cargo-deny',
+    filter: '@opensip-cli/tool-cargo-deny',
+    publishReason: 'cargo-deny external tool adapter; Rust dependency policy scanning',
+  },
+  {
+    unscoped: 'tool-bandit',
+    name: '@opensip-cli/tool-bandit',
+    dir: 'packages/tool-bandit',
+    filter: '@opensip-cli/tool-bandit',
+    publishReason: 'Bandit external tool adapter; Python security scanning',
+  },
+  {
+    unscoped: 'tool-pip-audit',
+    name: '@opensip-cli/tool-pip-audit',
+    dir: 'packages/tool-pip-audit',
+    filter: '@opensip-cli/tool-pip-audit',
+    publishReason: 'pip-audit external tool adapter; Python dependency vulnerability scanning',
+  },
+  {
+    unscoped: 'tool-cargo-clippy',
+    name: '@opensip-cli/tool-cargo-clippy',
+    dir: 'packages/tool-cargo-clippy',
+    filter: '@opensip-cli/tool-cargo-clippy',
+    publishReason: 'cargo-clippy external tool adapter; Rust lint diagnostics',
+  },
+  {
+    unscoped: 'tool-spotbugs',
+    name: '@opensip-cli/tool-spotbugs',
+    dir: 'packages/tool-spotbugs',
+    filter: '@opensip-cli/tool-spotbugs',
+    publishReason: 'SpotBugs external tool adapter; Java bytecode analysis',
+  },
+  {
+    unscoped: 'tool-pmd',
+    name: '@opensip-cli/tool-pmd',
+    dir: 'packages/tool-pmd',
+    filter: '@opensip-cli/tool-pmd',
+    publishReason: 'PMD external tool adapter; Java source analysis',
+  },
+  {
+    unscoped: 'tool-dependency-check',
+    name: '@opensip-cli/tool-dependency-check',
+    dir: 'packages/tool-dependency-check',
+    filter: '@opensip-cli/tool-dependency-check',
+    publishReason:
+      'OWASP Dependency-Check external tool adapter; dependency vulnerability scanning',
+  },
+  {
+    unscoped: 'tool-cppcheck',
+    name: '@opensip-cli/tool-cppcheck',
+    dir: 'packages/tool-cppcheck',
+    filter: '@opensip-cli/tool-cppcheck',
+    publishReason: 'Cppcheck external tool adapter; C/C++ static analysis',
+  },
   // Layer 4 — check packs
   {
     unscoped: 'checks-universal',

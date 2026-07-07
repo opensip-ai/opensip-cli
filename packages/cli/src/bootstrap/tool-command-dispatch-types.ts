@@ -37,6 +37,7 @@ import type {
   ToolSessionContribution,
   ToolSource,
 } from '@opensip-cli/core';
+import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-adapter';
 
 /**
  * The request the host writes to a temp JSON spec file and forks the worker
@@ -93,6 +94,12 @@ export interface ToolCommandWorkerSpec {
    * deep validation needed). Plain serializable data.
    */
   readonly config?: unknown;
+  /**
+   * Host-selected presentation mode. In `adapter-live` mode the worker still runs
+   * the command, but the external-adapter substrate suppresses static human
+   * rendering and emits typed adapter progress events for the host-owned Ink view.
+   */
+  readonly presentationMode?: 'static' | 'adapter-live';
 }
 
 /**
@@ -180,6 +187,14 @@ export interface ToolCommandResult {
    * generic session row. `undefined` for a handler that produced no session.
    */
   readonly session?: ToolSessionContribution;
+  /**
+   * Raw-stream commands normally do not return a routable payload. External Tool
+   * Adapter scan commands are the exception the host-owned live view needs: the
+   * worker carries the returned envelope here so the host can render a summary
+   * after the worker resolves without re-running the scanner or asking the worker
+   * to render Ink.
+   */
+  readonly completionEnvelope?: unknown;
   /**
    * ADR-0054 M4-F: the plain-data result of a lifecycle HOOK run worker-side
    * (when the spec set `hook`). For `collectReportData` it is the contributed
@@ -321,6 +336,10 @@ export type HostRpcCall =
  * the monotonic `rpcId` that correlates the matching {@link RpcReply}.
  */
 export type HostRpcRequest = HostRpcCall & { readonly rpcId: number };
+
+export type DispatchProgressEvent =
+  | { readonly kind: 'host-rpc'; readonly request: HostRpcRequest }
+  | { readonly kind: 'adapter-progress'; readonly event: ExternalAdapterProgressEvent };
 
 /**
  * The host's reply to one {@link HostRpcRequest} (parent → child). Discriminated

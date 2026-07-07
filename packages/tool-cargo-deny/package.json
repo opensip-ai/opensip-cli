@@ -1,0 +1,141 @@
+{
+  "name": "@opensip-cli/tool-cargo-deny",
+  "version": "0.4.2",
+  "license": "Apache-2.0",
+  "description": "External Tool Adapter for cargo-deny — wraps Rust dependency policy checks as an opensip-cli tool",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "external-tool-adapter",
+    "scanner",
+    "rust",
+    "cargo-deny",
+    "security",
+    "policy"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-cargo-deny"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "cargo-deny",
+    "identity": {
+      "name": "cargo-deny"
+    },
+    "stableId": "93d06787-b067-468b-bba0-1086c876c5f7",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "cargo-deny",
+        "description": "Run cargo-deny policy checks",
+        "aliases": [],
+        "commonFlags": [
+          "json",
+          "cwd",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch",
+        "producesVerdict": true
+      },
+      {
+        "name": "doctor",
+        "description": "Check that the cargo-deny binary is installed and ready",
+        "parent": "cargo-deny",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "version",
+        "description": "Print the resolved cargo-deny binary version",
+        "parent": "cargo-deny",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      }
+    ],
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Executes the user-installed cargo-deny binary via execFile (no shell)"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      },
+      {
+        "resource": "network",
+        "reason": "Performs network I/O for the networked scanner posture"
+      }
+    ],
+    "config": {
+      "namespace": "cargo-deny",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

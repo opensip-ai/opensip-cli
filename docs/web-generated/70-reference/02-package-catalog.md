@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Package catalog"
 audience: [contributors, plugin-authors]
@@ -97,6 +97,19 @@ Tool engines and opt-in tool adapters implement the `Tool` contract. They are pe
 | `@opensip-cli/tool-gitleaks` | `packages/tool-gitleaks/` | Opt-in external scanner adapter for Gitleaks — committed-secret scanning via a user-installed `gitleaks` binary, normalized into OpenSIP `Signal`s with doctor/version commands. | `tool`, `parseGitleaksJson`, `GITLEAKS_IDENTITY`, `GITLEAKS_STABLE_ID` |
 | `@opensip-cli/tool-osv-scanner` | `packages/tool-osv-scanner/` | Opt-in external scanner adapter for OSV-Scanner — dependency vulnerability scanning via a user-installed `osv-scanner` binary, normalized into OpenSIP `Signal`s with doctor/version commands. | `tool`, `parseOsvJson`, `OSV_SCANNER_IDENTITY`, `OSV_SCANNER_STABLE_ID` |
 | `@opensip-cli/tool-trivy` | `packages/tool-trivy/` | Opt-in external scanner adapter for Trivy — filesystem vulnerability and misconfiguration scanning via a user-installed `trivy` binary, normalized through the shared SARIF ingest path. | `tool`, `TRIVY_IDENTITY`, `TRIVY_STABLE_ID` |
+| `@opensip-cli/tool-semgrep` | `packages/tool-semgrep/` | Opt-in external scanner adapter for Semgrep — SAST/policy scanning via a user-installed `semgrep` binary, normalized through the shared SARIF ingest path. | `tool`, `SEMGREP_IDENTITY`, `SEMGREP_STABLE_ID` |
+| `@opensip-cli/tool-ast-grep` | `packages/tool-ast-grep/` | Opt-in external scanner adapter for ast-grep — structural search scanning via a user-installed `ast-grep` binary and stdout SARIF ingestion. | `tool`, `AST_GREP_IDENTITY`, `AST_GREP_STABLE_ID` |
+| `@opensip-cli/tool-ruff` | `packages/tool-ruff/` | Opt-in external scanner adapter for Ruff — Python lint diagnostics via a user-installed `ruff` binary, normalized from JSON. | `tool`, `parseRuffJson`, `RUFF_IDENTITY`, `RUFF_STABLE_ID` |
+| `@opensip-cli/tool-golangci-lint` | `packages/tool-golangci-lint/` | Opt-in external scanner adapter for golangci-lint — Go lint aggregation via a user-installed `golangci-lint` binary, normalized from stdout JSON. | `tool`, `parseGolangciLintJson`, `GOLANGCI_LINT_IDENTITY`, `GOLANGCI_LINT_STABLE_ID` |
+| `@opensip-cli/tool-govulncheck` | `packages/tool-govulncheck/` | Opt-in external scanner adapter for govulncheck — Go vulnerability scanning via a user-installed `govulncheck` binary, normalized from JSON lines. | `tool`, `parseGovulncheckJsonLines`, `GOVULNCHECK_IDENTITY`, `GOVULNCHECK_STABLE_ID` |
+| `@opensip-cli/tool-cargo-deny` | `packages/tool-cargo-deny/` | Opt-in external scanner adapter for cargo-deny — Rust dependency policy scanning via a user-installed `cargo-deny` binary, normalized from JSON lines. | `tool`, `parseCargoDenyJsonLines`, `CARGO_DENY_IDENTITY`, `CARGO_DENY_STABLE_ID` |
+| `@opensip-cli/tool-bandit` | `packages/tool-bandit/` | Opt-in external scanner adapter for Bandit — Python security scanning via a user-installed `bandit` binary, normalized from JSON. | `tool`, `parseBanditJson`, `BANDIT_IDENTITY`, `BANDIT_STABLE_ID` |
+| `@opensip-cli/tool-pip-audit` | `packages/tool-pip-audit/` | Opt-in external scanner adapter for pip-audit — Python dependency vulnerability scanning via a user-installed `pip-audit` binary, normalized from JSON. | `tool`, `parsePipAuditJson`, `PIP_AUDIT_IDENTITY`, `PIP_AUDIT_STABLE_ID` |
+| `@opensip-cli/tool-cargo-clippy` | `packages/tool-cargo-clippy/` | Opt-in external scanner adapter for cargo clippy — Rust lint diagnostics via `cargo clippy --message-format=json`, normalized from JSON lines. | `tool`, `parseCargoClippyJsonLines`, `CARGO_CLIPPY_IDENTITY`, `CARGO_CLIPPY_STABLE_ID` |
+| `@opensip-cli/tool-spotbugs` | `packages/tool-spotbugs/` | Opt-in external scanner adapter for SpotBugs — Java bytecode analysis via a user-installed `spotbugs` binary, normalized through SARIF. | `tool`, `SPOTBUGS_IDENTITY`, `SPOTBUGS_STABLE_ID` |
+| `@opensip-cli/tool-pmd` | `packages/tool-pmd/` | Opt-in external scanner adapter for PMD — Java source analysis via a user-installed `pmd` binary, normalized through SARIF. | `tool`, `PMD_IDENTITY`, `PMD_STABLE_ID` |
+| `@opensip-cli/tool-dependency-check` | `packages/tool-dependency-check/` | Opt-in external scanner adapter for OWASP Dependency-Check — dependency vulnerability scanning via a user-installed `dependency-check` binary, normalized through SARIF. | `tool`, `DEPENDENCY_CHECK_IDENTITY`, `DEPENDENCY_CHECK_STABLE_ID` |
+| `@opensip-cli/tool-cppcheck` | `packages/tool-cppcheck/` | Opt-in external scanner adapter for Cppcheck — C/C++ static analysis via a user-installed `cppcheck` binary, normalized through SARIF. | `tool`, `CPPCHECK_IDENTITY`, `CPPCHECK_STABLE_ID` |
 
 ## Layer 5 — fitness check packs and graph adapter packs
 
@@ -163,7 +176,7 @@ Imports every layer below. The published binary.
 Last verified at v0.4.2 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **42 publishable packages** total (all at `0.4.2`), plus one workspace-private
+- **55 publishable packages** total (all at `0.4.2`), plus one workspace-private
   `@opensip-cli/test-support` package and the private root `@opensip-cli/root`:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + cli-ui + cli-live): 7 —
@@ -171,8 +184,11 @@ package source of truth) and the layer tables above:
   - Layer 3 (config + targeting + session-store + output + dashboard + external-tool substrate + fitness language adapters): 12 —
     `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`,
     `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`, `external-tool-adapter`
-  - Layer 4 Tools/tool adapters: 8 — `fitness`, `simulation`, `graph`, `yagni`,
-    `mcp`, `tool-gitleaks`, `tool-osv-scanner`, `tool-trivy`
+  - Layer 4 Tools/tool adapters: 21 — `fitness`, `simulation`, `graph`, `yagni`,
+    `mcp`, `tool-gitleaks`, `tool-osv-scanner`, `tool-trivy`, `tool-semgrep`,
+    `tool-ast-grep`, `tool-ruff`, `tool-golangci-lint`, `tool-govulncheck`,
+    `tool-cargo-deny`, `tool-bandit`, `tool-pip-audit`, `tool-cargo-clippy`,
+    `tool-spotbugs`, `tool-pmd`, `tool-dependency-check`, `tool-cppcheck`
   - Layer 5 (check packs + graph adapter packs/scaffolding): 13 —
     `checks-universal`, `checks-typescript`, `checks-python`,
     `checks-java`, `checks-go`, `checks-cpp`, `checks-rust`, `graph-adapter-common`,

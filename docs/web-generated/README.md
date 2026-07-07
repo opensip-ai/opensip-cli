@@ -24,7 +24,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 | Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and eleven built-in graph rules |
 | Review evidence-backed code-reduction opportunities (advisory) | `opensip yagni` with bundled detectors and optional graph evidence |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
-| Bring existing security scanners into the same report and gate | Opt in with `opensip tools install @opensip-cli/tool-gitleaks`, `@opensip-cli/tool-osv-scanner`, or `@opensip-cli/tool-trivy` |
+| Bring existing scanners into the same report and gate | Opt in to one of 16 adapters, including Gitleaks, Semgrep, Ruff, golangci-lint, cargo-deny, Bandit, PMD, Cppcheck, OSV-Scanner, and Trivy |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
 | Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
 | Give coding agents deterministic repo evidence | `opensip agent-catalog --json`, `opensip mcp`, filtered JSON, sessions, and graph impact |
@@ -102,6 +102,11 @@ opensip tools install @opensip-cli/tool-gitleaks
 opensip gitleaks doctor
 opensip gitleaks --json --gate-save
 ```
+
+Adapters currently cover secrets, SAST/structural search, Python/Go/Rust linting,
+dependency vulnerabilities, Java analysis, and C/C++ static analysis. The adapter
+package does not install the scanner binary; `opensip <tool> doctor` verifies the
+local binary and prerequisites.
 
 For every command, flag, exit code, and machine-output contract, use the [CLI command reference](/docs/opensip-cli/70-reference/01-cli-commands/). For Tool plugin management specifically, use the [`tools` command reference](/docs/opensip-cli/70-reference/12-tools-command/).
 
@@ -226,7 +231,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 This v0.4.2 doc set was rechecked against the source on 2026-07-07:
 
 - 160 built-in fitness checks across seven packs.
-- 42 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
+- 55 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
 - Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.

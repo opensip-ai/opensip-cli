@@ -74,6 +74,42 @@ export function sarifLevelToSeverity(level: string | undefined): SignalSeverity 
   }
 }
 
+/** Common scanner label → OpenSIP four-bucket severity mapping. */
+export function nativeLabelToSeverity(
+  label: string | undefined,
+  fallback: SignalSeverity = 'medium',
+): SignalSeverity {
+  switch (label?.trim().toLowerCase()) {
+    case 'critical':
+    case 'blocker': {
+      return 'critical';
+    }
+    case 'high':
+    case 'error':
+    case 'fatal':
+    case 'major': {
+      return 'high';
+    }
+    case 'medium':
+    case 'moderate':
+    case 'warning':
+    case 'warn':
+    case 'minor': {
+      return 'medium';
+    }
+    case 'low':
+    case 'info':
+    case 'information':
+    case 'note':
+    case 'style': {
+      return 'low';
+    }
+    default: {
+      return fallback;
+    }
+  }
+}
+
 /**
  * Merge the scanner's NATIVE severity label/number onto a metadata bag under
  * `nativeSeverity` (preserved beside the mapped four-bucket `Signal.severity`).

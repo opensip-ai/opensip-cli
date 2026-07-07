@@ -133,6 +133,9 @@ importers:
       '@opensip-cli/checks-universal':
         specifier: workspace:*
         version: file:packages/fitness/checks-universal(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
+      '@opensip-cli/cli-live':
+        specifier: workspace:*
+        version: link:../cli-live
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../cli-ui
@@ -151,6 +154,9 @@ importers:
       '@opensip-cli/datastore':
         specifier: workspace:*
         version: link:../datastore
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: link:../fitness/engine
@@ -1190,6 +1196,120 @@ importers:
         specifier: ^4.1.9
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
+  packages/tool-ast-grep:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-bandit:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-cargo-clippy:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-cargo-deny:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-cppcheck:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-dependency-check:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
   packages/tool-gitleaks:
     dependencies:
       '@opensip-cli/contracts':
@@ -1215,6 +1335,44 @@ importers:
         specifier: ^4.1.9
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
+  packages/tool-golangci-lint:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-govulncheck:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
   packages/tool-osv-scanner:
     dependencies:
       '@opensip-cli/contracts':
@@ -1233,6 +1391,101 @@ importers:
       opensip-cli:
         specifier: workspace:*
         version: link:../cli
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-pip-audit:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-pmd:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-ruff:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-semgrep:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.1.3(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/tool-spotbugs:
+    dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      '@opensip-cli/external-tool-adapter':
+        specifier: workspace:*
+        version: link:../external-tool-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
       typescript:
         specifier: ~6.0.3
         version: 6.0.3

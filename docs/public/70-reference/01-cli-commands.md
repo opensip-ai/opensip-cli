@@ -27,6 +27,19 @@ source-files:
   - packages/tool-gitleaks/src/tool.ts
   - packages/tool-osv-scanner/src/tool.ts
   - packages/tool-trivy/src/tool.ts
+  - packages/tool-semgrep/src/tool.ts
+  - packages/tool-ast-grep/src/tool.ts
+  - packages/tool-ruff/src/tool.ts
+  - packages/tool-golangci-lint/src/tool.ts
+  - packages/tool-govulncheck/src/tool.ts
+  - packages/tool-cargo-deny/src/tool.ts
+  - packages/tool-bandit/src/tool.ts
+  - packages/tool-pip-audit/src/tool.ts
+  - packages/tool-cargo-clippy/src/tool.ts
+  - packages/tool-spotbugs/src/tool.ts
+  - packages/tool-pmd/src/tool.ts
+  - packages/tool-dependency-check/src/tool.ts
+  - packages/tool-cppcheck/src/tool.ts
 related-docs:
   - ../60-guides/08-connect-mcp-clients.md
   - ../80-implementation/01-cli-dispatch.md
@@ -1167,9 +1180,14 @@ run scope has resolved policy.
 
 ## External tool adapters (opt-in)
 
-Tool-owned: [`@opensip-cli/external-tool-adapter`](../../../packages/external-tool-adapter) + the three MVP adapter packages ([ADR-0090](../../decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)).
+Tool-owned: [`@opensip-cli/external-tool-adapter`](../../../packages/external-tool-adapter) + the opt-in adapter packages ([ADR-0090](../../decisions/ADR-0090-external-tool-adapter-substrate.md) / [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md) / [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)).
 
-An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`, `osv-scanner`, `trivy`) as a first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its native output to `Signal`s, and feeds the same envelope/session/gate/egress path as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one you want. To author your own, see [External tool adapters](../50-extend/08-external-tool-adapters.md).
+An **External Tool Adapter** wraps a user-installed CLI scanner (`gitleaks`,
+`semgrep`, `ruff`, `golangci-lint`, `osv-scanner`, `trivy`, etc.) as a
+first-class OpenSIP Tool: it runs the scanner as a subprocess, normalizes its
+native output to `Signal`s, and feeds the same envelope/session/gate/egress path
+as `fit` and `graph`. Adapters are **opt-in and not bundled** — install the one
+you want. To author your own, see [External tool adapters](../50-extend/08-external-tool-adapters.md).
 
 The full user flow:
 
@@ -1180,15 +1198,28 @@ opensip gitleaks                                   # scan → normalize → stor
 opensip gitleaks --json --gate-compare             # envelope + net-new ratchet
 ```
 
-`opensip tools install` validates the package, installs the validated bytes, and records a managed trust entry for the selected scope. Ambient `node_modules` Tool packages remain deny-by-default; `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` is an override for incident response/manual experiments. The same `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) applies to all three adapters.
+`opensip tools install` validates the package, installs the validated bytes, and records a managed trust entry for the selected scope. Ambient `node_modules` Tool packages remain deny-by-default; `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` is an override for incident response/manual experiments. The same `OPENSIP_<TOOL>_BIN` binary override (see [Binary resolution](#binary-resolution)) applies to every adapter.
 
-### The three MVP adapters
+### Shipped adapter commands
 
 | Command | Wraps | Scans | Posture |
 |---------|-------|-------|---------|
 | `opensip gitleaks` (alias `secrets`) | `gitleaks` | Committed secrets in the working tree | `local-only` |
 | `opensip osv-scanner` (alias `osv`) | `osv-scanner` | Dependency vulnerabilities (lockfiles) | `local-only` |
 | `opensip trivy` | `trivy` | Vulnerabilities + misconfigurations (filesystem) | `local-only` |
+| `opensip semgrep` | `semgrep` | SAST / policy rules | `networked` when using Semgrep `auto` config |
+| `opensip ast-grep` (alias `sg`) | `ast-grep` | Structural search rules | `local-only` |
+| `opensip ruff` | `ruff` | Python lint diagnostics | `local-only` |
+| `opensip golangci-lint` (alias `golangci`) | `golangci-lint` | Go lint aggregation | `local-only` |
+| `opensip govulncheck` | `govulncheck` | Go vulnerabilities | `networked` |
+| `opensip cargo-deny` | `cargo-deny` | Rust dependency policy | `networked` |
+| `opensip bandit` | `bandit` | Python security issues | `local-only` |
+| `opensip pip-audit` | `pip-audit` | Python dependency vulnerabilities | `networked` |
+| `opensip cargo-clippy` (alias `clippy`) | `cargo clippy` | Rust lint diagnostics | `local-only` |
+| `opensip spotbugs` | `spotbugs` | Java bytecode issues | `local-only` |
+| `opensip pmd` | `pmd` | Java source rules | `local-only` |
+| `opensip dependency-check` (alias `owasp-dependency-check`) | `dependency-check` | Dependency vulnerabilities | `local-only` with a pre-populated DB |
+| `opensip cppcheck` | `cppcheck` | C/C++ static analysis | `local-only` |
 
 Each adapter mounts three commands — the primary `scan` (`opensip <tool>`), plus nested `opensip <tool> doctor` and `opensip <tool> version`:
 
@@ -1198,9 +1229,14 @@ Each adapter mounts three commands — the primary `scan` (`opensip <tool>`), pl
 
 **Local-binary + DB-cache prerequisites (surfaced by `doctor`):**
 
-- **gitleaks** — needs the `gitleaks` binary on `PATH` (or pinned). Offline; no DB.
-- **osv-scanner** — needs the `osv-scanner` binary. It ships an embedded/offline advisory DB, so the scan is local-only; a project with **no lockfiles** is a clean no-op, not a failure.
-- **trivy** — needs the `trivy` binary **and a pre-populated local vulnerability DB cache**. The adapter scans with `--skip-db-update --skip-java-db-update --offline-scan`, so Trivy will **not** fetch its DB at scan time. Populate the cache once online (e.g. `trivy image --download-db-only`) before the first offline scan; `doctor`'s install hint notes this.
+- **Every adapter** — needs the wrapped scanner binary on `PATH` or pinned with
+  `binaries.<tool>.path` / `OPENSIP_<TOOL>_BIN`.
+- **Configuration-backed tools** — ast-grep requires an `sgconfig.yml` /
+  `.ast-grep.yml`; SpotBugs requires compiled Java classes; PMD uses the Java
+  quickstart ruleset by default.
+- **Network/cache tools** — Semgrep `auto`, govulncheck, cargo-deny, and
+  pip-audit may reach advisory/rule services; Trivy and Dependency-Check run
+  local-only only when their DB caches are already populated.
 
 ### The gate ratchet, JSON, and the artifact store
 
@@ -1229,7 +1265,7 @@ gitleaks:
       path: /opt/homebrew/bin/gitleaks
 ```
 
-A missing binary yields a `doctor` install hint, never an install. **Both** the env override and the `binaries.<tool>.path` config pin work out of the box for the three MVP adapters — the substrate claims each adapter's config namespace by default (no per-adapter config schema required).
+A missing binary yields a `doctor` install hint, never an install. **Both** the env override and the `binaries.<tool>.path` config pin work out of the box for shipped adapters — the substrate claims each adapter's config namespace by default (no per-adapter config schema required).
 
 ---
 

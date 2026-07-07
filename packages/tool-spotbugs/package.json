@@ -1,0 +1,137 @@
+{
+  "name": "@opensip-cli/tool-spotbugs",
+  "version": "0.4.2",
+  "license": "Apache-2.0",
+  "description": "External Tool Adapter for SpotBugs — wraps Java bytecode analysis as an opensip-cli tool",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "external-tool-adapter",
+    "scanner",
+    "java",
+    "spotbugs",
+    "security",
+    "sarif"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-spotbugs"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "spotbugs",
+    "identity": {
+      "name": "spotbugs"
+    },
+    "stableId": "47a950e0-f631-4d80-aa35-02968ef97747",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "spotbugs",
+        "description": "Analyze compiled Java classes with SpotBugs",
+        "aliases": [],
+        "commonFlags": [
+          "json",
+          "cwd",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch",
+        "producesVerdict": true
+      },
+      {
+        "name": "doctor",
+        "description": "Check that the spotbugs binary is installed and ready",
+        "parent": "spotbugs",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "version",
+        "description": "Print the resolved spotbugs binary version",
+        "parent": "spotbugs",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      }
+    ],
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Executes the user-installed spotbugs binary via execFile (no shell)"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      }
+    ],
+    "config": {
+      "namespace": "spotbugs",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

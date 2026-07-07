@@ -7,10 +7,11 @@
     "opensip-cli",
     "static-analysis",
     "code-quality",
+    "external-tool-adapter",
+    "scanner",
     "security",
     "gitleaks",
-    "secrets",
-    "scanner"
+    "secrets"
   ],
   "repository": {
     "type": "git",

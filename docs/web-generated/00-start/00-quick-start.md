@@ -33,18 +33,21 @@ From a clean shell to a passing fitness run. The point of this page is to give y
 
 opensip-cli auto-detects your project's language(s) from filesystem markers and runs the matching checks. Polyglot projects get every relevant pack.
 
-| Language | Detection marker | Language-specific checks | Universal checks |
-|---|---|---|---|
-| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 58 | ✓ |
-| **Python** | `pyproject.toml`, `setup.py` | 2 | ✓ |
-| **Java** | `pom.xml`, `build.gradle` | 1 | ✓ |
-| **Go** | `go.mod` | 1 | ✓ |
-| **C / C++** | `CMakeLists.txt` | 1 (clang-tidy backed) | ✓ |
-| **Rust** | `Cargo.toml` | 1 | ✓ |
+| Language | Detection marker | Language-specific checks | Universal checks | Opt-in scanner adapters |
+|---|---|---|---|---|
+| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 58 | ✓ | 5, including Semgrep, ast-grep, OSV-Scanner |
+| **Python** | `pyproject.toml`, `setup.py` | 2 | ✓ | 6, including Ruff, Bandit, pip-audit |
+| **Java** | `pom.xml`, `build.gradle` | 1 | ✓ | 5, including PMD, SpotBugs, Dependency-Check |
+| **Go** | `go.mod` | 1 | ✓ | 4, including golangci-lint, govulncheck |
+| **C / C++** | `CMakeLists.txt` | 1 (clang-tidy backed) | ✓ | 3, including Cppcheck |
+| **Rust** | `Cargo.toml` | 1 | ✓ | 4, including cargo-deny, cargo-clippy |
 
 Every detected language gets the **96 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 58 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
 
 For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/).
+Scanner adapters are not bundled; install only the ones you want with
+`opensip tools install @opensip-cli/tool-...`. Cross-language adapters such as
+Gitleaks, Semgrep, and Trivy can apply to several rows.
 
 ---
 
@@ -161,9 +164,10 @@ The full command tree is at [`../70-reference/01-cli-commands.md`](/docs/opensip
 
 ## Optional: add a local security scanner
 
-If your team already uses Gitleaks, OSV-Scanner, or Trivy, install only the
-adapter you want. The adapter does **not** install the scanner binary; `doctor`
-checks that the local binary and cache prerequisites are ready.
+If your team already uses scanners such as Gitleaks, Semgrep, Ruff,
+golangci-lint, cargo-deny, Bandit, PMD, Cppcheck, OSV-Scanner, or Trivy, install
+only the adapter you want. The adapter does **not** install the scanner binary;
+`doctor` checks that the local binary and cache prerequisites are ready.
 
 ```bash
 # Example: committed-secret scanning with a local gitleaks binary

@@ -38,6 +38,10 @@ import {
   type SignalDeliveryResult,
   type ToolCliContext,
 } from '@opensip-cli/core';
+import {
+  attachExternalAdapterProgress,
+  type ExternalAdapterProgressBridge,
+} from '@opensip-cli/external-tool-adapter';
 
 import { resolveReportFailure, toReportedFailureWire } from './report-failure.js';
 
@@ -161,11 +165,12 @@ export function buildWorkerContext(
   acc: ResultAccumulator,
   rpcClient: WorkerRpcClient,
   maxCapturedOutputBytes = getWorkerLimits().maxCapturedOutputBytes,
+  adapterProgress?: ExternalAdapterProgressBridge,
 ): ToolCliContext {
   const cap = (field: string, value: unknown): void => {
     assertCapturedOutputFits(field, value, maxCapturedOutputBytes);
   };
-  return {
+  const ctx: ToolCliContext = {
     scope,
     runSession: { timing },
     logger: scope.logger,
@@ -247,4 +252,5 @@ export function buildWorkerContext(
     registerLiveView: unsupported('registerLiveView'),
     renderLive: unsupported('renderLive'),
   };
+  return adapterProgress === undefined ? ctx : attachExternalAdapterProgress(ctx, adapterProgress);
 }

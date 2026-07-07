@@ -139,11 +139,18 @@ const BUNDLED_TOOL_DIRS = bundledToolDirs();
  * produces the identical shape from the same `commandSpecs`; `deriveCommandShell`
  * below is the generator-local equivalent already used for bundled tools.
  */
-const ADAPTER_TOOL_DIRS = [
-  'packages/tool-gitleaks',
-  'packages/tool-osv-scanner',
-  'packages/tool-trivy',
-];
+function adapterToolDirs() {
+  return workspacePackageDirs()
+    .map((dir) => relative(REPO_ROOT, dir))
+    .filter((dir) => dir.startsWith('packages/tool-'))
+    .filter((dir) => {
+      const pkg = JSON.parse(readFileSync(join(REPO_ROOT, dir, 'package.json'), 'utf8'));
+      return pkg.opensipTools?.kind === 'tool';
+    })
+    .sort();
+}
+
+const ADAPTER_TOOL_DIRS = adapterToolDirs();
 
 /** Every tool dir whose static manifest carries a generated command shell. */
 const TOOL_DIRS = [...BUNDLED_TOOL_DIRS, ...ADAPTER_TOOL_DIRS];

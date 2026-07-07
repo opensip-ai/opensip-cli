@@ -43,6 +43,7 @@ export function spawnCli(descriptor, args, opts = {}) {
     cwd: opts.cwd,
     encoding: 'utf8',
     timeout: opts.timeout ?? 60_000,
+    maxBuffer: 16 * 1024 * 1024,
     env: { ...process.env, NO_COLOR: '1', ...opts.env },
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: SPAWN_MAX_BUFFER,

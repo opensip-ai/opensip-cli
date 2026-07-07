@@ -4,7 +4,7 @@ last_verified: 2026-06-27
 release: v0.4.2
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 43-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The 56-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -25,7 +25,7 @@ Forty-three workspace packages. Six layers. One enforced rule: dependencies flow
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-cli ships as 43 workspace packages instead of one.
+> - Why opensip-cli ships as 56 workspace packages instead of one.
 > - The six layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
@@ -147,7 +147,7 @@ The upshot: there is **no** standing "you may `import type` upward" allowance. A
 
 ---
 
-## Why 43 workspace packages and not 1
+## Why 56 workspace packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -159,7 +159,7 @@ A check pack like `@opensip-cli/checks-python` has to be installable on its own.
 opensip fit plugin add @opensip-cli/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 43 workspace packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 56 workspace packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -167,15 +167,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 43 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 56 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 43-package layout is more expensive in three places:
+Trade-offs are real. The 56-package layout is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 42 publishable packages (plus the private workspace-root `package.json` for tooling versions and private `@opensip-cli/test-support`). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 55 publishable packages (plus the private workspace-root `package.json` for tooling versions and private `@opensip-cli/test-support`). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)) is the antidote.
 

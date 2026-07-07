@@ -25,6 +25,7 @@ import { defaultAdapterConfig, defaultAdapterConfigManifest } from './adapter-co
 import { type AdapterToolMarkers } from './adapter-manifest.js';
 import { buildDoctorCommand } from './doctor-command.js';
 import { resolveFingerprintStrategy } from './fingerprint.js';
+import { externalAdapterProgressOf } from './progress.js';
 import { runScanLoop } from './run-loop.js';
 import { buildVersionCommand } from './version-command.js';
 
@@ -87,6 +88,7 @@ async function dispatchScan(
     binary: spec.binary,
     fingerprintStrategy: resolveFingerprintStrategy(spec.fingerprintStrategy),
     opts: rawOpts as Record<string, unknown>,
+    progress: externalAdapterProgressOf(cli),
   });
   // `undefined` ⇒ a gate config error the loop already recorded via reportFailure
   // (the host replays the exit). No envelope/session to persist.

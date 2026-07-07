@@ -1,0 +1,141 @@
+{
+  "name": "@opensip-cli/tool-semgrep",
+  "version": "0.4.2",
+  "license": "Apache-2.0",
+  "description": "External Tool Adapter for Semgrep — wraps the semgrep scanner as an opensip-cli tool",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "external-tool-adapter",
+    "scanner",
+    "security",
+    "semgrep",
+    "sast",
+    "sarif"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-semgrep"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "semgrep",
+    "identity": {
+      "name": "semgrep"
+    },
+    "stableId": "dbd7d730-8b53-4b2b-9a86-2ad4e98d098b",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "semgrep",
+        "description": "Scan the project with Semgrep rules",
+        "aliases": [],
+        "commonFlags": [
+          "json",
+          "cwd",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch",
+        "producesVerdict": true
+      },
+      {
+        "name": "doctor",
+        "description": "Check that the semgrep binary is installed and ready",
+        "parent": "semgrep",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "version",
+        "description": "Print the resolved semgrep binary version",
+        "parent": "semgrep",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      }
+    ],
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Executes the user-installed semgrep binary via execFile (no shell)"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      },
+      {
+        "resource": "network",
+        "reason": "Performs network I/O for the networked scanner posture"
+      }
+    ],
+    "config": {
+      "namespace": "semgrep",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

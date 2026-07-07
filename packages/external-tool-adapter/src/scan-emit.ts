@@ -12,6 +12,7 @@
 import { buildFindingGroups, runHostGateDispatch } from '@opensip-cli/contracts';
 
 import { renderGateCompareLines, renderGateSaveLines } from './gate-render.js';
+import { externalAdapterProgressOf } from './progress.js';
 import { buildAdapterSessionPayload } from './session-payload.js';
 
 import type { BinaryResolutionLayer } from './types.js';
@@ -195,7 +196,7 @@ export async function emitScanCompletion(input: EmitScanCompletionInput): Promis
 
   if (opts.json === true) {
     cli.emitEnvelope(envelope);
-  } else {
+  } else if (externalAdapterProgressOf(cli)?.suppressHumanRender !== true) {
     await cli.render(scanPresentation(tool, envelope, opts));
   }
   await cli.deliverSignals(envelope, deliver);

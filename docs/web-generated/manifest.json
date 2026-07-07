@@ -148,7 +148,7 @@
       "audience": [
         "contributors"
       ],
-      "purpose": "The 43-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+      "purpose": "The 56-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
     },
     {
       "file": "docs/web-generated/10-concepts/04-contract-surfaces.md",
@@ -402,7 +402,7 @@
       "audience": [
         "plugin-authors"
       ],
-      "purpose": "Wrap a local CLI scanner (gitleaks/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
+      "purpose": "Wrap a local CLI scanner (gitleaks/semgrep/ruff/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
     },
     {
       "file": "docs/web-generated/55-yagni/01-command-reference.md",

@@ -21,56 +21,69 @@ packages) is a separate trust gate — see
 [ADR-0068](../docs/decisions/ADR-0068-consumption-side-verification-policy.md)
 and [ADR-0061](../docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
-## The 42 packages
+## The 55 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
 contract tests derive from or verify against that source.
 
-| Layer          | Package                             | Path                                  |
-| -------------- | ----------------------------------- | ------------------------------------- |
-| Kernel         | `@opensip-cli/core`                 | `packages/core`                       |
-| Persistence    | `@opensip-cli/datastore`            | `packages/datastore`                  |
-| Shared CLI     | `@opensip-cli/contracts`            | `packages/contracts`                  |
-| Authoring      | `@opensip-cli/tool-test-kit`        | `packages/tool-test-kit`              |
-| Substrate      | `@opensip-cli/clone-detection`      | `packages/clone-detection`            |
-| Persistence    | `@opensip-cli/session-store`        | `packages/session-store`              |
-| Output         | `@opensip-cli/output`               | `packages/output`                     |
-| Config         | `@opensip-cli/config`               | `packages/config`                     |
-| Targeting      | `@opensip-cli/targeting`            | `packages/targeting`                  |
-| Shared CLI     | `@opensip-cli/cli-ui`               | `packages/cli-ui`                     |
-| Shared CLI     | `@opensip-cli/cli-live`             | `packages/cli-live`                   |
-| Languages      | `@opensip-cli/tree-sitter`          | `packages/tree-sitter`                |
-| Languages      | `@opensip-cli/lang-typescript`      | `packages/languages/lang-typescript`  |
-| Languages      | `@opensip-cli/lang-rust`            | `packages/languages/lang-rust`        |
-| Languages      | `@opensip-cli/lang-python`          | `packages/languages/lang-python`      |
-| Languages      | `@opensip-cli/lang-go`              | `packages/languages/lang-go`          |
-| Languages      | `@opensip-cli/lang-java`            | `packages/languages/lang-java`        |
-| Languages      | `@opensip-cli/lang-cpp`             | `packages/languages/lang-cpp`         |
-| Tools          | `@opensip-cli/dashboard`            | `packages/dashboard`                  |
-| Substrate      | `@opensip-cli/external-tool-adapter` | `packages/external-tool-adapter`     |
-| Tools          | `@opensip-cli/fitness`              | `packages/fitness/engine`             |
-| Tools          | `@opensip-cli/simulation`           | `packages/simulation/engine`          |
-| Tools          | `@opensip-cli/graph`                | `packages/graph/engine`               |
-| Tools          | `@opensip-cli/yagni`                | `packages/yagni/engine`               |
-| Graph adapters | `@opensip-cli/graph-adapter-common` | `packages/graph/graph-adapter-common` |
-| Graph adapters | `@opensip-cli/graph-typescript`     | `packages/graph/graph-typescript`     |
-| Graph adapters | `@opensip-cli/graph-python`         | `packages/graph/graph-python`         |
-| Graph adapters | `@opensip-cli/graph-rust`           | `packages/graph/graph-rust`           |
-| Graph adapters | `@opensip-cli/graph-go`             | `packages/graph/graph-go`             |
-| Graph adapters | `@opensip-cli/graph-java`           | `packages/graph/graph-java`           |
-| Tools          | `@opensip-cli/mcp`                  | `packages/mcp`                        |
-| Tool adapters  | `@opensip-cli/tool-gitleaks`        | `packages/tool-gitleaks`              |
-| Tool adapters  | `@opensip-cli/tool-osv-scanner`     | `packages/tool-osv-scanner`           |
-| Tool adapters  | `@opensip-cli/tool-trivy`           | `packages/tool-trivy`                 |
-| Check packs    | `@opensip-cli/checks-universal`     | `packages/fitness/checks-universal`   |
-| Check packs    | `@opensip-cli/checks-typescript`    | `packages/fitness/checks-typescript`  |
-| Check packs    | `@opensip-cli/checks-python`        | `packages/fitness/checks-python`      |
-| Check packs    | `@opensip-cli/checks-go`            | `packages/fitness/checks-go`          |
-| Check packs    | `@opensip-cli/checks-java`          | `packages/fitness/checks-java`        |
-| Check packs    | `@opensip-cli/checks-cpp`           | `packages/fitness/checks-cpp`         |
-| Check packs    | `@opensip-cli/checks-rust`          | `packages/fitness/checks-rust`        |
-| CLI            | `opensip-cli` (unscoped)            | `packages/cli`                        |
+| Layer          | Package                              | Path                                  |
+| -------------- | ------------------------------------ | ------------------------------------- |
+| Kernel         | `@opensip-cli/core`                  | `packages/core`                       |
+| Persistence    | `@opensip-cli/datastore`             | `packages/datastore`                  |
+| Shared CLI     | `@opensip-cli/contracts`             | `packages/contracts`                  |
+| Authoring      | `@opensip-cli/tool-test-kit`         | `packages/tool-test-kit`              |
+| Substrate      | `@opensip-cli/clone-detection`       | `packages/clone-detection`            |
+| Persistence    | `@opensip-cli/session-store`         | `packages/session-store`              |
+| Output         | `@opensip-cli/output`                | `packages/output`                     |
+| Config         | `@opensip-cli/config`                | `packages/config`                     |
+| Targeting      | `@opensip-cli/targeting`             | `packages/targeting`                  |
+| Shared CLI     | `@opensip-cli/cli-ui`                | `packages/cli-ui`                     |
+| Shared CLI     | `@opensip-cli/cli-live`              | `packages/cli-live`                   |
+| Languages      | `@opensip-cli/tree-sitter`           | `packages/tree-sitter`                |
+| Languages      | `@opensip-cli/lang-typescript`       | `packages/languages/lang-typescript`  |
+| Languages      | `@opensip-cli/lang-rust`             | `packages/languages/lang-rust`        |
+| Languages      | `@opensip-cli/lang-python`           | `packages/languages/lang-python`      |
+| Languages      | `@opensip-cli/lang-go`               | `packages/languages/lang-go`          |
+| Languages      | `@opensip-cli/lang-java`             | `packages/languages/lang-java`        |
+| Languages      | `@opensip-cli/lang-cpp`              | `packages/languages/lang-cpp`         |
+| Tools          | `@opensip-cli/dashboard`             | `packages/dashboard`                  |
+| Substrate      | `@opensip-cli/external-tool-adapter` | `packages/external-tool-adapter`      |
+| Tools          | `@opensip-cli/fitness`               | `packages/fitness/engine`             |
+| Tools          | `@opensip-cli/simulation`            | `packages/simulation/engine`          |
+| Tools          | `@opensip-cli/graph`                 | `packages/graph/engine`               |
+| Tools          | `@opensip-cli/yagni`                 | `packages/yagni/engine`               |
+| Graph adapters | `@opensip-cli/graph-adapter-common`  | `packages/graph/graph-adapter-common` |
+| Graph adapters | `@opensip-cli/graph-typescript`      | `packages/graph/graph-typescript`     |
+| Graph adapters | `@opensip-cli/graph-python`          | `packages/graph/graph-python`         |
+| Graph adapters | `@opensip-cli/graph-rust`            | `packages/graph/graph-rust`           |
+| Graph adapters | `@opensip-cli/graph-go`              | `packages/graph/graph-go`             |
+| Graph adapters | `@opensip-cli/graph-java`            | `packages/graph/graph-java`           |
+| Tools          | `@opensip-cli/mcp`                   | `packages/mcp`                        |
+| Tool adapters  | `@opensip-cli/tool-gitleaks`         | `packages/tool-gitleaks`              |
+| Tool adapters  | `@opensip-cli/tool-osv-scanner`      | `packages/tool-osv-scanner`           |
+| Tool adapters  | `@opensip-cli/tool-trivy`            | `packages/tool-trivy`                 |
+| Tool adapters  | `@opensip-cli/tool-semgrep`          | `packages/tool-semgrep`               |
+| Tool adapters  | `@opensip-cli/tool-ast-grep`         | `packages/tool-ast-grep`              |
+| Tool adapters  | `@opensip-cli/tool-ruff`             | `packages/tool-ruff`                  |
+| Tool adapters  | `@opensip-cli/tool-golangci-lint`    | `packages/tool-golangci-lint`         |
+| Tool adapters  | `@opensip-cli/tool-govulncheck`      | `packages/tool-govulncheck`           |
+| Tool adapters  | `@opensip-cli/tool-cargo-deny`       | `packages/tool-cargo-deny`            |
+| Tool adapters  | `@opensip-cli/tool-bandit`           | `packages/tool-bandit`                |
+| Tool adapters  | `@opensip-cli/tool-pip-audit`        | `packages/tool-pip-audit`             |
+| Tool adapters  | `@opensip-cli/tool-cargo-clippy`     | `packages/tool-cargo-clippy`          |
+| Tool adapters  | `@opensip-cli/tool-spotbugs`         | `packages/tool-spotbugs`              |
+| Tool adapters  | `@opensip-cli/tool-pmd`              | `packages/tool-pmd`                   |
+| Tool adapters  | `@opensip-cli/tool-dependency-check` | `packages/tool-dependency-check`      |
+| Tool adapters  | `@opensip-cli/tool-cppcheck`         | `packages/tool-cppcheck`              |
+| Check packs    | `@opensip-cli/checks-universal`      | `packages/fitness/checks-universal`   |
+| Check packs    | `@opensip-cli/checks-typescript`     | `packages/fitness/checks-typescript`  |
+| Check packs    | `@opensip-cli/checks-python`         | `packages/fitness/checks-python`      |
+| Check packs    | `@opensip-cli/checks-go`             | `packages/fitness/checks-go`          |
+| Check packs    | `@opensip-cli/checks-java`           | `packages/fitness/checks-java`        |
+| Check packs    | `@opensip-cli/checks-cpp`            | `packages/fitness/checks-cpp`         |
+| Check packs    | `@opensip-cli/checks-rust`           | `packages/fitness/checks-rust`        |
+| CLI            | `opensip-cli` (unscoped)             | `packages/cli`                        |
 
 All publishable packages share the same version. The release workflow publishes
 them in dependency order, with `opensip-cli` last.
@@ -85,8 +98,8 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 
 ### 1. Version fields (hand-set, lockstep)
 
-All 42 publishable packages **plus** the private root (`@opensip-cli/root`) and
-the private `@opensip-cli/test-support` carry one shared version — 44
+All 55 publishable packages **plus** the private root (`@opensip-cli/root`) and
+the private `@opensip-cli/test-support` carry one shared version — 57
 `package.json` files. The bump script matches `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
@@ -103,7 +116,7 @@ Each reads `packages/core/package.json#version`:
 | Surface                                   | Regenerate with                                                               | Pins                                                  |
 | ----------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
 | CLI `--version`                           | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version                                 |
-| Per-package `README.md` (×41 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
+| Per-package `README.md` (×54 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
 | `docs/web-generated/**` + `manifest.json` | `pnpm docs:build`                                                             | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
 
 CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
@@ -139,7 +152,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    derived ones (see "Version Surfaces" above):
 
    ```bash
-   node scripts/bump-version.mjs <new-version>   # 40 package.json + docs + SECURITY + prose
+   node scripts/bump-version.mjs <new-version>   # 57 package.json + docs + SECURITY + prose
    pnpm install --lockfile-only                  # refresh the lockfile
    pnpm docs:readmes && pnpm docs:build          # regenerate version-pinned READMEs + web docs
    node scripts/bump-version.mjs --check         # assert no surface drifted
@@ -187,34 +200,41 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    Or inspect manually:
 
    ```bash
-  for p in core datastore contracts tool-test-kit clone-detection session-store output config targeting cli-ui cli-live tree-sitter \
-            lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
-            dashboard external-tool-adapter fitness simulation graph yagni graph-adapter-common graph-typescript \
-            graph-python graph-rust graph-go graph-java mcp tool-gitleaks tool-osv-scanner tool-trivy checks-universal checks-typescript \
-            checks-python checks-go checks-java checks-cpp checks-rust; do
-     printf '%-40s %s\n' "@opensip-cli/$p" "$(npm view "@opensip-cli/$p" version 2>/dev/null || echo MISSING)"
+
+   ```
+
+for p in core datastore contracts tool-test-kit clone-detection session-store output config targeting cli-ui cli-live tree-sitter \
+lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
+dashboard external-tool-adapter fitness simulation graph yagni graph-adapter-common graph-typescript \
+graph-python graph-rust graph-go graph-java mcp tool-gitleaks tool-osv-scanner tool-trivy \
+tool-semgrep tool-ast-grep tool-ruff tool-golangci-lint tool-govulncheck tool-cargo-deny \
+tool-bandit tool-pip-audit tool-cargo-clippy tool-spotbugs tool-pmd tool-dependency-check tool-cppcheck \
+checks-universal checks-typescript \
+checks-python checks-go checks-java checks-cpp checks-rust; do
+printf '%-40s %s\n' "@opensip-cli/$p" "$(npm view "@opensip-cli/$p" version 2>/dev/null || echo MISSING)"
    done
    printf '%-40s %s\n' "opensip-cli" "$(npm view opensip-cli version 2>/dev/null || echo MISSING)"
-   ```
+
+````
 
 7. Verify the GitHub Release assets. The workflow uploads the release manifest,
-   checksum file, and CycloneDX SBOM only after staging publish, promotion, and
-   publish-surface verification succeed:
+checksum file, and CycloneDX SBOM only after staging publish, promotion, and
+publish-surface verification succeed:
 
-   ```bash
-   VERSION=0.1.0
-   TAG="v$VERSION"
-   mkdir -p "/tmp/opensip-cli-$TAG"
-   gh release download "$TAG" \
-     --repo opensip-ai/opensip-cli \
-     --dir "/tmp/opensip-cli-$TAG" \
-     --pattern opensip-cli-release-manifest.v1.json \
-     --pattern SHA256SUMS \
-     --pattern opensip-cli-sbom.cyclonedx.json
-   ```
+```bash
+VERSION=0.1.0
+TAG="v$VERSION"
+mkdir -p "/tmp/opensip-cli-$TAG"
+gh release download "$TAG" \
+  --repo opensip-ai/opensip-cli \
+  --dir "/tmp/opensip-cli-$TAG" \
+  --pattern opensip-cli-release-manifest.v1.json \
+  --pattern SHA256SUMS \
+  --pattern opensip-cli-sbom.cyclonedx.json
+````
 
-   Full hash and provenance verification commands are documented in
-   [Verifiable releases](docs/public/70-reference/13-verifiable-releases.md).
+Full hash and provenance verification commands are documented in
+[Verifiable releases](docs/public/70-reference/13-verifiable-releases.md).
 
 ## Partial publish recovery
 
@@ -291,7 +311,7 @@ in `release.yml` or `bootstrap-publish.sh`.
    and `filter`.
 3. **Update this file (`RELEASING.md`)** — CI's release-package-order contract
    test enforces the prose:
-   - Add a row to [The 42 packages](#the-42-packages) (update the section title
+   - Add a row to [The 55 packages](#the-55-packages) (update the section title
      count when the set size changes).
    - Add the unscoped name to the [npm verify loop](#cutting-a-release) `for p in …`
      block (scoped packages only; `opensip-cli` stays on its own line).
@@ -322,13 +342,13 @@ are immutable).
 
 **Operator roles:**
 
-| Step | Who |
-| ---- | --- |
-| Create a short-lived granular npm token | Human |
-| Run `bootstrap-publish.sh` | Human or agent (token via env var only) |
-| Configure trusted publishing on npmjs.com | Human |
-| Delete the npm token | Human |
-| All future releases | Tag-driven OIDC (`release.yml`) |
+| Step                                      | Who                                     |
+| ----------------------------------------- | --------------------------------------- |
+| Create a short-lived granular npm token   | Human                                   |
+| Run `bootstrap-publish.sh`                | Human or agent (token via env var only) |
+| Configure trusted publishing on npmjs.com | Human                                   |
+| Delete the npm token                      | Human                                   |
+| All future releases                       | Tag-driven OIDC (`release.yml`)         |
 
 **Token:** create a **granular access token** at npm → Account → Access Tokens
 (scope `@opensip-cli/*`, publish permission). Provide it only in the shell
@@ -347,12 +367,12 @@ skipped (their next version is published by the OIDC release).
 When bootstrap completes, configure **trusted publishing** for each package
 marked **NEW** in the output:
 
-| Field | Value |
-| ----- | ----- |
-| Organization | `opensip-ai` |
-| Repository | `opensip-cli` |
-| Workflow file | `release.yml` |
-| Environment | *(leave empty)* |
+| Field         | Value           |
+| ------------- | --------------- |
+| Organization  | `opensip-ai`    |
+| Repository    | `opensip-cli`   |
+| Workflow file | `release.yml`   |
+| Environment   | _(leave empty)_ |
 
 Direct link pattern: `https://www.npmjs.com/package/<encoded-name>/access`
 (e.g. `@opensip-cli/foo` → `%40opensip-cli%2Ffoo`).

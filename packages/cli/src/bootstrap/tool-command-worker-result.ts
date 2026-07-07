@@ -20,6 +20,7 @@ import type { ToolCommandFailureClass, ToolCommandResult } from './tool-command-
 /** The completion shape a run-producing handler returns (the session leg the host persists). */
 export interface MaybeCompletion {
   readonly session?: ToolSessionContribution;
+  readonly envelope?: unknown;
 }
 
 /**
@@ -33,6 +34,11 @@ function isReturnValuedOutput(output: ToolCommandResult['output']): boolean {
   return output === 'command-result' || output === 'signal-envelope';
 }
 
+function completionEnvelopeOf(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || !('envelope' in value)) return undefined;
+  return (value as MaybeCompletion).envelope;
+}
+
 /** Drain the accumulator + the handler's return into a serializable result. */
 export function toResult(
   output: ToolCommandResult['output'],
@@ -40,6 +46,7 @@ export function toResult(
   session: ToolSessionContribution | undefined,
   returned: unknown,
 ): ToolCommandResult {
+  const completionEnvelope = output === 'raw-stream' ? completionEnvelopeOf(returned) : undefined;
   return {
     output,
     ...(acc.render === undefined ? {} : { render: acc.render }),
@@ -50,6 +57,7 @@ export function toResult(
     ...(acc.reportedFailure === undefined ? {} : { reportedFailure: acc.reportedFailure }),
     ...(acc.exitCode === undefined ? {} : { exitCode: acc.exitCode }),
     ...(session === undefined ? {} : { session }),
+    ...(completionEnvelope === undefined ? {} : { completionEnvelope }),
     // Carry the handler's return for the return-valued modes so the supervisor
     // routes it via the same `dispatchOutput` the in-process path uses (parity).
     ...(returned === undefined || !isReturnValuedOutput(output) ? {} : { returned }),
