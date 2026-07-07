@@ -59,9 +59,7 @@ function toolsAvailableRow(row: ToolsAvailableRow): Span[] {
     { text: row.id, tone: 'brand', bold: true },
     { text: row.languages.length === 0 ? 'polyglot' : row.languages.join(', ') },
     { text: row.network, tone: row.network === 'networked' ? 'warning' : 'muted' },
-    row.installed
-      ? { text: 'installed', tone: 'success' }
-      : { text: 'not installed', dim: true },
+    row.installed ? { text: 'installed', tone: 'success' } : { text: 'not installed', dim: true },
     { text: row.pkg, dim: true },
   ];
 }

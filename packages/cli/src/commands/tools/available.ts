@@ -9,10 +9,7 @@
  * caller already resolved.
  */
 
-import {
-  FIRST_PARTY_ADAPTERS,
-  type FirstPartyAdapter,
-} from './first-party-adapters.generated.js';
+import { FIRST_PARTY_ADAPTERS, type FirstPartyAdapter } from './first-party-adapters.generated.js';
 
 import type { ToolsAvailableResult, ToolsAvailableRow } from '@opensip-cli/contracts';
 

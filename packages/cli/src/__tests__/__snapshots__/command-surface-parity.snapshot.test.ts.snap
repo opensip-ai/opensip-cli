@@ -2917,6 +2917,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             {
               "choices": undefined,
               "defaultValue": false,
+              "description": "List installable first-party external-tool adapters (the opt-in catalog) instead of the installed set",
+              "flags": "--available",
+              "negate": false,
+              "optional": false,
+              "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": false,
               "description": "Only user-global installed tools",
               "flags": "--global",
               "negate": false,
@@ -2932,6 +2942,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
               "negate": false,
               "optional": false,
               "required": false,
+              "variadic": false,
+            },
+            {
+              "choices": undefined,
+              "defaultValue": undefined,
+              "description": "With --available, filter the adapter catalog by covered language (e.g. c++, python, go); implies --available",
+              "flags": "--lang <language>",
+              "negate": false,
+              "optional": false,
+              "required": true,
               "variadic": false,
             },
             {

@@ -62,7 +62,9 @@ export function adapterConfigManifestOf(tool: Tool): ToolConfigManifestDescripto
  */
 export function deriveAdapterManifestLanguages(tool: Tool): readonly string[] {
   const raw = (tool as Tool & AdapterToolMarkers).adapterLanguages ?? [];
-  return [...new Set(raw.map((lang) => lang.trim().toLowerCase()).filter((lang) => lang.length > 0))].sort();
+  return [
+    ...new Set(raw.map((lang) => lang.trim().toLowerCase()).filter((lang) => lang.length > 0)),
+  ].sort();
 }
 
 /**

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * @fileoverview Generate the CLI-bundled first-party External Tool Adapter catalog.
  *
@@ -53,11 +54,16 @@ function adapterEntries() {
   return entries.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+/** Render a string array as a single-quoted TS array literal (no nested templates). */
+function quotedArray(values) {
+  return `[${values.map((v) => "'" + v + "'").join(', ')}]`;
+}
+
 function render(entries) {
   const rows = entries
     .map((e) => {
-      const langs = `[${e.languages.map((l) => `'${l}'`).join(', ')}]`;
-      const aliases = `[${e.aliases.map((a) => `'${a}'`).join(', ')}]`;
+      const langs = quotedArray(e.languages);
+      const aliases = quotedArray(e.aliases);
       return [
         '  {',
         `    pkg: '${e.pkg}',`,

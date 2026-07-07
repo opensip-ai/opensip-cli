@@ -18,11 +18,11 @@ import {
 
 import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
 
+import { toolsListAvailable } from './available.js';
 import { toolsCreate } from './create.js';
 import { deriveToolDataPurgeIdForms, toolsDataPurge } from './data-purge.js';
 import { toolsDoctor } from './doctor.js';
 import { toolsInstall } from './install.js';
-import { toolsListAvailable } from './available.js';
 import { toolsList } from './list.js';
 import { toolsUninstall } from './uninstall.js';
 import { runToolValidation } from './validate.js';

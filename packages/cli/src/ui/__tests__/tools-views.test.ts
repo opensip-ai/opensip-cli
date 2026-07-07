@@ -10,6 +10,7 @@ import { renderToText } from '@opensip-cli/cli-ui';
 import { describe, expect, it } from 'vitest';
 
 import {
+  viewToolsAvailable,
   viewToolsCreate,
   viewToolsDataPurge,
   viewToolsDoctor,
@@ -89,6 +90,50 @@ describe('viewToolsList', () => {
     expect(out).toContain('denied');
     // commands.length === 0 renders a dash, not an empty cell.
     expect(out).toContain('-');
+  });
+});
+
+describe('viewToolsAvailable', () => {
+  it('renders the adapter catalog with language, network, installed marker, and install hint', () => {
+    const out = renderToText(
+      viewToolsAvailable({
+        type: 'tools-available',
+        lang: 'cpp',
+        totalCount: 2,
+        adapters: [
+          {
+            pkg: '@opensip-cli/tool-cppcheck',
+            id: 'cppcheck',
+            command: 'opensip cppcheck',
+            description: 'C/C++ static analysis',
+            network: 'local-only',
+            languages: ['cpp'],
+            installed: false,
+          },
+          {
+            pkg: '@opensip-cli/tool-semgrep',
+            id: 'semgrep',
+            command: 'opensip semgrep',
+            description: 'Polyglot SAST',
+            network: 'networked',
+            languages: [],
+            installed: true,
+          },
+        ],
+      }),
+    );
+    expect(out).toMatch(/Available external-tool adapters \(2 · cpp\)/);
+    expect(out).toContain('cppcheck');
+    expect(out).toMatch(/polyglot/); // semgrep's [] renders as "polyglot"
+    expect(out).toMatch(/installed/);
+    expect(out).toMatch(/opensip tools install/);
+  });
+
+  it('renders an empty-state line when no adapter matches the filter', () => {
+    const out = renderToText(
+      viewToolsAvailable({ type: 'tools-available', lang: 'haskell', totalCount: 0, adapters: [] }),
+    );
+    expect(out).toMatch(/No first-party adapters match/);
   });
 });
 
