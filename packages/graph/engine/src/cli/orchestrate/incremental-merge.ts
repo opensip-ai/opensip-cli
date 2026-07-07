@@ -258,7 +258,8 @@ export function mergeResolvedAndCachedEdges(
   const cachedByOwner = new Map<string, FunctionOccurrence>();
   for (const occs of Object.values(cached.functions)) {
     if (!occs) continue;
-    for (const o of occs) cachedByOwner.set(ownerEdgeKey(o.bodyHash, o.filePath), o);
+    for (const o of occs)
+      cachedByOwner.set(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column), o);
   }
   const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
     string,
@@ -268,7 +269,7 @@ export function mergeResolvedAndCachedEdges(
     if (!occs) continue;
     const arr: FunctionOccurrence[] = [];
     for (const o of occs) {
-      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath);
+      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
       if (closureRel.has(o.filePath)) {
         // Closure files keep their freshly-resolved edges.
         arr.push({ ...o, calls: edgesByOwner.get(ownerKey) ?? [] });

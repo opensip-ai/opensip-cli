@@ -26,15 +26,17 @@ function occ(
   filePath: string,
   bodyHash: string,
   calls: readonly CallEdge[] = [],
+  line = 1,
+  column = 0,
 ): FunctionOccurrence {
   return {
     bodyHash,
     simpleName,
     qualifiedName: `${filePath}.${simpleName}`,
     filePath,
-    line: 1,
-    column: 0,
-    endLine: 1,
+    line,
+    column,
+    endLine: line,
     kind: 'function-declaration',
     params: [],
     returnType: null,
@@ -137,6 +139,8 @@ describe('resolveCrossBoundaryCalls', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'helperB',
       importSpecifier: '@scope/pkgb', // bare → resolved via manifest + export index
       line: 2,
@@ -159,6 +163,8 @@ describe('resolveCrossBoundaryCalls', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'helperB',
       importSpecifier: '../pkg-b/index.js',
       line: 2,
@@ -176,6 +182,8 @@ describe('resolveCrossBoundaryCalls', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'chalk', // external npm
       importSpecifier: 'chalk',
       line: 3,
@@ -195,6 +203,8 @@ describe('resolveCrossBoundaryCalls', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'notExported', // package pkg-b exports helperB only
       importSpecifier: '@scope/pkgb',
       line: 4,
@@ -229,6 +239,8 @@ describe('resolveCrossBoundaryCalls', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'helperB',
       importSpecifier: '@scope/pkgb',
       line: 2,
@@ -256,6 +268,8 @@ describe('resolveCrossBoundaryCalls — cross-package method (targetFile pin)', 
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'getAll',
       targetFile: 'packages/pkg-b/registry.ts',
       line: 2,
@@ -277,6 +291,8 @@ describe('resolveCrossBoundaryCalls — cross-package method (targetFile pin)', 
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'getAll',
       targetFile: 'packages/pkg-b/registry.ts', // not in the catalog
       line: 2,
@@ -302,6 +318,8 @@ describe('resolveCrossBoundaryCalls — cross-package method (targetFile pin)', 
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'getAll',
       targetFile: 'packages/pkg-b/registry.ts',
       line: 2,
@@ -340,6 +358,8 @@ describe('resolveCrossBoundaryCalls — cross-package method (targetFile pin)', 
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'setExitCode',
       targetFile: 'packages/pkg-b/context.ts', // the interface's file — no body here
       line: 2,
@@ -390,6 +410,8 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'dup', // two occurrences named 'dup' in pkg-b
       importSpecifier: '@scope/pkgb', // root specifier → no subpath to narrow
       line: 2,
@@ -409,6 +431,8 @@ describe('resolveCrossBoundaryCalls — ambiguity', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'dup',
       importSpecifier: '@scope/pkgb/b', // subpath → narrows to packages/pkg-b/b.ts
       line: 2,
@@ -486,6 +510,8 @@ describe('diffCatalogsByEdge', () => {
         {
           ownerHash: 'A',
           ownerFile: 'packages/pkg-a/index.ts',
+          ownerLine: 1,
+          ownerColumn: 0,
           calleeName: 'helperB',
           importSpecifier: '@scope/pkgb',
           line: 2,
@@ -526,6 +552,8 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
     const bc: CrossBoundaryCall = {
       ownerHash: 'CALLER',
       ownerFile: 'packages/pkg-a/src/call.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'g',
       importSpecifier: '@scope/pkgb',
       line: 2,
@@ -543,6 +571,8 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
     const bc: CrossBoundaryCall = {
       ownerHash: 'CALLER',
       ownerFile: 'packages/pkg-a/src/call.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'f',
       importSpecifier: '@scope/pkgb',
       line: 2,
@@ -557,6 +587,8 @@ describe('resolveCrossBoundaryCalls — semantic export linking (packages/ paths
     const bc: CrossBoundaryCall = {
       ownerHash: 'CALLER',
       ownerFile: 'packages/pkg-a/src/call.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'g',
       importSpecifier: '@scope/unknown',
       line: 2,
@@ -605,6 +637,8 @@ describe('resolveCrossBoundaryCalls — body-twin keying (F1, ADR-0003)', () => 
   const bcA: CrossBoundaryCall = {
     ownerHash: 'TWIN',
     ownerFile: 'packages/pkg-a/src/twin.ts',
+    ownerLine: 1,
+    ownerColumn: 0,
     calleeName: 'helperA',
     importSpecifier: './helper.js',
     line: 2,
@@ -614,6 +648,8 @@ describe('resolveCrossBoundaryCalls — body-twin keying (F1, ADR-0003)', () => 
   const bcB: CrossBoundaryCall = {
     ownerHash: 'TWIN',
     ownerFile: 'packages/pkg-b/src/twin.ts',
+    ownerLine: 1,
+    ownerColumn: 0,
     calleeName: 'helperB',
     importSpecifier: './helper.js',
     line: 2,
@@ -643,6 +679,52 @@ describe('resolveCrossBoundaryCalls — body-twin keying (F1, ADR-0003)', () => 
     // HA lives in pkg-a, HB in pkg-b — no crossed wires.
     expect(twinA?.calls.flatMap((e) => [...e.to])).not.toContain('HB');
     expect(twinB?.calls.flatMap((e) => [...e.to])).not.toContain('HA');
+  });
+});
+
+describe('resolveCrossBoundaryCalls — same-file body-twin keying (ADR-0136)', () => {
+  // The collision class the (bodyHash, filePath) 2-tuple key still smeared: TWO
+  // occurrences named `twin` share a bodyHash ('TWIN') in ONE file, differing
+  // ONLY by column (two byte-identical arrows on one source line). ONE of them
+  // makes a resolvable cross-boundary call; the recovered edge must land on ONLY
+  // that occurrence — keyed by full occurrence identity
+  // (ownerEdgeKey(hash, file, line, column)), the other twin stays empty. Under
+  // the old 2-tuple key both twins would have received the edge (a sharded-only
+  // smear the exact engine never produces).
+  const merged = mergeShardFragments(
+    [
+      fragment(
+        'typescript',
+        occ('twin', 'packages/pkg-a/twin.ts', 'TWIN', [], 5, 2),
+        occ('twin', 'packages/pkg-a/twin.ts', 'TWIN', [], 5, 40),
+      ),
+      fragment('typescript', occ('helperB', 'packages/pkg-b/index.ts', 'B')),
+    ],
+    ['packages/pkg-a/twin.ts', 'packages/pkg-b/index.ts'],
+  );
+  const mIndex = manifests(manifest('@scope/pkgb', 'packages/pkg-b'));
+
+  it('routes the recovered edge to ONLY the owning same-line twin (no smear)', () => {
+    // Only the (line 5, col 2) twin calls helperB; the (line 5, col 40) twin does not.
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'TWIN',
+      ownerFile: 'packages/pkg-a/twin.ts',
+      ownerLine: 5,
+      ownerColumn: 2,
+      calleeName: 'helperB',
+      importSpecifier: '@scope/pkgb',
+      line: 6,
+      column: 4,
+      text: 'helperB()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
+    const twins = catalog.functions.twin ?? [];
+    const owner = twins.find((o) => o.column === 2);
+    const sibling = twins.find((o) => o.column === 40);
+    // The owning twin carries the recovered edge…
+    expect(owner?.calls.filter((e) => e.crossShard).flatMap((e) => [...e.to])).toEqual(['B']);
+    // …and its same-line twin carries none (the 2-tuple key would have smeared it).
+    expect(sibling?.calls.filter((e) => e.crossShard)).toEqual([]);
   });
 });
 
@@ -677,6 +759,8 @@ describe('resolveCrossBoundaryCalls — re-export follow (relative import to a r
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/cmd.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'defineThing',
       importSpecifier: './shared.js', // → packages/pkg-a/shared.ts (a re-exporter)
       line: 5,
@@ -707,6 +791,8 @@ describe('resolveCrossBoundaryCalls — re-export follow (relative import to a r
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/cmd.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'defineThing',
       importSpecifier: './shared.js',
       line: 5,
@@ -721,6 +807,8 @@ describe('resolveCrossBoundaryCalls — re-export follow (relative import to a r
     const bc: CrossBoundaryCall = {
       ownerHash: 'A',
       ownerFile: 'packages/pkg-a/cmd.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'defineThing',
       importSpecifier: './other.js', // no re-export records `defineThing` from ./other
       line: 5,

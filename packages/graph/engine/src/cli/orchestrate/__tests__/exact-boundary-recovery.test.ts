@@ -115,6 +115,8 @@ describe('findPackageRoot / derivePackageRoots (on-disk walk)', () => {
     const bc: CrossBoundaryCall = {
       ownerHash: 'hg',
       ownerFile: 'packages/a/src/g.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
       calleeName: 'somethingExternal',
       importSpecifier: 'lodash', // not a workspace package → linker declines, no throw
       line: 2,

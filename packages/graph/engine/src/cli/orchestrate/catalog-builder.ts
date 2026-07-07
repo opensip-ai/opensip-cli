@@ -351,7 +351,7 @@ function attachDependenciesIncremental(
   >;
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
-      const deps = dependenciesByOwner.get(ownerEdgeKey(o.bodyHash, o.filePath));
+      const deps = dependenciesByOwner.get(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column));
       return deps === undefined ? o : { ...o, dependencies: deps };
     });
   }
@@ -463,10 +463,10 @@ function stitchEdges(
   for (const [name, occs] of Object.entries(initial.functions)) {
     if (!occs) continue;
     next[name] = occs.map((o) => {
-      // Owner identity comes from the ONE shared module (ADR-0003 canonical
+      // Owner identity comes from the ONE shared module (ADR-0003/0136 canonical
       // key) — the exact and cross-shard paths bucket/stitch through the same
-      // `ownerEdgeKey`, never a bare `bodyHash`.
-      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath);
+      // `ownerEdgeKey` (full occurrence identity), never a bare `bodyHash`.
+      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
       const calls = edgesByOwner.get(ownerKey) ?? [];
       const dependencies = dependenciesByOwner?.get(ownerKey);
       // Omit `dependencies` entirely when no edges resolved — the

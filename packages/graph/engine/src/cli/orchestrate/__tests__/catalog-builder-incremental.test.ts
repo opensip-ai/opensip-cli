@@ -137,7 +137,7 @@ describe('buildAndResolveCatalogIncremental', () => {
     };
     const adapter = incrementalAdapter({
       walked: { 'a.ts': [occ('a', 'a.ts', 'A2')] },
-      edges: new Map([[ownerEdgeKey('A2', 'a.ts'), [freshEdge]]]),
+      edges: new Map([[ownerEdgeKey('A2', 'a.ts', 1, 0), [freshEdge]]]),
     });
 
     const { catalog, resolutionStats } = await buildAndResolveCatalogIncremental({
@@ -170,7 +170,7 @@ describe('buildAndResolveCatalogIncremental', () => {
     const adapter = incrementalAdapter({
       walked: { 'a.ts': [occ('mod', 'a.ts', 'M1')] },
       edges: new Map(),
-      deps: new Map([[ownerEdgeKey('M1', 'a.ts'), [dep]]]),
+      deps: new Map([[ownerEdgeKey('M1', 'a.ts', 1, 0), [dep]]]),
     });
 
     const { catalog } = await buildAndResolveCatalogIncremental({

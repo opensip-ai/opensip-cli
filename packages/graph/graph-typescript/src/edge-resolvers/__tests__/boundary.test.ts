@@ -47,12 +47,16 @@ function allCallNodes(sf: ts.SourceFile): ts.Node[] {
   return out;
 }
 
-/** Wrap call nodes as 'call'-kind CallSiteRecords owned by `ownerHash`. */
+/** Wrap call nodes as 'call'-kind CallSiteRecords owned by `ownerHash`. The owner
+ *  occurrence position (`ownerLine`/`ownerColumn`) is a fixed 1:0 here — the tests
+ *  only need `resolvedFor` and the extractor to agree on the same value. */
 function callRecords(sf: ts.SourceFile, ownerHash = 'owner'): CallSiteRecord[] {
   return allCallNodes(sf).map((node) => ({
     node,
     sourceFile: sf,
     ownerHash,
+    ownerLine: 1,
+    ownerColumn: 0,
     kind: 'call' as const,
   }));
 }
@@ -77,7 +81,7 @@ function resolvedFor(
       line: lc.line + 1,
       column: lc.character,
     } as unknown as CallEdge;
-    const key = ownerEdgeKey(r.ownerHash, ownerFile);
+    const key = ownerEdgeKey(r.ownerHash, ownerFile, r.ownerLine, r.ownerColumn);
     const bucket = map.get(key);
     if (bucket) bucket.push(edge);
     else map.set(key, [edge]);
@@ -103,7 +107,8 @@ describe('extractBoundaryCalls', () => {
     expect(call?.importSpecifier).toBe('./other.js');
     expect(call?.ownerHash).toBe('owner');
     // Owner file is derived project-relative (matches FunctionOccurrence.filePath)
-    // so the cross-shard merge can key by ownerEdgeKey(ownerHash, ownerFile).
+    // so the cross-shard merge can key by
+    // ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn).
     expect(call?.ownerFile).toBe('m.ts');
     // `return helper()` — the value is used, not discarded.
     expect(call?.discarded).toBe(false);
@@ -216,6 +221,8 @@ describe('extractBoundaryCalls', () => {
       node,
       sourceFile: sf,
       ownerHash: 'owner',
+      ownerLine: 1,
+      ownerColumn: 0,
       kind: 'creation' as const,
       childHash: 'child',
     }));

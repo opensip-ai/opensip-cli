@@ -130,6 +130,8 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
     nodeRef: r.node,
     sourceFileRef: r.sourceFile,
     ownerHash: r.ownerHash,
+    ownerLine: r.ownerLine,
+    ownerColumn: r.ownerColumn,
     kind: r.kind,
     childHash: r.childHash,
   }));
@@ -137,6 +139,8 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
     nodeRef: r.node,
     sourceFileRef: r.sourceFile,
     ownerHash: r.ownerHash,
+    ownerLine: r.ownerLine,
+    ownerColumn: r.ownerColumn,
     specifier: r.specifier,
     line: r.line,
     column: r.column,
@@ -161,6 +165,13 @@ function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSite
     node: r.nodeRef as ts.Node,
     sourceFile: r.sourceFileRef as ts.SourceFile,
     ownerHash: r.ownerHash,
+    // The TS walk always populates ownerLine/ownerColumn (the contract types them
+    // optional only so bare-hash polyglot adapters need not supply a position they
+    // don't key on). This round-trip is same-adapter, so they are always present;
+    // the assertion keeps the value EXACT (a `?? default` would silently mismatch
+    // the stitch key for any owner not at 1:0).
+    ownerLine: r.ownerLine!,
+    ownerColumn: r.ownerColumn!,
     kind: r.kind,
     childHash: r.childHash,
   }));
@@ -219,6 +230,10 @@ async function resolveCallSitesExact(
             node: r.nodeRef as ts.Node,
             sourceFile: r.sourceFileRef as ts.SourceFile,
             ownerHash: r.ownerHash,
+            // Always set by the TS walk (see toTsCallSites) — assert to keep the
+            // module-init occurrence position exact for the ownerEdgeKey stitch.
+            ownerLine: r.ownerLine!,
+            ownerColumn: r.ownerColumn!,
             specifier: r.specifier,
             line: r.line,
             column: r.column,
@@ -365,11 +380,14 @@ function resolveDependencies(
       column: site.column,
       specifier: site.specifier,
     };
-    // Key per owner OCCURRENCE (module-init bodyHash + file) to match
-    // stitchEdges; module-init bodies can collide across trivial files.
+    // Key per owner OCCURRENCE (module-init bodyHash + file + line + column) to
+    // match stitchEdges; module-init bodies can collide across trivial files
+    // (ADR-0136).
     const ownerKey = ownerEdgeKey(
       site.ownerHash,
       relative(projectDirAbs, site.sourceFile.fileName),
+      site.ownerLine,
+      site.ownerColumn,
     );
     const existing = out.get(ownerKey);
     if (existing === undefined) {
@@ -393,7 +411,7 @@ function collectByOwner(catalog: Catalog): ReadonlyMap<string, readonly CallEdge
     if (!arr) continue;
     for (const o of arr) {
       if (o.calls.length === 0) continue;
-      out.set(ownerEdgeKey(o.bodyHash, o.filePath), o.calls);
+      out.set(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column), o.calls);
     }
   }
   return out;

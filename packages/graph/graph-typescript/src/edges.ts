@@ -77,6 +77,8 @@ export async function resolveEdgesFromRecords(
     const ownerKey = ownerEdgeKey(
       r.ownerHash,
       relative(input.projectDirAbs, r.sourceFile.fileName),
+      r.ownerLine,
+      r.ownerColumn,
     );
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;
@@ -140,6 +142,8 @@ export async function resolveEdgesSyntactic(
     const ownerKey = ownerEdgeKey(
       r.ownerHash,
       relative(input.projectDirAbs, r.sourceFile.fileName),
+      r.ownerLine,
+      r.ownerColumn,
     );
     if (r.kind === 'creation') {
       if (r.childHash === undefined) continue;

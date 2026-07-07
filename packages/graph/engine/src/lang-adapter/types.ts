@@ -117,6 +117,16 @@ export interface CallSiteRecord {
   readonly sourceFileRef: unknown;
   /** bodyHash of the enclosing function-shape. Always exists in WalkOutput.occurrences (I-3). */
   readonly ownerHash: string;
+  /**
+   * Owning occurrence's 1-based declaration line / 0-based column — supplied by
+   * adapters that key edges by FULL occurrence identity so the engine can bucket
+   * via `ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn)` and never
+   * union same-file body-twins (ADR-0136). OPTIONAL because bare-hash-keying
+   * adapters (the polyglot walkers, a pre-existing exception) do not use them.
+   * The TypeScript adapter always populates them.
+   */
+  readonly ownerLine?: number;
+  readonly ownerColumn?: number;
   /** 'call' dispatches to resolvers; 'creation' produces a static edge. */
   readonly kind: 'call' | 'creation';
   /** For 'creation' kind, the bodyHash of the nested callable. */
@@ -141,6 +151,14 @@ export interface DependencySiteRecord {
   readonly sourceFileRef: unknown;
   /** bodyHash of the enclosing file's module-init occurrence. */
   readonly ownerHash: string;
+  /**
+   * Owning module-init occurrence's 1-based declaration line / 0-based column
+   * (see {@link CallSiteRecord.ownerLine}). OPTIONAL for the same reason: adapters
+   * keying dependency edges by full occurrence identity supply them; bare-hash
+   * adapters may omit. The TypeScript adapter always populates them.
+   */
+  readonly ownerLine?: number;
+  readonly ownerColumn?: number;
   /** The raw import specifier — `'./foo'`, `'@opensip/core'`, etc. */
   readonly specifier: string;
   /** 1-based line of the import statement. */
@@ -194,7 +212,14 @@ export interface ResolveInput<P = ParsedProject> {
 }
 
 export interface ResolveOutput {
-  /** Map: owner bodyHash → CallEdges produced by resolution. */
+  /**
+   * Map: owner occurrence identity → CallEdges produced by resolution. The engine
+   * stitches these back by `ownerEdgeKey(bodyHash, filePath, line, column)`
+   * (ADR-0136), so an adapter keying edges by full occurrence identity — the
+   * TypeScript adapter — aligns with the stitch. (Bare-hash-keying adapters
+   * remain a pre-existing exception whose keys the engine's stitch does not
+   * match; see ADR-0136 consequences.)
+   */
   readonly edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>;
   /**
    * Optional — Phase 4 (DEC-498) addition. Map: module-init bodyHash →

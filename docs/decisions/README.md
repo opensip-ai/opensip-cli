@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0136](ADR-0136-owner-edge-key-full-occurrence-identity.md) — The owner-edge bucket key is full occurrence identity (bodyHash+filePath+line+column), refining ADR-0003's (bodyHash, filePath) 2-tuple so two byte-identical bodies on one source line no longer union their edges.
 - [ADR-0135](ADR-0135-run-outcome-taxonomy-and-fault-policy.md) — One 3-way run outcome (pass/fail/fault) derived once from the envelope verdict and shared by single runs + suites; envelope-backed faults are non-blocking by default (`failOnFault`); suite-as-universal-runner rejected.
 - [ADR-0134](ADR-0134-per-session-cli-engine-version-provenance.md) — Every StoredSession records the CLI + engine version that produced it, for per-session provenance.
 - [ADR-0133](ADR-0133-allowlist-form-layer-rules.md) — Cross-package layer rules are authored as negative-lookahead allowlists, so newly added workspace packages are denied by default until reviewed.

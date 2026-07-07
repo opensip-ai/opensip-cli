@@ -59,7 +59,7 @@ for (const f of files) {
 // Shard ids starting with 'bc:' inject one unresolvable boundary call so the
 // shardStats.boundaryCallSites plumbing can be asserted (ADR-0045).
 const boundaryCalls = id.startsWith('bc:')
-  ? [{ ownerHash: 'h-' + id, ownerFile: id + '/index.ts', calleeName: 'nonexistent_callee', line: 1, column: 0, text: 'nonexistent_callee()' }]
+  ? [{ ownerHash: 'h-' + id, ownerFile: id + '/index.ts', ownerLine: 1, ownerColumn: 0, calleeName: 'nonexistent_callee', line: 1, column: 0, text: 'nonexistent_callee()' }]
   : [];
 const result = {
   shardId: id,

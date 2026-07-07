@@ -101,7 +101,7 @@ describe('mergeResolvedAndCachedEdges', () => {
     // Merged catalog: a.ts (closure, hash A1) + unchanged b.ts (B1).
     const merged = catalogOf(occ('a', 'a.ts', 'A1'), occ('b', 'b.ts', 'B1'));
     const edgesByOwner = new Map<string, readonly CallEdge[]>([
-      [ownerEdgeKey('A1', 'a.ts'), [freshEdge]],
+      [ownerEdgeKey('A1', 'a.ts', 1, 0), [freshEdge]],
     ]);
 
     const out = mergeResolvedAndCachedEdges(merged, cached, edgesByOwner, new Set(['a.ts']));

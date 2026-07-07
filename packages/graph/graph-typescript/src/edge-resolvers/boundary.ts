@@ -86,8 +86,8 @@ export function extractBoundaryCalls(
     let ownerFile = ownerFileBySf.get(r.sourceFile);
     if (ownerFile === undefined) {
       // Byte-identical to FunctionOccurrence.filePath (walk.ts) so the merge's
-      // ownerEdgeKey(ownerHash, ownerFile) lookup hits and relative-import
-      // pinning resolves against the owner's REAL directory.
+      // ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn) lookup hits
+      // and relative-import pinning resolves against the owner's REAL directory.
       ownerFile = relative(projectDirAbs, r.sourceFile.fileName).split(sep).join('/');
       ownerFileBySf.set(r.sourceFile, ownerFile);
     }
@@ -125,7 +125,9 @@ function boundaryCallFor(
   // placeholder is NOT a resolution.) Keyed on the outcome at THIS site, so a
   // local same-name occurrence elsewhere in the shard no longer suppresses it.
   const resolvedHere = (
-    deps.resolvedEdgesByOwner.get(ownerEdgeKey(r.ownerHash, ownerFile)) ?? []
+    deps.resolvedEdgesByOwner.get(
+      ownerEdgeKey(r.ownerHash, ownerFile, r.ownerLine, r.ownerColumn),
+    ) ?? []
   ).some((e) => e.line === pos.line && e.column === pos.column && e.to.length > 0);
   if (resolvedHere) return null;
 
@@ -139,6 +141,11 @@ function boundaryCallFor(
   return {
     ownerHash: r.ownerHash,
     ownerFile,
+    // The owning OCCURRENCE's declaration position (from the walk record), NOT
+    // the call-site `line`/`column` below — carried so the cross-shard merge keys
+    // by full occurrence identity (ADR-0136).
+    ownerLine: r.ownerLine,
+    ownerColumn: r.ownerColumn,
     calleeName,
     ...(importSpecifier === undefined ? {} : { importSpecifier }),
     ...(targetFile === undefined ? {} : { targetFile }),

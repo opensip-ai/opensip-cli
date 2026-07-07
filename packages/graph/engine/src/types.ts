@@ -240,13 +240,25 @@ export interface CrossBoundaryCall {
   /**
    * Project-relative file path of the owning occurrence — byte-identical to its
    * `FunctionOccurrence.filePath` (posix-normalized, as the walk emits it). The
-   * cross-shard merge keys/stitches edges by `ownerEdgeKey(ownerHash, ownerFile)`
-   * — NOT by `ownerHash` alone — so body-twins (identical bodies in different
-   * files) never smear each other's edges (ADR-0003). It is ALSO the directory
-   * the cross-shard linker resolves a relative import specifier against (the
-   * owner's actual file, not a last-writer-wins `bodyHash→file` guess).
+   * cross-shard merge keys/stitches edges by
+   * `ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn)` — NOT by
+   * `ownerHash` alone — so body-twins (identical bodies in different files, or on
+   * one source line) never smear each other's edges (ADR-0003/0136). It is ALSO
+   * the directory the cross-shard linker resolves a relative import specifier
+   * against (the owner's actual file, not a last-writer-wins `bodyHash→file` guess).
    */
   readonly ownerFile: string;
+  /**
+   * 1-based declaration line of the owning OCCURRENCE (byte-identical to its
+   * `FunctionOccurrence.line`) — NOT the call-site line (`line`, below). Carried
+   * so the cross-shard merge keys edges by FULL occurrence identity: a `bodyHash`
+   * can appear twice in one file (two byte-identical arrows on a single line),
+   * and only `(line, column)` distinguishes those same-file twins (ADR-0136).
+   */
+  readonly ownerLine: number;
+  /** 0-based declaration column of the owning OCCURRENCE (byte-identical to its
+   *  `FunctionOccurrence.column`). See {@link ownerLine}. */
+  readonly ownerColumn: number;
   /** Syntactic callee simple name (`foo` in `foo()`, rightmost in `a.b.c()`). */
   readonly calleeName: string;
   /** The raw import specifier the name came from, if imported (`'./x.js'`, `'@scope/pkg'`). */

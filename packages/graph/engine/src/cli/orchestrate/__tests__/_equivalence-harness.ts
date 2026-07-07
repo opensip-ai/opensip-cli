@@ -208,10 +208,16 @@ function makeFixtureAdapter(deps: AdapterDeps): GraphLanguageAdapter<FixtureProj
         }
         for (const call of file.callSites) {
           if (KEYWORD_CALLS.has(call.calleeName)) continue;
+          // Owner OCCURRENCE position (its exported-fn declaration), byte-identical
+          // to the occurrence makeOccurrence records, so the ownerEdgeKey stitch
+          // hits (ADR-0136). Owners are always exports → the lookup is defined.
+          const ownerPos = file.exports.get(call.ownerName);
           callSites.push({
             nodeRef: { file, call },
             sourceFileRef: file,
             ownerHash: deps.bodyHashFor(file.projectRel, call.ownerName),
+            ownerLine: ownerPos?.line ?? 1,
+            ownerColumn: ownerPos?.column ?? 0,
             kind: 'call',
           });
         }
@@ -356,9 +362,13 @@ function resolveFixtureEdges(
     };
     totalCallSites++;
     // The engine stitches BOTH local AND boundary edges back by
-    // ownerEdgeKey(bodyHash, filePath) — so a body-twin's edges never union
-    // (ADR-0003). The boundary descriptor carries `ownerFile` for exactly this.
-    const ownerKey = ownerEdgeKey(site.ownerHash, file.projectRel);
+    // ownerEdgeKey(bodyHash, filePath, line, column) — so a body-twin's edges
+    // never union (ADR-0003/0136). The boundary descriptor carries `ownerFile`
+    // plus the owner OCCURRENCE position for exactly this.
+    const ownerPos = file.exports.get(call.ownerName);
+    const ownerLine = ownerPos?.line ?? 1;
+    const ownerColumn = ownerPos?.column ?? 0;
+    const ownerKey = ownerEdgeKey(site.ownerHash, file.projectRel, ownerLine, ownerColumn);
     const spec = file.importsByName.get(call.calleeName);
     const target = resolveOne(call, file, spec, {
       exportIndex,
@@ -371,6 +381,8 @@ function resolveFixtureEdges(
       boundaryCalls.push({
         ownerHash: site.ownerHash,
         ownerFile: file.projectRel,
+        ownerLine,
+        ownerColumn,
         calleeName: call.calleeName,
         importSpecifier: spec,
         line: call.line,

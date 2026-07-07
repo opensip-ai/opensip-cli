@@ -96,8 +96,10 @@ describe('body-twin edge keying', () => {
     expect(workA?.bodyHash).toBe(workB?.bodyHash);
     expect(helperA?.bodyHash).not.toBe(helperB?.bodyHash);
 
-    const edgesA = edgesByOwner.get(ownerEdgeKey(workA!.bodyHash, 'src/a.ts')) ?? [];
-    const edgesB = edgesByOwner.get(ownerEdgeKey(workB!.bodyHash, 'src/b.ts')) ?? [];
+    const edgesA =
+      edgesByOwner.get(ownerEdgeKey(workA!.bodyHash, 'src/a.ts', workA!.line, workA!.column)) ?? [];
+    const edgesB =
+      edgesByOwner.get(ownerEdgeKey(workB!.bodyHash, 'src/b.ts', workB!.line, workB!.column)) ?? [];
     const targetsA = edgesA.flatMap((e) => e.to);
     const targetsB = edgesB.flatMap((e) => e.to);
 
