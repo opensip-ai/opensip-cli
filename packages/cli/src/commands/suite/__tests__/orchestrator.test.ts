@@ -80,6 +80,7 @@ function helpCommand(
 function signalEnvelope(input: {
   readonly tool?: SignalEnvelope['tool'];
   readonly passed: boolean;
+  readonly faulted?: boolean;
   readonly errors?: number;
   readonly warnings?: number;
   readonly findings?: number;
@@ -112,6 +113,7 @@ function signalEnvelope(input: {
     verdict: {
       score: input.passed ? 100 : 0,
       passed: input.passed,
+      ...(input.faulted === undefined ? {} : { faulted: input.faulted }),
       summary: {
         total: 1,
         passed: input.passed ? 1 : 0,
@@ -1071,7 +1073,11 @@ describe('runSuite', () => {
     expect(result.exitCode).toBe(2);
     expect(result.aggregate).toEqual({
       steps: 6,
-      passed: 2,
+      // `missing-output` (success exit, no envelope) is now a first-class `passed`
+      // — the old aggregate silently dropped it from all three counts, so a 6-step
+      // suite reported only 5 outcomes despite this test's own "without collapsing
+      // outcome classes" contract.
+      passed: 3,
       failed: 2,
       faulted: 1,
       errors: 2,
@@ -1102,32 +1108,38 @@ describe('runSuite', () => {
     expect(result.steps[0]).toMatchObject({
       command: 'empty',
       exitCode: EXIT_CODES.SUCCESS,
+      outcome: 'passed',
       verdict: { passed: true, errors: 0, warnings: 0, findings: 0 },
     });
     expect(result.steps[1]).toMatchObject({
       command: 'external-warning',
       exitCode: EXIT_CODES.SUCCESS,
+      outcome: 'passed',
       verdict: { passed: true, errors: 0, warnings: 1, findings: 1 },
     });
     expect(result.steps[2]).toMatchObject({
       command: 'error',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
+      outcome: 'failed',
       verdict: { passed: false, errors: 2, warnings: 0, findings: 2 },
     });
     expect(result.steps[3]).toMatchObject({
       command: 'failure-without-findings',
       exitCode: 2,
+      outcome: 'failed',
     });
     expect(result.steps[3]?.verdict).toBeUndefined();
     expect(result.steps[4]).toMatchObject({
       command: 'fault',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
+      outcome: 'faulted',
       error: 'step faulted',
     });
     expect(result.steps[4]?.verdict).toBeUndefined();
     expect(result.steps[5]).toMatchObject({
       command: 'missing-output',
       exitCode: EXIT_CODES.SUCCESS,
+      outcome: 'passed',
     });
     expect(result.steps[5]?.verdict).toBeUndefined();
 
@@ -1143,6 +1155,39 @@ describe('runSuite', () => {
         command: 'empty',
         verdict: { passed: true, findings: 0 },
       }),
+    );
+  });
+
+  it('counts a unit-fault that emitted findings as faulted and raises it in the brief', async () => {
+    // Case B: a check threw (verdict.faulted) WHILE sibling checks emitted findings
+    // (signals.length > 0). The step emitted an envelope, so `step.error` is absent
+    // — the old aggregate mislabeled this `failed`, and the old brief only caught
+    // faults with ZERO signals. Both must now surface the runtime fault.
+    const faultWithFindings = helpCommand('fault-with-findings', async (_opts, cli) => {
+      await cli.deliverSignals(
+        signalEnvelope({ passed: false, faulted: true, errors: 1, findings: 1 }),
+        { cwd: '/repo' },
+      );
+      return { type: 'help' };
+    });
+
+    const result = await runWithScope(new RunScope({}), () =>
+      runSuite({
+        name: 'unit-fault',
+        suite: { steps: [{ tool: TOOL_ID, command: 'fault-with-findings' }] },
+        tools: [tool(TOOL_ID, 'fitness', [faultWithFindings])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: {},
+      }),
+    );
+
+    expect(result.aggregate).toMatchObject({ steps: 1, passed: 0, failed: 0, faulted: 1 });
+    expect(result.steps[0]?.outcome).toBe('faulted');
+    // The fault was NOT a run-level throw — it rode in on the envelope's verdict.
+    expect(result.steps[0]?.error).toBeUndefined();
+    expect(result.reviewBrief?.degraded).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'step-fault', stepIndex: 0 })]),
     );
   });
 
@@ -1298,53 +1343,64 @@ describe('runSuite', () => {
 });
 
 describe('deriveSuiteAggregate', () => {
-  it('counts verdict, exit-only, faulted, and missing-output steps distinctly', () => {
+  const base = { tool: 'fitness', stableId: TOOL_ID, durationMs: 1 } as const;
+
+  it('tallies every step into exactly one outcome bucket (passed/failed/faulted)', () => {
     const steps: SuiteStepSummary[] = [
       {
-        tool: 'fitness',
-        stableId: TOOL_ID,
+        ...base,
         command: 'pass',
         exitCode: EXIT_CODES.SUCCESS,
-        durationMs: 1,
+        outcome: 'passed',
         verdict: { passed: true, errors: 0, warnings: 1, findings: 1 },
       },
       {
-        tool: 'fitness',
-        stableId: TOOL_ID,
+        ...base,
         command: 'fail',
         exitCode: EXIT_CODES.RUNTIME_ERROR,
-        durationMs: 1,
+        outcome: 'failed',
         verdict: { passed: false, errors: 2, warnings: 0, findings: 2 },
       },
       {
-        tool: 'fitness',
-        stableId: TOOL_ID,
+        ...base,
         command: 'exit-only',
         exitCode: 2,
-        durationMs: 1,
+        outcome: 'failed',
       },
       {
-        tool: 'fitness',
-        stableId: TOOL_ID,
-        command: 'fault',
+        // A UNIT-level fault: an envelope WAS emitted (so `error` is absent) but
+        // its verdict carried `faulted`. The old `error`-only heuristic mislabeled
+        // this `failed`; keyed on `outcome` it now counts as `faulted`.
+        ...base,
+        command: 'unit-fault',
         exitCode: EXIT_CODES.RUNTIME_ERROR,
-        durationMs: 1,
+        outcome: 'faulted',
+        verdict: { passed: false, errors: 0, warnings: 0, findings: 0 },
+      },
+      {
+        // A run-LEVEL fault: the step threw and the host caught it into `error`.
+        ...base,
+        command: 'run-fault',
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        outcome: 'faulted',
         error: 'boom',
       },
       {
-        tool: 'fitness',
-        stableId: TOOL_ID,
+        // A success-exit step that emitted no envelope: the old shape dropped it
+        // from all three counts (steps=5 but passed+failed+faulted=4); it is now a
+        // first-class `passed`.
+        ...base,
         command: 'missing-output',
         exitCode: EXIT_CODES.SUCCESS,
-        durationMs: 1,
+        outcome: 'passed',
       },
     ];
 
     expect(deriveSuiteAggregate(steps)).toEqual({
-      steps: 5,
-      passed: 1,
+      steps: 6,
+      passed: 2,
       failed: 2,
-      faulted: 1,
+      faulted: 2,
       errors: 2,
       warnings: 1,
     });

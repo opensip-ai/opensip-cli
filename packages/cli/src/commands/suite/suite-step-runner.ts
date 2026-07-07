@@ -1,6 +1,11 @@
 import { performance } from 'node:perf_hooks';
 
-import { EXIT_CODES, type SuiteStepSummary } from '@opensip-cli/contracts';
+import {
+  deriveOutcome,
+  EXIT_CODES,
+  type RunOutcome,
+  type SuiteStepSummary,
+} from '@opensip-cli/contracts';
 import { currentLogger, currentScope, type ToolCliContext } from '@opensip-cli/core';
 
 import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
@@ -53,6 +58,29 @@ export async function runStepsSerially(args: {
 
   await chain;
   return summaries;
+}
+
+/**
+ * Derive a suite step's authoritative 3-way {@link RunOutcome} from the two
+ * runtime signals the runner observes — the host-caught `errorMessage` (a thrown
+ * step OR a reportFailure) and the emitted envelope's verdict.
+ *
+ * A step is `faulted` when EITHER a runtime issue was caught by the host OR the
+ * envelope's own verdict is faulted (a UNIT-level fault — a check that threw —
+ * reaches us only through `verdict.faulted`, never through `errorMessage`). The
+ * old aggregate tested only the first half, which is why a unit-fault was
+ * mislabeled `failed`. With an envelope present, its verdict decides
+ * passed/failed; with no envelope and no error, the exit code is the fallback.
+ */
+export function deriveStepOutcome(input: {
+  readonly errorMessage: string | undefined;
+  readonly envelopeVerdict: { readonly passed: boolean; readonly faulted?: boolean } | undefined;
+  readonly exitCode: number;
+}): RunOutcome {
+  const envelopeOutcome =
+    input.envelopeVerdict === undefined ? undefined : deriveOutcome(input.envelopeVerdict);
+  if (input.errorMessage !== undefined || envelopeOutcome === 'faulted') return 'faulted';
+  return envelopeOutcome ?? (input.exitCode === EXIT_CODES.SUCCESS ? 'passed' : 'failed');
 }
 
 async function runStep(args: {
@@ -173,6 +201,14 @@ async function runStep(args: {
           findings: envelopeStats.findings,
         };
 
+  // The step's authoritative 3-way outcome — the single source of truth shared
+  // with single-tool runs (see {@link deriveStepOutcome}).
+  const outcome = deriveStepOutcome({
+    errorMessage,
+    envelopeVerdict: envelopeStats?.verdict,
+    exitCode,
+  });
+
   log.info?.({
     evt: 'cli.suite.run.step',
     suite: args.suite.name,
@@ -197,6 +233,7 @@ async function runStep(args: {
     command: args.step.spec.name,
     exitCode,
     durationMs,
+    outcome,
     ...(errorMessage === undefined ? {} : { error: errorMessage }),
     ...(errorCode === undefined ? {} : { errorCode }),
     ...(verdict === undefined ? {} : { verdict }),

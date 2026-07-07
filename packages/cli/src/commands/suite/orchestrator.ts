@@ -1,6 +1,5 @@
 import { performance } from 'node:perf_hooks';
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
@@ -145,16 +144,28 @@ export function deriveSuiteAggregate(
   let warnings = 0;
 
   for (const step of steps) {
-    const verdict = step.verdict;
-    if (step.error !== undefined) {
-      faulted += 1;
-    } else if (step.exitCode !== EXIT_CODES.SUCCESS || verdict?.passed === false) {
-      failed += 1;
-    } else if (verdict?.passed === true) {
-      passed += 1;
+    // `step.outcome` is the single source of truth (deriveOutcome over the step's
+    // RunVerdict, unioned with host-caught runtime issues). A UNIT-level fault (a
+    // check that threw, surfaced as `verdict.faulted`) now counts `faulted`, not
+    // `failed` — the old `step.error`-only heuristic only saw run-LEVEL throws.
+    // Every step lands in exactly one bucket (the old shape silently dropped a
+    // success-exit step that emitted no envelope from all three counts).
+    switch (step.outcome) {
+      case 'faulted': {
+        faulted += 1;
+        break;
+      }
+      case 'failed': {
+        failed += 1;
+        break;
+      }
+      case 'passed': {
+        passed += 1;
+        break;
+      }
     }
-    errors += verdict?.errors ?? 0;
-    warnings += verdict?.warnings ?? 0;
+    errors += step.verdict?.errors ?? 0;
+    warnings += step.verdict?.warnings ?? 0;
   }
 
   return {
