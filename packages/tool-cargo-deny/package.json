@@ -30,13 +30,18 @@
     ".": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "NOTICE"
   ],
   "opensipTools": {
     "kind": "tool",
     "id": "cargo-deny",
     "identity": {
-      "name": "cargo-deny"
+      "name": "cargo-deny",
+      "aliases": [
+        "deny"
+      ]
     },
     "stableId": "93d06787-b067-468b-bba0-1086c876c5f7",
     "apiVersion": 1,
@@ -44,7 +49,9 @@
       {
         "name": "cargo-deny",
         "description": "Run cargo-deny policy checks",
-        "aliases": [],
+        "aliases": [
+          "deny"
+        ],
         "commonFlags": [
           "json",
           "cwd",

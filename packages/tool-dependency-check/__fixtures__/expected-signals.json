@@ -1,0 +1,26 @@
+[
+  {
+    "ruleId": "CVE-2021-44228",
+    "severity": "critical",
+    "message": "log4j-core: Remote code execution via JNDI (Log4Shell)",
+    "file": "pom.xml",
+    "line": 1,
+    "column": 1
+  },
+  {
+    "ruleId": "CVE-2019-10086",
+    "severity": "high",
+    "message": "commons-beanutils: class property access bypass",
+    "file": "pom.xml",
+    "line": 1,
+    "column": 1
+  },
+  {
+    "ruleId": "CVE-2020-13956",
+    "severity": "medium",
+    "message": "Apache HttpClient improper URI parsing",
+    "file": "pom.xml",
+    "line": 1,
+    "column": 1
+  }
+]

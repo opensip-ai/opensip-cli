@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Cppcheck",
+          "version": "2.16.0",
+          "informationUri": "https://cppcheck.sourceforge.io/",
+          "rules": [
+            {
+              "id": "nullPointer",
+              "name": "nullPointer",
+              "shortDescription": {
+                "text": "Null pointer dereference"
+              },
+              "helpUri": "https://cppcheck.sourceforge.io/",
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "unusedVariable",
+              "name": "unusedVariable",
+              "shortDescription": {
+                "text": "Unused variable"
+              },
+              "helpUri": "https://cppcheck.sourceforge.io/",
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "nullPointer",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Null pointer dereference: buf"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main.c"
+                },
+                "region": {
+                  "startLine": 15,
+                  "startColumn": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "unusedVariable",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "Unused variable: tmp"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/util.cpp"
+                },
+                "region": {
+                  "startLine": 8,
+                  "startColumn": 5
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

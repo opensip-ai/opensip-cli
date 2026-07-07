@@ -1,0 +1,34 @@
+{
+  "dependencies": [
+    {
+      "name": "flask",
+      "version": "1.0",
+      "vulns": [
+        {
+          "id": "PYSEC-2019-179",
+          "fix_versions": ["1.0.3"],
+          "aliases": ["CVE-2019-1010083", "GHSA-5wv5-4vpf-pj6m"],
+          "description": "The Pallets Project Flask before 1.0 is affected by unexpected memory usage due to a large amount of chunked encoding data."
+        }
+      ]
+    },
+    {
+      "name": "jinja2",
+      "version": "2.11.1",
+      "vulns": [
+        {
+          "id": "PYSEC-2021-66",
+          "fix_versions": ["2.11.3"],
+          "aliases": ["CVE-2020-28493"],
+          "description": "A ReDoS vulnerability was found in Jinja2 due to the _punctuation_re regex."
+        }
+      ]
+    },
+    {
+      "name": "requests",
+      "version": "2.31.0",
+      "vulns": []
+    }
+  ],
+  "fixes": []
+}

@@ -275,6 +275,9 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
   try {
     const acc: ResultAccumulator = {};
     const maxCapturedOutputBytes = getWorkerLimits().maxCapturedOutputBytes;
+    // The completion envelope only crosses IPC (and is size-checked) for the live
+    // view; --json / non-TTY runs never read it, so they must not pay for it.
+    const captureCompletionEnvelope = spec.presentationMode === 'adapter-live';
     const adapterProgress =
       spec.presentationMode === 'adapter-live'
         ? {
@@ -305,13 +308,19 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
       { ...spec.opts, _args: spec.positionals },
       ctx,
     )) as MaybeCompletion | void;
-    if (returned?.envelope !== undefined) {
+    if (captureCompletionEnvelope && returned?.envelope !== undefined) {
       assertCapturedOutputFits('completionEnvelope', returned.envelope, maxCapturedOutputBytes);
     }
     assertReturnValuedHandlerResult(commandSpec, acc, returned);
     return {
       kind: 'result',
-      value: toResult(commandSpec.output, acc, returned?.session, returned),
+      value: toResult(
+        commandSpec.output,
+        acc,
+        returned?.session,
+        returned,
+        captureCompletionEnvelope,
+      ),
     };
   } finally {
     rpcClient.dispose();

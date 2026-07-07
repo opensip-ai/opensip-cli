@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "DM_DEFAULT_ENCODING",
+    "severity": "medium",
+    "message": "Reliance on default encoding",
+    "file": "src/main/java/com/example/App.java",
+    "line": 42,
+    "column": 5
+  },
+  {
+    "ruleId": "NP_NULL_ON_SOME_PATH",
+    "severity": "high",
+    "message": "Possible null pointer dereference",
+    "file": "src/main/java/com/example/Service.java",
+    "line": 88,
+    "column": 9
+  }
+]

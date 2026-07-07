@@ -45,8 +45,16 @@ export function toResult(
   acc: ResultAccumulator,
   session: ToolSessionContribution | undefined,
   returned: unknown,
+  captureCompletionEnvelope = false,
 ): ToolCommandResult {
-  const completionEnvelope = output === 'raw-stream' ? completionEnvelopeOf(returned) : undefined;
+  // The completion envelope is consumed ONLY by the host live view; carrying it for
+  // every raw-stream scan would duplicate the findings already in `session.payload`
+  // across IPC and subject `--json`/non-TTY runs to the captured-output size cap for
+  // nothing. Capture it only when the run is actually rendering the live view.
+  const completionEnvelope =
+    captureCompletionEnvelope && output === 'raw-stream'
+      ? completionEnvelopeOf(returned)
+      : undefined;
   return {
     output,
     ...(acc.render === undefined ? {} : { render: acc.render }),

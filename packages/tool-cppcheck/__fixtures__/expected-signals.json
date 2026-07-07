@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "nullPointer",
+    "severity": "high",
+    "message": "Null pointer dereference",
+    "file": "src/main.c",
+    "line": 15,
+    "column": 3
+  },
+  {
+    "ruleId": "unusedVariable",
+    "severity": "medium",
+    "message": "Unused variable",
+    "file": "src/util.cpp",
+    "line": 8,
+    "column": 5
+  }
+]
