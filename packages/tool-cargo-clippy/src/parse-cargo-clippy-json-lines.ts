@@ -26,10 +26,15 @@ function firstPrimarySpan(message: Record<string, unknown>): Record<string, unkn
 function normalize(message: Record<string, unknown>): Signal | undefined {
   const text = getString(message, 'message');
   if (text === undefined) return undefined;
+  // rustc emits spanless AGGREGATE messages ("aborting due to N previous errors",
+  // "N warnings emitted") as `compiler-message` records with `spans: []` and a null
+  // `code`. They are not findings — skip them so they don't inflate the error count
+  // with a bogus high-severity signal at an empty location.
+  const span = firstPrimarySpan(message);
+  if (span === undefined) return undefined;
   const code = asObject(message.code);
   const ruleId = getString(code, 'code') ?? 'clippy';
   const level = getString(message, 'level');
-  const span = firstPrimarySpan(message);
   return createSignal({
     source: 'cargo-clippy',
     category: 'quality',

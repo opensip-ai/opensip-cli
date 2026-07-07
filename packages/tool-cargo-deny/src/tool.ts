@@ -6,7 +6,7 @@ import { parseCargoDenyJsonLines } from './parse-cargo-deny-json-lines.js';
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
 
-export const CARGO_DENY_IDENTITY: ToolIdentity = { name: 'cargo-deny' };
+export const CARGO_DENY_IDENTITY: ToolIdentity = { name: 'cargo-deny', aliases: ['deny'] };
 export const CARGO_DENY_STABLE_ID = '93d06787-b067-468b-bba0-1086c876c5f7';
 
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
@@ -37,7 +37,10 @@ export const tool: Tool = defineExternalToolAdapter({
       args: buildScanArgs,
       output: { kind: 'stdout', path: 'cargo-deny.jsonl' },
       parse: parseCargoDenyJsonLines,
-      exitCodes: { ok: [0], findings: [1], errorFrom: 2 },
+      // cargo-deny's exit code is an OR of per-check category bits (advisories 1,
+      // bans 2, licenses 4, sources 8, …), so no single "findings" code exists.
+      // Any nonzero with parseable diagnostics is a findings verdict.
+      exitCodes: { ok: [0], findings: [], findingsFromNonzero: true },
     },
   ],
   fingerprintStrategy: 'message-hash',

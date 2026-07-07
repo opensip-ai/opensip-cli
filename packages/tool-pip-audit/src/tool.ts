@@ -22,8 +22,12 @@ function requirementsFile(projectRoot: string): string | undefined {
 
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   const requirements = requirementsFile(ctx.projectRoot);
-  const targetArgs =
-    requirements === undefined ? ['--path', ctx.projectRoot] : ['-r', requirements];
+  // With a requirements file, audit it. Otherwise audit the ACTIVE Python
+  // environment (pip-audit's default with no target). We deliberately do NOT pass
+  // `--path <projectRoot>`: `--path` targets an installed environment's
+  // site-packages directory, not a project source tree, so pointing it at the repo
+  // root either errors or audits the wrong thing.
+  const targetArgs = requirements === undefined ? [] : ['-r', requirements];
   return [
     ...targetArgs,
     '--format',

@@ -10,6 +10,11 @@ export const CARGO_CLIPPY_IDENTITY: ToolIdentity = { name: 'cargo-clippy', alias
 export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
 
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
+  // NOTE (build cache): `cargo clippy` only emits `compiler-message` records for
+  // crates it actually (re)compiles. With a warm target cache a repeat run emits
+  // zero diagnostics even though the lints still hold — so a stable `--gate-compare`
+  // requires a cold cache (fresh checkout / CI without target caching). See the
+  // package README's determinism caveat.
   return ['clippy', '--message-format=json', '--all-targets', '--all-features'];
 }
 
@@ -38,7 +43,10 @@ export const tool: Tool = defineExternalToolAdapter({
       args: buildScanArgs,
       output: { kind: 'stdout', path: 'cargo-clippy.jsonl' },
       parse: parseCargoClippyJsonLines,
-      exitCodes: { ok: [0], findings: [1], errorFrom: 2 },
+      // clippy exits 0 (clean, even with warnings) or 101 (deny-level lints /
+      // compile error); it never exits 1. Treat any nonzero with parseable
+      // diagnostics as findings rather than faulting and swallowing them.
+      exitCodes: { ok: [0], findings: [], findingsFromNonzero: true },
     },
   ],
   fingerprintStrategy: 'message-hash',

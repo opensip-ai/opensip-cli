@@ -36,6 +36,9 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     '--sarif',
     '--output',
     ctx.artifactPath('semgrep.sarif'),
+    // `--error` makes semgrep exit nonzero on findings (spec 31a exit contract), so
+    // the exit-code model and the SARIF report agree; without it findings exit 0.
+    '--error',
     ctx.projectRoot,
   ];
 }

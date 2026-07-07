@@ -70,7 +70,7 @@ export { defaultBinaryEnvVar, resolveBinary } from './binary-resolver.js';
 export type { BinaryResolution, BinaryResolveDeps, ResolveBinaryInput } from './binary-resolver.js';
 export { messageHashFingerprintStrategy, resolveFingerprintStrategy } from './fingerprint.js';
 export { stampProvenance, stampProvenanceAll } from './provenance.js';
-export { redactSecret, secretHash } from './redact.js';
+export { redactCredentials, redactSecret, secretHash } from './redact.js';
 export {
   attachExternalAdapterProgress,
   externalAdapterProgressOf,

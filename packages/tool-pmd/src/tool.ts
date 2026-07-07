@@ -34,7 +34,9 @@ export const tool: Tool = defineExternalToolAdapter({
     command: 'pmd',
     versionArgs: ['--version'],
     versionParse: (stdout) => parseFirstSemver(stdout) ?? stdout.trim(),
-    minVersion: '6.50.0',
+    // The `check` subcommand + `-f sarif` invocation below is PMD 7 CLI; PMD 6.x
+    // has no `check` verb, so 7.0.0 is the real floor.
+    minVersion: '7.0.0',
     resolution: ['config', 'path'],
     installHint: 'Install PMD: https://pmd.github.io/ (brew install pmd)',
   },

@@ -38,6 +38,7 @@ import { asObject, getString, safeParseJson } from './ingest-json.js';
 import { ingestSarif } from './ingest-sarif.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
+import { redactCredentials } from './redact.js';
 import { buildAdapterRunContext } from './run-context.js';
 import { buildScanCompletion, deliverOptions, emitScanCompletion } from './scan-emit.js';
 
@@ -258,7 +259,7 @@ function faultInvalidArtifact(
   throw new ToolError(
     `${tool} produced no usable ${command.output.kind} report (${detail}).`,
     'ADAPTER.ARTIFACT.INVALID',
-    { stderrTail: stderr.slice(-STDERR_TAIL) },
+    { stderrTail: redactCredentials(stderr.slice(-STDERR_TAIL)) },
   );
 }
 
@@ -377,15 +378,20 @@ export async function runScanLoop(
     });
     throw new TimeoutError(`${tool} scan timed out after ${String(deps.timeoutMs)}ms`, {
       code: 'ADAPTER.SCAN.TIMEOUT',
-      stderrTail: proc.stderr.slice(-STDERR_TAIL),
+      stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }
 
-  // Read the native output: stdout commands use the captured stdout (always valid);
-  // file-backed commands read + classify the report (A11) via readReportArtifact.
+  // Read the native output: stdout commands use the captured stdout; when stdout is
+  // empty we fall back to stderr, because some scanners emit their machine output on
+  // stderr via a logger (e.g. cargo-deny's `--format json` diagnostics). The fallback
+  // only fires on empty stdout, so a scanner that legitimately prints nothing on a
+  // clean run reads its (noise) stderr through the tolerant JSON-lines/SARIF parser →
+  // zero signals, not a false clean pass on a stream mismatch. File-backed commands
+  // read + classify the report (A11) via readReportArtifact.
   const read: ReportRead =
     command.output.kind === 'stdout'
-      ? { raw: proc.stdout, artifactValid: true }
+      ? { raw: proc.stdout.trim().length > 0 ? proc.stdout : proc.stderr, artifactValid: true }
       : readReportArtifact(artifactFullPath, deps);
 
   const verdict = interpretExit(proc.code, command.exitCodes ?? DEFAULT_EXIT_MODEL, {
@@ -399,7 +405,7 @@ export async function runScanLoop(
       code: proc.code,
     });
     throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
-      stderrTail: proc.stderr.slice(-STDERR_TAIL),
+      stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }
 

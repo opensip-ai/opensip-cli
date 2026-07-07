@@ -8,7 +8,7 @@ import {
   withNativeSeverity,
 } from '@opensip-cli/external-tool-adapter';
 
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, SignalSeverity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
 interface FindingContext {
@@ -51,24 +51,40 @@ function contextFromTrace(finding: Record<string, unknown>): FindingContext {
   return { file: '' };
 }
 
+/**
+ * A finding is REACHABLE when its trace resolves to a concrete vulnerable symbol
+ * (a `function` frame) — govulncheck's call-graph confirmed the vulnerable code is
+ * actually invoked. Findings that only reach the module/package level are imported
+ * but not called: real but lower priority.
+ */
+function isReachable(finding: Record<string, unknown>): boolean {
+  return (asArray(finding.trace) ?? []).some(
+    (frame) => getString(asObject(frame), 'function') !== undefined,
+  );
+}
+
 function normalize(
+  osv: string,
   finding: Record<string, unknown>,
+  reachable: boolean,
   advisories: Map<string, Record<string, unknown>>,
 ): Signal {
-  const ruleId = getString(finding, 'osv') ?? 'go-vulnerability';
-  const advisory = advisories.get(ruleId);
+  const advisory = advisories.get(osv);
   const context = contextFromTrace(finding);
   const summary = getString(advisory, 'summary');
   const fixedVersion = getString(finding, 'fixed_version');
   const aliases = (asArray(advisory?.aliases) ?? [])
     .filter((alias): alias is string => typeof alias === 'string')
     .join(', ');
+  // Reachable (called) vulns are actionable now → high; import-only → medium.
+  const severity: SignalSeverity = reachable ? 'high' : 'medium';
+  const reachabilityNote = reachable ? '' : ' (imported, not called)';
   return createSignal({
     source: 'govulncheck',
     category: 'security',
-    severity: 'high',
-    ruleId,
-    message: summary ?? `Go vulnerability detected (${ruleId})`,
+    severity,
+    ruleId: osv,
+    message: `${summary ?? `Go vulnerability detected (${osv})`}${reachabilityNote}`,
     ...(fixedVersion === undefined ? {} : { suggestion: `Upgrade to ${fixedVersion} or later.` }),
     code: {
       file: context.file,
@@ -81,6 +97,7 @@ function normalize(
         package: context.packageName ?? null,
         symbol: context.symbol ?? null,
         fixedVersion: fixedVersion ?? null,
+        reachable,
         aliases: aliases.length === 0 ? null : aliases,
       },
       null,
@@ -88,6 +105,14 @@ function normalize(
   });
 }
 
+/**
+ * govulncheck streams MULTIPLE `finding` messages per OSV id — one per distinct
+ * call trace and one per aggregation level (module, package, symbol). Emitting a
+ * signal for each over-counts a single vulnerability 2–4× and flattens govulncheck's
+ * reachability signal. Instead we collapse to ONE signal per OSV id, keeping the
+ * most-specific (reachable) trace so the location and severity reflect the strongest
+ * evidence.
+ */
 export function parseGovulncheckJsonLines(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,
@@ -96,10 +121,21 @@ export function parseGovulncheckJsonLines(
     (line) => line.value,
   );
   const advisories = osvMap(values);
-  const signals: Signal[] = [];
+  // Per OSV id, keep the "best" finding: a reachable trace beats an import-only one,
+  // and among equals the first-seen wins (stable).
+  const best = new Map<string, { finding: Record<string, unknown>; reachable: boolean }>();
   for (const value of values) {
     const finding = asObject(asObject(value)?.finding);
-    if (finding !== undefined) signals.push(normalize(finding, advisories));
+    if (finding === undefined) continue;
+    const osv = getString(finding, 'osv');
+    if (osv === undefined) continue;
+    const reachable = isReachable(finding);
+    const current = best.get(osv);
+    if (current === undefined || (reachable && !current.reachable)) {
+      best.set(osv, { finding, reachable });
+    }
   }
-  return signals;
+  return [...best.entries()].map(([osv, { finding, reachable }]) =>
+    normalize(osv, finding, reachable, advisories),
+  );
 }

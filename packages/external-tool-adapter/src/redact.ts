@@ -34,3 +34,28 @@ export function secretHash(raw: string | undefined | null): string {
   if (raw === undefined || raw === null || raw.length === 0) return '';
   return createHash('sha256').update(String(raw)).digest('hex').slice(0, 12);
 }
+
+// URL userinfo — `scheme://user:password@host`. Networked scanners (pip-audit,
+// dependency-check, cargo-deny) echo the failing index/registry URL into stderr
+// on an auth error; the password half must never reach a ToolError / log / report.
+const URL_USERINFO_RE = /(\b[a-z][a-z0-9+.-]*:\/\/)([^@/\s:]+):([^@/\s]+)@/giu;
+
+// Inline credential assignments a scanner may print back from its own argv/config
+// (`--password hunter2`, `token=abc123`, `api-key: xyz`, `Authorization: Bearer …`).
+const INLINE_SECRET_RE =
+  /((?:password|passwd|pwd|token|api[_-]?key|secret|authorization|bearer)\b["']?\s*[:=]\s*["']?)(\S+)/giu;
+
+/**
+ * Redact credential material from FREE-TEXT scanner diagnostics (stderr tails,
+ * error messages) before it reaches a {@link import('@opensip-cli/core').ToolError},
+ * a log, or a report. Masks URL userinfo passwords and inline secret assignments
+ * while leaving the surrounding diagnostic readable. Conservative by design — it
+ * targets known credential shapes, not arbitrary high-entropy strings. Returns the
+ * input unchanged when there is nothing to mask. Empty/undefined → `''`.
+ */
+export function redactCredentials(raw: string | undefined | null): string {
+  if (raw === undefined || raw === null || raw.length === 0) return '';
+  return String(raw)
+    .replace(URL_USERINFO_RE, (_match, scheme: string, user: string) => `${scheme}${user}:***@`)
+    .replace(INLINE_SECRET_RE, (_match, prefix: string) => `${prefix}***`);
+}
