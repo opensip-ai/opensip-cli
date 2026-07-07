@@ -181,10 +181,18 @@ describe('session-replay keeps the envelope-derived detail table', () => {
   it('the replay body contains the per-unit table while a fresh non-verbose run stays compact', () => {
     const replayText = textOf(replay);
     const runText = textOf(presentation);
-    for (const token of ['no-console', 'naming', 'Status', 'Validated', '10 files']) {
+    // The per-unit TABLE (columns, validated counts, PASSING rows) is replay-only;
+    // the compact run surface renders no table. `naming` passed, so it never
+    // appears on the compact surface's attention-only bullets either.
+    for (const token of ['Status', 'Validated', '10 files', 'naming']) {
       expect(replayText).toContain(token);
       expect(runText).not.toContain(token);
     }
+    // The compact run DOES surface the FAILING unit as an attention bullet
+    // (Option C — failed + faulted only); the replay shows it in the full table.
+    expect(runText).toContain('no-console');
+    expect(runText).toContain('fail');
+    expect(replayText).toContain('no-console');
     // The shared verdict summary line (2 errors -> FAIL) remains present in both.
     expect(runText).toContain('FAIL  (2 Errors, 0 Warnings)');
     expect(replayText).toContain('FAIL  (2 Errors, 0 Warnings)');

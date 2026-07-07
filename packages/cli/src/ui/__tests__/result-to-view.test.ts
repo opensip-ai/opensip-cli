@@ -87,10 +87,14 @@ describe('resultToView', () => {
         runFaulted: false,
       }),
     });
+    // No per-unit TABLE on the compact surface (columns absent).
     expect(out).not.toContain('Unit');
     expect(out).not.toContain('Status');
     expect(out).not.toContain('Validated');
-    expect(out).not.toContain('no-console');
+    // But the FAILING unit surfaces as an attention bullet with its finding
+    // locations (Option C); the PASSING unit is omitted from the default view.
+    expect(out).toContain('no-console');
+    expect(out).toContain('a.ts:3');
     expect(out).not.toContain('naming');
     expect(out).toContain('FAIL  (2 Errors, 1 Warnings) | Duration 8ms');
     expect(out).toContain('Use --verbose for detailed results');

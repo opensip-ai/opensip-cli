@@ -86,6 +86,26 @@ describe('RunSummary', () => {
     ).toBe('FAIL  (3 Errors, 0 Warnings) | Duration 20ms');
   });
 
+  it('renders FAULT (not FAIL) when the run faulted, keeping the real error/warning counts', () => {
+    // A UNIT-level fault (a check threw): the other checks ran, so the counts are
+    // real and stay in the headline; the token becomes FAULT (result unknown).
+    expect(
+      renderToText(
+        viewRunSummary({ passed: false, faulted: true, errors: 2, warnings: 1, durationMs: 450 }),
+      ),
+    ).toBe('FAULT  (2 Errors, 1 Warnings) | Duration 450ms');
+
+    const { lastFrame } = render(
+      <ThemeProvider>
+        <RunSummary passed={false} faulted={true} errors={2} warnings={1} durationMs={450} />
+      </ThemeProvider>,
+    );
+    const out = lastFrame() ?? '';
+    expect(out).toContain('FAULT');
+    expect(out).not.toContain('FAIL');
+    expect(out).toContain('2 Errors');
+  });
+
   it('renders the all-clean PASS shape', () => {
     const { lastFrame } = render(
       <ThemeProvider>
