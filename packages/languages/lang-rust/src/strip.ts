@@ -71,6 +71,11 @@ function scan(src: string): ScanResult {
       if (j < len && src[j] === '"') {
         const contentStart = j + 1;
         j++;
+        // Track closure explicitly — a successfully-closed raw string whose
+        // delimiter ends exactly at EOF leaves `j === len`, so inferring
+        // "unterminated" from `j >= len` would spuriously fire and blank the
+        // closing delimiter. (lang-java/lang-cpp guard the same way.)
+        let closed = false;
         // Find closing " followed by `hashes` # characters
         while (j < len) {
           if (src[j] === '"') {
@@ -81,12 +86,13 @@ function scan(src: string): ScanResult {
               stringRegions.push({ start: contentStart, end: contentEnd });
               j += 1 + hashes;
               i = j;
+              closed = true;
               break;
             }
           }
           j++;
         }
-        if (j >= len) {
+        if (!closed) {
           // Unterminated raw string — record what we have
           stringRegions.push({ start: contentStart, end: len });
           i = len;

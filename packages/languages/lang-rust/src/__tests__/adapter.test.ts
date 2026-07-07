@@ -45,6 +45,24 @@ describe('rust stripStrings', () => {
     expect(out).toContain('let s =');
   });
 
+  it('preserves the closing delimiter of a raw string ending at EOF (regression)', () => {
+    // Closing `"` is the final character — a prior bug inferred "unterminated"
+    // from `j >= len` after a *successful* close and blanked the closing quote.
+    const src = 'let s = r"x"';
+    const out = stripStrings(src);
+    expect(out.length).toBe(src.length);
+    expect(out).not.toContain('x'); // content blanked
+    expect(out.endsWith('"')).toBe(true); // closing delimiter intact, not blanked
+  });
+
+  it('preserves the closing delimiter of a hashed raw string ending at EOF (regression)', () => {
+    const src = 'let s = r#"x"#';
+    const out = stripStrings(src);
+    expect(out.length).toBe(src.length);
+    expect(out).not.toContain('x');
+    expect(out.endsWith('"#')).toBe(true); // `"#` delimiter intact
+  });
+
   it('handles byte strings b"..."', () => {
     const src = 'let b = b"binary";';
     const out = stripStrings(src);

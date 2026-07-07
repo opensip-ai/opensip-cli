@@ -40,15 +40,23 @@ export function hostMetricsBySessionId(
   ids: readonly string[],
 ): Map<string, StoredSessionHostMetrics> {
   const byId = new Map<string, StoredSessionHostMetrics>();
-  if (ids.length === 0) return byId;
-  const rows = datastore.db
-    .select()
-    .from(sessionHostMetrics)
-    .where(inArray(sessionHostMetrics.sessionId, ids))
-    .all();
-  for (const row of rows) {
-    const metrics = projectHostMetrics(row);
-    if (metrics) byId.set(row.sessionId, metrics);
+  // Chunk to stay under SQLite's bound-parameter ceiling
+  // (SQLITE_MAX_VARIABLE_NUMBER, ~32k): `list()` is unbounded when no limit is
+  // given, so `ids` can exceed the ceiling on a large, retention-disabled
+  // history. Mirrors BaselineRepo.save's chunking. An empty `ids` runs 0 loops.
+  const CHUNK = 2000;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    if (slice.length === 0) continue;
+    const rows = datastore.db
+      .select()
+      .from(sessionHostMetrics)
+      .where(inArray(sessionHostMetrics.sessionId, slice))
+      .all();
+    for (const row of rows) {
+      const metrics = projectHostMetrics(row);
+      if (metrics) byId.set(row.sessionId, metrics);
+    }
   }
   return byId;
 }

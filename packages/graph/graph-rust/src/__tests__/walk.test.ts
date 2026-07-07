@@ -277,6 +277,27 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
     expect(helperFn?.inTestFile).toBe(false);
   });
 
+  it('does NOT leak a preceding item’s attributes onto a later function (contiguous run)', () => {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    // `#[test]` and `#[derive]` belong to the items they immediately precede; a
+    // LATER function in the same module must not inherit them. Regression: the
+    // sibling scan used to collect every earlier attribute_item, not just the
+    // contiguous run ending at the function — so big_prod wrongly gained
+    // inTestFile=true (from #[test]) and Cfg's #[derive], flipping rule gating.
+    writeFileSync(
+      join(dir, 'src/lib.rs'),
+      `#[test]\nfn it_works() {\n    assert_eq!(1, 1);\n}\n` +
+        `#[derive(Debug)]\nstruct Cfg;\n` +
+        `pub fn big_prod() -> i32 {\n    1\n}\n`,
+      'utf8',
+    );
+    const walk = run();
+    const prod = walk.occurrences.big_prod?.[0];
+    expect(prod?.inTestFile).toBe(false); // must NOT inherit #[test]
+    expect(prod?.decorators.some((d) => d.includes('#[test]'))).toBe(false);
+    expect(prod?.decorators.some((d) => d.includes('derive'))).toBe(false); // nor Cfg's #[derive]
+  });
+
   it('flags files under tests/ as test files (path-based detection)', () => {
     mkdirSync(join(dir, 'tests'), { recursive: true });
     writeFileSync(join(dir, 'tests/integration.rs'), `fn integ() { }\n`, 'utf8');
