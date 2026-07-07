@@ -2,6 +2,36 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.5.0] - 2026-07-07
+
+A polyglot external-tool and suite-verdict release. This adds the first wave of
+external scanner adapters, improves adapter discovery, introduces explicit fault
+handling across live and suite output, and tightens stored-session and baseline
+evidence so reports and MCP reads stay project-scoped and stable.
+
+### Added
+
+- Polyglot external scanner adapters and adapter-language metadata for the
+  `tools` command surface.
+- `opensip tools list --available` discovery for installable adapters.
+- Unified suite/single-run result summaries with explicit fault verdicts and
+  attention bullets in live output.
+
+### Changed
+
+- Suite `failOnFault` handling treats envelope-backed faults as non-blocking by
+  default while still surfacing them clearly in results.
+- Root `pnpm` shortcuts now cover the current top-level CLI command surface,
+  including suite, tools, config, policy, repair, and agent-catalog commands.
+
+### Fixed
+
+- MCP latest-session reads are scoped to the project root.
+- Baseline fingerprints disambiguate colliding occurrences with ordinals.
+- Graph owner edges key by full occurrence identity.
+- Dashboard recent activity groups suite runs as expandable rows and keeps
+  pagination/sorting attached to the grouped evidence.
+
 ## [0.4.2] - 2026-07-06
 
 A small external-tool and CI-output patch. External adapter runs now render

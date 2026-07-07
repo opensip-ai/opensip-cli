@@ -1,12 +1,12 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.4.2
+release: v0.5.0
 owner: opensip-cli
 indexable: true
 title: "opensip-cli Docs"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Public documentation entry point for opensip-cli v0.4.2: product overview, fast paths, and the full reference map."
+purpose: "Public documentation entry point for opensip-cli v0.5.0: product overview, fast paths, and the full reference map."
 ---
 # opensip-cli Docs
 
@@ -88,6 +88,8 @@ Whole Tool plugins are managed through the `tools` group:
 
 ```bash
 opensip tools list
+opensip tools list --available [--lang <language>]
+opensip tools doctor
 opensip tools validate <spec>
 opensip tools install <spec> [--global|--project]
 opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
@@ -98,6 +100,7 @@ Opt-in scanner adapters use the same Tool plugin path and then mount normal
 commands:
 
 ```bash
+opensip tools list --available --lang python
 opensip tools install @opensip-cli/tool-gitleaks
 opensip gitleaks doctor
 opensip gitleaks --json --gate-save
@@ -228,7 +231,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ## Factual Baseline
 
-This v0.4.2 doc set was rechecked against the source on 2026-07-07:
+This v0.5.0 doc set was rechecked against the source on 2026-07-07:
 
 - 160 built-in fitness checks across seven packs.
 - 55 publishable workspace packages, plus the private `@opensip-cli/test-support` package.

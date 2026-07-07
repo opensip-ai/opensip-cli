@@ -1,13 +1,15 @@
 ---
 status: current
-last_verified: 2026-06-12
-release: v0.4.2
+last_verified: 2026-07-07
+release: v0.5.0
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
 source-files:
   - packages/cli/src/commands/tools/index.ts
   - packages/cli/src/commands/tools/list.ts
+  - packages/cli/src/commands/tools/available.ts
+  - packages/cli/src/commands/tools/doctor.ts
   - packages/cli/src/bootstrap/register-tools.ts
   - packages/core/src/plugins/manifest-loader.ts
 related-docs:
@@ -19,11 +21,13 @@ related-docs:
 
 The customer-facing command group for whole Tool plugins (ADR-0041): packages
 declaring `package.json#opensipTools.kind: "tool"` that contribute entire
-subcommands to the CLI. Six subcommands — no flag aliases, no `tool`
+subcommands to the CLI. Seven subcommands — no flag aliases, no `tool`
 singular:
 
 ```
 opensip tools list
+opensip tools list --available [--lang <language>]
+opensip tools doctor
 opensip tools validate <spec>
 opensip tools create <tool-id>
 opensip tools install <spec> [--global|--project]
@@ -72,6 +76,57 @@ The effective tool inventory: bundled tools, user-global installs
 
 `--global` / `--project` filter to one install scope. `--json` puts the rows
 under `.data.tools`.
+
+### `tools list --available`
+
+`tools list --available` switches from the installed/effective inventory to the
+first-party External Tool Adapter catalog. This is the discovery path for teams
+that already use scanners such as Gitleaks, Semgrep, Ruff, golangci-lint,
+cargo-deny, Bandit, pip-audit, PMD, Dependency-Check, Cppcheck, OSV-Scanner, or
+Trivy and want those findings in OpenSIP's sessions, HTML report, JSON/SARIF,
+and baseline ratchet.
+
+```
+opensip tools list --available
+opensip tools list --available --lang python
+opensip tools list --lang c++ --json
+```
+
+The catalog is bundled into the CLI as a generated projection of the shipped
+adapter manifests, so it works offline and before any adapter is installed.
+Rows include the npm package to install, primary command, language coverage,
+network posture, and whether that adapter is already installed in the effective
+tool set. `--lang <language>` implies `--available`; language values are
+canonicalized (`c++`, `cxx`, and `cpp` all match C/C++ coverage), and
+language-agnostic adapters match every filter.
+
+Install the adapter package, then run that adapter's own `doctor` command before
+the first scan:
+
+```bash
+opensip tools install @opensip-cli/tool-gitleaks
+opensip gitleaks doctor
+opensip gitleaks --json --gate-save
+```
+
+The adapter package does not install the native scanner binary. Keep managing
+`gitleaks`, `semgrep`, `ruff`, `trivy`, and the other scanner executables through
+your normal OS/package-manager path, or pin the binary with
+`binaries.<tool>.path` / `OPENSIP_<TOOL>_BIN`. See
+[External tool adapters](../50-extend/08-external-tool-adapters.md) for the full
+adapter table and prerequisites.
+
+## `tools doctor`
+
+Shows buffered bootstrap diagnostics for the current CLI run. This is the host
+diagnostic surface for "which tools loaded, which were denied, and why?" It is
+different from an adapter-specific `opensip <tool> doctor`, which probes that
+scanner's native binary, version, network posture, and cache prerequisites.
+
+```bash
+opensip tools doctor
+opensip tools doctor --json
+```
 
 ## `tools validate <spec>`
 

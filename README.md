@@ -298,10 +298,29 @@ opensip sim plugin sync
 
 ```bash
 opensip tools list
+opensip tools list --available [--lang <language>]
+opensip tools doctor
 opensip tools validate <spec>
 opensip tools install <spec> [--global|--project]
-opensip tools uninstall <name-or-id> [--global|--project]
+opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
+opensip tools data-purge <tool-id>
 ```
+
+`tools list --available` shows the opt-in first-party scanner-adapter catalog.
+Install only the adapters you need; the adapter package wraps, but does not
+install, the native scanner binary:
+
+```bash
+opensip tools list --available --lang python
+opensip tools install @opensip-cli/tool-gitleaks
+opensip gitleaks doctor
+opensip gitleaks --json --gate-save
+```
+
+The shipped adapter packages cover secrets, SAST/structural search,
+Python/Go/Rust linting, dependency vulnerabilities, Java analysis, and C/C++
+static analysis through tools such as Gitleaks, Semgrep, Ruff, golangci-lint,
+cargo-deny, Bandit, PMD, Cppcheck, OSV-Scanner, and Trivy.
 
 ## Project Layout
 
