@@ -37,6 +37,16 @@ describe('ToolStateRepo', () => {
     expect(repo.get('acme-audit', 'nope')).toBeUndefined();
   });
 
+  it('distinguishes a stored null from a never-put key', () => {
+    // Regression: `get` used `?? undefined`, collapsing a stored JSON null into
+    // the never-put sentinel. A stored null must read back as null (and the row
+    // stays visible to list()), unlike an absent key which is undefined.
+    repo.put('acme-audit', 'maybe', null);
+    expect(repo.get('acme-audit', 'maybe')).toBeNull();
+    expect(repo.list('acme-audit')).toContain('maybe');
+    expect(repo.get('acme-audit', 'never')).toBeUndefined();
+  });
+
   it('put is an upsert (same key replaces)', () => {
     repo.put('acme-audit', 'k', { v: 1 });
     repo.put('acme-audit', 'k', { v: 2 });

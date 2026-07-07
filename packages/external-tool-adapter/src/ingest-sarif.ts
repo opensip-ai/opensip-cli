@@ -173,6 +173,16 @@ function recoverSeverity(
   return { severity: sarifLevelToSeverity(level), nativeLevel: level };
 }
 
+/**
+ * `[]` for any NON-array runtime value, preserving the element type. Unlike
+ * `?? []` it also guards a truthy non-array (a JSON-valid but non-conformant
+ * SARIF report); unlike a bare `Array.isArray(x) ? x : []` it does not widen the
+ * element type to `any`.
+ */
+function iterableArray<T>(value: readonly T[] | undefined): readonly T[] {
+  return Array.isArray(value) ? (value as readonly T[]) : [];
+}
+
 /** Collapse a result's locations to the primary site + a count of extras. */
 function primaryLocation(result: SarifResult): {
   readonly file?: string;
@@ -180,7 +190,7 @@ function primaryLocation(result: SarifResult): {
   readonly column?: number;
   readonly extra: number;
 } {
-  const locations = result.locations ?? [];
+  const locations = iterableArray(result.locations);
   const first = locations[0]?.physicalLocation;
   return {
     file: first?.artifactLocation?.uri,
@@ -272,11 +282,17 @@ function resultToSignal(
 export function ingestSarif(sarif: SarifLog, options?: IngestSarifOptions): readonly Signal[] {
   const category = options?.category ?? 'security';
   const signals: Signal[] = [];
-  for (const run of sarif.runs ?? []) {
+  // Total array guards (`Array.isArray`, not `?? []`): a JSON-valid but
+  // non-conformant SARIF report can carry a truthy NON-array `runs`/`rules`/
+  // `results` (version drift, a scanner error-report shape), which `?? []`
+  // passes straight through — crashing `for..of` / `rules.find` with a raw stack
+  // trace instead of the graceful `ADAPTER.ARTIFACT.INVALID` fault. Mirrors the
+  // total guards the sibling JSON parsers (gitleaks/osv) already use.
+  for (const run of iterableArray(sarif.runs)) {
     const driver = run.tool?.driver;
-    const rules = driver?.rules ?? [];
+    const rules = iterableArray(driver?.rules);
     const source = options?.source ?? driver?.name?.toLowerCase() ?? 'sarif';
-    for (const result of run.results ?? []) {
+    for (const result of iterableArray(run.results)) {
       signals.push(resultToSignal(result, rules, source, category));
     }
   }

@@ -115,7 +115,7 @@ function toRow(event: PolicyAuditAppendEvent): typeof policyAuditEvents.$inferIn
     timestamp: boundedString(event.timestamp, 'timestamp'),
     subjectKind: boundedString(event.subjectKind, 'subjectKind'),
     subjectId: boundedString(event.subjectId, 'subjectId'),
-    subject: boundedJson(event.subject, 'subject'),
+    subject: event.subject === undefined ? null : boundedJson(event.subject, 'subject'),
     action: boundedString(event.action, 'action'),
     outcome: boundedString(event.outcome, 'outcome'),
     reasons: boundedJson(event.reasons, 'reasons'),
