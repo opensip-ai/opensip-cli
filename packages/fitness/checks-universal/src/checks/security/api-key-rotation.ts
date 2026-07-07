@@ -6,7 +6,10 @@
 
 import { logger } from '@opensip-cli/core';
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-cli/fitness';
+import {
+  stripStringLiteralsPreservingPositions,
+  stripStringsAndComments,
+} from '@opensip-cli/fitness';
 
 /**
  * Checks if text contains a single API key equality comparison
@@ -185,7 +188,7 @@ export const apiKeyRotation = defineCheck({
         continue;
       }
 
-      const strippedLine = stripStringLiterals(line);
+      const strippedLine = stripStringLiteralsPreservingPositions(line);
       for (const pattern of SINGLE_KEY_PATTERNS) {
         const match = pattern.match(strippedLine);
         if (match) {

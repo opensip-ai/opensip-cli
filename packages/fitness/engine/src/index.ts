@@ -96,6 +96,7 @@ export type { ImportGraph } from './framework/import-graph.js';
 export {
   isInsideStringLiteral,
   stripStringLiterals,
+  stripStringLiteralsPreservingPositions,
   stripStringsAndComments,
   stripStringsAndCommentsPreservingPositions,
 } from './framework/strip-literals.js';

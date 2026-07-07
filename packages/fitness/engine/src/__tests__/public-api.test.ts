@@ -51,6 +51,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'readPackageVersion',
   'setCurrentRecipeCheckConfig',
   'stripStringLiterals',
+  'stripStringLiteralsPreservingPositions',
   'stripStringsAndComments',
   'stripStringsAndCommentsPreservingPositions',
   'tool',

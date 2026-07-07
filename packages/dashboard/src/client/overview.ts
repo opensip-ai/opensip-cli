@@ -14,7 +14,7 @@
  */
 
 import { el } from './el.js';
-import { paginateTable } from './pagination.js';
+import { paginateSectionedRows } from './pagination.js';
 import { scoreColorStyle, sessionStatus, statusBadge } from './sessions.js';
 import { activateTabForSession } from './tab-activators.js';
 
@@ -133,5 +133,8 @@ export function renderOverview(): void {
   const pag = el('div', { class: 'pagination' });
   sec.append(el('div', { class: 'card' }, [table, pag]));
   panel.append(sec);
-  paginateTable(tbody, pag, 10);
+  // Synthetic `.suite-group-header` divider rows share the tbody with the 9-cell
+  // session rows; page by SESSION-row count only (a header must not consume a
+  // page slot or inflate the count) via the header-aware paginator.
+  paginateSectionedRows(tbody, pag, 10, '.suite-group-header');
 }

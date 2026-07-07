@@ -4,7 +4,10 @@
 
 import { logger } from '@opensip-cli/core';
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-cli/fitness';
+import {
+  stripStringLiteralsPreservingPositions,
+  stripStringsAndComments,
+} from '@opensip-cli/fitness';
 
 /**
  * Pre-compiled regex patterns for rate limit detection.
@@ -155,8 +158,8 @@ export const rateLimitCoverage = defineCheck({
         continue;
       }
 
-      const strippedLine = stripStringLiterals(line);
-      const strippedContext = stripStringLiterals(context);
+      const strippedLine = stripStringLiteralsPreservingPositions(line);
+      const strippedContext = stripStringLiteralsPreservingPositions(context);
 
       for (const pattern of ROUTE_PATTERNS) {
         // Reset regex state
