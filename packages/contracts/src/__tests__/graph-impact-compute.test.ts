@@ -13,7 +13,10 @@ function minimalCatalog(): GraphCatalog {
     functions: {
       caller: [
         {
-          bodyHash: 'caller',
+          // bodyHash is a content hash, deliberately DISTINCT from qualifiedName
+          // (in production it is a sha256, never the dotted symbol name). Edges
+          // reference callees by bodyHash — see `to: ['hash-callee']` below.
+          bodyHash: 'hash-caller',
           qualifiedName: 'caller',
           simpleName: 'caller',
           filePath: 'src/caller.ts',
@@ -30,7 +33,7 @@ function minimalCatalog(): GraphCatalog {
           decorators: [],
           calls: [
             {
-              to: ['callee'],
+              to: ['hash-callee'],
               line: 2,
               column: 4,
               resolution: 'static',
@@ -42,7 +45,7 @@ function minimalCatalog(): GraphCatalog {
       ],
       callee: [
         {
-          bodyHash: 'callee',
+          bodyHash: 'hash-callee',
           qualifiedName: 'callee',
           simpleName: 'callee',
           filePath: 'src/callee.ts',
@@ -74,7 +77,8 @@ function chainCatalog(length: number): GraphCatalog {
   for (let i = 0; i < length; i++) {
     functions[`f${i}`] = [
       {
-        bodyHash: `f${i}`,
+        // bodyHash distinct from qualifiedName (see minimalCatalog note).
+        bodyHash: `hash-f${i}`,
         qualifiedName: `f${i}`,
         simpleName: `f${i}`,
         filePath: `src/f${i}.ts`,
@@ -95,7 +99,7 @@ function chainCatalog(length: number): GraphCatalog {
             ? []
             : [
                 {
-                  to: [`f${i - 1}`],
+                  to: [`hash-f${i - 1}`],
                   line: 2,
                   column: 4,
                   resolution: 'static',
@@ -174,7 +178,7 @@ describe('computeImpact', () => {
       ...minimalCatalog(),
       features: {
         function: {
-          caller: {
+          'hash-caller': {
             bodyLines: 5,
             blast: { direct: 1, transitive: 9, score: 10 },
             testReachable: true,
@@ -190,7 +194,7 @@ describe('computeImpact', () => {
       ...minimalCatalog(),
       features: {
         function: {
-          caller: {
+          'hash-caller': {
             bodyLines: 5,
             testReachable: false,
           },
@@ -281,7 +285,7 @@ describe('computeImpact', () => {
               ...source.functions.caller[0],
               calls: [
                 {
-                  to: ['callee'],
+                  to: ['hash-callee'],
                   line: 2,
                   column: 4,
                   resolution: 'syntactic',

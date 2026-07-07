@@ -53,7 +53,12 @@ export class SessionWriteRepo {
               engine_version: session.engineVersion ?? null,
             })
             .run();
-          if (session.payload !== undefined) {
+          // `!= null` skips BOTH undefined and null: the `payload` column is
+          // NOT NULL, so a tool that returns a null payload (type-valid under
+          // `payload?: unknown`) would otherwise hit a NOT NULL constraint,
+          // roll back the already-inserted session row, and silently drop the
+          // whole run from history. Treat null like "no payload row".
+          if (session.payload != null) {
             const hasInnerVersion = extractPayloadVersion(session.payload) !== undefined;
             if (!hasInnerVersion) {
               logger.warn({
@@ -89,7 +94,7 @@ export class SessionWriteRepo {
         msg: 'Session saved',
         sessionId: session.id,
         tool: session.tool,
-        hasPayload: session.payload !== undefined,
+        hasPayload: session.payload != null,
       });
     } catch (error) {
       logger.error({
