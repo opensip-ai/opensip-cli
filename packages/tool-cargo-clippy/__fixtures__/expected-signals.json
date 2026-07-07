@@ -1,0 +1,10 @@
+[
+  {
+    "ruleId": "clippy::needless_return",
+    "severity": "medium",
+    "message": "unneeded return statement",
+    "file": "src/lib.rs",
+    "line": 5,
+    "column": 9
+  }
+]
