@@ -135,6 +135,10 @@ describe('External Tools catch-all tab (Defect #3 — adapter findings render)',
     const panel = document.querySelector<HTMLElement>('#panel-external');
     expect(panel).not.toBeNull();
 
+    const overviewBadges = [...document.querySelectorAll<HTMLElement>('#panel-overview .badge')];
+    const toolBadge = overviewBadges.find((badge) => badge.textContent === 'GITLEAKS');
+    expect(toolBadge?.getAttribute('style')).toContain('background:var(--bg-hover)');
+
     // The grouped payload.checks[] detail is REACHABLE in the panel (the rule and
     // the file render through renderExternalTab → renderSessionTable →
     // renderSessionDetail, which falls back to a "Check" column for the unknown

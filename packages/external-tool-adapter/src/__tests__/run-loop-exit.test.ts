@@ -172,8 +172,11 @@ describe('runScanLoop — clean exit ⇒ passing envelope through the host seams
     expect(completion?.envelope.tool).toBe('examplescan');
     expect(completion?.envelope.verdict.passed).toBe(true);
     expect(completion?.session.payload.findings).toBe(0);
-    // No-gate, no-json path: human summary, delivered without a runFailed override.
+    // No-gate, no-json path: standard run presentation, delivered without a runFailed override.
     expect(spies.emitEnvelope).not.toHaveBeenCalled();
+    expect(spies.render).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'run-presentation', tool: 'examplescan' }),
+    );
     expect(
       (spies.deliverSignals.mock.calls[0]?.[1] as { runFailed?: boolean }).runFailed,
     ).toBeUndefined();

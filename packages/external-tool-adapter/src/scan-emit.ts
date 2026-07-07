@@ -9,13 +9,13 @@
  * RPC for `saveBaseline`/`compareBaseline`/`deliverSignals`).
  */
 
-import { runHostGateDispatch } from '@opensip-cli/contracts';
+import { buildFindingGroups, runHostGateDispatch } from '@opensip-cli/contracts';
 
 import { renderGateCompareLines, renderGateSaveLines } from './gate-render.js';
 import { buildAdapterSessionPayload } from './session-payload.js';
 
 import type { BinaryResolutionLayer } from './types.js';
-import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { RunPresentation, SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
 
 /** Logger `module` field for every event this module emits. */
@@ -91,12 +91,22 @@ export function buildScanCompletion(input: ScanCompletionInput): ScanCompletion 
   };
 }
 
-/** The human (non-`--json`) one-line scan summary. */
-function summaryLines(tool: string, signalCount: number, score: number, passed: boolean): string[] {
-  return [
-    `${tool}: ${String(signalCount)} finding(s)`,
-    `verdict: ${passed ? 'PASS' : 'FAIL'} (score ${score.toFixed(2)})`,
-  ];
+/** The standard run presentation used by first-party analysis tools. */
+function scanPresentation(
+  tool: string,
+  envelope: SignalEnvelope,
+  opts: Record<string, unknown>,
+): RunPresentation {
+  const verboseDetail =
+    opts.verbose === true
+      ? { kind: 'findings' as const, groups: buildFindingGroups(envelope.units, envelope.signals) }
+      : undefined;
+  return {
+    type: 'run-presentation',
+    tool,
+    envelope,
+    ...(verboseDetail === undefined ? {} : { verboseDetail }),
+  };
 }
 
 interface LogCompletedInput {
@@ -141,8 +151,8 @@ export interface EmitScanCompletionInput {
  *   - `--gate-compare` (ADR-0035/0036): diff against the saved baseline, render the
  *     diff, and pass `degraded && failOnDegraded` as the host runFailed override
  *     (the findings verdict does NOT gate here — only NET-NEW findings fail).
- *   - normal: emit the envelope (`--json`) or a human summary, deliver without an
- *     override.
+ *   - normal: emit the envelope (`--json`) or the shared run presentation,
+ *     deliver without an override.
  *
  * Both gate paths still RETURN the session contribution, so a gate run persists a
  * session alongside a normal scan.
@@ -186,11 +196,7 @@ export async function emitScanCompletion(input: EmitScanCompletionInput): Promis
   if (opts.json === true) {
     cli.emitEnvelope(envelope);
   } else {
-    await cli.render({
-      type: 'text-lines',
-      title: `${tool} scan`,
-      lines: summaryLines(tool, signalCount, envelope.verdict.score, envelope.verdict.passed),
-    });
+    await cli.render(scanPresentation(tool, envelope, opts));
   }
   await cli.deliverSignals(envelope, deliver);
   logCompleted({ cli, tool, signalCount, passed: envelope.verdict.passed });

@@ -205,15 +205,32 @@ describe('runScanLoop — gate-ratchet branch (ADR-0036)', () => {
     expect(completion?.envelope.tool).toBe('examplescan');
   });
 
-  it('the no-gate, no-json path renders the human summary and delivers without runFailed', async () => {
+  it('the no-gate, no-json path renders the standard run presentation and delivers without runFailed', async () => {
     const { cli, spies } = makeCli();
     await runScanLoop(input(cli, {}), makeDeps());
     expect(spies.emitEnvelope).not.toHaveBeenCalled();
     expect(spies.render).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'text-lines', title: 'examplescan scan' }),
+      expect.objectContaining({ type: 'run-presentation', tool: 'examplescan' }),
     );
+    expect(spies.render.mock.calls[0][0]).not.toHaveProperty('verboseDetail');
     expect(
       (spies.deliverSignals.mock.calls[0][1] as { runFailed?: boolean }).runFailed,
     ).toBeUndefined();
+  });
+
+  it('the no-gate, --verbose path carries adapter findings through the shared verbose detail body', async () => {
+    const { cli, spies } = makeCli();
+    await runScanLoop(input(cli, { verbose: true }), makeDeps());
+
+    const rendered = spies.render.mock.calls[0][0] as {
+      readonly type: string;
+      readonly verboseDetail?: {
+        readonly kind: string;
+        readonly groups: readonly { readonly findings: readonly unknown[] }[];
+      };
+    };
+    expect(rendered.type).toBe('run-presentation');
+    expect(rendered.verboseDetail?.kind).toBe('findings');
+    expect(rendered.verboseDetail?.groups[0]?.findings).toHaveLength(2);
   });
 });

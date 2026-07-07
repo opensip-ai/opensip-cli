@@ -18,6 +18,8 @@ import { paginateTable } from './pagination.js';
 import { scoreColorStyle, sessionStatus, statusBadge } from './sessions.js';
 import { activateTabForSession } from './tab-activators.js';
 
+const DEFAULT_TOOL_BADGE_STYLE = 'background:var(--bg-hover);color:var(--text-muted)';
+
 export function renderOverview(): void {
   const panel = document.querySelector('#panel-overview');
   if (!panel) return;
@@ -103,7 +105,7 @@ export function renderOverview(): void {
     toolCell.append(
       el('span', {
         class: 'badge',
-        style: toolBadgeStyles[s.tool] ?? '',
+        style: toolBadgeStyles[s.tool] ?? DEFAULT_TOOL_BADGE_STYLE,
         text: s.tool.toUpperCase(),
       }),
     );

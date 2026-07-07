@@ -401,7 +401,7 @@ export async function runScanLoop(
     tool,
     runId: ctx.runId,
     createdAt: startedAt,
-    units: [{ slug: command.name, passed: unitPassed, violationCount: signals.length, durationMs }],
+    units: [{ slug: tool, passed: unitPassed, violationCount: signals.length, durationMs }],
     signals,
     policy: resolveVerdictPolicy(tool),
     runFaulted: false,
