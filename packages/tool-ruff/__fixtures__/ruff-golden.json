@@ -1,0 +1,28 @@
+[
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": { "column": 10, "row": 1 },
+    "filename": "src/app.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [],
+      "message": "Remove unused import: `os`"
+    },
+    "location": { "column": 8, "row": 1 },
+    "message": "`os` imported but unused",
+    "noqa_row": 1,
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
+    "code": "E501",
+    "end_location": { "column": 100, "row": 12 },
+    "filename": "src/app.py",
+    "fix": null,
+    "location": { "column": 89, "row": 12 },
+    "message": "Line too long (99 > 88)",
+    "noqa_row": 12,
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+  }
+]
