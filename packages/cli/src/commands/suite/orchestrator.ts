@@ -92,7 +92,20 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   // deliverSignals, reportFailure, emitError, process.exit) writes the per-step
   // capture slot, so `step.exitCode` is the single source of truth here — no step
   // touches the host holder mid-run for this aggregate to miss.
-  const exitCode = Math.max(0, ...steps.map((step) => step.exitCode));
+  //
+  // A CHECK-level runtime fault (a unit threw but the tool still produced an
+  // envelope — `verdict` present) is "result unknown" and NON-blocking by default
+  // (#2 fault taxonomy): its exit is excluded from the worst-of so a crashed check
+  // doesn't fail the suite like a findings failure does — the fault is still
+  // raised in the aggregate counts + review brief. A STEP/APP-level failure (NO
+  // envelope: a thrown command, ConfigurationError, or ToolError before results,
+  // ADR-0060) keeps its ADR-0020 exit taxonomy and still blocks. `failOnFault`
+  // (suite execution policy, default false) opts every fault back into blocking.
+  const failOnFault = input.suite.execution?.failOnFault === true;
+  const isNonBlockingFault = (step: SuiteStepSummary): boolean =>
+    step.outcome === 'faulted' && step.verdict !== undefined;
+  const blockingSteps = failOnFault ? steps : steps.filter((step) => !isNonBlockingFault(step));
+  const exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
   const aggregate = deriveSuiteAggregate(steps);
   const reviewBrief = buildReviewBrief({
     suite: suite.name,

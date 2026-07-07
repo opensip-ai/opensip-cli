@@ -51,6 +51,22 @@ describe('suitesConfigSchema', () => {
     });
   });
 
+  it('accepts execution.failOnFault (the live suite fault policy)', () => {
+    expect(
+      suitesConfigSchema.parse({
+        security: {
+          execution: { failOnFault: true },
+          steps: [{ tool: TOOL_ID, command: 'fit' }],
+        },
+      }),
+    ).toEqual({
+      security: {
+        execution: { failOnFault: true },
+        steps: [{ tool: TOOL_ID, command: 'fit', args: {} }],
+      },
+    });
+  });
+
   it('rejects invalid UUIDs, unknown step keys, and empty step lists', () => {
     expect(() =>
       suitesConfigSchema.parse({

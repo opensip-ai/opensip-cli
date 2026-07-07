@@ -65,22 +65,28 @@ export async function runStepsSerially(args: {
  * runtime signals the runner observes — the host-caught `errorMessage` (a thrown
  * step OR a reportFailure) and the emitted envelope's verdict.
  *
- * A step is `faulted` when EITHER a runtime issue was caught by the host OR the
- * envelope's own verdict is faulted (a UNIT-level fault — a check that threw —
- * reaches us only through `verdict.faulted`, never through `errorMessage`). The
- * old aggregate tested only the first half, which is why a unit-fault was
- * mislabeled `failed`. With an envelope present, its verdict decides
- * passed/failed; with no envelope and no error, the exit code is the fallback.
+ * The emitted envelope's verdict is AUTHORITATIVE when present: it already
+ * carries `faulted` for a UNIT-level fault (a check that threw), and a
+ * report-DELIVERY failure on a run that DID produce results is orthogonal to the
+ * analysis outcome (it rides the exit code, ADR-0008) — so it does not override a
+ * passing/failing verdict into `faulted`. A host-caught error decides the outcome
+ * ONLY when the step produced NO envelope at all (a thrown command,
+ * ConfigurationError, or ToolError before results, ADR-0060) — that reads
+ * `faulted`. With neither an envelope nor an error, the exit code is the fallback.
+ *
+ * This distinction is load-bearing for the suite exit: an envelope-backed fault
+ * (a check crashed, `verdict` present) is a NON-blocking "result unknown", while
+ * a no-envelope fault (the tool/step itself crashed) keeps its ADR-0020 exit
+ * taxonomy and blocks — see the `isNonBlockingFault` gate in `orchestrator.ts`.
  */
 export function deriveStepOutcome(input: {
   readonly errorMessage: string | undefined;
   readonly envelopeVerdict: { readonly passed: boolean; readonly faulted?: boolean } | undefined;
   readonly exitCode: number;
 }): RunOutcome {
-  const envelopeOutcome =
-    input.envelopeVerdict === undefined ? undefined : deriveOutcome(input.envelopeVerdict);
-  if (input.errorMessage !== undefined || envelopeOutcome === 'faulted') return 'faulted';
-  return envelopeOutcome ?? (input.exitCode === EXIT_CODES.SUCCESS ? 'passed' : 'failed');
+  if (input.envelopeVerdict !== undefined) return deriveOutcome(input.envelopeVerdict);
+  if (input.errorMessage !== undefined) return 'faulted';
+  return input.exitCode === EXIT_CODES.SUCCESS ? 'passed' : 'failed';
 }
 
 async function runStep(args: {

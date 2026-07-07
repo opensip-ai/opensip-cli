@@ -38,16 +38,18 @@ describe('deriveStepOutcome', () => {
     ).toBe('faulted');
   });
 
-  it("derives 'faulted' when the host caught a runtime issue even over a passing envelope", () => {
-    // A reportFailure on an otherwise-passing run lands in `errorMessage`; a
-    // host-caught runtime issue is a fault regardless of the envelope verdict.
+  it('keeps the envelope verdict when a report-delivery failure rides over a passing run', () => {
+    // A reportFailure on an otherwise-passing run lands in `errorMessage`, but the
+    // envelope is authoritative for the OUTCOME: the analysis passed, and the
+    // delivery failure is tracked via the exit code (ADR-0008), not by flipping
+    // the run to `faulted`. Envelope present ⇒ envelope wins.
     expect(
       deriveStepOutcome({
         errorMessage: 'report upload failed',
         envelopeVerdict: { passed: true, faulted: false },
         exitCode: EXIT_CODES.SUCCESS,
       }),
-    ).toBe('faulted');
+    ).toBe('passed');
   });
 
   it("derives 'faulted' from a thrown step that never emitted an envelope", () => {

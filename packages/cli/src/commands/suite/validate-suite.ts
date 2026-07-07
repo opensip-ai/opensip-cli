@@ -45,7 +45,10 @@ export function validateSuite(args: {
   readonly tools: readonly Tool[];
 }): ValidatedSuite {
   const errors: string[] = [];
-  if (args.suite.execution !== undefined) {
+  // `execution.failOnFault` is a live policy (#2 fault taxonomy); `mode` /
+  // `stopOnFirstFailure` remain reserved and are rejected in v1.
+  const execution = args.suite.execution;
+  if (execution?.mode !== undefined || execution?.stopOnFirstFailure !== undefined) {
     errors.push(
       `Suite '${args.name}' declares reserved execution options. execution.mode and execution.stopOnFirstFailure are not supported in v1.`,
     );

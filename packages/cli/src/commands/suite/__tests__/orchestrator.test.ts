@@ -1191,6 +1191,48 @@ describe('runSuite', () => {
     );
   });
 
+  it('raises an envelope-backed fault but does not fail the suite exit by default (failOnFault false)', async () => {
+    const ok = helpCommand('ok', () => ({ type: 'help' }));
+    // A CHECK faulted: the tool RAN and emitted an envelope whose verdict is
+    // faulted (result unknown) — distinct from the whole step crashing.
+    const faultyCheck = helpCommand('faulty', async (_opts, cli) => {
+      await cli.deliverSignals(
+        signalEnvelope({ passed: false, faulted: true, errors: 1, findings: 1 }),
+        { cwd: '/repo' },
+      );
+      return { type: 'help' };
+    });
+    const run = (execution?: { readonly failOnFault: boolean }) =>
+      runWithScope(new RunScope({}), () =>
+        runSuite({
+          name: 'faulty',
+          suite: {
+            steps: [
+              { tool: TOOL_ID, command: 'ok' },
+              { tool: TOOL_ID, command: 'faulty' },
+            ],
+            ...(execution === undefined ? {} : { execution }),
+          },
+          tools: [tool(TOOL_ID, 'fitness', [ok, faultyCheck])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {},
+          suiteOpts: {},
+        }),
+      );
+
+    // Default: the fault is RAISED in the aggregate but is NON-blocking — the
+    // envelope-backed faulted step's exit is excluded from the suite worst-of.
+    const nonBlocking = await run();
+    expect(nonBlocking.aggregate).toMatchObject({ steps: 2, passed: 1, faulted: 1 });
+    expect(nonBlocking.steps[1]?.outcome).toBe('faulted');
+    expect(nonBlocking.exitCode).toBe(0);
+
+    // failOnFault: true opts back into hard-failing on the runtime fault.
+    const blocking = await run({ failOnFault: true });
+    expect(blocking.aggregate).toMatchObject({ faulted: 1 });
+    expect(blocking.exitCode).not.toBe(0);
+  });
+
   it('correlates related risks across live suite step envelopes', async () => {
     const shared = { qualifiedName: 'src/review.ts#reviewChange' };
     const fit = helpCommand('fit', async (_opts, cli) => {
