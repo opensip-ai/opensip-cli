@@ -17,6 +17,9 @@ export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 export { appendBoundedUtf8Text } from './lib/bounded-text.js';
 export type { BoundedTextAppendResult } from './lib/bounded-text.js';
 
+// Lib — embedded-render mode (suite steps run headless; host owns the visible output).
+export { isEmbeddedRender, runEmbeddedRender } from './lib/embedded-render.js';
+
 // Lib — logger.
 //
 // Production callers should import the typed `logger` singleton +

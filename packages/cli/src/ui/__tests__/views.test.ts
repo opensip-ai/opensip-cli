@@ -530,6 +530,7 @@ describe('suite views', () => {
       suiteRunId: 'run-1',
       exitCode: 1,
       durationMs: 1200,
+      verbose: true,
       steps: [
         {
           tool: 'fitness',
@@ -758,6 +759,7 @@ describe('suite views', () => {
       suiteRunId: 'run-warn',
       exitCode: 0,
       durationMs: 10,
+      verbose: true,
       steps: [],
       reviewBrief: {
         version: 1,

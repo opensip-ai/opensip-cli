@@ -6,7 +6,12 @@ import {
   type RunOutcome,
   type SuiteStepSummary,
 } from '@opensip-cli/contracts';
-import { currentLogger, currentScope, type ToolCliContext } from '@opensip-cli/core';
+import {
+  currentLogger,
+  currentScope,
+  runEmbeddedRender,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 
 import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
 import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
@@ -137,12 +142,13 @@ async function runStep(args: {
     exitCode = await withProcessExitGuard(
       async () => {
         hooks.resetRun?.();
-        await runCommandSpecAction(
-          args.step.spec,
-          opts,
-          args.step.positionals,
-          capture.context,
-          hooks,
+        // Run the step EMBEDDED: its render/renderLive seams go headless (no
+        // banner, no per-step output), so only the suite's own live view reaches
+        // the terminal. The step's envelope/exit are still captured. Host-owned +
+        // contract-based — any tool routing through the documented seams inherits
+        // this (bundled, tool-*, or third-party), no per-tool code.
+        await runEmbeddedRender(() =>
+          runCommandSpecAction(args.step.spec, opts, args.step.positionals, capture.context, hooks),
         );
         return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
       },

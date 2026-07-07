@@ -53,6 +53,13 @@ export interface SuiteRunResult {
   readonly exitCode: number;
   readonly durationMs: number;
   readonly scope?: SuiteRunScope;
+  /**
+   * True when the run requested `--verbose`. Display-only: the default surface is
+   * the count line + per-step bullets; verbose additionally renders the review
+   * risks/correlated/degraded tables and the full per-step table. Optional/
+   * forward-compat (absent ⇒ compact).
+   */
+  readonly verbose?: boolean;
   readonly aggregate?: {
     readonly steps: number;
     /** Steps with a passing emitted verdict and a successful step exit. */

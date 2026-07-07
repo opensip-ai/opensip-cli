@@ -6,6 +6,7 @@ import {
   createRunLogger,
   LanguageRegistry,
   RunScope,
+  runEmbeddedRender,
   ToolRegistry,
   runWithScope,
 } from '@opensip-cli/core';
@@ -88,6 +89,46 @@ describe('runToolLiveView', () => {
 
     expect(completion.session?.tool).toBe('yagni');
     expect(completion.envelope?.signals).toEqual([]);
+  }, 10_000);
+
+  it('runs produce HEADLESS (no Ink, no terminal output) in embedded-render mode', async () => {
+    const scope = makeScope();
+    let produced = false;
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      const completion = await runWithScope(scope, () =>
+        runEmbeddedRender(() =>
+          runToolLiveView({
+            tool: 'yagni',
+            meta: { title: 'Test', description: 'Running' },
+            surface: { shape: 'pool', label: 'Working...' },
+            verbose: false,
+            quiet: false,
+            produce: () => {
+              produced = true;
+              return Promise.resolve({
+                kind: 'done',
+                done: { summary: { passed: true, errors: 0, warnings: 0 } },
+                session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
+                envelope: {
+                  signals: [],
+                  units: [],
+                  verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
+                },
+              });
+            },
+          }),
+        ),
+      );
+      // The work still ran and the envelope/session are still returned...
+      expect(produced).toBe(true);
+      expect(completion.envelope?.signals).toEqual([]);
+      expect(completion.session?.tool).toBe('yagni');
+      // ...but nothing reached the terminal (Ink never mounted; no trailing newline).
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
   }, 10_000);
 
   it('invokes setExitCode on produce error outcomes', async () => {

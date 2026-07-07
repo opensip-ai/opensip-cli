@@ -21,6 +21,7 @@ import {
 import {
   currentLogger,
   currentScope,
+  isEmbeddedRender,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -220,13 +221,58 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
 }
 
 /**
+ * Run a tool's `produce()` HEADLESS — no Ink, no banner, no output. Used when the
+ * run is an embedded suite step ({@link isEmbeddedRender}): the tool's work still
+ * runs and its envelope/session are still returned (and captured by the host via
+ * the egress seams), but the terminal stays silent so the suite owns the visible
+ * output. The live-only helpers (`setHeaderMetadata`/`setShowRunHeader`/
+ * `setRunning`) and progress `emit` are no-ops. A thrown `produce` propagates to
+ * the host (the suite step runner records it as a step fault); a `kind:'error'`
+ * outcome sets the exit code (captured by the host) and returns no envelope.
+ */
+/** Inert callback for the headless path's live-only hooks + progress emit. */
+const HEADLESS_NOOP = (): void => {
+  // no-op: embedded steps render nothing, so header/running/progress hooks are inert
+};
+
+async function runToolLiveHeadless(spec: LiveRunSpec, glue: HostGlue): Promise<ToolRunCompletion> {
+  const logger = currentLogger();
+  logger.info({ evt: 'cli.liveview.run.start', tool: spec.tool });
+  const outcome = await spec.produce(HEADLESS_NOOP, {
+    setHeaderMetadata: HEADLESS_NOOP,
+    setShowRunHeader: HEADLESS_NOOP,
+    setRunning: HEADLESS_NOOP,
+  });
+  if (outcome.kind === 'error') {
+    logger.error({
+      evt: 'cli.liveview.run.error',
+      tool: spec.tool,
+      message: scrubErrorMessage(outcome.message),
+    });
+    glue.setExitCode?.(outcome.exitCode);
+    return {};
+  }
+  logger.info({ evt: 'cli.liveview.run.complete', tool: spec.tool });
+  return {
+    ...(outcome.envelope === undefined ? {} : { envelope: outcome.envelope }),
+    ...(outcome.session === undefined ? {} : { session: outcome.session }),
+  };
+}
+
+/**
  * Render a tool live view through the shared shell. Resolves once the Ink app
- * exits with the captured {@link ToolRunCompletion}.
+ * exits with the captured {@link ToolRunCompletion}. When the run is an embedded
+ * suite step, skips Ink entirely and runs {@link runToolLiveHeadless} so only the
+ * suite's own live view reaches the terminal.
  */
 export async function runToolLiveView(
   spec: LiveRunSpec,
   glue: HostGlue = {},
 ): Promise<ToolRunCompletion> {
+  if (isEmbeddedRender()) {
+    return runToolLiveHeadless(spec, glue);
+  }
+
   let completion: ToolRunCompletion = {};
 
   const app = render(

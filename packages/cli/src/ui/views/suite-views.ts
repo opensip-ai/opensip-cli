@@ -175,8 +175,11 @@ function resultSummaryNode(
 ): ViewNode {
   const items: ResultSummaryItem[] = steps.map((step) => {
     const detail = stepBulletDetail(step);
+    // Dedupe when a tool's command name equals its display name (e.g. 'fitness
+    // fitness' / 'yagni yagni') — show the tool once.
+    const label = step.tool === step.command ? step.tool : `${step.tool} ${step.command}`;
     return {
-      label: `${step.tool} ${step.command}`,
+      label,
       outcome: step.outcome,
       ...(detail === undefined ? {} : { detail }),
     };
@@ -235,7 +238,7 @@ function scopeLine(result: SuiteRunResult): ViewNode[] {
   return [line([{ text: 'Scope: ', dim: true }, { text: 'full' }])];
 }
 
-function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
+function reviewBriefNodes(brief: ReviewBrief, verbose: boolean): ViewNode[] {
   const nodes: ViewNode[] = [
     line([
       { text: 'Review: ', dim: true },
@@ -259,9 +262,12 @@ function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
     ]),
   ];
 
+  // The one-line `Review:` header (with risks/correlated/degraded COUNTS) always
+  // shows; the detail TABLES are `--verbose` only, so the default suite surface
+  // stays a simple summary. A clean run keeps its positive one-liner.
   if (brief.topRisks.length === 0) {
     nodes.push(line([{ text: 'No review risks found.', tone: 'success' }]));
-  } else {
+  } else if (verbose) {
     nodes.push(
       SPACER,
       viewTable(
@@ -271,7 +277,7 @@ function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
     );
   }
 
-  if ((brief.correlatedRisks?.length ?? 0) > 0) {
+  if (verbose && (brief.correlatedRisks?.length ?? 0) > 0) {
     nodes.push(
       SPACER,
       viewTable(
@@ -281,7 +287,7 @@ function reviewBriefNodes(brief: ReviewBrief): ViewNode[] {
     );
   }
 
-  if (brief.degraded.length > 0) {
+  if (verbose && brief.degraded.length > 0) {
     nodes.push(
       SPACER,
       viewTable(['Source', 'Code', 'Reason'], brief.degraded.slice(0, 5).map(degradedRow)),
@@ -312,21 +318,27 @@ export function viewSuiteRun(result: SuiteRunResult): ViewNode {
     ...scopeLine(result),
   ];
 
+  const verbose = result.verbose === true;
+
   if (result.aggregate !== undefined) {
     children.push(resultSummaryNode(result.aggregate, result.steps));
   }
 
   if (result.reviewBrief !== undefined) {
-    children.push(...reviewBriefNodes(result.reviewBrief));
+    children.push(...reviewBriefNodes(result.reviewBrief, verbose));
   }
 
-  children.push(
-    SPACER,
-    viewTable(
-      ['Tool', 'Command', 'Exit', 'Verdict', 'Counts', 'Duration', 'Error'],
-      result.steps.map(stepSummaryRow),
-    ),
-  );
+  // The full per-step table is `--verbose` only — the count line + bullets above
+  // already carry the per-step outcome for the default surface.
+  if (verbose) {
+    children.push(
+      SPACER,
+      viewTable(
+        ['Tool', 'Command', 'Exit', 'Verdict', 'Counts', 'Duration', 'Error'],
+        result.steps.map(stepSummaryRow),
+      ),
+    );
+  }
 
   return group(children);
 }

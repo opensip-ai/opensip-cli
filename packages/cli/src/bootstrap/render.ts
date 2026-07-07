@@ -16,7 +16,7 @@
 
 import { performance } from 'node:perf_hooks';
 
-import { currentScope } from '@opensip-cli/core';
+import { currentScope, isEmbeddedRender } from '@opensip-cli/core';
 
 import type { CommandResult } from '@opensip-cli/contracts';
 
@@ -34,6 +34,10 @@ function elapsedMsSince(startedAt: number): number {
  * path emits no banner or project line by design (clean pipes/CI logs).
  */
 export async function renderResult(result: CommandResult): Promise<void> {
+  // Embedded suite step: the host (the suite's own live view) owns the visible
+  // output, so a step's static render is suppressed. The step's envelope is
+  // already captured via the egress seams, so the aggregate loses nothing.
+  if (isEmbeddedRender()) return;
   const renderStartedAt = performance.now();
   const scope = currentScope();
   scope?.diagnostics.event('render', 'debug', 'static render started', {

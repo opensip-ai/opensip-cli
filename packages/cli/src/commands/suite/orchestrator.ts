@@ -144,6 +144,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     aggregate,
     steps,
     reviewBrief,
+    verbose: input.suiteOpts.verbose === true,
   };
 }
 
