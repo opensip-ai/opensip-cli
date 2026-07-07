@@ -28,6 +28,14 @@ import { spawnSync } from 'node:child_process';
  * unrecognized-language-tag warning) still surfaces its stderr. `execFileSync`
  * only returns stdout on the success path and would silently drop that stderr.
  */
+// `spawnSync` truncates a stream once it exceeds `maxBuffer` (default 1 MiB) and
+// returns the truncated bytes, which then fails `JSON.parse`. A full-repo
+// `fit --json` / `graph --json` catalog is ~1 MiB and grows with the codebase
+// (and with the absolute cwd path length baked into every finding), so the
+// default silently breaks large-output scenarios. 64 MiB is comfortably above
+// any real CLI payload.
+const SPAWN_MAX_BUFFER = 64 * 1024 * 1024;
+
 export function spawnCli(descriptor, args, opts = {}) {
   const file = descriptor.kind === 'node-script' ? 'node' : descriptor.bin;
   const argv = descriptor.kind === 'node-script' ? [descriptor.script, ...args] : [...args];
@@ -37,6 +45,7 @@ export function spawnCli(descriptor, args, opts = {}) {
     timeout: opts.timeout ?? 60_000,
     env: { ...process.env, NO_COLOR: '1', ...opts.env },
     stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: SPAWN_MAX_BUFFER,
   });
   return {
     stdout: result.stdout ?? '',

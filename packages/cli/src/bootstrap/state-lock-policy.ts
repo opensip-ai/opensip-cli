@@ -25,13 +25,18 @@ const DEFAULT_STALE_MS = 600_000;
 const DEFAULT_HEARTBEAT_MS = 2000;
 
 function parseNonNegativeLockOverride(raw: string, name: string): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) {
+  // Strict decimal digits only. A bare `Number()` accepts '', '  ', '1e3', '0x1F'
+  // as 0/1000/31 — so a set-but-empty CI env var (the common `VAR=${{ maybeUnset }}`
+  // pattern) would silently become `0`, and `staleMs = 0` makes every live lock
+  // look stale (force-unlinked → mutual exclusion defeated → interleaved datastore
+  // /baseline writes). Empty/whitespace is treated as "unset" by the caller; any
+  // other non-decimal form is rejected loudly here.
+  if (!/^\d+$/.test(raw)) {
     throw new ConfigurationError(`${name} must be a non-negative integer`, {
       code: 'CONFIGURATION.STATE_LOCK.INVALID_OVERRIDE',
     });
   }
-  return value;
+  return Number(raw);
 }
 
 function isCiEnv(): boolean {
@@ -41,16 +46,18 @@ function isCiEnv(): boolean {
 
 /** Resolve lock timing policy from host env and interactive/CI context. */
 export function resolveStateLockPolicy(input?: { readonly commandName?: string }): StateLockPolicy {
-  const waitOverride = hostEnv.get<string | undefined>('OPENSIP_STATE_LOCK_WAIT_MS');
-  const staleOverride = hostEnv.get<string | undefined>('OPENSIP_STATE_LOCK_STALE_MS');
+  // Trim + treat empty as unset: a set-but-empty override must fall back to the
+  // default, not coerce to 0 (see parseNonNegativeLockOverride).
+  const waitOverride = hostEnv.get<string | undefined>('OPENSIP_STATE_LOCK_WAIT_MS')?.trim();
+  const staleOverride = hostEnv.get<string | undefined>('OPENSIP_STATE_LOCK_STALE_MS')?.trim();
 
   const defaultWait = isCiEnv() ? DEFAULT_CI_WAIT_MS : DEFAULT_LOCAL_WAIT_MS;
   const waitMs =
-    waitOverride === undefined
+    waitOverride === undefined || waitOverride === ''
       ? defaultWait
       : parseNonNegativeLockOverride(waitOverride, 'OPENSIP_STATE_LOCK_WAIT_MS');
   const staleMs =
-    staleOverride === undefined
+    staleOverride === undefined || staleOverride === ''
       ? DEFAULT_STALE_MS
       : parseNonNegativeLockOverride(staleOverride, 'OPENSIP_STATE_LOCK_STALE_MS');
 

@@ -45,6 +45,29 @@ describe('resolveStateLockPolicy', () => {
     expect(resolveStateLockPolicy().staleMs).toBe(120_000);
   });
 
+  it('treats a set-but-empty stale override as unset (default, NOT 0)', () => {
+    // Regression: `Number('') === 0` made staleMs 0, so every live lock looked
+    // stale and got force-unlinked — defeating mutual exclusion. The common CI
+    // pattern `STALE_MS: ${{ vars.MAYBE_UNSET }}` yields a set-but-empty var.
+    setEnv('OPENSIP_STATE_LOCK_STALE_MS', '');
+    expect(resolveStateLockPolicy().staleMs).toBe(600_000);
+    setEnv('OPENSIP_STATE_LOCK_STALE_MS', '   ');
+    expect(resolveStateLockPolicy().staleMs).toBe(600_000);
+  });
+
+  it('treats a set-but-empty wait override as unset (default, NOT 0)', () => {
+    setEnv('CI', undefined);
+    setEnv('OPENSIP_STATE_LOCK_WAIT_MS', '');
+    expect(resolveStateLockPolicy().waitMs).toBe(30_000);
+  });
+
+  it('rejects non-decimal numeric overrides (1e3 / 0x1F) instead of silently coercing', () => {
+    setEnv('OPENSIP_STATE_LOCK_STALE_MS', '1e3');
+    expect(() => resolveStateLockPolicy()).toThrow(ConfigurationError);
+    setEnv('OPENSIP_STATE_LOCK_STALE_MS', '0x1F');
+    expect(() => resolveStateLockPolicy()).toThrow(ConfigurationError);
+  });
+
   it('treats CI=false and CI=0 as non-CI for default wait timing', () => {
     setEnv('OPENSIP_STATE_LOCK_WAIT_MS', undefined);
     setEnv('CI', 'false');
