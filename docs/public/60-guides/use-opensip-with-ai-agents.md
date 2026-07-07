@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.4.1
+release: v0.4.2
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."

@@ -2,6 +2,21 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.4.2] - 2026-07-06
+
+A small external-tool and CI-output patch. External adapter runs now render
+consistently in the terminal and HTML report, and the compatibility matrix
+script no longer writes report artifacts unless explicitly requested.
+
+### Changed
+
+- Compatibility matrix report output is opt-in instead of emitted by default.
+
+### Fixed
+
+- External tool scan/emit and dashboard overview tab align with the shared CLI
+  rendering path so terminal and report views stay consistent.
+
 ## [0.4.1] - 2026-07-06
 
 A session-provenance and report-polish patch. Stored runs now record which CLI

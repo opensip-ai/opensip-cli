@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.4.1
+release: v0.4.2
 title: "Impact analysis and trust"
 audience: [contributors, ci-integrators, agent-builders]
 purpose: "How `graph impact` and `fit --changed --include-impacted` report coverage, uncertainty, and conservative fallbacks."
