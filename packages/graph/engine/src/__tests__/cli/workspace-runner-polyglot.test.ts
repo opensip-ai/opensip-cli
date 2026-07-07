@@ -154,4 +154,32 @@ process.stdout.write(JSON.stringify({ signals: [] }));
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('SIGKILLs a hung unit child after the hard kill-timeout instead of hanging forever', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'workspace-runner-hang-'));
+    try {
+      const unitRoot = join(root, 'packages', 'stuck');
+      mkdirSync(unitRoot, { recursive: true });
+      const cliScript = join(root, 'hang-cli.cjs');
+      // A child that never exits and emits no output — keeps the event loop
+      // alive, so it only ever settles via the hard kill-timeout.
+      writeFileSync(cliScript, `setInterval(() => {}, 1000);\n`, 'utf8');
+
+      const out = await runWorkspaceUnitsInParallel({
+        cwd: root,
+        units: [{ id: 'stuck', rootDir: unitRoot }],
+        cliScript,
+        concurrency: 1,
+        noCache: true,
+        hardKillTimeoutMs: 300, // tiny so the test is fast; the run must NOT hang
+      });
+
+      expect(out.anyChildFailed).toBe(true);
+      expect(out.perUnit).toHaveLength(1);
+      expect(out.perUnit[0]?.exitCode).toBe(-1);
+      expect(out.perUnit[0]?.stderr).toContain('hard kill-timeout');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

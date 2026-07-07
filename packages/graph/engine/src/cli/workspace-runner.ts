@@ -95,6 +95,8 @@ export interface RunWorkspaceUnitsInput {
    * use the default recipe.
    */
   readonly recipe?: string;
+  /** Test override (ms) for the per-unit hard kill-timeout. */
+  readonly hardKillTimeoutMs?: number;
 }
 
 /**
@@ -162,6 +164,9 @@ export async function runWorkspaceUnitsInParallel(
       resolution: input.resolution,
       recipe: input.recipe,
       ...(input.language === undefined ? {} : { language: input.language }),
+      ...(input.hardKillTimeoutMs === undefined
+        ? {}
+        : { hardKillTimeoutMs: input.hardKillTimeoutMs }),
     }),
   );
   const anyChildFailed = results.some((r) => r.exitCode !== 0);
@@ -180,6 +185,12 @@ export async function runWorkspaceUnitsInParallel(
   return { perUnit: results, anyChildFailed };
 }
 
+/**
+ * Wall-clock floor after which a hung workspace-unit child is SIGKILLed so the
+ * pool drains instead of hanging forever. Matches shard-runner's default.
+ */
+const WORKSPACE_HARD_KILL_TIMEOUT_MS = 10 * 60_000;
+
 interface SpawnInput {
   readonly cliScript: string;
   readonly unit: WorkspaceUnit;
@@ -188,6 +199,8 @@ interface SpawnInput {
   readonly resolution?: ResolutionMode;
   readonly language?: string;
   readonly recipe?: string;
+  /** Test override for the hard kill-timeout (default {@link WORKSPACE_HARD_KILL_TIMEOUT_MS}). */
+  readonly hardKillTimeoutMs?: number;
 }
 
 function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
@@ -212,6 +225,20 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
         OPENSIP_GRAPH_WORKSPACE_CHILD: '1',
       },
     });
+    // Arm the hard kill-timeout: a child stuck forever (deadlocked tree-sitter
+    // parse, or blocked on the project write-lock under N-way contention) only
+    // ever settles this promise via 'close'/'error', so without a wall-clock
+    // floor its worker-pool slot — and thus the whole `--workspace` run — hangs
+    // with no recovery. Mirrors shard-runner.ts. `unref()` so a pending timer
+    // never keeps the loop alive past a clean settle; cleared on EVERY path.
+    const hardKillMs = input.hardKillTimeoutMs ?? WORKSPACE_HARD_KILL_TIMEOUT_MS;
+    let timedOut = false;
+    const killTimer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, hardKillMs);
+    killTimer.unref?.();
+
     let stdout = '';
     let stderr = '';
     // setEncoding routes chunks through a StringDecoder that buffers
@@ -228,6 +255,7 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     });
     child.on('error', (err) => {
       /* v8 ignore start */
+      clearTimeout(killTimer);
       resolvePromise({
         unitId: input.unit.id,
         rootDir: input.unit.rootDir,
@@ -239,6 +267,18 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
       /* v8 ignore stop */
     });
     child.on('close', (code) => {
+      clearTimeout(killTimer);
+      if (timedOut) {
+        resolvePromise({
+          unitId: input.unit.id,
+          rootDir: input.unit.rootDir,
+          displayPath: relative(input.cwd, input.unit.rootDir),
+          signals: [],
+          exitCode: -1,
+          stderr: `${stderr}\ngraph workspace unit killed after ${String(hardKillMs)}ms hard kill-timeout`,
+        });
+        return;
+      }
       const signals = parseChildSignals(stdout, input.unit.rootDir, stderr);
       resolvePromise({
         unitId: input.unit.id,
