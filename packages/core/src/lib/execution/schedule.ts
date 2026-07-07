@@ -152,6 +152,11 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
         launch(unit, i);
       }
     }
+    // If nothing launched — abort already signaled at entry, or no units — no
+    // `.finally()` will ever run to resolve the promise, so settle it here.
+    // (Launched units are still in flight at this synchronous point, so a
+    // positive activeCount means their `.finally()` drain will resolve later.)
+    if (activeCount === 0) resolve();
   });
 }
 /* eslint-enable sonarjs/cognitive-complexity */

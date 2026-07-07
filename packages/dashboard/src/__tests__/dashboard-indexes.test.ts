@@ -76,6 +76,34 @@ describe('buildIndexes (browser-side)', () => {
     expect(idx.callers.size).toBe(0);
   });
 
+  it('dedups callees/callers when a function calls the same target from two sites', () => {
+    const buildIndexes = loadBuildIndexes();
+    // `a` calls `b` from two separate call edges. Counts must reflect ONE
+    // distinct callee/caller, not two (regression: edges were pushed undeduped).
+    const cat: GraphCatalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        a: [
+          occ({
+            bodyHash: 'ha',
+            simpleName: 'a',
+            calls: [
+              { to: ['hb'], line: 2, column: 0, resolution: 'static', confidence: 'high', text: 'b()' },
+              { to: ['hb'], line: 3, column: 0, resolution: 'static', confidence: 'high', text: 'b()' },
+            ],
+          }),
+        ],
+        b: [occ({ bodyHash: 'hb', simpleName: 'b' })],
+      },
+    };
+    const idx = buildIndexes(cat);
+    expect(idx.callees.get('ha')).toEqual(['hb']); // not ['hb', 'hb']
+    expect(idx.callers.get('hb')).toEqual(['ha']); // not ['ha', 'ha']
+  });
+
   it('builds byBodyHash, bySimpleName, callees, callers for a 5-function fixture', () => {
     const buildIndexes = loadBuildIndexes();
     // a → b, a → c, b → d, c → d, e isolated.

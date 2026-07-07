@@ -168,6 +168,14 @@ function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   const occ = visitFunctionDefinition(node, frame.enclosingClass, ctx);
   if (!occ) return;
   record(ctx.out, occ);
+  // Default-argument expressions (`def f(x=make_default()):`) are evaluated in
+  // the ENCLOSING scope when the def executes, so attribute their call sites to
+  // the enclosing owner (`frame`), not the function body — otherwise the edge is
+  // dropped entirely because the body descent never reaches `parameters`.
+  const params = node.childForFieldName('parameters');
+  if (params) {
+    for (const child of childrenOf(params)) visit(child, frame, ctx);
+  }
   const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingClass: null };
   const body = node.childForFieldName('body');
   if (body) {

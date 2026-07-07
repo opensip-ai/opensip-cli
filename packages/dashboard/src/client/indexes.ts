@@ -53,25 +53,50 @@ function indexOccurrences(
 }
 
 /**
- * Pass 2: build callees (forward) + callers (reverse) from byBodyHash. Edges
- * resolving to a hash not in byBodyHash are dropped (unresolved/external targets).
+ * Pass 2: build callees (forward) + callers (reverse). Edges resolving to a hash
+ * not in byBodyHash are dropped (unresolved/external targets). Mirrors the
+ * engine's `buildAdjacency`: iterate ALL occurrences (not just the byBodyHash
+ * last-writer winners, which would erase losing body-twins' out-edges), and
+ * accumulate DISTINCT targets/callers per body via Sets — otherwise a function
+ * called from two sites double-counts its callee, and its callee double-counts
+ * the caller (inflated Function Card counts + duplicated list rows).
  */
+/** Add `value` to the Set bucket at `key`, creating the bucket on first use. */
+function addToSet(map: Map<string, Set<string>>, key: string, value: string): void {
+  const set = map.get(key);
+  if (set) set.add(value);
+  else map.set(key, new Set([value]));
+}
+
+/** Accumulate one occurrence's resolved out-edges into the callee/caller Sets. */
+function accumulateOccEdges(
+  occ: OccLike,
+  byBodyHash: Map<string, OccLike>,
+  calleeSets: Map<string, Set<string>>,
+  callerSets: Map<string, Set<string>>,
+): void {
+  for (const edge of occ.calls ?? []) {
+    for (const target of edge.to ?? []) {
+      if (!byBodyHash.has(target)) continue;
+      addToSet(calleeSets, occ.bodyHash, target); // union over body-twins, deduped
+      addToSet(callerSets, target, occ.bodyHash);
+    }
+  }
+}
+
 function indexEdges(
   byBodyHash: Map<string, OccLike>,
+  occurrencesByHash: Map<string, OccLike[]>,
   callees: Map<string, string[]>,
   callers: Map<string, string[]>,
 ): void {
-  for (const occ of byBodyHash.values()) {
-    const out: string[] = [];
-    for (const edge of occ.calls ?? []) {
-      for (const target of edge.to ?? []) {
-        if (!byBodyHash.has(target)) continue;
-        out.push(target);
-        pushToBucket(callers, target, occ.bodyHash);
-      }
-    }
-    if (out.length > 0) callees.set(occ.bodyHash, out);
+  const calleeSets = new Map<string, Set<string>>();
+  const callerSets = new Map<string, Set<string>>();
+  for (const occs of occurrencesByHash.values()) {
+    for (const occ of occs) accumulateOccEdges(occ, byBodyHash, calleeSets, callerSets);
   }
+  for (const [hash, set] of calleeSets) callees.set(hash, [...set]);
+  for (const [hash, set] of callerSets) callers.set(hash, [...set]);
 }
 
 export function buildIndexes(catalog: CatalogLike | null): IndexesLike {
@@ -88,7 +113,7 @@ export function buildIndexes(catalog: CatalogLike | null): IndexesLike {
     return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers };
   }
   indexOccurrences(catalog, byBodyHash, occurrencesByHash, bySimpleName);
-  indexEdges(byBodyHash, callees, callers);
+  indexEdges(byBodyHash, occurrencesByHash, callees, callers);
   return { byBodyHash, occurrencesByHash, bySimpleName, callees, callers };
 }
 

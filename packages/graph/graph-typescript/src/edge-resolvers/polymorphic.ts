@@ -63,7 +63,10 @@ function appendHashesForSymbol(
   for (const d of decls) {
     const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
-    const hash = resolveDeclToHash(declNode, d.getSourceFile(), [methodName], ctx);
+    // Explicit empty bindingNames: a dispatched method name is never an import
+    // binding, so it must not drive cross-package resolution (else `s.save()`
+    // with an imported free `save` misresolves). Decline → type-anchored pin.
+    const hash = resolveDeclToHash(declNode, d.getSourceFile(), [methodName], ctx, []);
     if (hash && !out.includes(hash)) out.push(hash);
   }
 }

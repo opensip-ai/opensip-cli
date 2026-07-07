@@ -39,8 +39,15 @@ export const resolvePropertyAccessCall: EdgeResolver<ts.CallExpression> = (node,
   // carries the workspace import specifier (a namespace/default import). Used by
   // the cross-package boundary path so `ns.fn()` binds to `ns`'s package, while
   // the EXPORTED callee name to look up stays `fn` (`propName`).
+  //
+  // `propName` (the METHOD name) must NOT be a binding: a method is not an import
+  // binding, and including it defeated the binding-required phantom guard —
+  // `new Widget().serialize()` misresolved to a same-named free function
+  // `serialize` imported from another package. With no receiver identifier
+  // (`new X().m()`, `getX().m()`) there is no cross-package binding, so the
+  // boundary path declines and falls back to the type-anchored dts-decl pin.
   const receiver = node.expression.expression;
-  const bindingNames = ts.isIdentifier(receiver) ? [propName, receiver.text] : [propName];
+  const bindingNames = ts.isIdentifier(receiver) ? [receiver.text] : [];
 
   const real = unaliasSymbol(symbol, ctx.typeChecker);
   const decls = real.getDeclarations() ?? [];
