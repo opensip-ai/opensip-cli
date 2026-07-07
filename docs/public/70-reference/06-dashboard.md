@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Report"
 audience: [users, contributors]
@@ -22,7 +22,9 @@ related-docs:
 ---
 # Report
 
-The report is a self-contained HTML view of every fit, sim, graph, and yagni run on the local machine. No server, no database, no asset hosting — a single file you can email or commit, fully functional offline.
+The report is a self-contained HTML view of every fit, sim, graph, yagni, and
+installed external-tool run on the local machine. No server, no database, no
+asset hosting — a single file you can email or commit, fully functional offline.
 
 > **What you'll understand after this:**
 > - When the report opens automatically vs. manually.
@@ -53,7 +55,7 @@ The HTML file is always written. If any guard skips the browser launch, the user
 
 ## What it shows
 
-Five top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`). The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](../../../packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](../../../packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts).
+Five first-party top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`) are always available when their data exists. A sixth `External Tools` tab appears when the report includes sessions from installed Tool plugins that are not claimed by a first-party tab, such as `gitleaks`, `osv-scanner`, or `trivy`. The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](../../../packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](../../../packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts).
 
 ### Overview
 
@@ -132,7 +134,7 @@ Source: [`packages/dashboard/src/code-paths.ts`](../../../packages/dashboard/src
 
 ### Tool tabs
 
-The report supports fit, sim, graph, and yagni runs. The top-of-page tab switcher filters the panels by tool. Fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](../../../packages/dashboard/src/tool-tabs-registrations.ts).
+The report supports fit, sim, graph, yagni, and installed Tool plugin runs. The top-of-page tab switcher filters the panels by tool. Fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Installed external scanner adapters fall into `External Tools`: their sessions render with the same Overview rows, run detail, verdicts, timing, findings, and tool badges as built-in tools, without requiring a custom dashboard module for each scanner. Source: [`tool-tabs.ts`](../../../packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](../../../packages/dashboard/src/tool-tabs-registrations.ts).
 
 ---
 
@@ -143,7 +145,7 @@ Static HTML. The generator ([`packages/dashboard/src/generator.ts`](../../../pac
 1. The base HTML scaffold (head, body shell, the panel containers).
 2. The CSS, inlined via `<style>` (from [`css.ts`](../../../packages/dashboard/src/css.ts)).
 3. Session and catalog data (checks, recipes), inlined directly into the panel `<script type="module">` blocks as `const sessions = …` / `const catalog = …` literals — there's no separate `<script type="application/json">` for these.
-4. The graph catalog (v0.3 Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` and consumed by the Code Paths panel JS at init time. This one *does* use the `application/json` idiom because it's loaded across module boundaries.
+4. The graph catalog (Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` and consumed by the Code Paths panel JS at init time. This one *does* use the `application/json` idiom because it's loaded across module boundaries.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).
 
 The output is one self-contained `latest.html`. No CDN, no external script tags, no fetch calls, no asset directory. You can save the file and open it in three weeks on a plane.

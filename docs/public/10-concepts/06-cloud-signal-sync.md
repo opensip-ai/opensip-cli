@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-02
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Cloud signal sync"
 audience: [getting-started, ci-integrators, contributors]
@@ -21,7 +21,7 @@ related-docs:
 ---
 # Cloud signal sync
 
-Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and a compatible endpoint, each deliverable `fit`, `sim`, `graph`, or `yagni` run *also* sends the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](../../decisions/ADR-0008-opensip-cloud-signal-sync.md).
+Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and a compatible endpoint, each deliverable first-party run (`fit`, `sim`, `graph`, `yagni`) and installed adapter run that emits a `SignalEnvelope` can *also* send the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](../../decisions/ADR-0008-opensip-cloud-signal-sync.md).
 
 If you don't have a key, none of this runs — no network, no check, no cost. The keyless OSS majority can ignore this page.
 

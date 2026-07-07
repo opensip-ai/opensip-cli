@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Plugin authoring"
 audience: [plugin-authors]
@@ -70,5 +70,5 @@ Use `opensip tools validate` before adopting a third-party tool in CI.
 - **Authoring your first thing** → [Write your first check](/docs/opensip-cli/60-guides/01-write-your-first-check/). Hands-on walkthrough with `init`, a custom check, a recipe, and a CI gate.
 - **Creating a whole CLI subcommand** → [Create your first Tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/). Short path before the full Tool reference.
 - **Nested `<tool> <verb>` grammar** → [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/). Tier-1/2/3 rules, `parent`, export `--format`, internal visibility.
-- **Reference for every check that ships** → [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/). Browse all 151 built-in checks with descriptions and links to source.
+- **Reference for every check that ships** → [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/). Browse all 160 built-in checks with descriptions and links to source.
 - **Deep dive on what a "Tool" is architecturally** → [The tool-plugin model](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).

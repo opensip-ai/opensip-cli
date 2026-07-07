@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-02
-release: v0.2.x
+last_verified: 2026-07-07
+release: v0.4.2
 title: "Verifiable releases"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "How opensip-cli release artifacts are checksummed, attested, published, and verified."
@@ -65,7 +65,7 @@ release asset upload list.
 To verify a full release set from a checkout of this repository:
 
 ```bash
-VERSION=0.3.0
+VERSION=0.4.2
 TAG="v$VERSION"
 mkdir -p "/tmp/opensip-cli-$TAG"
 

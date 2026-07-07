@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Sim execution model"
 audience: [contributors]
@@ -24,7 +24,7 @@ The sim engine has the same architectural shape as fit's recipe engine — selec
 > - The two executors (load, chaos) and what each does.
 > - How sequential vs. parallel execution affects scenarios that share state.
 > - The shape of the per-kind executor result.
-> - How the run aggregates into a `SimDoneResult`.
+> - How the run aggregates into a `SignalEnvelope` and render-only `RunPresentation`.
 
 ---
 
@@ -47,7 +47,7 @@ opensip sim --recipe <name>
                  │      kind 'load'   → kinds/load/executor            │    │
                  │      kind 'chaos'  → kinds/chaos/executor           │    │
                  └─────────────────────────────────────────────────────┘    │
-            → aggregate results into SimDoneResult                           │
+            → aggregate results into SignalEnvelope + RunPresentation         │
        → render (Ink or JSON)                                                │
        → set exit code (1 if any scenario failed)                            ▼
                                                                        shell prompt
@@ -107,21 +107,20 @@ A recipe's `kind` selector narrows the selected scenarios to one or more kinds *
 
 ## The aggregated result
 
-After every scenario runs, the recipe service builds the run's **`SignalEnvelope`** (each scenario is a *unit* that produces signals, ADR-0011) and returns it inside a `SimDoneResult` ([`packages/contracts/src/command-results.ts`](../../../packages/contracts/src/command-results.ts)):
+After every scenario runs, the recipe service builds the run's **`SignalEnvelope`** (each scenario is a *unit* that produces signals, ADR-0011) and returns it inside the shared render-only `RunPresentation` ([`packages/contracts/src/run-presentation.ts`](../../../packages/contracts/src/run-presentation.ts)):
 
 ```ts
-interface SimDoneResult {
-  type: 'sim-done';
-  recipeName: string;
-  cwd: string;
-  durationMs: number;
-  envelope: SignalEnvelope;    // the run's signals + verdict + per-scenario units
+interface RunPresentation {
+  type: 'run-presentation';
+  tool: 'simulation';
+  envelope: SignalEnvelope;     // the run's signals + verdict + per-scenario units
+  verboseDetail?: VerboseDetail;
 }
 ```
 
 There is no pass/fail boolean on the result: the run verdict lives on `envelope.verdict` (ADR-0035 — the tool declares its policy; the **host** derives the findings exit code from the envelope when the signals are delivered, so sim never calls `setExitCode` for scenario failures).
 
-`SimDoneResult` is the internal `CommandResult` union member the renderer consumes (the `App.tsx` dispatcher in [`packages/cli/src/ui/`](../../../packages/cli/src/ui/) switches on `result.type`); it derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output wraps the `envelope` in a `CommandOutcome`** (the byte-identical `SignalEnvelope` `fit` and `graph` emit, nested under `.envelope`) — the old bespoke `sim-done` JSON shape is retired. See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
+`RunPresentation` is the single run-shaped `CommandResult` union member the renderer consumes. It replaced the old per-tool `*DoneResult` variants, including `sim-done`. The shared render path derives the per-scenario table from `envelope.units` (one unit per scenario — `slug` = scenario id, `passed`, `durationMs`, `error?`). The **`--json` output never serializes `RunPresentation`**; it wraps the same `envelope` in a `CommandOutcome` (the byte-identical `SignalEnvelope` `fit` and `graph` emit, nested under `.envelope`). See [`70-reference/04-json-output-schema.md`](../70-reference/04-json-output-schema.md).
 
 Per-kind details (the load p99, the chaos recovery time) are *not* in the envelope. They're in the executor result, which rides in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record to show full per-kind detail; the CLI summary stays compact.
 

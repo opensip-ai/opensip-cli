@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-02
+last_verified: 2026-07-07
 release: v0.4.2
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
@@ -28,7 +28,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip graph lookup --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config commands carry their result under `.data`; failures carry structured `errors`. The top-level `exitCode` always equals the process exit code ([ADR-0132](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/docs/decisions/ADR-0132-command-outcome-exit-parity.md)). This is the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip yagni --json`, installed adapter runs such as `opensip gitleaks --json`, `opensip graph lookup --json`, `opensip suite run <name> --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config/suite commands carry their result under `.data`; failures carry structured `errors`. The top-level `exitCode` always equals the process exit code ([ADR-0132](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/docs/decisions/ADR-0132-command-outcome-exit-parity.md)). This is the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -680,12 +680,16 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 
 ## Per-tool notes
 
-All three tools emit the **same envelope**; the differences are confined to a few fields:
+All envelope-producing tools emit the **same envelope**; the differences are confined to a few fields:
 
 - **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`. Scoped changed runs may include envelope-level `verification` impact-trust metadata (`coverage`, `fallback`, `fullyVerified`, `uncertainties`).
-- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/packages/graph/engine/src/cli/build-envelope.ts).
+- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `near-duplicate-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.4.2/packages/graph/engine/src/cli/build-envelope.ts).
 - **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id,
   `error` set when a scenario errored).
+- **`yagni`** — `tool: "yagni"`; each unit is a detector and findings carry `metadata.yagni` evidence such as confidence, preservation argument, and validation steps.
+- **Installed external adapters** — `tool` is the adapter verb (`"gitleaks"`,
+  `"osv-scanner"`, `"trivy"`, or another installed Tool); the envelope is the
+  same contract after the adapter normalizes native scanner output to `Signal`s.
 
 > **Per-kind sim detail** (load p99, chaos recovery time) is **not** in the envelope. It lives in the session's `session_tool_payload` row persisted to the project-local SQLite store (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. The dashboard reads the session record for the deeper view.
 
@@ -774,11 +778,11 @@ without bumping that version.
       "fingerprintStrategyVersion": 1
     },
     "declaredInputs": {
-      "cliVersion": "0.3.0",
+      "cliVersion": "0.4.2",
       "nodeVersion": "24.16.0",
       "platform": "darwin/arm64",
       "tool": "fit",
-      "engineVersion": "0.3.0"
+      "engineVersion": "0.4.2"
     },
     "divergenceContractVersion": 1
   },

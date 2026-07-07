@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Write your first check"
 audience: [getting-started, plugin-authors]
@@ -96,7 +96,7 @@ Five fields you'll touch in every check:
 ## 3. Confirm it loads
 
 ```bash
-opensip fit --list
+opensip fit list
 ```
 
 Your check appears in the list. If it doesn't, check:

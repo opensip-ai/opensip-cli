@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Check pack architecture"
 audience: [contributors, plugin-authors]
@@ -83,8 +83,8 @@ The [`collectCheckObjects`](https://github.com/opensip-ai/opensip-cli/blob/v0.4.
 
 | Pack | Path | Scope |
 |---|---|---|
-| `@opensip-cli/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. 108 checks. |
-| `@opensip-cli/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. 52 checks. |
+| `@opensip-cli/checks-universal` | `packages/fitness/checks-universal/` | Cross-language checks (text/regex/file shape), e.g. file-length, TODO scanners, security secret detection. 96 checks. |
+| `@opensip-cli/checks-typescript` | `packages/fitness/checks-typescript/` | TypeScript-specific: complex-function via AST, dead-code detection, dependency rules, react/hook patterns. 58 checks. |
 | `@opensip-cli/checks-python` | `packages/fitness/checks-python/` | Python-specific. Today ships 2 checks. |
 | `@opensip-cli/checks-java` | `packages/fitness/checks-java/` | Java-specific. Today ships `no-printstacktrace`. |
 | `@opensip-cli/checks-go` | `packages/fitness/checks-go/` | Go-specific. Today ships `no-fmt-print`. |
@@ -317,7 +317,7 @@ src/checks/<category>/
 - `@opensip-cli/checks-python` — `no-bare-except`.
 - Project-local `<project>/opensip-cli/fit/checks/` — three custom checks.
 
-The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit list` command shows the full inventory: 151 checks across the bundled packs, source-tagged.
+The dashboard groups by category (universal pack's display map provides the icons), shows pack-of-origin in the verbose view, and highlights checks with project-level overrides. The CLI's `fit list` command shows the full inventory: 160 checks across the bundled packs, source-tagged.
 
 ---
 

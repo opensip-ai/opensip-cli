@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-07-07
 release: v0.4.2
 title: "What is opensip-cli?"
 audience: [getting-started, contributors]
@@ -30,7 +30,7 @@ You write the rules. The runner discovers them, runs them across TypeScript / Py
 ```text
 > opensip fit
   Fitness Checks
-  Recipe: default   Checks: 151   Project: ~/work/my-app
+  Recipe: default   Checks: 160   Project: ~/work/my-app
 
   Scanning your codebase for quality, security, and architecture issues.
   ────────────────────────────────────────────────────────────
@@ -71,8 +71,10 @@ gates into deterministic evidence.
 ## What it does well
 
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-cli can, in 15 lines.
-- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 151 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
+- **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 160 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
+- **Multi-tool review suites.** `opensip suite run audit` runs a changed-scope review across first-party tools and returns one aggregate JSON result with a review brief.
+- **Security scanner consolidation.** Opt-in adapters wrap a user's existing `gitleaks`, `osv-scanner`, or `trivy` binary and normalize findings into the same sessions, report, JSON, and gate path as built-in tools.
 - **AI-agent guardrails.** Structured JSON, sessions, `agent-catalog`, MCP, and
   agent recipes give coding agents deterministic feedback without making the CLI
   an AI runtime.
@@ -81,7 +83,9 @@ gates into deterministic evidence.
 
 - **Not a linter replacement.** ESLint, Ruff, and golangci-lint are still the right call for syntactic patterns inside one language. opensip-cli sits *above* linters: it adds architectural and cross-language checks linters can't express.
 - **Not a bundled-rules product.** Useful checks ship with it, but the point is *you write your own* for the constraints that matter to your codebase. The built-ins are a starting point, not the product.
-- **Not a SaaS.** The binary runs locally and in your CI. There's an optional cloud reporting endpoint (`--report-to`), but it's opt-in; the tool works fully offline.
+- **Not a SaaS.** The binary runs locally and in your CI. Optional `--report-to`
+  delivery posts SARIF to a compatible endpoint, and optional OpenSIP Cloud
+  signal sync is key/entitlement-gated; the tool works fully offline.
 - **Not an AI runtime.** It does not call models, create embeddings, or apply
   autonomous code changes. It is built to help humans and agents trust the code
   agents produce.
@@ -116,11 +120,12 @@ The third loop. *"What is reachable from where?"* Builds the project's static
 call graph in a staged pipeline and runs built-in rules over it. The graph tool
 is a peer of `fit`: rules are authored with `defineRule` (mirroring
 `defineCheck`), selected through the same shared recipe substrate, and their
-findings land in sessions and the dashboard just like fitness checks. Ten rules
-ship today: five reachability/duplication rules (`orphan-subtree`,
-`duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`,
-`always-throws-branch`) plus five structural rules (`large-function`,
-`wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`).
+findings land in sessions and the dashboard just like fitness checks. Eleven
+rules ship today: six reachability/duplication rules (`orphan-subtree`,
+`duplicated-function-body`, `near-duplicate-function-body`,
+`no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five
+structural rules (`large-function`, `wide-function`, `high-blast-untested`,
+`cycle`, `unexpected-coupling`).
 Per-function metrics — size, fan-out, blast radius, test coverage — are computed
 by an engine feature layer and surfaced both as rule findings and in the
 dashboard's graph view. Five language adapters ship (TypeScript, Python, Rust,
@@ -135,6 +140,22 @@ preservation arguments, and validation steps. Exit code is 0 by default; finding
 are recommendations, not gate failures. See [`../55-yagni/01-command-reference.md`](/docs/opensip-cli/55-yagni/01-command-reference/).
 
 The CLI doesn't know what any of these four do internally — they're tools registered against a shared dispatcher. Same model lets future `lint`, `bench`, or domain-specific tools slot in without CLI changes. The `audit` name is already used by the built-in suite preset. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](/docs/opensip-cli/10-concepts/02-tool-plugin-model/).
+
+### Installed security adapters
+
+The same dispatcher can admit opt-in Tool plugins. The shipped external scanner
+adapters are intentionally not bundled, but a team that already uses a scanner
+can bring it into OpenSIP's evidence loop:
+
+```bash
+opensip tools install @opensip-cli/tool-gitleaks
+opensip gitleaks doctor
+opensip gitleaks --json --gate-save
+```
+
+The adapter records a normal session, contributes to the HTML report, supports
+the host-owned baseline ratchet, and keeps the raw scanner artifact local and
+gitignored. The scanner binary itself remains user-managed.
 
 ---
 

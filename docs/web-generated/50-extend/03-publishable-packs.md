@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Publishable packs"
 audience: [plugin-authors]
@@ -112,7 +112,7 @@ Two structural details make this scale cleanly past a few dozen checks:
   check file, its category barrel, the display map, and tests; the root
   `index.ts` remains stable.
 
-This pattern works at scale in the opensip codebase's 151 built-in fitness
+This pattern works at scale in the opensip codebase's 160 built-in fitness
 checks across seven packs. Small packs can keep everything in one `index.ts`;
 the split only pays off once re-skimming the public surface on every change
 becomes a tax. Sim packs can use the same idea with `scenarios/index.ts` barrels
@@ -284,4 +284,4 @@ For a tighter unit test, call the analyzer directly — `defineCheck` keeps the 
 | Understand the platform side: pack contract, scope filters, discovery internals | [Check pack architecture](/docs/opensip-cli/50-extend/04-check-pack-architecture/) |
 | Author a Tool with its own subcommand | [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) |
 | Walk the monorepo adoption flow end-to-end | [Adopt in a monorepo](/docs/opensip-cli/60-guides/04-adopt-in-a-monorepo/) |
-| Browse all 151 built-in checks for inspiration | [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/) |
+| Browse all 160 built-in checks for inspiration | [Checks reference](/docs/opensip-cli/70-reference/05-checks-index/) |

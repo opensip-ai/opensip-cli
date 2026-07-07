@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Architecture overview"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -136,7 +136,7 @@ The local-first rule from system context still holds: there is no daemon, no que
 
 ## Tool execution flow
 
-The three built-in tools are different domains, but they intentionally return the same output currency.
+The first-party analysis tools are different domains, but they intentionally return the same output currency.
 
 ```mermaid
 flowchart LR
@@ -163,9 +163,15 @@ flowchart LR
     S4 --> S5["signals"]
   end
 
+  subgraph Yagni["yagni"]
+    Y1["load detectors"] --> Y2["analyze reduction<br/>candidates"]
+    Y2 --> Y3["signals"]
+  end
+
   F6 --> E["SignalEnvelope<br/>shared contract"]
   G6 --> E
   S5 --> E
+  Y3 --> E
 
   E --> O["CLI composition root<br/>renders/delivers output"]
   E --> P["session-store/datastore<br/>persists run data"]
@@ -173,7 +179,7 @@ flowchart LR
   P --> D["report history<br/>fit gate baseline<br/>graph catalog/baseline"]
 ```
 
-This shared envelope is the architectural hinge. It lets the three tools keep their own execution models while sharing output formatters, sessions, report composition, SARIF, gates, and optional cloud delivery.
+This shared envelope is the architectural hinge. It lets each tool keep its own execution model while sharing output formatters, sessions, report composition, SARIF, gates where supported, and optional cloud delivery. Installed external scanner adapters use the same envelope path after normalizing their native findings.
 
 ---
 
@@ -184,7 +190,7 @@ This shared envelope is the architectural hinge. It lets the three tools keep th
 - `@opensip-cli/contracts` owns shared result shapes such as `SignalEnvelope`, `CommandResult`, exit codes, session types, and dashboard-facing catalog contracts.
 - `@opensip-cli/output` owns machine output formatting and signal delivery. Tool engines return envelopes instead of writing JSON, SARIF, or cloud reports themselves.
 - `@opensip-cli/datastore` and `@opensip-cli/session-store` own local SQLite access and run history. Tool-specific schemas stay with the tool that produces the data.
-- `@opensip-cli/fitness`, `@opensip-cli/graph`, and `@opensip-cli/simulation` own domain execution. They do not import the CLI.
+- `@opensip-cli/fitness`, `@opensip-cli/graph`, `@opensip-cli/simulation`, and `@opensip-cli/yagni` own domain execution. They do not import the CLI.
 - `@opensip-cli/dashboard` generates the self-contained HTML report from data the CLI composes across tools.
 
 ---

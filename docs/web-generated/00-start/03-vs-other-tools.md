@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-02
-release: v0.2.x
+last_verified: 2026-07-07
+release: v0.4.2
 title: "vs. other tools"
 audience: [getting-started]
 purpose: "Honest comparison: where opensip-cli complements linters, dead-code tools, architecture gates, Semgrep, Fallow, Sonarqube, and Snyk."

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-02
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Show me each loop"
 audience: [getting-started]
@@ -25,7 +25,7 @@ opensip-cli ships four first-party tools. Each answers a different question shap
 |---|---|---|
 | `fit` | "Is the codebase clean?" | A **check** — runs once per file, returns violations. |
 | `sim` | "Does it behave correctly under stress?" | A **scenario** — drives traffic against your service and asserts on the result. |
-| `graph` | "What is reachable from where?" | A **rule** over the static call graph — authored with `defineRule` (parallel to `defineCheck`); ten ship in the box. |
+| `graph` | "What is reachable from where?" | A **rule** over the static call graph — authored with `defineRule` (parallel to `defineCheck`); eleven ship in the box. |
 | `yagni` | "What could we remove safely?" | A **detector** — ranks advisory reduction candidates with `metadata.yagni` evidence; two ship in the MVP. |
 
 One concrete sample of each, below. After you've seen them, [quick start](/docs/opensip-cli/00-start/00-quick-start/) shows you how to run them.

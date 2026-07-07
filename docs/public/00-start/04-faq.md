@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-07-07
 release: v0.4.2
 title: "FAQ"
 audience: [getting-started]
@@ -59,21 +59,35 @@ See [vs. other tools](./03-vs-other-tools.md) for the full comparison.
 
 ---
 
-### Do I have to use all three tools (fit, sim, graph)?
+### Do I have to use every built-in tool?
 
-**No.** Each is independent. Most teams adopt `fit` first (the primary loop), add `graph` when they want static call-graph analysis, and only use `sim` if they have a workload to simulate. You can run `opensip fit` and never touch the others.
+**No.** Each is independent. Most teams adopt `fit` first (the primary loop), add
+`graph` when they want static call-graph analysis, run `yagni` when they want an
+advisory reduction audit, and only use `sim` if they have a workload to
+simulate. You can run `opensip fit` and never touch the others.
 
 ---
 
 ### Does it work offline?
 
-**Yes.** The CLI runs fully offline. The optional `--report-to <url>` flag posts results to OpenSIP Cloud for trend dashboards, but it's opt-in — the tool works without it.
+**Yes.** The CLI runs fully offline. Optional `--report-to <url>` delivery posts
+SARIF to an explicitly configured endpoint, and optional OpenSIP Cloud signal
+sync is disabled unless an API key and entitlement are configured. The local
+report, sessions, JSON, gates, and installed adapter runs work without network
+access.
 
 ---
 
 ### What's OpenSIP Cloud, and do I need it?
 
-OpenSIP Cloud is a separate product (at [opensip.ai](https://opensip.ai)) that aggregates results across runs and shows trend dashboards. **OpenSIP CLI is fully usable without it.** If you set an API key via `opensip configure` and use `--report-to`, runs get posted. Otherwise, the CLI runs entirely locally.
+OpenSIP Cloud is a separate product (at [opensip.ai](https://opensip.ai)) that
+aggregates CLI evidence across runs. **OpenSIP CLI is fully usable without it.**
+There are two optional network paths:
+
+- `--report-to <url>` explicitly POSTs SARIF to OpenSIP Cloud or another
+  compatible receiver and can fail a CI build with exit code 4 when upload fails.
+- Cloud signal sync sends native OpenSIP signals best-effort only when an API key
+  and cloud entitlement are configured; disable it with `--no-cloud` or config.
 
 ---
 
@@ -95,7 +109,7 @@ Use the **baseline gate flow.** Run `opensip fit --gate-save` once to capture ev
 
 ### What languages does it support?
 
-`fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). Most built-in checks are language-agnostic (the 108-check `checks-universal` pack); the rest target a specific language pack.
+`fit` runs against TypeScript / JavaScript, Python, Rust, Go, Java, and C/C++. Language detection is automatic (looks for `tsconfig.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `CMakeLists.txt`). Most built-in checks are language-agnostic (the 96-check `checks-universal` pack); the rest target a specific language pack.
 
 `graph` ships five language adapters: TypeScript, Python, Rust, Go, Java. The TypeScript adapter uses the TypeScript compiler API; the Python, Go, Rust, and Java adapters parse with vendored web-tree-sitter WASM grammars, so there's no native toolchain or compiler to install for them.
 
@@ -123,13 +137,32 @@ The runtime cost scales with `checks × matched-files`, not with project size. A
 - **Recipe** — a named lineup of checks (or scenarios) plus execution options. Used for "what should we run in this CI step?"
 - **Scenario** — a single `sim` workload (load, chaos).
 - **Rule** — what `graph` calls its analyses (orphan-subtree,
-  duplicated-function-body, large-function, etc.). A rule is authored with
-  `defineRule`, the call-graph parallel to `defineCheck`; ten ship in the box.
+  duplicated-function-body, near-duplicate-function-body, large-function, etc.).
+  A rule is authored with `defineRule`, the call-graph parallel to
+  `defineCheck`; eleven ship in the box.
   The difference from a check is the input: a rule queries the engine
   **dataset** (call graph + derived feature columns), not a single file's
   `(content, filePath)`.
 
 See [vocabulary](./05-vocabulary.md) for the full glossary.
+
+---
+
+### Can I use security tools I already have, like Gitleaks?
+
+**Yes.** Install the OpenSIP adapter, keep managing the scanner binary yourself,
+and run `doctor` to confirm the binary and local prerequisites are ready:
+
+```bash
+opensip tools install @opensip-cli/tool-gitleaks
+opensip gitleaks doctor
+opensip gitleaks
+```
+
+The shipped opt-in adapters cover Gitleaks, OSV-Scanner, and Trivy. Adapter
+findings become normal OpenSIP signals: they appear in sessions, JSON, SARIF,
+the HTML report, and the baseline ratchet. See
+[External tool adapters](../50-extend/08-external-tool-adapters.md).
 
 ---
 

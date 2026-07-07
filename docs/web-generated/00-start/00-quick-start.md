@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
@@ -24,6 +24,7 @@ From a clean shell to a passing fitness run. The point of this page is to give y
 > - A first analysis run, either before initialization or after scaffolding.
 > - An `opensip-cli.config.yml` and an `opensip-cli/` directory when you choose to initialize.
 > - One passing `fit` run, plus an optional `sim` smoke test.
+> - A local HTML report and optional paths for agent/MCP access and scanner adapters.
 > - Enough mechanical context that [`./01-what-is-opensip-cli.md`](/docs/opensip-cli/00-start/01-what-is-opensip-cli/) lands as *"oh, that's why"* instead of *"wait, what's a recipe?"*
 
 ---
@@ -34,14 +35,14 @@ opensip-cli auto-detects your project's language(s) from filesystem markers and 
 
 | Language | Detection marker | Language-specific checks | Universal checks |
 |---|---|---|---|
-| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 51 | ✓ |
+| **TypeScript** / JS / TSX | `tsconfig.json` (or `package.json` alone) | 58 | ✓ |
 | **Python** | `pyproject.toml`, `setup.py` | 2 | ✓ |
 | **Java** | `pom.xml`, `build.gradle` | 1 | ✓ |
 | **Go** | `go.mod` | 1 | ✓ |
 | **C / C++** | `CMakeLists.txt` | 1 (clang-tidy backed) | ✓ |
 | **Rust** | `Cargo.toml` | 1 | ✓ |
 
-Every detected language gets the **94 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 51 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
+Every detected language gets the **96 universal checks** (Docker, `.env`, Sentry, generic structure, dead-code, package conventions). TypeScript additionally gets the deepest treatment through 58 TypeScript-specific checks for typed-inject, drizzle-orm, React patterns, package.json exports, and tsconfig posture.
 
 For the full per-language breakdown, see [`../70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/).
 
@@ -126,10 +127,19 @@ node packages/cli/dist/index.js fit
 opensip fit
 
 # See what checks are available
-opensip fit --list
+opensip fit list
+
+# See the named fit recipes
+opensip fit recipes
 
 # See what graph would analyze without building a catalog
 opensip graph --list-files
+
+# Run changed-scope fit + graph evidence in one host-owned suite
+opensip suite run audit --json
+
+# Ask graph which symbols are impacted by your current git diff
+opensip graph impact --changed --json --top 20
 
 # Get a per-violation breakdown instead of the summary line
 opensip fit --verbose
@@ -139,9 +149,33 @@ opensip fit --json
 
 # Run the static call-graph tool (different question shape: "what is reachable from where?")
 opensip graph
+
+# Open the self-contained local HTML report
+opensip report
+
+# Show coding agents the supported machine surfaces
+opensip agent-catalog --json
 ```
 
 The full command tree is at [`../70-reference/01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/).
+
+## Optional: add a local security scanner
+
+If your team already uses Gitleaks, OSV-Scanner, or Trivy, install only the
+adapter you want. The adapter does **not** install the scanner binary; `doctor`
+checks that the local binary and cache prerequisites are ready.
+
+```bash
+# Example: committed-secret scanning with a local gitleaks binary
+brew install gitleaks
+opensip tools install @opensip-cli/tool-gitleaks
+opensip gitleaks doctor
+opensip gitleaks
+```
+
+The run lands in the same session store, HTML report, JSON envelope, and
+baseline gate path as built-in tools. See
+[External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/).
 
 ---
 

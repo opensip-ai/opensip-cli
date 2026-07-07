@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-15
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -73,7 +73,7 @@ Scenarios are defined by tool packs analogous to check packs ([`packages/simulat
 
 A **rule** is the `graph`-side equivalent of a check — a single, named analysis over the static call graph. The graph tool is an architectural peer of fitness: rules are authored with `defineRule` ([`packages/graph/engine/src/rules/define-rule.ts`](../../../packages/graph/engine/src/rules/define-rule.ts)), the parallel to `defineCheck`. The difference is the input — a check sees `(content, filePath)`; a rule's `evaluate(dataset)` sees the engine **dataset**: the catalog, the indexes, and a derived **feature layer** (per-function size, fan-out, blast radius, test reachability; package-coupling and SCC membership). "The data is the data, the engine is the engine" — rules are declarative queries over that dataset, and the dashboard's graph view is a pure view over the same data.
 
-Ten rules ship today, in a fixed registration order ([`packages/graph/engine/src/rules/registry.ts`](../../../packages/graph/engine/src/rules/registry.ts)): the five original reachability/duplication rules (`orphan-subtree`, `duplicated-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five structural rules (`large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`). Runtime loading of project-local rules is deferred — the bundled set is what runs today. Rule slugs are byte-stable (they key the baseline fingerprint), so a rule's `ruleId` survives refactors.
+Eleven rules ship today, in a fixed registration order ([`packages/graph/engine/src/rules/registry.ts`](../../../packages/graph/engine/src/rules/registry.ts)): six reachability/duplication rules (`orphan-subtree`, `duplicated-function-body`, `near-duplicate-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`) plus five structural rules (`large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`). Runtime loading of project-local rules is deferred — the bundled set is what runs today. Rule slugs are byte-stable (they key the baseline fingerprint), so a rule's `ruleId` survives refactors.
 
 ## Detector
 
@@ -130,7 +130,7 @@ The per-tool `opensip <tool> plugin` command surface (`add`/`remove`/`list`/`syn
 
 ## Session
 
-A **session** is one run of `opensip fit`, `sim`, `graph`, or `yagni`. Each session is persisted as a row in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, alongside a structured log under `.runtime/logs/` and a rendered HTML report under `.runtime/reports/`.
+A **session** is one persisted run of a Tool such as `opensip fit`, `sim`, `graph`, `yagni`, or an installed scanner adapter like `gitleaks`. Each session is persisted as a row in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, alongside a structured log under `.runtime/logs/` and a rendered HTML report under `.runtime/reports/`.
 
 Each session record is keyed by a UUID (`session.id`, generated via `randomUUID()`) and ordered by its `timestamp` column (newest first). The persisted row carries only the columns every tool shares; per-session detail rides in a companion `session_tool_payload` row as a tool-owned opaque JSON blob. The logger uses a separate per-process correlation id of the form `RUN_<ulid>` (`generatePrefixedId('run')`); it appears in every log entry as `runId`. The `sessions list` command (with `--summary-only` for agents) browses past sessions; `sessions purge` deletes the rows. See `agent-catalog` (in the CLI commands reference) for the recommended way for agents to discover these surfaces and the new ergonomics around historical inspection.
 
@@ -138,7 +138,7 @@ The runtime dir is gitignored — sessions are local artifacts, not source. The 
 
 ## Gate
 
-A **gate** is the architecture-baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). Use `opensip fit export --format baseline` when CI needs a SARIF file.
+A **gate** is the host-owned baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). `graph` and installed external scanner adapters use the same `--gate-save` / `--gate-compare` ratchet for their signal envelopes. Use `opensip fit export --format baseline` or graph's SARIF/export commands when CI needs files.
 
 The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts) and [`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-12
+last_verified: 2026-07-07
 release: v0.4.2
 title: "Initialize your first repo"
 audience: [getting-started, ci-integrators]
@@ -119,12 +119,12 @@ Simulation scenarios drive real targets. Keep scaffolded scenarios harmless unti
 ## 5. Inspect what is available
 
 ```bash
-opensip fit --list
+opensip fit list
 opensip fit recipes
 opensip graph --list-files
 ```
 
-`fit --list` shows the loaded check inventory. `fit recipes` shows named fit recipes. `graph --list-files` is a cheap discovery-only check that prints the files graph would analyze without building the catalog.
+`fit list` shows the loaded check inventory. `fit recipes` shows named fit recipes. `graph --list-files` is a cheap discovery-only check that prints the files graph would analyze without building the catalog.
 
 ## 6. Re-run safely
 

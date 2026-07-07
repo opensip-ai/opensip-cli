@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-28
+last_verified: 2026-07-07
 release: v0.4.2
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -346,7 +346,7 @@ indexes, and report views consume.
 
 **Cache behavior:** three verdicts — `valid` (full cache hit), `incremental` (re-walk only the changed files plus their transitive edge-dependents), `invalid` (full rebuild). The incremental path makes single-file edits ~6× faster than a `--no-cache` rebuild while producing byte-identical output. See the cache section in the stages-and-catalog doc.
 
-**Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics are deferred to v0.3.
+**Entry-point reasons** (rendered in the entry-points section): `module-init` (every file's top-level statements), `name-match` (`main` / `run` / `start` / `register` / `init` / `bootstrap` / `initialize`), `no-callers-exported` (exported with no in-project caller). Bin-entry and tool-registration heuristics remain deferred.
 
 > **History.** v0.2 originally registered three subcommands — `graph`, `graph-orphans`, and `graph-entry-points`. The two filtered views were folded into the unified `graph` output; all three data slices (rules, entry points, catalog summary) are now reachable from the single `graph` invocation.
 
@@ -640,7 +640,7 @@ JSON shape:
 {
   "type": "list-checks",
   "checks": [{ "slug": "...", "description": "...", "tags": ["..."] }],
-  "totalCount": 151
+  "totalCount": 160
 }
 ```
 
