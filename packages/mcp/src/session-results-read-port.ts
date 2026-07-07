@@ -118,6 +118,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ...(opts.tool ? { tool: opts.tool } : {}),
       replayFor: this.replayFor,
       ...(opts.filters?.length ? { filters: opts.filters } : {}),
+      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
@@ -141,6 +142,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       tool: opts.tool,
       replayFor: this.replayFor,
       ...(filters.length > 0 ? { filters } : {}),
+      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
@@ -232,6 +234,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ref: opts.ref ?? 'latest',
       tool: opts.tool,
       replayFor: this.replayFor,
+      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay } = outcome;
@@ -263,6 +266,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     const resolved = resolveSession(this.store, {
       ref,
       ...(tool === undefined ? {} : { tool }),
+      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
     if (!resolved.ok) return err(readError(resolved.reason, resolved.detail));
     if (!this.isSessionInScope(resolved.session)) {

@@ -136,4 +136,62 @@ describe('resolveSession', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.session.payload).toEqual({ audit: true });
   });
+
+  // cwdWithin scopes the 'latest' SELECTION (ADR-0130 amendment 2026-07-07):
+  // the newest in-scope session wins over a newer foreign one, and an all-foreign
+  // history is a not-found. Explicit ids stay unscoped (the caller enforces scope).
+  it('resolves the newest in-scope latest when cwdWithin is set', () => {
+    repo.save(
+      makeSession({
+        id: 'FIT_LOCAL_OLD',
+        cwd: '/repo/a',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FIT_FOREIGN_NEW',
+        cwd: '/other',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FIT_LOCAL_NEW',
+        cwd: '/repo',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    const result = resolveSession(datastore, { ref: 'latest', tool: 'fit', cwdWithin: '/repo' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.session.id).toBe('FIT_LOCAL_NEW');
+      expect(result.session.cwd).toBe('/repo');
+    }
+  });
+
+  it('returns not-found for latest when all sessions are foreign to cwdWithin', () => {
+    repo.save(makeSession({ id: 'FIT_FOREIGN_1', cwd: '/other' }));
+    repo.save(
+      makeSession({
+        id: 'FIT_FOREIGN_2',
+        cwd: '/elsewhere',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    const result = resolveSession(datastore, { ref: 'latest', tool: 'fit', cwdWithin: '/repo' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('not-found');
+  });
+
+  it('ignores cwdWithin for an explicit id (explicit ids stay unscoped)', () => {
+    repo.save(makeSession({ id: 'FIT_FOREIGN', cwd: '/other' }));
+    const result = resolveSession(datastore, { ref: 'FIT_FOREIGN', cwdWithin: '/repo' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.session.id).toBe('FIT_FOREIGN');
+  });
 });

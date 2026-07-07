@@ -249,6 +249,67 @@ describe('SessionRepo — latest', () => {
     expect(repo.latest({ tool: 'fit' })?.id).toBe('fit-new');
     expect(repo.latest()?.id).toBe('graph-newer');
   });
+
+  // cwdWithin filters BEFORE the limit-1 slice (SessionReadRepo.list), so
+  // latest returns the newest IN-SCOPE row, not the global newest.
+  it('scopes latest to cwdWithin, skipping a newer foreign row', () => {
+    repo.save(
+      makeSession({
+        id: 'in-old',
+        cwd: '/repo',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'foreign-new',
+        cwd: '/other',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'in-new',
+        cwd: '/repo/pkg',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    expect(repo.latest({ cwdWithin: '/repo' })?.id).toBe('in-new');
+  });
+
+  it('combines tool and cwdWithin', () => {
+    repo.save(
+      makeSession({
+        id: 'fit-in',
+        tool: 'fit',
+        cwd: '/repo',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'graph-in',
+        tool: 'graph',
+        cwd: '/repo',
+        startedAt: '2026-05-02T00:00:00.000Z',
+        completedAt: '2026-05-02T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'fit-foreign',
+        tool: 'fit',
+        cwd: '/other',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
+    expect(repo.latest({ tool: 'fit', cwdWithin: '/repo' })?.id).toBe('fit-in');
+  });
 });
 
 describe('SessionRepo — error paths', () => {

@@ -38,6 +38,8 @@ export interface ResolveAndReplayOptions {
   readonly ref: string;
   /** Tool for `'latest'`, or an optional id sanity check. */
   readonly tool?: ToolShortId;
+  /** Scopes the `'latest'` selection to sessions under this root; ignored for explicit ids. */
+  readonly cwdWithin?: string;
   /** Resolve the replay closure for a stored session's tool id. */
   readonly replayFor: (tool: ToolShortId) => SessionReplayFn | undefined;
   /** Agent ergonomics filters applied to the replayed envelope (ADR-0085). */
@@ -70,7 +72,11 @@ export async function resolveAndReplaySession(
   store: DataStore,
   opts: ResolveAndReplayOptions,
 ): Promise<ReplaySessionOutcome> {
-  const resolved = resolveSession(store, { ref: opts.ref, tool: opts.tool });
+  const resolved = resolveSession(store, {
+    ref: opts.ref,
+    tool: opts.tool,
+    cwdWithin: opts.cwdWithin,
+  });
   if (!resolved.ok) {
     return { ok: false, reason: resolved.reason, detail: resolved.detail };
   }

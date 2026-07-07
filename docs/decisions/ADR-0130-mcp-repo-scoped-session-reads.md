@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-07-05
+last_verified: 2026-07-07
 owner: opensip-cli
 ---
 
@@ -66,3 +66,44 @@ behavior, enforced by `session-cwd-scope.test.ts` and `repo-scoping.test.ts`.
 [ADR-0084](ADR-0084-mcp-server-surface.md) and preserves the tool-owned payload /
 host-owned persistence split from
 [ADR-0042](ADR-0042-tool-storage-contract-and-state-store.md).
+
+---
+
+## Amendment — 2026-07-07: `latest` sentinel scopes selection
+
+The original decision above is **unchanged for explicit session ids**: they
+resolve globally against the datastore and are reported as `not-found` when the
+resolved session is foreign to the MCP project root (the fail-closed containment
+that closes the evidence-corruption class).
+
+The refinement is to the **`latest` sentinel only**. Previously `latest`
+resolved the *global* newest session and then failed closed when that row was
+foreign — so a single newer foreign run in a shared datastore hid an older but
+in-scope run entirely. `latest` now **SELECTS** the newest session whose stored
+`cwd` is inside the project root, instead of resolving the global latest and
+rejecting it. So `get_latest_findings` (and `show_run` with `ref: latest`, and
+`compare_to_baseline` defaulting to `latest`) return the newest **in-scope**
+evidence even when a newer foreign run exists in a shared datastore.
+
+**Mechanism:** `cwdWithin` is threaded into the `latest` branch of
+`resolveSession` and into `resolveAndReplaySession` via
+`SessionReadRepo.latest({ cwdWithin })`, which reuses the same
+`isSessionCwdWithin` predicate and the same before-limit filter as `list`. The
+MCP `SessionResultsReadPort` passes `projectRoot` as `cwdWithin` at all resolve
+sites (the `latest` pre-check plus each replay) so the pre-check and the replay
+agree on the same in-scope selection. Explicit ids still pass no `cwdWithin` and
+stay unscoped-then-checked as before.
+
+**Consequence to note:** when NO in-scope session exists, `latest` returns
+`not-found` **without** emitting the per-row `mcp.results.scope.rejected` log —
+the foreign row is filtered out before resolution, never resolved-then-rejected.
+That log still fires for an explicit foreign id (unchanged).
+
+**Enforcing tests:**
+`packages/mcp/src/__tests__/repo-scoping.test.ts` (latest-selection over a newer
+foreign row + empty-scope not-found) and
+`packages/session-store/src/__tests__/resolve-session.test.ts` (cwdWithin latest
+selection, all-foreign not-found, explicit-id ignores cwdWithin).
+
+No schema, migration, or version bump: `cwdWithin` is a query-time filter over
+the existing predicate.

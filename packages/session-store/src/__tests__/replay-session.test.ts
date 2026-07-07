@@ -124,4 +124,44 @@ describe('resolveAndReplaySession', () => {
       expect(result.replay.envelope.signals[0]?.severity).toBe('high');
     }
   });
+
+  it('replays the newest in-scope latest when cwdWithin is set', async () => {
+    repo.save(
+      makeSession({
+        id: 'IN',
+        tool: 'fit',
+        cwd: '/repo',
+        startedAt: '2026-05-01T00:00:00.000Z',
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    );
+    repo.save(
+      makeSession({
+        id: 'FOREIGN',
+        tool: 'fit',
+        cwd: '/other',
+        startedAt: '2026-05-03T00:00:00.000Z',
+        completedAt: '2026-05-03T00:00:00.000Z',
+      }),
+    );
+
+    // Record which session actually reaches the replay closure. The newer
+    // FOREIGN row is filtered out before resolution, so only IN is replayed.
+    const replayedIds: string[] = [];
+    const recordingReplay = (stored: StoredSession) => {
+      replayedIds.push(stored.id);
+      return replayEnvelope(stored.tool);
+    };
+
+    const result = await resolveAndReplaySession(datastore, {
+      ref: 'latest',
+      tool: 'fit',
+      cwdWithin: '/repo',
+      replayFor: () => recordingReplay,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(replayedIds).toEqual(['IN']);
+    if (result.ok) expect(result.session.cwd).toBe('/repo');
+  });
 });
