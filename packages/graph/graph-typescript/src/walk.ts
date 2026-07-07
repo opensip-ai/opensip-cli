@@ -368,8 +368,15 @@ function walkFile(
       return;
     }
 
+    // Descending into a function/method BODY leaves the class scope: a function
+    // (or arrow) nested inside a method is a local, not a member, so it must not
+    // inherit `enclosingClass`. The occurrence itself was already recorded above
+    // with the current `ctx` (so a method / class-property arrow keeps its
+    // class); only the body descent resets. A nested class re-establishes its own
+    // `enclosingClass` via the branch above.
+    const childCtx: VisitorContext = occ ? { ...ctx, enclosingClass: null } : ctx;
     ts.forEachChild(node, (c) => {
-      descend(c, ctx, childOwnerHash);
+      descend(c, childCtx, childOwnerHash);
     });
   }
 

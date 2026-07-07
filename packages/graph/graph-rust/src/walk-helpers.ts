@@ -82,6 +82,33 @@ function decodeParam(child: Node): { name: string; optional: boolean; rest: bool
   }
 }
 
+/**
+ * The attributes that decorate `node`: its own child attribute_items plus the
+ * contiguous run of attribute_items immediately preceding it among its siblings.
+ * Only the contiguous run counts — the previous logic pushed EVERY earlier
+ * `attribute_item` in the block, so a function inherited attributes from
+ * unrelated earlier items (e.g. a `#[derive(Debug)] struct Cfg;` before it),
+ * corrupting `decorators` and `inTestFile`, which gate `orphan-subtree`,
+ * `large-function`, and the other production rules.
+ */
+function precedingAttributeRun(node: Node): string[] {
+  const parent = node.parent;
+  if (!parent) return [];
+  // A preceding non-attribute item resets the run; comments between an attribute
+  // and its item do not break it.
+  const run: string[] = [];
+  for (const sib of parent.children) {
+    if (sib === null) continue;
+    if (sib.startIndex >= node.startIndex) break;
+    if (sib.type === 'attribute_item' || sib.type === 'inner_attribute_item') {
+      run.push(sib.text.trim());
+    } else if (!sib.type.includes('comment')) {
+      run.length = 0;
+    }
+  }
+  return run;
+}
+
 function extractAttributes(node: Node): readonly string[] {
   const out: string[] = [];
   for (const c of childrenOf(node)) {
@@ -89,15 +116,7 @@ function extractAttributes(node: Node): readonly string[] {
       out.push(c.text.trim());
     }
   }
-  const parent = node.parent;
-  if (parent) {
-    for (const sib of parent.children) {
-      if (sib === null || sib.startIndex >= node.startIndex) break;
-      if (sib.type === 'attribute_item' || sib.type === 'inner_attribute_item') {
-        out.push(sib.text.trim());
-      }
-    }
-  }
+  out.push(...precedingAttributeRun(node));
   return [...new Set(out)];
 }
 

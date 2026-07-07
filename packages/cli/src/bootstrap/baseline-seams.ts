@@ -279,7 +279,13 @@ export function buildBaselineSeams(deps: {
       }
       const storedMeta = repo.loadMeta(tool);
       const rows = repo.load(tool);
-      const fingerprints = rows.map((r) => r.fingerprint).sort((a, b) => a.localeCompare(b));
+      // Ordinal (code-unit) sort — deterministic across locales/`LC_ALL`, and
+      // identical to the save-time comparator (`BaselineRepo.save`). `localeCompare`
+      // is locale- and case-sensitive, so it would order this byte-preserved,
+      // git-tracked artifact differently on different machines.
+      const fingerprints = rows
+        .map((r) => r.fingerprint)
+        .sort((a, b) => Number(a > b) - Number(a < b));
       const file = {
         version: String(BASELINE_FORMAT_VERSION),
         tool,

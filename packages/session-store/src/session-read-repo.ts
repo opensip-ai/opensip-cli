@@ -94,21 +94,29 @@ export class SessionReadRepo {
   /** Batch-load tool payloads for a page of session ids (avoids list()'s N+1). */
   private payloadsBySessionId(ids: readonly string[]): Map<string, StoredPayloadRow> {
     const byId = new Map<string, StoredPayloadRow>();
-    if (ids.length === 0) return byId;
-    const rows = this.datastore.db
-      .select({
-        sessionId: sessionToolPayload.sessionId,
-        payload: sessionToolPayload.payload,
-        payload_version: sessionToolPayload.payload_version,
-      })
-      .from(sessionToolPayload)
-      .where(inArray(sessionToolPayload.sessionId, ids))
-      .all();
-    for (const r of rows) {
-      byId.set(r.sessionId, {
-        payload: r.payload,
-        payload_version: r.payload_version,
-      });
+    // Chunk to stay under SQLite's bound-parameter ceiling
+    // (SQLITE_MAX_VARIABLE_NUMBER, ~32k): `list()` with no limit is unbounded, so
+    // `ids` can exceed the ceiling on a large, retention-disabled history.
+    // Mirrors BaselineRepo.save's chunking. An empty `ids` runs 0 loops.
+    const CHUNK = 2000;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      if (slice.length === 0) continue;
+      const rows = this.datastore.db
+        .select({
+          sessionId: sessionToolPayload.sessionId,
+          payload: sessionToolPayload.payload,
+          payload_version: sessionToolPayload.payload_version,
+        })
+        .from(sessionToolPayload)
+        .where(inArray(sessionToolPayload.sessionId, slice))
+        .all();
+      for (const r of rows) {
+        byId.set(r.sessionId, {
+          payload: r.payload,
+          payload_version: r.payload_version,
+        });
+      }
     }
     return byId;
   }

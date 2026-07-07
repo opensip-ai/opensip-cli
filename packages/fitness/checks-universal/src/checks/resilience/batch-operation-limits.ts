@@ -31,24 +31,36 @@ function findUnboundedBatchMatch(
     evt: 'fitness.checks.batch_operations.find_unbounded_batch_match',
     msg: 'Finding unbounded batch pattern match at position in content',
   });
-  const idx = content.indexOf(patternDef.pattern, startIndex);
-  if (idx === -1) return null;
+  // Scan forward through EVERY occurrence of the literal pattern, returning the
+  // first one whose surrounding syntax is actually async/for-of shaped. Advancing
+  // past non-shaped occurrences (instead of returning null on the first) is what
+  // lets the caller keep looking — previously the caller's `if (!match) break`
+  // terminated the whole scan at the first plain `.map`/`for` in the file, so the
+  // async-loop and for-of detections almost never fired.
+  let searchFrom = startIndex;
+  while (searchFrom < content.length) {
+    const idx = content.indexOf(patternDef.pattern, searchFrom);
+    if (idx === -1) return null;
 
-  if (patternDef.type === 'async') {
-    const afterPattern = content.slice(
-      idx + patternDef.pattern.length,
-      idx + patternDef.pattern.length + 20,
-    );
-    const asyncMatch = /^\s*\(\s*async/.exec(afterPattern);
-    if (asyncMatch) {
-      return { index: idx, match: patternDef.pattern + asyncMatch[0] };
+    if (patternDef.type === 'async') {
+      const afterPattern = content.slice(
+        idx + patternDef.pattern.length,
+        idx + patternDef.pattern.length + 20,
+      );
+      const asyncMatch = /^\s*\(\s*async/.exec(afterPattern);
+      if (asyncMatch) {
+        return { index: idx, match: patternDef.pattern + asyncMatch[0] };
+      }
+    } else {
+      const afterFor = content.slice(idx, idx + 50);
+      const forOfMatch = /^for\s*\(\s*const\s+\w+\s+of/.exec(afterFor);
+      if (forOfMatch) {
+        return { index: idx, match: forOfMatch[0] };
+      }
     }
-  } else {
-    const afterFor = content.slice(idx, idx + 50);
-    const forOfMatch = /^for\s*\(\s*const\s+\w+\s+of/.exec(afterFor);
-    if (forOfMatch) {
-      return { index: idx, match: forOfMatch[0] };
-    }
+
+    // Not shaped at this occurrence — advance past it and keep scanning.
+    searchFrom = idx + patternDef.pattern.length;
   }
 
   return null;

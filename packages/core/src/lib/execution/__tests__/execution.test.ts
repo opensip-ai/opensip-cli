@@ -204,6 +204,25 @@ describe('scheduleUnits', () => {
     expect(maxActive).toBeLessThanOrEqual(2);
   });
 
+  it('resolves (does not hang) when abort is already signaled at entry (parallel)', async () => {
+    // Regression: in parallel mode `resolve()` was only reachable from a launched
+    // unit's `.finally()`. With abort already signaled before the first launch,
+    // zero units launched and the promise never settled — an infinite hang. This
+    // test would time out on the old code; it now returns immediately.
+    const seen: number[] = [];
+    await scheduleUnits<number>({
+      units: [1, 2, 3],
+      mode: 'parallel',
+      maxParallel: 2,
+      shouldAbort: () => true, // aborted before the initial batch launches
+      runUnit: (u) => {
+        seen.push(u);
+        return Promise.resolve({ shouldStop: false });
+      },
+    });
+    expect(seen).toEqual([]); // nothing launched — and, critically, it resolved
+  });
+
   it('honours an external abort (sequential)', async () => {
     const seen: number[] = [];
     let aborted = false;

@@ -61,40 +61,28 @@ function derivePackage(occ: GraphFunctionOccurrence): string {
   return segment ?? 'root';
 }
 
-function indexQualifiedToBodyHashes(catalog: GraphCatalog): Map<string, string[]> {
-  const qualifiedToBodyHashes = new Map<string, string[]>();
-  for (const occurrences of Object.values(catalog.functions)) {
-    for (const occ of occurrences) {
-      const existing = qualifiedToBodyHashes.get(occ.qualifiedName) ?? [];
-      existing.push(occ.bodyHash);
-      qualifiedToBodyHashes.set(occ.qualifiedName, existing);
-    }
-  }
-  return qualifiedToBodyHashes;
-}
-
-function addReverseEdgesForOcc(
-  reverse: Map<string, string[]>,
-  occ: GraphFunctionOccurrence,
-  qualifiedToBodyHashes: Map<string, string[]>,
-): void {
+function addReverseEdgesForOcc(reverse: Map<string, string[]>, occ: GraphFunctionOccurrence): void {
+  // `CallEdge.to` entries are callee bodyHashes — the catalog is the id
+  // authority (graph engine `types.ts`: "every CallEdge.to is a bodyHash that
+  // already exists in the catalog"). Reverse each edge directly on bodyHashes:
+  // every callee bodyHash maps to the caller bodyHashes that reach it. (An
+  // earlier version looked `edge.to` up in a qualifiedName→bodyHash index,
+  // which silently produced an empty reverse graph in production, where a
+  // content hash never equals a dotted qualified name.)
   for (const edge of occ.calls) {
-    for (const calleeQName of edge.to) {
-      for (const calleeHash of qualifiedToBodyHashes.get(calleeQName) ?? []) {
-        const callers = reverse.get(calleeHash) ?? [];
-        callers.push(occ.bodyHash);
-        reverse.set(calleeHash, callers);
-      }
+    for (const calleeHash of edge.to) {
+      const callers = reverse.get(calleeHash) ?? [];
+      callers.push(occ.bodyHash);
+      reverse.set(calleeHash, callers);
     }
   }
 }
 
 function buildReverseAdjacency(catalog: GraphCatalog): Map<string, readonly string[]> {
-  const qualifiedToBodyHashes = indexQualifiedToBodyHashes(catalog);
   const reverse = new Map<string, string[]>();
   for (const occurrences of Object.values(catalog.functions)) {
     for (const occ of occurrences) {
-      addReverseEdgesForOcc(reverse, occ, qualifiedToBodyHashes);
+      addReverseEdgesForOcc(reverse, occ);
     }
   }
   return reverse;

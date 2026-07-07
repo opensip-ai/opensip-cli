@@ -43,6 +43,100 @@ const FS_FUNCTIONS = new Set([
   'mkdirSync',
 ]);
 
+/** Node's `child_process` module specifiers. */
+const CHILD_PROCESS_MODULES = new Set(['child_process', 'node:child_process']);
+
+interface ChildProcessBindings {
+  /** Local names bound to a specific cp function (named import / require destructure). */
+  readonly directFns: Set<string>;
+  /** Local names bound to the cp module object (default/namespace import / require). */
+  readonly moduleAliases: Set<string>;
+}
+
+function isChildProcessRequire(node: ts.Node): boolean {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'require' &&
+    node.arguments.length === 1 &&
+    ts.isStringLiteralLike(node.arguments[0]) &&
+    CHILD_PROCESS_MODULES.has(node.arguments[0].text)
+  );
+}
+
+/**
+ * Collect the file's bindings to Node's `child_process` module so the command-
+ * injection rule can require provenance instead of matching the bare method name
+ * `exec`/`spawn` — which collides with `RegExp.prototype.exec`, ORM `.exec()`,
+ * `EventEmitter`-style `.spawn()`, etc.
+ */
+/** `import ... from 'child_process'` → record named fns + namespace/default aliases. */
+function collectCpImportBinding(node: ts.Node, out: ChildProcessBindings): void {
+  if (
+    !ts.isImportDeclaration(node) ||
+    !ts.isStringLiteral(node.moduleSpecifier) ||
+    !CHILD_PROCESS_MODULES.has(node.moduleSpecifier.text)
+  ) {
+    return;
+  }
+  const clause = node.importClause;
+  if (!clause) return;
+  if (clause.name) out.moduleAliases.add(clause.name.text); // default import
+  const named = clause.namedBindings;
+  if (named && ts.isNamespaceImport(named)) {
+    out.moduleAliases.add(named.name.text); // import * as cp from 'child_process'
+  } else if (named && ts.isNamedImports(named)) {
+    for (const element of named.elements) out.directFns.add(element.name.text); // { exec, spawn as sp }
+  }
+}
+
+/** `const cp = require('child_process')` / `const { exec } = require(...)`. */
+function collectCpRequireBinding(node: ts.Node, out: ChildProcessBindings): void {
+  if (
+    !ts.isVariableDeclaration(node) ||
+    !node.initializer ||
+    !isChildProcessRequire(node.initializer)
+  ) {
+    return;
+  }
+  if (ts.isIdentifier(node.name)) {
+    out.moduleAliases.add(node.name.text); // const cp = require('child_process')
+  } else if (ts.isObjectBindingPattern(node.name)) {
+    for (const element of node.name.elements) {
+      if (ts.isIdentifier(element.name)) out.directFns.add(element.name.text); // const { exec } = require(...)
+    }
+  }
+}
+
+function collectChildProcessBindings(sourceFile: ts.SourceFile): ChildProcessBindings {
+  const out: ChildProcessBindings = { directFns: new Set(), moduleAliases: new Set() };
+  walkNodes(sourceFile, (node) => {
+    collectCpImportBinding(node, out);
+    collectCpRequireBinding(node, out);
+  });
+  return out;
+}
+
+/**
+ * Guard for the exec rule: a matched exec-family call is a real shell exec only
+ * when its callee resolves to a `child_process` binding — a named/destructured
+ * function, a module alias's method, or an inline `require('child_process').x`.
+ */
+function makeChildProcessGuard(
+  bindings: ChildProcessBindings,
+): (node: ts.CallExpression) => boolean {
+  return (node) => {
+    const callee = node.expression;
+    if (ts.isIdentifier(callee)) return bindings.directFns.has(callee.text);
+    if (ts.isPropertyAccessExpression(callee)) {
+      const receiver = callee.expression;
+      if (ts.isIdentifier(receiver)) return bindings.moduleAliases.has(receiver.text);
+      return isChildProcessRequire(receiver);
+    }
+    return false;
+  };
+}
+
 /**
  * Check if an expression tree references user input (req.body, req.params, req.query).
  * Walks the subtree of the given node looking for property access chains like
@@ -159,6 +253,12 @@ interface UnsanitizedCallRule {
   readonly functionNames: Set<string>;
   readonly message: string;
   readonly suggestion: string;
+  /**
+   * Optional provenance gate: matched by name, but only a real violation when
+   * this returns true (e.g. the exec rule requires a `child_process` callee).
+   * Omitted rules match by name alone.
+   */
+  readonly receiverGuard?: (node: ts.CallExpression) => boolean;
 }
 
 function checkUnsanitizedCallArgs(
@@ -167,9 +267,10 @@ function checkUnsanitizedCallArgs(
   filePath: string,
   rule: UnsanitizedCallRule,
 ): CheckViolation | null {
-  const { functionNames, message, suggestion } = rule;
+  const { functionNames, message, suggestion, receiverGuard } = rule;
   const functionName = getCallFunctionName(node);
   if (!functionNames.has(functionName)) return null;
+  if (receiverGuard && !receiverGuard(node)) return null;
   /* v8 ignore next -- defensive AST/type guard */
   if (isInStringOrRegex(node)) return null;
   for (const arg of node.arguments) {
@@ -253,6 +354,7 @@ export const inputSanitization = defineCheck({
     if (!sourceFile) return [];
 
     const violations: CheckViolation[] = [];
+    const childProcessGuard = makeChildProcessGuard(collectChildProcessBindings(sourceFile));
 
     walkNodes(sourceFile, (node) => {
       const innerHtml = checkInnerHtmlAssignment(node, sourceFile, filePath);
@@ -273,6 +375,7 @@ export const inputSanitization = defineCheck({
           message: 'User input passed to shell command - potential command injection',
           suggestion:
             'Never pass user input directly to shell commands. Use execFile with separate arguments array, or validate input against a strict allowlist. Consider using child_process.spawn with shell: false.',
+          receiverGuard: childProcessGuard,
         });
         if (cmdInjection) {
           violations.push(cmdInjection);

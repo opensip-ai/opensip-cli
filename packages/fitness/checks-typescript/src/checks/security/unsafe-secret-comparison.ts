@@ -15,6 +15,7 @@ import {
   isLiteral,
   isPropertyAccess,
   getLineNumber,
+  getColumn,
 } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
@@ -233,7 +234,11 @@ export const unsafeSecretComparison = defineCheck({
             node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ? '===' : '!==';
           violations.push({
             line,
-            column: node.operatorToken.getStart() - node.getStart(),
+            // Line-relative column of the operator token. (Previously computed
+            // `operatorToken.getStart() - node.getStart()` — the operator's offset
+            // WITHIN the binary expression, which points into the left operand for
+            // any comparison not starting at column 0.)
+            column: getColumn(node.operatorToken, sourceFile),
             message: `Timing-unsafe ${operator} comparison on '${secretName}' — use crypto.timingSafeEqual() (Node.js built-in)`,
             severity: 'error',
             suggestion: `Replace \`a ${operator} b\` with \`${operator === '!==' ? '!' : ''}safeCompare(a, b)\` to prevent timing side-channel attacks.`,
