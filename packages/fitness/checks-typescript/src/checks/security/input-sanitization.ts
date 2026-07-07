@@ -70,41 +70,51 @@ function isChildProcessRequire(node: ts.Node): boolean {
  * `exec`/`spawn` — which collides with `RegExp.prototype.exec`, ORM `.exec()`,
  * `EventEmitter`-style `.spawn()`, etc.
  */
+/** `import ... from 'child_process'` → record named fns + namespace/default aliases. */
+function collectCpImportBinding(node: ts.Node, out: ChildProcessBindings): void {
+  if (
+    !ts.isImportDeclaration(node) ||
+    !ts.isStringLiteral(node.moduleSpecifier) ||
+    !CHILD_PROCESS_MODULES.has(node.moduleSpecifier.text)
+  ) {
+    return;
+  }
+  const clause = node.importClause;
+  if (!clause) return;
+  if (clause.name) out.moduleAliases.add(clause.name.text); // default import
+  const named = clause.namedBindings;
+  if (named && ts.isNamespaceImport(named)) {
+    out.moduleAliases.add(named.name.text); // import * as cp from 'child_process'
+  } else if (named && ts.isNamedImports(named)) {
+    for (const element of named.elements) out.directFns.add(element.name.text); // { exec, spawn as sp }
+  }
+}
+
+/** `const cp = require('child_process')` / `const { exec } = require(...)`. */
+function collectCpRequireBinding(node: ts.Node, out: ChildProcessBindings): void {
+  if (
+    !ts.isVariableDeclaration(node) ||
+    !node.initializer ||
+    !isChildProcessRequire(node.initializer)
+  ) {
+    return;
+  }
+  if (ts.isIdentifier(node.name)) {
+    out.moduleAliases.add(node.name.text); // const cp = require('child_process')
+  } else if (ts.isObjectBindingPattern(node.name)) {
+    for (const element of node.name.elements) {
+      if (ts.isIdentifier(element.name)) out.directFns.add(element.name.text); // const { exec } = require(...)
+    }
+  }
+}
+
 function collectChildProcessBindings(sourceFile: ts.SourceFile): ChildProcessBindings {
-  const directFns = new Set<string>();
-  const moduleAliases = new Set<string>();
+  const out: ChildProcessBindings = { directFns: new Set(), moduleAliases: new Set() };
   walkNodes(sourceFile, (node) => {
-    if (
-      ts.isImportDeclaration(node) &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
-      CHILD_PROCESS_MODULES.has(node.moduleSpecifier.text)
-    ) {
-      const clause = node.importClause;
-      if (!clause) return;
-      if (clause.name) moduleAliases.add(clause.name.text); // default import
-      const named = clause.namedBindings;
-      if (named && ts.isNamespaceImport(named)) {
-        moduleAliases.add(named.name.text); // import * as cp from 'child_process'
-      } else if (named && ts.isNamedImports(named)) {
-        for (const el of named.elements) directFns.add(el.name.text); // { exec, spawn as sp }
-      }
-      return;
-    }
-    if (
-      ts.isVariableDeclaration(node) &&
-      node.initializer &&
-      isChildProcessRequire(node.initializer)
-    ) {
-      if (ts.isIdentifier(node.name)) {
-        moduleAliases.add(node.name.text); // const cp = require('child_process')
-      } else if (ts.isObjectBindingPattern(node.name)) {
-        for (const el of node.name.elements) {
-          if (ts.isIdentifier(el.name)) directFns.add(el.name.text); // const { exec } = require(...)
-        }
-      }
-    }
+    collectCpImportBinding(node, out);
+    collectCpRequireBinding(node, out);
   });
-  return { directFns, moduleAliases };
+  return out;
 }
 
 /**
