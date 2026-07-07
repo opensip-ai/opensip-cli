@@ -34,3 +34,35 @@ export function secretHash(raw: string | undefined | null): string {
   if (raw === undefined || raw === null || raw.length === 0) return '';
   return createHash('sha256').update(String(raw)).digest('hex').slice(0, 12);
 }
+
+// URL userinfo — `scheme://user:password@host`. Networked scanners (pip-audit,
+// dependency-check, cargo-deny) echo the failing index/registry URL into stderr
+// on an auth error; the password half must never reach a ToolError / log / report.
+const URL_USERINFO_RE = /(\b[a-z][a-z0-9+.-]*:\/\/)([^@/\s:]+):([^@/\s]+)@/giu;
+
+// `Authorization: Bearer <token>` / `Basic <token>` — the auth scheme is followed
+// by whitespace and the credential (no `:`/`=`). Masked before the key=value pass so
+// the token after the scheme cannot leak.
+const AUTH_SCHEME_RE = /\b(bearer|basic)\s+([\w.~+/=-]{4,})/giu;
+
+// Inline `key=value` / `key: value` credential assignments a scanner may echo from
+// its own argv/config (`token=abc123`, `api-key: xyz`, `password="hunter2"`).
+const INLINE_SECRET_RE =
+  /\b(password|passwd|pwd|token|api[_-]?key|secret)\b(["']?\s*[:=]\s*["']?)(\S+)/giu;
+
+/**
+ * Redact credential material from FREE-TEXT scanner diagnostics (stderr tails,
+ * error messages) before it reaches a {@link import('@opensip-cli/core').ToolError},
+ * a log, or a report. Masks URL userinfo passwords, `Bearer`/`Basic` tokens, and
+ * inline `key=value` secret assignments while leaving the surrounding diagnostic
+ * readable. Conservative by design — it targets known credential shapes, not
+ * arbitrary high-entropy strings. Returns the input unchanged when there is nothing
+ * to mask. Empty/undefined → `''`.
+ */
+export function redactCredentials(raw: string | undefined | null): string {
+  if (raw === undefined || raw === null || raw.length === 0) return '';
+  return String(raw)
+    .replace(URL_USERINFO_RE, (_match, scheme: string, user: string) => `${scheme}${user}:***@`)
+    .replace(AUTH_SCHEME_RE, (_match, scheme: string) => `${scheme} ***`)
+    .replace(INLINE_SECRET_RE, (_match, key: string, sep: string) => `${key}${sep}***`);
+}

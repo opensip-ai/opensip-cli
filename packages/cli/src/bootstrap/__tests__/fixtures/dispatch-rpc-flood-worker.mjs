@@ -14,6 +14,9 @@ readFileSync(specPath, 'utf8');
 const send = (message) => process.send?.(message);
 
 for (let index = 1; index <= 5; index += 1) {
-  send({ kind: 'progress', event: { rpcId: index, seam: 'getExitCode' } });
+  send({
+    kind: 'progress',
+    event: { kind: 'host-rpc', request: { rpcId: index, seam: 'getExitCode' } },
+  });
 }
 send({ kind: 'result', value: { output: 'command-result', exitCode: 0 } });

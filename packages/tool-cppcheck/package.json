@@ -1,0 +1,140 @@
+{
+  "name": "@opensip-cli/tool-cppcheck",
+  "version": "0.4.2",
+  "license": "Apache-2.0",
+  "description": "External Tool Adapter for Cppcheck — wraps C/C++ static analysis as an opensip-cli tool",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality",
+    "external-tool-adapter",
+    "scanner",
+    "cpp",
+    "c++",
+    "cppcheck",
+    "linting",
+    "sarif"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/tool-cppcheck"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "opensipTools": {
+    "kind": "tool",
+    "id": "cppcheck",
+    "identity": {
+      "name": "cppcheck"
+    },
+    "stableId": "dafe9acd-77c5-4055-a01c-05950c15d5f1",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "cppcheck",
+        "description": "Run Cppcheck and normalize SARIF diagnostics",
+        "aliases": [],
+        "commonFlags": [
+          "json",
+          "cwd",
+          "quiet",
+          "verbose",
+          "debug",
+          "reportTo",
+          "apiKey",
+          "open"
+        ],
+        "options": [
+          {
+            "flag": "--gate-save",
+            "description": "Architecture-gate: save current findings as baseline in the project SQLite store (mutually exclusive with --gate-compare)",
+            "default": false
+          },
+          {
+            "flag": "--gate-compare",
+            "description": "Architecture-gate: compare current findings against the saved baseline; exit 1 on regression",
+            "default": false
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "runtime-render-dispatch",
+        "producesVerdict": true
+      },
+      {
+        "name": "doctor",
+        "description": "Check that the cppcheck binary is installed and ready",
+        "parent": "cppcheck",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "version",
+        "description": "Print the resolved cppcheck binary version",
+        "parent": "cppcheck",
+        "commonFlags": [
+          "json",
+          "cwd"
+        ],
+        "scope": "none",
+        "output": "raw-stream",
+        "rawStreamReason": "diagnostic-gate"
+      }
+    ],
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Executes the user-installed cppcheck binary via execFile (no shell)"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      }
+    ],
+    "config": {
+      "namespace": "cppcheck",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "binaries": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

@@ -356,22 +356,29 @@ module.exports = {
 
     // -------------------------------------------------------------------
     // ADR-0090 — external tool adapters are layer-4: they import the substrate +
-    // core/contracts ONLY. Scoped to the three MVP adapter dirs so the `tool-`
+    // core/contracts ONLY. Scoped by an EXPLICIT adapter allowlist so the `tool-`
     // prefix does NOT collide with the layer-2 published `tool-test-kit` (Risk R8).
-    // Inert until the adapter packages land (Phase 3); recorded now as the boundary.
+    // Extend the alternation when a new @opensip-cli/tool-<scanner> adapter lands.
     // -------------------------------------------------------------------
     {
       name: 'tool-adapters-import-substrate-core-contracts-only',
       severity: 'error',
       comment:
-        'An external tool adapter (tool-gitleaks / tool-osv-scanner / tool-trivy) ' +
-        'is layer-4 (ADR-0090): it imports @opensip-cli/external-tool-adapter + ' +
+        'An external tool adapter (tool-gitleaks / tool-osv-scanner / tool-trivy / the ' +
+        'polyglot scanner adapters: semgrep, ast-grep, ruff, golangci-lint, govulncheck, ' +
+        'cargo-deny, bandit, pip-audit, cargo-clippy, spotbugs, pmd, dependency-check, ' +
+        'cppcheck) is layer-4 (ADR-0090): it imports @opensip-cli/external-tool-adapter + ' +
         'core + contracts ONLY — never cli, output, a tool engine, a check/graph/lang ' +
         'pack, OR another adapter. The `from` captures the adapter package dir ($1) ' +
         'so `to.pathNot` excludes its OWN intra-package relative imports; a sibling ' +
-        'adapter (a DIFFERENT tool-*) therefore still violates. Scoped to the three ' +
-        'MVP adapters to avoid the layer-2 tool-test-kit collision.',
-      from: { path: '^packages/(tool-(?:gitleaks|osv-scanner|trivy))/src/' },
+        'adapter (a DIFFERENT tool-*) therefore still violates. An explicit allowlist ' +
+        '(not a bare `tool-` glob) avoids the layer-2 tool-test-kit collision.',
+      from: {
+        path:
+          '^packages/(tool-(?:gitleaks|osv-scanner|trivy|semgrep|ast-grep|ruff|' +
+          'golangci-lint|govulncheck|cargo-deny|bandit|pip-audit|cargo-clippy|' +
+          'spotbugs|pmd|dependency-check|cppcheck))/src/',
+      },
       to: {
         path: '^packages/(?!core/|contracts/|external-tool-adapter/)',
         pathNot: '^packages/$1/',

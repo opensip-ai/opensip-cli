@@ -74,7 +74,10 @@ gates into deterministic evidence.
 - **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 160 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
 - **Multi-tool review suites.** `opensip suite run audit` runs a changed-scope review across first-party tools and returns one aggregate JSON result with a review brief.
-- **Security scanner consolidation.** Opt-in adapters wrap a user's existing `gitleaks`, `osv-scanner`, or `trivy` binary and normalize findings into the same sessions, report, JSON, and gate path as built-in tools.
+- **Scanner consolidation.** Opt-in adapters wrap a user's existing scanner binary
+  — Gitleaks, Semgrep, Ruff, golangci-lint, cargo-deny, Bandit, PMD, Cppcheck,
+  OSV-Scanner, Trivy, and more — and normalize findings into the same sessions,
+  report, JSON, and gate path as built-in tools.
 - **AI-agent guardrails.** Structured JSON, sessions, `agent-catalog`, MCP, and
   agent recipes give coding agents deterministic feedback without making the CLI
   an AI runtime.
@@ -155,7 +158,9 @@ opensip gitleaks --json --gate-save
 
 The adapter records a normal session, contributes to the HTML report, supports
 the host-owned baseline ratchet, and keeps the raw scanner artifact local and
-gitignored. The scanner binary itself remains user-managed.
+gitignored. The scanner binary itself remains user-managed. Sixteen adapter
+packages ship today across secrets, SAST/structural search, Python/Go/Rust
+linting, dependency vulnerabilities, Java analysis, and C/C++ static analysis.
 
 ---
 

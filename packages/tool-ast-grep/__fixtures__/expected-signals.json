@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "no-console-log",
+    "severity": "medium",
+    "message": "Avoid console.log in production code",
+    "file": "src/a.ts",
+    "line": 3,
+    "column": 5
+  },
+  {
+    "ruleId": "no-debugger",
+    "severity": "high",
+    "message": "Remove debugger statements",
+    "file": "src/b.ts",
+    "line": 10,
+    "column": 1
+  }
+]

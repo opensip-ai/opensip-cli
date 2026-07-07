@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "PMD",
+          "version": "7.0.0",
+          "informationUri": "https://pmd.github.io/",
+          "rules": [
+            {
+              "id": "UnusedLocalVariable",
+              "name": "UnusedLocalVariable",
+              "shortDescription": {
+                "text": "Avoid unused local variables"
+              },
+              "fullDescription": {
+                "text": "Detects when a local variable is declared and/or assigned, but not used."
+              },
+              "helpUri": "https://pmd.github.io/pmd/pmd_rules_java_bestpractices.html#unusedlocalvariable",
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "EmptyCatchBlock",
+              "name": "EmptyCatchBlock",
+              "shortDescription": {
+                "text": "Avoid empty catch blocks"
+              },
+              "fullDescription": {
+                "text": "Empty Catch Block finds instances where an exception is caught, but nothing is done."
+              },
+              "helpUri": "https://pmd.github.io/pmd/pmd_rules_java_errorprone.html#emptycatchblock",
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "UnusedLocalVariable",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "Avoid unused local variables such as 'total'."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/Calc.java"
+                },
+                "region": {
+                  "startLine": 12,
+                  "startColumn": 9
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "EmptyCatchBlock",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "Avoid empty catch blocks"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/Io.java"
+                },
+                "region": {
+                  "startLine": 30,
+                  "startColumn": 7
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

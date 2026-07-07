@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-28
+last_verified: 2026-07-07
 release: v0.4.2
 title: "External tool adapters"
 audience: [plugin-authors]
-purpose: "Wrap a local CLI scanner (gitleaks/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
+purpose: "Wrap a local CLI scanner (gitleaks/semgrep/ruff/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
 source-files:
   - packages/external-tool-adapter/src/define-external-tool-adapter.ts
   - packages/external-tool-adapter/src/types.ts
@@ -15,6 +15,19 @@ source-files:
   - packages/tool-gitleaks/src/parse-gitleaks-json.ts
   - packages/tool-osv-scanner/src/tool.ts
   - packages/tool-trivy/src/tool.ts
+  - packages/tool-semgrep/src/tool.ts
+  - packages/tool-ast-grep/src/tool.ts
+  - packages/tool-ruff/src/tool.ts
+  - packages/tool-golangci-lint/src/tool.ts
+  - packages/tool-govulncheck/src/tool.ts
+  - packages/tool-cargo-deny/src/tool.ts
+  - packages/tool-bandit/src/tool.ts
+  - packages/tool-pip-audit/src/tool.ts
+  - packages/tool-cargo-clippy/src/tool.ts
+  - packages/tool-spotbugs/src/tool.ts
+  - packages/tool-pmd/src/tool.ts
+  - packages/tool-dependency-check/src/tool.ts
+  - packages/tool-cppcheck/src/tool.ts
 related-docs:
   - ./06-full-tool-plugins.md
   - ./07-command-taxonomy.md
@@ -28,22 +41,37 @@ related-docs:
 # External tool adapters
 
 An **External Tool Adapter** wraps a user-installed CLI scanner — `gitleaks`,
-`osv-scanner`, `trivy`, or your own — as an ordinary OpenSIP `Tool`. The scanner
-runs as a subprocess; its native output (JSON or SARIF) is normalized to the
-platform's `Signal` currency, persisted, gated by the baseline ratchet, and
-egressed exactly like a `fit` or `graph` finding. The author writes a **descriptor
-plus a parser**, not a from-scratch Tool: the substrate
+`semgrep`, `ruff`, `golangci-lint`, `osv-scanner`, `trivy`, or your own — as an
+ordinary OpenSIP `Tool`. The scanner runs as a subprocess; its native output
+(JSON, SARIF, or stdout JSON/SARIF) is normalized to the platform's `Signal`
+currency, persisted, gated by the baseline ratchet, and egressed exactly like a
+`fit` or `graph` finding. The author writes a **descriptor plus a parser**, not a
+from-scratch Tool: the substrate
 [`@opensip-cli/external-tool-adapter`](../../../packages/external-tool-adapter)
 owns binary resolution, the run loop, the shared SARIF/JSON ingest, the
-`doctor`/`version` commands, secret redaction, provenance, and the gate.
+`doctor`/`version` commands, live progress events, secret redaction, provenance,
+and the gate.
 
-The three MVP adapters are the worked examples and the precedent for any new one:
+The shipped adapters are:
 
 | Adapter | Wraps | Scans | Native output | Posture |
 |---------|-------|-------|---------------|---------|
 | [`@opensip-cli/tool-gitleaks`](../../../packages/tool-gitleaks) | `gitleaks` | Committed secrets in the working tree | JSON (`parse`) | `local-only` |
 | [`@opensip-cli/tool-osv-scanner`](../../../packages/tool-osv-scanner) | `osv-scanner` | Dependency vulnerabilities | JSON (`parse`) | `local-only` |
 | [`@opensip-cli/tool-trivy`](../../../packages/tool-trivy) | `trivy` | Vulnerabilities + misconfigurations | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-semgrep`](../../../packages/tool-semgrep) | `semgrep` | SAST / policy rules | SARIF (shared `ingestSarif`) | `networked` when using `--config auto` |
+| [`@opensip-cli/tool-ast-grep`](../../../packages/tool-ast-grep) | `ast-grep` | Structural search rules | stdout SARIF (`parseStdoutSarif`) | `local-only` |
+| [`@opensip-cli/tool-ruff`](../../../packages/tool-ruff) | `ruff` | Python lint diagnostics | JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-golangci-lint`](../../../packages/tool-golangci-lint) | `golangci-lint` | Go lint aggregation | stdout JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-govulncheck`](../../../packages/tool-govulncheck) | `govulncheck` | Go vulnerabilities | stdout JSON lines (`parse`) | `networked` |
+| [`@opensip-cli/tool-cargo-deny`](../../../packages/tool-cargo-deny) | `cargo-deny` | Rust dependency policy | stdout JSON lines (`parse`) | `networked` |
+| [`@opensip-cli/tool-bandit`](../../../packages/tool-bandit) | `bandit` | Python security issues | JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-pip-audit`](../../../packages/tool-pip-audit) | `pip-audit` | Python dependency vulnerabilities | JSON (`parse`) | `networked` |
+| [`@opensip-cli/tool-cargo-clippy`](../../../packages/tool-cargo-clippy) | `cargo clippy` | Rust lint diagnostics | stdout JSON lines (`parse`) | `local-only` |
+| [`@opensip-cli/tool-spotbugs`](../../../packages/tool-spotbugs) | `spotbugs` | Java bytecode issues | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-pmd`](../../../packages/tool-pmd) | `pmd` | Java source rules | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-dependency-check`](../../../packages/tool-dependency-check) | `dependency-check` | Dependency vulnerabilities | SARIF (shared `ingestSarif`) | `local-only` with a pre-populated DB |
+| [`@opensip-cli/tool-cppcheck`](../../../packages/tool-cppcheck) | `cppcheck` | C/C++ static analysis | SARIF (shared `ingestSarif`) | `local-only` |
 
 Adapters are **opt-in and never bundled** — the core CLI stays scanner-agnostic.
 A user installs one with `opensip tools install`, then trusts it (see
@@ -306,9 +334,9 @@ binary yields a `doctor` install hint instead. The `BinarySpec`:
 - **`command`** — the `PATH` lookup name (`'gitleaks'`).
 - **`versionArgs`** — args that print the version (`['version']` / `['--version']`),
   used by `doctor`, `version`, and provenance.
-- **`versionParse?`** — normalize the version stdout to a bare semver (the MVP
-  adapters take the first semver-shaped token and strip a leading `v`). Defaults to
-  `stdout.trim()`.
+- **`versionParse?`** — normalize the version stdout to a bare semver (the
+  shipped adapters generally take the first semver-shaped token and strip a
+  leading `v`). Defaults to `stdout.trim()`.
 - **`minVersion?`** — `doctor` warns when the resolved version is below it.
 - **`resolution?`** — the order, default `['config', 'path']`. `config` reads the
   operator pin from the namespaced config (`binaries.<tool>.path`) **and** the
@@ -400,7 +428,7 @@ owns the perms and retention.
 ## Exit modeling
 
 Scanners overload exit codes, so a `ScannerExitModel` separates findings from
-faults per command. The frozen MVP models (ADR-0091) are the templates:
+faults per command. The shipped models follow the ADR-0091 templates:
 
 - **Gitleaks** — `{ ok: [0], findings: [1], errorFrom: 2 }`. Gitleaks **also**
   exits `1` on an internal fatal, so the substrate disambiguates by **artifact
@@ -427,9 +455,10 @@ the project + artifact store), and `network` is added **only** for a
 `networked`/`auth-required` posture. Because the mapping is derived, flipping an
 adapter's posture surfaces as a `tool-manifests --check` drift (CI fails until the
 manifest is regenerated) — you can't ship a `networked` adapter that still claims
-`[subprocess, filesystem]`. All three MVP adapters are `local-only` (`subprocess` +
-`filesystem` only) — Trivy is `local-only` because it scans against a
-**pre-populated local DB cache** with `--offline-scan`.
+`[subprocess, filesystem]`. Local-only adapters emit `subprocess` + `filesystem`
+only; networked adapters such as Semgrep auto-config mode, govulncheck,
+cargo-deny, and pip-audit also declare `network`. Trivy and Dependency-Check are
+`local-only` only when they scan against a **pre-populated local DB cache**.
 
 `requires` is **declaration-only** — honest labeling for review and
 provenance, not an enforced sandbox. Capability *enforcement* is **shelved**
@@ -471,11 +500,10 @@ install and worker import. The first-party adapters generate and drift-gate thei
 through the shared tool-manifest generator.
 
 The **public third-party adapter ecosystem** stays gated on the platform's launch
-posture (ADR-0061): the first-party MVP adapters ship because they are
-opensip.ai-authored JS wrapping a user-installed subprocess and add no untrusted-JS
-surface. A third-party adapter is installable today (deny-by-default trust opt-in)
-but is not a *recommended* listing until it clears the consumption-side security
-bar.
+posture (ADR-0061): the first-party adapters ship because they are
+opensip.ai-authored JS wrapping a user-installed subprocess. A third-party
+adapter is installable today (deny-by-default trust opt-in) but is not a
+*recommended* listing until it clears the consumption-side security bar.
 
 ## Reference
 
@@ -485,5 +513,3 @@ bar.
 - [ADR-0090](../../decisions/ADR-0090-external-tool-adapter-substrate.md) ·
   [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md) ·
   [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)
-</content>
-</invoke>

@@ -1,0 +1,63 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { readPackageVersion } from '@opensip-cli/core';
+import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+
+import type { Tool, ToolIdentity } from '@opensip-cli/core';
+import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
+
+export const CPPCHECK_IDENTITY: ToolIdentity = { name: 'cppcheck' };
+export const CPPCHECK_STABLE_ID = 'dafe9acd-77c5-4055-a01c-05950c15d5f1';
+
+function projectInput(projectRoot: string): readonly string[] {
+  const compileCommands = join(projectRoot, 'compile_commands.json');
+  if (existsSync(compileCommands)) return [`--project=${compileCommands}`];
+  return [projectRoot];
+}
+
+export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
+  return [
+    '--enable=warning,style,performance,portability,information',
+    '--inline-suppr',
+    '--output-format=sarif',
+    `--output-file=${ctx.artifactPath('cppcheck.sarif')}`,
+    ...projectInput(ctx.projectRoot),
+  ];
+}
+
+export function buildCppcheckExclude(input: { readonly excludePath: string }): {
+  readonly args: readonly string[];
+} {
+  return { args: ['-i', input.excludePath] };
+}
+
+export const tool: Tool = defineExternalToolAdapter({
+  identity: CPPCHECK_IDENTITY,
+  metadata: {
+    id: CPPCHECK_STABLE_ID,
+    version: readPackageVersion(import.meta.url),
+    description: 'C/C++ static analysis via Cppcheck',
+    adapterPackage: '@opensip-cli/tool-cppcheck',
+  },
+  binary: {
+    command: 'cppcheck',
+    versionArgs: ['--version'],
+    versionParse: (stdout) => parseFirstSemver(stdout) ?? stdout.trim(),
+    minVersion: '2.16.0',
+    resolution: ['config', 'path'],
+    installHint: 'Install cppcheck: https://cppcheck.sourceforge.io/ (brew install cppcheck)',
+  },
+  network: 'local-only',
+  commands: [
+    {
+      name: 'scan',
+      description: 'Run Cppcheck and normalize SARIF diagnostics',
+      args: buildScanArgs,
+      output: { kind: 'sarif', path: 'cppcheck.sarif' },
+      exitCodes: { ok: [0], findings: [], errorFrom: 1 },
+      excludeScan: buildCppcheckExclude,
+    },
+  ],
+  fingerprintStrategy: 'message-hash',
+});

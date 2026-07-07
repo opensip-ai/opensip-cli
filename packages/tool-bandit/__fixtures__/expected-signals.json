@@ -1,0 +1,26 @@
+[
+  {
+    "ruleId": "B602",
+    "severity": "high",
+    "message": "subprocess call with shell=True identified, security issue.",
+    "file": "app.py",
+    "line": 10,
+    "column": 4
+  },
+  {
+    "ruleId": "B108",
+    "severity": "medium",
+    "message": "Probable insecure usage of temp file/directory.",
+    "file": "app.py",
+    "line": 22,
+    "column": 8
+  },
+  {
+    "ruleId": "B404",
+    "severity": "low",
+    "message": "Consider possible security implications associated with the subprocess module.",
+    "file": "app.py",
+    "line": 1,
+    "column": 0
+  }
+]

@@ -90,7 +90,11 @@ function runCli(args: string[], extraEnv: Record<string, string> = {}, cwd = pro
     return { stdout, stderr: '', status: 0 };
   } catch (error) {
     const e = error as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', status: e.status ?? 1 };
+    return {
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
+      status: e.status ?? 1,
+    };
   }
 }
 
@@ -207,7 +211,10 @@ describe('trivy worker E2E — opensip trivy (real forked worker)', () => {
   it('stamps message-hash fingerprints + provenance + recovered native severity worker-side', () => {
     for (const s of envelope.signals) {
       expect(s.fingerprint).toMatch(/^[0-9a-f]{64}$/);
-      const provenance = s.metadata.provenance as { tool: string; adapterPackage: string };
+      const provenance = s.metadata.provenance as {
+        tool: string;
+        adapterPackage: string;
+      };
       expect(provenance.tool).toBe('trivy');
       expect(provenance.adapterPackage).toBe('@opensip-cli/tool-trivy');
     }
@@ -243,7 +250,10 @@ describe('trivy worker E2E — opensip trivy (real forked worker)', () => {
     const trivyRow = sessions.find((s) => s.tool === 'trivy');
     expect(trivyRow).toBeDefined();
     expect(trivyRow?.passed).toBe(false);
-    const payload = trivyRow?.payload as { binary?: { path?: string }; findings?: number };
+    const payload = trivyRow?.payload as {
+      binary?: { path?: string };
+      findings?: number;
+    };
     expect(payload?.binary?.path).toContain('trivy');
     expect(payload?.findings).toBe(3);
   });
@@ -276,7 +286,10 @@ describe('trivy worker E2E — doctor / version diagnostics', () => {
       OPENSIP_CLI_TOOL_ENV_PASSTHROUGH: 'FAKE_TRIVY_GOLDEN OPENSIP_TRIVY_BIN',
     });
     expect(run.status).toBe(2);
-    const report = outcomeJson(run).data as { ready: boolean; binary: { found: boolean } };
+    const report = outcomeJson(run).data as {
+      ready: boolean;
+      binary: { found: boolean };
+    };
     expect(report.ready).toBe(false);
     expect(report.binary.found).toBe(false);
   });
@@ -284,7 +297,10 @@ describe('trivy worker E2E — doctor / version diagnostics', () => {
   it('version --json prints the resolved trivy binary version', () => {
     const run = runCli(['trivy', 'version', '--json']);
     expect(run.status).toBe(0);
-    const report = outcomeJson(run).data as { found: boolean; version?: string };
+    const report = outcomeJson(run).data as {
+      found: boolean;
+      version?: string;
+    };
     expect(report.found).toBe(true);
     expect(report.version).toBe('0.50.1');
   });
@@ -292,7 +308,9 @@ describe('trivy worker E2E — doctor / version diagnostics', () => {
 
 describe('trivy worker E2E — installed tools are deny-by-default', () => {
   it('without the trust allowlist, `opensip trivy` is not admitted', () => {
-    const run = runCli(['trivy', '--json'], { OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '' });
+    const run = runCli(['trivy', '--json'], {
+      OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '',
+    });
     // Deny-by-default: the command never mounts (unknown command / not found), so
     // the scan does NOT run.
     expect(run.status).not.toBe(0);
@@ -337,7 +355,10 @@ describe('trivy worker E2E — full gate ratchet (§4.12)', () => {
       shortDescription: { text: 'axios: Server-Side Request Forgery' },
       helpUri: 'https://avd.aquasec.com/nvd/cve-2024-99999',
       defaultConfiguration: { level: 'error' },
-      properties: { 'security-severity': '8.6', tags: ['vulnerability', 'security', 'HIGH'] },
+      properties: {
+        'security-severity': '8.6',
+        tags: ['vulnerability', 'security', 'HIGH'],
+      },
     });
     run0.results.push({
       ruleId: 'CVE-2024-99999',
@@ -347,7 +368,10 @@ describe('trivy worker E2E — full gate ratchet (§4.12)', () => {
       locations: [
         {
           physicalLocation: {
-            artifactLocation: { uri: 'requirements.txt', uriBaseId: 'ROOTPATH' },
+            artifactLocation: {
+              uri: 'requirements.txt',
+              uriBaseId: 'ROOTPATH',
+            },
             region: { startLine: 1, startColumn: 1 },
           },
         },
@@ -378,7 +402,9 @@ describe('trivy worker E2E — full gate ratchet (§4.12)', () => {
     // the baseline IS written — proven by the clean compare below.
     expect(save.status).toBe(1);
     const list = runCli(['sessions', 'list', '--json'], {}, gateProject);
-    const data = outcomeJson(list).data as { sessions?: Record<string, unknown>[] };
+    const data = outcomeJson(list).data as {
+      sessions?: Record<string, unknown>[];
+    };
     const trivyRows = (data.sessions ?? []).filter((s) => s.tool === 'trivy');
     expect(trivyRows.length).toBeGreaterThanOrEqual(1);
   });

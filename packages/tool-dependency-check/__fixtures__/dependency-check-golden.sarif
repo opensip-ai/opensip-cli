@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "dependency-check",
+          "version": "9.0.9",
+          "informationUri": "https://owasp.org/www-project-dependency-check/",
+          "rules": [
+            {
+              "id": "CVE-2021-44228",
+              "name": "log4j-core",
+              "shortDescription": {
+                "text": "log4j-core: Remote code execution via JNDI (Log4Shell)"
+              },
+              "helpUri": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+            },
+            {
+              "id": "CVE-2020-13956",
+              "name": "httpclient",
+              "shortDescription": {
+                "text": "Apache HttpClient improper URI parsing"
+              },
+              "helpUri": "https://nvd.nist.gov/vuln/detail/CVE-2020-13956"
+            },
+            {
+              "id": "CVE-2019-10086",
+              "name": "commons-beanutils",
+              "shortDescription": {
+                "text": "commons-beanutils: class property access bypass"
+              },
+              "helpUri": "https://nvd.nist.gov/vuln/detail/CVE-2019-10086"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2021-44228",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "log4j-core-2.14.1.jar (pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1) : CVE-2021-44228"
+          },
+          "properties": {
+            "security-severity": "9.1"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "pom.xml"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CVE-2019-10086",
+          "ruleIndex": 2,
+          "level": "error",
+          "message": {
+            "text": "commons-beanutils-1.9.3.jar (pkg:maven/commons-beanutils/commons-beanutils@1.9.3) : CVE-2019-10086"
+          },
+          "properties": {
+            "security-severity": "7.5"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "pom.xml"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CVE-2020-13956",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "httpclient-4.5.12.jar (pkg:maven/org.apache.httpcomponents/httpclient@4.5.12) : CVE-2020-13956"
+          },
+          "properties": {
+            "security-severity": "5.3"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "pom.xml"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

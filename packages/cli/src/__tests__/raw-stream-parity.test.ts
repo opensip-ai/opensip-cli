@@ -64,7 +64,7 @@ interface ToolPackageJson {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..', '..');
-const RAW_STREAM_MANIFEST_BUDGET = 24;
+const RAW_STREAM_MANIFEST_BUDGET = 63;
 
 function workspacePackageDirs(): readonly string[] {
   const packagesDir = join(REPO_ROOT, 'packages');
@@ -128,8 +128,21 @@ const RUNTIME_RENDER_DISPATCH = new Set([
   'graph:graph impact',
   'simulation:simulation',
   'yagni:yagni',
+  'ast-grep:ast-grep',
+  'bandit:bandit',
+  'cargo-clippy:cargo-clippy',
+  'cargo-deny:cargo-deny',
+  'cppcheck:cppcheck',
+  'dependency-check:dependency-check',
   'gitleaks:gitleaks',
+  'golangci-lint:golangci-lint',
+  'govulncheck:govulncheck',
   'osv-scanner:osv-scanner',
+  'pip-audit:pip-audit',
+  'pmd:pmd',
+  'ruff:ruff',
+  'semgrep:semgrep',
+  'spotbugs:spotbugs',
   'trivy:trivy',
 ]);
 
@@ -188,12 +201,25 @@ describe('raw-stream inventory (packaged tools)', () => {
 
   it('groups bundled raw-stream commands by reason category', () => {
     expect(reasonKeys(manifestInventory, 'runtime-render-dispatch')).toEqual([
+      'ast-grep:ast-grep',
+      'bandit:bandit',
+      'cargo-clippy:cargo-clippy',
+      'cargo-deny:cargo-deny',
+      'cppcheck:cppcheck',
+      'dependency-check:dependency-check',
       'fitness:fitness',
       'gitleaks:gitleaks',
+      'golangci-lint:golangci-lint',
+      'govulncheck:govulncheck',
       'graph:graph',
       'graph:graph impact',
       'osv-scanner:osv-scanner',
+      'pip-audit:pip-audit',
+      'pmd:pmd',
+      'ruff:ruff',
+      'semgrep:semgrep',
       'simulation:simulation',
+      'spotbugs:spotbugs',
       'trivy:trivy',
       'yagni:yagni',
     ]);
@@ -203,11 +229,37 @@ describe('raw-stream inventory (packaged tools)', () => {
       'graph:graph index',
     ]);
     expect(reasonKeys(manifestInventory, 'diagnostic-gate')).toEqual([
+      'ast-grep:ast-grep doctor',
+      'ast-grep:ast-grep version',
+      'bandit:bandit doctor',
+      'bandit:bandit version',
+      'cargo-clippy:cargo-clippy doctor',
+      'cargo-clippy:cargo-clippy version',
+      'cargo-deny:cargo-deny doctor',
+      'cargo-deny:cargo-deny version',
+      'cppcheck:cppcheck doctor',
+      'cppcheck:cppcheck version',
+      'dependency-check:dependency-check doctor',
+      'dependency-check:dependency-check version',
       'gitleaks:gitleaks doctor',
       'gitleaks:gitleaks version',
+      'golangci-lint:golangci-lint doctor',
+      'golangci-lint:golangci-lint version',
+      'govulncheck:govulncheck doctor',
+      'govulncheck:govulncheck version',
       'graph:graph-equivalence-check',
       'osv-scanner:osv-scanner doctor',
       'osv-scanner:osv-scanner version',
+      'pip-audit:pip-audit doctor',
+      'pip-audit:pip-audit version',
+      'pmd:pmd doctor',
+      'pmd:pmd version',
+      'ruff:ruff doctor',
+      'ruff:ruff version',
+      'semgrep:semgrep doctor',
+      'semgrep:semgrep version',
+      'spotbugs:spotbugs doctor',
+      'spotbugs:spotbugs version',
       'trivy:trivy doctor',
       'trivy:trivy version',
     ]);

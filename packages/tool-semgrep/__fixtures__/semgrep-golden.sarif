@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "semgrep",
+          "version": "1.70.0",
+          "informationUri": "https://semgrep.dev",
+          "rules": [
+            {
+              "id": "python.lang.security.audit.dangerous-subprocess-use",
+              "shortDescription": { "text": "Detected subprocess function with a shell" },
+              "helpUri": "https://semgrep.dev/r/python.lang.security.audit.dangerous-subprocess-use",
+              "properties": { "security-severity": "8.5" }
+            },
+            {
+              "id": "python.flask.security.audit.directly-returned-format-string",
+              "shortDescription": { "text": "Detected Flask route directly returning a formatted string" },
+              "helpUri": "https://semgrep.dev/r/python.flask.security.audit.directly-returned-format-string"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "python.lang.security.audit.dangerous-subprocess-use",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Detected subprocess function 'Popen' with a shell. This is dangerous because it can allow a malicious actor to execute arbitrary commands."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/app.py" },
+                "region": { "startLine": 12, "startColumn": 5 }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "python.flask.security.audit.directly-returned-format-string",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "Detected Flask route directly returning a formatted string. This may expose the app to cross-site scripting (XSS)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "src/views.py" },
+                "region": { "startLine": 8, "startColumn": 3 }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

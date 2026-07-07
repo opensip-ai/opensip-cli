@@ -25,45 +25,21 @@
  * run.
  */
 
-import { currentScope, SystemError, type ToolProvenance, type ToolSource } from '@opensip-cli/core';
+import { currentScope, SystemError, type ToolSource } from '@opensip-cli/core';
 
 import {
   DEFAULT_DISPATCH_TIMEOUT_MS,
   requirePackageDir,
   runWorkerSpec,
 } from './dispatch-fork-core.js';
-import { replayResult, type DispatchHostCtx } from './dispatch-replay-result.js';
+import { replayResult } from './dispatch-replay-result.js';
+import {
+  runExternalAdapterLiveView,
+  shouldUseExternalAdapterLiveView,
+} from './external-adapter-live-view.js';
 
+import type { DispatchExternalToolCommandArgs } from './dispatch-external-tool-command-types.js';
 import type { ToolCommandResult, ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
-
-export interface DispatchExternalToolCommandArgs {
-  /** The external tool's provenance (source must NOT be `'bundled'`). */
-  readonly provenance: ToolProvenance;
-  /** Which command (by `CommandSpec.name`) to run in the worker. */
-  readonly commandName: string;
-  /** Parsed opts for this invocation (serializable). */
-  readonly opts: Record<string, unknown>;
-  /** Trailing positionals (`_args`) for this invocation (serializable). */
-  readonly positionals: readonly unknown[];
-  /**
-   * The tool's RAW config namespace block for the WORKER deep pass (ADR-0054
-   * M4-E Config two-pass). Forwarded into the spec so the worker runs the tool's
-   * real Zod after load. `undefined` when there is no block to validate.
-   */
-  readonly config?: unknown;
-  /** The real host context the supervisor replays the worker result through. */
-  readonly ctx: DispatchHostCtx;
-  /** Override the wall-clock timeout (tests use a short one). */
-  readonly timeoutMs?: number;
-  /**
-   * Override the CLI entry script the supervisor forks (defaults to
-   * `process.argv[1]`). The worker runs as `node <cliScript> __tool-command-worker
-   * <specPath> --cwd <cwd>`, going through the full bootstrap so the dispatched
-   * tool's scope (config/registries/subscope) is worker-local (ADR-0054 M4-E).
-   * Tests point this at the built CLI dist entry.
-   */
-  readonly cliScript?: string;
-}
 
 /**
  * Fork the worker, await its slim {@link ToolCommandResult}, and replay it
@@ -94,6 +70,15 @@ export async function dispatchExternalToolCommand(
     'debug',
     `dispatching external tool '${args.provenance.id}' command '${args.commandName}' out-of-process`,
   );
+  if (shouldUseExternalAdapterLiveView(args)) {
+    await runExternalAdapterLiveView(args);
+    diagnostics?.event(
+      'execute',
+      'debug',
+      `external tool '${args.provenance.id}' command '${args.commandName}' live view resolved`,
+    );
+    return;
+  }
   const result = await runCommandWorker(args);
   diagnostics?.event(
     'execute',
@@ -119,6 +104,7 @@ function runCommandWorker(args: DispatchExternalToolCommandArgs): Promise<ToolCo
     // ADR-0054 M4-E: forward the coarse-validated config block so the worker can
     // run the tool's real Zod deep pass after load. Omitted when no block exists.
     ...(args.config === undefined ? {} : { config: args.config }),
+    ...(args.presentationMode === undefined ? {} : { presentationMode: args.presentationMode }),
   };
   const cwd = typeof args.opts.cwd === 'string' ? args.opts.cwd : process.cwd();
   return runWorkerSpec({
@@ -127,5 +113,6 @@ function runCommandWorker(args: DispatchExternalToolCommandArgs): Promise<ToolCo
     cwd,
     ...(args.cliScript === undefined ? {} : { cliScript: args.cliScript }),
     timeoutMs: args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS,
+    ...(args.onAdapterProgress === undefined ? {} : { onAdapterProgress: args.onAdapterProgress }),
   });
 }

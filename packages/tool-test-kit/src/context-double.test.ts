@@ -54,7 +54,9 @@ describe('createToolCliContextDouble', () => {
     expect(run.result.type).toBe('text-lines');
     expect(run.captured.json).toEqual([{ ok: true }]);
     expect(run.captured.artifactWrites).toEqual([{ path: 'out.json', bytes: '{"ok":true}\n' }]);
-    await expect(run.ctx.toolState.get('sample', 'last')).resolves.toEqual({ json: true });
+    await expect(run.ctx.toolState.get('sample', 'last')).resolves.toEqual({
+      json: true,
+    });
   });
 
   it('captures reportFailure details with unknown throwables', async () => {
@@ -79,7 +81,12 @@ describe('createToolCliContextDouble', () => {
 
   it('captures every documented host seam exposed by the double', async () => {
     const envelope = sampleEnvelope();
-    const compareResult = { added: ['new'], resolved: [], unchanged: [], degraded: true };
+    const compareResult = {
+      added: ['new'],
+      resolved: [],
+      unchanged: [],
+      degraded: true,
+    };
     const double = createToolCliContextDouble({
       deliveryResult: { cloudAccepted: 1 },
       compareResult,
@@ -96,10 +103,17 @@ describe('createToolCliContextDouble', () => {
     });
     await expect(double.ctx.renderLive('missing-live', {})).rejects.toBeInstanceOf(Error);
 
-    await double.ctx.maybeOpenReport({ openRequested: true, jsonOutput: false });
+    await double.ctx.maybeOpenReport({
+      openRequested: true,
+      jsonOutput: false,
+    });
     await double.ctx.reportFailure({ message: 'reported', exitCode: 2 });
     double.ctx.setExitCode(7);
-    double.ctx.emitError({ message: 'bad input', exitCode: 2, code: 'BAD_INPUT' });
+    double.ctx.emitError({
+      message: 'bad input',
+      exitCode: 2,
+      code: 'BAD_INPUT',
+    });
     double.ctx.emitRaw('raw text');
     await expect(
       double.ctx.deliverSignals(envelope, {
@@ -142,7 +156,12 @@ describe('createToolCliContextDouble', () => {
     expect(double.captured.deliveredSignals).toEqual([
       {
         envelope,
-        opts: { cwd: '/repo', reportTo: 'cloud', apiKey: 'redacted', runFailed: true },
+        opts: {
+          cwd: '/repo',
+          reportTo: 'cloud',
+          apiKey: 'redacted',
+          runFailed: true,
+        },
       },
     ]);
     expect(double.captured.sarifWrites).toEqual([{ envelope, path: 'out.sarif' }]);

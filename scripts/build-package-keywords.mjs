@@ -83,6 +83,28 @@ const OVERRIDES = {
   '@opensip-cli/graph-adapter-common': ['call-graph', 'tree-sitter'],
   '@opensip-cli/external-tool-adapter': ['security', 'scanners', 'adapters', 'sarif'],
   '@opensip-cli/tool-gitleaks': ['security', 'gitleaks', 'secrets', 'scanner'],
+  '@opensip-cli/tool-osv-scanner': ['security', 'osv', 'vulnerabilities', 'scanner'],
+  '@opensip-cli/tool-trivy': ['security', 'trivy', 'vulnerabilities', 'scanner', 'sarif'],
+  '@opensip-cli/tool-semgrep': ['security', 'semgrep', 'sast', 'scanner', 'sarif'],
+  '@opensip-cli/tool-ast-grep': ['ast-grep', 'structural-search', 'linting', 'scanner'],
+  '@opensip-cli/tool-ruff': ['python', 'ruff', 'linting', 'scanner'],
+  '@opensip-cli/tool-golangci-lint': ['go', 'golang', 'golangci-lint', 'linting', 'scanner'],
+  '@opensip-cli/tool-govulncheck': ['go', 'golang', 'govulncheck', 'security', 'scanner'],
+  '@opensip-cli/tool-cargo-deny': ['rust', 'cargo-deny', 'security', 'policy', 'scanner'],
+  '@opensip-cli/tool-bandit': ['python', 'bandit', 'security', 'scanner'],
+  '@opensip-cli/tool-pip-audit': ['python', 'pip-audit', 'security', 'vulnerabilities', 'scanner'],
+  '@opensip-cli/tool-cargo-clippy': ['rust', 'cargo-clippy', 'clippy', 'linting', 'scanner'],
+  '@opensip-cli/tool-spotbugs': ['java', 'spotbugs', 'security', 'scanner', 'sarif'],
+  '@opensip-cli/tool-pmd': ['java', 'pmd', 'linting', 'scanner', 'sarif'],
+  '@opensip-cli/tool-dependency-check': [
+    'owasp',
+    'dependency-check',
+    'security',
+    'vulnerabilities',
+    'scanner',
+    'sarif',
+  ],
+  '@opensip-cli/tool-cppcheck': ['cpp', 'c++', 'cppcheck', 'linting', 'scanner', 'sarif'],
   // Preserve the MCP package's distinctive search keywords (the generator is the
   // source of truth; its package.json keyword set pre-dated this map entry).
   '@opensip-cli/mcp': ['mcp', 'model-context-protocol', 'code-graph'],
@@ -98,6 +120,7 @@ function deriveKeywords(pkg) {
   if (kind === 'fit-pack') out.push('fitness-checks', 'linting');
   if (kind === 'graph-adapter') out.push('call-graph', 'dependency-graph');
   if (short.startsWith('lang-')) out.push('parser', 'ast', 'tree-sitter');
+  if (short.startsWith('tool-')) out.push('external-tool-adapter', 'scanner');
 
   const langKey = Object.keys(LANG_KEYWORDS).find((l) => short === l || short.endsWith(`-${l}`));
   if (langKey) out.push(...LANG_KEYWORDS[langKey]);

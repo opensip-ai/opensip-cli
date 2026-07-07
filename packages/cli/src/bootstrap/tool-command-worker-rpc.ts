@@ -20,11 +20,16 @@
 
 import { toolErrorFromCanonicalCode } from '@opensip-cli/core';
 
-import type { HostRpcCall, HostRpcRequest, RpcReply } from './tool-command-dispatch-types.js';
+import type {
+  DispatchProgressEvent,
+  HostRpcCall,
+  HostRpcRequest,
+  RpcReply,
+} from './tool-command-dispatch-types.js';
 import type { WorkerMessage } from '@opensip-cli/core';
 
 /** The worker's outbound IPC type binding: requests stream on `progress`. */
-type WorkerOutbound = WorkerMessage<HostRpcRequest, unknown>;
+type WorkerOutbound = WorkerMessage<DispatchProgressEvent, unknown>;
 
 /**
  * A worker RPC client: `call` issues one upcall and resolves with the host's
@@ -130,11 +135,11 @@ export function createWorkerRpcClient(channel: {
         }
         const rpcId = nextId++;
         pending.set(rpcId, { resolve, reject });
-        const event: HostRpcRequest = { ...request, rpcId };
+        const requestWithId: HostRpcRequest = { ...request, rpcId };
         // Call through `channel.send(...)` (not an extracted reference) so the
         // method keeps its `this` binding — `process.send` reads `this.connected`
         // internally and throws if invoked unbound.
-        channel.send({ kind: 'progress', event });
+        channel.send({ kind: 'progress', event: { kind: 'host-rpc', request: requestWithId } });
       }),
     dispose: () => {
       channel.off?.('message', onMessage);

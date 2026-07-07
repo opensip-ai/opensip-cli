@@ -74,8 +74,14 @@ const ROLE_BY_KIND = {
 const DEFAULT_ROLE =
   'This is an **internal library** of the opensip-cli toolkit. It is published so the CLI and tools can depend on it; most users will not install it directly.';
 
-function roleSentence(kind) {
-  return ROLE_BY_KIND[kind] ?? DEFAULT_ROLE;
+function roleSentence(pkg) {
+  if (pkg.opensipTools?.kind === 'tool' && pkg.name?.startsWith('@opensip-cli/tool-')) {
+    return (
+      'This package is an **opt-in external scanner adapter**. Install it alongside ' +
+      '`opensip-cli` when you want OpenSIP to run the corresponding customer-installed tool.'
+    );
+  }
+  return ROLE_BY_KIND[pkg.opensipTools?.kind] ?? DEFAULT_ROLE;
 }
 
 const GENERATED_MARKER =
@@ -95,7 +101,7 @@ function renderReadme(pkg, releaseRef) {
     `${GENERATED_MARKER}\n\n` +
     `# ${name}\n\n` +
     `> ${description}\n\n` +
-    `${roleSentence(pkg.opensipTools?.kind)}\n\n` +
+    `${roleSentence(pkg)}\n\n` +
     `Part of [**opensip-cli**](${repoRootUrl}) — an open-source codebase intelligence ` +
     `CLI: fitness checks (\`fit\`), static call-graph analysis (\`graph\`), ` +
     `simulation (\`sim\`), and advisory reduction audits (\`yagni\`).\n\n` +

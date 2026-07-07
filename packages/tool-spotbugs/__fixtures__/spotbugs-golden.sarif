@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "SpotBugs",
+          "version": "4.8.3",
+          "informationUri": "https://spotbugs.github.io/",
+          "rules": [
+            {
+              "id": "DM_DEFAULT_ENCODING",
+              "name": "DmDefaultEncoding",
+              "shortDescription": {
+                "text": "Reliance on default encoding"
+              },
+              "fullDescription": {
+                "text": "Found a call to a method which will perform a byte to String (or String to byte) conversion, and will assume that the default platform encoding is suitable."
+              },
+              "helpUri": "https://spotbugs.readthedocs.io/en/stable/bugDescriptions.html#dm-default-encoding",
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "NP_NULL_ON_SOME_PATH",
+              "name": "NpNullOnSomePath",
+              "shortDescription": {
+                "text": "Possible null pointer dereference"
+              },
+              "fullDescription": {
+                "text": "There is a branch of statement that, if executed, guarantees that a null value will be dereferenced, which would generate a NullPointerException when the code is executed."
+              },
+              "helpUri": "https://spotbugs.readthedocs.io/en/stable/bugDescriptions.html#np-null-on-some-path",
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "DM_DEFAULT_ENCODING",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "Found reliance on default encoding in com.example.App.readConfig(): new String(byte[])"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/App.java"
+                },
+                "region": {
+                  "startLine": 42,
+                  "startColumn": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "NP_NULL_ON_SOME_PATH",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "Possible null pointer dereference of user in com.example.Service.handle(Request)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/Service.java"
+                },
+                "region": {
+                  "startLine": 88,
+                  "startColumn": 9
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

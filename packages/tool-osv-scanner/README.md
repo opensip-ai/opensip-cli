@@ -6,7 +6,7 @@
 
 > External Tool Adapter for OSV-Scanner — wraps the osv-scanner dependency vulnerability scanner as an opensip-cli tool (opensip osv-scanner / opensip osv)
 
-This package is the **engine** behind a first-party `opensip-cli` tool. The CLI bundles it — you do not normally install it directly.
+This package is an **opt-in external scanner adapter**. Install it alongside `opensip-cli` when you want OpenSIP to run the corresponding customer-installed tool.
 
 Part of [**opensip-cli**](https://github.com/opensip-ai/opensip-cli) — an open-source codebase intelligence CLI: fitness checks (`fit`), static call-graph analysis (`graph`), simulation (`sim`), and advisory reduction audits (`yagni`).
 

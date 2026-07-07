@@ -63,6 +63,17 @@ function deepConfigBlockFor(tool: Tool): unknown {
   return currentScope()?.configDocument?.[namespace];
 }
 
+function commandAllowsAdapterLiveView(tool: Tool, commandName: string): boolean {
+  const spec = tool.commandSpecs?.find(
+    (candidate) => candidate.name === commandName || candidate.aliases?.includes(commandName),
+  );
+  return (
+    spec?.output === 'raw-stream' &&
+    spec.rawStreamReason === 'runtime-render-dispatch' &&
+    spec.producesVerdict === true
+  );
+}
+
 /**
  * Build the `maybeDispatchExternal` hook bound to one tool + its host context.
  * The returned hook is merged onto the bound `ToolCliContext` by `mountOneTool`.
@@ -106,6 +117,7 @@ export function buildMaybeDispatchExternal(
       positionals,
       ctx: dispatchCtx,
       config: deepConfigBlockFor(tool),
+      allowAdapterLiveView: commandAllowsAdapterLiveView(tool, commandName),
     });
     return true;
   };

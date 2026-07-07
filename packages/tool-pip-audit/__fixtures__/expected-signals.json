@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "PYSEC-2019-179",
+    "severity": "high",
+    "message": "The Pallets Project Flask before 1.0 is affected by unexpected memory usage due to a large amount of chunked encoding data. (flask@1.0)",
+    "file": ""
+  },
+  {
+    "ruleId": "PYSEC-2021-66",
+    "severity": "high",
+    "message": "A ReDoS vulnerability was found in Jinja2 due to the _punctuation_re regex. (jinja2@2.11.1)",
+    "file": ""
+  }
+]

@@ -27,7 +27,12 @@ export const DEFAULT_EXIT_MODEL: ScannerExitModel = { ok: [0], findings: [1], er
  *   (the gitleaks disambiguation: exit 1 + missing/garbage report ⇒ `'fault'`).
  *   `artifactValid` left `undefined` is treated as valid (stdout scanners, no
  *   artifact to validate).
- * - code `>= errorFrom`, or any other unmodeled value, ⇒ `'fault'`.
+ * - code `>= errorFrom` ⇒ `'fault'` (the hard ceiling, checked before the
+ *   {@link ScannerExitModel.findingsFromNonzero} reclaim so an analysis-error bit
+ *   still faults).
+ * - `findingsFromNonzero` + nonzero + below the ceiling + valid artifact ⇒
+ *   `'findings'` (bitset/threshold scanners — cargo-deny, spotbugs, cargo-clippy).
+ * - any other unmodeled value ⇒ `'fault'`.
  *
  * `ok` is checked before `findings` so an overlap resolves to the cleaner verdict.
  */
@@ -36,9 +41,12 @@ export function interpretExit(
   model: ScannerExitModel,
   opts?: { readonly artifactValid?: boolean },
 ): ExitVerdict {
+  const artifactValid = opts?.artifactValid !== false;
   if (model.ok.includes(code)) return 'ok';
-  if (model.findings.includes(code)) {
-    return opts?.artifactValid === false ? 'fault' : 'findings';
-  }
+  if (model.findings.includes(code)) return artifactValid ? 'findings' : 'fault';
+  // Hard ceiling wins over the bitset reclaim: an `error`-class code is a fault
+  // even for a `findingsFromNonzero` scanner.
+  if (model.errorFrom !== undefined && code >= model.errorFrom) return 'fault';
+  if (model.findingsFromNonzero === true && code !== 0 && artifactValid) return 'findings';
   return 'fault';
 }

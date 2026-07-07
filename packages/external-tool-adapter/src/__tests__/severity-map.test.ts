@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   cvssToSeverity,
+  nativeLabelToSeverity,
   parseCvss,
   sarifLevelToSeverity,
   withNativeSeverity,
@@ -65,5 +66,37 @@ describe('withNativeSeverity', () => {
   it('records the raw label and null for missing', () => {
     expect(withNativeSeverity({ a: 1 }, 'HIGH')).toEqual({ a: 1, nativeSeverity: 'HIGH' });
     expect(withNativeSeverity({}, undefined)).toEqual({ nativeSeverity: null });
+  });
+});
+
+describe('nativeLabelToSeverity (common scanner label → four-bucket)', () => {
+  it('maps the critical / blocker band', () => {
+    expect(nativeLabelToSeverity('critical')).toBe('critical');
+    expect(nativeLabelToSeverity('BLOCKER')).toBe('critical');
+  });
+
+  it('maps the high band (high / error / fatal / major)', () => {
+    for (const label of ['high', 'error', 'Fatal', 'MAJOR']) {
+      expect(nativeLabelToSeverity(label)).toBe('high');
+    }
+  });
+
+  it('maps the medium band (medium / moderate / warning / warn / minor)', () => {
+    for (const label of ['medium', 'moderate', 'warning', 'warn', 'minor']) {
+      expect(nativeLabelToSeverity(label)).toBe('medium');
+    }
+  });
+
+  it('maps the low band (low / info / information / note / style)', () => {
+    for (const label of ['low', 'info', 'information', 'note', 'style']) {
+      expect(nativeLabelToSeverity(label)).toBe('low');
+    }
+  });
+
+  it('is case/space-insensitive and falls back for unknown labels', () => {
+    expect(nativeLabelToSeverity('  Error  ')).toBe('high');
+    expect(nativeLabelToSeverity('nonsense')).toBe('medium');
+    expect(nativeLabelToSeverity(undefined)).toBe('medium');
+    expect(nativeLabelToSeverity('nonsense', 'low')).toBe('low');
   });
 });

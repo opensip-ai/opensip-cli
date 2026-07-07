@@ -33,12 +33,14 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  assertCapturedOutputFits,
   canonicalToolErrorCode,
   CapturedOutputTooLargeError,
   ConfigurationError,
   createRunTimer,
   currentScope,
   defineCommand,
+  getWorkerLimits,
   IpcPayloadTooLargeError,
   resolveToolHooks,
   sendWorkerIpcMessage,
@@ -67,17 +69,18 @@ import {
 import { createWorkerRpcClient } from './tool-command-worker-rpc.js';
 
 import type {
-  HostRpcRequest,
+  DispatchProgressEvent,
   ToolCommandFailureClass,
   ToolCommandResult,
   ToolCommandWorkerSpec,
 } from './tool-command-dispatch-types.js';
+import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-adapter';
 
 /**
  * The worker's IPC message type binding: host-RPC requests stream on the
  * `progress` arm; the final {@link ToolCommandResult} settles `result`.
  */
-type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
+type DispatchWorkerMessage = WorkerMessage<DispatchProgressEvent, ToolCommandResult>;
 
 /** Post one IPC message to the parent (no-op when not forked — e.g. a unit call). */
 function send(msg: DispatchWorkerMessage): void {
@@ -271,7 +274,28 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
   }
   try {
     const acc: ResultAccumulator = {};
-    const ctx = buildWorkerContext(scope, createRunTimer(), acc, rpcClient);
+    const maxCapturedOutputBytes = getWorkerLimits().maxCapturedOutputBytes;
+    // The completion envelope only crosses IPC (and is size-checked) for the live
+    // view; --json / non-TTY runs never read it, so they must not pay for it.
+    const captureCompletionEnvelope = spec.presentationMode === 'adapter-live';
+    const adapterProgress =
+      spec.presentationMode === 'adapter-live'
+        ? {
+            mode: 'live' as const,
+            suppressHumanRender: true,
+            emit: (event: ExternalAdapterProgressEvent) => {
+              send({ kind: 'progress', event: { kind: 'adapter-progress', event } });
+            },
+          }
+        : undefined;
+    const ctx = buildWorkerContext(
+      scope,
+      createRunTimer(),
+      acc,
+      rpcClient,
+      maxCapturedOutputBytes,
+      adapterProgress,
+    );
 
     // Run the handler. A `process.exit` / crash / hang here is contained by the
     // supervisor (premature-exit / timeout → structured parent failure); a throw
@@ -284,10 +308,19 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
       { ...spec.opts, _args: spec.positionals },
       ctx,
     )) as MaybeCompletion | void;
+    if (captureCompletionEnvelope && returned?.envelope !== undefined) {
+      assertCapturedOutputFits('completionEnvelope', returned.envelope, maxCapturedOutputBytes);
+    }
     assertReturnValuedHandlerResult(commandSpec, acc, returned);
     return {
       kind: 'result',
-      value: toResult(commandSpec.output, acc, returned?.session, returned),
+      value: toResult(
+        commandSpec.output,
+        acc,
+        returned?.session,
+        returned,
+        captureCompletionEnvelope,
+      ),
     };
   } finally {
     rpcClient.dispose();

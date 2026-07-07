@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { redactSecret, secretHash } from '../redact.js';
+import { redactCredentials, redactSecret, secretHash } from '../redact.js';
 
 describe('redactSecret', () => {
   it('returns a first-4 preview and NEVER the raw secret', () => {
@@ -38,5 +38,38 @@ describe('secretHash', () => {
     expect(secretHash('')).toBe('');
     expect(secretHash(undefined)).toBe('');
     expect(secretHash(null)).toBe('');
+  });
+});
+
+describe('redactCredentials', () => {
+  it('masks the password half of a URL userinfo, keeping the user + host', () => {
+    const out = redactCredentials(
+      'error: could not fetch https://deploy:s3cr3t-token@nexus.internal/simple/flask/',
+    );
+    expect(out).toContain('https://deploy:***@nexus.internal/simple/flask/');
+    expect(out).not.toContain('s3cr3t-token');
+  });
+
+  it('masks inline key=value credential assignments', () => {
+    expect(redactCredentials('token=abc123DEF')).toBe('token=***');
+    expect(redactCredentials('api-key: XYZ-super-secret')).toBe('api-key: ***');
+    expect(redactCredentials('password="hunter2"')).toBe('password="***');
+  });
+
+  it('masks Bearer/Basic auth tokens without leaking the credential', () => {
+    const out = redactCredentials('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9');
+    expect(out).toBe('Authorization: Bearer ***');
+    expect(out).not.toContain('eyJhbGciOiJIUzI1NiJ9');
+  });
+
+  it('leaves ordinary diagnostics untouched', () => {
+    const text = 'error CWE-89: SQL injection at line 42 in src/db.go';
+    expect(redactCredentials(text)).toBe(text);
+  });
+
+  it('handles empty / nullish', () => {
+    expect(redactCredentials('')).toBe('');
+    expect(redactCredentials(undefined)).toBe('');
+    expect(redactCredentials(null)).toBe('');
   });
 });

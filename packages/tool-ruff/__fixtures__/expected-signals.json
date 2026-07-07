@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "F401",
+    "severity": "medium",
+    "message": "`os` imported but unused",
+    "file": "src/app.py",
+    "line": 1,
+    "column": 8
+  },
+  {
+    "ruleId": "E501",
+    "severity": "medium",
+    "message": "Line too long (99 > 88)",
+    "file": "src/app.py",
+    "line": 12,
+    "column": 89
+  }
+]

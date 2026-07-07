@@ -42,8 +42,19 @@ export type {
 } from './ingest-sarif.js';
 export { asArray, asObject, getNumber, getString, navigate, safeParseJson } from './ingest-json.js';
 export type { JsonParseResult } from './ingest-json.js';
+export { parseJsonLines } from './json-lines.js';
+export type {
+  JsonLine,
+  JsonLineParseError,
+  JsonLinesResult,
+  ParseJsonLinesOptions,
+} from './json-lines.js';
+export { parseStdoutSarif } from './stdout-sarif.js';
+export type { ParseStdoutSarifOptions } from './stdout-sarif.js';
+export { parseFirstSemver } from './version.js';
 export {
   cvssToSeverity,
+  nativeLabelToSeverity,
   parseCvss,
   sarifLevelToSeverity,
   withNativeSeverity,
@@ -59,7 +70,17 @@ export { defaultBinaryEnvVar, resolveBinary } from './binary-resolver.js';
 export type { BinaryResolution, BinaryResolveDeps, ResolveBinaryInput } from './binary-resolver.js';
 export { messageHashFingerprintStrategy, resolveFingerprintStrategy } from './fingerprint.js';
 export { stampProvenance, stampProvenanceAll } from './provenance.js';
-export { redactSecret, secretHash } from './redact.js';
+export { redactCredentials, redactSecret, secretHash } from './redact.js';
+export {
+  attachExternalAdapterProgress,
+  externalAdapterProgressOf,
+  EXTERNAL_ADAPTER_PROGRESS,
+} from './progress.js';
+export type {
+  ExternalAdapterProgressBridge,
+  ExternalAdapterProgressEvent,
+  ExternalAdapterProgressStage,
+} from './progress.js';
 
 // ── Session payload (tool-owned, dashboard-shaped detail) ────────────────────
 export { buildAdapterSessionPayload } from './session-payload.js';

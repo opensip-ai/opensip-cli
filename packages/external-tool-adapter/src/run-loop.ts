@@ -38,12 +38,18 @@ import { asObject, getString, safeParseJson } from './ingest-json.js';
 import { ingestSarif } from './ingest-sarif.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
+import { redactCredentials } from './redact.js';
 import { buildAdapterRunContext } from './run-context.js';
 import { buildScanCompletion, deliverOptions, emitScanCompletion } from './scan-emit.js';
 
 import type { BinaryResolveDeps } from './binary-resolver.js';
 import type { SarifLog } from './ingest-sarif.js';
 import type { ProbeVersionInput, ProcessResult, RunProcessInput } from './process-exec.js';
+import type {
+  ExternalAdapterProgressBridge,
+  ExternalAdapterProgressEvent,
+  ExternalAdapterProgressStage,
+} from './progress.js';
 import type { ScanCompletion } from './scan-emit.js';
 import type {
   AdapterProvenance,
@@ -102,6 +108,7 @@ export interface ScanLoopInput {
   readonly fingerprintStrategy: FingerprintStrategy;
   /** The parsed command flags (`json` / `cwd` / `reportTo` / `apiKey`). */
   readonly opts: Record<string, unknown>;
+  readonly progress?: ExternalAdapterProgressBridge;
 }
 
 const ARTIFACT_EXT: Record<ExternalCommandSpec['output']['kind'], string> = {
@@ -120,6 +127,40 @@ function configuredBinaryPath(
   tool: string,
 ): string | undefined {
   return getString(asObject(config.binaries)?.[tool], 'path');
+}
+
+function emitProgress(
+  bridge: ExternalAdapterProgressBridge | undefined,
+  stage: ExternalAdapterProgressStage,
+  status: 'start' | 'done',
+  extra: Omit<ExternalAdapterProgressEvent, 'kind' | 'stage' | 'status'> = {},
+): void {
+  bridge?.emit({ kind: 'adapter-stage', stage, status, ...extra });
+}
+
+async function progressStep<T>(
+  bridge: ExternalAdapterProgressBridge | undefined,
+  stage: ExternalAdapterProgressStage,
+  fn: () => T | Promise<T>,
+  /** Optional: derive count/detail fields to surface on the `done` event (e.g. signal count). */
+  deriveExtra?: (result: T) => Omit<ExternalAdapterProgressEvent, 'kind' | 'stage' | 'status'>,
+): Promise<T> {
+  emitProgress(bridge, stage, 'start');
+  const begin = performance.now();
+  try {
+    const result = await fn();
+    emitProgress(bridge, stage, 'done', {
+      durationMs: Math.max(0, Math.round(performance.now() - begin)),
+      ...deriveExtra?.(result),
+    });
+    return result;
+  } catch (error) {
+    emitProgress(bridge, stage, 'done', {
+      detail: error instanceof Error ? error.name : 'error',
+      durationMs: Math.max(0, Math.round(performance.now() - begin)),
+    });
+    throw error;
+  }
 }
 
 /** Parse native output into signals (SARIF via shared ingest; JSON/stdout via the descriptor). */
@@ -221,7 +262,7 @@ function faultInvalidArtifact(
   throw new ToolError(
     `${tool} produced no usable ${command.output.kind} report (${detail}).`,
     'ADAPTER.ARTIFACT.INVALID',
-    { stderrTail: stderr.slice(-STDERR_TAIL) },
+    { stderrTail: redactCredentials(stderr.slice(-STDERR_TAIL)) },
   );
 }
 
@@ -239,6 +280,7 @@ export async function runScanLoop(
 ): Promise<ScanCompletion | undefined> {
   const deps: ScanLoopDeps = { ...DEFAULT_DEPS, ...overrides };
   const { cli, tool, command, binary } = input;
+  const progress = input.progress;
 
   // ADR-0036 gate-ratchet: --gate-save and --gate-compare are mutually exclusive
   // (mirrors fit's runGateMode). Validate BEFORE any IO so a misconfiguration
@@ -261,13 +303,15 @@ export async function runScanLoop(
 
   const config = (cli.scope.toolConfig?.[tool] ?? {}) as Readonly<Record<string, unknown>>;
   const envVar = binary.envVar ?? defaultBinaryEnvVar(tool);
-  const resolution = resolveBinary(
-    {
-      command: binary.command,
-      configuredPath: configuredBinaryPath(config, tool),
-      envPath: deps.env[envVar],
-    },
-    deps.binaryDeps,
+  const resolution = await progressStep(progress, 'resolve-binary', () =>
+    resolveBinary(
+      {
+        command: binary.command,
+        configuredPath: configuredBinaryPath(config, tool),
+        envPath: deps.env[envVar],
+      },
+      deps.binaryDeps,
+    ),
   );
   if (!resolution.found) {
     throw new ConfigurationError(
@@ -297,7 +341,9 @@ export async function runScanLoop(
   // A1/A7: create the per-run artifact dir through the host seam before the
   // scanner opens its report path. The substrate never mkdirs `.runtime` itself;
   // host RPC owns the privileged FS effect.
-  await cli.ensureArtifactDir(artifactFullPath);
+  await progressStep(progress, 'prepare-artifacts', async () => {
+    await cli.ensureArtifactDir(artifactFullPath);
+  });
 
   // A3: keep the scanner off opensip's own persisted reports under `.runtime/`
   // (see applyScanExclusion) — inherited by every adapter, no user flag.
@@ -315,13 +361,15 @@ export async function runScanLoop(
 
   const startedAt = new Date().toISOString();
   const begin = performance.now();
-  const proc = await deps.runProcess({
-    command: resolution.path,
-    args,
-    cwd: ctx.projectRoot,
-    timeoutMs: deps.timeoutMs,
-    maxBuffer: deps.maxBuffer,
-  });
+  const proc = await progressStep(progress, 'run-scanner', async () =>
+    deps.runProcess({
+      command: resolution.path,
+      args,
+      cwd: ctx.projectRoot,
+      timeoutMs: deps.timeoutMs,
+      maxBuffer: deps.maxBuffer,
+    }),
+  );
   const durationMs = Math.max(0, Math.round(performance.now() - begin));
 
   if (proc.timedOut) {
@@ -333,15 +381,20 @@ export async function runScanLoop(
     });
     throw new TimeoutError(`${tool} scan timed out after ${String(deps.timeoutMs)}ms`, {
       code: 'ADAPTER.SCAN.TIMEOUT',
-      stderrTail: proc.stderr.slice(-STDERR_TAIL),
+      stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }
 
-  // Read the native output: stdout commands use the captured stdout (always valid);
-  // file-backed commands read + classify the report (A11) via readReportArtifact.
+  // Read the native output: stdout commands use the captured stdout; when stdout is
+  // empty we fall back to stderr, because some scanners emit their machine output on
+  // stderr via a logger (e.g. cargo-deny's `--format json` diagnostics). The fallback
+  // only fires on empty stdout, so a scanner that legitimately prints nothing on a
+  // clean run reads its (noise) stderr through the tolerant JSON-lines/SARIF parser →
+  // zero signals, not a false clean pass on a stream mismatch. File-backed commands
+  // read + classify the report (A11) via readReportArtifact.
   const read: ReportRead =
     command.output.kind === 'stdout'
-      ? { raw: proc.stdout, artifactValid: true }
+      ? { raw: proc.stdout.trim().length > 0 ? proc.stdout : proc.stderr, artifactValid: true }
       : readReportArtifact(artifactFullPath, deps);
 
   const verdict = interpretExit(proc.code, command.exitCodes ?? DEFAULT_EXIT_MODEL, {
@@ -355,7 +408,7 @@ export async function runScanLoop(
       code: proc.code,
     });
     throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
-      stderrTail: proc.stderr.slice(-STDERR_TAIL),
+      stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }
 
@@ -385,7 +438,12 @@ export async function runScanLoop(
     bytes: raw.length,
   });
 
-  const parsed = parseSignals(command, raw, ctx);
+  const parsed = await progressStep(
+    progress,
+    'ingest-report',
+    () => parseSignals(command, raw, ctx),
+    (signals) => ({ signals: signals.length, findings: signals.length }),
+  );
   const provenance: AdapterProvenance = {
     tool,
     adapterPackage: input.adapterPackage,
@@ -411,25 +469,29 @@ export async function runScanLoop(
   const deliver = deliverOptions(input.opts, ctx.projectRoot);
   // The session contribution (incl. the dashboard-shaped grouped payload) is shaped
   // in a sibling helper so this orchestration body stays flat (file-length budget).
-  const completion = buildScanCompletion({
-    tool,
-    cwd: deliver.cwd,
-    envelope,
-    signals,
-    binary: { path: resolution.path, layer: resolution.layer, version: version ?? null },
-    artifact: artifactFullPath,
-    durationMs,
-  });
+  const completion = await progressStep(progress, 'store-evidence', () =>
+    buildScanCompletion({
+      tool,
+      cwd: deliver.cwd,
+      envelope,
+      signals,
+      binary: { path: resolution.path, layer: resolution.layer, version: version ?? null },
+      artifact: artifactFullPath,
+      durationMs,
+    }),
+  );
 
   // Emit + deliver + return. The gate-ratchet branch (ADR-0036) and the normal
   // emit live in a sibling helper so this orchestration body stays flat.
-  return emitScanCompletion({
-    cli,
-    tool,
-    opts: input.opts,
-    envelope,
-    signalCount: signals.length,
-    deliver,
-    completion,
-  });
+  return progressStep(progress, 'deliver-signals', async () =>
+    emitScanCompletion({
+      cli,
+      tool,
+      opts: input.opts,
+      envelope,
+      signalCount: signals.length,
+      deliver,
+      completion,
+    }),
+  );
 }

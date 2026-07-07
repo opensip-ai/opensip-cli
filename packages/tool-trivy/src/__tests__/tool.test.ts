@@ -270,7 +270,9 @@ describe('trivy tool — shared ingestSarif (normalize → envelope)', () => {
 });
 
 describe('trivy tool — SARIF severity recovery (the ingest core job, ADR-0091 D2)', () => {
-  const signals = ingestSarif(JSON.parse(GOLDEN_RAW) as SarifLog, { source: 'trivy' });
+  const signals = ingestSarif(JSON.parse(GOLDEN_RAW) as SarifLog, {
+    source: 'trivy',
+  });
   const byRule = (id: string) => signals.find((s) => s.ruleId === id);
 
   it('recovers `critical` from CVSS 9.8 even though `level:"error"` alone maps to `high`', () => {

@@ -45,8 +45,25 @@ export interface ScannerExitModel {
   readonly ok: readonly number[];
   /** Ran fine, found issues (e.g. `[1]`) — NOT a fault. */
   readonly findings: readonly number[];
-  /** `>= this` ⇒ a genuine scanner error (e.g. `2`). Any unmodeled nonzero is also a fault. */
+  /**
+   * Hard-error CEILING. A code `>= errorFrom` is ALWAYS a fault — even when
+   * {@link findingsFromNonzero} is set (e.g. spotbugs' `error` mask bit `4`, so
+   * `errorFrom: 4` faults on analysis errors while `1`/`2`/`3` stay findings).
+   * When `findingsFromNonzero` is NOT set, this is advisory only: any unmodeled
+   * nonzero is already a fault, so the ceiling changes nothing.
+   */
   readonly errorFrom?: number;
+  /**
+   * Bitset / threshold scanners don't enumerate a single "found issues" code:
+   * cargo-deny returns an OR of per-check category bits (advisories 1, bans 2,
+   * licenses 4, sources 8, …), spotbugs a `bugs|missing-class|error` mask, and
+   * cargo-clippy exits `101` for deny-level lints. Enumerating every combination
+   * in `findings` is infeasible. With this set, ANY nonzero code that is (a) not
+   * in `ok`, (b) below `errorFrom` (if given), and (c) backed by a valid/parseable
+   * artifact is classified `findings` instead of `fault`. Without an `errorFrom`
+   * ceiling, every nonzero code is findings-eligible.
+   */
+  readonly findingsFromNonzero?: boolean;
 }
 
 /**

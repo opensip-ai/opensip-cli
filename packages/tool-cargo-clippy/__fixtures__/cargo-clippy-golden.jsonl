@@ -1,0 +1,4 @@
+{"reason":"compiler-artifact","package_id":"crate 0.1.0","manifest_path":"/proj/Cargo.toml","target":{"name":"crate","kind":["lib"]},"fresh":false}
+{"reason":"compiler-message","message":{"message":"unneeded return statement","level":"warning","code":{"code":"clippy::needless_return"},"spans":[{"file_name":"src/lib.rs","line_start":5,"line_end":5,"column_start":9,"column_end":22,"is_primary":true}],"rendered":"warning: unneeded return statement\n --> src/lib.rs:5:9\n"}}
+{"reason":"compiler-message","message":{"message":"aborting due to 2 previous errors","level":"error","code":null,"spans":[],"rendered":"error: aborting due to 2 previous errors\n"}}
+{"reason":"build-finished","success":false}

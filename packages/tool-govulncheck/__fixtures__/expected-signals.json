@@ -1,0 +1,17 @@
+[
+  {
+    "ruleId": "GO-2024-0001",
+    "severity": "high",
+    "message": "Denial of service in github.com/foo/bar",
+    "file": "main.go",
+    "line": 10,
+    "column": 2
+  },
+  {
+    "ruleId": "GO-2024-0002",
+    "severity": "medium",
+    "message": "Import-only issue in github.com/baz/qux (imported, not called)",
+    "file": "util.go",
+    "line": 7
+  }
+]

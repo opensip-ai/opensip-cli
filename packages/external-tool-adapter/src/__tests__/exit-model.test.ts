@@ -35,4 +35,60 @@ describe('interpretExit', () => {
   it('an unmodeled nonzero with no errorFrom is still a fault', () => {
     expect(interpretExit(3, { ok: [0], findings: [1] })).toBe('fault');
   });
+
+  describe('findingsFromNonzero (bitset / threshold scanners)', () => {
+    // cargo-deny: exit is an OR of per-check category bits (advisories 1, bans 2,
+    // licenses 4, sources 8). No single "findings" code; no error ceiling.
+    const CARGO_DENY: ScannerExitModel = { ok: [0], findings: [], findingsFromNonzero: true };
+
+    it('cargo-deny: any nonzero bitset with a valid artifact ⇒ findings', () => {
+      expect(interpretExit(0, CARGO_DENY)).toBe('ok');
+      for (const bitset of [1, 2, 4, 5, 8, 12, 15]) {
+        expect(interpretExit(bitset, CARGO_DENY)).toBe('findings');
+      }
+    });
+
+    it('cargo-deny: nonzero + invalid/garbage artifact ⇒ fault (not a false clean pass)', () => {
+      expect(interpretExit(4, CARGO_DENY, { artifactValid: false })).toBe('fault');
+    });
+
+    // spotbugs: exit is a bugs(1)|missing-class(2)|error(4) mask. The error bit is
+    // a genuine fault, so the ceiling sits at 4.
+    const SPOTBUGS: ScannerExitModel = {
+      ok: [0],
+      findings: [],
+      findingsFromNonzero: true,
+      errorFrom: 4,
+    };
+
+    it('spotbugs: bugs/missing-class bits (1/2/3) ⇒ findings; error bit (>=4) ⇒ fault', () => {
+      expect(interpretExit(1, SPOTBUGS)).toBe('findings');
+      expect(interpretExit(2, SPOTBUGS)).toBe('findings');
+      expect(interpretExit(3, SPOTBUGS)).toBe('findings');
+      expect(interpretExit(4, SPOTBUGS)).toBe('fault');
+      expect(interpretExit(6, SPOTBUGS)).toBe('fault');
+    });
+
+    // cargo-clippy: 0 (clean, even with warnings) or 101 (deny-level lints /
+    // compile error). 101 with parseable diagnostics is a findings verdict.
+    const CARGO_CLIPPY: ScannerExitModel = { ok: [0], findings: [], findingsFromNonzero: true };
+
+    it('cargo-clippy: exit 101 with a valid artifact ⇒ findings', () => {
+      expect(interpretExit(0, CARGO_CLIPPY)).toBe('ok');
+      expect(interpretExit(101, CARGO_CLIPPY)).toBe('findings');
+      expect(interpretExit(101, CARGO_CLIPPY, { artifactValid: false })).toBe('fault');
+    });
+
+    it('the ceiling wins over the reclaim even when findingsFromNonzero is set', () => {
+      const model: ScannerExitModel = {
+        ok: [0],
+        findings: [],
+        findingsFromNonzero: true,
+        errorFrom: 2,
+      };
+      expect(interpretExit(1, model)).toBe('findings');
+      expect(interpretExit(2, model)).toBe('fault');
+      expect(interpretExit(9, model)).toBe('fault');
+    });
+  });
 });

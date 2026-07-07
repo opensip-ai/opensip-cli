@@ -173,7 +173,10 @@ describe('parseOsvJson', () => {
     });
     const [s] = parseOsvJson(parsed(doc), CTX);
     expect(s?.severity).toBe('medium');
-    expect(s?.metadata).toMatchObject({ cvss: null, nativeSeverity: 'MODERATE' });
+    expect(s?.metadata).toMatchObject({
+      cvss: null,
+      nativeSeverity: 'MODERATE',
+    });
   });
 
   it('carries the advisory details as a suggestion', () => {
@@ -211,8 +214,16 @@ describe('parseOsvJson', () => {
             {
               package: { name: 'pkg-c', version: '1.0.0', ecosystem: 'PyPI' },
               vulnerabilities: [
-                { id: 'V-CRIT', summary: 'crit', database_specific: { severity: 'CRITICAL' } },
-                { id: 'V-LOW', summary: 'low', database_specific: { severity: 'LOW' } },
+                {
+                  id: 'V-CRIT',
+                  summary: 'crit',
+                  database_specific: { severity: 'CRITICAL' },
+                },
+                {
+                  id: 'V-LOW',
+                  summary: 'low',
+                  database_specific: { severity: 'LOW' },
+                },
               ],
               groups: [{ ids: ['V-CRIT'] }, { ids: ['V-LOW'] }],
             },
@@ -234,7 +245,11 @@ describe('parseOsvJson', () => {
               package: { name: 'pkg-x', version: '2.0.0', ecosystem: 'npm' },
               // Label says MODERATE, but the numeric score is critical-band (9.8).
               vulnerabilities: [
-                { id: 'V-X', summary: 'x', database_specific: { severity: 'MODERATE' } },
+                {
+                  id: 'V-X',
+                  summary: 'x',
+                  database_specific: { severity: 'MODERATE' },
+                },
               ],
               groups: [{ ids: ['V-X'], max_severity: '9.8' }],
             },
@@ -250,12 +265,21 @@ describe('parseOsvJson', () => {
 
   it('falls back defensively for a vuln missing id/summary/package fields', () => {
     const doc = JSON.stringify({
-      results: [{ source: { path: 'Cargo.lock' }, packages: [{ vulnerabilities: [{}] }] }],
+      results: [
+        {
+          source: { path: 'Cargo.lock' },
+          packages: [{ vulnerabilities: [{}] }],
+        },
+      ],
     });
     const [s] = parseOsvJson(parsed(doc), CTX);
     expect(s?.ruleId).toBe('osv-vulnerability');
     expect(s?.message).toBe('osv-vulnerability');
-    expect(s?.metadata).toMatchObject({ pkg: null, installed: null, ecosystem: null });
+    expect(s?.metadata).toMatchObject({
+      pkg: null,
+      installed: null,
+      ecosystem: null,
+    });
     expect(s?.filePath).toBe('Cargo.lock');
   });
 
@@ -274,7 +298,12 @@ describe('parseOsvJson', () => {
 
   it('skips non-object packages / vulnerabilities entries', () => {
     const doc = JSON.stringify({
-      results: [{ source: { path: 'p' }, packages: ['nope', { vulnerabilities: [42, null] }] }],
+      results: [
+        {
+          source: { path: 'p' },
+          packages: ['nope', { vulnerabilities: [42, null] }],
+        },
+      ],
     });
     expect(parseOsvJson(parsed(doc), CTX)).toEqual([]);
   });

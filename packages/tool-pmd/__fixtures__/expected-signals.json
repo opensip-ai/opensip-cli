@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "UnusedLocalVariable",
+    "severity": "medium",
+    "message": "Avoid unused local variables",
+    "file": "src/main/java/com/example/Calc.java",
+    "line": 12,
+    "column": 9
+  },
+  {
+    "ruleId": "EmptyCatchBlock",
+    "severity": "high",
+    "message": "Avoid empty catch blocks",
+    "file": "src/main/java/com/example/Io.java",
+    "line": 30,
+    "column": 7
+  }
+]

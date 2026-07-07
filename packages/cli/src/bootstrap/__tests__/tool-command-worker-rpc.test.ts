@@ -15,10 +15,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createWorkerRpcClient } from '../tool-command-worker-rpc.js';
 
-import type { HostRpcCall, HostRpcRequest, RpcReply } from '../tool-command-dispatch-types.js';
+import type {
+  DispatchProgressEvent,
+  HostRpcCall,
+  HostRpcRequest,
+  RpcReply,
+} from '../tool-command-dispatch-types.js';
 import type { WorkerMessage } from '@opensip-cli/core';
 
-type Outbound = WorkerMessage<HostRpcRequest, unknown>;
+type Outbound = WorkerMessage<DispatchProgressEvent, unknown>;
 
 interface FakeChannel {
   readonly send: (msg: Outbound) => void;
@@ -40,7 +45,8 @@ function makeChannel(opts: { withSend?: boolean } = {}): FakeChannel {
       ? undefined
       : (msg: Outbound): void => {
           // The client only ever posts host-RPC requests on the `progress` arm.
-          if (msg.kind === 'progress') sent.push(msg.event);
+          if (msg.kind === 'progress' && msg.event.kind === 'host-rpc')
+            sent.push(msg.event.request);
         };
   return {
     // `send` is intentionally undefined-able to exercise the no-channel reject arm.
@@ -161,7 +167,11 @@ describe('createWorkerRpcClient — host fault reply', () => {
     const channel = makeChannel();
     const client = createWorkerRpcClient(channel);
 
-    const pending = client.call({ seam: 'compareBaseline', tool: 'gitleaks', envelope: {} });
+    const pending = client.call({
+      seam: 'compareBaseline',
+      tool: 'gitleaks',
+      envelope: {},
+    });
     const { rpcId } = channel.sent[0];
     channel.deliver({
       kind: 'rpc-reply',
@@ -205,7 +215,11 @@ describe('createWorkerRpcClient — host fault reply', () => {
       kind: 'rpc-reply',
       rpcId,
       ok: false,
-      error: { message: 'weird', code: 'SUB', toolErrorCode: 'NOT_A_REAL_CODE' },
+      error: {
+        message: 'weird',
+        code: 'SUB',
+        toolErrorCode: 'NOT_A_REAL_CODE',
+      },
     } satisfies RpcReply);
     const err = await pending.catch((error: unknown) => error as Error & { code?: string });
     expect(err).toBeInstanceOf(Error);

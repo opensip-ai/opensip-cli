@@ -159,9 +159,11 @@ opensip gitleaks doctor
 opensip gitleaks
 ```
 
-The shipped opt-in adapters cover Gitleaks, OSV-Scanner, and Trivy. Adapter
+The shipped opt-in adapters cover Gitleaks, Semgrep, ast-grep, Ruff,
+golangci-lint, govulncheck, cargo-deny, Bandit, pip-audit, cargo-clippy,
+SpotBugs, PMD, Dependency-Check, Cppcheck, OSV-Scanner, and Trivy. Adapter
 findings become normal OpenSIP signals: they appear in sessions, JSON, SARIF,
-the HTML report, and the baseline ratchet. See
+the HTML report, live CLI progress, and the baseline ratchet. See
 [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/).
 
 ---

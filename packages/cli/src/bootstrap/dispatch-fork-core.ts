@@ -46,11 +46,13 @@ import { handleHostRpc } from './dispatch-host-rpc-handler.js';
 import { type DispatchHostCtx } from './dispatch-replay-result.js';
 
 import type {
+  DispatchProgressEvent,
   HostRpcRequest,
   RpcReply,
   ToolCommandResult,
   ToolCommandWorkerSpec,
 } from './tool-command-dispatch-types.js';
+import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-adapter';
 
 /** Default supervisor wall-clock timeout for one forked worker run (ms). */
 export const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
@@ -59,7 +61,7 @@ export const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
 export const WORKER_SUBCOMMAND = '__tool-command-worker';
 
 /** The dispatch IPC binding: host-RPC requests stream on `progress`. */
-type DispatchWorkerMessage = WorkerMessage<HostRpcRequest, ToolCommandResult>;
+type DispatchWorkerMessage = WorkerMessage<DispatchProgressEvent, ToolCommandResult>;
 
 /** Narrowing helper: a worker `error` IPC message carries an optional failureClass/stack. */
 type DispatchWorkerError = Extract<DispatchWorkerMessage, { kind: 'error' }>;
@@ -88,6 +90,7 @@ export async function runWorkerSpec(args: {
   readonly cwd: string;
   readonly cliScript?: string;
   readonly timeoutMs?: number;
+  readonly onAdapterProgress?: (event: ExternalAdapterProgressEvent) => void;
 }): Promise<ToolCommandResult> {
   const dir = mkdtempSync(join(tmpdir(), 'opensip-tool-dispatch-'));
   const specPath = join(dir, 'spec.json');
@@ -104,6 +107,7 @@ export async function runWorkerSpec(args: {
       spec: args.spec,
       timeoutMs,
       ctx: args.ctx,
+      onAdapterProgress: args.onAdapterProgress,
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -128,6 +132,7 @@ interface ForkAndAwaitInput {
   readonly spec: ToolCommandWorkerSpec;
   readonly timeoutMs: number;
   readonly ctx: DispatchHostCtx;
+  readonly onAdapterProgress?: (event: ExternalAdapterProgressEvent) => void;
 }
 
 function forkAndAwait({
@@ -137,6 +142,7 @@ function forkAndAwait({
   spec,
   timeoutMs,
   ctx,
+  onAdapterProgress,
 }: ForkAndAwaitInput): Promise<ToolCommandResult> {
   return new Promise<ToolCommandResult>((resolve, reject) => {
     const runId = currentScope()?.runId;
@@ -157,7 +163,8 @@ function forkAndAwait({
         onMessage: (msg: unknown) => {
           const typed = msg as DispatchWorkerMessage;
           if (typed.kind === 'progress') {
-            serveRpc(typed.event);
+            if (typed.event.kind === 'host-rpc') serveRpc(typed.event.request);
+            else onAdapterProgress?.(typed.event.event);
           } else if (typed.kind === 'result') {
             handle.done(() => {
               resolve(typed.value);
