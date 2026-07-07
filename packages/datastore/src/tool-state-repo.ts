@@ -48,7 +48,10 @@ export class ToolStateRepo {
       .where(and(eq(toolState.tool, tool), eq(toolState.key, key)))
       .limit(1)
       .get();
-    return row?.payload ?? undefined;
+    // Distinguish "row absent" from "row present with a stored JSON null": `??`
+    // would collapse a stored `null` into `undefined` (the never-put sentinel),
+    // disagreeing with `list()`/`delete()` which key on row existence.
+    return row === undefined ? undefined : row.payload;
   }
 
   /**

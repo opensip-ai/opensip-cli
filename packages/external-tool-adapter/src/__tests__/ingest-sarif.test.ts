@@ -302,3 +302,18 @@ describe('ingestSarif — round-trip against buildOpenSipSarif (the writer is th
     expect(out.ruleId).toBe('CVE-X');
   });
 });
+
+describe('ingestSarif — robustness over non-conformant (non-array) SARIF', () => {
+  it('returns [] without throwing when runs/results/rules are non-array', () => {
+    // JSON-valid but not SARIF-shaped (the artifact reader only checks
+    // JSON-parseability). `?? []` used to pass these truthy non-arrays straight
+    // through and crash `for..of` / `rules.find` with a raw stack trace.
+    expect(ingestSarif({ runs: {} } as unknown as SarifLog)).toEqual([]);
+    expect(ingestSarif({ runs: [{ results: {} }] } as unknown as SarifLog)).toEqual([]);
+    const withBadRules = {
+      runs: [{ tool: { driver: { rules: {} } }, results: [{ ruleId: 'x' }] }],
+    } as unknown as SarifLog;
+    // Non-array `rules` must not crash `rules.find`; the result still maps.
+    expect(ingestSarif(withBadRules)).toHaveLength(1);
+  });
+});
