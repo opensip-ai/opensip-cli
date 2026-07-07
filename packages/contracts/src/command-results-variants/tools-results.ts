@@ -54,6 +54,31 @@ export interface ToolsListResult {
   totalCount: number;
 }
 
+/** One installable first-party External Tool Adapter row (`tools list --available`). */
+export interface ToolsAvailableRow {
+  /** npm package to `opensip tools install`. */
+  readonly pkg: string;
+  /** Tool id / primary command verb. */
+  readonly id: string;
+  /** The run hint, e.g. `opensip cppcheck`. */
+  readonly command: string;
+  readonly description: string;
+  readonly network: 'local-only' | 'networked';
+  /** Canonical language ids the scanner covers; `[]` = polyglot. */
+  readonly languages: readonly string[];
+  /** True when the adapter is already installed (global or project). */
+  readonly installed: boolean;
+}
+
+/** Outcome of `opensip tools list --available [--lang <l>]`: the opt-in adapter catalog. */
+export interface ToolsAvailableResult {
+  type: 'tools-available';
+  /** The canonical language filter applied (`c++` → `cpp`), when `--lang` was given. */
+  readonly lang?: string;
+  readonly adapters: readonly ToolsAvailableRow[];
+  readonly totalCount: number;
+}
+
 /** Outcome of `opensip tools doctor` (ADR-0060). */
 export interface ToolsDoctorResult {
   type: 'tools-doctor';

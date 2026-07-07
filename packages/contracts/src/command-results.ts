@@ -35,6 +35,8 @@ export type {
   ToolsListRow,
   ToolsCreateResult,
   ToolsListResult,
+  ToolsAvailableRow,
+  ToolsAvailableResult,
   ToolsDoctorResult,
   ToolsValidateSection,
   ToolsValidateResult,
@@ -154,6 +156,7 @@ import type {
 } from './command-results-variants/suite-results.js';
 import type {
   ToolsListResult,
+  ToolsAvailableResult,
   ToolsDoctorResult,
   ToolsCreateResult,
   ToolsValidateResult,
@@ -193,6 +196,7 @@ export type CommandResult =
   | UninstallDoneResult
   | TextLinesResult
   | ToolsListResult
+  | ToolsAvailableResult
   | ToolsDoctorResult
   | ToolsCreateResult
   | ToolsValidateResult
