@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-30
-release: v0.4.0
+release: v0.4.1
 title: "Connect MCP clients (Cursor, Claude Code, Codex)"
 audience: [getting-started, ci-integrators]
 purpose: "Register opensip mcp as a stdio MCP server in Cursor, Claude Code, and Codex."
@@ -71,7 +71,7 @@ until the client closes stdin:
 Use an **absolute path** for `--cwd` unless the client provides a project-root
 variable (Claude Code's `${CLAUDE_PROJECT_DIR}`). MCP result tools are scoped to
 that project root: runs recorded under another root are treated as not found
-([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.4.0/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)).
+([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.4.1/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)).
 
 ---
 
@@ -313,4 +313,4 @@ stdout must stay clean for JSON-RPC; do not pipe or tee it manually while testin
 
 - [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) — CLI loops without MCP
 - [`mcp` command reference](/docs/opensip-cli/70-reference/01-cli-commands/#mcp--serve-the-call-graph--results-to-agents-over-stdio) — full tool table and limitations
-- [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.4.0/docs/decisions/ADR-0084-mcp-server-surface.md) — design decisions and trust model
+- [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.4.1/docs/decisions/ADR-0084-mcp-server-surface.md) — design decisions and trust model

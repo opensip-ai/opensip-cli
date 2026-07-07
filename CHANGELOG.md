@@ -2,6 +2,32 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.4.1] - 2026-07-06
+
+A session-provenance and report-polish patch. Stored runs now record which CLI
+and engine versions produced them, HTML reports link those versions and hide
+rows that do not apply, and the datastore migration chain is repaired for
+`db:generate`.
+
+### Added
+
+- Session rows record CLI and per-tool engine version provenance on each run.
+
+### Changed
+
+- HTML report details link CLI release versions; the header shows the version as
+  plain text.
+- CI dependency and GitHub Action bumps (attest, upload-artifact, patch/minor
+  npm group).
+
+### Fixed
+
+- Dashboard omits Engine/Baseline rows when they do not apply to a tool tab.
+- Drizzle snapshot chain repaired so `db:generate` works again.
+- Language-adapters doc no longer references the deleted `generic-types.ts`
+  source file.
+- Prettier `format:check` excludes generated report artifacts.
+
 ## [0.4.0] - 2026-07-06
 
 An architecture-remediation and agent-workflow release. It hardens the layered
