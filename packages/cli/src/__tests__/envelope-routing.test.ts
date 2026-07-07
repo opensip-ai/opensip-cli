@@ -233,7 +233,11 @@ describe('root render path (renderResult derives the run view from the envelope)
     await runWithScope(makeScope(), () => renderResult(result));
 
     const out = stdout.join('');
-    expect(out).not.toContain('no-console');
+    // ADR-0135 (Option C): the compact surface surfaces the FAILING unit as an
+    // attention bullet with its finding location; the PASSING unit is omitted and
+    // no per-unit TABLE columns appear.
+    expect(out).toContain('no-console');
+    expect(out).toContain('src/a.ts:1');
     expect(out).not.toContain('no-todo');
     expect(out).not.toContain('Unit');
     expect(out).not.toContain('Status');
