@@ -209,6 +209,7 @@ export async function renderGraphLive(
               ...(banner === undefined ? {} : { banner }),
               ...(table === undefined ? {} : { table }),
             },
+            envelope,
             session,
           };
         } catch (error) {

@@ -10,6 +10,7 @@ import { ErrorMessage } from './error-message.js';
 import { LiveProgress } from './live-progress.js';
 import { liveRunTable } from './live-run-table.js';
 import { renderToInk } from './render-to-ink.js';
+import { viewResultSummary } from './result-summary.js';
 import { RunFooterHints } from './run-footer-hints.js';
 import { RunHeader } from './run-header.js';
 import {
@@ -94,11 +95,19 @@ function liveRunDoneBody(
   const summaryEl = (
     <RunSummary
       passed={data.summary.passed}
+      {...(data.summary.faulted === undefined ? {} : { faulted: data.summary.faulted })}
       errors={data.summary.errors}
       warnings={data.summary.warnings}
       {...(data.summary.durationMs === undefined ? {} : { durationMs: data.summary.durationMs })}
     />
   );
+  // Compact (non-verbose) surface: the attention-only unit bullets (failed +
+  // faulted, with finding locations). The verbose surface shows the full table
+  // instead, so this is suppressed there to avoid duplicating the per-unit view.
+  const attentionNode =
+    !props.quiet && !props.verbose && data.attention !== undefined
+      ? viewResultSummary({ counts: data.attention.counts, items: data.attention.items })
+      : null;
   const timedSummary =
     props.timer === undefined ? (
       summaryEl
@@ -130,6 +139,11 @@ function liveRunDoneBody(
       {tableNode !== null && (
         <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
           {renderToInk(tableNode)}
+        </Box>
+      )}
+      {attentionNode !== null && (
+        <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+          {renderToInk(attentionNode)}
         </Box>
       )}
       {timedSummary}

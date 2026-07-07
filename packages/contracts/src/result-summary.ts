@@ -1,38 +1,39 @@
 /**
- * Project a single-run {@link SignalEnvelope} onto the {@link viewResultSummary}
- * model — the attention-only bullet block for the compact default run surface
- * (`opensip fit` without `--verbose`).
+ * Project a run {@link SignalEnvelope} onto the attention-only result summary —
+ * the 3-way unit counts + one item per unit that both the static render
+ * (`result-to-view`) and the live done-body (`cli-live`) turn into the shared
+ * `viewResultSummary` block. It lives in `contracts` (beside {@link deriveOutcome}
+ * and {@link buildSignalEnvelope}) because the derivation is envelope SEMANTICS,
+ * not styling: it yields DATA (label, outcome, a compact detail string), and the
+ * UI layer owns the glyphs/tones. Keeping it here lets the engine live runners
+ * (layer 4) and the cli composition root (layer 6) share one derivation without a
+ * same-layer import.
  *
  * Granularity is UNIT-centric (one item per check/rule/scenario), so the count
  * line and bullets both count units and line up. A failing unit's detail is its
  * finding LOCATIONS (`file:line`); a faulted unit's detail is its runtime error
- * message (the check that threw, named). A run that faults at the RUN level (fit
- * itself failing to load/parse) never reaches here — ADR-0060 makes that a
- * command-error before the envelope, so there is no faulted-envelope with
- * spurious counts to render.
- *
- * Returns `undefined` when every unit passed, so a clean run keeps the
- * headline-only compact surface (no redundant "all passed" block).
+ * message (the check that threw, named). A run that faults at the RUN level (the
+ * tool itself failing to load/parse) never reaches here — ADR-0060 makes that a
+ * command-error before the envelope.
  */
 
-import type { ResultOutcome, ResultSummaryItem } from '@opensip-cli/cli-ui';
-import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
+import { deriveOutcome, type RunOutcome } from './run-outcome.js';
 
-/** How many finding locations to list inline on a failing unit's bullet before eliding. */
+import type { SignalEnvelope, UnitResult } from './signal-envelope.js';
+
+/** How many finding locations to list inline on a failing unit before eliding. */
 const MAX_INLINE_LOCATIONS = 2;
 
 /** A unit's 3-way outcome: a per-unit `error` is a fault; otherwise pass/fail from `passed`. */
-export function unitOutcome(unit: UnitResult): ResultOutcome {
-  if (unit.error !== undefined) return 'faulted';
-  return unit.passed ? 'passed' : 'failed';
+export function unitOutcome(unit: UnitResult): RunOutcome {
+  return deriveOutcome({ passed: unit.passed, faulted: unit.error !== undefined });
 }
 
 /**
  * The distinct finding locations a unit produced (`filePath[:line]`), compacted
- * to one line: the first {@link MAX_INLINE_LOCATIONS}, then `(+N more)`. A
- * signal belongs to a unit when `signal.source === unit.slug` (fit stamps each
- * finding's source with the check slug — the same grouping the per-unit table
- * uses). `undefined` when the unit produced no locatable findings.
+ * to one line: the first {@link MAX_INLINE_LOCATIONS}, then `(+N more)`. A signal
+ * belongs to a unit when `signal.source === unit.slug` (the same grouping the
+ * per-unit table uses). `undefined` when the unit produced no locatable findings.
  */
 function unitLocations(envelope: SignalEnvelope, slug: string): string | undefined {
   const locations: string[] = [];
@@ -53,11 +54,18 @@ function unitLocations(envelope: SignalEnvelope, slug: string): string | undefin
 function unitDetail(
   envelope: SignalEnvelope,
   unit: UnitResult,
-  outcome: ResultOutcome,
+  outcome: RunOutcome,
 ): string | undefined {
   if (outcome === 'faulted') return unit.error;
   if (outcome === 'failed') return unitLocations(envelope, unit.slug);
   return undefined;
+}
+
+/** One row of the attention list — the data a `viewResultSummary` bullet renders. */
+export interface ResultSummaryItem {
+  readonly label: string;
+  readonly outcome: RunOutcome;
+  readonly detail?: string;
 }
 
 export interface EnvelopeResultSummary {

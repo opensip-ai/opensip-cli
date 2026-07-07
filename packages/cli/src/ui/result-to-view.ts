@@ -31,9 +31,9 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
+import { envelopeToResultSummary } from '@opensip-cli/contracts';
 import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
-import { envelopeToResultSummary } from './envelope-result-summary.js';
 import { viewConfigMigrate, viewConfigSchema, viewConfigValidate } from './views/config-views.js';
 import { viewInit } from './views/init-view.js';
 import {

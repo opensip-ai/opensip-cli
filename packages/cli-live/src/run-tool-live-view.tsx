@@ -28,6 +28,7 @@ import {
 import { render, useApp } from 'ink';
 import React, { useEffect, useRef, useState } from 'react';
 
+import { enrichDoneWithEnvelope } from './enrich-done.js';
 import { scrubErrorMessage } from './scrub-error-message.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
@@ -171,7 +172,7 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
           ...(spec.progressOnDone === true && doneSubscribe !== undefined
             ? { subscribe: doneSubscribe }
             : {}),
-          data: outcome.done,
+          data: enrichDoneWithEnvelope(outcome.done, outcome.envelope),
         });
         setTimeout(() => exit(), 50);
       } catch (error) {

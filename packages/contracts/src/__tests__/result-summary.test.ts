@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { envelopeToResultSummary, unitOutcome } from '../envelope-result-summary.js';
+import { envelopeToResultSummary, unitOutcome } from '../result-summary.js';
 
-import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
+import type { SignalEnvelope, UnitResult } from '../signal-envelope.js';
 import type { Signal } from '@opensip-cli/core';
 
 function signal(source: string, filePath: string, line?: number): Signal {
@@ -104,7 +104,6 @@ describe('envelopeToResultSummary', () => {
 
   it('leaves a failed unit with no findings location-less (no detail)', () => {
     const env = envelope([{ slug: 'gate', passed: false, durationMs: 1 }], []);
-    const item = envelopeToResultSummary(env)?.items[0];
-    expect(item).toEqual({ label: 'gate', outcome: 'failed' });
+    expect(envelopeToResultSummary(env)?.items[0]).toEqual({ label: 'gate', outcome: 'failed' });
   });
 });
