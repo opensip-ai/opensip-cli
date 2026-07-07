@@ -107,6 +107,14 @@ function sortByColumn(options: SortByColumnOptions): void {
   for (const h of headers) h.dataset.sort = '';
   th.dataset.sort = state.asc ? 'asc' : 'desc';
 
+  // Overview's synthetic suite-divider rows (single-cell `.suite-group-header`)
+  // carry no sortable column data, so a column sort makes their grouping
+  // meaningless — the per-row Suite column already records membership. Drop them
+  // before collecting groups so they neither sort as '' (clustering every banner
+  // at one end) nor detach from their sessions. Guarded by the class: a no-op on
+  // every other tab's tables, and it never touches `.expander-row` grouping.
+  for (const banner of tbody.querySelectorAll('.suite-group-header')) banner.remove();
+
   const groups = collectRowGroups(tbody);
   groups.sort((a, b) => compareGroups(a, b, colIdx, state.asc));
   reorderRows(tbody, groups);

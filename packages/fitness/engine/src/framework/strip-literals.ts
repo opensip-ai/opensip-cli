@@ -47,6 +47,27 @@ const SINGLE_QUOTE_RE = /'(?:[^'\\]|\\.)*'/g;
 const DOUBLE_QUOTE_RE = /"(?:[^"\\]|\\.)*"/g;
 const BACKTICK_RE = /`(?:[^`\\]|\\.)*`/gs;
 
+/** Blank one matched string literal's interior, keeping its delimiters + newlines. */
+function blankLiteralInterior(m: string): string {
+  return m.charAt(0) + m.slice(1, -1).replaceAll(/[^\n]/g, ' ') + (m.at(-1) ?? '');
+}
+
+/**
+ * Position-preserving variant of {@link stripStringLiterals}: blanks each string
+ * literal's INTERIOR with equal-length spaces while keeping the delimiters and
+ * any interior newlines, so the output has the SAME length and line structure as
+ * the input. Use this — NOT `stripStringLiterals`, which collapses `'…'`→`''` and
+ * so shifts the column of everything after a literal — whenever a check reports a
+ * `column` derived from the stripped content (mirrors the strings+comments
+ * {@link stripStringsAndCommentsPreservingPositions}).
+ */
+export function stripStringLiteralsPreservingPositions(line: string): string {
+  return line
+    .replaceAll(SINGLE_QUOTE_RE, blankLiteralInterior)
+    .replaceAll(DOUBLE_QUOTE_RE, blankLiteralInterior)
+    .replaceAll(BACKTICK_RE, blankLiteralInterior);
+}
+
 /**
  * Strip string literals and single-line comments from full file content.
  * Used by checks for quick-filter gates to avoid matching keywords
