@@ -99,6 +99,8 @@ export const tool: Tool = defineExternalToolAdapter({
   // OSV-Scanner queries its embedded/offline advisory DB via execFile — no
   // network, no credentials.
   network: 'local-only',
+  // Polyglot / language-agnostic: matches every --lang discovery filter.
+  languages: [],
   commands: [
     {
       name: 'scan',

@@ -119,7 +119,10 @@
           }
         }
       }
-    }
+    },
+    "languages": [
+      "java"
+    ]
   },
   "scripts": {
     "build": "tsc",

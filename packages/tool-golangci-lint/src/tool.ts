@@ -47,6 +47,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install golangci-lint: https://golangci-lint.run/welcome/install/',
   },
   network: 'local-only',
+  languages: ['go'],
   commands: [
     {
       name: 'scan',

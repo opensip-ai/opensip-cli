@@ -41,6 +41,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install PMD: https://pmd.github.io/ (brew install pmd)',
   },
   network: 'local-only',
+  languages: ['java'],
   commands: [
     {
       name: 'scan',

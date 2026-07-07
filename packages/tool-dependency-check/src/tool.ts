@@ -51,6 +51,8 @@ export const tool: Tool = defineExternalToolAdapter({
       'Install Dependency-Check: https://owasp.org/www-project-dependency-check/ and pre-populate its vulnerability database before offline scans.',
   },
   network: 'local-only',
+  // Polyglot / language-agnostic: matches every --lang discovery filter.
+  languages: [],
   commands: [
     {
       name: 'scan',

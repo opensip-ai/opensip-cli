@@ -124,7 +124,10 @@
           }
         }
       }
-    }
+    },
+    "languages": [
+      "rust"
+    ]
   },
   "scripts": {
     "build": "tsc",

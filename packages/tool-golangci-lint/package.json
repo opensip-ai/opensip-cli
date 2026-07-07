@@ -124,7 +124,10 @@
           }
         }
       }
-    }
+    },
+    "languages": [
+      "go"
+    ]
   },
   "scripts": {
     "build": "tsc",

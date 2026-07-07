@@ -123,7 +123,10 @@
           }
         }
       }
-    }
+    },
+    "languages": [
+      "python"
+    ]
   },
   "scripts": {
     "build": "tsc",

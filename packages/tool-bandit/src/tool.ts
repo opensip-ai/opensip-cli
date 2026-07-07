@@ -36,6 +36,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install bandit: https://bandit.readthedocs.io/en/latest/start.html',
   },
   network: 'local-only',
+  languages: ['python'],
   commands: [
     {
       name: 'scan',

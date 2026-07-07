@@ -119,7 +119,8 @@
           }
         }
       }
-    }
+    },
+    "languages": []
   },
   "scripts": {
     "build": "tsc",

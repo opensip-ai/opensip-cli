@@ -71,6 +71,8 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install ast-grep: https://ast-grep.github.io/guide/quick-start.html',
   },
   network: 'local-only',
+  // Polyglot / language-agnostic: matches every --lang discovery filter.
+  languages: [],
   commands: [
     {
       name: 'scan',

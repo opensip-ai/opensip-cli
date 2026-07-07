@@ -56,6 +56,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install pip-audit: https://pypi.org/project/pip-audit/',
   },
   network: 'networked',
+  languages: ['python'],
   commands: [
     {
       name: 'scan',
