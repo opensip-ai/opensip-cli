@@ -33,6 +33,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install cargo-deny: https://embarkstudios.github.io/cargo-deny/',
   },
   network: 'networked',
+  languages: ['rust'],
   commands: [
     {
       name: 'scan',

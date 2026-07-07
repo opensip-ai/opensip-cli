@@ -40,6 +40,8 @@ export interface AdapterToolMarkers {
   readonly adapterNetwork?: NetworkPosture;
   /** The coarse config descriptor the adapter claims, or `undefined` for a custom config. */
   readonly adapterConfigManifest?: ToolConfigManifestDescriptor;
+  /** Canonical language ids the scanner covers (drives `--available --lang`); `[]` = polyglot. */
+  readonly adapterLanguages?: readonly string[];
 }
 
 /** Read the stamped network posture; defaults to `'local-only'` (the safe, no-network posture). */
@@ -50,6 +52,19 @@ export function adapterNetworkOf(tool: Tool): NetworkPosture {
 /** Read the stamped config descriptor, or `undefined` when the adapter uses a custom config. */
 export function adapterConfigManifestOf(tool: Tool): ToolConfigManifestDescriptor | undefined {
   return (tool as Tool & AdapterToolMarkers).adapterConfigManifest;
+}
+
+/**
+ * Derive `opensipTools.languages` — the canonical language ids the adapter's
+ * scanner covers, normalized (trimmed, lowercased, de-duped, sorted) so the
+ * generated manifest is stable and the `--check` parity gate catches drift. A
+ * polyglot / language-agnostic scanner yields `[]`.
+ */
+export function deriveAdapterManifestLanguages(tool: Tool): readonly string[] {
+  const raw = (tool as Tool & AdapterToolMarkers).adapterLanguages ?? [];
+  return [
+    ...new Set(raw.map((lang) => lang.trim().toLowerCase()).filter((lang) => lang.length > 0)),
+  ].sort();
 }
 
 /**

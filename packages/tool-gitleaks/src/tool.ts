@@ -134,6 +134,8 @@ export const tool: Tool = defineExternalToolAdapter({
   },
   // Gitleaks scans local files via execFile — no network, no credentials.
   network: 'local-only',
+  // Polyglot / language-agnostic: matches every --lang discovery filter.
+  languages: [],
   commands: [
     {
       name: 'scan',

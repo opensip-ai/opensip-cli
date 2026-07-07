@@ -67,6 +67,8 @@ export const tool: Tool = defineExternalToolAdapter({
       'Install semgrep: https://semgrep.dev/docs/getting-started/ (brew install semgrep)',
   },
   network: 'networked',
+  // Polyglot / language-agnostic: matches every --lang discovery filter.
+  languages: [],
   commands: [
     {
       name: 'scan',

@@ -1164,7 +1164,8 @@ Extension packs are **project-committed and always project-local**: `add` writes
 The documented surface for whole Tool plugins (`kind: "tool"` packages that contribute entire subcommands). See the full reference: [`12-tools-command.md`](./12-tools-command.md).
 
 ```
-opensip tools list
+opensip tools list [--global|--project]
+opensip tools list --available [--lang <language>]
 opensip tools validate <spec>
 opensip tools install <spec> [--global|--project]
 opensip tools uninstall <name-or-id> [--global|--project] [--purge-data]
@@ -1175,6 +1176,32 @@ opensip tools data-purge <tool-id>
 
 `tools list` also reports the current local policy outcome for each row when a
 run scope has resolved policy.
+
+### `tools list --available` — discover installable adapters
+
+By default `tools list` shows the **effective/installed** set. `--available`
+instead lists the **opt-in first-party External Tool Adapter catalog** — every
+`@opensip-cli/tool-*` scanner adapter you could install — with its covered
+languages, network posture, and an installed / not-installed marker, plus the
+`opensip tools install <package>` hint. The catalog is bundled into the CLI (a
+build-time projection of each adapter's manifest), so discovery works offline and
+before anything is installed.
+
+`--lang <language>` filters the catalog to adapters that cover that language and
+**implies `--available`**. The value is canonicalized through the language
+registry, so `c++`, `cxx`, and `cpp` are equivalent. Polyglot / language-agnostic
+adapters (secret, dependency, and SBOM scanners — `languages: []`) always match
+every `--lang` filter.
+
+```
+opensip tools list --available                 # the whole opt-in catalog
+opensip tools list --available --lang c++      # C/C++ coverage (+ polyglot adapters)
+opensip tools list --lang python --json        # machine output; --lang implies --available
+```
+
+The catalog's language coverage is declared on each adapter (`languages` in its
+manifest) — the single source of truth the `--lang` filter, the bundled catalog,
+and this reference all derive from.
 
 ---
 

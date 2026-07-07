@@ -191,6 +191,7 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
   // — these are adapter concepts, not kernel ones.
   const markers: AdapterToolMarkers = {
     adapterNetwork: spec.network,
+    adapterLanguages: spec.languages ?? [],
     ...(configManifest === undefined ? {} : { adapterConfigManifest: configManifest }),
   };
   return Object.assign(tool, markers);

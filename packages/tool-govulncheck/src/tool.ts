@@ -30,6 +30,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install govulncheck: https://go.dev/doc/tutorial/govulncheck',
   },
   network: 'networked',
+  languages: ['go'],
   commands: [
     {
       name: 'scan',

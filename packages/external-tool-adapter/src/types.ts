@@ -213,6 +213,15 @@ export interface ExternalToolAdapterSpec {
   };
   readonly binary: BinarySpec;
   readonly network: NetworkPosture;
+  /**
+   * The source languages this adapter's scanner covers, as canonical language ids
+   * (`'python'`, `'go'`, `'rust'`, `'java'`, `'cpp'`, …). Drives the `opensip tools
+   * list --available --lang <l>` discovery filter (matched via the language
+   * registry's alias canonicalization, so `c++` → `cpp`). OMIT or use `[]` for a
+   * polyglot / language-agnostic scanner (secrets, dependencies, SBOM) that no
+   * single-language filter should exclude.
+   */
+  readonly languages?: readonly string[];
   readonly commands: readonly ExternalCommandSpec[];
   /** Adapter default `'message-hash'` (ADR-0091 §4.5). */
   readonly fingerprintStrategy?: FingerprintStrategyChoice;

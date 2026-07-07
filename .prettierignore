@@ -47,3 +47,6 @@ pnpm-lock.yaml
 slo-report.json
 compatibility-matrix-report.json
 detection-quality-report.json
+
+# CLI-bundled adapter catalog (generated projection of adapter manifests)
+**/first-party-adapters.generated.ts

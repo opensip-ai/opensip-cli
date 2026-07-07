@@ -20,7 +20,7 @@ import type { LanguageAdapter } from '@opensip-cli/core';
 export const cppAdapter: LanguageAdapter<null> = {
   id: 'cpp',
   fileExtensions: ['.cpp', '.cc', '.cxx', '.c++', '.hpp', '.hh', '.hxx', '.h', '.c'],
-  aliases: ['c'],
+  aliases: ['c', 'c++', 'cxx', 'cc'],
   parse: () => null,
   stripStrings,
   stripComments,

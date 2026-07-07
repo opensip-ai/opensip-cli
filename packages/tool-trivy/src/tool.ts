@@ -139,6 +139,8 @@ export const tool: Tool = defineExternalToolAdapter({
   // Trivy queries its LOCAL vuln DB cache via execFile with --offline-scan — no
   // network, no credentials at scan time (the DB cache must be pre-populated).
   network: 'local-only',
+  // Polyglot / language-agnostic: matches every --lang discovery filter.
+  languages: [],
   commands: [
     {
       name: 'scan',

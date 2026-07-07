@@ -43,6 +43,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install ruff: https://docs.astral.sh/ruff/installation/ (brew install ruff)',
   },
   network: 'local-only',
+  languages: ['python'],
   commands: [
     {
       name: 'scan',

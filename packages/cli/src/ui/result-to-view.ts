@@ -345,6 +345,7 @@ export function resultToView(result: CommandResult): ViewNode {
     case 'tools-doctor':
     case 'tools-install':
     case 'tools-list':
+    case 'tools-available':
     case 'tools-uninstall':
     case 'tools-validate': {
       return viewToolsResult(result);

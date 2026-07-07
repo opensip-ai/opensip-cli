@@ -49,6 +49,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install cppcheck: https://cppcheck.sourceforge.io/ (brew install cppcheck)',
   },
   network: 'local-only',
+  languages: ['cpp'],
   commands: [
     {
       name: 'scan',

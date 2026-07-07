@@ -39,6 +39,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install clippy: rustup component add clippy',
   },
   network: 'local-only',
+  languages: ['rust'],
   commands: [
     {
       name: 'scan',

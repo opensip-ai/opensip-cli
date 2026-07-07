@@ -17,6 +17,8 @@ import { renderDiagnosticHuman } from '../render-diagnostic.js';
 
 import type {
   CommandResult,
+  ToolsAvailableResult,
+  ToolsAvailableRow,
   ToolsCreateResult,
   ToolsDataPurgeResult,
   ToolsDoctorResult,
@@ -43,6 +45,24 @@ const TOOLS_LIST_COLUMNS: readonly (string | TableColumnSpec)[] = [
 ];
 
 const VALIDATION_COLUMNS: readonly (string | TableColumnSpec)[] = ['Section', 'Status', 'Detail'];
+
+const TOOLS_AVAILABLE_COLUMNS: readonly (string | TableColumnSpec)[] = [
+  'Adapter',
+  'Languages',
+  'Network',
+  'Installed',
+  'Package',
+];
+
+function toolsAvailableRow(row: ToolsAvailableRow): Span[] {
+  return [
+    { text: row.id, tone: 'brand', bold: true },
+    { text: row.languages.length === 0 ? 'polyglot' : row.languages.join(', ') },
+    { text: row.network, tone: row.network === 'networked' ? 'warning' : 'muted' },
+    row.installed ? { text: 'installed', tone: 'success' } : { text: 'not installed', dim: true },
+    { text: row.pkg, dim: true },
+  ];
+}
 
 function statusTone(status: ToolsValidateSection['status']): Tone {
   switch (status) {
@@ -110,6 +130,7 @@ type ToolsCommandResult = Extract<
   {
     type:
       | 'tools-list'
+      | 'tools-available'
       | 'tools-doctor'
       | 'tools-create'
       | 'tools-validate'
@@ -128,6 +149,9 @@ export function viewToolsResult(result: ToolsCommandResult): ViewNode {
   switch (result.type) {
     case 'tools-list': {
       return viewToolsList(result);
+    }
+    case 'tools-available': {
+      return viewToolsAvailable(result);
     }
     case 'tools-doctor': {
       return viewToolsDoctor(result);
@@ -264,6 +288,35 @@ export function viewToolsList(result: ToolsListResult): ViewNode {
     ]),
     SPACER,
     group([viewTable(TOOLS_LIST_COLUMNS, result.tools.map(toolsListRow))], 2),
+  ]);
+}
+
+export function viewToolsAvailable(result: ToolsAvailableResult): ViewNode {
+  const scope = result.lang === undefined ? '' : ` · ${result.lang}`;
+  if (result.adapters.length === 0) {
+    return group(
+      [
+        line([
+          { text: 'No first-party adapters match', dim: true },
+          ...(result.lang === undefined ? [] : [{ text: ` language "${result.lang}"`, dim: true }]),
+          { text: '.', dim: true },
+        ]),
+      ],
+      2,
+    );
+  }
+  return group([
+    line([
+      { text: 'Available external-tool adapters', bold: true },
+      { text: ` (${result.totalCount}${scope})`, dim: true },
+    ]),
+    SPACER,
+    group([viewTable(TOOLS_AVAILABLE_COLUMNS, result.adapters.map(toolsAvailableRow))], 2),
+    SPACER,
+    line([
+      { text: 'Install with: ', dim: true },
+      { text: 'opensip tools install <package>', tone: 'brand' },
+    ]),
   ]);
 }
 

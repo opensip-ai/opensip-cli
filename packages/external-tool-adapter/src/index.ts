@@ -99,6 +99,7 @@ export {
   adapterConfigManifestOf,
   adapterNetworkOf,
   deriveAdapterConfigManifest,
+  deriveAdapterManifestLanguages,
   deriveAdapterManifestRequires,
 } from './adapter-manifest.js';
 export type { AdapterToolMarkers } from './adapter-manifest.js';

@@ -70,6 +70,7 @@ async function loadAdapterManifestHelpers() {
   adapterManifestHelpers = {
     deriveAdapterManifestRequires: mod.deriveAdapterManifestRequires,
     deriveAdapterConfigManifest: mod.deriveAdapterConfigManifest,
+    deriveAdapterManifestLanguages: mod.deriveAdapterManifestLanguages,
   };
   return adapterManifestHelpers;
 }
@@ -262,9 +263,15 @@ async function main() {
     // single-sourced in the substrate so the static manifest can never drift from
     // the runtime; the `--check` lane fails CI on a derivation mismatch.
     if (ADAPTER_TOOL_DIRS.includes(toolDir)) {
-      const { deriveAdapterManifestRequires, deriveAdapterConfigManifest } =
-        await loadAdapterManifestHelpers();
+      const {
+        deriveAdapterManifestRequires,
+        deriveAdapterConfigManifest,
+        deriveAdapterManifestLanguages,
+      } = await loadAdapterManifestHelpers();
       pkg.opensipTools.requires = deriveAdapterManifestRequires(tool);
+      // `languages` drives `tools list --available --lang`; derived from the adapter
+      // so the static manifest can never drift. Polyglot adapters yield `[]`.
+      pkg.opensipTools.languages = deriveAdapterManifestLanguages(tool);
       const config = deriveAdapterConfigManifest(tool);
       if (config === undefined) {
         delete pkg.opensipTools.config;

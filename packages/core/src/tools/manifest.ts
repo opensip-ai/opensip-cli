@@ -233,6 +233,13 @@ interface ToolPluginManifestBase {
   readonly pluginDomains?: readonly unknown[];
   /** Declaration-only consumed-resource needs, structurally validated at admission. */
   readonly requires?: readonly ToolResourceRequirement[];
+  /**
+   * Canonical source-language ids the tool covers (`'python'`, `'go'`, `'cpp'`, …),
+   * used by `opensip tools list --available --lang <l>` discovery. `[]` / omitted =
+   * polyglot / language-agnostic. Derived for external-tool adapters from the
+   * adapter's declared `languages`; the per-tool `--check` parity gate catches drift.
+   */
+  readonly languages?: readonly string[];
 
   // ── Reserved for community / catalog (ecosystem vision) ─────────────
   // These are additive reservations (currently unused) so manifests

@@ -58,6 +58,7 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint: 'Install SpotBugs: https://spotbugs.github.io/ (brew install spotbugs)',
   },
   network: 'local-only',
+  languages: ['java'],
   commands: [
     {
       name: 'scan',

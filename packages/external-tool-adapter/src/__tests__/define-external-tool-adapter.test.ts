@@ -1,7 +1,11 @@
 import { createSignal, ValidationError } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { deriveAdapterConfigManifest, deriveAdapterManifestRequires } from '../adapter-manifest.js';
+import {
+  deriveAdapterConfigManifest,
+  deriveAdapterManifestLanguages,
+  deriveAdapterManifestRequires,
+} from '../adapter-manifest.js';
 import { defineExternalToolAdapter } from '../define-external-tool-adapter.js';
 import { messageHashFingerprintStrategy } from '../fingerprint.js';
 
@@ -157,6 +161,25 @@ describe('defineExternalToolAdapter', () => {
     it('an auth-required adapter also derives a network requirement', () => {
       const tool = defineExternalToolAdapter({ ...baseSpec, network: 'auth-required' });
       expect(deriveAdapterManifestRequires(tool).some((r) => r.resource === 'network')).toBe(true);
+    });
+  });
+
+  describe('languages → manifest derivation', () => {
+    it('an adapter with no declared languages is polyglot ([])', () => {
+      expect(deriveAdapterManifestLanguages(defineExternalToolAdapter(baseSpec))).toEqual([]);
+    });
+
+    it('normalizes declared languages (lowercase, trim, dedupe, sort)', () => {
+      const tool = defineExternalToolAdapter({
+        ...baseSpec,
+        languages: ['Python', ' rust ', 'python', 'cpp'],
+      });
+      expect(deriveAdapterManifestLanguages(tool)).toEqual(['cpp', 'python', 'rust']);
+    });
+
+    it('drops empty / whitespace-only entries', () => {
+      const tool = defineExternalToolAdapter({ ...baseSpec, languages: ['go', '', '   '] });
+      expect(deriveAdapterManifestLanguages(tool)).toEqual(['go']);
     });
   });
 

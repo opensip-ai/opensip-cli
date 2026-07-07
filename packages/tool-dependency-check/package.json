@@ -125,7 +125,8 @@
           }
         }
       }
-    }
+    },
+    "languages": []
   },
   "scripts": {
     "build": "tsc",

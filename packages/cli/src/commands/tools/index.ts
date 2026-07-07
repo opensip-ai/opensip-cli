@@ -18,6 +18,7 @@ import {
 
 import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
 
+import { toolsListAvailable } from './available.js';
 import { toolsCreate } from './create.js';
 import { deriveToolDataPurgeIdForms, toolsDataPurge } from './data-purge.js';
 import { toolsDoctor } from './doctor.js';
@@ -79,16 +80,46 @@ function buildToolsListSpec(): HostSpec {
         description: 'Only project-local installed tools',
         default: false,
       },
+      {
+        flag: '--available',
+        description:
+          'List installable first-party external-tool adapters (the opt-in catalog) instead of the installed set',
+        default: false,
+      },
+      {
+        flag: '--lang <language>',
+        description:
+          'With --available, filter the adapter catalog by covered language (e.g. c++, python, go); implies --available',
+      },
     ],
     // Listing must work outside a project too (global tools are still
     // visible); the project host dir simply scans empty there.
     scope: 'none',
     output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts;
+      const opts = rawOpts as ScopeFilterOpts & { available?: boolean; lang?: string };
       // The admitted-tool set is per-run state on the entered RunScope (stamped
       // by the bootstrap), read here and passed into the pure `toolsList`.
       const scope = currentScope();
+      // `--lang` implies `--available` (filtering the installed set by covered
+      // language is meaningless — installed rows carry no language metadata).
+      if (opts.available === true || opts.lang !== undefined) {
+        const installed = toolsList({
+          cwd: effectiveCwd(opts),
+          provenance: scope?.toolProvenance ?? [],
+          manifests: scope?.toolManifests ?? [],
+          policy: policyFromCurrentScope(),
+        });
+        const installedIds = new Set(installed.tools.map((row) => row.id));
+        const rawLang = opts.lang?.trim();
+        const lang =
+          rawLang === undefined || rawLang.length === 0
+            ? undefined
+            : (scope?.languages.canonicalize(rawLang) ?? rawLang.toLowerCase());
+        return Promise.resolve(
+          toolsListAvailable({ installedIds, ...(lang === undefined ? {} : { lang }) }),
+        );
+      }
       return Promise.resolve(
         toolsList({
           cwd: effectiveCwd(opts),
