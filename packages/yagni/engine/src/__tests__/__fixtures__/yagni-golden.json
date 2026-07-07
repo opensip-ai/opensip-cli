@@ -2,6 +2,7 @@
   "verdict": {
     "score": 100,
     "passed": true,
+    "faulted": false,
     "summary": {
       "total": 1,
       "passed": 1,
