@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "L001",
+    "severity": "high",
+    "message": "failed to satisfy license requirements for crate foo",
+    "file": "foo 1.2.0 registry+https://github.com/rust-lang/crates.io-index",
+    "line": 3,
+    "column": 1
+  },
+  {
+    "ruleId": "A001",
+    "severity": "medium",
+    "message": "crate bar has a known security advisory",
+    "file": "bar 0.4.1 registry+https://github.com/rust-lang/crates.io-index",
+    "line": 5,
+    "column": 2
+  }
+]

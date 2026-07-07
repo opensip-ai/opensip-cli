@@ -142,6 +142,8 @@ async function progressStep<T>(
   bridge: ExternalAdapterProgressBridge | undefined,
   stage: ExternalAdapterProgressStage,
   fn: () => T | Promise<T>,
+  /** Optional: derive count/detail fields to surface on the `done` event (e.g. signal count). */
+  deriveExtra?: (result: T) => Omit<ExternalAdapterProgressEvent, 'kind' | 'stage' | 'status'>,
 ): Promise<T> {
   emitProgress(bridge, stage, 'start');
   const begin = performance.now();
@@ -149,6 +151,7 @@ async function progressStep<T>(
     const result = await fn();
     emitProgress(bridge, stage, 'done', {
       durationMs: Math.max(0, Math.round(performance.now() - begin)),
+      ...(deriveExtra?.(result) ?? {}),
     });
     return result;
   } catch (error) {
@@ -435,8 +438,11 @@ export async function runScanLoop(
     bytes: raw.length,
   });
 
-  const parsed = await progressStep(progress, 'ingest-report', () =>
-    parseSignals(command, raw, ctx),
+  const parsed = await progressStep(
+    progress,
+    'ingest-report',
+    () => parseSignals(command, raw, ctx),
+    (signals) => ({ signals: signals.length, findings: signals.length }),
   );
   const provenance: AdapterProvenance = {
     tool,

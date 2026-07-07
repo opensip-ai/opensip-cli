@@ -62,17 +62,30 @@ function titleFor(toolId: string): string {
     .join('-');
 }
 
+/** Fold optional counts into a human detail string ("32 signal(s)"), per spec 32. */
+function detailFor(event: ExternalAdapterProgressEvent): string | undefined {
+  if (event.detail !== undefined) return event.detail;
+  if (event.signals !== undefined) {
+    return `${String(event.signals)} signal${event.signals === 1 ? '' : 's'}`;
+  }
+  if (event.findings !== undefined) {
+    return `${String(event.findings)} finding${event.findings === 1 ? '' : 's'}`;
+  }
+  return undefined;
+}
+
 function toProgressEvent(event: ExternalAdapterProgressEvent): ProgressEvent {
   const label =
     ADAPTER_PROGRESS_STAGES.find((stage) => stage.id === event.stage)?.label ?? event.stage;
   if (event.status === 'start') {
     return { type: 'stage-start', stage: event.stage, label };
   }
+  const detail = detailFor(event);
   return {
     type: 'stage-done',
     stage: event.stage,
     durationMs: event.durationMs ?? 0,
-    ...(event.detail === undefined ? {} : { detail: event.detail }),
+    ...(detail === undefined ? {} : { detail }),
   };
 }
 
