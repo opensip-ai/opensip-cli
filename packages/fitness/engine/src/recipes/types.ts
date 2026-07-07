@@ -59,10 +59,7 @@ interface AllCheckSelector {
 
 /** Union of all check selector types used by recipes */
 export type CheckSelector =
-  | ExplicitCheckSelector
-  | PatternCheckSelector
-  | TagsCheckSelector
-  | AllCheckSelector;
+  ExplicitCheckSelector | PatternCheckSelector | TagsCheckSelector | AllCheckSelector;
 
 // =============================================================================
 // EXECUTION OPTIONS

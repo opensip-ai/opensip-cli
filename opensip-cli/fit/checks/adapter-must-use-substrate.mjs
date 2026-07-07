@@ -46,7 +46,7 @@ import { defineCheck } from '@opensip-cli/fitness';
 function stripComments(src) {
   let out = '';
   let str = null;
-  for (let i = 0; i < src.length; ) {
+  for (let i = 0; i < src.length;) {
     const ch = src[i];
     if (str !== null) {
       out += ch;

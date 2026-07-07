@@ -16,12 +16,7 @@ export type ReviewBriefCorrelationConfidence = 'low' | 'medium' | 'high';
 
 /** Entity kinds used by the review-brief correlation join. */
 export type ReviewBriefEntityKind =
-  | 'fingerprint'
-  | 'file'
-  | 'file-range'
-  | 'symbol'
-  | 'graph-node'
-  | 'package';
+  'fingerprint' | 'file' | 'file-range' | 'symbol' | 'graph-node' | 'package';
 
 /** Stable entity reference projected from a signal for correlation. */
 export interface ReviewBriefEntityRef {
@@ -36,13 +31,7 @@ export interface ReviewBriefEntityRef {
 
 /** Correlation key kinds, ordered by grouping strength. */
 export type ReviewBriefCorrelationKeyKind =
-  | 'fingerprint'
-  | 'graph-node'
-  | 'symbol'
-  | 'rule-location'
-  | 'file-range'
-  | 'package'
-  | 'file';
+  'fingerprint' | 'graph-node' | 'symbol' | 'rule-location' | 'file-range' | 'package' | 'file';
 
 /** A deterministic key that can place a risk into a correlation group. */
 export interface ReviewBriefCorrelationKey {

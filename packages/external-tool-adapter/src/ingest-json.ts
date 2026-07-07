@@ -8,8 +8,7 @@
 
 /** The result of a defensive JSON parse — never throws. */
 export type JsonParseResult =
-  | { readonly ok: true; readonly value: unknown }
-  | { readonly ok: false; readonly error: string };
+  { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string };
 
 /** Parse JSON, returning a Result instead of throwing on malformed input. */
 export function safeParseJson(raw: string): JsonParseResult {

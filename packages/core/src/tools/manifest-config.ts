@@ -25,13 +25,7 @@
  * those are the worker's deep Zod pass, never the host's coarse pass.
  */
 export type JsonSchemaPrimitiveType =
-  | 'string'
-  | 'number'
-  | 'integer'
-  | 'boolean'
-  | 'object'
-  | 'array'
-  | 'null';
+  'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null';
 
 /**
  * A draft-07-subset JSON-Schema node — the plain-data structural shape the

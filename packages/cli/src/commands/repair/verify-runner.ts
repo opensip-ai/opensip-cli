@@ -33,12 +33,10 @@ const CHILD_ENV_SPECS = [
   'FORCE_COLOR',
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'OPENSIP_PROFILING',
-].map(
-  (canonical): EnvVarSpec => ({
-    canonical,
-    docs: 'Forwarded from the parent process into a nested repair verification CLI run.',
-  }),
-);
+].map((canonical): EnvVarSpec => ({
+  canonical,
+  docs: 'Forwarded from the parent process into a nested repair verification CLI run.',
+}));
 
 export interface ProcessRunRequest {
   readonly command: string;

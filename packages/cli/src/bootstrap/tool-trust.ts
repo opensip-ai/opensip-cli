@@ -57,12 +57,7 @@ const TOOL_TRUST_FILE = 'tool-trust.json';
 const TOOL_TRUST_SCHEMA_VERSION = 1;
 
 export type ToolTrustReason =
-  | 'bundled'
-  | 'managed-install'
-  | 'project-config'
-  | 'env'
-  | 'user-global'
-  | 'denied';
+  'bundled' | 'managed-install' | 'project-config' | 'env' | 'user-global' | 'denied';
 
 export interface InstalledToolTrustRecord {
   readonly toolId: string;

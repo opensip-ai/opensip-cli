@@ -6,8 +6,7 @@ import type { ImpactTrust } from '../impact-trust.js';
 import type { ChangedFileBasis } from '@opensip-cli/core';
 
 export type GraphImpactBasis =
-  | ChangedFileBasis
-  | { readonly type: 'files'; readonly files: readonly string[] };
+  ChangedFileBasis | { readonly type: 'files'; readonly files: readonly string[] };
 
 export interface GraphImpactResult {
   readonly type: 'graph-impact';

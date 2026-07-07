@@ -37,14 +37,7 @@
  * contracts (the `cross-tool-flag-parity` check guards the run-command set).
  */
 export type CommonFlagKey =
-  | 'json'
-  | 'cwd'
-  | 'quiet'
-  | 'verbose'
-  | 'debug'
-  | 'reportTo'
-  | 'apiKey'
-  | 'open';
+  'json' | 'cwd' | 'quiet' | 'verbose' | 'debug' | 'reportTo' | 'apiKey' | 'open';
 
 /** The full set of {@link CommonFlagKey} values — the validation source for `defineCommand`. */
 export const COMMON_FLAG_KEYS: readonly CommonFlagKey[] = [

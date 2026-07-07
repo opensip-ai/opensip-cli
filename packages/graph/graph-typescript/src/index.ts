@@ -215,16 +215,14 @@ async function resolveCallSitesExact(
   const dependenciesByOwner =
     input.dependencySites && input.dependencySites.length > 0
       ? resolveDependencies(
-          input.dependencySites.map(
-            (r): TsDependencySiteRecord => ({
-              node: r.nodeRef as ts.Node,
-              sourceFile: r.sourceFileRef as ts.SourceFile,
-              ownerHash: r.ownerHash,
-              specifier: r.specifier,
-              line: r.line,
-              column: r.column,
-            }),
-          ),
+          input.dependencySites.map((r): TsDependencySiteRecord => ({
+            node: r.nodeRef as ts.Node,
+            sourceFile: r.sourceFileRef as ts.SourceFile,
+            ownerHash: r.ownerHash,
+            specifier: r.specifier,
+            line: r.line,
+            column: r.column,
+          })),
           input.catalog,
           project.program,
           input.projectDirAbs,

@@ -158,14 +158,12 @@ async function resolveSyntheticFlatShards(opts: GraphCommandOptions): Promise<Sh
   });
   const shards = partitions
     .filter((p) => p.files.length > 0)
-    .map(
-      (p): Shard => ({
-        id: `partition:${p.id}`,
-        rootDir: discovery.projectDirAbs,
-        files: p.files,
-        configPathAbs: discovery.configPathAbs,
-      }),
-    );
+    .map((p): Shard => ({
+      id: `partition:${p.id}`,
+      rootDir: discovery.projectDirAbs,
+      files: p.files,
+      configPathAbs: discovery.configPathAbs,
+    }));
   if (shards.length <= 1) return { shards: [] };
   return {
     shards,

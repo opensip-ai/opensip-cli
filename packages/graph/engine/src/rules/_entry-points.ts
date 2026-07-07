@@ -54,11 +54,7 @@ const NAME_HEURISTICS = new Set([
 export interface EntryPoint {
   readonly bodyHash: string;
   readonly reason:
-    | 'module-init'
-    | 'name-match'
-    | 'no-callers-exported'
-    | 'dynamic-import'
-    | 'target-convention';
+    'module-init' | 'name-match' | 'no-callers-exported' | 'dynamic-import' | 'target-convention';
 }
 
 export function inferEntryPoints(catalog: Catalog, indexes: Indexes): readonly EntryPoint[] {

@@ -37,8 +37,7 @@ export interface TypescriptParsedProject {
  * The engine treats this as opaque `unknown`; only the TS adapter introspects it.
  */
 export type TsParsed =
-  | ({ readonly kind: 'exact' } & TypescriptParsedProject)
-  | TypescriptFastParsedProject;
+  ({ readonly kind: 'exact' } & TypescriptParsedProject) | TypescriptFastParsedProject;
 
 /**
  * Parse the project for the requested resolution tier. `fast` skips the

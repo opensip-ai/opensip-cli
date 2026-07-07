@@ -8,9 +8,7 @@ export const MAX_CONFIG_MIGRATION_BYTES = 1_048_576;
 
 /** Change categories emitted by the project-config migration planner. */
 export type ConfigMigrationOperationKind =
-  | 'add-schema-version'
-  | 'normalize-schema-version'
-  | 'bump-schema-version';
+  'add-schema-version' | 'normalize-schema-version' | 'bump-schema-version';
 
 /** One human-readable operation applied, or proposed, during config migration. */
 export interface ConfigMigrationOperation {

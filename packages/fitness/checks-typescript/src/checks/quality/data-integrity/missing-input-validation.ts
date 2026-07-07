@@ -34,10 +34,7 @@ const EXCLUDED_PATH_SEGMENTS = [
 const isExcludedValidationPath = createPathMatcher(EXCLUDED_PATH_SEGMENTS);
 
 type FunctionLike =
-  | ts.FunctionDeclaration
-  | ts.MethodDeclaration
-  | ts.ArrowFunction
-  | ts.FunctionExpression;
+  ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression;
 
 /**
  * Quick filter regex for handler patterns

@@ -4,12 +4,7 @@ const MAX_PROPERTY_OBJECT_KEYS = 16;
 const MAX_PROPERTY_DEPTH = 3;
 
 export type JsonLike =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly JsonLike[]
-  | { readonly [key: string]: JsonLike };
+  string | number | boolean | null | readonly JsonLike[] | { readonly [key: string]: JsonLike };
 
 interface BoundedJson {
   readonly value: JsonLike;

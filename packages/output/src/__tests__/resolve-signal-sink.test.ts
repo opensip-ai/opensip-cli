@@ -21,10 +21,8 @@ const batch = (n: number) =>
   buildSignalBatch({
     tool: 'fit',
     repo: {},
-    signals: Array.from(
-      { length: n },
-      (_, i): Signal =>
-        createSignal({ source: 't', severity: 'high', ruleId: `r${i}`, message: 'm' }),
+    signals: Array.from({ length: n }, (_, i): Signal =>
+      createSignal({ source: 't', severity: 'high', ruleId: `r${i}`, message: 'm' }),
     ),
   });
 

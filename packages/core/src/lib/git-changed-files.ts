@@ -30,13 +30,7 @@ export interface ChangedFileBasis {
 
 /** Git status classification for a changed path. */
 export type ChangedFileStatus =
-  | 'added'
-  | 'modified'
-  | 'copied'
-  | 'renamed'
-  | 'deleted'
-  | 'untracked'
-  | 'unknown';
+  'added' | 'modified' | 'copied' | 'renamed' | 'deleted' | 'untracked' | 'unknown';
 
 /** A changed path plus enough status metadata for conservative impact trust. */
 export interface ChangedFileEntry {
