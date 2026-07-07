@@ -151,7 +151,7 @@ async function progressStep<T>(
     const result = await fn();
     emitProgress(bridge, stage, 'done', {
       durationMs: Math.max(0, Math.round(performance.now() - begin)),
-      ...(deriveExtra?.(result) ?? {}),
+      ...deriveExtra?.(result),
     });
     return result;
   } catch (error) {

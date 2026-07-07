@@ -1,8 +1,8 @@
 /**
- * Tier-1 (in-process) tests for the cargo-deny adapter `Tool`: the declarative
- * surface (commandSpecs / identity / metadata), the scan-arg helper, the exit
- * model (findingsFromNonzero bitset scanner), the manifest↔runtime host-shape
- * parity guards, and the full normalize→envelope path via the acceptance harness.
+ * Tier-1 (in-process) tests for the golangci-lint adapter `Tool`: the declarative
+ * surface (commandSpecs / identity / metadata), the scan-arg + exclude helpers, the
+ * exit model, the manifest↔runtime host-shape parity guards, and the full
+ * normalize→envelope path via the acceptance harness.
  */
 
 import { readFileSync } from 'node:fs';
@@ -19,8 +19,8 @@ import {
 } from '@opensip-cli/external-tool-adapter';
 import { describe, expect, it } from 'vitest';
 
-import { parseCargoDenyJsonLines } from '../parse-cargo-deny-json-lines.js';
-import { buildScanArgs, CARGO_DENY_STABLE_ID, tool } from '../tool.js';
+import { parseGolangciLintJson } from '../parse-golangci-lint-json.js';
+import { buildGolangciLintExclude, buildScanArgs, GOLANGCI_LINT_STABLE_ID, tool } from '../tool.js';
 
 import type { ToolPluginManifest } from '@opensip-cli/core';
 import type { AdapterRunContext, ScannerExitModel } from '@opensip-cli/external-tool-adapter';
@@ -30,7 +30,7 @@ const PKG = JSON.parse(
 ) as { name: string; version: string; opensipTools: Record<string, unknown> };
 
 const GOLDEN_RAW = readFileSync(
-  fileURLToPath(new URL('../../__fixtures__/cargo-deny-golden.jsonl', import.meta.url)),
+  fileURLToPath(new URL('../../__fixtures__/golangci-lint-golden.json', import.meta.url)),
   'utf8',
 );
 const EXPECTED = JSON.parse(
@@ -51,15 +51,18 @@ function manifestFromPackage(): ToolPluginManifest {
 
 const byName = (name: string) => tool.commandSpecs?.find((c) => c.name === name);
 
-describe('cargo-deny tool — identity + metadata', () => {
-  it('declares the cargo-deny identity with the `deny` alias', () => {
-    expect(tool.identity).toEqual({ name: 'cargo-deny', aliases: ['deny'] });
+describe('golangci-lint tool — identity + metadata', () => {
+  it('declares the golangci-lint identity with the `golangci` alias', () => {
+    expect(tool.identity).toEqual({
+      name: 'golangci-lint',
+      aliases: ['golangci'],
+    });
   });
 
   it('carries the stable UUID, name, and description', () => {
-    expect(tool.metadata.id).toBe(CARGO_DENY_STABLE_ID);
-    expect(tool.metadata.name).toBe('cargo-deny');
-    expect(tool.metadata.description).toBe('Rust dependency policy checks via cargo-deny');
+    expect(tool.metadata.id).toBe(GOLANGCI_LINT_STABLE_ID);
+    expect(tool.metadata.name).toBe('golangci-lint');
+    expect(tool.metadata.description).toBe('Go lint aggregation via golangci-lint');
   });
 
   it('defaults to the message-hash fingerprint strategy', () => {
@@ -69,62 +72,55 @@ describe('cargo-deny tool — identity + metadata', () => {
   });
 });
 
-describe('cargo-deny tool — commandSpecs', () => {
+describe('golangci-lint tool — commandSpecs', () => {
   it('mounts the primary scan plus nested doctor + version', () => {
     expect((tool.commandSpecs ?? []).map((c) => c.name)).toEqual([
-      'cargo-deny',
+      'golangci-lint',
       'doctor',
       'version',
     ]);
   });
 
-  it('the primary command is project-scoped, raw-stream, aliased `deny`', () => {
-    const primary = byName('cargo-deny');
+  it('the primary command is project-scoped, raw-stream, aliased `golangci`', () => {
+    const primary = byName('golangci-lint');
     expect(primary?.parent).toBeUndefined();
-    expect(primary?.aliases).toEqual(['deny']);
+    expect(primary?.aliases).toEqual(['golangci']);
     expect(primary?.scope).toBe('project');
     expect(primary?.output).toBe('raw-stream');
   });
 
-  it('doctor + version are nested under cargo-deny, scope:none', () => {
+  it('doctor + version are nested under golangci-lint, scope:none', () => {
     for (const name of ['doctor', 'version']) {
-      expect(byName(name)?.parent).toBe('cargo-deny');
+      expect(byName(name)?.parent).toBe('golangci-lint');
       expect(byName(name)?.scope).toBe('none');
     }
   });
 });
 
-describe('cargo-deny tool — scan helper', () => {
-  it('builds the `check --format json` argv', () => {
+describe('golangci-lint tool — scan + exclude helpers', () => {
+  it('builds the v2 `run --output.json.path=stdout` argv', () => {
     const ctx = { projectRoot: '/proj' } as unknown as AdapterRunContext;
-    expect(buildScanArgs(ctx)).toEqual(['check', '--format', 'json']);
+    expect(buildScanArgs(ctx)).toEqual(['run', '--output.json.path=stdout']);
+  });
+
+  it('emits no extra CLI args for the .runtime exclusion (v2 moved it to config)', () => {
+    expect(buildGolangciLintExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual(
+      [],
+    );
   });
 });
 
-describe('cargo-deny tool — exit model (findingsFromNonzero bitset scanner)', () => {
-  // cargo-deny ORs per-check category bits; any nonzero with a parseable artifact is
-  // findings, otherwise a fault.
-  const model: ScannerExitModel = {
-    ok: [0],
-    findings: [],
-    findingsFromNonzero: true,
-  };
+describe('golangci-lint tool — exit model', () => {
+  const model: ScannerExitModel = { ok: [0], findings: [1], errorFrom: 2 };
 
-  it('exit 0 ⇒ ok', () => {
+  it('0 ⇒ ok, 1 ⇒ findings, >=2 ⇒ fault', () => {
     expect(interpretExit(0, model)).toBe('ok');
-  });
-
-  it('nonzero + a valid artifact ⇒ findings', () => {
-    expect(interpretExit(4, model, { artifactValid: true })).toBe('findings');
-    expect(interpretExit(15, model, { artifactValid: true })).toBe('findings');
-  });
-
-  it('nonzero + a missing/garbage artifact ⇒ fault', () => {
-    expect(interpretExit(4, model, { artifactValid: false })).toBe('fault');
+    expect(interpretExit(1, model)).toBe('findings');
+    expect(interpretExit(2, model)).toBe('fault');
   });
 });
 
-describe('cargo-deny tool — manifest ↔ runtime parity (no drift)', () => {
+describe('golangci-lint tool — manifest ↔ runtime parity (no drift)', () => {
   it('the package.json manifest matches the runtime tool', () => {
     expect(() => {
       assertManifestMatchesTool(manifestFromPackage(), tool);
@@ -149,16 +145,16 @@ describe('cargo-deny tool — manifest ↔ runtime parity (no drift)', () => {
   });
 });
 
-describe('cargo-deny tool — acceptance harness (normalize → envelope)', () => {
+describe('golangci-lint tool — acceptance harness (normalize → envelope)', () => {
   const result = runAcceptanceCase({
-    tool: 'cargo-deny',
+    tool: 'golangci-lint',
     kind: 'stdout',
     raw: GOLDEN_RAW,
-    parse: parseCargoDenyJsonLines,
+    parse: parseGolangciLintJson,
     fingerprintStrategy: 'message-hash',
   });
 
-  it('produces the golden normalized signals (summary line ignored)', () => {
+  it('produces the golden normalized signals', () => {
     expect(result.signals.map(normalizedSignalShape)).toEqual(EXPECTED);
   });
 

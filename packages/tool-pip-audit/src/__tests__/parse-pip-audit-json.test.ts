@@ -4,7 +4,10 @@ import { parsePipAuditJson } from '../parse-pip-audit-json.js';
 
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
-const CTX = { projectRoot: '/proj', tool: 'pip-audit' } as unknown as AdapterRunContext;
+const CTX = {
+  projectRoot: '/proj',
+  tool: 'pip-audit',
+} as unknown as AdapterRunContext;
 
 /** Build the `ParsedScannerOutput` the run loop hands a JSON-kind parser. */
 function output(raw: string): ParsedScannerOutput {
@@ -74,23 +77,32 @@ describe('parsePipAuditJson', () => {
   });
 
   it('falls back to a default rule id and omits the suggestion / aliases when fields are absent', () => {
-    const raw = JSON.stringify({ dependencies: [{ name: 'x', version: '1', vulns: [{}] }] });
+    const raw = JSON.stringify({
+      dependencies: [{ name: 'x', version: '1', vulns: [{}] }],
+    });
     const [signal] = parsePipAuditJson(output(raw), CTX);
     expect(signal?.ruleId).toBe('pip-vulnerability');
     expect(signal?.message).toBe('pip-vulnerability (x@1)');
     expect(signal?.suggestion).toBeUndefined();
-    expect(signal?.metadata).toMatchObject({ aliases: null, fixVersions: null });
+    expect(signal?.metadata).toMatchObject({
+      aliases: null,
+      fixVersions: null,
+    });
   });
 
   it('labels the dependency by name only when the version is missing', () => {
-    const raw = JSON.stringify({ dependencies: [{ name: 'lib', vulns: [{ id: 'V-1' }] }] });
+    const raw = JSON.stringify({
+      dependencies: [{ name: 'lib', vulns: [{ id: 'V-1' }] }],
+    });
     expect(parsePipAuditJson(output(raw), CTX)[0]?.message).toBe('V-1 (lib)');
   });
 
   it('tolerates malformed / non-JSON output and non-object entries without throwing', () => {
     expect(parsePipAuditJson(output('not json'), CTX)).toEqual([]);
     expect(parsePipAuditJson(output('{"unexpected":true}'), CTX)).toEqual([]);
-    const raw = JSON.stringify({ dependencies: [null, 5, { name: 'x', vulns: [null, { id: 'V' }] }] });
+    const raw = JSON.stringify({
+      dependencies: [null, 5, { name: 'x', vulns: [null, { id: 'V' }] }],
+    });
     expect(parsePipAuditJson(output(raw), CTX).map((s) => s.ruleId)).toEqual(['V']);
   });
 });

@@ -6,7 +6,10 @@ import { parseCargoClippyJsonLines } from './parse-cargo-clippy-json-lines.js';
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
 
-export const CARGO_CLIPPY_IDENTITY: ToolIdentity = { name: 'cargo-clippy', aliases: ['clippy'] };
+export const CARGO_CLIPPY_IDENTITY: ToolIdentity = {
+  name: 'cargo-clippy',
+  aliases: ['clippy'],
+};
 export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
 
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {

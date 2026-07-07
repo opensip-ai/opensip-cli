@@ -115,14 +115,44 @@ describe('ast-grep tool — scan helper', () => {
 describe('ast-grep tool — stdout SARIF parse', () => {
   it('normalizes the stdout SARIF document into golden signals (source = tool)', () => {
     const raw: ParsedScannerOutput = { kind: 'stdout', raw: GOLDEN_RAW };
-    const ctx = { tool: 'ast-grep', projectRoot: '/proj' } as unknown as AdapterRunContext;
+    const ctx = {
+      tool: 'ast-grep',
+      projectRoot: '/proj',
+    } as unknown as AdapterRunContext;
     expect(parseAstGrepSarif(raw, ctx).map(normalizedSignalShape)).toEqual(EXPECTED);
   });
 
   it('throws ADAPTER.ARTIFACT.INVALID on non-JSON stdout', () => {
     const raw: ParsedScannerOutput = { kind: 'stdout', raw: 'not sarif' };
-    const ctx = { tool: 'ast-grep', projectRoot: '/proj' } as unknown as AdapterRunContext;
+    const ctx = {
+      tool: 'ast-grep',
+      projectRoot: '/proj',
+    } as unknown as AdapterRunContext;
     expect(() => parseAstGrepSarif(raw, ctx)).toThrow(/invalid SARIF/);
+  });
+});
+
+describe('ast-grep tool — version probe (covers the binary versionParse)', () => {
+  it('resolves the config-pinned binary and normalizes its --version output to a semver', async () => {
+    // Pin the binary to the real node executable so the substrate's version probe
+    // runs a REAL `--version` and feeds stdout through the tool's inline
+    // `versionParse` (parseFirstSemver ?? trim). node --version ⇒ `vX.Y.Z`.
+    const version = tool.commandSpecs?.find((c) => c.name === 'version') as unknown as {
+      handler: (opts: unknown, cli: unknown) => Promise<void>;
+    };
+    const emitted: { found: boolean; version?: string }[] = [];
+    const cli = {
+      scope: {
+        toolConfig: {
+          'ast-grep': { binaries: { 'ast-grep': { path: process.execPath } } },
+        },
+      },
+      emitJson: (value: { found: boolean; version?: string }) => emitted.push(value),
+    };
+    await version.handler({ json: true }, cli);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.found).toBe(true);
+    expect(emitted[0]?.version).toMatch(/^\d+\.\d+/);
   });
 });
 

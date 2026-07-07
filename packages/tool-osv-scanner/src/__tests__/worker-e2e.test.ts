@@ -84,7 +84,11 @@ function runCli(args: string[], extraEnv: Record<string, string> = {}, cwd = pro
     return { stdout, stderr: '', status: 0 };
   } catch (error) {
     const e = error as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', status: e.status ?? 1 };
+    return {
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
+      status: e.status ?? 1,
+    };
   }
 }
 
@@ -193,7 +197,10 @@ describe('osv-scanner worker E2E — opensip osv (real forked worker)', () => {
   it('stamps message-hash fingerprints + provenance + native severity worker-side', () => {
     for (const s of envelope.signals) {
       expect(s.fingerprint).toMatch(/^[0-9a-f]{64}$/);
-      const provenance = s.metadata.provenance as { tool: string; adapterPackage: string };
+      const provenance = s.metadata.provenance as {
+        tool: string;
+        adapterPackage: string;
+      };
       expect(provenance.tool).toBe('osv-scanner');
       expect(provenance.adapterPackage).toBe('@opensip-cli/tool-osv-scanner');
     }
@@ -231,7 +238,10 @@ describe('osv-scanner worker E2E — opensip osv (real forked worker)', () => {
     const osvRow = sessions.find((s) => s.tool === 'osv-scanner');
     expect(osvRow).toBeDefined();
     expect(osvRow?.passed).toBe(false);
-    const payload = osvRow?.payload as { binary?: { path?: string }; findings?: number };
+    const payload = osvRow?.payload as {
+      binary?: { path?: string };
+      findings?: number;
+    };
     expect(payload?.binary?.path).toContain('osv-scanner');
     expect(payload?.findings).toBe(2);
   });
@@ -264,7 +274,10 @@ describe('osv-scanner worker E2E — doctor / version diagnostics', () => {
       OPENSIP_CLI_TOOL_ENV_PASSTHROUGH: 'FAKE_OSV_GOLDEN OPENSIP_OSV_SCANNER_BIN',
     });
     expect(run.status).toBe(2);
-    const report = outcomeJson(run).data as { ready: boolean; binary: { found: boolean } };
+    const report = outcomeJson(run).data as {
+      ready: boolean;
+      binary: { found: boolean };
+    };
     expect(report.ready).toBe(false);
     expect(report.binary.found).toBe(false);
   });
@@ -272,7 +285,10 @@ describe('osv-scanner worker E2E — doctor / version diagnostics', () => {
   it('version --json prints the resolved osv-scanner binary version', () => {
     const run = runCli(['osv-scanner', 'version', '--json']);
     expect(run.status).toBe(0);
-    const report = outcomeJson(run).data as { found: boolean; version?: string };
+    const report = outcomeJson(run).data as {
+      found: boolean;
+      version?: string;
+    };
     expect(report.found).toBe(true);
     expect(report.version).toBe('1.9.1');
   });
@@ -280,7 +296,9 @@ describe('osv-scanner worker E2E — doctor / version diagnostics', () => {
 
 describe('osv-scanner worker E2E — installed tools are deny-by-default', () => {
   it('without the trust allowlist, `opensip osv` is not admitted', () => {
-    const run = runCli(['osv', '--json'], { OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '' });
+    const run = runCli(['osv', '--json'], {
+      OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '',
+    });
     // Deny-by-default: the command never mounts (unknown command / not found), so
     // the scan does NOT run.
     expect(run.status).not.toBe(0);
@@ -352,7 +370,9 @@ describe('osv-scanner worker E2E — full gate ratchet (§4.12)', () => {
     // the baseline IS written — proven by the clean compare below.
     expect(save.status).toBe(1);
     const list = runCli(['sessions', 'list', '--json'], {}, gateProject);
-    const data = outcomeJson(list).data as { sessions?: Record<string, unknown>[] };
+    const data = outcomeJson(list).data as {
+      sessions?: Record<string, unknown>[];
+    };
     const osvRows = (data.sessions ?? []).filter((s) => s.tool === 'osv-scanner');
     expect(osvRows.length).toBeGreaterThanOrEqual(1);
   });

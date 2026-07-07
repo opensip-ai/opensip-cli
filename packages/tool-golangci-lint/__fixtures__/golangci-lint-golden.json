@@ -1,0 +1,34 @@
+{
+  "Issues": [
+    {
+      "FromLinter": "errcheck",
+      "Text": "Error return value of `w.Write` is not checked",
+      "Severity": "",
+      "SourceLines": ["\tw.Write(payload)"],
+      "Pos": {
+        "Filename": "main.go",
+        "Offset": 210,
+        "Line": 10,
+        "Column": 2
+      }
+    },
+    {
+      "FromLinter": "govet",
+      "Text": "printf: non-constant format string in call to fmt.Sprintf",
+      "Severity": "",
+      "SourceLines": ["\tfmt.Sprintf(msg)"],
+      "Pos": {
+        "Filename": "internal/handler.go",
+        "Offset": 512,
+        "Line": 22,
+        "Column": 5
+      }
+    }
+  ],
+  "Report": {
+    "Linters": [
+      { "Name": "errcheck", "Enabled": true },
+      { "Name": "govet", "Enabled": true }
+    ]
+  }
+}

@@ -89,7 +89,11 @@ function runCli(args: string[], extraEnv: Record<string, string> = {}, cwd = pro
     return { stdout, stderr: '', status: 0 };
   } catch (error) {
     const e = error as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', status: e.status ?? 1 };
+    return {
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
+      status: e.status ?? 1,
+    };
   }
 }
 
@@ -201,7 +205,10 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
   it('stamps message-hash fingerprints + provenance worker-side', () => {
     for (const s of envelope.signals) {
       expect(s.fingerprint).toMatch(/^[0-9a-f]{64}$/);
-      const provenance = s.metadata.provenance as { tool: string; adapterPackage: string };
+      const provenance = s.metadata.provenance as {
+        tool: string;
+        adapterPackage: string;
+      };
       expect(provenance.tool).toBe('gitleaks');
       expect(provenance.adapterPackage).toBe('@opensip-cli/tool-gitleaks');
     }
@@ -245,7 +252,10 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
     const gitleaksRow = sessions.find((s) => s.tool === 'gitleaks');
     expect(gitleaksRow).toBeDefined();
     expect(gitleaksRow?.passed).toBe(false);
-    const payload = gitleaksRow?.payload as { binary?: { path?: string }; findings?: number };
+    const payload = gitleaksRow?.payload as {
+      binary?: { path?: string };
+      findings?: number;
+    };
     expect(payload?.binary?.path).toContain('gitleaks');
     expect(payload?.findings).toBe(2);
   });
@@ -256,7 +266,9 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
   // `payload.summary` for its clean/dirty decision).
   it('persists a grouped session payload (checks[] + summary) so the report is NOT falsely clean', () => {
     const list = runCli(['sessions', 'list', '--json']);
-    const data = parseGitleaksOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const data = parseGitleaksOutcome(list.stdout).data as {
+      sessions?: Record<string, unknown>[];
+    };
     const gitleaksRow = (data.sessions ?? []).find((s) => s.tool === 'gitleaks');
     const payload = gitleaksRow?.payload as {
       summary?: { errors?: number; warnings?: number };
@@ -277,7 +289,9 @@ describe('gitleaks worker E2E — opensip gitleaks (real forked worker)', () => 
   // envelope/payload build — prove it holds through to the persisted row).
   it('NEVER persists a raw Secret/Match into the session payload (only the masked preview)', () => {
     const list = runCli(['sessions', 'list', '--json']);
-    const data = parseGitleaksOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const data = parseGitleaksOutcome(list.stdout).data as {
+      sessions?: Record<string, unknown>[];
+    };
     const gitleaksRow = (data.sessions ?? []).find((s) => s.tool === 'gitleaks');
     const payloadBlob = JSON.stringify(gitleaksRow?.payload ?? {});
     for (const raw of RAW_SECRETS) expect(payloadBlob).not.toContain(raw);
@@ -326,7 +340,10 @@ describe('gitleaks worker E2E — doctor / version diagnostics', () => {
   it('version --json prints the resolved gitleaks binary version', () => {
     const run = runCli(['gitleaks', 'version', '--json']);
     expect(run.status).toBe(0);
-    const report = parseGitleaksOutcome(run.stdout).data as { found: boolean; version?: string };
+    const report = parseGitleaksOutcome(run.stdout).data as {
+      found: boolean;
+      version?: string;
+    };
     expect(report.found).toBe(true);
     expect(report.version).toBe('8.18.4');
   });
@@ -368,7 +385,9 @@ describe('gitleaks worker E2E — typed exit-class survives the worker boundary 
 
 describe('gitleaks worker E2E — installed tools are deny-by-default', () => {
   it('without the trust allowlist, `opensip gitleaks` is not admitted', () => {
-    const run = runCli(['gitleaks', '--json'], { OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '' });
+    const run = runCli(['gitleaks', '--json'], {
+      OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '',
+    });
     // Deny-by-default: the command never mounts (unknown command / not found),
     // so the scan does NOT run.
     expect(run.status).not.toBe(0);
@@ -444,7 +463,9 @@ describe('gitleaks worker E2E — full gate ratchet (§4.12)', () => {
     // but the baseline IS written — proven by the clean compare below.
     expect(save.status).toBe(1);
     const list = runCli(['sessions', 'list', '--json'], {}, gateProject);
-    const data = parseGitleaksOutcome(list.stdout).data as { sessions?: Record<string, unknown>[] };
+    const data = parseGitleaksOutcome(list.stdout).data as {
+      sessions?: Record<string, unknown>[];
+    };
     const gitleaksRows = (data.sessions ?? []).filter((s) => s.tool === 'gitleaks');
     expect(gitleaksRows.length).toBeGreaterThanOrEqual(1);
   });

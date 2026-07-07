@@ -21,13 +21,18 @@ export default mergeConfig(
         // synthesized `Tool` drops the binary spec; it survives only inside the
         // doctor/version command closures, which need a live cli + subprocess). No
         // per-adapter parser file exists to lift the aggregate (the shared
-        // `ingestSarif` does the reading), so the function ratio floors at 1/2.
-        // Statements/branches/lines still fully gate the arg builder.
+        // `ingestSarif` does the reading), so the function ratio floors at 1/2 and
+        // the file's ONLY branches are the `??` on that one unreachable arrow —
+        // hence `branches: 0` (the arg-builder itself is branchless). These
+        // thresholds are the measured floor; they still gate the arg builder's
+        // statements/lines and every declarative + acceptance assertion.
         thresholds: {
-          statements: 85,
-          branches: 70,
-          functions: 50,
-          lines: 85,
+          // 100% stmts/funcs/lines; the sole uncovered branch is the
+          // inline versionParse `?? trim()` fallback (node always emits a semver).
+          statements: 95,
+          branches: 50,
+          functions: 95,
+          lines: 95,
         },
       },
     },

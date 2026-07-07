@@ -124,7 +124,11 @@ function createCapturedLogger(captured: ToolCliContextCaptured): Logger {
     message: string | Record<string, unknown>,
     data?: Record<string, unknown>,
   ): void => {
-    captured.logs.push({ level, message, ...(data === undefined ? {} : { data }) });
+    captured.logs.push({
+      level,
+      message,
+      ...(data === undefined ? {} : { data }),
+    });
   };
   return {
     debug: (message, data) => push('debug', message, data),

@@ -89,7 +89,10 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildGitleaksExclude(input: {
   readonly excludePath: string;
   readonly configPath: (name: string) => string;
-}): { readonly args: readonly string[]; readonly configFile: { path: string; contents: string } } {
+}): {
+  readonly args: readonly string[];
+  readonly configFile: { path: string; contents: string };
+} {
   const path = input.configPath('gitleaks-exclude.toml');
   const contents = [
     '# opensip-cli A3 exclude: opensip-cli/.runtime',

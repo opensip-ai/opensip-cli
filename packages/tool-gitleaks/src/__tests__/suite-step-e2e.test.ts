@@ -100,7 +100,11 @@ function runCli(args: string[], extraEnv: Record<string, string>, cwd: string): 
     return { stdout, stderr: '', status: 0 };
   } catch (error) {
     const e = error as { stdout?: string; stderr?: string; status?: number };
-    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', status: e.status ?? 1 };
+    return {
+      stdout: e.stdout ?? '',
+      stderr: e.stderr ?? '',
+      status: e.status ?? 1,
+    };
   }
 }
 
@@ -164,7 +168,12 @@ describe('gitleaks as a suite step (04↔05) — external adapter over the worke
   let suiteOutcome: {
     exitCode: number;
     suiteRunId: string;
-    steps: { tool: string; stableId: string; command: string; exitCode: number }[];
+    steps: {
+      tool: string;
+      stableId: string;
+      command: string;
+      exitCode: number;
+    }[];
   };
 
   beforeAll(() => {

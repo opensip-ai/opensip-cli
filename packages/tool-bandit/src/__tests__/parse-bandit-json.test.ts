@@ -4,7 +4,10 @@ import { parseBanditJson } from '../parse-bandit-json.js';
 
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
-const CTX = { projectRoot: '/proj', tool: 'bandit' } as unknown as AdapterRunContext;
+const CTX = {
+  projectRoot: '/proj',
+  tool: 'bandit',
+} as unknown as AdapterRunContext;
 
 /** Build the `ParsedScannerOutput` the run loop hands a JSON-kind parser. */
 function output(raw: string): ParsedScannerOutput {
@@ -48,9 +51,24 @@ describe('parseBanditJson', () => {
   it('maps issue_severity HIGH/MEDIUM/LOW → high/medium/low', () => {
     const raw = JSON.stringify({
       results: [
-        { test_id: 'B1', filename: 'a.py', issue_severity: 'HIGH', issue_text: 'h' },
-        { test_id: 'B2', filename: 'a.py', issue_severity: 'MEDIUM', issue_text: 'm' },
-        { test_id: 'B3', filename: 'a.py', issue_severity: 'LOW', issue_text: 'l' },
+        {
+          test_id: 'B1',
+          filename: 'a.py',
+          issue_severity: 'HIGH',
+          issue_text: 'h',
+        },
+        {
+          test_id: 'B2',
+          filename: 'a.py',
+          issue_severity: 'MEDIUM',
+          issue_text: 'm',
+        },
+        {
+          test_id: 'B3',
+          filename: 'a.py',
+          issue_severity: 'LOW',
+          issue_text: 'l',
+        },
       ],
     });
     expect(parseBanditJson(output(raw), CTX).map((s) => s.severity)).toEqual([
@@ -61,7 +79,9 @@ describe('parseBanditJson', () => {
   });
 
   it('defaults severity to medium when issue_severity is absent/unknown', () => {
-    const raw = JSON.stringify({ results: [{ test_id: 'B9', filename: 'a.py', issue_text: 'x' }] });
+    const raw = JSON.stringify({
+      results: [{ test_id: 'B9', filename: 'a.py', issue_text: 'x' }],
+    });
     const [signal] = parseBanditJson(output(raw), CTX);
     expect(signal?.severity).toBe('medium');
     expect(signal?.metadata?.nativeSeverity).toBeNull();
@@ -77,7 +97,10 @@ describe('parseBanditJson', () => {
           issue_severity: 'HIGH',
           issue_confidence: 'HIGH',
           issue_text: 'x',
-          issue_cwe: { id: 78, link: 'https://cwe.mitre.org/data/definitions/78.html' },
+          issue_cwe: {
+            id: 78,
+            link: 'https://cwe.mitre.org/data/definitions/78.html',
+          },
         },
       ],
     });
@@ -93,7 +116,11 @@ describe('parseBanditJson', () => {
 
   it('falls back to test_name then "bandit" for the rule id, and issue_text→ruleId for the message', () => {
     const byName = parseBanditJson(
-      output(JSON.stringify({ results: [{ test_name: 'blacklist', filename: 'a.py' }] })),
+      output(
+        JSON.stringify({
+          results: [{ test_name: 'blacklist', filename: 'a.py' }],
+        }),
+      ),
       CTX,
     );
     expect(byName[0]?.ruleId).toBe('blacklist');
@@ -114,7 +141,9 @@ describe('parseBanditJson', () => {
   });
 
   it('skips result entries that are not objects', () => {
-    const raw = JSON.stringify({ results: [null, 5, 'x', { test_id: 'B1', filename: 'a.py' }] });
+    const raw = JSON.stringify({
+      results: [null, 5, 'x', { test_id: 'B1', filename: 'a.py' }],
+    });
     expect(parseBanditJson(output(raw), CTX)).toHaveLength(1);
   });
 });

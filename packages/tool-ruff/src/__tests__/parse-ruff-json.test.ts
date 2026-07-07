@@ -4,7 +4,10 @@ import { parseRuffJson } from '../parse-ruff-json.js';
 
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
-const CTX = { projectRoot: '/proj', tool: 'ruff' } as unknown as AdapterRunContext;
+const CTX = {
+  projectRoot: '/proj',
+  tool: 'ruff',
+} as unknown as AdapterRunContext;
 
 /** Build the `ParsedScannerOutput` the run loop hands a JSON-kind parser. */
 function output(raw: string): ParsedScannerOutput {
@@ -41,7 +44,12 @@ describe('parseRuffJson', () => {
 
   it('defaults severity to medium (ruff emits no severity field)', () => {
     const raw = JSON.stringify([
-      { code: 'E501', filename: 'a.py', message: 'Line too long', location: { row: 2, column: 89 } },
+      {
+        code: 'E501',
+        filename: 'a.py',
+        message: 'Line too long',
+        location: { row: 2, column: 89 },
+      },
     ]);
     const [signal] = parseRuffJson(output(raw), CTX);
     expect(signal?.severity).toBe('medium');
@@ -63,7 +71,9 @@ describe('parseRuffJson', () => {
   });
 
   it('falls back to the rule id for a diagnostic with no message', () => {
-    const raw = JSON.stringify([{ code: 'B008', filename: 'a.py', location: { row: 1, column: 1 } }]);
+    const raw = JSON.stringify([
+      { code: 'B008', filename: 'a.py', location: { row: 1, column: 1 } },
+    ]);
     const [signal] = parseRuffJson(output(raw), CTX);
     expect(signal?.message).toBe('B008');
   });

@@ -112,6 +112,30 @@ describe('semgrep tool — scan helper', () => {
   });
 });
 
+describe('semgrep tool — version probe (covers the binary versionParse)', () => {
+  it('resolves the config-pinned binary and normalizes its --version output to a semver', async () => {
+    // Pin the binary to the real node executable so the substrate's version probe
+    // runs a REAL `--version` and feeds stdout through the tool's inline
+    // `versionParse` (parseFirstSemver ?? trim). node --version ⇒ `vX.Y.Z`.
+    const version = tool.commandSpecs?.find((c) => c.name === 'version') as unknown as {
+      handler: (opts: unknown, cli: unknown) => Promise<void>;
+    };
+    const emitted: { found: boolean; version?: string }[] = [];
+    const cli = {
+      scope: {
+        toolConfig: {
+          semgrep: { binaries: { semgrep: { path: process.execPath } } },
+        },
+      },
+      emitJson: (value: { found: boolean; version?: string }) => emitted.push(value),
+    };
+    await version.handler({ json: true }, cli);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.found).toBe(true);
+    expect(emitted[0]?.version).toMatch(/^\d+\.\d+/);
+  });
+});
+
 describe('semgrep tool — exit model', () => {
   const model: ScannerExitModel = { ok: [0], findings: [1], errorFrom: 2 };
   it('0 ⇒ ok, 1 ⇒ findings, >=2 ⇒ fault', () => {

@@ -4,7 +4,10 @@ import { parseGovulncheckJsonLines } from '../parse-govulncheck-json-lines.js';
 
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
-const CTX = { projectRoot: '/proj', tool: 'govulncheck' } as unknown as AdapterRunContext;
+const CTX = {
+  projectRoot: '/proj',
+  tool: 'govulncheck',
+} as unknown as AdapterRunContext;
 
 /** govulncheck streams NDJSON to stdout. */
 function output(lines: string[]): ParsedScannerOutput {
@@ -12,7 +15,9 @@ function output(lines: string[]): ParsedScannerOutput {
 }
 
 const osv = (id: string, summary: string, aliases?: string[]): string =>
-  JSON.stringify({ osv: { id, summary, ...(aliases === undefined ? {} : { aliases }) } });
+  JSON.stringify({
+    osv: { id, summary, ...(aliases === undefined ? {} : { aliases }) },
+  });
 
 describe('parseGovulncheckJsonLines', () => {
   it('DEDUPES multiple finding messages per OSV into one high (reachable) signal', () => {
@@ -34,7 +39,12 @@ describe('parseGovulncheckJsonLines', () => {
         },
       }),
       // … plus a duplicate import-only finding for the SAME OSV.
-      JSON.stringify({ finding: { osv: 'GO-2024-0001', trace: [{ module: 'm', package: 'p' }] } }),
+      JSON.stringify({
+        finding: {
+          osv: 'GO-2024-0001',
+          trace: [{ module: 'm', package: 'p' }],
+        },
+      }),
     ]);
     const signals = parseGovulncheckJsonLines(raw, CTX);
     expect(signals).toHaveLength(1);
@@ -54,7 +64,13 @@ describe('parseGovulncheckJsonLines', () => {
       JSON.stringify({
         finding: {
           osv: 'GO-2024-0002',
-          trace: [{ module: 'm', package: 'p', position: { filename: 'util.go', line: 7 } }],
+          trace: [
+            {
+              module: 'm',
+              package: 'p',
+              position: { filename: 'util.go', line: 7 },
+            },
+          ],
         },
       }),
     ]);
@@ -71,16 +87,32 @@ describe('parseGovulncheckJsonLines', () => {
       JSON.stringify({
         finding: {
           osv: 'GO-2024-0001',
-          trace: [{ module: 'm', package: 'p', function: 'F', position: { filename: 'a.go', line: 1 } }],
+          trace: [
+            {
+              module: 'm',
+              package: 'p',
+              function: 'F',
+              position: { filename: 'a.go', line: 1 },
+            },
+          ],
         },
       }),
       JSON.stringify({
-        finding: { osv: 'GO-2024-0001', trace: [{ module: 'm', package: 'p' }] },
+        finding: {
+          osv: 'GO-2024-0001',
+          trace: [{ module: 'm', package: 'p' }],
+        },
       }),
       JSON.stringify({
         finding: {
           osv: 'GO-2024-0002',
-          trace: [{ module: 'm', package: 'p', position: { filename: 'b.go', line: 2 } }],
+          trace: [
+            {
+              module: 'm',
+              package: 'p',
+              position: { filename: 'b.go', line: 2 },
+            },
+          ],
         },
       }),
     ]);
@@ -94,12 +126,24 @@ describe('parseGovulncheckJsonLines', () => {
     const raw = output([
       osv('GO-2024-0003', 'Order test'),
       // import-only first
-      JSON.stringify({ finding: { osv: 'GO-2024-0003', trace: [{ module: 'm', package: 'p' }] } }),
+      JSON.stringify({
+        finding: {
+          osv: 'GO-2024-0003',
+          trace: [{ module: 'm', package: 'p' }],
+        },
+      }),
       // reachable second — should win
       JSON.stringify({
         finding: {
           osv: 'GO-2024-0003',
-          trace: [{ module: 'm', package: 'p', function: 'F', position: { filename: 'c.go', line: 3 } }],
+          trace: [
+            {
+              module: 'm',
+              package: 'p',
+              function: 'F',
+              position: { filename: 'c.go', line: 3 },
+            },
+          ],
         },
       }),
     ]);
@@ -113,7 +157,14 @@ describe('parseGovulncheckJsonLines', () => {
       JSON.stringify({
         finding: {
           osv: 'GO-2024-0004',
-          trace: [{ module: 'm', package: 'p', function: 'F', position: { filename: 'd.go', line: 4 } }],
+          trace: [
+            {
+              module: 'm',
+              package: 'p',
+              function: 'F',
+              position: { filename: 'd.go', line: 4 },
+            },
+          ],
         },
       }),
     ]);

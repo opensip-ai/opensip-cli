@@ -11,7 +11,10 @@ import {
 import type { Signal, Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
-export const AST_GREP_IDENTITY: ToolIdentity = { name: 'ast-grep', aliases: ['sg'] };
+export const AST_GREP_IDENTITY: ToolIdentity = {
+  name: 'ast-grep',
+  aliases: ['sg'],
+};
 export const AST_GREP_STABLE_ID = 'ea5f288f-3049-42fc-af9f-959184282f2f';
 
 const CONFIGS = ['sgconfig.yml', 'sgconfig.yaml', '.ast-grep.yml', '.ast-grep.yaml'] as const;

@@ -4,7 +4,10 @@ import { parseCargoDenyJsonLines } from '../parse-cargo-deny-json-lines.js';
 
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
-const CTX = { projectRoot: '/proj', tool: 'cargo-deny' } as unknown as AdapterRunContext;
+const CTX = {
+  projectRoot: '/proj',
+  tool: 'cargo-deny',
+} as unknown as AdapterRunContext;
 
 /** cargo-deny writes NDJSON to stdout — the run loop hands the parser a stdout output. */
 function output(raw: string): ParsedScannerOutput {
@@ -35,11 +38,25 @@ describe('parseCargoDenyJsonLines', () => {
 
   it('maps severity error → high and warning → medium', () => {
     const [err] = parseCargoDenyJsonLines(
-      output(diagnostic({ severity: 'error', message: 'm', code: 'L001', labels: [] })),
+      output(
+        diagnostic({
+          severity: 'error',
+          message: 'm',
+          code: 'L001',
+          labels: [],
+        }),
+      ),
       CTX,
     );
     const [warn] = parseCargoDenyJsonLines(
-      output(diagnostic({ severity: 'warning', message: 'm', code: 'A001', labels: [] })),
+      output(
+        diagnostic({
+          severity: 'warning',
+          message: 'm',
+          code: 'A001',
+          labels: [],
+        }),
+      ),
       CTX,
     );
     expect(err?.severity).toBe('high');
@@ -48,11 +65,25 @@ describe('parseCargoDenyJsonLines', () => {
 
   it('derives the category from the code prefix (L* → quality, A* → security)', () => {
     const [license] = parseCargoDenyJsonLines(
-      output(diagnostic({ severity: 'error', message: 'm', code: 'L001', labels: [] })),
+      output(
+        diagnostic({
+          severity: 'error',
+          message: 'm',
+          code: 'L001',
+          labels: [],
+        }),
+      ),
       CTX,
     );
     const [advisory] = parseCargoDenyJsonLines(
-      output(diagnostic({ severity: 'warning', message: 'm', code: 'A001', labels: [] })),
+      output(
+        diagnostic({
+          severity: 'warning',
+          message: 'm',
+          code: 'A001',
+          labels: [],
+        }),
+      ),
       CTX,
     );
     expect(license?.category).toBe('quality');
@@ -60,13 +91,23 @@ describe('parseCargoDenyJsonLines', () => {
   });
 
   it('IGNORES a non-diagnostic summary line (yields no signal)', () => {
-    const raw = JSON.stringify({ type: 'summary', fields: { advisories: { errors: 0 } } });
+    const raw = JSON.stringify({
+      type: 'summary',
+      fields: { advisories: { errors: 0 } },
+    });
     expect(parseCargoDenyJsonLines(output(raw), CTX)).toEqual([]);
   });
 
   it('tolerates a diagnostic with no labels (empty file token, no line/column)', () => {
     const [signal] = parseCargoDenyJsonLines(
-      output(diagnostic({ severity: 'warning', message: 'm', code: 'B001', labels: [] })),
+      output(
+        diagnostic({
+          severity: 'warning',
+          message: 'm',
+          code: 'B001',
+          labels: [],
+        }),
+      ),
       CTX,
     );
     expect(signal?.filePath).toBe('');

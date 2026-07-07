@@ -67,7 +67,12 @@ export const tool: Tool = defineExternalToolAdapter({
       // SpotBugs' exit code is a bugs(1)|missing-class(2)|error(4) bitmask. Missing
       // referenced classes (common without a full -auxclasspath) set bit 2 but are
       // not a fault; only the error bit (>=4) is. Findings come from the SARIF file.
-      exitCodes: { ok: [0], findings: [], findingsFromNonzero: true, errorFrom: 4 },
+      exitCodes: {
+        ok: [0],
+        findings: [],
+        findingsFromNonzero: true,
+        errorFrom: 4,
+      },
     },
   ],
   fingerprintStrategy: 'message-hash',

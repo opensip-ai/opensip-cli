@@ -34,7 +34,10 @@ const GOLDEN_RAW = readFileSync(
   'utf8',
 );
 const EXPECTED = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../__fixtures__/expected-signals.json', import.meta.url)), 'utf8'),
+  readFileSync(
+    fileURLToPath(new URL('../../__fixtures__/expected-signals.json', import.meta.url)),
+    'utf8',
+  ),
 ) as unknown[];
 
 function manifestFromPackage(): ToolPluginManifest {

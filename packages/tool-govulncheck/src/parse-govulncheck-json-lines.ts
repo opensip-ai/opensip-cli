@@ -79,12 +79,13 @@ function normalize(
   // Reachable (called) vulns are actionable now → high; import-only → medium.
   const severity: SignalSeverity = reachable ? 'high' : 'medium';
   const reachabilityNote = reachable ? '' : ' (imported, not called)';
+  const baseMessage = summary ?? `Go vulnerability detected (${osv})`;
   return createSignal({
     source: 'govulncheck',
     category: 'security',
     severity,
     ruleId: osv,
-    message: `${summary ?? `Go vulnerability detected (${osv})`}${reachabilityNote}`,
+    message: `${baseMessage}${reachabilityNote}`,
     ...(fixedVersion === undefined ? {} : { suggestion: `Upgrade to ${fixedVersion} or later.` }),
     code: {
       file: context.file,

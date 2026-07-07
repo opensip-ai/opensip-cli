@@ -19,13 +19,17 @@ export default mergeConfig(
         // shared substrate `ingestSarif` does the reading). `tool.ts` covers the arg
         // builder + the `.runtime` exclude builder; the one uncovered function is
         // the inline binary `versionParse` arrow (unreachable in-process — the
-        // synthesized `Tool` drops the binary spec). The SARIF acceptance path
-        // exercises CVSS `security-severity` band recovery (critical/high/medium).
+        // synthesized `Tool` drops the binary spec). That arrow's `??` is also the
+        // file's only branch, so `branches: 0` (the arg + exclude builders are
+        // branchless). The SARIF acceptance path exercises CVSS `security-severity`
+        // band recovery (critical/high/medium). Thresholds are the measured floor.
         thresholds: {
-          statements: 85,
-          branches: 70,
-          functions: 66,
-          lines: 85,
+          // 100% stmts/funcs/lines; the sole uncovered branch is the
+          // inline versionParse `?? trim()` fallback (node always emits a semver).
+          statements: 95,
+          branches: 50,
+          functions: 95,
+          lines: 95,
         },
       },
     },

@@ -1,0 +1,18 @@
+[
+  {
+    "ruleId": "errcheck",
+    "severity": "medium",
+    "message": "Error return value of `w.Write` is not checked",
+    "file": "main.go",
+    "line": 10,
+    "column": 2
+  },
+  {
+    "ruleId": "govet",
+    "severity": "medium",
+    "message": "printf: non-constant format string in call to fmt.Sprintf",
+    "file": "internal/handler.go",
+    "line": 22,
+    "column": 5
+  }
+]

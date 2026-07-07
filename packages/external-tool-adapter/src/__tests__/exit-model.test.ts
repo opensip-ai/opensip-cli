@@ -80,7 +80,12 @@ describe('interpretExit', () => {
     });
 
     it('the ceiling wins over the reclaim even when findingsFromNonzero is set', () => {
-      const model: ScannerExitModel = { ok: [0], findings: [], findingsFromNonzero: true, errorFrom: 2 };
+      const model: ScannerExitModel = {
+        ok: [0],
+        findings: [],
+        findingsFromNonzero: true,
+        errorFrom: 2,
+      };
       expect(interpretExit(1, model)).toBe('findings');
       expect(interpretExit(2, model)).toBe('fault');
       expect(interpretExit(9, model)).toBe('fault');

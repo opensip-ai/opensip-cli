@@ -10,11 +10,10 @@
  * while the analysis-error bit (>= 4) is a genuine fault.
  */
 
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
 
 import { assertManifestMatchesTool } from '@opensip-cli/core';
 import {

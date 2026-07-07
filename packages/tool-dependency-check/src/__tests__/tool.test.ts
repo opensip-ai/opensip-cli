@@ -12,8 +12,8 @@
  * the `.runtime` exclude, and the manifest↔runtime host-shape guards.
  */
 
-import { basename, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertManifestMatchesTool } from '@opensip-cli/core';
@@ -142,9 +142,9 @@ describe('dependency-check tool — scan-arg + exclude builders', () => {
   });
 
   it('excludes the .runtime store via --exclude (A3)', () => {
-    expect(
-      buildDependencyCheckExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args,
-    ).toEqual(['--exclude', '/proj/opensip-cli/.runtime']);
+    expect(buildDependencyCheckExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual(
+      ['--exclude', '/proj/opensip-cli/.runtime'],
+    );
   });
 });
 
@@ -205,7 +205,9 @@ describe('dependency-check tool — CVSS security-severity recovery (ADR-0091 D2
   });
 
   it('maps the CVSS bands: 9.1 → critical, 7.5 → high, 5.3 → medium', () => {
-    const signals = ingestSarif(JSON.parse(GOLDEN_RAW) as SarifLog, { source: 'dependency-check' });
+    const signals = ingestSarif(JSON.parse(GOLDEN_RAW) as SarifLog, {
+      source: 'dependency-check',
+    });
     const byRule = (id: string) => signals.find((s) => s.ruleId === id);
     expect(byRule('CVE-2021-44228')?.severity).toBe('critical');
     expect(byRule('CVE-2021-44228')?.metadata.securitySeverity).toBe('9.1');
@@ -221,5 +223,31 @@ describe('dependency-check tool — CVSS security-severity recovery (ADR-0091 D2
     for (const s of result.envelope.signals) {
       expect(s.fingerprint).toMatch(/^[0-9a-f]{64}$/);
     }
+  });
+});
+
+describe('dependency-check tool — version probe (covers the binary versionParse)', () => {
+  it('resolves the config-pinned binary and normalizes its --version output to a semver', async () => {
+    // Pin the binary to the real node executable so the substrate's version probe
+    // runs a REAL `--version` and feeds stdout through the tool's inline
+    // `versionParse` (parseFirstSemver ?? trim). node --version ⇒ `vX.Y.Z`.
+    const version = tool.commandSpecs?.find((c) => c.name === 'version') as unknown as {
+      handler: (opts: unknown, cli: unknown) => Promise<void>;
+    };
+    const emitted: { found: boolean; version?: string }[] = [];
+    const cli = {
+      scope: {
+        toolConfig: {
+          'dependency-check': {
+            binaries: { 'dependency-check': { path: process.execPath } },
+          },
+        },
+      },
+      emitJson: (value: { found: boolean; version?: string }) => emitted.push(value),
+    };
+    await version.handler({ json: true }, cli);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.found).toBe(true);
+    expect(emitted[0]?.version).toMatch(/^\d+\.\d+/);
   });
 });
