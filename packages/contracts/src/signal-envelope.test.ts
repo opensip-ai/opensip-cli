@@ -95,6 +95,22 @@ describe('buildSignalEnvelope', () => {
       expect(env.baselineIdentity.fingerprintStrategyId).toBe('test.tool-strategy');
     });
 
+    it('disambiguates two signals sharing a base fingerprint (occurrence-ordinal)', () => {
+      // Two signals with no code share ruleId+message → identical default base
+      // (`rule-low||0|0`); the host occurrence-ordinal in stampFingerprints keeps
+      // them distinct so the ratchet does not collapse one away (ADR-0036 amendment).
+      const env = buildSignalEnvelope({
+        ...BASE,
+        units: [unit('a', false)],
+        signals: [signal('low'), signal('low')],
+      });
+      expect(env.signals[0]?.fingerprint).not.toBe(env.signals[1]?.fingerprint);
+      // first stays the bare base; only the second is suffixed
+      expect(env.signals[0]?.fingerprint).toBe(
+        defaultFingerprintStrategy.fingerprint(env.signals[0]),
+      );
+    });
+
     it('preserves pre-stamped signals byte-for-byte and by array identity', () => {
       const preStamped = [{ ...signal('low'), fingerprint: 'pre-existing' }];
       const env = buildSignalEnvelope({

@@ -6,6 +6,7 @@ import {
   defaultFingerprintStrategy,
   defineFingerprintStrategy,
   fileLevelFingerprintStrategy,
+  OCCURRENCE_ORDINAL_SEPARATOR,
   stampFingerprints,
 } from '../fingerprint-strategy.js';
 
@@ -88,6 +89,63 @@ describe('stampFingerprints', () => {
     });
     const [out] = stampFingerprints([sig()], custom);
     expect(out.fingerprint).toBe('custom:rule-x');
+  });
+});
+
+describe('stampFingerprints occurrence-ordinal disambiguation (ADR-0036 amendment)', () => {
+  /** A strategy that maps every signal to the same base — forces a collision. */
+  const constant = defineFingerprintStrategy({
+    id: 'test.constant',
+    version: 1,
+    fingerprint: () => 'H',
+  });
+
+  it('leaves unique bases unsuffixed (no collision → byte-identical)', () => {
+    const out = stampFingerprints([sig(), sig({ ruleId: 'rule-y' })], defaultFingerprintStrategy);
+    expect(out.map((s) => s.fingerprint)).toEqual(['rule-x|src/a.ts|12|3', 'rule-y|src/a.ts|12|3']);
+    for (const s of out) expect(s.fingerprint).not.toContain(OCCURRENCE_ORDINAL_SEPARATOR);
+  });
+
+  it('keeps the first of a collision group bare and suffixes the second', () => {
+    const out = stampFingerprints([sig(), sig()], constant);
+    expect(out.map((s) => s.fingerprint)).toEqual(['H', `H${OCCURRENCE_ORDINAL_SEPARATOR}1`]);
+  });
+
+  it('assigns ordinals in array order for three identical bases (determinism)', () => {
+    const out = stampFingerprints([sig(), sig(), sig()], constant);
+    expect(out.map((s) => s.fingerprint)).toEqual([
+      'H',
+      `H${OCCURRENCE_ORDINAL_SEPARATOR}1`,
+      `H${OCCURRENCE_ORDINAL_SEPARATOR}2`,
+    ]);
+  });
+
+  it('suffixes only the colliding group, leaving an interleaved singleton bare', () => {
+    // strategy keys on ruleId: two "dup" share a base, the "solo" is a singleton.
+    const byRule = defineFingerprintStrategy({
+      id: 'test.by-rule',
+      version: 1,
+      fingerprint: (s) => s.ruleId,
+    });
+    const out = stampFingerprints(
+      [sig({ ruleId: 'dup' }), sig({ ruleId: 'solo' }), sig({ ruleId: 'dup' })],
+      byRule,
+    );
+    expect(out.map((s) => s.fingerprint)).toEqual([
+      'dup',
+      'solo',
+      `dup${OCCURRENCE_ORDINAL_SEPARATOR}1`,
+    ]);
+  });
+
+  it('excludes pre-stamped signals from grouping (idempotency preserved)', () => {
+    const pre = sig({ fingerprint: 'H' });
+    const [preOut, freshOut] = stampFingerprints([pre, sig()], constant);
+    // the pre-stamped signal is returned untouched by identity
+    expect(preOut).toBe(pre);
+    expect(preOut.fingerprint).toBe('H');
+    // the lone un-stamped signal is a singleton among un-stamped signals → bare
+    expect(freshOut.fingerprint).toBe('H');
   });
 });
 

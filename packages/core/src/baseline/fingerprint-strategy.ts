@@ -23,6 +23,14 @@ import { ValidationError } from '../lib/errors.js';
 
 import type { Signal } from '../types/signal.js';
 
+/**
+ * Separator between a base fingerprint and its intra-run occurrence ordinal
+ * (ADR-0036 amendment, 2026-07-07). Appended by {@link stampFingerprints} to the
+ * 2nd+ member of an in-run collision group so distinct findings that share a base
+ * fingerprint do not collapse in the baseline/ratchet.
+ */
+export const OCCURRENCE_ORDINAL_SEPARATOR = '#';
+
 /** Maps a {@link Signal} to its stable, opaque baseline identity (ADR-0036). */
 export interface FingerprintStrategyDescriptor {
   readonly id: string;
@@ -146,13 +154,47 @@ export const contentHashFallbackFingerprintStrategy: FingerprintStrategy =
  * (no re-allocation). This is a safety net (it lets a tool stamp earlier still,
  * e.g. at `createSignal`, without double-hashing), NOT a second stamping point —
  * the host seams only ever READ `signal.fingerprint`.
+ *
+ * **Occurrence-ordinal disambiguation** (ADR-0036 amendment, 2026-07-07): the
+ * per-tool `strategy.fingerprint` is a `(signal) => string` and cannot see its
+ * siblings, so two DISTINCT findings that share a base fingerprint (e.g. two
+ * identical `except:` lines under fitness's `sha256(filePath\nruleId\nmessage)`)
+ * would collapse to one entry at both `diffBaseline` (map keyed by fingerprint)
+ * and `BaselineRepo.save` (dedupe + composite PK), silently dropping a finding
+ * from the ratchet. As a host-owned post-pass, when 2+ un-stamped signals share a
+ * base under `strategy`, the FIRST occurrence (array order) keeps the exact base
+ * hash and each subsequent occurrence gets an `#<n>` suffix
+ * ({@link OCCURRENCE_ORDINAL_SEPARATOR}). Singletons and the no-collision common
+ * case are byte-identical to the bare base hash (zero migration). Pre-stamped
+ * signals are opaque: they are excluded from grouping and returned by identity,
+ * so idempotency is preserved.
  */
 export function stampFingerprints(
   signals: readonly Signal[],
   strategy: FingerprintStrategy,
 ): readonly Signal[] {
   if (signals.every((signal) => signal.fingerprint)) return signals;
-  return signals.map((signal) =>
-    signal.fingerprint ? signal : { ...signal, fingerprint: strategy.fingerprint(signal) },
-  );
+  // PASS 1 — compute each un-stamped signal's base fingerprint and count bases.
+  const baseByIndex: (string | undefined)[] = [];
+  const counts = new Map<string, number>();
+  for (const signal of signals) {
+    if (signal.fingerprint) {
+      baseByIndex.push(undefined);
+      continue;
+    }
+    const base = strategy.fingerprint(signal);
+    baseByIndex.push(base);
+    counts.set(base, (counts.get(base) ?? 0) + 1);
+  }
+  // PASS 2 — assign, suffixing only the 2nd+ occurrence of a colliding base.
+  const seen = new Map<string, number>();
+  return signals.map((signal, index) => {
+    if (signal.fingerprint) return signal;
+    const base = baseByIndex[index]!;
+    if ((counts.get(base) ?? 0) < 2) return { ...signal, fingerprint: base };
+    const ordinal = seen.get(base) ?? 0;
+    seen.set(base, ordinal + 1);
+    const fingerprint = ordinal === 0 ? base : `${base}${OCCURRENCE_ORDINAL_SEPARATOR}${ordinal}`;
+    return { ...signal, fingerprint };
+  });
 }

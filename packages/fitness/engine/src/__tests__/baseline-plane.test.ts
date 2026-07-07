@@ -40,7 +40,7 @@ function fingerprintSet(signals: readonly Signal[]): Set<string> {
 const FITNESS_BASELINE_IDENTITY = {
   baselineFormatVersion: 1,
   fingerprintStrategyId: 'fitness.sha256-file-rule-message',
-  fingerprintStrategyVersion: 1,
+  fingerprintStrategyVersion: 2,
 } as const;
 
 function save(signals: readonly Signal[]): void {
@@ -82,6 +82,25 @@ describe('fitness baseline plane', () => {
     const s = fsig('no-any', 'src/a.ts', 'Avoid any');
     const expected = createHash('sha256').update('src/a.ts\nno-any\nAvoid any').digest('hex');
     expect(fitnessFingerprintStrategy.fingerprint(s)).toBe(expected);
+  });
+
+  it('is version 2 (ADR-0036 amendment: host occurrence-ordinal disambiguation)', () => {
+    expect(fitnessFingerprintStrategy.version).toBe(2);
+  });
+
+  it('two distinct findings sharing file+rule+message survive save→reload as 2 rows', () => {
+    // Same (ruleId, file, message) at different lines → identical base fingerprint;
+    // the host occurrence-ordinal keeps them distinct so neither is dropped.
+    const signals = stamp([
+      fsig('bare-except', 'a.py', 'Bare except', 10),
+      fsig('bare-except', 'a.py', 'Bare except', 20),
+    ]);
+    expect(signals[0].fingerprint).not.toBe(signals[1].fingerprint);
+    save(signals);
+    const loaded = fingerprintSet(new BaselineRepo(ds).load('fitness').map((r) => r.payload!));
+    // no collapse: both distinct fingerprints round-trip
+    expect(loaded.size).toBe(2);
+    expect(loaded).toEqual(fingerprintSet(signals));
   });
 
   it('preserves line-shift tolerance: two signals differing only in line share a fingerprint', () => {
