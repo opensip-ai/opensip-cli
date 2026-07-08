@@ -35,9 +35,10 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |
 
-## Workspace packages (56)
+## Workspace packages (57)
 
 - `@opensip-cli/checks-cpp`
+- `@opensip-cli/checks-dogfood`
 - `@opensip-cli/checks-go`
 - `@opensip-cli/checks-java`
 - `@opensip-cli/checks-python`

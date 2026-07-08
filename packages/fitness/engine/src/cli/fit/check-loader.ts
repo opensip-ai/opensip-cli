@@ -33,6 +33,8 @@ import {
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
 
+import type { CapabilityPackageAdmission, SelectedCapabilityPackage } from '@opensip-cli/core';
+
 const log = createToolLogger('fitness:cli');
 
 // ---------------------------------------------------------------------------
@@ -142,6 +144,22 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
     descriptor === undefined
       ? {}
       : resolveCapabilityPreferences(descriptor, scope?.configDocument?.plugins ?? {});
+  // Route package admission through the host trust gate published on the scope, so
+  // this engine-triggered load applies the SAME policy as the CLI bootstrap: a
+  // non-bundled builtin `@opensip-cli/*` pack (the private dogfood pack) that a
+  // project did not opt into via `plugins.checkPackages` is DENIED, not admitted by
+  // the permissive builtin default. Undefined outside a host scope (programmatic
+  // use) → the core discovery default applies (unchanged). The explicit-package set
+  // mirrors the host's pre-augment `explicitlyConfigured` (checkPackages only).
+  const admit = scope?.capabilityAdmission;
+  const explicitPackages = new Set(
+    'packages' in preferences && Array.isArray(preferences.packages) ? preferences.packages : [],
+  );
+  const shouldLoadPackage =
+    descriptor !== undefined && admit !== undefined
+      ? (pkg: SelectedCapabilityPackage): CapabilityPackageAdmission =>
+          admit(descriptor, pkg, explicitPackages)
+      : undefined;
   const errors = registry.isDomainLoaded('fit-pack', projectDir)
     ? registry.domainLoadErrors('fit-pack')
     : await loadCapabilityDomain({
@@ -150,6 +168,7 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
         projectDir,
         cliDir: cliInstallDir(),
         preferences,
+        ...(shouldLoadPackage === undefined ? {} : { shouldLoadPackage }),
         onDiagnostic: (diagnostic) => {
           currentScope()?.bootstrapDiagnostics.record(
             capabilityDiscoveryToCliDiagnostic(diagnostic, 'fit-pack', {

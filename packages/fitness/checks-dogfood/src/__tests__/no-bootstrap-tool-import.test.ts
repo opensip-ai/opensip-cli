@@ -8,7 +8,7 @@
 import { runCheckOnFixture, type FixtureFile } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
-import { analyzeBootstrapToolImport } from '../checks/architecture/no-bootstrap-tool-import.js';
+import { analyzeBootstrapToolImport } from '../checks/no-bootstrap-tool-import.js';
 import { checks } from '../index.js';
 
 const CLI_PATH = 'packages/cli/src/sample.ts';

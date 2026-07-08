@@ -6,7 +6,7 @@
 import { runCheckOnFixture, type FixtureFile } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
-import { analyzeMcpResultsNoRerun } from '../checks/architecture/mcp-results-no-rerun.js';
+import { analyzeMcpResultsNoRerun } from '../checks/mcp-results-no-rerun.js';
 import { checks } from '../index.js';
 
 const TOOL_PATH = 'packages/mcp/src/tools/get-latest-findings.ts';

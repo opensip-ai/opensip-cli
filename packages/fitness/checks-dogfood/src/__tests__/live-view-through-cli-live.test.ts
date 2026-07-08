@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyzeLiveViewThroughCliLive } from '../live-view-through-cli-live.js';
+import { analyzeLiveViewThroughCliLive } from '../checks/live-view-through-cli-live.js';
 
 describe('live-view-through-cli-live', () => {
   it('flags direct ink render imports in tool engines', () => {

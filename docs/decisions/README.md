@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0138](ADR-0138-scope-published-capability-admission.md) — The host publishes its capability-pack trust admission on `RunScope.capabilityAdmission`; an engine that triggers its own capability load (the fitness check-loader) routes package admission through it instead of the permissive builtin default, so a non-bundled builtin pack (the private dogfood pack) is admitted identically on the bootstrap and engine paths and never leaks into a project that didn't opt in.
 - [ADR-0137](ADR-0137-live-run-five-section-render-contract.md) — Every run surface renders as the same five fixed sections (banner / header+metadata / body / canonical summary / footer); tools populate them through additive done-body seams (`summaryNote`, `verboseExtra`) — the full-replacement `body` slot is removed, so the suite can no longer drift from fit/graph.
 - [ADR-0136](ADR-0136-owner-edge-key-full-occurrence-identity.md) — The owner-edge bucket key is full occurrence identity (bodyHash+filePath+line+column), refining ADR-0003's (bodyHash, filePath) 2-tuple so two byte-identical bodies on one source line no longer union their edges.
 - [ADR-0135](ADR-0135-run-outcome-taxonomy-and-fault-policy.md) — One 3-way run outcome (pass/fail/fault) derived once from the envelope verdict and shared by single runs + suites; envelope-backed faults are non-blocking by default (`failOnFault`); suite-as-universal-runner rejected.

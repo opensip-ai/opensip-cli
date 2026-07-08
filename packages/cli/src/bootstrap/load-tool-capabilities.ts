@@ -213,7 +213,15 @@ function rawContributionFromBridge(
   };
 }
 
-function admitCapabilityPackage(
+/**
+ * The host trust-policy capability-pack admission. Exported so it can be
+ * published on `RunScope.capabilityAdmission` (build-per-run-scope): an engine
+ * that triggers its own capability load (the fitness check-loader) then admits
+ * packs through THIS gate — identical to the bootstrap path — rather than a
+ * permissive builtin default that would let a non-bundled `@opensip-cli/*` pack
+ * (the private dogfood pack) load in a project that never opted into it.
+ */
+export function admitCapabilityPackage(
   descriptor: CapabilityDiscoveryDescriptor,
   pkg: SelectedCapabilityPackage,
   explicitlyConfiguredPackages: ReadonlySet<string>,

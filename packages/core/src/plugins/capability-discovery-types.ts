@@ -66,6 +66,25 @@ export type CapabilityPackageAdmission =
   | { readonly admit: true; readonly resourceDecision?: CapabilityResourceDecision }
   | { readonly admit: false; readonly reason: string };
 
+/**
+ * Host-owned capability-pack admission gate, published on the RunScope
+ * (`scope.capabilityAdmission`). Any engine that triggers its OWN capability load
+ * — e.g. the fitness check-loader's `loadFitCheckPackages`, which runs for
+ * fit/report contexts the host bootstrap does not drive — MUST route package
+ * admission through this so it applies the SAME host trust policy (bundled +
+ * explicit `plugins.<packages>` + env allowlist) instead of a permissive
+ * builtin-default that would let a non-bundled `@opensip-cli/*` pack (e.g. the
+ * private dogfood pack) slip in. Undefined outside a host-constructed scope
+ * (programmatic use), where the core default admission applies. The signature
+ * matches the host's `admitCapabilityPackage` exactly, so the host assigns that
+ * function directly — no adapter.
+ */
+export type CapabilityPackAdmission = (
+  descriptor: CapabilityDiscoveryDescriptor,
+  pkg: SelectedCapabilityPackage,
+  explicitlyConfigured: ReadonlySet<string>,
+) => CapabilityPackageAdmission;
+
 export interface CapabilityContributionLoadContext {
   readonly descriptor: CapabilityDiscoveryDescriptor;
   readonly admission: Extract<CapabilityPackageAdmission, { readonly admit: true }>;

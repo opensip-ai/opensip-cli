@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T05:32:35.944Z",
+  "generatedAt": "2026-07-08T07:13:11.708Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -105,7 +105,8 @@
           "contracts": 2,
           "core": 5,
           "dashboard": 1,
-          "fitness/checks-typescript": 64,
+          "fitness/checks-dogfood": 7,
+          "fitness/checks-typescript": 57,
           "fitness/checks-universal": 103,
           "fitness/engine": 11,
           "graph/engine": 11,
@@ -248,7 +249,8 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-typescript": 64,
+          "fitness/checks-dogfood": 7,
+          "fitness/checks-typescript": 57,
           "fitness/checks-universal": 103
         }
       },

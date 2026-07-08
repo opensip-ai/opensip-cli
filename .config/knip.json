@@ -11,6 +11,7 @@
       "entry": ["opensip-cli/fit/checks/**/*.mjs", "scripts/github-action/run.mjs"],
       "ignoreDependencies": [
         "@opensip-cli/checks-cpp",
+        "@opensip-cli/checks-dogfood",
         "@opensip-cli/checks-go",
         "@opensip-cli/checks-java",
         "@opensip-cli/checks-python",
@@ -32,6 +33,7 @@
       ],
       "ignoreDependencies": [
         "@opensip-cli/checks-cpp",
+        "@opensip-cli/checks-dogfood",
         "@opensip-cli/checks-go",
         "@opensip-cli/checks-java",
         "@opensip-cli/checks-python",
@@ -61,6 +63,9 @@
       "ignoreDependencies": ["cytoscape", "cytoscape-dagre"]
     },
     "packages/fitness/checks-cpp": {
+      "ignoreDependencies": ["@opensip-cli/core"]
+    },
+    "packages/fitness/checks-dogfood": {
       "ignoreDependencies": ["@opensip-cli/core"]
     },
     "packages/fitness/engine": {

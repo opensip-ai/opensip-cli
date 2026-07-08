@@ -9,8 +9,11 @@
  *       enforcers, or NONE-YET for a tracked gap).
  *   - enforcement: not-mechanizable   ⇒ must have `enforcement-reason:`.
  *   - `enforced-by` values are origin-tagged:
- *       local:<slug>   — project-local dogfood fitness check (opensip-cli/fit/checks)
- *       shipped:<slug> — fitness check shipped in packages/fitness/checks-*
+ *       local:<slug>   — project-local dogfood fitness check: an opensip-cli/fit/
+ *                        checks/*.mjs file OR a check in a private (never-published)
+ *                        packages/fitness/checks-* pack (e.g. checks-dogfood)
+ *       shipped:<slug> — fitness check shipped in a publishable packages/fitness/
+ *                        checks-* pack (the product)
  *       depcruise:<r> | graph:<r> | eslint:<r> | script:<name> | type-structural
  *       NONE-YET       — mechanizable but no check exists yet (a tracked gap)
  *   - A `local:`/`shipped:` slug MUST exist as a defined fitness check, and its
@@ -38,7 +41,13 @@ function sourceFiles(dir, acc = []) {
     return acc;
   }
   for (const name of entries) {
-    if (name === 'node_modules' || name === 'dist' || name === '__tests__') continue;
+    if (
+      name === 'node_modules' ||
+      name === 'dist' ||
+      name === '__tests__' ||
+      name === '__fixtures__'
+    )
+      continue;
     const full = join(dir, name);
     if (statSync(full).isDirectory()) sourceFiles(full, acc);
     else if (/\.(ts|mjs)$/.test(name)) acc.push(full);
@@ -59,12 +68,27 @@ function loadSlugOrigins() {
       }
     }
   };
-  // shipped: every packages/fitness/checks-*/src tree
-  const shippedRoots = readdirSync('packages/fitness')
-    .filter((d) => d.startsWith('checks-'))
-    .map((d) => join('packages/fitness', d, 'src'));
+  // Partition packages/fitness/checks-* by their package.json `private` flag: a
+  // private, never-published pack (e.g. checks-dogfood) holds opensip-cli-internal
+  // dogfood checks → origin 'local'; a publishable pack ships to adopters →
+  // origin 'shipped'. This keeps the relocated opensip-internal architecture
+  // checks tagged 'local:' even though they live under packages/fitness/checks-*.
+  const shippedRoots = [];
+  const localPackRoots = [];
+  for (const d of readdirSync('packages/fitness')) {
+    if (!d.startsWith('checks-')) continue;
+    let isPrivate = false;
+    try {
+      const pkg = JSON.parse(readFileSync(join('packages/fitness', d, 'package.json'), 'utf8'));
+      isPrivate = pkg.private === true;
+    } catch {
+      // no/unreadable package.json → fail safe toward the stricter 'shipped' tag
+    }
+    (isPrivate ? localPackRoots : shippedRoots).push(join('packages/fitness', d, 'src'));
+  }
   scan(shippedRoots, 'shipped');
-  scan(['opensip-cli/fit/checks'], 'local');
+  // Project-local origins: the .mjs dogfood checks AND any private checks-* pack.
+  scan([...localPackRoots, 'opensip-cli/fit/checks'], 'local');
   return origins;
 }
 

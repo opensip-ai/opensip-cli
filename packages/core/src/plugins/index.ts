@@ -47,6 +47,7 @@ export type {
   CapabilityIsolationLevel,
   CapabilityContributionLoadContext,
   CapabilityContributionLoader,
+  CapabilityPackAdmission,
   CapabilityPackageAdmission,
   CapabilityResourceDecision,
   RawCapabilityContribution,

@@ -101,6 +101,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@opensip-cli/checks-cpp": "workspace:*",
+    "@opensip-cli/checks-dogfood": "workspace:*",
     "@opensip-cli/checks-go": "workspace:*",
     "@opensip-cli/checks-java": "workspace:*",
     "@opensip-cli/checks-python": "workspace:*",

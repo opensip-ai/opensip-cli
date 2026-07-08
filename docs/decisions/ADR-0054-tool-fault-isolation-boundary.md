@@ -16,7 +16,7 @@ superseded_by: null
 related: [ADR-0023, ADR-0027, ADR-0028, ADR-0029, ADR-0030, ADR-0052]
 tags: [tools, plugins, isolation, cli, architecture, config, saas]
 enforcement: mechanizable
-enforced-by: ['shipped:host-tool-runtime-import-boundary']
+enforced-by: ['local:host-tool-runtime-import-boundary']
 enforcement-reason: >
   The capstone (M4-G) has landed: external-provenance tool runtime NEVER imports
   in the host process. The boundary is enforced repo-wide on every PR.

@@ -95,6 +95,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@opensip-cli/checks-dogfood": "workspace:*",
     "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

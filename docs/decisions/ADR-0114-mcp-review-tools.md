@@ -16,7 +16,7 @@ superseded_by: null
 related: [ADR-0084, ADR-0110]
 tags: [mcp, agents, sessions, baselines]
 enforcement: mechanizable
-enforced-by: ['shipped:mcp-results-no-rerun']
+enforced-by: ['local:mcp-results-no-rerun']
 enforcement-reason: >
   MCP handler/read-port re-run imports are blocked by mcp-results-no-rerun.
   Package layering and tests cover the remaining boundaries: MCP imports

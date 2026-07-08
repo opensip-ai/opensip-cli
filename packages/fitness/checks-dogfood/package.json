@@ -1,0 +1,35 @@
+{
+  "name": "@opensip-cli/checks-dogfood",
+  "version": "0.5.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "opensip-cli-INTERNAL architecture dogfood checks — NEVER published; keyed on @opensip-cli package internals (ToolCliContext, cli-live, bootstrap). Loaded only for opensip-cli's own fit:ci gate.",
+  "type": "module",
+  "opensipTools": {
+    "kind": "fit-pack",
+    "targetDomain": "fit-pack",
+    "targetDomainApiVersion": 1
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/fitness": "workspace:*",
+    "@opensip-cli/lang-typescript": "workspace:*",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@opensip-cli/test-support": "workspace:*",
+    "@types/node": "^24.13.2",
+    "vitest": "^4.1.9"
+  }
+}

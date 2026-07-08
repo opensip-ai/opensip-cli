@@ -52,6 +52,13 @@ beforeEach(() => {
   // Without this the "bundled" vs "installed" fitness paths can see different check
   // sets, causing the normalized CommandOutcome envelope comparison to fail even
   // though behaviour on the fixture is identical.
+  //
+  // The private @opensip-cli/checks-dogfood fit-pack is a separate (builtin-scoped,
+  // non-bundled) case: this project does NOT opt into it via plugins.checkPackages,
+  // so the host trust gate — now applied on BOTH the bootstrap and the engine's own
+  // capability load (ADR-0138) — denies it on both provenance paths. A regression
+  // that let the engine default-admit it would surface here as a bundled≠installed
+  // envelope diff, which is exactly what this test guards.
   writeFileSync(
     join(testDir, 'package.json'),
     JSON.stringify({ name: 'fit-acceptance-fixture', private: true }, null, 2),

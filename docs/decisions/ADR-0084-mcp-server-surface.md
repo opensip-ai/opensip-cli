@@ -16,7 +16,7 @@ superseded_by: null
 related: [ADR-0009, ADR-0006, ADR-0030]
 tags: [mcp, graph, agents, tools, packaging]
 enforcement: mechanizable
-enforced-by: ['local:architecture-session-timing-not-host-owned', 'local:restrict-raw-db-access', 'shipped:mcp-results-no-rerun']
+enforced-by: ['local:architecture-session-timing-not-host-owned', 'local:restrict-raw-db-access', 'local:mcp-results-no-rerun']
 enforcement-reason: >
   The result-tools-never-rerun invariant is enforced by the new
   `mcp-results-no-rerun` fitness check; the no-SessionRepo / no-raw-db invariants

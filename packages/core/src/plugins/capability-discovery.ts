@@ -38,6 +38,7 @@ export type {
   CapabilityIsolationLevel,
   CapabilityContributionLoader,
   CapabilityContributionLoadContext,
+  CapabilityPackAdmission,
   CapabilityPackageAdmission,
   CapabilityResourceDecision,
   DiscoverCapabilityContributionsOptions,

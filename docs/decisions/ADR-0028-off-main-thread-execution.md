@@ -16,7 +16,7 @@ superseded_by: null
 related: [ADR-0016, ADR-0011, ADR-0027]
 tags: [cli, ux, performance, graph, simulation, fitness, architecture]
 enforcement: mechanizable
-enforced-by: ['shipped:live-view-through-cli-live', 'local:live-runs-off-thread']
+enforced-by: ['local:live-view-through-cli-live', 'local:live-runs-off-thread']
 enforcement-reason: >
   The surviving ADR-0058 enforcement is `live-view-through-cli-live`
   (checks-typescript), which forbids `import { render } from 'ink'` in tool

@@ -36,6 +36,7 @@ import type { ProjectContext } from './project-context.js';
 import type { RunCorrelation } from './run-correlation.js';
 import type { DataStoreThunk, RecipeUnitConfigSlot, ToolScope } from './scope-types.js';
 import type { UiContext } from './ui-context.js';
+import type { CapabilityPackAdmission } from '../plugins/capability-discovery-types.js';
 import type { SignalSink } from '../signals/signal-sink.js';
 import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
 
@@ -145,6 +146,14 @@ export interface RunScopeOptions {
   readonly trustPolicy?: unknown;
   /** Host-owned opaque policy audit collector. Core carries it but never interprets it. */
   readonly policyAudit?: unknown;
+  /**
+   * Host-owned capability-pack admission gate. Set by the CLI bootstrap so an
+   * engine-triggered capability load (e.g. the fitness check-loader) admits packs
+   * through the SAME host trust policy as the bootstrap, not a permissive builtin
+   * default. Undefined outside a host-constructed scope (programmatic use) — the
+   * core discovery default applies. See {@link CapabilityPackAdmission}.
+   */
+  readonly capabilityAdmission?: CapabilityPackAdmission;
 }
 
 /**
@@ -219,6 +228,11 @@ export class RunScope {
   readonly trustPolicy: unknown;
   /** Host-owned opaque policy audit collector; narrowed only by the CLI composition root. */
   readonly policyAudit: unknown;
+  /**
+   * Host-owned capability-pack admission gate; `undefined` outside a
+   * host-constructed scope. See {@link RunScopeOptions.capabilityAdmission}.
+   */
+  readonly capabilityAdmission: CapabilityPackAdmission | undefined;
 
   /**
    * Tool-registered teardown callbacks, invoked once during {@link dispose}.
@@ -254,6 +268,7 @@ export class RunScope {
     }
     this.trustPolicy = opts.trustPolicy;
     this.policyAudit = opts.policyAudit;
+    this.capabilityAdmission = opts.capabilityAdmission;
   }
 
   /**

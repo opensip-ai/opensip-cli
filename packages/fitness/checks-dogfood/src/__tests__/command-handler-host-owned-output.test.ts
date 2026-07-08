@@ -7,7 +7,7 @@
 import { runCheckOnFixture, type FixtureFile } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
-import { analyzeCommandHandlerHostOwnedOutput } from '../checks/architecture/command-handler-host-owned-output.js';
+import { analyzeCommandHandlerHostOwnedOutput } from '../checks/command-handler-host-owned-output.js';
 import { checks } from '../index.js';
 
 const TOOL_PATH = 'src/audit-sec.ts';

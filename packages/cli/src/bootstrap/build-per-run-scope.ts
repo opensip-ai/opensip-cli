@@ -44,6 +44,7 @@ import { buildDatastoreThunk } from '../cli-context.js';
 import { assembleCorrelation } from './assemble-correlation.js';
 import { buildTargets } from './build-targets.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
+import { admitCapabilityPackage } from './load-tool-capabilities.js';
 import { flushPolicyAuditEvents } from './policy-audit-flush.js';
 import { resolvePolicyForRun } from './run-policy.js';
 import { shouldRunHookInHost } from './tool-provenance.js';
@@ -286,6 +287,11 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     correlation,
     trustPolicy: runPolicy.policy,
     policyAudit: runPolicy.audit,
+    // Publish the host trust-policy capability-pack admission so an engine that
+    // triggers its OWN capability load (the fitness check-loader, in fit/report
+    // contexts the bootstrap does not drive) admits packs through the same gate —
+    // never a permissive builtin default that would leak a non-bundled dogfood pack.
+    capabilityAdmission: admitCapabilityPackage,
   });
 
   // Flush policy audit events before the datastore close disposer. Both are

@@ -5,7 +5,7 @@
 import { runCheckOnFixture, type FixtureFile } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
-import { analyzeSubprocessCorrelationRequired } from '../checks/architecture/subprocess-correlation-required.js';
+import { analyzeSubprocessCorrelationRequired } from '../checks/subprocess-correlation-required.js';
 import { checks } from '../index.js';
 
 const SHARD_RUNNER = 'packages/graph/engine/src/cli/orchestrate/shard-runner.ts';

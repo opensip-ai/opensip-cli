@@ -51,6 +51,7 @@
       "@opensip-cli/graph-rust": ["packages/graph/graph-rust/src/index.ts"],
       "@opensip-cli/graph-go": ["packages/graph/graph-go/src/index.ts"],
       "@opensip-cli/graph-java": ["packages/graph/graph-java/src/index.ts"],
+      "@opensip-cli/checks-dogfood": ["packages/fitness/checks-dogfood/src/index.ts"],
       "@opensip-cli/checks-typescript": ["packages/fitness/checks-typescript/src/index.ts"],
       "@opensip-cli/checks-universal": ["packages/fitness/checks-universal/src/index.ts"],
       "@opensip-cli/checks-python": ["packages/fitness/checks-python/src/index.ts"],

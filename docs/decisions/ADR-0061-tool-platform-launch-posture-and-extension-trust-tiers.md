@@ -16,7 +16,7 @@ superseded_by: null
 related: [ADR-0030, ADR-0054, ADR-0028, ADR-0058, ADR-0036, ADR-0051, ADR-0056]
 tags: [platform, trust, plugins, security, isolation]
 enforcement: mechanizable
-enforced-by: ['shipped:host-tool-runtime-import-boundary', 'local:only-documented-toolcli-seams']
+enforced-by: ['local:host-tool-runtime-import-boundary', 'local:only-documented-toolcli-seams']
 enforcement-reason: >
   The host/tool boundary that this posture rests on is already mechanized by two
   existing fitness checks: `only-documented-toolcli-seams` (tools and host
