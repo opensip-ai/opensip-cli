@@ -37,6 +37,10 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0142](ADR-0142-dependency-check-offline-safe-default.md) — The OWASP Dependency-Check adapter runs with `--noupdate` by default; users prepare the vulnerability database outside OpenSIP unless a future explicit online mode is approved.
+- [ADR-0141](ADR-0141-external-scanner-binary-ownership.md) — OpenSIP adapter packages do not bundle or download scanner binaries; users own scanner installation/update, while adapter `doctor` reports readiness.
+- [ADR-0140](ADR-0140-polyglot-external-adapter-package-contract.md) — External scanner adapters use `defineExternalToolAdapter`, declare manifest/config/binary requirements, and delegate subprocess/output/session/baseline effects to the substrate and host seams.
+- [ADR-0139](ADR-0139-host-owned-external-adapter-live-view.md) — The CLI host owns external-adapter live rendering; installed adapter workers emit typed progress through a private bridge and never expose a public live-view seam.
 - [ADR-0138](ADR-0138-scope-published-capability-admission.md) — The host publishes its capability-pack trust admission on `RunScope.capabilityAdmission`; an engine that triggers its own capability load (the fitness check-loader) routes package admission through it instead of the permissive builtin default, so a non-bundled builtin pack (the private dogfood pack) is admitted identically on the bootstrap and engine paths and never leaks into a project that didn't opt in.
 - [ADR-0137](ADR-0137-live-run-five-section-render-contract.md) — Every run surface renders as the same five fixed sections (banner / header+metadata / body / canonical summary / footer); tools populate them through additive done-body seams (`summaryNote`, `verboseExtra`) — the full-replacement `body` slot is removed, so the suite can no longer drift from fit/graph.
 - [ADR-0136](ADR-0136-owner-edge-key-full-occurrence-identity.md) — The owner-edge bucket key is full occurrence identity (bodyHash+filePath+line+column), refining ADR-0003's (bodyHash, filePath) 2-tuple so two byte-identical bodies on one source line no longer union their edges.

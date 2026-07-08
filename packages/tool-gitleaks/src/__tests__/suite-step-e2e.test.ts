@@ -62,6 +62,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { parseCliJsonOutcomes } from '@opensip-cli/test-support';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -118,18 +120,6 @@ function makeSuiteProject(): string {
   mkdirSync(scopeDir, { recursive: true });
   symlinkSync(GITLEAKS_PKG_DIR, join(scopeDir, 'tool-gitleaks'), 'dir');
   return dir;
-}
-
-/** Split the CLI's concatenated top-level `--json` outcome documents. */
-function parseOutcomes(stdout: string): Record<string, unknown>[] {
-  // The CLI pretty-prints each top-level outcome object starting at column 0; a
-  // `suite run --json` emits the step's gitleaks envelope outcome AND the suite-run
-  // outcome back-to-back. Split before each line-leading `{`, then JSON.parse each.
-  return stdout
-    .split(/\n(?=\{)/)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.startsWith('{'))
-    .map((chunk) => JSON.parse(chunk) as Record<string, unknown>);
 }
 
 beforeAll(() => {
@@ -193,7 +183,7 @@ describe('gitleaks as a suite step (04↔05) — external adapter over the worke
     // 2) Run the suite over the real forked worker (single `--json` run drives all
     //    the structured assertions + the on-disk side effects).
     suiteRun = runCli(['suite', 'run', 'security', '--json'], {}, project);
-    const outcomes = parseOutcomes(suiteRun.stdout);
+    const outcomes = parseCliJsonOutcomes(suiteRun.stdout);
     const found = outcomes.find((o) => o.kind === 'suite-run');
     if (found === undefined) {
       throw new Error(`no suite-run outcome in stdout:\n${suiteRun.stdout}`);
@@ -246,7 +236,7 @@ describe('gitleaks as a suite step (04↔05) — external adapter over the worke
   it('persists the run under the suite grouping with the gitleaks verdict', () => {
     const list = runCli(['sessions', 'list', '--json'], {}, project);
     expect(list.status).toBe(0);
-    const data = parseOutcomes(list.stdout).find((o) => o.kind === 'history')?.data as {
+    const data = parseCliJsonOutcomes(list.stdout).find((o) => o.kind === 'history')?.data as {
       sessions?: Record<string, unknown>[];
     };
     const gitleaksRow = (data?.sessions ?? []).find((s) => s.tool === 'gitleaks') as
@@ -334,7 +324,7 @@ describe('gitleaks as a suite step — deny-by-default still applies in suite co
       { OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: '' },
       project,
     );
-    const data = parseOutcomes(list.stdout).find((o) => o.kind === 'history')?.data as {
+    const data = parseCliJsonOutcomes(list.stdout).find((o) => o.kind === 'history')?.data as {
       sessions?: Record<string, unknown>[];
     };
     const gitleaksRows = (data?.sessions ?? []).filter((s) => s.tool === 'gitleaks');

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 release: v0.5.0
 title: "External tool adapters"
 audience: [plugin-authors]
@@ -37,6 +37,10 @@ related-docs:
   - ../../decisions/ADR-0090-external-tool-adapter-substrate.md
   - ../../decisions/ADR-0091-external-scanner-finding-ingestion.md
   - ../../decisions/ADR-0092-external-adapter-network-auth-trust.md
+  - ../../decisions/ADR-0139-host-owned-external-adapter-live-view.md
+  - ../../decisions/ADR-0140-polyglot-external-adapter-package-contract.md
+  - ../../decisions/ADR-0141-external-scanner-binary-ownership.md
+  - ../../decisions/ADR-0142-dependency-check-offline-safe-default.md
 ---
 # External tool adapters
 
@@ -82,6 +86,12 @@ This shape is decided in [ADR-0090](../../decisions/ADR-0090-external-tool-adapt
 (the substrate + worker dispatch), [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md)
 (ingestion, artifacts, exit modeling), and [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)
 (network posture + the no-egress confidentiality rule).
+[ADR-0139](../../decisions/ADR-0139-host-owned-external-adapter-live-view.md)
+keeps live rendering host-owned through a private progress bridge,
+[ADR-0140](../../decisions/ADR-0140-polyglot-external-adapter-package-contract.md)
+records the adapter package contract, and
+[ADR-0141](../../decisions/ADR-0141-external-scanner-binary-ownership.md)
+keeps scanner binaries customer-owned.
 
 ## When to write an adapter
 
@@ -512,4 +522,8 @@ adapter is installable today (deny-by-default trust opt-in) but is not a
 - [Environment variables](../70-reference/10-environment-variables.md)
 - [ADR-0090](../../decisions/ADR-0090-external-tool-adapter-substrate.md) ·
   [ADR-0091](../../decisions/ADR-0091-external-scanner-finding-ingestion.md) ·
-  [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md)
+  [ADR-0092](../../decisions/ADR-0092-external-adapter-network-auth-trust.md) ·
+  [ADR-0139](../../decisions/ADR-0139-host-owned-external-adapter-live-view.md) ·
+  [ADR-0140](../../decisions/ADR-0140-polyglot-external-adapter-package-contract.md) ·
+  [ADR-0141](../../decisions/ADR-0141-external-scanner-binary-ownership.md) ·
+  [ADR-0142](../../decisions/ADR-0142-dependency-check-offline-safe-default.md)

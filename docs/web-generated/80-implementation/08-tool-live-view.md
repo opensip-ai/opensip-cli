@@ -91,6 +91,21 @@ from `ink`. The `live-view-through-cli-live` fitness check enforces this.
    timing and persists the session row (tools never write `StoredSession` timing
    columns directly).
 
+## External Adapter Live View
+
+External Tool Adapters are installed tools, so their runtime still executes in
+the worker path from ADR-0090. The host owns the TTY live view and attaches a
+private adapter-progress bridge only around worker dispatch. Adapter packages do
+not import Ink, `cli-live`, or the private bridge helpers; they describe scanner
+work with `defineExternalToolAdapter`, and the substrate emits typed progress
+events for host rendering.
+
+Fallbacks stay the normal surfaces: `--json` emits the `SignalEnvelope`, gate
+runs use the host baseline seams, suite steps capture the shared dispatch
+outcome, and non-TTY runs render the static run presentation. The private bridge
+is enforced by `external-adapter-progress-private-bridge`; see
+[ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md).
+
 ## Observability
 
 `runToolLiveView` logs structured events through the scoped logger:

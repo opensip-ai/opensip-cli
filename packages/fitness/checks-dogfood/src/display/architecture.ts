@@ -10,6 +10,8 @@ import type { CheckDisplayEntry } from './types.js';
 
 /** Architecture dogfood check display entries (TS_AST only). */
 export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEntry>>({
+  'external-adapter-progress-private-bridge': ['🔒', 'External Adapter Progress Private Bridge'],
+  'external-tool-adapter-contract': ['🧩', 'External Tool Adapter Contract'],
   'command-handler-host-owned-output': ['🚪', 'Command Handler Host-Owned Output'],
   'host-tool-runtime-import-boundary': ['🧱', 'Host Tool Runtime Import Boundary'],
   'live-view-through-cli-live': ['🖥️', 'Live View Through cli-live'],

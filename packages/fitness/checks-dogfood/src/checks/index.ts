@@ -12,6 +12,8 @@
  * (host-tool-runtime-import-boundary, command-handler-host-owned-output) were
  * historically shipped; the enforcement here dogfoods opensip's own tree.
  */
+export * from './external-adapter-progress-private-bridge.js';
+export * from './external-tool-adapter-contract.js';
 export * from './command-handler-host-owned-output.js';
 export * from './host-tool-runtime-import-boundary.js';
 export * from './live-view-through-cli-live.js';

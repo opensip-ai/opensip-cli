@@ -76,6 +76,18 @@ function command(parse: ExternalCommandSpec['parse']): ExternalCommandSpec {
   };
 }
 
+function stdoutFindingsFromNonzeroCommand(
+  parse: ExternalCommandSpec['parse'],
+): ExternalCommandSpec {
+  return {
+    name: 'scan',
+    args: (ctx) => ['scan', ctx.projectRoot],
+    output: { kind: 'stdout', path: 'scan.jsonl' },
+    exitCodes: { ok: [0], findings: [], findingsFromNonzero: true },
+    parse,
+  };
+}
+
 const BINARY: BinarySpec = { command: 'examplescan', versionArgs: ['version'] };
 
 /** IO-deps stub: a found binary; `code`/`artifact` per case. */
@@ -148,6 +160,22 @@ describe('runScanLoop — scanner-error exit ⇒ fault (never a silent clean sca
           command(() => ONE_FINDING),
         ),
         makeDeps(1, ''),
+      ),
+    ).rejects.toMatchObject({ code: 'ADAPTER.SCAN.FAULT' });
+
+    expect(spies.writeArtifact).not.toHaveBeenCalled();
+    expect(spies.deliverSignals).not.toHaveBeenCalled();
+  });
+
+  it('stdout findingsFromNonzero scanners fault when nonzero stderr parses to zero signals', async () => {
+    const { cli, spies } = makeCli();
+    await expect(
+      runScanLoop(
+        input(
+          cli,
+          stdoutFindingsFromNonzeroCommand(() => []),
+        ),
+        makeDeps(2, ''),
       ),
     ).rejects.toMatchObject({ code: 'ADAPTER.SCAN.FAULT' });
 

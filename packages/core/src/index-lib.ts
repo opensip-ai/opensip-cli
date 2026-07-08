@@ -146,6 +146,9 @@ export { namespacedRuleId } from './lib/rule-id.js';
 // paths and by tools for their own state versioning.
 export { extractPayloadVersion } from './lib/payload-version.js';
 
+// Lib — bounded-concurrency map/forEach helpers (shared across fit/graph/mcp).
+export { mapWithConcurrency, forEachWithConcurrency } from './lib/map-with-concurrency.js';
+
 // Lib — retry
 export { withRetry } from './lib/retry.js';
 export type { RetryOptions } from './lib/retry.js';

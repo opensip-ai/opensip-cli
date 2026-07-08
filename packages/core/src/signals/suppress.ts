@@ -19,67 +19,73 @@
  * here.
  */
 
+import { forEachWithConcurrency } from '../lib/map-with-concurrency.js';
 import { logger } from '../lib/logger.js';
 
 import { COMMENT_OPENERS } from './comment-openers.js';
 
 import type { Signal } from '../types/signal.js';
 
-// =============================================================================
-// PUBLIC TYPES
-// =============================================================================
+import type {
+  SuppressionKeywords,
+  SuppressionLocation,
+  SuppressionMatch,
+  SuppressionRequest,
+  SuppressionResult,
+} from './suppress-types.js';
 
-/** The two directive keywords a tool owns. */
-export interface SuppressionKeywords {
-  /** File-level directive, e.g. `@fitness-ignore-file` / `@graph-ignore-file`. */
-  readonly file: string;
-  /** Next-line directive, e.g. `@fitness-ignore-next-line` / `@graph-ignore-next-line`. */
-  readonly nextLine: string;
-}
-
-/** A candidate source location a directive may target for a given signal. */
-export interface SuppressionLocation {
-  readonly file: string;
-  /** 1-based line; omit for a file-only candidate. */
-  readonly line?: number;
-}
-
-/** Request for {@link filterSignalsBySuppressions}. */
-export interface SuppressionRequest {
-  readonly signals: readonly Signal[];
-  /** The tool's explicit directive keywords. */
-  readonly keywords: SuppressionKeywords;
-  /** Injected content reader (kernel performs no file I/O). */
-  readonly readFile: (filePath: string) => Promise<string>;
-  /**
-   * Candidate locations a directive may target for this signal. Defaults to
-   * the signal's own `code` location. Graph overrides this for `graph:cycle`.
-   */
-  readonly locate?: (signal: Signal) => readonly SuppressionLocation[];
-  /**
-   * The id a directive must name to suppress this signal. Defaults to
-   * `signal.ruleId`. Fitness passes `() => checkId` to reproduce its exact
-   * per-check semantics.
-   */
-  readonly ruleIdOf?: (signal: Signal) => string;
-}
-
-/** One suppressed signal + the directive that suppressed it. */
-export interface SuppressionMatch {
-  readonly signal: Signal;
-  readonly ruleId: string;
-  readonly file: string;
-  /** The 1-based line, or `'file'` for a file-level directive. */
-  readonly line: number | 'file';
-}
-
-/** Result of {@link filterSignalsBySuppressions}. */
-export interface SuppressionResult {
-  readonly kept: readonly Signal[];
-  readonly suppressed: readonly SuppressionMatch[];
-}
+export type {
+  SuppressionKeywords,
+  SuppressionLocation,
+  SuppressionMatch,
+  SuppressionRequest,
+  SuppressionResult,
+} from './suppress-types.js';
 
 const SUPPRESSION_SCAN_CONCURRENCY = 32;
+
+/** True when `error` is a Node `ENOENT` (file genuinely absent). */
+function isEnoent(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT'
+  );
+}
+
+function attributeMissingFiles(
+  missingFiles: ReadonlySet<string>,
+  request: SuppressionRequest,
+  defaultLocate: (signal: Signal) => readonly SuppressionLocation[],
+): void {
+  if (missingFiles.size === 0) return;
+
+  const locate = request.locate ?? defaultLocate;
+  const ruleIdOf = request.ruleIdOf ?? ((s: Signal) => s.ruleId);
+
+  const ruleIdsByFile = new Map<string, Set<string>>();
+  for (const signal of request.signals) {
+    const id = ruleIdOf(signal);
+    for (const loc of locate(signal)) {
+      if (!missingFiles.has(loc.file)) continue;
+      let ids = ruleIdsByFile.get(loc.file);
+      if (!ids) {
+        ids = new Set();
+        ruleIdsByFile.set(loc.file, ids);
+      }
+      ids.add(id);
+    }
+  }
+
+  for (const file of missingFiles) {
+    for (const ruleId of ruleIdsByFile.get(file) ?? []) {
+      logger.warn('Suppression directive file is missing; a waiver may not be applied', {
+        evt: 'signals.suppress.directive-file-missing',
+        module: 'core:signals:suppress',
+        file,
+        ruleId,
+      });
+    }
+  }
+}
 
 // =============================================================================
 // INTERNAL CONSTANTS
@@ -343,7 +349,7 @@ export async function filterSignalsBySuppressions(
     }
   });
 
-  attributeMissingFiles(missingFiles, request);
+  attributeMissingFiles(missingFiles, request, defaultLocate);
 
   const kept: Signal[] = [];
   const suppressed: SuppressionMatch[] = [];
@@ -364,78 +370,6 @@ export async function filterSignalsBySuppressions(
   }
 
   return { kept, suppressed };
-}
-
-/** True when `error` is a Node `ENOENT` (file genuinely absent). */
-function isEnoent(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT'
-  );
-}
-
-async function forEachWithConcurrency<T>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T) => Promise<void>,
-): Promise<void> {
-  let nextIndex = 0;
-  const workerCount = Math.min(concurrency, items.length);
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const index = nextIndex;
-      nextIndex++;
-      if (index >= items.length) return;
-      const item = items[index];
-      if (item === undefined) continue;
-      await fn(item);
-    }
-  });
-
-  await Promise.all(workers);
-}
-
-/**
- * Surface every `ENOENT`-absent directive file as a warning-level structured
- * log, one `evt` per `(file, ruleId)` pair so a potentially-dropped waiver
- * names both the unreadable file AND the signal whose suppression could not be
- * evaluated. Emitting per-ruleId (rather than per-file) is what makes a leaked
- * waiver a 1-minute find. The `logger` singleton stamps `runId` from the
- * current scope, so no logger injection is threaded through the pure scan.
- */
-function attributeMissingFiles(
-  missingFiles: ReadonlySet<string>,
-  request: SuppressionRequest,
-): void {
-  if (missingFiles.size === 0) return;
-
-  const locate = request.locate ?? defaultLocate;
-  const ruleIdOf = request.ruleIdOf ?? ((s: Signal) => s.ruleId);
-
-  // ruleIds whose candidate locations reference each missing file.
-  const ruleIdsByFile = new Map<string, Set<string>>();
-  for (const signal of request.signals) {
-    const id = ruleIdOf(signal);
-    for (const loc of locate(signal)) {
-      if (!missingFiles.has(loc.file)) continue;
-      let ids = ruleIdsByFile.get(loc.file);
-      if (!ids) {
-        ids = new Set();
-        ruleIdsByFile.set(loc.file, ids);
-      }
-      ids.add(id);
-    }
-  }
-
-  for (const file of missingFiles) {
-    for (const ruleId of ruleIdsByFile.get(file) ?? []) {
-      logger.warn('Suppression directive file is missing; a waiver may not be applied', {
-        evt: 'signals.suppress.directive-file-missing',
-        module: 'core:signals:suppress',
-        file,
-        ruleId,
-      });
-    }
-  }
 }
 
 /** The first candidate location that suppresses `id`, or `null`. */

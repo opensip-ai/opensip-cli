@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 release: v0.5.0
 title: "`tools` command"
 audience: [plugin-authors, contributors]
@@ -16,6 +16,7 @@ related-docs:
   - ./01-cli-commands.md
   - ./10-environment-variables.md
   - ../50-extend/06-full-tool-plugins.md
+  - ../../decisions/ADR-0141-external-scanner-binary-ownership.md
 ---
 # `tools` — manage whole Tool plugins
 
@@ -114,7 +115,8 @@ The adapter package does not install the native scanner binary. Keep managing
 your normal OS/package-manager path, or pin the binary with
 `binaries.<tool>.path` / `OPENSIP_<TOOL>_BIN`. See
 [External tool adapters](../50-extend/08-external-tool-adapters.md) for the full
-adapter table and prerequisites.
+adapter table and prerequisites; [ADR-0141](../../decisions/ADR-0141-external-scanner-binary-ownership.md)
+records the scanner-binary ownership boundary.
 
 ## `tools doctor`
 

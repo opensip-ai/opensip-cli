@@ -221,6 +221,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'loadToolManifest',
   'logger',
   'makeStripper',
+  'mapWithConcurrency',
+  'forEachWithConcurrency',
   'measureIpcPayloadBytes',
   'namespacedRuleId',
   'noopSignalSink',

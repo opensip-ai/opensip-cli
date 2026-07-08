@@ -1,6 +1,7 @@
 /**
  * @fileoverview adapter-must-use-substrate — an External Tool Adapter package
- *   (packages/tool-gitleaks|osv-scanner|trivy/src/**) MUST build its `Tool` via
+ *   any first-party package under packages/tool-<adapter>/src MUST build its
+ *   `Tool` via
  *   `defineExternalToolAdapter` from `@opensip-cli/external-tool-adapter` and MUST
  *   NOT hand-roll the scanner loop. Project-local SELF-check.
  *
@@ -26,9 +27,9 @@
  * the substrate authoring helper. Both defeat the substrate's confidentiality +
  * isolation guarantees, so both are violations.
  *
- * Path-gated to the three first-party adapter packages ONLY — NOT the substrate
- * (which legitimately owns subprocess execution) and NOT `tool-test-kit`
- * (a layer-2 published helper, Risk R8). contentFilter is `raw`, and the analyzer
+ * Path-gated to first-party adapter packages ONLY — NOT the substrate (which
+ * legitimately owns subprocess execution) and NOT `tool-test-kit` (a layer-2
+ * published helper, Risk R8). contentFilter is `raw`, and the analyzer
  * strips COMMENTS ITSELF (preserving strings) before matching: the `child_process`
  * module specifier lives in a STRING literal, so the engine's strip-strings filter
  * would erase the very token we match, while comment prose mentioning `execFile(`
@@ -81,8 +82,9 @@ function stripComments(src) {
   return out;
 }
 
-/** The first-party External Tool Adapter source trees (ADR-0090 MVP set). */
-const ADAPTER_SRC = /packages\/tool-(?:gitleaks|osv-scanner|trivy)\/src\//;
+/** The first-party External Tool Adapter source trees. */
+const ADAPTER_SRC =
+  /packages\/tool-(?:gitleaks|osv-scanner|trivy|semgrep|ast-grep|ruff|golangci-lint|govulncheck|cargo-deny|bandit|pip-audit|cargo-clippy|spotbugs|pmd|dependency-check|cppcheck)\/src\//;
 
 /** Tests/fixtures are not adapter runtime source. */
 const NON_SOURCE = /\.test\.tsx?$|\/__tests__\/|\/__fixtures__\//;

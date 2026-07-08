@@ -25,6 +25,7 @@
  * they use core's public `RunScope` API directly.
  */
 
+export { parseCliJsonOutcomes } from './cli-json-outcomes.js';
 export { makeTestScope, makeFitnessTestScope, withScope, withScopeSync } from './with-scope.js';
 export { runTwoScopesConcurrently } from './concurrent-scopes.js';
 export { findOrphanedDisplayKeys } from './display-parity.js';

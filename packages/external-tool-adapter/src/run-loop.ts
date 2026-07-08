@@ -3,8 +3,8 @@
  *
  * resolve binary → build run context → probe version → compute artifact path →
  * `execFile` (no shell, timeout + output cap) → interpret exit → read native
- * output → persist via `cli.writeArtifact` (the host seam — NEVER raw fs) →
- * parse (SARIF via shared `ingestSarif`; JSON via the descriptor `parse`) →
+ * output → parse (SARIF via shared `ingestSarif`; JSON via the descriptor `parse`) →
+ * persist via `cli.writeArtifact` (the host seam — NEVER raw fs) →
  * stamp provenance → `buildSignalEnvelope` + worker-side fingerprint stamping →
  * emit via `cli.emitEnvelope` (`--json`) / `cli.render` (human) → `cli.deliverSignals`
  * (host derives the findings exit from the verdict) → return a `ToolRunCompletion`.
@@ -26,7 +26,6 @@ import { buildSignalEnvelope, EXIT_CODES } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   isErrorSignal,
-  resolveProjectPaths,
   resolveVerdictPolicy,
   TimeoutError,
   ToolError,
@@ -34,11 +33,17 @@ import {
 
 import { resolveBinary, defaultBinaryEnvVar } from './binary-resolver.js';
 import { DEFAULT_EXIT_MODEL, interpretExit } from './exit-model.js';
-import { asObject, getString } from './ingest-json.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
 import { redactCredentials } from './redact.js';
 import { buildAdapterRunContext } from './run-context.js';
+import {
+  applyScanExclusion,
+  configuredBinaryPath,
+  defaultArtifactName,
+  isEmptyReclaimedStdoutFindings,
+  progressStep,
+} from './run-loop-helpers.js';
 import {
   STDERR_TAIL,
   invalidArtifactFault,
@@ -50,18 +55,9 @@ import { buildScanCompletion, deliverOptions, emitScanCompletion } from './scan-
 
 import type { BinaryResolveDeps } from './binary-resolver.js';
 import type { ProbeVersionInput, ProcessResult, RunProcessInput } from './process-exec.js';
-import type {
-  ExternalAdapterProgressBridge,
-  ExternalAdapterProgressEvent,
-  ExternalAdapterProgressStage,
-} from './progress.js';
+import type { ExternalAdapterProgressBridge } from './progress.js';
 import type { ScanCompletion } from './scan-emit.js';
-import type {
-  AdapterProvenance,
-  AdapterRunContext,
-  BinarySpec,
-  ExternalCommandSpec,
-} from './types.js';
+import type { AdapterProvenance, BinarySpec, ExternalCommandSpec } from './types.js';
 import type { FingerprintStrategy, ToolCliContext } from '@opensip-cli/core';
 
 /** Logger `module` field for every event this loop emits. */
@@ -112,83 +108,6 @@ export interface ScanLoopInput {
   /** The parsed command flags (`json` / `cwd` / `reportTo` / `apiKey`). */
   readonly opts: Record<string, unknown>;
   readonly progress?: ExternalAdapterProgressBridge;
-}
-
-const ARTIFACT_EXT: Record<ExternalCommandSpec['output']['kind'], string> = {
-  sarif: 'sarif',
-  json: 'json',
-  stdout: 'out',
-};
-
-function defaultArtifactName(tool: string, kind: ExternalCommandSpec['output']['kind']): string {
-  return `${tool}.${ARTIFACT_EXT[kind]}`;
-}
-
-/** Read the namespaced operator pin `binaries.<tool>.path` from the resolved config. */
-function configuredBinaryPath(
-  config: Readonly<Record<string, unknown>>,
-  tool: string,
-): string | undefined {
-  return getString(asObject(config.binaries)?.[tool], 'path');
-}
-
-function emitProgress(
-  bridge: ExternalAdapterProgressBridge | undefined,
-  stage: ExternalAdapterProgressStage,
-  status: 'start' | 'done',
-  extra: Omit<ExternalAdapterProgressEvent, 'kind' | 'stage' | 'status'> = {},
-): void {
-  bridge?.emit({ kind: 'adapter-stage', stage, status, ...extra });
-}
-
-async function progressStep<T>(
-  bridge: ExternalAdapterProgressBridge | undefined,
-  stage: ExternalAdapterProgressStage,
-  fn: () => T | Promise<T>,
-  /** Optional: derive count/detail fields to surface on the `done` event (e.g. signal count). */
-  deriveExtra?: (result: T) => Omit<ExternalAdapterProgressEvent, 'kind' | 'stage' | 'status'>,
-): Promise<T> {
-  emitProgress(bridge, stage, 'start');
-  const begin = performance.now();
-  try {
-    const result = await fn();
-    emitProgress(bridge, stage, 'done', {
-      durationMs: Math.max(0, Math.round(performance.now() - begin)),
-      ...deriveExtra?.(result),
-    });
-    return result;
-  } catch (error) {
-    emitProgress(bridge, stage, 'done', {
-      detail: error instanceof Error ? error.name : 'error',
-      durationMs: Math.max(0, Math.round(performance.now() - begin)),
-    });
-    throw error;
-  }
-}
-
-/**
- * A3: append the descriptor's exclusion of opensip's `.runtime` artifact store to
- * the scanner argv. The substrate supplies the path (run-context-driven) while the
- * descriptor supplies the per-scanner flag shape; a config-file form (gitleaks's
- * allowlist) is written through the host `writeArtifact` seam into the per-run dir,
- * never a raw substrate fs write. No user-facing flag — the command manifest is
- * unchanged.
- */
-async function applyScanExclusion(
-  cli: ToolCliContext,
-  command: ExternalCommandSpec,
-  ctx: AdapterRunContext,
-  args: string[],
-): Promise<void> {
-  if (command.excludeScan === undefined) return;
-  const exclusion = command.excludeScan({
-    excludePath: resolveProjectPaths(ctx.projectRoot).runtimeDir,
-    configPath: (name) => ctx.artifactPath(name),
-  });
-  if (exclusion.configFile !== undefined) {
-    await cli.writeArtifact(exclusion.configFile.path, exclusion.configFile.contents);
-  }
-  if (exclusion.args !== undefined) args.push(...exclusion.args);
 }
 
 /**
@@ -357,6 +276,25 @@ export async function runScanLoop(
   }
 
   const raw = read.raw;
+  const parsed = await progressStep(
+    progress,
+    'ingest-report',
+    () => parseSignals(command, raw, ctx),
+    (signals) => ({ signals: signals.length, findings: signals.length }),
+  );
+  if (isEmptyReclaimedStdoutFindings(command, proc.code, verdict, parsed.length)) {
+    cli.logger.warn({
+      evt: 'adapter.scan.faulted',
+      module: MODULE,
+      tool,
+      code: proc.code,
+      reason: 'empty-stdout-findings',
+    });
+    throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
+      stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
+    });
+  }
+
   // Persist the raw artifact through the HOST seam (0600 + retention, ADR-0080/0091).
   await cli.writeArtifact(artifactFullPath, raw);
   cli.logger.info({
@@ -367,12 +305,6 @@ export async function runScanLoop(
     bytes: raw.length,
   });
 
-  const parsed = await progressStep(
-    progress,
-    'ingest-report',
-    () => parseSignals(command, raw, ctx),
-    (signals) => ({ signals: signals.length, findings: signals.length }),
-  );
   const provenance: AdapterProvenance = {
     tool,
     adapterPackage: input.adapterPackage,

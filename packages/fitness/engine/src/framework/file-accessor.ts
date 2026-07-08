@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs/promises';
 
-import { ValidationError, applyContentFilter } from '@opensip-cli/core';
+import { ValidationError, applyContentFilter, mapWithConcurrency } from '@opensip-cli/core';
 
 import type { FileAccessor } from './check-config.js';
 import type { FileCache } from './file-cache.js';
@@ -195,29 +195,4 @@ function normalizeReadConcurrency(value: number | undefined): number {
   return Math.max(1, Math.floor(value));
 }
 
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: ({ readonly value: R } | undefined)[] = [];
-  let nextIndex = 0;
-  const workerCount = Math.min(concurrency, items.length);
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const index = nextIndex;
-      nextIndex++;
-      if (index >= items.length) return;
-      results[index] = { value: await fn(items[index], index) };
-    }
-  });
 
-  await Promise.all(workers);
-  const ordered: R[] = [];
-  for (let index = 0; index < items.length; index++) {
-    const entry = results[index];
-    if (entry === undefined) throw new Error('mapWithConcurrency worker did not fill result slot');
-    ordered.push(entry.value);
-  }
-  return ordered;
-}
