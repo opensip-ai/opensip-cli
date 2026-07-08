@@ -1,0 +1,49 @@
+{
+  "name": "@opensip-cli/tool-clean",
+  "private": true,
+  "description": "Fixture package for the external adapter contract check",
+  "dependencies": {
+    "@opensip-cli/core": "workspace:*",
+    "@opensip-cli/external-tool-adapter": "workspace:*"
+  },
+  "opensipTools": {
+    "kind": "tool",
+    "id": "clean",
+    "apiVersion": 1,
+    "commands": [
+      {
+        "name": "clean",
+        "description": "Run clean scanner",
+        "output": "raw-stream"
+      },
+      {
+        "name": "doctor",
+        "parent": "clean",
+        "description": "Check scanner readiness",
+        "output": "raw-stream"
+      },
+      {
+        "name": "version",
+        "parent": "clean",
+        "description": "Print scanner version",
+        "output": "raw-stream"
+      }
+    ],
+    "requires": [
+      {
+        "resource": "subprocess",
+        "reason": "Runs scanner"
+      },
+      {
+        "resource": "filesystem",
+        "reason": "Reads project files"
+      }
+    ],
+    "config": {
+      "namespace": "clean",
+      "schema": {
+        "type": "object"
+      }
+    }
+  }
+}

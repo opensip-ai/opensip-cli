@@ -63,7 +63,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseCliJsonOutcomes } from '@opensip-cli/test-support';
-
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

@@ -4,7 +4,9 @@ import { forEachWithConcurrency, mapWithConcurrency } from '../map-with-concurre
 
 describe('mapWithConcurrency', () => {
   it('preserves order with bounded concurrency', async () => {
-    const out = await mapWithConcurrency([1, 2, 3, 4], 2, async (item, index) => item + index);
+    const out = await mapWithConcurrency([1, 2, 3, 4], 2, (item, index) =>
+      Promise.resolve(item + index),
+    );
     expect(out).toEqual([1, 3, 5, 7]);
   });
 });
@@ -12,9 +14,12 @@ describe('mapWithConcurrency', () => {
 describe('forEachWithConcurrency', () => {
   it('visits every item', async () => {
     const seen: number[] = [];
-    await forEachWithConcurrency([1, 2, 3], 2, async (item) => {
+    await forEachWithConcurrency([1, 2, 3], 2, (item) => {
       seen.push(item);
+      return Promise.resolve();
     });
-    expect(seen.sort((a, b) => a - b)).toEqual([1, 2, 3]);
+    const sorted = [...seen];
+    sorted.sort((a, b) => a - b);
+    expect(sorted).toEqual([1, 2, 3]);
   });
 });

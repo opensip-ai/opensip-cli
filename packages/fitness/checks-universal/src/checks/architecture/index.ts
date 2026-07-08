@@ -3,6 +3,8 @@ export * from './docker-best-practices.js';
 export * from './docker-ignore-validation.js';
 export * from './docker-version-sync.js';
 export * from './env-var-validation.js';
+export * from './external-adapter-progress-private-bridge.js';
+export * from './external-tool-adapter-contract.js';
 export * from './heavy-import-detection.js';
 export * from './modules/index.js';
 export * from './no-custom-event-emitter.js';

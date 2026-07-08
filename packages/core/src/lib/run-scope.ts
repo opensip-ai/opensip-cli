@@ -18,8 +18,8 @@
  * `AsyncLocalStorage` instance exported from `@opensip-cli/core`.
  */
 
-import { currentScope } from './scope-storage.js';
 import { logger as defaultLogger } from './logger.js';
+import { currentScope } from './scope-storage.js';
 
 import type { Logger, LoggerImpl } from './logger.js';
 

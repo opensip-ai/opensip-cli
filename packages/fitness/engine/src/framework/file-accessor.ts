@@ -194,5 +194,3 @@ function normalizeReadConcurrency(value: number | undefined): number {
   if (!Number.isFinite(value)) return DEFAULT_READ_CONCURRENCY;
   return Math.max(1, Math.floor(value));
 }
-
-

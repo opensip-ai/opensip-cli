@@ -192,5 +192,3 @@ export class PathMatcher {
     return [...this.options.exclude, ...(this.options.additionalExcludes ?? [])];
   }
 }
-
-

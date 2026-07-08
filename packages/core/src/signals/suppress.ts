@@ -19,12 +19,10 @@
  * here.
  */
 
-import { forEachWithConcurrency } from '../lib/map-with-concurrency.js';
 import { logger } from '../lib/logger.js';
+import { forEachWithConcurrency } from '../lib/map-with-concurrency.js';
 
 import { COMMENT_OPENERS } from './comment-openers.js';
-
-import type { Signal } from '../types/signal.js';
 
 import type {
   SuppressionKeywords,
@@ -33,6 +31,7 @@ import type {
   SuppressionRequest,
   SuppressionResult,
 } from './suppress-types.js';
+import type { Signal } from '../types/signal.js';
 
 export type {
   SuppressionKeywords,

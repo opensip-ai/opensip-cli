@@ -1,18 +1,16 @@
-// @fitness-ignore-file shipped-checks-must-be-generic -- opensip-internal dogfood check (ADR-0140): self-targeting adapter package contract; inert for adopters.
 /**
  * @fileoverview External Tool Adapter package contract.
  *
- * ADR-0140/ADR-0090 make scanner adapters ordinary Tool packages authored through
- * defineExternalToolAdapter. The substrate owns binary resolution, subprocess
- * execution, doctor/version commands, redaction, evidence delivery, and session /
- * baseline host seams. This check is self-targeting: it only inspects packages
- * whose manifest declares a Tool and whose dependencies include
- * @opensip-cli/external-tool-adapter.
+ * ADR-0140/ADR-0090 make scanner adapters ordinary Tool packages authored
+ * through defineExternalToolAdapter. The substrate owns binary resolution,
+ * subprocess execution, doctor/version commands, redaction, evidence delivery,
+ * and session / baseline host seams. This check is self-targeting: it only
+ * inspects packages whose manifest declares a Tool and whose dependencies
+ * include @opensip-cli/external-tool-adapter.
  */
 
 import path from 'node:path';
 
-import { isRecord, mapWithConcurrency } from '@opensip-cli/core';
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
 const ADAPTER_DEP = '@opensip-cli/external-tool-adapter';
@@ -21,7 +19,6 @@ const CHILD_PROCESS_IMPORT =
   /(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)['"](?:node:)?child_process['"]/;
 const SUBPROCESS_CALL = /\b(?:execFile|execFileSync|spawn|spawnSync)\s*\(/;
 const DEFINE_TOOL = /\bdefineTool\b/;
-const SESSION_REPO_SYMBOL = 'Session' + 'Repo';
 const FORBIDDEN_PERSISTENCE_IMPORT =
   /(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)['"]@opensip-cli\/(?:datastore|session-store)['"]/;
 const FORBIDDEN_PROCESS_OUTPUT =
@@ -51,6 +48,10 @@ interface AdapterPackage {
 }
 
 type Quote = '"' | "'" | '`';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function normalizePath(filePath: string): string {
   return filePath.replaceAll('\\', '/');
@@ -100,10 +101,6 @@ function violation(
   };
 }
 
-/**
- * Strip comments while preserving strings/templates so import specifier strings
- * remain matchable but prose comments do not produce false positives.
- */
 function stripComments(source: string): string {
   let out = '';
   for (let i = 0; i < source.length;) {
@@ -254,10 +251,7 @@ async function checkSource(
         ),
       );
     }
-    if (
-      FORBIDDEN_PERSISTENCE_IMPORT.test(source) ||
-      new RegExp(`\\b${SESSION_REPO_SYMBOL}\\b`).test(source)
-    ) {
+    if (FORBIDDEN_PERSISTENCE_IMPORT.test(source) || /\bSessionRepo\b/.test(source)) {
       violations.push(
         violation(
           adapter,
@@ -295,7 +289,6 @@ function adapterFromPackageJson(filePath: string, raw: string): AdapterPackage |
   try {
     pkg = JSON.parse(raw) as PackageJson;
   } catch {
-    // Expected: malformed package.json rows are skipped; JSON validity is owned elsewhere.
     return undefined;
   }
   if (pkg.opensipTools?.kind !== 'tool' || !hasDependency(pkg, ADAPTER_DEP)) return undefined;
@@ -313,29 +306,17 @@ function adapterName(pkg: PackageJson, filePath: string): string {
   return filePath;
 }
 
-const ADAPTER_SCAN_CONCURRENCY = 8;
-
 export async function analyzeExternalToolAdapterContracts(
   files: FileAccessor,
 ): Promise<CheckViolation[]> {
-  const packageJsonPaths = files.paths.filter(
-    (filePath) => path.basename(filePath) === 'package.json',
-  );
-  const adapterCandidates = await mapWithConcurrency(
-    packageJsonPaths,
-    ADAPTER_SCAN_CONCURRENCY,
-    async (filePath) => adapterFromPackageJson(filePath, await files.read(filePath)),
-  );
-  const adapters = adapterCandidates.filter(
-    (adapter): adapter is AdapterPackage => adapter !== undefined,
-  );
-
-  const perAdapter = await mapWithConcurrency(
-    adapters,
-    ADAPTER_SCAN_CONCURRENCY,
-    async (adapter) => [...checkManifest(adapter), ...(await checkSource(files, adapter))],
-  );
-  return perAdapter.flat();
+  const violations: CheckViolation[] = [];
+  for (const filePath of files.paths) {
+    if (path.basename(filePath) !== 'package.json') continue;
+    const adapter = adapterFromPackageJson(filePath, await files.read(filePath));
+    if (adapter === undefined) continue;
+    violations.push(...checkManifest(adapter), ...(await checkSource(files, adapter)));
+  }
+  return violations;
 }
 
 export const externalToolAdapterContract = defineCheck({
