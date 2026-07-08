@@ -57,6 +57,9 @@ export async function executeMultiPathGraph(
   let totalSuppressed = 0;
   let lastResult: RunGraphResult | null = null;
   const config = loadGraphConfig(opts.cwd);
+  // @sequential-ok — each path is a full graph build; running them serially is
+  // exactly the memory bound (parallel full builds would exhaust memory — the
+  // very resource exhaustion this heuristic warns about).
   for (const p of paths) {
     const profileRun = profile?.startRun({
       label: positionalPathLabel(p, opts.cwd),

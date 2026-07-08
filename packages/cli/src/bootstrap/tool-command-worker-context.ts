@@ -155,18 +155,25 @@ function buildHostPlanesRpc(client: WorkerRpcClient): NonNullable<ToolCliContext
   return { governance, audit, entitlements };
 }
 
+/** Inputs for {@link buildWorkerContext} — bundled so the seam stays narrow. */
+export interface BuildWorkerContextInput {
+  readonly scope: RunScope;
+  readonly timing: RunTimer;
+  readonly acc: ResultAccumulator;
+  readonly rpcClient: WorkerRpcClient;
+  /** Byte cap for captured worker output (defaults to the worker limits). */
+  readonly maxCapturedOutputBytes?: number;
+  readonly adapterProgress?: ExternalAdapterProgressBridge;
+}
+
 /**
  * Build the worker-side {@link ToolCliContext} shim. FRR seams record into
  * `acc`; RPC seams upcall via `rpcClient`; the live-view seams fail loud.
  */
-export function buildWorkerContext(
-  scope: RunScope,
-  timing: RunTimer,
-  acc: ResultAccumulator,
-  rpcClient: WorkerRpcClient,
-  maxCapturedOutputBytes = getWorkerLimits().maxCapturedOutputBytes,
-  adapterProgress?: ExternalAdapterProgressBridge,
-): ToolCliContext {
+export function buildWorkerContext(input: BuildWorkerContextInput): ToolCliContext {
+  const { scope, timing, acc, rpcClient, adapterProgress } = input;
+  const maxCapturedOutputBytes =
+    input.maxCapturedOutputBytes ?? getWorkerLimits().maxCapturedOutputBytes;
   const cap = (field: string, value: unknown): void => {
     assertCapturedOutputFits(field, value, maxCapturedOutputBytes);
   };

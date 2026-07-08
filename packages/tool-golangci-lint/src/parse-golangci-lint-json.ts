@@ -49,6 +49,11 @@ function normalize(entry: unknown): Signal | undefined {
   });
 }
 
+/**
+ * Parse golangci-lint's JSON report — the top-level `Issues[]` array — into
+ * normalized findings. Each issue maps to a signal keyed on its `FromLinter`
+ * rule, `Text` message, and `Pos` location, preserving the native `Severity`.
+ */
 export function parseGolangciLintJson(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,

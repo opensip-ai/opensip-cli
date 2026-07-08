@@ -12,12 +12,21 @@ export const GOLANGCI_LINT_IDENTITY: ToolIdentity = {
 };
 export const GOLANGCI_LINT_STABLE_ID = 'b46ee627-2dd6-42b6-9888-c9132b803167';
 
+/**
+ * Build the CLI args for a golangci-lint scan: `run` with the JSON report
+ * streamed to stdout (the golangci-lint v2 replacement for v1's `--out-format`).
+ */
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
   // golangci-lint v2 replaced `--out-format json` with `--output.json.path`; use
   // `stdout` so the JSON report streams to stdout (output kind: 'stdout').
   return ['run', '--output.json.path=stdout'];
 }
 
+/**
+ * Build the exclude-path args for golangci-lint — always none. golangci-lint
+ * lints only `.go` files and `.runtime/` holds no Go source, and v2 dropped the
+ * `--skip-dirs` flag (exclusion moved to config), so there is nothing to pass.
+ */
 export function buildGolangciLintExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {

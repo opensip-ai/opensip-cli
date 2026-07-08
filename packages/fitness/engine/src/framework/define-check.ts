@@ -130,6 +130,9 @@ async function executeAnalyzeMode(
     .totalItems(files.length)
     .filesScanned(files.length);
 
+  // @sequential-ok — checks analyze one file at a time by design: concurrency-1
+  // keeps memory bounded (one file's content resident), preserves deterministic
+  // violation ordering, and keeps the abort signal responsive between files.
   for (const filePath of files) {
     if (ctx.signal?.aborted) {
       throw new CheckAbortedError(config.slug);

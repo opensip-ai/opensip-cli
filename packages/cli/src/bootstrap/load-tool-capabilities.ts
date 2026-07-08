@@ -98,6 +98,8 @@ export async function loadOwningToolCapabilities(
     .filter((d) => d.ownerToolId === owningTool.metadata.id);
 
   let driven = 0;
+  // @sequential-ok — bounded by a single tool's declared discovery domains;
+  // each capability import registers into shared scope, so serial-by-design.
   for (const domain of ownedDomains) {
     const descriptor = domain.discovery;
     if (descriptor === undefined) continue;

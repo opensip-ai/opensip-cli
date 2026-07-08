@@ -47,6 +47,11 @@ function normalize(entry: unknown): Signal | undefined {
   });
 }
 
+/**
+ * Parse Ruff's JSON diagnostics array into normalized findings. Each diagnostic
+ * maps to a signal keyed on its rule `code`, `message`, and `location`,
+ * preserving the native severity label and rule documentation `url`.
+ */
 export function parseRuffJson(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,

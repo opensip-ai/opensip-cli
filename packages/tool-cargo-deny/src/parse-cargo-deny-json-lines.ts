@@ -78,6 +78,11 @@ function normalize(value: unknown): Signal | undefined {
   });
 }
 
+/**
+ * Parse cargo-deny's `check --format json` NDJSON stream into signals — one per
+ * `diagnostic` message. Non-diagnostic lines (`summary`/`log`) and messages
+ * without a `message` field are skipped.
+ */
 export function parseCargoDenyJsonLines(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,

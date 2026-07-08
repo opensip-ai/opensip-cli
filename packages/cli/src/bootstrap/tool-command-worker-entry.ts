@@ -35,8 +35,6 @@ import { readFileSync } from 'node:fs';
 import {
   assertCapturedOutputFits,
   canonicalToolErrorCode,
-  CapturedOutputTooLargeError,
-  ConfigurationError,
   createRunTimer,
   currentScope,
   defineCommand,
@@ -47,7 +45,6 @@ import {
   startWorkerHeartbeat,
   ToolError,
   type CommandSpec,
-  type ToolCliContext,
   type Tool,
   type ToolSessionRecord,
   type WorkerMessage,
@@ -56,11 +53,13 @@ import {
 import { type CliCommandsContext } from '../commands/shared.js';
 
 import { runDeepConfigPass } from './tool-command-worker-config-pass.js';
+import { buildWorkerContext, type ResultAccumulator } from './tool-command-worker-context.js';
 import {
-  buildWorkerContext,
-  UnsupportedSeamError,
-  type ResultAccumulator,
-} from './tool-command-worker-context.js';
+  classifyThrow,
+  findCommandSpec,
+  resolveTool,
+  runWorkerInitialize,
+} from './tool-command-worker-resolve.js';
 import {
   assertReturnValuedHandlerResult,
   toResult,
@@ -100,64 +99,6 @@ function send(msg: DispatchWorkerMessage): void {
 }
 
 /**
- * Resolve the dispatched tool from the re-bootstrapped registry. The bootstrap
- * already imported + registered it (the isolation import happened in this worker
- * during preAction). Match by the registry's human key first, then by stable id /
- * human name — symmetric to the host provenance/dispatch matchers.
- *
- * @throws {Error & {failureClass}} `runtime-load-failed` when the tool is not in
- *   the worker's registry (the bootstrap did not admit it — e.g. a trust-policy
- *   or discovery miss). Surfaces as a structured IPC error; the host survives.
- */
-function resolveTool(spec: ToolCommandWorkerSpec): Tool {
-  const tools = currentScope()?.tools;
-  const tool =
-    tools?.get(spec.toolId) ??
-    tools?.list().find((t) => t.metadata.id === spec.toolId || t.metadata.name === spec.toolId);
-  if (tool === undefined) {
-    const err = new Error(
-      `tool command worker: tool '${spec.toolId}' is not registered in the worker scope ` +
-        '(the bootstrap did not discover/admit it — check provenance/trust policy)',
-    );
-    (err as Error & { failureClass: ToolCommandFailureClass }).failureClass = 'runtime-load-failed';
-    throw err;
-  }
-  return tool;
-}
-
-/** Resolve the command spec the worker should run, or throw `command-not-found`. */
-function findCommandSpec(tool: Tool, commandName: string): CommandSpec<unknown, ToolCliContext> {
-  const spec = tool.commandSpecs?.find(
-    (s) => s.name === commandName || s.aliases?.includes(commandName) === true,
-  );
-  if (spec === undefined) {
-    const err = new Error(
-      `tool command worker: tool '${tool.metadata.id}' has no command '${commandName}'`,
-    );
-    (err as Error & { failureClass: ToolCommandFailureClass }).failureClass = 'command-not-found';
-    throw err;
-  }
-  return spec;
-}
-
-/**
- * ADR-0054 M4-F: run the dispatched tool's `initialize()` once, worker-side,
- * before its handler. The host no longer runs an EXTERNAL owning tool's
- * `initialize` (that would execute untrusted runtime in the kernel) — and the
- * worker bootstraps the host `__tool-command-worker` subcommand (owned by NO
- * tool), so the worker's own preflight never resolves the dispatched tool as the
- * "owning tool". Running it here is the only place an external tool's
- * `initialize` runs under worker dispatch. A throw propagates to
- * {@link runToolCommandWorker}'s catch → structured `tool-handler-throw`; the
- * host survives (fail loud, never a half-initialised silent run).
- */
-async function runWorkerInitialize(tool: Tool): Promise<void> {
-  const initialize = resolveToolHooks(tool).initialize;
-  if (initialize === undefined) return;
-  await initialize();
-}
-
-/**
  * Build a structured `error` IPC message with a failure class (+ stack when
  * present). `code` carries the thrown error's canonical exit-class
  * `ToolErrorCode` when it originated as a typed `ToolError`, so the supervisor
@@ -191,26 +132,6 @@ function readSpec(specPath: string): ToolCommandWorkerSpec | DispatchWorkerMessa
       'bad-spec',
     );
   }
-}
-
-/**
- * Map a thrown error to its structured failure class for the IPC `error` message.
- *
- * A thrown `ConfigurationError` maps to `'config-invalid'` so the supervisor's
- * `dispatchError` reconstructs a `ConfigurationError` (→ exit 2) — the SAME
- * contract the in-process bundled path and `doctor` honour. Without this, a
- * binary-not-found / no-project / baseline-missing config fault thrown in the
- * worker would flatten to the generic `'tool-handler-throw'` → `SystemError` →
- * exit 1, silently losing the frozen exit-2 contract over the fork boundary. The
- * non-config typed exit classes (NotFound → 3, Network → 4, …) ride the separate
- * `code` carry (`canonicalToolErrorCode`) — see `errorMessage`/`runToolCommandWorker`.
- */
-function classifyThrow(error: unknown): ToolCommandFailureClass {
-  if (error instanceof UnsupportedSeamError) return error.failureClass;
-  if (error instanceof CapturedOutputTooLargeError) return error.failureClass;
-  if (error instanceof IpcPayloadTooLargeError) return error.failureClass;
-  if (error instanceof ConfigurationError) return 'config-invalid';
-  return (error as { failureClass?: ToolCommandFailureClass }).failureClass ?? 'tool-handler-throw';
 }
 
 /**
@@ -288,14 +209,14 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
             },
           }
         : undefined;
-    const ctx = buildWorkerContext(
+    const ctx = buildWorkerContext({
       scope,
-      createRunTimer(),
+      timing: createRunTimer(),
       acc,
       rpcClient,
       maxCapturedOutputBytes,
-      adapterProgress,
-    );
+      ...(adapterProgress === undefined ? {} : { adapterProgress }),
+    });
 
     // Run the handler. A `process.exit` / crash / hang here is contained by the
     // supervisor (premature-exit / timeout → structured parent failure); a throw

@@ -3,7 +3,7 @@ import {
   asArray,
   asObject,
   getString,
-  safeParseJson,
+  parsedObjectDocument,
   withNativeSeverity,
 } from '@opensip-cli/external-tool-adapter';
 
@@ -12,12 +12,6 @@ import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/extern
 
 function stringList(value: unknown): readonly string[] {
   return (asArray(value) ?? []).filter((item): item is string => typeof item === 'string');
-}
-
-function document(raw: ParsedScannerOutput): Record<string, unknown> | undefined {
-  if (raw.json !== undefined) return asObject(raw.json);
-  const parsed = safeParseJson(raw.raw);
-  return parsed.ok ? asObject(parsed.value) : undefined;
 }
 
 function normalize(vuln: Record<string, unknown>, dependency: Record<string, unknown>): Signal {
@@ -47,12 +41,17 @@ function normalize(vuln: Record<string, unknown>, dependency: Record<string, unk
   });
 }
 
+/**
+ * Parse pip-audit's JSON report into findings by walking each dependency's
+ * `vulns[]` and emitting one signal per vulnerability, labelled with the
+ * affected `name@version` and any available fix versions.
+ */
 export function parsePipAuditJson(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,
 ): readonly Signal[] {
   const signals: Signal[] = [];
-  for (const dep of asArray(document(raw)?.dependencies) ?? []) {
+  for (const dep of asArray(parsedObjectDocument(raw)?.dependencies) ?? []) {
     const dependency = asObject(dep);
     if (dependency === undefined) continue;
     for (const vuln of asArray(dependency.vulns) ?? []) {

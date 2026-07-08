@@ -20,6 +20,11 @@ function requirementsFile(projectRoot: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Build the CLI args for a pip-audit run. Audits a discovered requirements file
+ * when one exists, otherwise the active Python environment; writes JSON to the
+ * artifact path with the progress spinner disabled.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   const requirements = requirementsFile(ctx.projectRoot);
   // With a requirements file, audit it. Otherwise audit the ACTIVE Python

@@ -51,6 +51,8 @@ export async function runStepsSerially(args: {
   const summaries: SuiteStepReviewInput[] = [];
   let chain = Promise.resolve();
 
+  // @sequential-ok — suite steps run strictly one at a time (shared project
+  // scope, ordered evidence); this promise chain IS the concurrency-1 bound.
   for (const step of args.suite.steps) {
     chain = chain.then(async () => {
       args.onStepEvent?.({ phase: 'start', index: step.index });

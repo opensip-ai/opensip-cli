@@ -9,6 +9,10 @@ import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
 export const GOVULNCHECK_IDENTITY: ToolIdentity = { name: 'govulncheck' };
 export const GOVULNCHECK_STABLE_ID = '13862491-ff5c-412e-b1fa-5a2856c73a4a';
 
+/**
+ * Build the CLI args for a govulncheck scan: emit JSON (`-json`) across every
+ * package in the current module (`./...`).
+ */
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
   return ['-json', './...'];
 }

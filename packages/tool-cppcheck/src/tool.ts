@@ -16,6 +16,11 @@ function projectInput(projectRoot: string): readonly string[] {
   return [projectRoot];
 }
 
+/**
+ * Build the CLI args for a Cppcheck scan that writes SARIF to the `cppcheck.sarif`
+ * artifact path. Prefers a `compile_commands.json` project when present (accurate
+ * include/define resolution) and otherwise falls back to scanning the project root.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     '--enable=warning,style,performance,portability,information',
@@ -26,6 +31,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   ];
 }
 
+/** Build the `-i <path>` args that exclude a path from a Cppcheck scan. */
 export function buildCppcheckExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {

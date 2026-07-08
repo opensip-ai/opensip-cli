@@ -12,6 +12,7 @@ export const CARGO_DENY_IDENTITY: ToolIdentity = {
 };
 export const CARGO_DENY_STABLE_ID = '93d06787-b067-468b-bba0-1086c876c5f7';
 
+/** Build the CLI args for `cargo-deny check` with JSON (NDJSON) diagnostics. */
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
   return ['check', '--format', 'json'];
 }

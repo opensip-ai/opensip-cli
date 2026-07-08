@@ -91,6 +91,9 @@ export async function executeWorkspaceGraph(
   setProfileStageRecorded(profileRun, durationMs, units.length);
 
   const allSignals: Signal[] = [];
+  // @sequential-ok — a synchronous signal flatten (no await in the loop body);
+  // the heuristic's forward scan bleeds into the later `await writeWorkspaceReport`.
+  // Actual unit parallelism is bounded by `concurrency` in runWorkspaceUnitsInParallel.
   for (const r of result.perUnit) allSignals.push(...r.signals);
   setProfileSummaryFinished(profileRun, {
     cacheHit: false,

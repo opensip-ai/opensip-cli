@@ -68,6 +68,12 @@ export interface ResultSummaryItem {
   readonly detail?: string;
 }
 
+/**
+ * The attention-only projection of a run envelope: the 3-way unit counts
+ * (passed/failed/faulted) plus one {@link ResultSummaryItem} per unit. Both the
+ * static render and the live done-body turn this into the shared
+ * `viewResultSummary` block.
+ */
 export interface EnvelopeResultSummary {
   readonly counts: { readonly passed: number; readonly failed: number; readonly faulted: number };
   readonly items: readonly ResultSummaryItem[];

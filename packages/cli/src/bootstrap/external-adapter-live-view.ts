@@ -74,7 +74,7 @@ function detailFor(event: ExternalAdapterProgressEvent): string | undefined {
   return undefined;
 }
 
-function toProgressEvent(event: ExternalAdapterProgressEvent): ProgressEvent {
+function adapterEventToProgress(event: ExternalAdapterProgressEvent): ProgressEvent {
   const label =
     ADAPTER_PROGRESS_STAGES.find((stage) => stage.id === event.stage)?.label ?? event.stage;
   if (event.status === 'start') {
@@ -194,7 +194,7 @@ export async function runExternalAdapterLiveView(
             ...(args.cliScript === undefined ? {} : { cliScript: args.cliScript }),
             timeoutMs: args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS,
             onAdapterProgress: (event) => {
-              emit(toProgressEvent(event));
+              emit(adapterEventToProgress(event));
             },
           });
         } catch (error) {

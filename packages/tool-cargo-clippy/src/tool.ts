@@ -12,6 +12,11 @@ export const CARGO_CLIPPY_IDENTITY: ToolIdentity = {
 };
 export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
 
+/**
+ * Build the CLI args for `cargo clippy` with JSON diagnostics across all targets
+ * and features. See the build-cache caveat below on why a warm target cache can
+ * silently produce zero diagnostics.
+ */
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
   // NOTE (build cache): `cargo clippy` only emits `compiler-message` records for
   // crates it actually (re)compiles. With a warm target cache a repeat run emits

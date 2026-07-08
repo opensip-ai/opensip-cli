@@ -160,18 +160,30 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
  * back into the TS-internal shape (real ts.Node / ts.SourceFile handles)
  * that the resolvers and the boundary extractor consume.
  */
+/**
+ * The TS walk always populates ownerLine/ownerColumn (the contract types them
+ * optional only so bare-hash polyglot adapters need not supply a position they
+ * don't key on). This round-trip is same-adapter, so they are always present.
+ * Fail loud on the impossible absent case rather than defaulting — a `?? default`
+ * would silently mismatch the stitch key for any owner not at 1:0.
+ *
+ * @throws {Error} If `value` is undefined — an invariant violation (the TS walk
+ *   always sets owner positions on a same-adapter call-site record).
+ */
+function requireOwnerPos(value: number | undefined, field: 'ownerLine' | 'ownerColumn'): number {
+  if (value === undefined) {
+    throw new Error(`graph-typescript: same-adapter call-site record is missing ${field}`);
+  }
+  return value;
+}
+
 function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSiteRecord[] {
   return callSites.map((r) => ({
     node: r.nodeRef as ts.Node,
     sourceFile: r.sourceFileRef as ts.SourceFile,
     ownerHash: r.ownerHash,
-    // The TS walk always populates ownerLine/ownerColumn (the contract types them
-    // optional only so bare-hash polyglot adapters need not supply a position they
-    // don't key on). This round-trip is same-adapter, so they are always present;
-    // the assertion keeps the value EXACT (a `?? default` would silently mismatch
-    // the stitch key for any owner not at 1:0).
-    ownerLine: r.ownerLine!,
-    ownerColumn: r.ownerColumn!,
+    ownerLine: requireOwnerPos(r.ownerLine, 'ownerLine'),
+    ownerColumn: requireOwnerPos(r.ownerColumn, 'ownerColumn'),
     kind: r.kind,
     childHash: r.childHash,
   }));
@@ -230,10 +242,10 @@ async function resolveCallSitesExact(
             node: r.nodeRef as ts.Node,
             sourceFile: r.sourceFileRef as ts.SourceFile,
             ownerHash: r.ownerHash,
-            // Always set by the TS walk (see toTsCallSites) — assert to keep the
+            // Always set by the TS walk (see requireOwnerPos) — keep the
             // module-init occurrence position exact for the ownerEdgeKey stitch.
-            ownerLine: r.ownerLine!,
-            ownerColumn: r.ownerColumn!,
+            ownerLine: requireOwnerPos(r.ownerLine, 'ownerLine'),
+            ownerColumn: requireOwnerPos(r.ownerColumn, 'ownerColumn'),
             specifier: r.specifier,
             line: r.line,
             column: r.column,

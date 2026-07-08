@@ -8,6 +8,10 @@ export const PMD_IDENTITY: ToolIdentity = { name: 'pmd' };
 export const PMD_STABLE_ID = 'e770734d-5708-4f1a-9399-f4ced6424a53';
 const DEFAULT_RULESET = 'rulesets/java/quickstart.xml';
 
+/**
+ * Build the CLI args for a PMD 7 scan: `check` the project root against the
+ * bundled Java quickstart ruleset and write SARIF to the artifact path.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'check',

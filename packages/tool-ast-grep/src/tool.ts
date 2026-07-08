@@ -30,6 +30,12 @@ function requiredConfig(projectRoot: string): string {
   );
 }
 
+/**
+ * Build the CLI args for an ast-grep `scan` that emits SARIF to stdout. Resolves
+ * the required rule config (`sgconfig.yml`/`.ast-grep.yml`, etc.) from the project
+ * root, throwing `ADAPTER.CONFIG.MISSING` when none exists — ast-grep has no
+ * built-in ruleset, so a scan without a config would be a no-op.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'scan',
@@ -41,6 +47,10 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   ];
 }
 
+/**
+ * Parse ast-grep's stdout SARIF into normalized signals, attributing each to the
+ * running tool (`ctx.tool`) as the source.
+ */
 export function parseAstGrepSarif(
   raw: ParsedScannerOutput,
   ctx: AdapterRunContext,
@@ -48,6 +58,7 @@ export function parseAstGrepSarif(
   return parseStdoutSarif(raw.raw, { source: ctx.tool });
 }
 
+/** Build the `--exclude <path>` args that keep ast-grep from scanning a path. */
 export function buildAstGrepExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {

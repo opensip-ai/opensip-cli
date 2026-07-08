@@ -59,6 +59,11 @@ function normalize(message: Record<string, unknown>): Signal | undefined {
   });
 }
 
+/**
+ * Parse cargo clippy's `--message-format=json` NDJSON stream into signals. Keeps
+ * only `compiler-message` records that carry a source span, dropping rustc's
+ * spanless aggregate notes ("N warnings emitted") and non-diagnostic lines.
+ */
 export function parseCargoClippyJsonLines(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,

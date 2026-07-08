@@ -18,7 +18,6 @@ import { renderSuiteLive } from '../suite-live-view.js';
 
 import type { RunSuiteInput } from '../orchestrator.js';
 import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
-import type { RunActionHooks } from '../../../bootstrap/run-plane.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 const ACT_GLOBAL = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
@@ -37,7 +36,14 @@ const CANNED_RESULT: SuiteRunResult = {
 };
 
 function stepSummary(tool: string, durationMs: number): SuiteStepSummary {
-  return { tool, stableId: `${tool}-id`, command: tool, exitCode: 0, durationMs, outcome: 'passed' };
+  return {
+    tool,
+    stableId: `${tool}-id`,
+    command: tool,
+    exitCode: 0,
+    durationMs,
+    outcome: 'passed',
+  };
 }
 
 const { runSuiteMock } = vi.hoisted(() => ({ runSuiteMock: vi.fn() }));
@@ -57,10 +63,10 @@ function minimalInput(): RunSuiteInput {
   // only forwards `name`/`onStepEvent`.
   return {
     name: 'audit',
-    suite: { steps: [] } as unknown as RunSuiteInput['suite'],
+    suite: { steps: [] },
     tools: [],
     ctx: {} as unknown as ToolCliContext,
-    runActionHooks: {} as unknown as RunActionHooks,
+    runActionHooks: {},
     suiteOpts: {},
   };
 }
@@ -85,7 +91,7 @@ describe('renderSuiteLive', () => {
     const original = process.stdout.write.bind(process.stdout);
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk, ...args) => {
       writes.push(String(chunk));
-      return original(chunk, ...args as []);
+      return original(chunk, ...(args as []));
     });
   });
 

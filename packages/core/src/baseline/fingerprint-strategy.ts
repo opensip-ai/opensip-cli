@@ -190,7 +190,12 @@ export function stampFingerprints(
   const seen = new Map<string, number>();
   return signals.map((signal, index) => {
     if (signal.fingerprint) return signal;
-    const base = baseByIndex[index]!;
+    // Pass 1 pushed a base string for every un-stamped signal, and pre-stamped
+    // signals already returned above — so `base` is always defined here. The
+    // explicit narrow (over a `!`) keeps the value exact without bypassing the
+    // null check; the guard branch is unreachable.
+    const base = baseByIndex[index];
+    if (base === undefined) return signal;
     if ((counts.get(base) ?? 0) < 2) return { ...signal, fingerprint: base };
     const ordinal = seen.get(base) ?? 0;
     seen.set(base, ordinal + 1);

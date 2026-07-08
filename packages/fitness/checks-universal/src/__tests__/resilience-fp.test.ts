@@ -171,6 +171,55 @@ describe('unbounded-memory — bounded-read FP regression', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
+  it('does NOT flag a serial for-of await loop marked @sequential-ok', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-batch3-'));
+    const file = writeFixture(
+      cwd,
+      'src/serial.ts',
+      [
+        '// @sequential-ok steps run one at a time by design',
+        'export async function run(steps: readonly Step[]) {',
+        '  for (const step of steps) {',
+        '    await step.execute();',
+        '  }',
+        '}',
+        'interface Step { execute(): Promise<void> }',
+      ].join('\n'),
+    );
+    const result = await findCheck('batch-operation-limits').run(cwd, {
+      targetFiles: [file],
+    });
+    expect(result.signals).toHaveLength(0);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('STILL flags an unbounded query even when @sequential-ok is present', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-batch4-'));
+    const file = writeFixture(
+      cwd,
+      'src/mixed.ts',
+      [
+        '// @sequential-ok the loop below is serial by design',
+        'export async function load(repo: Repo) {',
+        '  const all = await repo.findAll();',
+        '  for (const row of all) {',
+        '    await row.touch();',
+        '  }',
+        '  return all;',
+        '}',
+        'interface Repo { findAll(): Promise<Row[]> }',
+        'interface Row { touch(): Promise<void> }',
+      ].join('\n'),
+    );
+    const result = await findCheck('batch-operation-limits').run(cwd, {
+      targetFiles: [file],
+    });
+    // The @sequential-ok marker silences the loop heuristic but NOT the
+    // unbounded-query detection — findAll() with empty args still fires.
+    expect(result.signals.some((s) => s.message.includes('findAll'))).toBe(true);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
   it('does NOT flag opensip-cli user config reads', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-mem4-'));
     const file = writeFixture(

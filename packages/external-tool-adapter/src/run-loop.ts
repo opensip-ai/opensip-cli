@@ -34,16 +34,21 @@ import {
 
 import { resolveBinary, defaultBinaryEnvVar } from './binary-resolver.js';
 import { DEFAULT_EXIT_MODEL, interpretExit } from './exit-model.js';
-import { asObject, getString, safeParseJson } from './ingest-json.js';
-import { ingestSarif } from './ingest-sarif.js';
+import { asObject, getString } from './ingest-json.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
 import { redactCredentials } from './redact.js';
 import { buildAdapterRunContext } from './run-context.js';
+import {
+  STDERR_TAIL,
+  invalidArtifactFault,
+  parseSignals,
+  readReportArtifact,
+  type ReportRead,
+} from './run-loop-ingest.js';
 import { buildScanCompletion, deliverOptions, emitScanCompletion } from './scan-emit.js';
 
 import type { BinaryResolveDeps } from './binary-resolver.js';
-import type { SarifLog } from './ingest-sarif.js';
 import type { ProbeVersionInput, ProcessResult, RunProcessInput } from './process-exec.js';
 import type {
   ExternalAdapterProgressBridge,
@@ -56,9 +61,8 @@ import type {
   AdapterRunContext,
   BinarySpec,
   ExternalCommandSpec,
-  ParsedScannerOutput,
 } from './types.js';
-import type { FingerprintStrategy, Signal, ToolCliContext } from '@opensip-cli/core';
+import type { FingerprintStrategy, ToolCliContext } from '@opensip-cli/core';
 
 /** Logger `module` field for every event this loop emits. */
 const MODULE = 'external-tool-adapter';
@@ -66,7 +70,6 @@ const MODULE = 'external-tool-adapter';
 /** Default scanner process budget. */
 const DEFAULT_TIMEOUT_MS = 300_000;
 const DEFAULT_MAX_BUFFER = 64 * 1024 * 1024;
-const STDERR_TAIL = 2000;
 
 /** Injectable IO seam (real impls default; tests pass stubs). */
 export interface ScanLoopDeps {
@@ -163,61 +166,6 @@ async function progressStep<T>(
   }
 }
 
-/** Parse native output into signals (SARIF via shared ingest; JSON/stdout via the descriptor). */
-function parseSignals(
-  command: ExternalCommandSpec,
-  raw: string,
-  ctx: AdapterRunContext,
-): readonly Signal[] {
-  if (command.output.kind === 'sarif') {
-    const parsed = safeParseJson(raw);
-    if (!parsed.ok) return [];
-    return ingestSarif(parsed.value as SarifLog, { source: ctx.tool });
-  }
-  if (command.parse === undefined) return [];
-  const json = command.output.kind === 'json' ? safeParseJson(raw) : undefined;
-  const payload: ParsedScannerOutput = {
-    kind: command.output.kind,
-    raw,
-    ...(json?.ok === true ? { json: json.value } : {}),
-  };
-  return command.parse(payload, ctx);
-}
-
-/** Why a file-backed scanner report is unusable (A11). */
-type ArtifactInvalidReason = 'missing' | 'oversize' | 'empty' | 'unparseable';
-
-interface ReportRead {
-  readonly raw: string;
-  readonly artifactValid: boolean;
-  readonly invalidReason?: ArtifactInvalidReason;
-}
-
-/**
- * Read a FILE-backed scanner report and classify its validity (A11). Size-guarded:
- * an over-cap report (OOM guard) is never read into memory. Returns the reason a
- * report is unusable so the caller can fault with a size-distinguished message and
- * never overwrite the on-disk report with an empty/truncated buffer.
- */
-function readReportArtifact(path: string, deps: ScanLoopDeps): ReportRead {
-  let size = -1;
-  try {
-    size = deps.fileSize(path);
-  } catch {
-    return { raw: '', artifactValid: false, invalidReason: 'missing' };
-  }
-  if (size > deps.maxBuffer) return { raw: '', artifactValid: false, invalidReason: 'oversize' };
-  let raw: string;
-  try {
-    raw = deps.readFile(path);
-  } catch {
-    return { raw: '', artifactValid: false, invalidReason: 'missing' };
-  }
-  if (raw.length === 0) return { raw, artifactValid: false, invalidReason: 'empty' };
-  if (!safeParseJson(raw).ok) return { raw, artifactValid: false, invalidReason: 'unparseable' };
-  return { raw, artifactValid: true };
-}
-
 /**
  * A3: append the descriptor's exclusion of opensip's `.runtime` artifact store to
  * the scanner argv. The substrate supplies the path (run-context-driven) while the
@@ -244,35 +192,16 @@ async function applyScanExclusion(
 }
 
 /**
- * A11: raise the typed `ADAPTER.ARTIFACT.INVALID` fault for an unusable file-backed
- * report, distinguishing the oversize-cap case from missing/empty/unparseable.
- */
-function faultInvalidArtifact(
-  tool: string,
-  command: ExternalCommandSpec,
-  read: ReportRead,
-  maxBuffer: number,
-  stderr: string,
-): never {
-  const maxMiB = Math.floor(maxBuffer / (1024 * 1024));
-  const detail =
-    read.invalidReason === 'oversize'
-      ? `report exceeded the ${String(maxMiB)} MiB cap`
-      : `report ${read.invalidReason ?? 'invalid'}`;
-  throw new ToolError(
-    `${tool} produced no usable ${command.output.kind} report (${detail}).`,
-    'ADAPTER.ARTIFACT.INVALID',
-    { stderrTail: redactCredentials(stderr.slice(-STDERR_TAIL)) },
-  );
-}
-
-/**
  * Run one scanner command end-to-end.
  *
  * Returns the {@link ScanCompletion} the host persists/dispatches, or `undefined`
  * when the invocation is a config error (`--gate-save` + `--gate-compare` together)
  * — the loop has already recorded the failure + exit via `cli.reportFailure`, so
  * there is no envelope/session to return.
+ *
+ * @throws {ToolError} On an unrecoverable scan fault — an unresolved binary, a
+ *   nonzero scanner exit under the strict exit model, or an unusable report
+ *   ({@link invalidArtifactFault}: missing / empty / unparseable / oversize).
  */
 export async function runScanLoop(
   input: ScanLoopInput,
@@ -424,7 +353,7 @@ export async function runScanLoop(
       tool,
       reason: `artifact-${read.invalidReason ?? 'invalid'}`,
     });
-    faultInvalidArtifact(tool, command, read, deps.maxBuffer, proc.stderr);
+    throw invalidArtifactFault(tool, command, read, deps.maxBuffer, proc.stderr);
   }
 
   const raw = read.raw;

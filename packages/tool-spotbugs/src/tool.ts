@@ -22,6 +22,11 @@ function classTargets(projectRoot: string): readonly string[] {
     .filter((path) => existsSync(path));
 }
 
+/**
+ * Build the CLI args for a SpotBugs scan over the project's compiled class
+ * directories, writing SARIF at max effort. Throws ConfigurationError when no
+ * build output is found — SpotBugs analyzes bytecode, not source.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   const targets = classTargets(ctx.projectRoot);
   if (targets.length === 0) {

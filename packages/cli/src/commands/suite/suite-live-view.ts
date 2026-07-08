@@ -37,7 +37,13 @@ export interface RenderSuiteLiveArgs {
   readonly glue?: HostGlue;
 }
 
-/** Run a suite through the live shell; returns the completion + the run result. */
+/**
+ * Run a suite through the live shell; returns the completion + the run result.
+ *
+ * @throws {Error} If `produce()` completes without `runSuite` yielding a result
+ *   (an internal invariant violation — `produce` always runs to completion
+ *   before `runToolLiveView` resolves, so `result` is always set on success).
+ */
 export async function renderSuiteLive(
   args: RenderSuiteLiveArgs,
 ): Promise<{ readonly completion: ToolRunCompletion; readonly result: SuiteRunResult }> {

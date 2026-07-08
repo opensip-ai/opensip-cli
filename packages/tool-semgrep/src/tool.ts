@@ -27,6 +27,11 @@ function discoverLocalConfig(projectRoot: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Build the CLI args for a Semgrep scan: use a discovered local rule config (or
+ * `auto`) and write SARIF to the artifact path. Passes `--error` so Semgrep
+ * exits nonzero on findings, keeping the exit-code model and SARIF in agreement.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   const config = discoverLocalConfig(ctx.projectRoot) ?? 'auto';
   return [
@@ -43,6 +48,10 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   ];
 }
 
+/**
+ * Build the exclude-path args for Semgrep by passing the host's exclude path
+ * through Semgrep's `--exclude` flag.
+ */
 export function buildSemgrepExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {

@@ -203,6 +203,9 @@ async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
   const pluginsConfig = scope?.configDocument?.plugins ?? {};
   const log = currentLogger();
 
+  // @sequential-ok — capability loading registers into shared scope with
+  // ordering side effects; bounded by the configured suite steps (a handful) and
+  // deduped, so serial-by-design, not unbounded fanout.
   for (const step of suite.steps) {
     const toolId = step.tool.metadata.id;
     if (loaded.has(toolId)) continue;

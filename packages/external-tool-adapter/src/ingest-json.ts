@@ -6,6 +6,8 @@
  * foreign, possibly-malformed document without throwing. All pure.
  */
 
+import type { ParsedScannerOutput } from './types.js';
+
 /** The result of a defensive JSON parse — never throws. */
 export type JsonParseResult =
   { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string };
@@ -29,6 +31,20 @@ export function asObject(value: unknown): Record<string, unknown> | undefined {
 /** Narrow to an array, else `undefined`. */
 export function asArray(value: unknown): readonly unknown[] | undefined {
   return Array.isArray(value) ? (value as readonly unknown[]) : undefined;
+}
+
+/**
+ * Read a scanner's top-level JSON OBJECT document from its descriptor. The run
+ * loop pre-parses JSON for `kind: 'json'` (use `raw.json`); otherwise fall back
+ * to the raw bytes (the acceptance-harness path) so the parse is total either
+ * way. Returns `undefined` for absent / malformed / non-object output.
+ */
+export function parsedObjectDocument(
+  raw: ParsedScannerOutput,
+): Record<string, unknown> | undefined {
+  if (raw.json !== undefined) return asObject(raw.json);
+  const parsed = safeParseJson(raw.raw);
+  return parsed.ok ? asObject(parsed.value) : undefined;
 }
 
 /** Read a string property, else `undefined`. */

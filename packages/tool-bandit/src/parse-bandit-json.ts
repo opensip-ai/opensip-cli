@@ -57,6 +57,11 @@ function normalize(entry: unknown): Signal | undefined {
   });
 }
 
+/**
+ * Parse Bandit's JSON report into normalized signals — one per entry in the
+ * top-level `results[]` array. Each result maps to a security signal keyed by
+ * `test_id`/`test_name`, carrying its severity, location, confidence, and CWE.
+ */
 export function parseBanditJson(
   raw: ParsedScannerOutput,
   _ctx: AdapterRunContext,

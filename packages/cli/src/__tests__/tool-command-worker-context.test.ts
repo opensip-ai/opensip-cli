@@ -38,7 +38,7 @@ function build(): {
   const acc: ResultAccumulator = {};
   const { client, calls } = makeStubClient();
   const scope = new RunScope({ runId: 'r' });
-  const ctx = buildWorkerContext(scope, createRunTimer(), acc, client);
+  const ctx = buildWorkerContext({ scope, timing: createRunTimer(), acc, rpcClient: client });
   return { ctx, acc, calls };
 }
 
@@ -47,7 +47,13 @@ describe('buildWorkerContext — FRR seams', () => {
     const acc: ResultAccumulator = {};
     const { client } = makeStubClient();
     const scope = new RunScope({ runId: 'r' });
-    const ctx = buildWorkerContext(scope, createRunTimer(), acc, client, 32);
+    const ctx = buildWorkerContext({
+      scope,
+      timing: createRunTimer(),
+      acc,
+      rpcClient: client,
+      maxCapturedOutputBytes: 32,
+    });
     expect(() => {
       void ctx.render({ blob: 'x'.repeat(200) });
     }).toThrow(/exceeds cap/);

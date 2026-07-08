@@ -151,6 +151,10 @@ const KNOWN_SMALL_FILE_PATTERNS = [
 ] as const;
 
 const BOUNDED_SOURCE_READ_PATHS = [
+  // readReportArtifact size-guards via the injected ArtifactIo port (`io.fileSize`
+  // > `io.maxBuffer` → 'oversize' before `io.readFile`), which the string
+  // heuristic can't see through — `io.readFile` is a port method, not an fs call.
+  /[/\\]external-tool-adapter[/\\]src[/\\]run-loop-ingest\.ts$/i,
   /[/\\]cli[/\\]src[/\\]commands[/\\]init[/\\]scaffold-writer\.ts$/i,
   /[/\\]cli[/\\]src[/\\]commands[/\\]plugin[/\\]config-edit\.ts$/i,
   /[/\\]config[/\\]src[/\\]document[/\\]global-config\.ts$/i,

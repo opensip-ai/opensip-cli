@@ -40,7 +40,15 @@ export type {
   SarifRun,
   SarifTool,
 } from './ingest-sarif.js';
-export { asArray, asObject, getNumber, getString, navigate, safeParseJson } from './ingest-json.js';
+export {
+  asArray,
+  asObject,
+  getNumber,
+  getString,
+  navigate,
+  parsedObjectDocument,
+  safeParseJson,
+} from './ingest-json.js';
 export type { JsonParseResult } from './ingest-json.js';
 export { parseJsonLines } from './json-lines.js';
 export type {

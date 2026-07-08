@@ -108,6 +108,18 @@ function hasBoundedKeyword(content: string): boolean {
   return BOUNDED_KEYWORDS.some((keyword) => lowerContent.includes(keyword));
 }
 
+/**
+ * `@sequential-ok` marks intentional sequential (concurrency-1) processing — the
+ * same escape hatch {@link performance-anti-patterns} honors. A `for (const … of
+ * …) { await … }` loop IS already concurrency-1 (it awaits each iteration before
+ * the next), so when the author has affirmed the serial intent this heuristic
+ * must not flag it as "unbounded async fanout". Unbounded-QUERY detection
+ * (`findAll()` etc.) still applies — the marker only silences the loop heuristic.
+ */
+function hasSequentialOkMarker(content: string): boolean {
+  return content.includes('@sequential-ok');
+}
+
 function isBoundedRegistryQuery(content: string, queryIndex: number): boolean {
   const start = Math.max(0, queryIndex - 200);
   const context = content.slice(start, queryIndex).toLowerCase();
@@ -241,6 +253,7 @@ export const batchOperationLimits = defineCheck({
 - Async callbacks in \`.map(\` and \`.forEach(\` without nearby batching keywords
 - \`for (const x of\` loops whose body contains \`await\` without pagination indicators (pure synchronous scans are skipped)
 - Skips files containing bounded keywords: \`batch\`, \`chunk\`, \`page\`, \`limit\`, \`take\`, \`skip\`, \`offset\`, \`slice\`
+- Honors \`@sequential-ok\` (as \`performance-anti-patterns\` does): silences the async-loop heuristic for deliberately serial, concurrency-1 processing; unbounded-query detection still applies
 
 **Why it matters:** Processing unbounded datasets can exhaust memory and starve other operations of resources.
 
@@ -265,7 +278,9 @@ export const batchOperationLimits = defineCheck({
     return [
       ...violations,
       ...queryViolations(content, filePath),
-      ...batchPatternViolations(content, filePath),
+      // `@sequential-ok` silences only the async-loop heuristic (deliberately
+      // serial for-of), not the unbounded-query detection above.
+      ...(hasSequentialOkMarker(content) ? [] : batchPatternViolations(content, filePath)),
     ];
   },
 });

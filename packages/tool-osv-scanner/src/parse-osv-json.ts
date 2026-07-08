@@ -31,21 +31,12 @@ import {
   cvssToSeverity,
   getString,
   parseCvss,
-  safeParseJson,
+  parsedObjectDocument,
   withNativeSeverity,
 } from '@opensip-cli/external-tool-adapter';
 
 import type { Signal, SignalSeverity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
-
-/** Read the parsed OSV document from the descriptor payload, defensively. */
-function osvDocument(raw: ParsedScannerOutput): Record<string, unknown> | undefined {
-  // The run loop pre-parses JSON for `kind: 'json'`; fall back to the raw bytes
-  // (the acceptance-harness path) so the parser is total either way.
-  if (raw.json !== undefined) return asObject(raw.json);
-  const parsed = safeParseJson(raw.raw);
-  return parsed.ok ? asObject(parsed.value) : undefined;
-}
 
 /**
  * Map a GHSA `database_specific.severity` LABEL to a four-bucket severity.
@@ -186,7 +177,7 @@ function normalizePackage(entry: unknown, sourcePath: string): Signal[] {
  * (preferred) or the GHSA label (`MODERATE ⇒ medium`), defaulting to `medium`.
  */
 export function parseOsvJson(raw: ParsedScannerOutput, _ctx: AdapterRunContext): readonly Signal[] {
-  const doc = osvDocument(raw);
+  const doc = parsedObjectDocument(raw);
   const results = asArray(doc?.results) ?? [];
 
   const signals: Signal[] = [];

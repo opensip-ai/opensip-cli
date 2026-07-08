@@ -9,6 +9,10 @@ import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
 export const RUFF_IDENTITY: ToolIdentity = { name: 'ruff' };
 export const RUFF_STABLE_ID = '16419cb0-553b-4bcb-a544-3099c6092480';
 
+/**
+ * Build the CLI args for a Ruff scan: `check` the project root and write JSON
+ * diagnostics to the artifact path.
+ */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'check',
@@ -20,6 +24,10 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   ];
 }
 
+/**
+ * Build the exclude-path args for Ruff by passing the host's exclude path
+ * through Ruff's `--exclude` flag.
+ */
 export function buildRuffExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
