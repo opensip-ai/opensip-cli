@@ -64,6 +64,7 @@ export type FailureClass = 'spawn' | 'exit_nonzero' | 'stdout_parse' | 'timeout'
  * without re-discovering the call site.
  */
 const SHARD_HARD_KILL_TIMEOUT_MS = 10 * 60_000;
+const SHARD_PLAN_CONCURRENCY = 32;
 
 /**
  * Project a (possibly absent) parent {@link RunCorrelation} onto the flat set of
@@ -306,22 +307,20 @@ export async function planShardWork(
   if (!useCache || !repo) return { cached: [], toBuild: [...shards] };
   const cached: ShardBuildResult[] = [];
   const toBuild: Shard[] = [];
-  const cacheInputs = await Promise.all(
-    shards.map(async (shard) => ({
-      shard,
-      cacheKey: stampEngineVersion(
-        await adapter.cacheKey({
-          projectDirAbs: shard.rootDir,
-          configPathAbs: shard.configPathAbs,
-          resolutionMode,
-        }),
-        // Shard fragments only ever feed the sharded engine; stamp the mode so a
-        // fragment row can never be confused with a single-program (exact) build.
-        'sharded',
-      ),
-      fingerprint: computeFilesFingerprint(shard.files),
-    })),
-  );
+  const cacheInputs = await mapWithConcurrency(shards, SHARD_PLAN_CONCURRENCY, async (shard) => ({
+    shard,
+    cacheKey: stampEngineVersion(
+      await adapter.cacheKey({
+        projectDirAbs: shard.rootDir,
+        configPathAbs: shard.configPathAbs,
+        resolutionMode,
+      }),
+      // Shard fragments only ever feed the sharded engine; stamp the mode so a
+      // fragment row can never be confused with a single-program (exact) build.
+      'sharded',
+    ),
+    fingerprint: computeFilesFingerprint(shard.files),
+  }));
   for (const { shard, cacheKey, fingerprint } of cacheInputs) {
     const fragment = repo.loadValidShardFragment(shard.id, cacheKey, fingerprint);
     if (fragment) cached.push(fragment);
@@ -338,6 +337,33 @@ export async function planShardWork(
     rebuild: toBuild.length,
   });
   return { cached, toBuild };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: ({ readonly value: R } | undefined)[] = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex++;
+      if (index >= items.length) return;
+      results[index] = { value: await fn(items[index]) };
+    }
+  });
+
+  await Promise.all(workers);
+  const ordered: R[] = [];
+  for (let index = 0; index < items.length; index++) {
+    const entry = results[index];
+    if (entry === undefined) throw new Error('mapWithConcurrency worker did not fill result slot');
+    ordered.push(entry.value);
+  }
+  return ordered;
 }
 
 interface ShardOutcome {

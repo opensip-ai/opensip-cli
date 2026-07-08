@@ -80,9 +80,16 @@ export interface FileAccessorOptions {
    * not by a required parameter.
    */
   readonly fileCache?: FileCache;
+  /**
+   * Maximum concurrent disk/cache reads for readMany/readAll. Defaults to a
+   * bounded value so repository-wide analyzeAll checks do not fan out one
+   * promise per matched file.
+   */
+  readonly readConcurrency?: number;
 }
 
 const DEFAULT_CACHE_CAPACITY = 100;
+const DEFAULT_READ_CONCURRENCY = 32;
 
 /** FileAccessor implementation with LRU caching and abort signal support. */
 class FileAccessorImpl implements FileAccessor {
@@ -93,6 +100,7 @@ class FileAccessorImpl implements FileAccessor {
   private readonly contentFilterMode?: FileAccessorOptions['contentFilter'];
   /** Per-run scope cache; undefined on the no-scope direct path (→ disk read). */
   private readonly fileCache?: FileCache;
+  private readonly readConcurrency: number;
 
   constructor(filePaths: readonly string[], options: FileAccessorOptions = {}) {
     this.paths = filePaths;
@@ -101,6 +109,7 @@ class FileAccessorImpl implements FileAccessor {
     this.signal = options.signal;
     this.contentFilterMode = options.contentFilter;
     this.fileCache = options.fileCache;
+    this.readConcurrency = normalizeReadConcurrency(options.readConcurrency);
   }
 
   async read(filePath: string): Promise<string> {
@@ -144,15 +153,14 @@ class FileAccessorImpl implements FileAccessor {
 
   async readMany(filePaths: readonly string[]): Promise<Map<string, string>> {
     // in-memory: single-threaded Node.js access pattern
+    const entries = await mapWithConcurrency(filePaths, this.readConcurrency, async (filePath) => {
+      const content = await this.read(filePath);
+      return [filePath, content] as const;
+    });
+
     const results = new Map<string, string>();
-    // @fitness-ignore-next-line no-unbounded-concurrency -- bounded by FileAccessor path set; LRU cache limits memory
-    const entries = await Promise.all(
-      filePaths.map(async (filePath) => {
-        const content = await this.read(filePath);
-        return [filePath, content] as const;
-      }),
-    );
-    for (const [filePath, content] of entries) {
+    for (const entry of entries) {
+      const [filePath, content] = entry;
       results.set(filePath, content);
     }
     return results;
@@ -179,4 +187,37 @@ export function createFileAccessor(
   options: FileAccessorOptions = {},
 ): FileAccessor {
   return new FileAccessorImpl(filePaths, options);
+}
+
+function normalizeReadConcurrency(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_READ_CONCURRENCY;
+  if (!Number.isFinite(value)) return DEFAULT_READ_CONCURRENCY;
+  return Math.max(1, Math.floor(value));
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: ({ readonly value: R } | undefined)[] = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex++;
+      if (index >= items.length) return;
+      results[index] = { value: await fn(items[index], index) };
+    }
+  });
+
+  await Promise.all(workers);
+  const ordered: R[] = [];
+  for (let index = 0; index < items.length; index++) {
+    const entry = results[index];
+    if (entry === undefined) throw new Error('mapWithConcurrency worker did not fill result slot');
+    ordered.push(entry.value);
+  }
+  return ordered;
 }

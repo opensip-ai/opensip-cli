@@ -133,12 +133,13 @@ async function readPackageJsons(files: FileAccessor, rootDir: string): Promise<P
     .filter((filePath) => path.basename(filePath) === 'package.json')
     .sort((a, b) => a.length - b.length);
 
-  // Read all package.json files in parallel, then assemble in path order.
-  const contents = await Promise.all(packagePaths.map((filePath) => files.read(filePath)));
+  const contents = await files.readMany(packagePaths);
 
   const packages: PackageJsonFile[] = [];
-  for (const [i, filePath] of packagePaths.entries()) {
-    const json = parseJson<PackageJson>(contents[i]);
+  for (const filePath of packagePaths) {
+    const content = contents.get(filePath);
+    if (content === undefined) continue;
+    const json = parseJson<PackageJson>(content);
     if (!json) continue;
     packages.push({
       filePath,

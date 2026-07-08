@@ -58,6 +58,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 /** The no-op replay resolver used when no tool registry was supplied. */
 const noReplay = (): undefined => undefined;
+const REVIEW_REPLAY_CONCURRENCY = 8;
 
 /** Construction deps — all captured once (no ambient scope reads). */
 export interface SessionResultsReadPortDeps {
@@ -190,7 +191,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       }
     };
 
-    const steps = await Promise.all(group.sessions.map((session) => replayStep(session)));
+    const steps = await mapWithConcurrency(group.sessions, REVIEW_REPLAY_CONCURRENCY, replayStep);
     const brief = buildPersistedReviewBrief({
       suiteRunId: group.suiteRunId,
       ...(group.suiteName === undefined ? {} : { suiteName: group.suiteName }),
@@ -285,6 +286,33 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     return err(readError('not-found', `session ${ref} was not found`));
   }
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: ({ readonly value: R } | undefined)[] = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex++;
+      if (index >= items.length) return;
+      results[index] = { value: await fn(items[index]) };
+    }
+  });
+
+  await Promise.all(workers);
+  const ordered: R[] = [];
+  for (let index = 0; index < items.length; index++) {
+    const entry = results[index];
+    if (entry === undefined) throw new Error('mapWithConcurrency worker did not fill result slot');
+    ordered.push(entry.value);
+  }
+  return ordered;
 }
 
 /** Map a `sessions list` row to the lean {@link RunSummary} agent shape. */

@@ -67,6 +67,15 @@ describe('createFileAccessor', () => {
     expect(map.get(b)).toBe('B');
   });
 
+  it('readMany propagates read failures under the bounded worker pool', async () => {
+    const a = join(testDir, 'a.ts');
+    const missing = join(testDir, 'missing.ts');
+    writeFileSync(a, 'A');
+    const acc = createFileAccessor([a, missing], { readConcurrency: 1 });
+
+    await expect(acc.readMany([a, missing])).rejects.toThrow();
+  });
+
   it('readAll returns every configured path', async () => {
     const a = join(testDir, 'a.ts');
     writeFileSync(a, 'AA');

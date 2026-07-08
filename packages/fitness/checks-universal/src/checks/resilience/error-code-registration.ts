@@ -39,10 +39,10 @@ export const errorCodeRegistration = defineCheck({
     const registryFilePattern = /(?:error-codes|error-registry|errors)\.ts$/;
 
     const registryPaths = files.paths.filter((fp) => registryFilePattern.test(fp));
-    // @fitness-ignore-next-line no-unbounded-concurrency -- bounded by small number of error registry files (typically 1-3)
-    const registryContents = await Promise.all(registryPaths.map((fp) => files.read(fp)));
+    const registryContents = await files.readMany(registryPaths);
 
-    for (const content of registryContents) {
+    for (const filePath of registryPaths) {
+      const content = registryContents.get(filePath);
       if (!content) continue;
 
       // Match code definitions: 'DOMAIN.CATEGORY.SPECIFIC' in any context
@@ -55,12 +55,11 @@ export const errorCodeRegistration = defineCheck({
 
     // Phase 2: Scan non-registry files for error code usage
     const nonRegistryPaths = files.paths.filter((fp) => !registryFilePattern.test(fp));
-    // @fitness-ignore-next-line no-unbounded-concurrency -- bounded by files matching target; read is lightweight (FileAccessor caches)
-    const nonRegistryContents = await Promise.all(nonRegistryPaths.map((fp) => files.read(fp)));
+    const nonRegistryContents = await files.readMany(nonRegistryPaths);
 
-    for (const [fileIdx, filePath] of nonRegistryPaths.entries()) {
+    for (const filePath of nonRegistryPaths) {
       if (!filePath) continue;
-      const content = nonRegistryContents[fileIdx];
+      const content = nonRegistryContents.get(filePath);
       if (!content) continue;
       const lines = content.split('\n');
 

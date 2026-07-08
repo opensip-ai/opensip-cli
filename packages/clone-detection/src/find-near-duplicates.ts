@@ -91,9 +91,12 @@ function indexLshBuckets(
     const bandHashes = lshBandHashes(occ.bodySignature, bands, rows);
     for (const [band, bandHash] of bandHashes.entries()) {
       const key = `${String(band)}:${bandHash ?? ''}`;
-      const list = buckets.get(key) ?? [];
+      let list = buckets.get(key);
+      if (!list) {
+        list = [];
+        buckets.set(key, list);
+      }
       list.push(i);
-      buckets.set(key, list);
     }
   }
   return buckets;
@@ -163,32 +166,52 @@ function emitComponentClusters(
   components: readonly number[][],
   edges: readonly NearEdge[],
 ): NearDuplicateCluster[] {
-  const edgeByPair = buildEdgeSimilarityIndex(edges);
+  const edgesByComponent = indexEdgesByComponent(components, edges);
   const clusters: NearDuplicateCluster[] = [];
-  for (const component of components) {
-    const cluster = buildComponentCluster(eligible, component, edges, edgeByPair);
+  for (const [index, component] of components.entries()) {
+    const cluster = buildComponentCluster(
+      eligible,
+      component,
+      edgesByComponent.get(index) ?? EMPTY_EDGES,
+    );
     if (cluster) clusters.push(cluster);
   }
   return clusters;
 }
 
-function buildEdgeSimilarityIndex(edges: readonly NearEdge[]): Map<string, number> {
-  const edgeByPair = new Map<string, number>();
-  for (const e of edges) {
-    const key = pairKey(e.a, e.b);
-    const prev = edgeByPair.get(key);
-    if (prev === undefined || e.similarity > prev) edgeByPair.set(key, e.similarity);
+const EMPTY_EDGES: readonly NearEdge[] = [];
+
+function indexEdgesByComponent(
+  components: readonly number[][],
+  edges: readonly NearEdge[],
+): Map<number, NearEdge[]> {
+  const componentByIndex = new Map<number, number>();
+  for (const [componentIndex, component] of components.entries()) {
+    for (const candidateIndex of component) {
+      componentByIndex.set(candidateIndex, componentIndex);
+    }
   }
-  return edgeByPair;
+
+  const edgesByComponent = new Map<number, NearEdge[]>();
+  for (const edge of edges) {
+    const componentIndex = componentByIndex.get(edge.a);
+    if (componentIndex === undefined) continue;
+    let componentEdges = edgesByComponent.get(componentIndex);
+    if (!componentEdges) {
+      componentEdges = [];
+      edgesByComponent.set(componentIndex, componentEdges);
+    }
+    componentEdges.push(edge);
+  }
+  return edgesByComponent;
 }
 
 function buildComponentCluster(
   eligible: readonly CloneCandidate[],
   component: readonly number[],
-  edges: readonly NearEdge[],
-  edgeByPair: ReadonlyMap<string, number>,
+  componentEdges: readonly NearEdge[],
 ): NearDuplicateCluster | undefined {
-  const nearIndices = nearIndicesInComponent(component, edges);
+  const nearIndices = nearIndicesInComponent(componentEdges);
   if (nearIndices.size < 2) return undefined;
   if (component.length > MAX_CLUSTER_SIZE) return undefined;
 
@@ -199,7 +222,7 @@ function buildComponentCluster(
     .filter((n): n is string => n !== undefined)
     .sort();
   const exactMembers = exactMembersInComponent(members);
-  const maxSim = maxSimilarityAmong(nearIndices, edgeByPair);
+  const maxSim = maxSimilarityAmong(componentEdges);
 
   return {
     anchor,
@@ -210,14 +233,9 @@ function buildComponentCluster(
   };
 }
 
-function nearIndicesInComponent(
-  component: readonly number[],
-  edges: readonly NearEdge[],
-): Set<number> {
+function nearIndicesInComponent(edges: readonly NearEdge[]): Set<number> {
   const nearIndices = new Set<number>();
-  const componentSet = new Set(component);
   for (const e of edges) {
-    if (!componentSet.has(e.a) && !componentSet.has(e.b)) continue;
     nearIndices.add(e.a);
     nearIndices.add(e.b);
   }
@@ -233,17 +251,10 @@ function exactMembersInComponent(members: readonly CloneCandidate[]): string[] {
     .sort();
 }
 
-function maxSimilarityAmong(
-  nearIndices: ReadonlySet<number>,
-  edgeByPair: ReadonlyMap<string, number>,
-): number {
+function maxSimilarityAmong(edges: readonly NearEdge[]): number {
   let maxSim = 0;
-  for (const i of nearIndices) {
-    for (const j of nearIndices) {
-      if (i >= j) continue;
-      const sim = edgeByPair.get(pairKey(i, j));
-      if (sim !== undefined && sim > maxSim) maxSim = sim;
-    }
+  for (const edge of edges) {
+    if (edge.similarity > maxSim) maxSim = edge.similarity;
   }
   return maxSim;
 }

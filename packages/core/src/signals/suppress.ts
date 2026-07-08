@@ -79,6 +79,8 @@ export interface SuppressionResult {
   readonly suppressed: readonly SuppressionMatch[];
 }
 
+const SUPPRESSION_SCAN_CONCURRENCY = 32;
+
 // =============================================================================
 // INTERNAL CONSTANTS
 // =============================================================================
@@ -316,32 +318,30 @@ export async function filterSignalsBySuppressions(
     for (const loc of locations) uniqueFiles.add(loc.file);
   }
 
-  // Scan each unique file once, in parallel. A read failure is UNEXPECTED
+  // Scan each unique file once, with bounded parallelism. A read failure is UNEXPECTED
   // (these are project SOURCE files the analyzers already loaded), so it must
   // not silently degrade a file to "no directives" and leak its waivers: an
   // `ENOENT` is non-fatal but attributed (logged + recorded below), any other
   // error propagates and aborts the run.
   const scanByFile = new Map<string, SuppressionScan>();
   const missingFiles = new Set<string>();
-  await Promise.all(
-    [...uniqueFiles].map(async (filePath) => {
-      try {
-        const content = await readFile(filePath);
-        scanByFile.set(filePath, scanSuppressionDirectives(content, keywords));
-      } catch (error) {
-        if (!isEnoent(error)) {
-          // Unexpected read failure (EACCES, EMFILE, decode, …) — fail loud
-          // rather than drop a waiver and leak the waived signal as a finding.
-          throw error;
-        }
-        // ENOENT: the file was genuinely removed. A removed source file yields
-        // no occurrences, so its signals should not exist — but we surface it
-        // (attribution below) instead of silently treating it as "no
-        // directives", so a leaked waiver is always diagnosable.
-        missingFiles.add(filePath);
+  await forEachWithConcurrency([...uniqueFiles], SUPPRESSION_SCAN_CONCURRENCY, async (filePath) => {
+    try {
+      const content = await readFile(filePath);
+      scanByFile.set(filePath, scanSuppressionDirectives(content, keywords));
+    } catch (error) {
+      if (!isEnoent(error)) {
+        // Unexpected read failure (EACCES, EMFILE, decode, …) — fail loud
+        // rather than drop a waiver and leak the waived signal as a finding.
+        throw error;
       }
-    }),
-  );
+      // ENOENT: the file was genuinely removed. A removed source file yields
+      // no occurrences, so its signals should not exist — but we surface it
+      // (attribution below) instead of silently treating it as "no
+      // directives", so a leaked waiver is always diagnosable.
+      missingFiles.add(filePath);
+    }
+  });
 
   attributeMissingFiles(missingFiles, request);
 
@@ -371,6 +371,27 @@ function isEnoent(error: unknown): boolean {
   return (
     typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT'
   );
+}
+
+async function forEachWithConcurrency<T>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex++;
+      if (index >= items.length) return;
+      const item = items[index];
+      if (item === undefined) continue;
+      await fn(item);
+    }
+  });
+
+  await Promise.all(workers);
 }
 
 /**

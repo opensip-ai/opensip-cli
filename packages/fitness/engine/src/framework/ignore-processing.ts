@@ -23,6 +23,8 @@ import type { FileCache } from './file-cache.js';
 import type { CheckResult } from '../types/findings.js';
 import type { Signal } from '@opensip-cli/core';
 
+const DIRECTIVE_COLLECTION_CONCURRENCY = 32;
+
 /**
  * Read file content for directive collection from the per-run scope cache when
  * present (`scope.fitness.fileCache`), else directly from disk. The module
@@ -130,8 +132,10 @@ async function collectFileIgnoreDirectives(
   appliedFileIgnores: Set<string>,
   fc: FileCache | undefined,
 ): Promise<DirectiveEntry[]> {
-  const results = await Promise.all(
-    [...appliedFileIgnores].map(async (filePath): Promise<DirectiveEntry | null> => {
+  const results = await mapWithConcurrency(
+    [...appliedFileIgnores],
+    DIRECTIVE_COLLECTION_CONCURRENCY,
+    async (filePath): Promise<DirectiveEntry | null> => {
       try {
         const content = await readViaCacheOrDisk(fc, filePath);
         const lines = content.split('\n');
@@ -149,7 +153,7 @@ async function collectFileIgnoreDirectives(
         });
       }
       return null;
-    }),
+    },
   );
   return results.filter((d): d is DirectiveEntry => d !== null);
 }
@@ -159,37 +163,37 @@ async function collectLineIgnoreDirectives(
   appliedLineIgnores: Map<string, Set<number>>,
   fc: FileCache | undefined,
 ): Promise<DirectiveEntry[]> {
-  const results = await Promise.all(
-    [...appliedLineIgnores.entries()].map(
-      async ([filePath, suppressedLines]): Promise<DirectiveEntry[]> => {
-        const found: DirectiveEntry[] = [];
-        try {
-          const content = await readViaCacheOrDisk(fc, filePath);
-          const lines = content.split('\n');
-          for (let i = 0; i < lines.length; i++) {
-            const parsed = parseDirectiveLine(lines[i] ?? '');
-            if (parsed?.type !== 'next-line' || parsed.checkId !== checkId) continue;
-            let targetLine = i + 1;
-            while (
-              targetLine < lines.length &&
-              (lines[targetLine] ?? '').trimStart().startsWith('//')
-            ) {
-              targetLine++;
-            }
-            if (suppressedLines.has(targetLine + 1)) {
-              found.push(toDirectiveEntry(filePath, i + 1, parsed));
-            }
+  const results = await mapWithConcurrency(
+    [...appliedLineIgnores.entries()],
+    DIRECTIVE_COLLECTION_CONCURRENCY,
+    async ([filePath, suppressedLines]): Promise<DirectiveEntry[]> => {
+      const found: DirectiveEntry[] = [];
+      try {
+        const content = await readViaCacheOrDisk(fc, filePath);
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const parsed = parseDirectiveLine(lines[i] ?? '');
+          if (parsed?.type !== 'next-line' || parsed.checkId !== checkId) continue;
+          let targetLine = i + 1;
+          while (
+            targetLine < lines.length &&
+            (lines[targetLine] ?? '').trimStart().startsWith('//')
+          ) {
+            targetLine++;
           }
-        } catch (error) {
-          logger.warn('fitness.ignore.directive_read.failed', {
-            evt: 'fitness.ignore.directive_read.failed',
-            module: 'fitness:ignore-processing',
-            err: error,
-          });
+          if (suppressedLines.has(targetLine + 1)) {
+            found.push(toDirectiveEntry(filePath, i + 1, parsed));
+          }
         }
-        return found;
-      },
-    ),
+      } catch (error) {
+        logger.warn('fitness.ignore.directive_read.failed', {
+          evt: 'fitness.ignore.directive_read.failed',
+          module: 'fitness:ignore-processing',
+          err: error,
+        });
+      }
+      return found;
+    },
   );
   const directives: DirectiveEntry[] = [];
   for (const batch of results) {
@@ -211,6 +215,33 @@ async function collectAppliedDirectives(
     collectLineIgnoreDirectives(checkId, appliedLineIgnores, fc),
   ]);
   return [...fileDirectives, ...lineDirectives];
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: ({ readonly value: R } | undefined)[] = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex++;
+      if (index >= items.length) return;
+      results[index] = { value: await fn(items[index]) };
+    }
+  });
+
+  await Promise.all(workers);
+  const ordered: R[] = [];
+  for (let index = 0; index < items.length; index++) {
+    const entry = results[index];
+    if (entry === undefined) throw new Error('mapWithConcurrency worker did not fill result slot');
+    ordered.push(entry.value);
+  }
+  return ordered;
 }
 
 // =============================================================================
