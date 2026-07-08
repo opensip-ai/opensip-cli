@@ -169,18 +169,34 @@ export function resolveChangedSet(
 }
 
 /**
- * Intersect each check's target file list with the changed set; drop empty checks.
+ * Intersect each per-file check's scope-resolved target file list with the changed
+ * set. `fullScopeSlugs` (the `analyzeAll` checks) are exempt — they keep their FULL
+ * file list.
+ *
+ * Two invariants:
+ * 1. A per-file (`analyze`) check with NO changed files keeps an EMPTY entry — it
+ *    is NOT dropped. Dropping it would leave `checkTargetFiles.get(slug)` undefined,
+ *    and the check's `matchFiles()` then falls back to the whole-repo fileCache
+ *    (which honors only `globalExcludes`, not the target-level `*.test.ts` /
+ *    `__tests__` excludes) — so a `--changed` run would silently scan the ENTIRE
+ *    repo, including test files. The empty entry pins the check to "scan nothing".
+ * 2. An `analyzeAll` (cross-file / whole-repo invariant) check keeps its FULL file
+ *    list — narrowing it to the changed subset would make an unchanged target read
+ *    as absent (a false "missing" violation), so its result must not depend on what
+ *    changed. Full scope is target-resolved (globalExcludes + `*.test.ts` excludes
+ *    already applied), so it stays clean and matches the full run.
  */
 export function restrictFileMapToChanged(
   scopeMap: Map<string, readonly string[]>,
   changedAbs: ReadonlySet<string>,
+  fullScopeSlugs: ReadonlySet<string>,
 ): Map<string, readonly string[]> {
   const narrowed = new Map<string, readonly string[]>();
   for (const [slug, files] of scopeMap) {
-    const intersection = files.filter((f) => changedAbs.has(path.resolve(f)));
-    if (intersection.length > 0) {
-      narrowed.set(slug, intersection);
-    }
+    narrowed.set(
+      slug,
+      fullScopeSlugs.has(slug) ? files : files.filter((f) => changedAbs.has(path.resolve(f))),
+    );
   }
   return narrowed;
 }

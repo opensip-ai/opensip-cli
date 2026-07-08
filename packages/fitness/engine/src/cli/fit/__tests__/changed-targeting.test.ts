@@ -89,16 +89,36 @@ function initGitProject(): string {
 }
 
 describe('restrictFileMapToChanged', () => {
-  it('intersects check targets with the changed set and drops empty checks', () => {
+  it('intersects per-file check targets with the changed set, KEEPING empty entries', () => {
     const cwd = '/proj';
     const changed = new Set([path.resolve(cwd, 'src/a.ts')]);
     const scopeMap = new Map<string, readonly string[]>([
       ['check-a', [path.resolve(cwd, 'src/a.ts'), path.resolve(cwd, 'src/b.ts')]],
       ['check-b', [path.resolve(cwd, 'src/c.ts')]],
     ]);
-    const narrowed = restrictFileMapToChanged(scopeMap, changed);
-    expect([...narrowed.keys()]).toEqual(['check-a']);
+    const narrowed = restrictFileMapToChanged(scopeMap, changed, new Set());
+    // check-b has no changed files, but it is NOT dropped — it keeps an EMPTY
+    // entry so it scans nothing (an absent entry would fall back to the whole-repo
+    // fileCache, which lacks the target-level test-file excludes).
+    expect([...narrowed.keys()]).toEqual(['check-a', 'check-b']);
     expect(narrowed.get('check-a')).toEqual([path.resolve(cwd, 'src/a.ts')]);
+    expect(narrowed.get('check-b')).toEqual([]);
+  });
+
+  it('keeps analyzeAll (full-scope) checks at their FULL file list', () => {
+    const cwd = '/proj';
+    const changed = new Set([path.resolve(cwd, 'src/a.ts')]);
+    const full = [path.resolve(cwd, 'src/x.ts'), path.resolve(cwd, 'src/y.ts')];
+    const scopeMap = new Map<string, readonly string[]>([
+      ['per-file', [path.resolve(cwd, 'src/a.ts'), path.resolve(cwd, 'src/b.ts')]],
+      ['whole-repo', full],
+    ]);
+    const narrowed = restrictFileMapToChanged(scopeMap, changed, new Set(['whole-repo']));
+    // A whole-repo invariant check must not be narrowed — none of its files
+    // changed, yet it keeps its full scope (or it would false-flag unchanged
+    // targets as "missing").
+    expect(narrowed.get('whole-repo')).toEqual(full);
+    expect(narrowed.get('per-file')).toEqual([path.resolve(cwd, 'src/a.ts')]);
   });
 });
 
