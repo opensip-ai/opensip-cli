@@ -44,12 +44,20 @@ export interface LiveRunDoneData {
   /** Attention bullets for the compact (non-verbose) surface; absent for a clean run. */
   readonly attention?: LiveRunAttention;
   /**
-   * A fully-formed done-body view (renderer-agnostic). When present it REPLACES
-   * the default summary/table/attention body — used by the suite live view, whose
-   * done frame is its own aggregate (count line + bullets + Review), not a
-   * per-unit table. The run-summary headline is still owned by the caller's body.
+   * One ADDITIVE line rendered directly under the run-summary headline, on every
+   * surface (not verbose-gated). A tool-specific note that rides WITH the standard
+   * §4 summary rather than replacing it — e.g. the suite's one-line review verdict
+   * (`Review: PASS · no risks found`). Keep it to a single line; richer detail
+   * belongs in {@link verboseExtra}.
    */
-  readonly body?: ViewNode;
+  readonly summaryNote?: ViewNode;
+  /**
+   * Additional VERBOSE-only detail rendered above the summary (only when
+   * `--verbose`). Additive — it does not replace any standard section. Used for
+   * tool-specific tables the standard slots don't model, e.g. the suite's per-step
+   * table + review-risk tables.
+   */
+  readonly verboseExtra?: ViewNode;
 }
 
 export type ProgressSubscribe = (cb: ProgressCallback) => void;

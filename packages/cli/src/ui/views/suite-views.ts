@@ -2,6 +2,7 @@ import {
   group,
   line,
   viewResultSummary,
+  viewRunSummary,
   viewTable,
   type ResultSummaryItem,
   type Span,
@@ -238,36 +239,47 @@ function scopeLine(result: SuiteRunResult): ViewNode[] {
   return [line([{ text: 'Scope: ', dim: true }, { text: 'full' }])];
 }
 
-function reviewBriefNodes(brief: ReviewBrief, verbose: boolean): ViewNode[] {
-  const nodes: ViewNode[] = [
-    line([
-      { text: 'Review: ', dim: true },
-      {
-        text: brief.verdict.toUpperCase(),
-        tone: reviewVerdictTone(brief.verdict),
-        bold: true,
-      },
-      {
-        text: `  risks:${brief.topRisks.length}`,
-        dim: brief.topRisks.length === 0,
-      },
-      {
-        text: `  correlated:${brief.correlatedRisks?.length ?? 0}`,
-        dim: (brief.correlatedRisks?.length ?? 0) === 0,
-      },
-      {
-        text: `  degraded:${brief.degraded.length}`,
-        dim: brief.degraded.length === 0,
-      },
-    ]),
-  ];
+/**
+ * The suite's ONE-LINE review verdict, shown directly under the run summary on
+ * every surface (the §4 `summaryNote`): `Review: PASS · no risks found` or
+ * `Review: FAIL · 2 risks · 1 degraded`. Full risk tables are `--verbose` only
+ * (see {@link suiteVerboseDetail}). Returns `undefined` when there is no brief.
+ */
+export function suiteReviewLine(brief: ReviewBrief | undefined): ViewNode | undefined {
+  if (brief === undefined) return undefined;
+  const risks = brief.topRisks.length;
+  const correlated = brief.correlatedRisks?.length ?? 0;
+  const degraded = brief.degraded.length;
+  const detail: string[] = [];
+  if (risks > 0) detail.push(`${risks} risk${risks === 1 ? '' : 's'}`);
+  if (correlated > 0) detail.push(`${correlated} correlated`);
+  if (degraded > 0) detail.push(`${degraded} degraded`);
+  return line([
+    { text: 'Review: ', dim: true },
+    { text: brief.verdict.toUpperCase(), tone: reviewVerdictTone(brief.verdict), bold: true },
+    detail.length === 0
+      ? { text: ' · no risks found', dim: true }
+      : { text: ` · ${detail.join(' · ')}`, dim: true },
+  ]);
+}
 
-  // The one-line `Review:` header (with risks/correlated/degraded COUNTS) always
-  // shows; the detail TABLES are `--verbose` only, so the default suite surface
-  // stays a simple summary. A clean run keeps its positive one-liner.
-  if (brief.topRisks.length === 0) {
-    nodes.push(line([{ text: 'No review risks found.', tone: 'success' }]));
-  } else if (verbose) {
+/**
+ * The suite's `--verbose` detail: scope + run id, the per-step table, and the
+ * review-risk / correlation / degradation tables. Additive detail above the
+ * summary (the §4 `verboseExtra`), NOT part of the default surface.
+ */
+export function suiteVerboseDetail(result: SuiteRunResult): ViewNode {
+  const nodes: ViewNode[] = [
+    ...scopeLine(result),
+    line([{ text: `Run: ${result.suiteRunId}`, dim: true }]),
+    SPACER,
+    viewTable(
+      ['Tool', 'Command', 'Exit', 'Verdict', 'Counts', 'Duration', 'Error'],
+      result.steps.map(stepSummaryRow),
+    ),
+  ];
+  const brief = result.reviewBrief;
+  if (brief !== undefined && brief.topRisks.length > 0) {
     nodes.push(
       SPACER,
       viewTable(
@@ -276,8 +288,7 @@ function reviewBriefNodes(brief: ReviewBrief, verbose: boolean): ViewNode[] {
       ),
     );
   }
-
-  if (verbose && (brief.correlatedRisks?.length ?? 0) > 0) {
+  if (brief !== undefined && (brief.correlatedRisks?.length ?? 0) > 0) {
     nodes.push(
       SPACER,
       viewTable(
@@ -286,59 +297,50 @@ function reviewBriefNodes(brief: ReviewBrief, verbose: boolean): ViewNode[] {
       ),
     );
   }
-
-  if (verbose && brief.degraded.length > 0) {
+  if (brief !== undefined && brief.degraded.length > 0) {
     nodes.push(
       SPACER,
       viewTable(['Source', 'Code', 'Reason'], brief.degraded.slice(0, 5).map(degradedRow)),
     );
   }
-
-  return nodes;
+  return group(nodes);
 }
 
+/**
+ * The suite result as a text view (the non-TTY / pipe render). Mirrors the live
+ * TTY shell's sections in text: a title band (name + step count), the per-step
+ * outcome list, the canonical `PASS (E, W) | Duration` run-summary line, then the
+ * one-line review verdict. Per-step + risk TABLES are `--verbose` only.
+ */
 export function viewSuiteRun(result: SuiteRunResult): ViewNode {
+  const verbose = result.verbose === true;
   const children: ViewNode[] = [
     line([
       { text: 'Suite ', bold: true },
       { text: result.suite, tone: 'brand', bold: true },
-      {
-        text: ` (${result.steps.length} steps, ${Math.round(result.durationMs)}ms)`,
-        dim: true,
-      },
+      { text: `   Steps: ${result.steps.length}`, dim: true },
     ]),
-    line([
-      { text: 'Exit: ', dim: true },
-      {
-        text: String(result.exitCode),
-        tone: result.exitCode === 0 ? 'success' : 'error',
-      },
-      { text: `  Run: ${result.suiteRunId}`, dim: true },
-    ]),
-    ...scopeLine(result),
   ];
 
-  const verbose = result.verbose === true;
-
+  // §3: the per-step outcome list (the pipe equivalent of the TTY checklist).
   if (result.aggregate !== undefined) {
     children.push(resultSummaryNode(result.aggregate, result.steps));
   }
 
-  if (result.reviewBrief !== undefined) {
-    children.push(...reviewBriefNodes(result.reviewBrief, verbose));
-  }
+  // §4: the canonical run-summary headline + the one-line review verdict.
+  children.push(
+    viewRunSummary({
+      passed: result.exitCode === 0,
+      faulted: (result.aggregate?.faulted ?? 0) > 0,
+      errors: result.aggregate?.errors ?? 0,
+      warnings: result.aggregate?.warnings ?? 0,
+      durationMs: result.durationMs,
+    }),
+  );
+  const reviewLine = suiteReviewLine(result.reviewBrief);
+  if (reviewLine !== undefined) children.push(reviewLine);
 
-  // The full per-step table is `--verbose` only — the count line + bullets above
-  // already carry the per-step outcome for the default surface.
-  if (verbose) {
-    children.push(
-      SPACER,
-      viewTable(
-        ['Tool', 'Command', 'Exit', 'Verdict', 'Counts', 'Duration', 'Error'],
-        result.steps.map(stepSummaryRow),
-      ),
-    );
-  }
+  if (verbose) children.push(SPACER, suiteVerboseDetail(result));
 
   return group(children);
 }

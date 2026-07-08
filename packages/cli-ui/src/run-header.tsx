@@ -44,7 +44,7 @@ export function RunHeader({
       {metadata.length > 0 && (
         <Text dimColor>{metadata.map((m) => `${m.label}: ${m.value}`).join('   ')}</Text>
       )}
-      {description !== undefined && (
+      {description !== undefined && description.trim() !== '' && (
         <>
           <Text> </Text>
           <Text dimColor>{description}</Text>

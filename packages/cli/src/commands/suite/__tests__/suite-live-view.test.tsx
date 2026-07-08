@@ -99,7 +99,7 @@ describe('renderSuiteLive', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the step checklist and the aggregate done body, and returns the result', async () => {
+  it('renders the step checklist + standard done sections, and returns the result', async () => {
     const setExitCode = vi.fn();
     const scope = makeScope();
 
@@ -114,13 +114,15 @@ describe('renderSuiteLive', () => {
     );
 
     const out = writes.join('');
-    // The checklist stages come from stepLabels...
+    // The checklist stages (§3) come from stepLabels...
     expect(out).toContain('fitness');
     expect(out).toContain('yagni');
-    // ...and the done body is the compact suite aggregate (viewSuiteRun).
+    // ...the header (§2) carries the title + Steps metadata band...
     expect(out).toContain('Suite');
     expect(out).toContain('audit');
-    expect(out).toContain('Exit:');
+    expect(out).toContain('Steps: 2');
+    // ...and §4 is the canonical run-summary headline (no custom aggregate body).
+    expect(out).toContain('PASS');
 
     // The wiring returns the run result + a completion, and the orchestrator ran once.
     expect(result).toBe(CANNED_RESULT);

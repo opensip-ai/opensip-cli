@@ -11,7 +11,7 @@
 
 import { runToolLiveView } from '@opensip-cli/cli-live';
 
-import { viewSuiteRun } from '../../ui/views/suite-views.js';
+import { suiteReviewLine, suiteVerboseDetail } from '../../ui/views/suite-views.js';
 
 import { runSuite, type RunSuiteInput } from './orchestrator.js';
 
@@ -55,11 +55,16 @@ export async function renderSuiteLive(
 
   const spec: LiveRunSpec = {
     tool: 'suite',
-    meta: { title: `Suite ${args.suiteInput.name}`, description: 'Running suite steps' },
+    // §2 header: title + a stable metadata band (`Steps: N`) — the suite's own
+    // description rides as the header description (blank ones are skipped).
+    meta: {
+      title: `Suite ${args.suiteInput.name}`,
+      description: args.suiteInput.suite.description ?? '',
+    },
+    initialHeaderMetadata: [{ label: 'Steps', value: String(stages.length) }],
     surface: { shape: 'phases', stages },
-    // Keep the completed checklist (✓ per step) visible in the final frame,
-    // above the aggregate — the user sees which steps ran, then the summary.
-    // (Also makes the checklist deterministic in non-TTY captured output.)
+    // §3 body: keep the completed checklist (✓ per step) visible in the final
+    // frame — the suite's per-step outcome IS the body (no duplicate step list).
     progressOnDone: true,
     verbose: args.verbose,
     quiet: args.quiet,
@@ -88,17 +93,23 @@ export async function renderSuiteLive(
           }
         },
       });
+      // The suite renders through the STANDARD done sections (no custom body):
+      // §4 the canonical RunSummary headline, a one-line review verdict under it
+      // (`summaryNote`), and the per-step + risk tables only under `--verbose`
+      // (`verboseExtra`). The per-step outcome list is §3 (the checklist above).
+      const reviewLine = suiteReviewLine(result.reviewBrief);
       return {
         kind: 'done',
-        // `summary` is unused when `body` is present, but the shape is required.
         done: {
           summary: {
             passed: result.exitCode === 0,
+            faulted: (result.aggregate?.faulted ?? 0) > 0,
             errors: result.aggregate?.errors ?? 0,
             warnings: result.aggregate?.warnings ?? 0,
             durationMs: result.durationMs,
           },
-          body: viewSuiteRun(result),
+          ...(reviewLine === undefined ? {} : { summaryNote: reviewLine }),
+          verboseExtra: suiteVerboseDetail(result),
         },
       };
     },

@@ -122,40 +122,42 @@ function liveRunDoneBody(
           <Text dimColor>{data.banner}</Text>
         </Box>
       )}
-      {data.body === undefined ? (
-        <>
-          {!props.quiet &&
-            props.verbose &&
-            data.verboseLines !== undefined &&
-            data.verboseLines.length > 0 && (
-              <Box flexDirection="column" paddingTop={1}>
-                {renderToInk(viewVerboseLines(data.verboseLines))}
-              </Box>
-            )}
-          {!props.quiet &&
-            props.verbose &&
-            data.verboseFindings !== undefined &&
-            data.verboseFindings.length > 0 && (
-              <Box>{renderToInk(viewFindingsGroups(data.verboseFindings))}</Box>
-            )}
-          {tableNode !== null && (
-            <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-              {renderToInk(tableNode)}
-            </Box>
-          )}
-          {attentionNode !== null && (
-            <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-              {renderToInk(attentionNode)}
-            </Box>
-          )}
-          {timedSummary}
-        </>
-      ) : (
-        // Custom done-body (the suite aggregate) REPLACES the default summary/
-        // table/attention body — the caller's view owns the whole frame.
+      {!props.quiet &&
+        props.verbose &&
+        data.verboseLines !== undefined &&
+        data.verboseLines.length > 0 && (
+          <Box flexDirection="column" paddingTop={1}>
+            {renderToInk(viewVerboseLines(data.verboseLines))}
+          </Box>
+        )}
+      {!props.quiet &&
+        props.verbose &&
+        data.verboseFindings !== undefined &&
+        data.verboseFindings.length > 0 && (
+          <Box>{renderToInk(viewFindingsGroups(data.verboseFindings))}</Box>
+        )}
+      {/* Verbose-only tool-specific detail (e.g. the suite's per-step + risk
+          tables) — additive, above the standard summary. */}
+      {!props.quiet && props.verbose && data.verboseExtra !== undefined && (
         <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-          {renderToInk(data.body)}
+          {renderToInk(data.verboseExtra)}
         </Box>
+      )}
+      {tableNode !== null && (
+        <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+          {renderToInk(tableNode)}
+        </Box>
+      )}
+      {attentionNode !== null && (
+        <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+          {renderToInk(attentionNode)}
+        </Box>
+      )}
+      {timedSummary}
+      {/* One additive line under the summary headline, on every surface (e.g.
+          the suite's review verdict). */}
+      {!props.quiet && data.summaryNote !== undefined && (
+        <Box paddingLeft={2}>{renderToInk(data.summaryNote)}</Box>
       )}
       {!props.quiet && data.warnings !== undefined && data.warnings.length > 0 && (
         <Box flexDirection="column" paddingTop={1}>

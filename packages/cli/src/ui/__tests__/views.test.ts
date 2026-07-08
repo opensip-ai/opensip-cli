@@ -665,7 +665,7 @@ describe('suite views', () => {
     });
     expect(run).toContain('Suite security');
     expect(run).toContain('Review: FAIL');
-    expect(run).toContain('correlated:1');
+    expect(run).toContain('1 correlated');
     expect(run).toContain('Related findings for symbol src/a.ts#handler');
     expect(run).toContain('same-symbol');
     expect(run).toContain('fixture-rule');
@@ -751,7 +751,7 @@ describe('suite views', () => {
       },
     });
     expect(pass).toContain('Review: PASS');
-    expect(pass).toContain('No review risks found.');
+    expect(pass).toContain('no risks found');
 
     const warn = text({
       type: 'suite-run',

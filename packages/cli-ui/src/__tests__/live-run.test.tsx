@@ -128,32 +128,36 @@ describe('<LiveRun>', () => {
     expect(out).toContain('threw RangeError');
   });
 
-  it('renders a custom done-body that REPLACES the default summary/attention block', () => {
-    // The suite live view supplies its own aggregate as `data.body`; it must own
-    // the whole done frame, so the default RunSummary/attention block is skipped.
-    const { lastFrame } = mount(
-      <LiveRun
-        meta={{ title: 'Suite audit', description: 'Running suite steps' }}
-        surface={PHASE_SURFACE}
-        state={{
-          phase: 'done',
-          data: {
-            summary: { passed: false, errors: 3, warnings: 0, durationMs: 5 },
-            attention: {
-              counts: { passed: 0, failed: 1, faulted: 0 },
-              items: [{ label: 'DEFAULT_ATTENTION_MARKER', outcome: 'failed', detail: 'x' }],
+  it('renders summaryNote under the summary on every surface, but verboseExtra only under --verbose', () => {
+    // Additive done-body seams (the suite uses these instead of a custom body):
+    // `summaryNote` rides under the RunSummary always; `verboseExtra` is verbose-only.
+    const render = (verbose: boolean) =>
+      mount(
+        <LiveRun
+          meta={{ title: 'Suite audit', description: '' }}
+          surface={PHASE_SURFACE}
+          state={{
+            phase: 'done',
+            data: {
+              summary: { passed: true, errors: 0, warnings: 0, durationMs: 5 },
+              summaryNote: { kind: 'heading', text: 'REVIEW_NOTE' },
+              verboseExtra: { kind: 'heading', text: 'VERBOSE_TABLES' },
             },
-            body: { kind: 'heading', text: 'CUSTOM_SUITE_BODY' },
-          },
-        }}
-        verbose={false}
-        quiet={false}
-      />,
-    );
-    const out = lastFrame() ?? '';
-    expect(out).toContain('CUSTOM_SUITE_BODY');
-    // The default attention block (which would otherwise render) is replaced.
-    expect(out).not.toContain('DEFAULT_ATTENTION_MARKER');
+          }}
+          verbose={verbose}
+          quiet={false}
+        />,
+      ).lastFrame() ?? '';
+
+    const compact = render(false);
+    expect(compact).toContain('PASS'); // the standard §4 summary is still shown
+    expect(compact).toContain('REVIEW_NOTE'); // summaryNote rides on every surface
+    expect(compact).not.toContain('VERBOSE_TABLES'); // verboseExtra is verbose-only
+
+    const verbose = render(true);
+    expect(verbose).toContain('PASS');
+    expect(verbose).toContain('REVIEW_NOTE');
+    expect(verbose).toContain('VERBOSE_TABLES');
   });
 
   it('suppresses attention bullets under --verbose (the full table is shown instead)', () => {

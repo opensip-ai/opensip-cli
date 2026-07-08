@@ -58,7 +58,7 @@ describe('suite view builders', () => {
           ],
         }),
       ),
-    ).toContain('Exit: 0');
+    ).toContain('PASS  (0 Errors, 0 Warnings)');
     expect(
       renderToText(
         viewSuiteRun({
@@ -208,22 +208,26 @@ describe('suite view builders', () => {
     expect(out).toContain('1/2 passed · 1/2 failed · 0/2 faulted');
     expect(out).toContain('✗ fitness  fail  2 errors');
     expect(out).toContain('✓ yagni  pass');
-    // The one-line Review header shows its counts...
+    // The one-line Review verdict shows its risk count in the concise form...
     expect(out).toContain('Review: FAIL');
-    expect(out).toContain('risks:1');
+    expect(out).toContain('1 risk');
+    // ...and the canonical run-summary headline is present.
+    expect(out).toContain('FAIL  (2 Errors, 0 Warnings)');
     // ...but NO detail tables by default (no step table, no risks table).
     expect(out).not.toContain('Verdict');
     expect(out).not.toContain('no-eval');
     expect(out).not.toContain('src/a.ts');
   });
 
-  it('renders suite run scope variants', () => {
+  it('renders suite run scope variants (verbose detail)', () => {
+    // Scope + run id live in the --verbose detail band now, not the default surface.
     const base = {
       type: 'suite-run' as const,
       suite: 'audit',
       suiteRunId: 'run-1',
       exitCode: 0,
       durationMs: 10,
+      verbose: true,
       steps: [],
     };
 
