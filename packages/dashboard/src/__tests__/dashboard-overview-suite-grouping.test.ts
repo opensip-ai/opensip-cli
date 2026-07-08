@@ -2,25 +2,14 @@
 /**
  * @vitest-environment jsdom
  *
- * Overview suite-grouping regressions — the synthetic `.suite-group-header`
- * divider rows the Overview table inserts between suite runs must NOT be treated
- * as sessions.
+ * Overview suite grouping regressions — suite runs render as one expandable
+ * summary row in Recent Activity, with the child tool runs hidden behind the
+ * disclosure arrow.
  *
- *   Fix #6 — pagination over-counted: `paginateTable` counted every
- *   `tbody.children` (dividers included), so the 'Showing X of M' total and the
- *   page window were inflated and < 10 sessions rendered per page. Overview now
- *   uses the header-aware `paginateSectionedRows`, which pages by SESSION-row
- *   count only and repeats a section's divider at the top of a continuation page.
- *
- *   Fix #7 — sorting scrambled the grouping: `collectRowGroups` treated each
- *   single-cell divider as a normal group; `compareGroups` read `children[colIdx]`
- *   (undefined for colIdx >= 1) and sorted them as '', clustering every banner at
- *   one end detached from its sessions. The sort entry point now drops
- *   `.suite-group-header` rows before collecting groups.
- *
- * Both exercise the FULL render path (generateDashboardHtml → boot the emitted
- * <script> in jsdom → renderOverview → paginateSectionedRows / makeSortable), so
- * the overview → paginator/sortable wiring is load-bearing, not mocked.
+ * These tests exercise the FULL render path (generateDashboardHtml → boot the
+ * emitted <script> in jsdom → renderOverview → paginateGroupedRows /
+ * makeSortable), so the overview, paginator, and sortable wiring is
+ * load-bearing, not mocked.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -29,12 +18,10 @@ import { generateDashboardHtml } from '../generator.js';
 
 import type { StoredSession } from '@opensip-cli/contracts';
 
-/** A suite-member fitness session (carries suiteRunId/suiteName → a divider row). */
-function suiteSession(
+function makeSession(
   id: string,
-  suiteRunId: string,
-  suiteName: string,
   startedAt: string,
+  overrides: Partial<StoredSession> = {},
 ): StoredSession {
   return {
     id,
@@ -42,8 +29,6 @@ function suiteSession(
     startedAt,
     completedAt: startedAt,
     cwd: '/home/dev/project',
-    suiteRunId,
-    suiteName,
     score: 100,
     passed: true,
     runOutcome: 'passed',
@@ -53,17 +38,83 @@ function suiteSession(
       summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
       checks: [],
     },
+    ...overrides,
   };
 }
 
-/** Two contiguous suite runs of `n` sessions each → 2 dividers + 2n session rows. */
-function twoSuites(n: number): StoredSession[] {
+function suiteSession(
+  id: string,
+  suiteRunId: string,
+  suiteName: string,
+  startedAt: string,
+  overrides: Partial<StoredSession> = {},
+): StoredSession {
+  return makeSession(id, startedAt, {
+    suiteRunId,
+    suiteName,
+    ...overrides,
+  });
+}
+
+function auditSuite(): StoredSession[] {
+  return [
+    suiteSession('yagni-1', 'suite-audit-1', 'audit', '2026-07-07T19:56:46.000Z', {
+      tool: 'yagni',
+      score: 100,
+      durationMs: 4000,
+      payload: {
+        __version: 1,
+        summary: { total: 2, passed: 2, failed: 0, errors: 0, warnings: 0 },
+        checks: [],
+      },
+    }),
+    suiteSession('yagni-2', 'suite-audit-1', 'audit', '2026-07-07T19:56:46.000Z', {
+      tool: 'yagni',
+      score: 100,
+      durationMs: 4000,
+      payload: {
+        __version: 1,
+        summary: { total: 2, passed: 2, failed: 0, errors: 0, warnings: 0 },
+        checks: [],
+      },
+    }),
+    suiteSession('fit-1', 'suite-audit-1', 'audit', '2026-07-07T19:56:23.000Z', {
+      tool: 'fit',
+      recipe: 'agent-risk',
+      score: 97,
+      passed: false,
+      runOutcome: 'failed',
+      durationMs: 21_200,
+      payload: {
+        __version: 1,
+        summary: { total: 127, passed: 123, failed: 4, errors: 53, warnings: 0 },
+        checks: [],
+      },
+    }),
+  ];
+}
+
+function manySuites(n: number): StoredSession[] {
   const out: StoredSession[] = [];
   for (let i = 0; i < n; i++) {
-    out.push(suiteSession('a' + i, 'suiteA', 'Audit', '2026-06-15T10:0' + i + ':00.000Z'));
-  }
-  for (let i = 0; i < n; i++) {
-    out.push(suiteSession('b' + i, 'suiteB', 'Verify', '2026-06-15T11:0' + i + ':00.000Z'));
+    const minute = String(i).padStart(2, '0');
+    out.push(
+      suiteSession(
+        'suite-' + i + '-fit',
+        'suite-' + i,
+        'audit-' + i,
+        '2026-07-07T19:' + minute + ':10.000Z',
+      ),
+      suiteSession(
+        'suite-' + i + '-graph',
+        'suite-' + i,
+        'audit-' + i,
+        '2026-07-07T19:' + minute + ':00.000Z',
+        {
+          tool: 'graph',
+        },
+      ),
+    );
   }
   return out;
 }
@@ -71,8 +122,7 @@ function twoSuites(n: number): StoredSession[] {
 /**
  * Render the full report HTML into the jsdom document and evaluate its inlined
  * <script> bodies in one sandbox — the same boot the external-tab / end-to-end
- * validation tests use, so assertions run through the real render block
- * (`renderOverview(); …`) and the load-time sortable activation.
+ * validation tests use.
  */
 function bootReport(sessions: StoredSession[]): void {
   const html = generateDashboardHtml({ sessions });
@@ -102,13 +152,34 @@ function overviewTbody(): HTMLElement {
   return document.querySelector<HTMLElement>('#panel-overview tbody')!;
 }
 
-/** Session (clickable) rows only — excludes the `.suite-group-header` dividers. */
-function sessionRows(): HTMLElement[] {
-  return [...overviewTbody().querySelectorAll<HTMLElement>('tr.clickable')];
+function overviewHeaders(): string[] {
+  return [...document.querySelectorAll<HTMLElement>('#panel-overview thead th')].map(
+    (h) => h.textContent ?? '',
+  );
 }
 
-function dividerRows(): HTMLElement[] {
-  return [...overviewTbody().querySelectorAll<HTMLElement>('tr.suite-group-header')];
+function topLevelRows(): HTMLElement[] {
+  return [...overviewTbody().children] as HTMLElement[];
+}
+
+function suiteRows(): HTMLElement[] {
+  return topLevelRows().filter((r) => r.classList.contains('overview-suite-summary-row'));
+}
+
+function expanderRows(): HTMLElement[] {
+  return topLevelRows().filter((r) => r.classList.contains('overview-suite-expander-row'));
+}
+
+function childRows(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('#panel-overview .overview-suite-child-row')];
+}
+
+function standaloneRows(): HTMLElement[] {
+  return topLevelRows().filter((r) => r.classList.contains('overview-session-row'));
+}
+
+function cells(row: HTMLElement): HTMLElement[] {
+  return [...row.children] as HTMLElement[];
 }
 
 function visible(rows: HTMLElement[]): HTMLElement[] {
@@ -132,59 +203,98 @@ beforeEach(() => {
   document.documentElement.innerHTML = '';
 });
 
-describe('Overview pagination excludes suite-group-header rows (Fix #6)', () => {
-  it('counts SESSION rows only in the page window and the "Showing X of M" total', () => {
-    // 16 sessions across 2 suites → 18 DOM rows (16 clickable + 2 dividers).
-    bootReport(twoSuites(8));
+describe('Overview suite rows', () => {
+  it('renders one aggregate suite row and expands to show the child tool runs', () => {
+    bootReport(auditSuite());
 
-    expect(dividerRows()).toHaveLength(2);
-    expect(sessionRows()).toHaveLength(16);
+    expect(suiteRows()).toHaveLength(1);
+    expect(expanderRows()).toHaveLength(1);
+    expect(childRows()).toHaveLength(3);
 
-    // The total reflects sessions (16), NOT the 18 tbody children — page 1 shows
-    // a full 10 sessions, not 10 mixed rows (which would strand 2 sessions).
-    expect(paginationInfoText()).toBe('Showing 1-10 of 16');
-    expect(visible(sessionRows())).toHaveLength(10);
+    const row = suiteRows()[0];
+    const rowCells = cells(row);
+    expect(overviewHeaders()).toEqual([
+      '',
+      'Timestamp',
+      'Run',
+      'Recipe',
+      'Pass Rate',
+      'Status',
+      'Checks',
+      'Findings',
+      'Duration',
+    ]);
+    expect(rowCells).toHaveLength(9);
+    expect(rowCells[2].querySelector('.badge')?.textContent).toBe('SUITE');
+    expect(rowCells[3].textContent).toBe('audit');
+    expect(row.textContent).toContain('97%');
+    expect(row.textContent).toContain('FAIL');
+    expect(row.textContent).toContain('127/131');
+    expect(row.textContent).toContain('53');
+    expect(row.textContent).toContain('29.2s');
+
+    const expander = expanderRows()[0];
+    expect(expander.classList.contains('open')).toBe(false);
+    expect(row.querySelector('.overview-suite-arrow')?.textContent).toBe('▶');
+
+    row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(expander.classList.contains('open')).toBe(true);
+    expect(expander.style.display).toBe('table-row');
+    expect(row.querySelector('.overview-suite-arrow')?.textContent).toBe('▼');
+    expect(
+      childRows()
+        .map((r) => r.textContent ?? '')
+        .join('\n'),
+    ).toContain('agent-risk');
   });
 
-  it('repeats the continuation section divider and drops the finished one on the next page', () => {
-    bootReport(twoSuites(8));
+  it('groups suite children by run id even when another run is interleaved', () => {
+    bootReport([
+      suiteSession('suite-a-fit', 'suite-audit-1', 'audit', '2026-07-07T19:56:46.000Z'),
+      makeSession('standalone-graph', '2026-07-07T19:56:40.000Z', { tool: 'graph' }),
+      suiteSession('suite-a-yagni', 'suite-audit-1', 'audit', '2026-07-07T19:56:23.000Z', {
+        tool: 'yagni',
+      }),
+    ]);
 
-    // Page 1: both dividers visible (suite A fully, suite B starting).
-    const [dividerA, dividerB] = dividerRows();
-    expect(dividerA.style.display).not.toBe('none');
-    expect(dividerB.style.display).not.toBe('none');
+    expect(suiteRows()).toHaveLength(1);
+    expect(expanderRows()).toHaveLength(1);
+    expect(childRows()).toHaveLength(2);
+    expect(standaloneRows()).toHaveLength(1);
+    expect(topLevelRows()).toHaveLength(3);
+    expect(
+      suiteRows()[0].nextElementSibling?.classList.contains('overview-suite-expander-row'),
+    ).toBe(true);
+    expect(cells(suiteRows()[0])[2].getAttribute('title')).toBe('2 runs');
+  });
+
+  it('paginates by suite or standalone run rows, not by hidden child runs', () => {
+    bootReport(manySuites(12));
+
+    expect(suiteRows()).toHaveLength(12);
+    expect(childRows()).toHaveLength(24);
+    expect(paginationInfoText()).toBe('Showing 1-10 of 12 runs');
+    expect(visible(suiteRows())).toHaveLength(10);
 
     clickPaginationButton('Next →');
 
-    // Page 2: 6 remaining suite-B sessions; the total still counts sessions only.
-    expect(paginationInfoText()).toBe('Showing 11-16 of 16');
-    expect(visible(sessionRows())).toHaveLength(6);
-    // Suite A's divider is gone (no visible A sessions); suite B's divider is
-    // REPEATED at the top of the continuation page.
-    expect(dividerA.style.display).toBe('none');
-    expect(dividerB.style.display).not.toBe('none');
+    expect(paginationInfoText()).toBe('Showing 11-12 of 12 runs');
+    expect(visible(suiteRows())).toHaveLength(2);
   });
-});
 
-describe('Overview sort drops suite-group-header banners (Fix #7)', () => {
-  it('removes the divider rows on sort so banners never detach from their sessions', async () => {
-    bootReport(twoSuites(8));
-    await flushTimers(); // let the load-time sortable activation wire the <th> clicks
+  it('keeps each suite expander attached to its summary row after sorting', async () => {
+    bootReport([...auditSuite(), ...manySuites(2)]);
+    await flushTimers();
 
-    expect(dividerRows()).toHaveLength(2);
-
-    // Sort by the "Pass Rate" column (a non-first column dividers cannot supply).
     const th = [...document.querySelectorAll<HTMLElement>('#panel-overview thead th')].find(
       (h) => h.textContent === 'Pass Rate',
     )!;
     th.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    // Banners are gone entirely (honest behaviour: grouping is meaningless under
-    // an arbitrary column sort; the per-row Suite column still carries membership).
-    expect(dividerRows()).toHaveLength(0);
-    // All 16 sessions survive the sort — none dropped, none stranded.
-    expect(sessionRows()).toHaveLength(16);
-    // No `.suite-group-header` left anywhere in the tbody to detach.
-    expect(overviewTbody().querySelector('.suite-group-header')).toBeNull();
+    expect(document.querySelector('.suite-group-header')).toBeNull();
+    for (const row of suiteRows()) {
+      expect(row.nextElementSibling?.classList.contains('overview-suite-expander-row')).toBe(true);
+    }
   });
 });

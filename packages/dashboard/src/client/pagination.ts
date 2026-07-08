@@ -157,89 +157,6 @@ export function paginateTable(
   renderPage(0);
 }
 
-/** A data row paired with the section header (if any) that precedes it. */
-interface SectionedRow {
-  row: HTMLElement;
-  header: HTMLElement | null;
-}
-
-/**
- * Paginate a tbody whose rows interleave LEADING section-header rows (matched by
- * `headerSelector`, e.g. the Overview table's `.suite-group-header` suite
- * dividers) with data rows. Unlike {@link paginateTable}, the page window is
- * measured in DATA rows only — header rows never count toward the page size, the
- * 'Showing X of M' total, or the page window (which is what {@link paginateTable}
- * over-counts when synthetic dividers share the tbody).
- *
- * A header is shown on a page iff at least one of the data rows it precedes (up
- * to the next header) is visible on that page. Because a header sits in the DOM
- * above all its data rows and `display:none` rows collapse, showing it renders
- * the divider directly above the first visible row of its section — so a section
- * spanning a page boundary keeps its header repeated at the top of the
- * continuation page for free (the single header element renders above whichever
- * portion of its section is visible).
- *
- * Dedicated variant (not a `paginateTable` param) so the ~6 other
- * `paginateTable` callers stay untouched. Header attribution runs
- * header-until-next-header, matching the Overview render order where each suite
- * divider precedes its own contiguous run of sessions.
- */
-export function paginateSectionedRows(
-  tbody: HTMLElement,
-  paginationContainer: HTMLElement,
-  pageSize: number,
-  headerSelector: string,
-): void {
-  const headerRows: HTMLElement[] = [];
-  const dataRows: SectionedRow[] = [];
-  let currentHeader: HTMLElement | null = null;
-  for (const child of [...tbody.children] as HTMLElement[]) {
-    if (child.matches(headerSelector)) {
-      currentHeader = child;
-      headerRows.push(child);
-    } else {
-      dataRows.push({ row: child, header: currentHeader });
-    }
-  }
-
-  const total = dataRows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  // `renderPage` takes the page as a parameter (no mutable closure re-entered by
-  // a per-button click), and the delegated listener (wired once below) calls it.
-  function renderPage(currentPage: number): void {
-    const start = currentPage * pageSize;
-    const end = start + pageSize;
-    const visibleHeaders = new Set<HTMLElement>();
-    dataRows.forEach((entry, i) => {
-      const visible = i >= start && i < end;
-      entry.row.style.display = visible ? '' : 'none';
-      if (visible && entry.header) visibleHeaders.add(entry.header);
-    });
-    for (const header of headerRows) {
-      header.style.display = visibleHeaders.has(header) ? '' : 'none';
-    }
-
-    while (paginationContainer.firstChild) paginationContainer.firstChild.remove();
-    if (total <= pageSize) return;
-
-    const info = el('div', {
-      class: 'pagination-info',
-      text: 'Showing ' + (start + 1) + '-' + Math.min(end, total) + ' of ' + total,
-    });
-    paginationContainer.append(info);
-
-    const btns = el('div', { class: 'pagination-btns' });
-    renderPageButtons(btns, currentPage, totalPages);
-    paginationContainer.append(btns);
-  }
-
-  // ONE delegated listener handles every page click for the lifetime of this
-  // container — set up before the first render, never re-attached on re-render.
-  wirePagination(paginationContainer, renderPage);
-  renderPage(0);
-}
-
 export function paginateGroupedRows(
   tbody: HTMLElement,
   paginationContainer: HTMLElement,
@@ -258,6 +175,7 @@ export function paginateGroupedRows(
   }
 
   const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+  const itemLabel = paginationContainer.dataset.pageItemLabel ?? 'checks';
 
   // `renderPage` takes the page as a parameter (no mutable closure re-entered by
   // a per-button click), and the delegated listener (wired once below) calls it.
@@ -269,7 +187,7 @@ export function paginateGroupedRows(
       group.forEach((row) => {
         if (row.classList.contains('expander-row')) {
           row.dataset.paged = visible ? 'yes' : 'no';
-          if (!visible) row.style.display = 'none';
+          row.style.display = visible && row.classList.contains('open') ? 'table-row' : 'none';
         } else {
           row.style.display = visible ? '' : 'none';
         }
@@ -288,7 +206,8 @@ export function paginateGroupedRows(
         Math.min(end, groups.length) +
         ' of ' +
         groups.length +
-        ' checks',
+        ' ' +
+        itemLabel,
     });
     paginationContainer.append(info);
 
