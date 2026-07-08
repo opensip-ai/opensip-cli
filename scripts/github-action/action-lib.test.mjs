@@ -16,6 +16,7 @@ import {
   parseCommandOutcome,
   renderAnnotations,
   renderComment,
+  renderGithubOutputs,
   renderSarif,
   tokenizeCommand,
 } from './action-lib.mjs';
@@ -299,6 +300,18 @@ describe('renderers', () => {
     assert.equal(sarif.version, '2.1.0');
     assert.equal(sarif.runs[0].tool.driver.name, 'opensip-cli github action');
     assert.equal(sarif.runs[0].results[0].ruleId, 'fit.no-console-log');
+  });
+
+  it('renders GitHub outputs without allowing newline injection', () => {
+    assert.equal(renderGithubOutputs({ verdict: 'pass', issues: '0' }), 'verdict=pass\nissues=0\n');
+
+    const output = renderGithubOutputs({
+      brief: 'safe\ninjected=true\nopensip_brief_0',
+    });
+    assert.equal(
+      output,
+      'brief<<opensip_brief_1\nsafe\ninjected=true\nopensip_brief_0\nopensip_brief_1\n',
+    );
   });
 });
 

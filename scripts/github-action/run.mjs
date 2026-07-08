@@ -22,6 +22,7 @@ import {
   parseCommandOutcome,
   renderAnnotations,
   renderComment,
+  renderGithubOutputs,
   renderSarif,
   renderStepSummary,
 } from './action-lib.mjs';
@@ -153,11 +154,7 @@ function writeDebugFile(directory, name, value) {
 function writeOutputs(outputs) {
   const outputPath = process.env.GITHUB_OUTPUT;
   if (outputPath === undefined || outputPath === '') return;
-  const lines = [];
-  for (const [key, value] of Object.entries(outputs)) {
-    lines.push(`${key}=${value}`);
-  }
-  appendFileSync(outputPath, `${lines.join('\n')}\n`, 'utf8');
+  appendFileSync(outputPath, renderGithubOutputs(outputs), 'utf8');
 }
 
 function writeStepSummary(markdown) {

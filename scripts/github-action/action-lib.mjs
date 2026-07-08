@@ -548,6 +548,32 @@ export function outputsForSummary(summary, paths) {
   };
 }
 
+export function renderGithubOutputs(outputs) {
+  const lines = [];
+  for (const [key, rawValue] of Object.entries(outputs)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_-]*$/u.test(key)) {
+      throw new Error(`Invalid GitHub output name: ${key}`);
+    }
+    const value = String(rawValue ?? '');
+    if (!/[\r\n]/u.test(value)) {
+      lines.push(`${key}=${value}`);
+      continue;
+    }
+
+    const normalized = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    const outputLines = normalized.split('\n');
+    const safeKey = key.replaceAll(/\W/gu, '_');
+    let suffix = 0;
+    let delimiter = `opensip_${safeKey}_${String(suffix)}`;
+    while (outputLines.includes(delimiter)) {
+      suffix += 1;
+      delimiter = `opensip_${safeKey}_${String(suffix)}`;
+    }
+    lines.push(`${key}<<${delimiter}\n${normalized}\n${delimiter}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 export function escapeAnnotationProperty(value) {
   return value
     .replaceAll('%', '%25')
