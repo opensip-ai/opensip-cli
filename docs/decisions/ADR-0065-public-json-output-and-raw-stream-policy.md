@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0024, ADR-0011]
 tags: [cli, output, contracts]
 enforcement: mechanizable
+enforced-by: ['shipped:command-handler-host-owned-output', 'local:raw-stream-output-guarded', 'local:one-outcome-shape']
 enforcement-reason: >
   opensip-cli/fit/checks/one-outcome-shape.mjs,
   opensip-cli/fit/checks/raw-stream-output-guarded.mjs, and

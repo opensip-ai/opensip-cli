@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0012, ADR-0021, ADR-0022]   # output currency; versioning; flag currency; tool-scoped recipes
 tags: [config, packaging, plugin-parity, contracts]
 enforcement: mechanizable
+enforced-by: ['local:no-config-loader-outside-config', 'local:cross-tool-flag-parity', 'local:one-config-document']
 enforcement-reason: >
   The `one-config-document` fitness check (planned, 2.10.0) fails CI if a config
   block is parsed outside the composed schema; a `no-config-loader-outside-config`

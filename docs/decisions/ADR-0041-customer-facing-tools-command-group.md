@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0027, ADR-0042, ADR-0043]
 tags: [cli, plugins, tools, ux]
 enforcement: mechanizable
+enforced-by: ['local:command-surface-parity']
 enforcement-reason: >
   The command-surface-parity snapshot test pins the group's shape (subcommands
   only; no flag aliases; no `tool` singular group). The one-validator invariant

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0020, ADR-0036, ADR-0065, ADR-0075, ADR-0094]
 tags: [gates, json, provenance, sessions, agents]
 enforcement: mechanizable
+enforced-by: ['local:declared-inputs-host-stamped-only']
 enforcement-reason: >
   Declared-input stamping is host-owned in the envelope delivery/output seams,
   and tests assert the manifest is additive, deterministic, and limited to an

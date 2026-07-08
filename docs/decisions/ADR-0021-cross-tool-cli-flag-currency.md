@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0016]
 tags: [cli, ux, fitness, graph, simulation, architecture]
 enforcement: mechanizable
+enforced-by: ['local:cross-tool-flag-parity']
 enforcement-reason: >
   A new fitness check (`cross-tool-flag-parity`, checks-universal) asserts that
   every registered run command declares the mandatory common flags with the

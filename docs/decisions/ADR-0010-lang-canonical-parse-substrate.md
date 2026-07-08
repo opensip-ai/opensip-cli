@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0009, DEC-521]   # DEC-521 (parent): opensip-cli = open deterministic signal foundry
 tags: [architecture, languages, parsing, tree-sitter, polyglot, fitness, graph]
 enforcement: mechanizable
+enforced-by: ['depcruise:tree-sitter-parser-only-in-lang-packs']
 enforcement-reason: >
   A dependency-cruiser rule restricts construction of a tree-sitter Parser (and
   import of the `web-tree-sitter` / grammar packages) to the `lang-*` packages;

@@ -15,7 +15,10 @@ supersedes: []
 superseded_by: null
 related: [ADR-0011, ADR-0093, ADR-0110, ADR-0111, ADR-0112]
 tags: [github-actions, ci, suite, review-brief]
-fitness-check: "No check warranted — the invariant is action metadata and script behavior outside packages/; script tests assert the root action has no Cloud inputs and the nested Cloud action keeps its upload inputs, while existing lint/dependency-cruiser rules still guard package layering."
+enforcement: mechanizable
+enforced-by: ['script:action-lib.test']
+enforcement-reason: >
+  No check warranted — the invariant is action metadata and script behavior outside packages/; script tests assert the root action has no Cloud inputs and the nested Cloud action keeps its upload inputs, while existing lint/dependency-cruiser rules still guard package layering.
 ```
 
 **Decision:** The repository root action `opensip-ai/opensip-cli@v1` is the OSS

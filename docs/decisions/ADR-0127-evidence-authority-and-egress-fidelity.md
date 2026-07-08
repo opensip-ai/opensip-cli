@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0008, ADR-0011, ADR-0036, ADR-0094, ADR-0097, ADR-0119, ADR-0126, DEC-587, DEC-520]
 tags: [egress, sarif, evidence, cloud, contracts]
 enforcement: mechanizable
+enforced-by: ['local:no-lossy-evidence-egress']
 enforcement-reason: >
   The local invariant is guarded by opensip-cli/fit/checks/no-lossy-evidence-egress.mjs:
   shared SARIF output must preserve OpenSIP fingerprints/properties, and native

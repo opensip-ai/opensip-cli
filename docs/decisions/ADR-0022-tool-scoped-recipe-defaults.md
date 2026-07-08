@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0021]
 tags: [cli, config, recipes, fit, graph, sim]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   The composed strict config schema rejects `cli.recipe` as an unknown
   `cli:` key, and the shared `resolveToolRecipeName` helper only accepts an

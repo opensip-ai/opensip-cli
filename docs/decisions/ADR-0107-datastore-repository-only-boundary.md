@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0105, ADR-0056, ADR-0042, ADR-0096]
 tags: [datastore, persistence, dip]
 enforcement: mechanizable
+enforced-by: ['local:restrict-raw-db-access']
 enforcement-reason: >
   Fitness restrict-raw-db-access check; depcruise rule on Drizzle query shapes;
   public barrel must not export DrizzleDataStore.

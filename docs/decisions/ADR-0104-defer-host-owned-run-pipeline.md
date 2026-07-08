@@ -16,6 +16,7 @@ superseded_by: ADR-0117
 related: [ADR-0051, ADR-0060, ADR-0065, ADR-0093]
 tags: [cli, tools, run-pipeline, diagnostics, gates]
 enforcement: mechanizable
+enforced-by: ['local:deferred-run-pipeline-boundary']
 enforcement-reason: >
   Superseded by ADR-0117. The project-local fitness check
   deferred-run-pipeline-boundary now permits the promoted contracts helpers only

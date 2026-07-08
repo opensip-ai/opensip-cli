@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0012, ADR-0027, ADR-0038]
 tags: [tool-contract, versioning, plugins, compatibility, architecture]
 enforcement: mechanizable
+enforced-by: ['local:tool-contract-version-policy']
 enforcement-reason: >
   A dedicated fitness check (`tool-contract-version-policy` in
   checks-universal/architecture) plus the requirement that changes to

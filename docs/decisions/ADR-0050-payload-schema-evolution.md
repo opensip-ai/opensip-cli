@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0025, ADR-0042, ADR-0075]
 tags: [persistence, contracts, sessions, tool-state, extensibility]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   Fitness architecture check (or engine-local test guard in Phase 8) plus
   explicit requirement in Phase 9/10 verifications that `pnpm fit:ci` /

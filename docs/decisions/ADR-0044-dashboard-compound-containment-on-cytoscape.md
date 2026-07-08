@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0006]
 tags: [dashboard, graph, visualization, vendoring, guardrails]
 enforcement: mechanizable
+enforced-by: ['depcruise:dashboard-no-ui-framework']
 enforcement-reason: >
   Every clause has a gate: the widened `dashboard-no-ui-framework` depcruise
   rule (`.config/dependency-cruiser.cjs`) blocks src/ imports of cytoscape AND

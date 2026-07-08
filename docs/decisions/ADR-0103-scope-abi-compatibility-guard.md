@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0060]
 tags: [core, plugins, discovery, capability, run-scope]
 enforcement: mechanizable
+enforced-by: ['script:scope-abi.test.ts']
 enforcement-reason: >
   The identity policy lives in packages/core/src/plugins/single-core-guard.ts
   and is covered by single-core-guard.test.ts + scope-abi.test.ts (the

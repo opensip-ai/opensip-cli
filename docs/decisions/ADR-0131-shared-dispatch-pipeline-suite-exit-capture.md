@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0093, ADR-0100, ADR-0020, ADR-0035, ADR-0066]
 tags: [cli, suites, dispatch, exit-codes, output]
 enforcement: mechanizable
+enforced-by: ['shipped:exit-code-correctness']
 enforcement-reason: >
   The existing exit-code-correctness check is re-armed over the suite step runner.
   Suite taxonomy parity is pinned by packages/cli/src/commands/suite/__tests__/orchestrator.test.ts,

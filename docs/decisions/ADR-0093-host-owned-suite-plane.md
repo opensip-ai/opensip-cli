@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0023, ADR-0036, ADR-0048, ADR-0054, ADR-0051, ADR-0100]
 tags: [cli, host-planes, composition, sessions, config]
 enforcement: mechanizable
+enforced-by: ['local:architecture-session-timing-not-host-owned', 'shipped:single-opts-assembly-seam']
 enforcement-reason: >
   The single-opts-assembly-seam fitness check forbids a second CommandSpec→opts
   projection; architecture-session-timing-not-host-owned keeps suite grouping keys

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0060, ADR-0066, ADR-0077]
 tags: [tools, errors, cli, contracts]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   Template coherence tests typecheck the generated ts-local handler path, and
   report-failure unit tests cover ToolError, Error, and arbitrary thrown values.

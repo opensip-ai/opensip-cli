@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0093, ADR-0011, ADR-0035]
 tags: [cli, suites, output, agents, security]
 enforcement: mechanizable
+enforced-by: ['local:only-documented-toolcli-seams', 'shipped:single-opts-assembly-seam']
 enforcement-reason: >
   Unit tests cover the mixed-step suite matrix, external-dispatch replay,
   aggregate derivation, additive output shape, and counts-only secret hygiene.

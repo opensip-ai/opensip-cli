@@ -15,7 +15,8 @@ supersedes: []
 superseded_by: null
 related: [ADR-0007, ADR-0027, ADR-0037, ADR-0040, ADR-0052, ADR-0054]
 tags: [core, layering, plugins, architecture]
-enforcement: convention-plus-layering-rules
+enforcement: mechanizable
+enforced-by: ['depcruise:no-cross-package-internal']
 enforcement-reason: >
   dependency-cruiser and ESLint keep the package-level direction acyclic. The
   sub-boundaries inside @opensip-cli/core are documented ownership rules rather

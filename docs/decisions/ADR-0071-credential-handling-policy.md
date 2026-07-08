@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0008, ADR-0023]
 tags: [security, config, credentials]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   cliConfigSchema rejects project cli.apiKey; whole-document and loadCliDefaults
   tests enforce the decision.

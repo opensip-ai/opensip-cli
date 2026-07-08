@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0006, ADR-0051, ADR-0080, ADR-0094]
 tags: [datastore, sessions, retention, sqlite, host-boundary]
 enforcement: mechanizable
+enforced-by: ['local:architecture-session-timing-not-host-owned']
 enforcement-reason: >
   The project-local fitness guard no-tool-owned-session-timing rejects first-party
   tool references to host-owned session retention and SQLite reclaim primitives.

@@ -24,6 +24,7 @@ superseded_by: ADR-0032
 related: [ADR-0014, ADR-0028]   # @graph-ignore suppression primitive; off-main-thread live-view worker
 tags: [graph, cli, cache, suppression, determinism]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   Suppression-parity is held at COMPILE TIME: `finalizeGraphSignals` is the only
   producer of the branded `FinalizedSignals` type, and `persistSession` (the shared

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0036, ADR-0050, ADR-0060]
 tags: [state, concurrency, baseline, observability]
 enforcement: mechanizable
+enforced-by: ['local:baseline-identity-metadata', 'local:state-locking-policy']
 enforcement-reason: >
   baseline-identity-metadata.mjs, state-locking-policy.mjs, baseline-repo tests, file-lock tests.
 ```

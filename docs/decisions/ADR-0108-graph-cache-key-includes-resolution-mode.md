@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0105, ADR-0031, ADR-0032, ADR-0010]
 tags: [graph, cache, determinism]
 enforcement: mechanizable
+enforced-by: ['script:cache-key.test.ts']
 enforcement-reason: >
   New unit test on makeConfigCacheKey asserting same config path + different
   resolutionMode yields different keys; cache-key tests in graph-adapter-common

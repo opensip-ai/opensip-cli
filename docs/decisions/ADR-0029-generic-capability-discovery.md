@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0027]
 tags: [capability, plugins, discovery, tool-plugin-parity, scope-isolation]
 enforcement: mechanizable
+enforced-by: ['local:capability-by-manifest', 'local:no-module-singleton']
 enforcement-reason: >
   The `capability-by-manifest` fit check forbids the host from compiling in
   domain-specific dispatch; `no-module-singleton` (tightened) forbids the

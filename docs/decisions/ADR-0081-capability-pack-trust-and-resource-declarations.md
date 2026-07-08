@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0061, ADR-0068, ADR-0074]
 tags: [plugins, trust, capabilities, supply-chain]
 enforcement: mechanizable
+enforced-by: ['script:capability-manifest-loader.test']
 enforcement-reason: >
   Manifest-loader tests validate the `requires` field, capability-discovery
   tests prove denied packages are not imported, and CLI load tests cover the

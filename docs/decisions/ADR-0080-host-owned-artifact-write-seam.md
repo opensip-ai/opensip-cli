@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0036, ADR-0054, ADR-0075]
 tags: [tools, persistence, artifacts, cli]
 enforcement: mechanizable
+enforced-by: ['local:no-raw-fs-artifact-write-in-tool-engine']
 enforcement-reason: >
   Fitness check `no-raw-fs-artifact-write-in-tool-engine` forbids durable raw fs
   writes from first-party tool engine paths and allows the host-owned

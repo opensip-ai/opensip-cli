@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0027, ADR-0051, ADR-0054]
 tags: [tools, lifecycle, sessions, reports]
 enforcement: mechanizable
+enforced-by: ['script:tool-lifecycle-hooks.test']
 enforcement-reason: >
   Worker-entry and lifecycle tests prove report/session hook paths do not assume
   command initialization ran, and source JSDoc/doc pages state the contract.

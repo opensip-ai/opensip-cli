@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0023, ADR-0031, ADR-0033]
 tags: [graph, sharding, partitioning, determinism, performance, prototype]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   Three mechanical gates. (1) Determinism is pinned by the prototype's own test
   suite (`orchestrate/__tests__/community-partition.test.ts`: byte-identity

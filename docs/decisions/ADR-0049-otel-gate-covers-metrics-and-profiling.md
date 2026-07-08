@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0004]
 tags: [observability, telemetry, layering, packaging]
 enforcement: mechanizable
+enforced-by: ['depcruise:otel-sdk-only-in-cli']
 enforcement-reason: >
   dependency-cruiser confirms new metrics/profiling SDK packages are imported
   only in the CLI composition root (never core or tool packages). The no-op

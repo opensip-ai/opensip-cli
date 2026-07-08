@@ -15,7 +15,10 @@ supersedes: []
 superseded_by: null
 related: [ADR-0023, ADR-0037, ADR-0052, ADR-0093, ADR-0111]
 tags: [bootstrap, config, onboarding, suite]
-fitness-check: "No check warranted yet — command allowlisting, config synthesis, runtime placement, init migration, and uninstall cleanup are covered by focused unit/e2e tests; the existing architecture checks already guard ToolCliContext and persistence boundaries."
+enforcement: mechanizable
+enforced-by: ['script:no-init-ephemeral.test']
+enforcement-reason: >
+  No check warranted yet — command allowlisting, config synthesis, runtime placement, init migration, and uninstall cleanup are covered by focused unit/e2e tests; the existing architecture checks already guard ToolCliContext and persistence boundaries.
 ```
 
 **Decision:** `fit`, `graph`, `graph impact`, and `suite run audit` may run in a

@@ -8,6 +8,8 @@ related:
   - ADR-0116
   - ADR-0123
   - ADR-0124
+enforcement: mechanizable
+enforced-by: ['script:repair-apply-verify.test']
 ---
 
 # ADR-0125: Deterministic Repair Apply-Verify Loop

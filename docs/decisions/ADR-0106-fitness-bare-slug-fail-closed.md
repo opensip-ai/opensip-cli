@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0105, ADR-0039, ADR-0020]
 tags: [fitness, recipes, determinism]
 enforcement: mechanizable
+enforced-by: ['script:registry-ambiguity.test.ts']
 enforcement-reason: >
   Integration test fixture with two packs registering the same bare slug;
   fitness check can grep built-in-recipes for unnamespaced explicit selectors.

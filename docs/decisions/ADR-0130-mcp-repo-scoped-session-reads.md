@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0084, ADR-0042]
 tags: [mcp, sessions, evidence, scoping]
 enforcement: mechanizable
+enforced-by: ['script:session-cwd-scope-tests']
 enforcement-reason: >
   Runtime scoping is locked by the predicate matrix in
   packages/session-store/src/__tests__/session-cwd-scope.test.ts and by the MCP

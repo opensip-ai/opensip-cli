@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0012, ADR-0021, ADR-0023]   # signal output currency; versioning; flag currency; config package
 tags: [output, observability, plugin-parity, contracts, cli]
 enforcement: mechanizable
+enforced-by: ['local:no-local-exit-or-stdout', 'local:one-outcome-shape', 'local:env-via-registry']
 enforcement-reason: >
   Three fitness checks (release 2.12.0) fail CI on bypass: `one-outcome-shape`
   (no bare {error}/raw-JSON machine output outside the renderer),

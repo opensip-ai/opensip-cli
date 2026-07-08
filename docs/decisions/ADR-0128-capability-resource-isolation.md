@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0054, ADR-0061, ADR-0074, ADR-0081, ADR-0126]
 tags: [plugins, capability-packs, isolation, trust-policy]
 enforcement: mechanizable
+enforced-by: ['local:no-host-external-capability-pack-execution']
 enforcement-reason: >
   opensip-cli/fit/checks/no-host-external-capability-pack-execution.mjs guards
   the CLI/core bypass points: capability loads must wire the isolated

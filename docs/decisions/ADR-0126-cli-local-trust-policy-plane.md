@@ -1,3 +1,9 @@
+---
+status: active
+enforcement: mechanizable
+enforced-by: ['depcruise:core-imports-nothing-workspace']
+---
+
 # ADR-0126: CLI-Local Trust Policy Plane
 
 ## Status

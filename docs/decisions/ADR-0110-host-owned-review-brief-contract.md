@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0093, ADR-0100]
 tags: [suite, agents, output, contracts]
 enforcement: mechanizable
+enforced-by: ['depcruise:fitness-no-cli']
 enforcement-reason: >
   Dependency-cruiser keeps tool packages from importing the CLI composition
   root. Existing output-seam checks keep suite output on CommandResult /

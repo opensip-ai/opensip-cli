@@ -27,6 +27,7 @@ superseded_by: ADR-0064
 related: [ADR-0036, ADR-0062]
 tags: [yagni, graph, fitness, tools, architecture]
 enforcement: mechanizable
+enforced-by: ['script:duplicate-parity-test']
 enforcement-reason: >
   Structural half is enforceable: `duplicate-body-candidate` is deleted (no file),
   a dependency-cruiser rule forbids yagni from owning detection that duplicates a

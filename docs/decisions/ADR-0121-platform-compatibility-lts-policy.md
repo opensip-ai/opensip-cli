@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0012, ADR-0024, ADR-0065, ADR-0074, ADR-0119]
 tags: [compatibility, contracts, config, json, ci]
 enforcement: partially-mechanized
+enforced-by: ['script:compat:matrix:check']
 enforcement-reason: >
   The compatibility registry is source-level code, public fixtures are checked by
   `pnpm compat:matrix:check`, `config migrate --check` covers committed project

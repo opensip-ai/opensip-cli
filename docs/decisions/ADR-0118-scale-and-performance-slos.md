@@ -16,6 +16,7 @@ superseded_by: null
 related: []
 tags: [ci, performance, graph, fitness]
 enforcement: mechanizable
+enforced-by: ['script:bench:slo:ci']
 enforcement-reason: >
   `pnpm bench:slo:ci` enforces configured budgets in CI, and
   `pnpm docs:performance-slos:check` keeps the public SLO documentation derived

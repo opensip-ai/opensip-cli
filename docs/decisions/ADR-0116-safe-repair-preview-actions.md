@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0086, ADR-0084, ADR-0095]
 tags: [signals, agents, repairs, sessions, cli]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   Repair actions live on the core SignalRepair type and round-trip through
   session replay tests; command-surface parity pins the host-owned repair group;

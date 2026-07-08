@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0005]       # symmetric tool architecture (same marker substrate)
 tags: [plugins, discovery, packaging]
 enforcement: mechanizable
+enforced-by: ['script:plugin-kind-contract.test.ts']
 enforcement-reason: >
   packages/cli/src/__tests__/plugin-kind-contract.test.ts walks every
   workspace package.json and asserts the marker contract in both directions

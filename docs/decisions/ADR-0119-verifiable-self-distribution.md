@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0017, ADR-0068, ADR-0094]
 tags: [release, supply-chain, provenance]
 enforcement: mechanizable
+enforced-by: ['script:supply-chain:verify']
 enforcement-reason: >
   scripts/verify-supply-chain.mjs enforces release.yml permissions, pinned
   actions/attest usage, generation and verification of release artifacts, and

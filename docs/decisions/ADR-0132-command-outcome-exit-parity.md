@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0024, ADR-0065, ADR-0011, ADR-0035, ADR-0020, ADR-0117]
 tags: [json, output, exit-codes, cli]
 enforcement: mechanizable
+enforced-by: ['script:command-outcome-exit-parity.test']
 enforcement-reason: >
   The runtime contract is pinned by
   packages/cli/src/__tests__/command-outcome-exit-parity.test.ts across fit,

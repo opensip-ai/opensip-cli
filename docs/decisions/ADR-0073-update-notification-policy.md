@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0070]
 tags: [cli, privacy, updates]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   update-notifier and host-env-specs tests cover opt-outs and sticky state shape.
 ```

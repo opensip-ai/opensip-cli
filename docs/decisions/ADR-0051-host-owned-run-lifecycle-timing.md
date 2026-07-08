@@ -26,6 +26,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0036, ADR-0042, ADR-0048]
 tags: [sessions, timing, persistence, hygiene, architecture, contracts]
 enforcement: mechanizable
+enforced-by: ['local:architecture-session-timing-not-host-owned', 'local:only-documented-toolcli-seams']
 enforcement-reason: >
   The project-local fitness check `architecture-session-timing-not-host-owned`
   (path-gated to the first-party tool packages) forbids tool code from

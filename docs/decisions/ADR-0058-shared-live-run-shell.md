@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0016, ADR-0051]
 tags: [cli, cli-ui, live-view, ink]
 enforcement: mechanizable
+enforced-by: ['shipped:live-view-through-cli-live']
 enforcement-reason: >
   The `live-view-through-cli-live` fitness check forbids direct `ink` render
   imports in first-party tool engines; dependency-cruiser pins cli-live's layer.

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0003, ADR-0010, ADR-0014, ADR-0015, ADR-0031]
 tags: [graph, resolution, determinism, cache, ci]
 enforcement: mechanizable
+enforced-by: ['script:graph:equivalence:ci']
 enforcement-reason: >
   The resolution model is held by THREE layers. (1) The DIRECTIONAL real-repo
   guardrail `graph-equivalence-check` (CI, every PR): builds this repo through

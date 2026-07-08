@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0009, ADR-0028, ADR-0036, ADR-0041]
 tags: [datastore, plugins, tools, parity]
 enforcement: mechanizable
+enforced-by: ['local:restrict-raw-db-access']
 enforcement-reason: >
   Tier A is enforced by static checks in `tools validate`/`tools install`
   (DDL strings, datastore-file paths, private schema/migration imports —

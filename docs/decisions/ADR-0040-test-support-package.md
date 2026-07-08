@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0009, ADR-0013]
 tags: [testing, packaging, layering, public-api]
 enforcement: mechanizable
+enforced-by: ['depcruise:no-prod-import-of-test-support']
 enforcement-reason: >
   dependency-cruiser rule `no-prod-import-of-test-support`
   (.config/dependency-cruiser.cjs) forbids any non-test module outside

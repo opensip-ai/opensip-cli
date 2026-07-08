@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0012]       # versioning-and-release-policy (immutable npm versions)
 tags: [packaging, ci, release]
 enforcement: mechanizable
+enforced-by: ['script:release.yml-gate-steps']
 enforcement-reason: >
   Enforced by the gate steps in `.github/workflows/release.yml` — `pnpm lint`,
   `pnpm test:coverage`, `pnpm fit:ci`, and `pnpm graph:ci` now run BEFORE the

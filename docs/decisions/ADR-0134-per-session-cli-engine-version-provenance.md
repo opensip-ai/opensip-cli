@@ -12,6 +12,8 @@ title: Stamp opensip-cli + engine version on every session row
 date: 2026-07-06
 status: active
 related: [ADR-0060]
+enforcement: mechanizable
+enforced-by: ['script:verify-drizzle-migrations']
 ```
 
 **Decision:** The host stamps two provenance columns on every persisted

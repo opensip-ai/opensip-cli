@@ -16,6 +16,7 @@ superseded_by: null
 related: []               # supersedes the backlog `engine-otel-opt-in` design (a plan, not an ADR)
 tags: [observability, telemetry, layering, packaging]
 enforcement: mechanizable
+enforced-by: ['depcruise:otel-sdk-only-in-cli']
 enforcement-reason: >
   dependency-cruiser (run by `pnpm lint`) confirms no `@opentelemetry/sdk-*`
   import leaks into `core` or any tool package — adding the SDK to the kernel

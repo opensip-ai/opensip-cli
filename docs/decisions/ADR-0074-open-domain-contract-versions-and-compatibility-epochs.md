@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0046, ADR-0047, ADR-0061, ADR-0027]
 tags: [tool-contract, versioning, plugins, compatibility, capability, architecture]
 enforcement: mechanizable
+enforced-by: ['local:no-first-party-contract-version-fields']
 enforcement-reason: >
   opensip-cli/fit/checks/no-first-party-contract-version-fields.mjs enforces the
   open runtime contractVersions map; opensip-cli/fit/checks/adr-plugin-contracts.mjs

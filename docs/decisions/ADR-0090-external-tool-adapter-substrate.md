@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0084, ADR-0041, ADR-0054, ADR-0048, ADR-0061]
 tags: [tools, adapters, scanners, packaging, isolation]
 enforcement: mechanizable
+enforced-by: ['local:adapter-must-use-substrate']
 enforcement-reason: >
   The substrate-is-layer-3 and adapter-is-layer-4 boundaries are dependency-cruiser
   rules (the substrate rule modeled on `output-imports-core-contracts-only`; the

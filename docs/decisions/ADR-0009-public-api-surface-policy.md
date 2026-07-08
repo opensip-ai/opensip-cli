@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0007]       # marker-canonical discovery (same "explicit, enforced contract" posture)
 tags: [architecture, modular-monolith, api-surface, persistence]
 enforcement: mechanizable
+enforced-by: ['depcruise:no-cross-package-internal']
 enforcement-reason: >
   dependency-cruiser forbids cross-package imports of any path segment named
   `internal/` (and of `*/schema/*` outside the owning package); the package

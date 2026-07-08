@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0048, ADR-0054]
 tags: [tools, cli, plugins, identity]
 enforcement: mechanizable
+enforced-by: ['shipped:tool-identity-single-source']
 enforcement-reason: >
   The `tool-identity-single-source` fitness check verifies first-party tool
   declarations, while the static manifest loader, runtime tool validator, and

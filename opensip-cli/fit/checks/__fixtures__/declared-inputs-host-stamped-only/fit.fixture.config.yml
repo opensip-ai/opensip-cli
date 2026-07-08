@@ -1,0 +1,27 @@
+# Fixture-only fit config for the declared-inputs-host-stamped-only dogfood check.
+#
+# The repo-level config excludes `**/__fixtures__/**`, so this deliberately
+# re-includes only this check's synthetic pass/fail tree.
+#
+# Run from the repo root:
+#   node packages/cli/dist/index.js fit \
+#     --check declared-inputs-host-stamped-only \
+#     --config opensip-cli/fit/checks/__fixtures__/declared-inputs-host-stamped-only/fit.fixture.config.yml
+#
+# Expected: exactly ONE finding, on the violation tool-engine file.
+
+globalExcludes: []
+
+targets:
+  fixtures:
+    description: declared-inputs-host-stamped-only fixtures
+    languages: [typescript]
+    concerns: [backend, server]
+    include:
+      - 'opensip-cli/fit/checks/__fixtures__/declared-inputs-host-stamped-only/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+
+checkOverrides:
+  declared-inputs-host-stamped-only: [fixtures]

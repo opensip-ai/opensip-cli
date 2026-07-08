@@ -15,11 +15,33 @@ supersedes: []            # [ADR-NNNN, ...]
 superseded_by: null       # ADR-NNNN
 related: []               # [ADR-NNNN, ...] or parent-repo [DEC-NNN]
 tags: []                  # e.g. [graph, rules, packaging]
-enforcement: not-mechanizable   # mechanizable | not-mechanizable
+enforcement: not-mechanizable   # mechanizable | not-mechanizable  (ADR-0137)
+# If mechanizable, list the live enforcer(s) — origin-tagged — or NONE-YET for a
+# tracked gap. Omit `enforced-by` when not-mechanizable; give a reason instead.
+enforced-by: []                 # e.g. [local:my-dogfood-check, shipped:no-eval,
+                                #       depcruise:no-core-to-cli, script:foo.test,
+                                #       graph:cycle, eslint:no-restricted-imports,
+                                #       type-structural]  |  NONE-YET
 enforcement-reason: >
-  If mechanizable, name the fitness check / graph rule / dep-cruiser rule that
-  enforces it. If not, say why (judgment call, framework choice, etc.).
+  If not-mechanizable, say why (judgment/policy/posture — no static invariant).
+  If mechanizable, optionally add detail beyond `enforced-by`.
 ```
+
+<!--
+Enforcement convention (ADR-0137), verified by scripts/verify-adr-enforcement.mjs
+in `pnpm lint`:
+- enforcement: mechanizable    ⇒ `enforced-by:` REQUIRED. Origin-tag each enforcer:
+    local:<slug>   — project-local dogfood check (opensip-cli/fit/checks/*.mjs)
+    shipped:<slug> — fitness check in packages/fitness/checks-* (the product)
+    depcruise:<r> | graph:<r> | eslint:<r> | script:<name> | type-structural
+    NONE-YET       — mechanizable but no check exists yet (a tracked gap)
+  A local:/shipped: slug must exist AND its origin tag must match where it lives.
+  opensip-cli-internal architecture checks belong in opensip-cli/fit/checks
+  (local), NOT the shipped product packs.
+- enforcement: not-mechanizable ⇒ `enforcement-reason:` REQUIRED (why it's a
+  judgment/policy call with no static invariant); no `enforced-by`.
+-->
+
 
 **Decision:** One or two sentences stating exactly what was decided. Present
 tense, imperative. This is the load-bearing line.

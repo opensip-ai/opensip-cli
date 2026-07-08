@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0053, ADR-0060, ADR-0076]
 tags: [tools, logging, errors, cli]
 enforcement: mechanizable
+enforced-by: ['local:tool-engine-no-direct-stderr-command-errors']
 enforcement-reason: >
   Fitness check `tool-engine-no-direct-stderr-command-errors` ratchets first-party
   tool engine CLI handlers away from direct command-error stderr writes.

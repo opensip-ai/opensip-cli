@@ -16,6 +16,7 @@ superseded_by: null
 related: []
 tags: [agents, fitness, graph, contracts, layering]
 enforcement: mechanizable
+enforced-by: ['local:single-changed-file-resolver', 'local:single-agent-filter-engine']
 enforcement-reason: >
   `single-changed-file-resolver` and `single-agent-filter-engine` enforce one
   implementation for changed-file derivation and agent filtering; the fitness→graph

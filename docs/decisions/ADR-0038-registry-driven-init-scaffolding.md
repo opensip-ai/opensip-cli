@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0009, ADR-0023, ADR-0027]
 tags: [cli, init, scaffolding, parity]
 enforcement: mechanizable
+enforced-by: ['script:test:init-registry-driven']
 enforcement-reason: >
   Three guards: (1) `init` output for a fit+sim project is byte-identical to today
   (golden-file test — the relocation is behavior-preserving); (2) a fixture tool

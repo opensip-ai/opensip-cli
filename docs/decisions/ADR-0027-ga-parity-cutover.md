@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0012, ADR-0021, ADR-0023, ADR-0024, ADR-0026]   # output currency; versioning + 3.0.0 reservation; flag currency; config package; command outcome; graph selection-only
 tags: [plugin-parity, cli, core, ga, breaking]
 enforcement: mechanizable
+enforced-by: ['shipped:no-bootstrap-tool-import']
 enforcement-reason: >
   The cutover is held by enforcement, not convention: `no-bootstrap-tool-import`
   (checks-typescript) forbids a static tool-runtime import in the host;

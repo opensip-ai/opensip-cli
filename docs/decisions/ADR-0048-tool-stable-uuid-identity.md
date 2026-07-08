@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0046, ADR-0047, ADR-0036, ADR-0027]
 tags: [tool, identity, uuid, plugins, community, datastore, architecture, hygiene]
 enforcement: mechanizable
+enforced-by: ['local:no-placeholder-check-ids']
 enforcement-reason: >
   A dedicated (or extended) fitness architecture check (parallel to `no-placeholder-check-ids` for checks) will enforce that Tool `id` fields (in manifests and exported Tool objects) are real promoted UUIDs and not placeholder patterns. The check will reference this ADR (and the governing spec). DB schema updates will be additive.
 ```

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0005, ADR-0008, ADR-0009, ADR-0006]   # symmetric tools; cloud signal sync (Signal/SignalSink); public-API + kernel-no-tool-vocab (this completes it); derived-data persistence
 tags: [signals, output, contracts, rendering, architecture]
 enforcement: mechanizable
+enforced-by: ['local:no-direct-stdout-in-tool-engine']
 enforcement-reason: >
   Retiring `CliOutput`/`CheckOutput`/`FindingOutput` from
   @opensip-cli/contracts makes the fitness-shaped envelope unimportable —

@@ -17,6 +17,7 @@ superseded_by: null
 related: [ADR-0017, ADR-0011, ADR-0019, ADR-0001]
 tags: [ci, fitness, graph, dogfood, gate]
 enforcement: mechanizable
+enforced-by: ['script:graph-gate-mode.test.ts']
 enforcement-reason: >
   Enforced by `runGateMode`'s gate-save branch (`fit-modes.ts`): on a
   fail-threshold breach (`failOnErrors`/`failOnWarnings`) it now sets exit

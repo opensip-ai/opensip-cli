@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0023, ADR-0027]
 tags: [output, contracts, parity, verdict, exit-codes]
 enforcement: mechanizable
+enforced-by: ['script:test:exit-parity']
 enforcement-reason: >
   A parity test asserts, for every registered tool, that the process exit code is
   a pure function of `envelope.verdict.passed` (no tool calls `setExitCode`

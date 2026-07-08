@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0024, ADR-0030, ADR-0051]
 tags: [cli, bootstrap, run-scope, testing, architecture]
 enforcement: partially-mechanizable
+enforced-by: ['local:no-module-singleton']
 enforcement-reason: >
   The ordered bootstrap phases can be unit-tested through a pure planner and
   table-driven hook tests. The architectural intent remains enforced by the

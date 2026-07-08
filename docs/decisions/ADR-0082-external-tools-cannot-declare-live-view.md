@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0028, ADR-0054, ADR-0058, ADR-0065]
 tags: [tools, live-view, isolation, cli]
 enforcement: mechanizable
+enforced-by: ['type-structural', 'script:tools-validate-external-output.test']
 enforcement-reason: >
   External-tool synthesis tests reject `output: live-view`, and `tools validate`
   has an `external-output-modes` section that fails before runtime probing.

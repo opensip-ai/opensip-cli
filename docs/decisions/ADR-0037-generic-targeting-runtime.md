@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0010, ADR-0023]
 tags: [config, targeting, discovery, parity]
 enforcement: mechanizable
+enforced-by: ['depcruise:targeting-imports-config-core-only']
 enforcement-reason: >
   Two guards: (1) a non-fitness fixture tool resolves a named target's files via
   `scope.targets` with NO `@opensip-cli/fitness` import (the adoption proof);

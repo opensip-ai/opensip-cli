@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0001, ADR-0011, ADR-0014, ADR-0024, ADR-0036, ADR-0064, ADR-0097]
 tags: [signals, output, precision, graph, fitness, agents]
 enforcement: mechanizable
+enforced-by: ['script:catalog-suppressions.mjs']
 enforcement-reason: >
   Signal dedup is routed through the CLI host output seams before JSON,
   terminal rendering, SARIF, cloud, and report egress. Unit tests assert

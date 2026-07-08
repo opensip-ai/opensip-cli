@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0080, ADR-0036, ADR-0042, ADR-0011]
 tags: [tools, adapters, scanners, sarif, artifacts, security, persistence]
 enforcement: mechanizable
+enforced-by: ['local:no-raw-fs-artifact-write-in-tool-engine']
 enforcement-reason: >
   A single SARIF read path is enforced by the NEW `single-sarif-ingest`
   dependency-cruiser rule (no SARIF parse symbol may be imported/defined outside

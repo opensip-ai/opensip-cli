@@ -27,6 +27,7 @@ superseded_by: ADR-0033
 related: [ADR-0015, ADR-0031]   # engine-version/mode cache stamping; one build/one finalize/many renderers
 tags: [graph, cli, cache, determinism, performance]
 enforcement: mechanizable
+enforced-by: ['script:graph:equivalence:ci']
 enforcement-reason: >
   The premise of this decision — that the sharded build is equivalent to the exact
   (single-program) build — is held by TWO layers (see Amendment 2026-06-10).

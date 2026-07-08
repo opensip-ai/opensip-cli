@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0023, ADR-0037, ADR-0084, ADR-0095]
 tags: [configuration, targeting, graph, fitness, yagni, agents]
 enforcement: mechanizable
+enforced-by: ['type-structural']
 enforcement-reason: >
   The composed config schema admits only the documented convention shape; the CLI
   target builder rejects absolute and parent-traversal convention globs with

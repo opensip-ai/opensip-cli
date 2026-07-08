@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0024]   # SignalEnvelope currency; CommandOutcome + observability
 tags: [sessions, persistence, tool-contract, output]
 enforcement: mechanizable
+enforced-by: ['local:one-outcome-shape']
 enforcement-reason: >
   The output path is enforced by the 2.12.0 `one-outcome-shape` guardrail (replay
   errors must flow through `cli.emitError`, success through the `renderOutcome`

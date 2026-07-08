@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0027, ADR-0012]   # GA parity cutover (the claim this realizes); 3.0.0 reservation
 tags: [plugin-parity, cli, core, security, tool-discovery]
 enforcement: mechanizable
+enforced-by: ['script:tool-trust.test.ts']
 enforcement-reason: >
   The deny-by-default trust gate is unit-pinned: `tool-trust.test.ts` asserts an
   un-allowlisted project-authored sidecar fail-closes (PluginIncompatibleError →

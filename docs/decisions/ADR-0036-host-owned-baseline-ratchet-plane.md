@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0020, ADR-0035]
 tags: [output, datastore, gate, baseline, parity]
 enforcement: mechanizable
+enforced-by: ['depcruise:output-imports-core-contracts-only']
 enforcement-reason: >
   Three guards in the implementing spec's verification matrix: (1) a toy fixture
   tool gets `--gate-save`/`--gate-compare` with zero tool-authored persistence/

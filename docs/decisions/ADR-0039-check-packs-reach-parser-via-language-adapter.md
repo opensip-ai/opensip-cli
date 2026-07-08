@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0010]
 tags: [fitness, checks, languages, tree-sitter, layering]
 enforcement: mechanizable
+enforced-by: ['depcruise:check-pack-no-tree-sitter']
 enforcement-reason: >
   dependency-cruiser rule `check-pack-no-tree-sitter` (.config/dependency-cruiser.cjs)
   forbids any `packages/fitness/checks-*` module from importing

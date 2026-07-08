@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0011, ADR-0012, ADR-0024]   # signal currency; versioning; CommandOutcome/observability
 tags: [graph, execution, plugin-parity, recipes]
 enforcement: mechanizable
+enforced-by: ['local:same-recipe-semantics']
 enforcement-reason: >
   The `same-recipe-semantics` fitness check (release 2.13.0) verifies that fit + sim
   run their execution through the shared substrate, and carries graph as a

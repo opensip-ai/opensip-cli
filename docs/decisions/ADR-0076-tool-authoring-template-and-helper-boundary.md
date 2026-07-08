@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0046, ADR-0061, ADR-0074]
 tags: [tools, plugins, authoring, templates, architecture]
 enforcement: mechanizable
+enforced-by: ['local:dogfood-no-implicit-tool-extension-defaults']
 enforcement-reason: >
   opensip-cli/fit/checks/no-implicit-tool-extension-defaults.mjs enforces absence
   defaults in createTool/defineTool; template tests validate manifest/runtime

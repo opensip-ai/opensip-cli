@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0084, ADR-0085, ADR-0095]
 tags: [agents, mcp, init, sessions]
 enforcement: mechanizable
+enforced-by: ['local:mcp-first-agent-guidance']
 enforcement-reason: >
   The project-local fitness check
   opensip-cli/fit/checks/mcp-first-agent-guidance.mjs verifies that init-managed

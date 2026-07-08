@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0036, ADR-0051, ADR-0058, ADR-0065, ADR-0097]
 tags: [cli, tools, run-pipeline, diagnostics, gates]
 enforcement: mechanizable
+enforced-by: ['local:deferred-run-pipeline-boundary']
 enforcement-reason: >
   The project-local fitness check deferred-run-pipeline-boundary now permits the
   promoted contracts APIs only at approved boundaries and still forbids local

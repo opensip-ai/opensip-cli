@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0057, ADR-0062, ADR-0036, ADR-0061]
 tags: [yagni, graph, tools, architecture, layering]
 enforcement: mechanizable
+enforced-by: ['depcruise:clone-detection-imports-nothing']
 enforcement-reason: >
   Structural half: a dependency-cruiser rule keeps `@opensip-cli/clone-detection`
   a leaf (no workspace deps beyond what its math needs), and the existing

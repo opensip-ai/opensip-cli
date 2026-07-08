@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0009, ADR-0011]
 tags: [fitness, packaging, public-api, boundaries]
 enforcement: mechanizable
+enforced-by: ['script:public-api.test.ts']
 enforcement-reason: >
   Two gates. (1) dependency-cruiser `no-cross-package-internal` already forbids
   production code from importing any `src/internal.ts`. (2) A new runtime

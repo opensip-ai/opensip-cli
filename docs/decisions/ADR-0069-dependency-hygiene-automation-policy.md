@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0012, ADR-0017]
 tags: [supply-chain, dependencies]
 enforcement: mechanizable
+enforced-by: ['shipped:package-supply-chain-policy']
 enforcement-reason: >
   scripts/verify-supply-chain.mjs check 6 and package-supply-chain-policy
   dependency-automation checks when config exists.

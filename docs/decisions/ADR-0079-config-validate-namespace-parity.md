@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0023, ADR-0043, ADR-0067]
 tags: [config, tools, validation, cli]
 enforcement: mechanizable
+enforced-by: ['script:config-namespace-policy.test']
 enforcement-reason: >
   The pure namespace-policy helper is covered in config tests, and CLI coherence
   tests compare pre-dispatch and config validate verdicts for benign unknown

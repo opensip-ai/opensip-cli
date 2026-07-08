@@ -23,6 +23,7 @@ superseded_by: ADR-0063
 related: [ADR-0014, ADR-0036, ADR-0047]
 tags: [yagni, graph, tools, architecture]
 enforcement: mechanizable
+enforced-by: ['depcruise:yagni-no-graph-engine']
 enforcement-reason: >
   dependency-cruiser rules yagni-no-cli, yagni-no-check-packs,
   yagni-no-graph-adapter-packs; graph-evidence.ts is the sole allowlisted

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0023, ADR-0041]
 tags: [config, plugins, tools]
 enforcement: mechanizable
+enforced-by: ['script:config-namespace-policy-tests']
 enforcement-reason: >
   Composer unit tests pin all four behaviors: (1) an unclaimed top-level
   namespace warns (does not abort) and the warning carries a did-you-mean

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0085, ADR-0110, ADR-0122]
 tags: [graph, fitness, agents, suites]
 enforcement: mechanizable
+enforced-by: ['local:impact-trust-conservative-fallback']
 enforcement-reason: >
   The project-local `impact-trust-conservative-fallback` fitness check prevents
   the old `fit --include-impacted` changed-only fallback from returning when the

@@ -16,6 +16,7 @@ superseded_by: ADR-0074
 related: [ADR-0046, ADR-0027, ADR-0012, ADR-0023]
 tags: [tool-contract, versioning, plugins, fitness, graph, simulation, compatibility, architecture]
 enforcement: mechanizable
+enforced-by: ['local:tool-contract-version-policy']
 enforcement-reason: >
   Each tool's engine exports its own FOO_CONTRACT_VERSION constant.
   The tool's Tool descriptor declares it under extensionPoints (or a dedicated

@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0058, ADR-0100, ADR-0102, ADR-0135]
 tags: [cli, cli-ui, live-view, render, suite]
 enforcement: mechanizable
+enforced-by: ['shipped:live-view-through-cli-live']
 enforcement-reason: >
   The contract is enforced by the type system: `LiveRunDoneData` (cli-ui) exposes
   ONLY the named section slots (`summary`, `summaryNote`, `verboseExtra`,

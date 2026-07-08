@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0110, ADR-0122, ADR-0123]
 tags: [agents, suites, mcp, contracts]
 enforcement: mechanizable
+enforced-by: ['local:review-brief-correlation-shared-helper']
 enforcement-reason: >
   The project-local `review-brief-correlation-shared-helper` fitness check
   requires live suite review briefs and persisted MCP review briefs to call the

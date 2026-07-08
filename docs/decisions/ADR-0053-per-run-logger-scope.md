@@ -16,6 +16,7 @@ superseded_by: null
 related: [ADR-0004, ADR-0024, ADR-0051, ADR-0052]
 tags: [logging, run-scope, concurrency, saas, architecture]
 enforcement: mechanizable
+enforced-by: ['local:no-module-singleton']
 enforcement-reason: >
   Construction can be locked by unit tests that two concurrent RunScopes write
   through independent LoggerImpl instances. Existing no-module-singleton checks
