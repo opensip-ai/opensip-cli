@@ -96,6 +96,12 @@ describe('readSupportedDbVersion', () => {
   it('returns undefined for an unreadable journal (broken install)', () => {
     expect(readSupportedDbVersion(join(tmp, 'does-not-exist'))).toBeUndefined();
   });
+
+  it('returns undefined when the journal has no entries', () => {
+    const migrations = join(tmp, 'empty-journal');
+    writeJournal(migrations, 0);
+    expect(readSupportedDbVersion(migrations)).toBeUndefined();
+  });
 });
 
 describe('isDbNewerThanCli', () => {

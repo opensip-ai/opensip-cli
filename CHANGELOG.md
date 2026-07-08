@@ -11,11 +11,17 @@ evidence so reports and MCP reads stay project-scoped and stable.
 
 ### Added
 
-- Polyglot external scanner adapters and adapter-language metadata for the
-  `tools` command surface.
-- `opensip tools list --available` discovery for installable adapters.
+- Thirteen polyglot external scanner adapters (`@opensip-cli/tool-semgrep`,
+  `tool-ast-grep`, `tool-ruff`, `tool-golangci-lint`, `tool-govulncheck`,
+  `tool-cargo-deny`, `tool-bandit`, `tool-pip-audit`, `tool-cargo-clippy`,
+  `tool-spotbugs`, `tool-pmd`, `tool-dependency-check`, `tool-cppcheck`) with
+  coverage-gated acceptance suites.
+- Adapter-language metadata on tool manifests and `opensip tools list
+  --available` discovery (optional `--lang` filter).
 - Unified suite/single-run result summaries with explicit fault verdicts and
   attention bullets in live output.
+- Suite live view: one banner, headless step execution, compact aggregate
+  checklist, and no double output across multi-step runs.
 
 ### Changed
 
@@ -26,11 +32,15 @@ evidence so reports and MCP reads stay project-scoped and stable.
 
 ### Fixed
 
+- Dogfood gate cleared: all fit, graph, and yagni findings resolved (52
+  warnings → 0).
 - MCP latest-session reads are scoped to the project root.
 - Baseline fingerprints disambiguate colliding occurrences with ordinals.
 - Graph owner edges key by full occurrence identity.
 - Dashboard recent activity groups suite runs as expandable rows and keeps
   pagination/sorting attached to the grouped evidence.
+- Three bug-audit cycles harden SARIF, datastore, graph-impact, sessions, and
+  suite orchestration paths.
 
 ## [0.4.2] - 2026-07-06
 

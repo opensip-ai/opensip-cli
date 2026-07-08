@@ -446,6 +446,7 @@ describe('runSuite', () => {
   });
 
   it('applies default changed only when no explicit selector was supplied', async () => {
+    const cwd = makeChangedGitFixture();
     const seen: Record<string, unknown>[] = [];
     const spec = defineCommand<unknown, ToolCliContext>({
       name: 'impact',
@@ -480,7 +481,7 @@ describe('runSuite', () => {
       tools,
       ctx,
       runActionHooks: {},
-      suiteOpts: {},
+      suiteOpts: { cwd },
       defaultChanged: true,
     });
     await runSuite({
@@ -489,7 +490,7 @@ describe('runSuite', () => {
       tools,
       ctx,
       runActionHooks: {},
-      suiteOpts: { since: 'origin/main' },
+      suiteOpts: { cwd, since: 'origin/main' },
       defaultChanged: true,
     });
 

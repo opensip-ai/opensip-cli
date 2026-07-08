@@ -9,6 +9,7 @@ import {
   POLICY_AUDIT_MAX_JSON_BYTES,
   POLICY_AUDIT_MAX_LIMIT,
   POLICY_AUDIT_MAX_ROWS,
+  POLICY_AUDIT_MAX_STRING_BYTES,
 } from '../policy-audit-repo.js';
 
 import type { DataStore } from '../data-store.js';
@@ -82,5 +83,34 @@ describe('PolicyAuditRepo', () => {
       metadata: { value: 'x'.repeat(POLICY_AUDIT_MAX_JSON_BYTES + 1) },
     };
     expect(() => repo.append([oversized])).toThrow(ValidationError);
+  });
+
+  it('rejects oversized string fields', () => {
+    const oversized = {
+      ...event('1'),
+      subjectId: 'x'.repeat(POLICY_AUDIT_MAX_STRING_BYTES + 1),
+    };
+    expect(() => repo.append([oversized])).toThrow(ValidationError);
+  });
+
+  it('omits optional fields when they are not supplied', () => {
+    repo.append([
+      {
+        id: 'policy_audit_optional',
+        timestamp: '2026-07-07T00:00:00.000Z',
+        subjectKind: 'installed-tool',
+        subjectId: 'tool-optional',
+        subject: null,
+        action: 'load',
+        outcome: 'allow',
+        reasons: ['ok'],
+        sourceTiers: ['builtin'],
+        matchedExceptionIds: [],
+      },
+    ]);
+    const [row] = repo.list({ limit: 1 });
+    expect(row.runId).toBeUndefined();
+    expect(row.subject).toBeNull();
+    expect(row.metadata).toBeUndefined();
   });
 });

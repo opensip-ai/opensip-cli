@@ -91,6 +91,35 @@ describe('runToolLiveView', () => {
     expect(completion.envelope?.signals).toEqual([]);
   }, 10_000);
 
+  it('sets exit code and returns empty completion on headless produce errors', async () => {
+    const scope = makeScope({ logger: createRunLogger({ runId: 'RUN_headless_err' }) });
+    const setExitCode = vi.fn();
+
+    const completion = await runWithScope(scope, () =>
+      runEmbeddedRender(() =>
+        runToolLiveView(
+          {
+            tool: 'sim',
+            meta: { title: 'Test', description: 'Running' },
+            surface: { shape: 'pool', label: 'Working...' },
+            verbose: false,
+            quiet: true,
+            produce: () =>
+              Promise.resolve({
+                kind: 'error',
+                message: 'api_key=secret',
+                exitCode: 2,
+              }),
+          },
+          { setExitCode },
+        ),
+      ),
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(2);
+    expect(completion).toEqual({});
+  }, 10_000);
+
   it('runs produce HEADLESS (no Ink, no terminal output) in embedded-render mode', async () => {
     const scope = makeScope();
     let produced = false;

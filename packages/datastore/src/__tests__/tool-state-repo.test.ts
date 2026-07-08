@@ -70,6 +70,11 @@ describe('ToolStateRepo', () => {
     expect(repo.get('tool-b', 'k')).toBe(2);
   });
 
+  it('stores undefined payloads as JSON null', () => {
+    repo.put('acme-audit', 'unset', undefined);
+    expect(repo.get('acme-audit', 'unset')).toBeNull();
+  });
+
   it('an oversized payload throws ValidationError (error, never evict)', () => {
     const big = 'x'.repeat(TOOL_STATE_MAX_PAYLOAD_BYTES + 1);
     expect(() => repo.put('acme-audit', 'big', big)).toThrow(ValidationError);

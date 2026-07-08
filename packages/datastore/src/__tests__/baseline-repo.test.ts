@@ -113,6 +113,10 @@ describe('BaselineRepo', () => {
     });
   });
 
+  it('loadMeta returns undefined when no baseline was saved for the tool', () => {
+    expect(repo.loadMeta('never-saved')).toBeUndefined();
+  });
+
   it('loadMeta returns undefined for legacy rows without identity columns populated', () => {
     repo.save('graph', [{ fingerprint: 'fp', payload: sig('r', 'f') }], ID);
     requireDrizzleHandle(ds).db.run(
