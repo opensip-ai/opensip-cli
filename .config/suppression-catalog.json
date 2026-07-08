@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-05T06:36:25.378Z",
+  "generatedAt": "2026-07-08T05:32:35.944Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,7 +25,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 217,
+        "total": 213,
         "bySlug": {
           "no-markdown-references": 5,
           "dogfood-one-config-document-ratchet": 2,
@@ -66,7 +66,7 @@
           "fitness-ignore-hygiene": 1,
           "graph-ignore-hygiene": 1,
           "no-window-alert": 1,
-          "no-unbounded-concurrency": 6,
+          "no-unbounded-concurrency": 2,
           "yagni-ignore-hygiene": 1,
           "catch-clause-safety": 1,
           "dangerous-config-defaults": 3,
@@ -106,8 +106,8 @@
           "core": 5,
           "dashboard": 1,
           "fitness/checks-typescript": 64,
-          "fitness/checks-universal": 106,
-          "fitness/engine": 12,
+          "fitness/checks-universal": 103,
+          "fitness/engine": 11,
           "graph/engine": 11,
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 2,
@@ -124,7 +124,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 45,
+        "total": 44,
         "bySlug": {
           "no-markdown-references": 3,
           "dogfood-one-config-document-ratchet": 2,
@@ -144,7 +144,6 @@
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
           "module-coupling-metrics": 2,
-          "no-unbounded-concurrency": 1,
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
@@ -160,7 +159,7 @@
           "contracts": 2,
           "core": 5,
           "dashboard": 1,
-          "fitness/engine": 12,
+          "fitness/engine": 11,
           "graph/engine": 11,
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 2,
@@ -193,7 +192,7 @@
     },
     "check-package": {
       "fitness": {
-        "total": 170,
+        "total": 167,
         "bySlug": {
           "shipped-checks-must-be-generic": 7,
           "fitness-check-standards": 17,
@@ -227,7 +226,7 @@
           "graph-ignore-hygiene": 1,
           "no-markdown-references": 2,
           "no-window-alert": 1,
-          "no-unbounded-concurrency": 4,
+          "no-unbounded-concurrency": 1,
           "yagni-ignore-hygiene": 1,
           "catch-clause-safety": 1,
           "dangerous-config-defaults": 3,
@@ -250,7 +249,7 @@
         },
         "byPackage": {
           "fitness/checks-typescript": 64,
-          "fitness/checks-universal": 106
+          "fitness/checks-universal": 103
         }
       },
       "graph": {
@@ -453,20 +452,20 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 217,
+    "budgetGateFitness": 213,
     "budgetGateFitnessSlugs": 71,
-    "productRuntimeFitness": 45,
-    "productRuntimeFitnessSlugs": 27,
+    "productRuntimeFitness": 44,
+    "productRuntimeFitnessSlugs": 26,
     "productRuntimeGraph": 33,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 78,
-    "checkPackageFitness": 170,
+    "productRuntimeCombined": 77,
+    "checkPackageFitness": 167,
     "testSupportFitness": 2,
     "testsFitness": 61,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
-    "unbudgetedProductRuntimeSlugs": 26
+    "unbudgetedProductRuntimeSlugs": 25
   },
   "phase4Audit": {
     "baseline": {
@@ -479,11 +478,11 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -260,
+      "productRuntimeFitness": -261,
       "productRuntimeGraph": 26,
-      "productRuntimeCombined": -234,
-      "budgetGateFitness": -325,
-      "checkPackageFitness": -64,
+      "productRuntimeCombined": -235,
+      "budgetGateFitness": -329,
+      "checkPackageFitness": -67,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
     },

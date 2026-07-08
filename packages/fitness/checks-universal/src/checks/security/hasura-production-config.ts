@@ -115,18 +115,12 @@ export const hasuraProductionConfig = defineCheck({
       return filename.includes('prod');
     });
 
-    // Read all prod files in parallel to avoid sequential async in loop
-    // @fitness-ignore-next-line no-unbounded-concurrency -- Bounded to production docker-compose files (typically 1-3)
-    const fileEntries = await Promise.all(
-      prodFiles.map(async (filePath) => {
-        const content = await files.read(filePath);
-        return { filePath, content };
-      }),
-    );
+    const fileContents = await files.readMany(prodFiles);
 
     const violations: CheckViolation[] = [];
 
-    for (const { filePath, content } of fileEntries) {
+    for (const filePath of prodFiles) {
+      const content = fileContents.get(filePath);
       // @lazy-ok -- result validation depends on preceding file read operation
       if (!content) continue;
       violations.push(...checkMissingSettings(filePath, content));
