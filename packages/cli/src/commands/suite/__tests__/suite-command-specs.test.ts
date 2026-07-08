@@ -174,13 +174,16 @@ describe('buildSuiteGroupLeaves', () => {
     const ctx = hostCtx();
     const [runSpec] = buildSuiteGroupLeaves(ctx);
 
-    const result = await runSpec.handler?.({ _args: ['security'] }, ctx);
+    await runSpec.handler?.({ _args: ['security'] }, ctx);
 
-    expect(result).toEqual({
-      type: 'error',
-      message: 'suite run requires the full ToolCliContext handle.',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    });
+    // raw-stream: the handler EMITS the error (via the command-result seam) + sets
+    // the exit code, rather than returning it for the host to render.
+    expect(ctx.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        message: 'suite run requires the full ToolCliContext handle.',
+      }),
+    );
     expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
   });
 
@@ -211,15 +214,16 @@ describe('buildSuiteGroupLeaves', () => {
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
 
-    const result = await withSuiteScope(() =>
+    await withSuiteScope(() =>
       runSpec.handler?.({ _args: ['security'], full: true, ...selector }, ctx),
     );
 
-    expect(result).toEqual({
-      type: 'error',
-      message: '--full conflicts with --changed/--since/--files.',
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    });
+    expect(ctx.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        message: '--full conflicts with --changed/--since/--files.',
+      }),
+    );
     expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
     expect(runSuiteMock).not.toHaveBeenCalled();
   });
@@ -278,7 +282,7 @@ describe('buildSuiteGroupLeaves', () => {
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
 
-    const result = await withSuiteScope(
+    await withSuiteScope(
       () => runSpec.handler?.({ _args: ['security'] }, ctx),
       undefined,
       auditTools(),
@@ -290,11 +294,12 @@ describe('buildSuiteGroupLeaves', () => {
       },
     );
 
-    expect(result).toEqual({
-      type: 'error',
-      message: "suite run without opensip init only supports the built-in 'audit' suite.",
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    });
+    expect(ctx.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        message: "suite run without opensip init only supports the built-in 'audit' suite.",
+      }),
+    );
     expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
     expect(runSuiteMock).not.toHaveBeenCalled();
   });
@@ -463,12 +468,11 @@ describe('buildSuiteGroupLeaves', () => {
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
 
-    const result = await withSuiteScope(() => runSpec.handler?.({ _args: ['missing'] }, ctx));
+    await withSuiteScope(() => runSpec.handler?.({ _args: ['missing'] }, ctx));
 
-    expect(result).toEqual({
-      type: 'error',
-      message: "Unknown suite 'missing'.",
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    });
+    expect(ctx.render).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', message: "Unknown suite 'missing'." }),
+    );
+    expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
   });
 });

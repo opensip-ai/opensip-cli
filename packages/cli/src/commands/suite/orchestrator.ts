@@ -13,7 +13,7 @@ import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run
 
 import { buildReviewBrief } from './review-brief-builder.js';
 import { resolveSuiteScope } from './suite-scope.js';
-import { runStepsSerially } from './suite-step-runner.js';
+import { runStepsSerially, type SuiteStepEvent } from './suite-step-runner.js';
 import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
 import type { SuiteDefinition } from '@opensip-cli/config';
@@ -27,6 +27,8 @@ export interface RunSuiteInput {
   readonly runActionHooks: RunActionHooks;
   readonly suiteOpts: Readonly<Record<string, unknown>>;
   readonly defaultChanged?: boolean;
+  /** Optional step-lifecycle sink — the suite live view wires this to progress events. */
+  readonly onStepEvent?: (event: SuiteStepEvent) => void;
 }
 
 export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
@@ -83,6 +85,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
         defaultChanged: input.defaultChanged === true,
         fullScope: scope.mode === 'full',
       }),
+      ...(input.onStepEvent === undefined ? {} : { onStepEvent: input.onStepEvent }),
     }),
   );
   const steps = internalSteps.map((step) => step.summary);

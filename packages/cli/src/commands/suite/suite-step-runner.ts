@@ -32,6 +32,11 @@ import type { SuiteStepReviewInput } from './review-brief.js';
 import type { ValidatedSuite, ValidatedSuiteStep } from './validate-suite.js';
 import type { RunActionHooks } from '../../bootstrap/run-plane.js';
 
+/** A step's lifecycle transition, emitted so a live view can drive the checklist. */
+export type SuiteStepEvent =
+  | { readonly phase: 'start'; readonly index: number }
+  | { readonly phase: 'done'; readonly index: number; readonly summary: SuiteStepSummary };
+
 export async function runStepsSerially(args: {
   readonly suite: ValidatedSuite;
   readonly suiteRunId: string;
@@ -40,24 +45,27 @@ export async function runStepsSerially(args: {
   readonly suiteOpts: Readonly<Record<string, unknown>>;
   readonly defaultChanged?: boolean;
   readonly fullScopeFiles?: readonly string[];
+  /** Optional lifecycle sink (the suite live view wires this to progress events). */
+  readonly onStepEvent?: (event: SuiteStepEvent) => void;
 }): Promise<SuiteStepReviewInput[]> {
   const summaries: SuiteStepReviewInput[] = [];
   let chain = Promise.resolve();
 
   for (const step of args.suite.steps) {
     chain = chain.then(async () => {
-      summaries.push(
-        await runStep({
-          suite: args.suite,
-          suiteRunId: args.suiteRunId,
-          step,
-          ctx: args.ctx,
-          runActionHooks: args.runActionHooks,
-          suiteOpts: args.suiteOpts,
-          defaultChanged: args.defaultChanged,
-          fullScopeFiles: args.fullScopeFiles,
-        }),
-      );
+      args.onStepEvent?.({ phase: 'start', index: step.index });
+      const review = await runStep({
+        suite: args.suite,
+        suiteRunId: args.suiteRunId,
+        step,
+        ctx: args.ctx,
+        runActionHooks: args.runActionHooks,
+        suiteOpts: args.suiteOpts,
+        defaultChanged: args.defaultChanged,
+        fullScopeFiles: args.fullScopeFiles,
+      });
+      summaries.push(review);
+      args.onStepEvent?.({ phase: 'done', index: step.index, summary: review.summary });
     });
   }
 

@@ -7,6 +7,7 @@ import type { ProgressCallback, ProgressSurface } from './progress-event.js';
 import type { ResultSummaryItem } from './result-summary.js';
 import type { RunTimerLike } from './run-timing-provider.js';
 import type { FindingGroupView } from './verbose-detail.js';
+import type { ViewNode } from './view-model.js';
 
 export interface LiveRunMeta {
   readonly title: string;
@@ -42,6 +43,13 @@ export interface LiveRunDoneData {
   readonly table?: readonly LiveRunTableRow[];
   /** Attention bullets for the compact (non-verbose) surface; absent for a clean run. */
   readonly attention?: LiveRunAttention;
+  /**
+   * A fully-formed done-body view (renderer-agnostic). When present it REPLACES
+   * the default summary/table/attention body — used by the suite live view, whose
+   * done frame is its own aggregate (count line + bullets + Review), not a
+   * per-unit table. The run-summary headline is still owned by the caller's body.
+   */
+  readonly body?: ViewNode;
 }
 
 export type ProgressSubscribe = (cb: ProgressCallback) => void;

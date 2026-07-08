@@ -122,31 +122,41 @@ function liveRunDoneBody(
           <Text dimColor>{data.banner}</Text>
         </Box>
       )}
-      {!props.quiet &&
-        props.verbose &&
-        data.verboseLines !== undefined &&
-        data.verboseLines.length > 0 && (
-          <Box flexDirection="column" paddingTop={1}>
-            {renderToInk(viewVerboseLines(data.verboseLines))}
-          </Box>
-        )}
-      {!props.quiet &&
-        props.verbose &&
-        data.verboseFindings !== undefined &&
-        data.verboseFindings.length > 0 && (
-          <Box>{renderToInk(viewFindingsGroups(data.verboseFindings))}</Box>
-        )}
-      {tableNode !== null && (
+      {data.body === undefined ? (
+        <>
+          {!props.quiet &&
+            props.verbose &&
+            data.verboseLines !== undefined &&
+            data.verboseLines.length > 0 && (
+              <Box flexDirection="column" paddingTop={1}>
+                {renderToInk(viewVerboseLines(data.verboseLines))}
+              </Box>
+            )}
+          {!props.quiet &&
+            props.verbose &&
+            data.verboseFindings !== undefined &&
+            data.verboseFindings.length > 0 && (
+              <Box>{renderToInk(viewFindingsGroups(data.verboseFindings))}</Box>
+            )}
+          {tableNode !== null && (
+            <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+              {renderToInk(tableNode)}
+            </Box>
+          )}
+          {attentionNode !== null && (
+            <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
+              {renderToInk(attentionNode)}
+            </Box>
+          )}
+          {timedSummary}
+        </>
+      ) : (
+        // Custom done-body (the suite aggregate) REPLACES the default summary/
+        // table/attention body — the caller's view owns the whole frame.
         <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-          {renderToInk(tableNode)}
+          {renderToInk(data.body)}
         </Box>
       )}
-      {attentionNode !== null && (
-        <Box flexDirection="column" paddingLeft={2} paddingTop={1}>
-          {renderToInk(attentionNode)}
-        </Box>
-      )}
-      {timedSummary}
       {!props.quiet && data.warnings !== undefined && data.warnings.length > 0 && (
         <Box flexDirection="column" paddingTop={1}>
           {data.warnings.map((w) => (

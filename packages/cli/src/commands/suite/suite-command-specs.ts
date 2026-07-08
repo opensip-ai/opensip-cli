@@ -1,21 +1,26 @@
 import { suitesConfigSchema } from '@opensip-cli/config';
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { currentLogger, currentScope } from '@opensip-cli/core';
+import { currentLogger, currentScope, type Tool } from '@opensip-cli/core';
 
+import { shouldUseSuiteLiveView } from '../../bootstrap/suite-live-view-policy.js';
 import {
   COMMAND_RESULT,
   defineCommand,
   PROJECT_SCOPE,
+  RAW_STREAM,
   type HostSpec,
 } from '../host-subcommand-shared.js';
+import { emitCommandResult } from '../mount-result-command.js';
 
 import { BUILT_IN_AUDIT_SUITE_NAME, listSuites, resolveSuite } from './built-in-suites.js';
-import { runSuite } from './orchestrator.js';
+import { runSuite, type RunSuiteInput } from './orchestrator.js';
 import { hasSelector } from './propagated-options.js';
 import { addSuiteStep } from './suite-add.js';
+import { renderSuiteLive } from './suite-live-view.js';
 import { validateSuite } from './validate-suite.js';
 
 import type { CliCommandsContext } from '../shared.js';
+import type { SuiteDefinition } from '@opensip-cli/config';
 import type { SuiteAddResult, SuiteListResult } from '@opensip-cli/contracts';
 
 function configuredSuites(): ReturnType<typeof suitesConfigSchema.parse> {
@@ -28,6 +33,14 @@ function isStringArray(value: unknown): value is readonly string[] {
 
 function parseArg(raw: string, previous: unknown): readonly string[] {
   return [...(isStringArray(previous) ? previous : []), raw];
+}
+
+/** One deduped checklist label per step, index-aligned, for the suite live view. */
+function buildSuiteStepLabels(suite: SuiteDefinition, tools: readonly Tool[]): string[] {
+  return suite.steps.map((step) => {
+    const name = tools.find((t) => t.metadata.id === step.tool)?.metadata.name ?? step.tool;
+    return name === step.command ? name : `${name} ${step.command}`;
+  });
 }
 
 function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
@@ -66,49 +79,46 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
       },
     ],
     scope: PROJECT_SCOPE,
-    output: COMMAND_RESULT,
+    // `raw-stream`: the handler owns its whole output surface — it renders the
+    // TTY suite live view itself, and reuses `emitCommandResult` for --json /
+    // non-TTY (keeping the exact command-result shape) — so the host renders
+    // nothing and never double-renders over the live view.
+    output: RAW_STREAM,
+    rawStreamReason: 'runtime-render-dispatch',
     handler: async (rawOpts) => {
-      if (ctx.toolContext === undefined) {
+      const opts = rawOpts as Record<string, unknown> & { _args?: readonly string[] };
+      const isJson = opts.json === true;
+      const fail = async (message: string): Promise<void> => {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'error',
-          message: 'suite run requires the full ToolCliContext handle.',
-          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        };
-      }
-      const opts = rawOpts as Record<string, unknown> & {
-        _args?: readonly string[];
+        await emitCommandResult(
+          { type: 'error', message, exitCode: EXIT_CODES.CONFIGURATION_ERROR },
+          { render: ctx.render, jsonRequested: isJson, exitCode: ctx.getExitCode?.() },
+        );
       };
+
+      if (ctx.toolContext === undefined) {
+        await fail('suite run requires the full ToolCliContext handle.');
+        return;
+      }
       if (opts.full === true && hasSelector(opts)) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'error',
-          message: '--full conflicts with --changed/--since/--files.',
-          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        };
+        await fail('--full conflicts with --changed/--since/--files.');
+        return;
       }
       const name = String(opts._args?.[0] ?? '');
       if (
         currentScope()?.projectContext?.scope === 'ephemeral' &&
         name !== BUILT_IN_AUDIT_SUITE_NAME
       ) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'error',
-          message:
-            `suite run without opensip init only supports the built-in ` +
+        await fail(
+          `suite run without opensip init only supports the built-in ` +
             `'${BUILT_IN_AUDIT_SUITE_NAME}' suite.`,
-          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        };
+        );
+        return;
       }
       const resolved = resolveSuite(name, configuredSuites());
       if (resolved === undefined) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'error',
-          message: `Unknown suite '${name}'.`,
-          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        };
+        await fail(`Unknown suite '${name}'.`);
+        return;
       }
       currentLogger().debug?.({
         evt: 'cli.suite.resolve.source',
@@ -116,14 +126,11 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
         source: resolved.source,
       });
       if (ctx.toolRunActionHooks === undefined) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'error',
-          message: 'suite run requires the host run-action hooks handle.',
-          exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        };
+        await fail('suite run requires the host run-action hooks handle.');
+        return;
       }
-      const result = await runSuite({
+
+      const suiteInput: RunSuiteInput = {
         name,
         suite: resolved.suite,
         tools: currentScope()?.tools.list() ?? [],
@@ -131,9 +138,35 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
         runActionHooks: ctx.toolRunActionHooks,
         suiteOpts: opts,
         defaultChanged: resolved.source === 'built-in' && name === BUILT_IN_AUDIT_SUITE_NAME,
-      });
+      };
+
+      // TTY (not --json): render the whole suite through one live view — banner,
+      // a step checklist (spinner → ✓/✗), then the compact aggregate. Steps run
+      // headless inside it. The TTY probe lives in the host policy helper so this
+      // handler never touches process.stdout directly.
+      if (shouldUseSuiteLiveView({ json: isJson })) {
+        const projectRoot = currentScope()?.projectContext?.projectRoot;
+        const { result } = await renderSuiteLive({
+          suiteInput,
+          stepLabels: buildSuiteStepLabels(resolved.suite, suiteInput.tools),
+          verbose: opts.verbose === true,
+          quiet: opts.quiet === true,
+          ...(projectRoot === undefined ? {} : { projectPath: projectRoot }),
+          glue: { setExitCode: ctx.setExitCode },
+        });
+        ctx.setExitCode(result.exitCode);
+        return;
+      }
+
+      // --json or non-TTY: run without the live view; the exact command-result
+      // path emits json or renders the compact aggregate as text.
+      const result = await runSuite(suiteInput);
       ctx.setExitCode(result.exitCode);
-      return result;
+      await emitCommandResult(result, {
+        render: ctx.render,
+        jsonRequested: isJson,
+        exitCode: ctx.getExitCode?.(),
+      });
     },
   });
 }
