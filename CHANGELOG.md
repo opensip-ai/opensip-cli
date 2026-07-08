@@ -27,11 +27,16 @@ evidence so reports and MCP reads stay project-scoped and stable.
 
 - Suite `failOnFault` handling treats envelope-backed faults as non-blocking by
   default while still surfacing them clearly in results.
+- Suite live output now renders through the standard five-section done-body
+  contract (consistent with single-tool runs).
 - Root `pnpm` shortcuts now cover the current top-level CLI command surface,
   including suite, tools, config, policy, repair, and agent-catalog commands.
 
 ### Fixed
 
+- `fit --changed` (and suite audit's changed-scope fitness step) now applies the
+  same target exclusions as a full `fit` run — no more false errors on test
+  files or whole-repo invariant checks when nothing relevant changed.
 - Dogfood gate cleared: all fit, graph, and yagni findings resolved (52
   warnings → 0).
 - MCP latest-session reads are scoped to the project root.
