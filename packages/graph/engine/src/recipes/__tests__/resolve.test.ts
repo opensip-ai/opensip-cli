@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import { makeGraphTestScope } from '../../__tests__/test-utils/with-graph-scope.js';
 import { currentRules } from '../../rules/registry.js';
-import { resolveRecipeToRules } from '../resolve.js';
+import { resolveRecipeToRules, resolveRecipeWithRules } from '../resolve.js';
 
 describe('resolveRecipeToRules', () => {
   it('no recipe (undefined) == --recipe default == all rules, in registration order', () => {
@@ -43,10 +43,11 @@ describe('resolveRecipeToRules', () => {
   it('tolerant mode falls back to default when a configured recipe name is unknown', () => {
     runWithScopeSync(makeGraphTestScope(), () => {
       const allSlugs = currentRules().map((r) => r.slug);
-      const slugs = resolveRecipeToRules('copied-from-fit-config', {
+      const resolved = resolveRecipeWithRules('copied-from-fit-config', {
         tolerant: true,
-      }).map((r) => r.slug);
-      expect(slugs).toEqual(allSlugs);
+      });
+      expect(resolved.name).toBe('default');
+      expect(resolved.rules.map((r) => r.slug)).toEqual(allSlugs);
     });
   });
 });

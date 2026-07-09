@@ -5,6 +5,7 @@ import { scoreColorStyle, statusBadge } from './sessions.js';
 
 const DIM_STYLE = 'color:var(--text-dim)';
 const MUTED_STYLE = 'color:var(--text-muted)';
+const EM_DASH = '—';
 const EMPTY_SUMMARY = {
   total: 0,
   passed: 0,
@@ -69,28 +70,16 @@ function stepStatus(step: DashboardRunStep): OverviewStatus {
   return 'pass';
 }
 
-function stepLabel(step: DashboardRunStep): string {
-  const args = step.effectiveArgs;
-  if (args === undefined || Object.keys(args).length === 0) return step.command;
-  const rendered = Object.entries(args)
-    .map(([key, value]) => `${key}=${formatStepArgValue(value)}`)
-    .join(' ');
-  return `${step.command} ${rendered}`;
-}
-
-function formatStepArgValue(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'bigint') return `${value}n`;
-  if (typeof value === 'symbol')
-    return value.description === undefined ? 'Symbol()' : `Symbol(${value.description})`;
-  try {
-    return JSON.stringify(value) ?? '[unserializable]';
-  } catch {
-    return '[unserializable]';
-  }
+/**
+ * Keep the Recipe column recipe-only. `effectiveArgs` is provenance and may
+ * contain the entire resolved Commander option bag, so rendering it as a
+ * fallback turns one cell into an unbounded command dump. A string recipe in
+ * the ledger still helps faulted runs that never produced a session.
+ */
+function recipeCellLabel(step: DashboardRunStep, sessionRecipe?: string): string {
+  if (sessionRecipe !== undefined) return sessionRecipe;
+  const ledgerRecipe = step.effectiveArgs?.recipe;
+  return typeof ledgerRecipe === 'string' && ledgerRecipe.length > 0 ? ledgerRecipe : EM_DASH;
 }
 
 function sortedSteps(run: DashboardRun): readonly DashboardRunStep[] {
@@ -120,6 +109,19 @@ function appendTimestampCell(row: HTMLElement, iso: string | undefined): void {
   );
 }
 
+function appendStepRunCell(
+  row: HTMLElement,
+  step: DashboardRunStep,
+  deps: OverviewLedgerDeps,
+): void {
+  const runCell = el('td', { title: step.command });
+  deps.appendToolBadge(runCell, step.tool);
+  if (step.command !== step.tool) {
+    runCell.append(el('span', { text: step.command, style: 'margin-left:8px;' + MUTED_STYLE }));
+  }
+  row.append(runCell);
+}
+
 function appendLedgerStepCells(
   row: HTMLElement,
   step: DashboardRunStep,
@@ -127,12 +129,10 @@ function appendLedgerStepCells(
 ): void {
   appendBlankControlCell(row);
   appendTimestampCell(row, undefined);
-  const runCell = el('td');
-  deps.appendToolBadge(runCell, step.tool);
-  row.append(runCell);
+  appendStepRunCell(row, step, deps);
   row.append(
     el('td', {
-      text: stepLabel(step),
+      text: recipeCellLabel(step),
       title: step.logicalStepKey,
       style: MUTED_STYLE,
     }),
@@ -160,12 +160,10 @@ function appendLinkedLedgerStepCells(
   const counts = sessionCounts(session);
   appendBlankControlCell(row);
   appendTimestampCell(row, session.startedAt);
-  const runCell = el('td');
-  deps.appendToolBadge(runCell, step.tool);
-  row.append(runCell);
+  appendStepRunCell(row, step, deps);
   row.append(
     el('td', {
-      text: session.recipe ?? stepLabel(step),
+      text: recipeCellLabel(step, session.recipe),
       title: step.logicalStepKey,
       style: MUTED_STYLE,
     }),
@@ -200,7 +198,8 @@ function appendImplicitRunRow(
   const counts = linked === undefined ? runCounts(run) : sessionCounts(linked);
   const score = linked === undefined ? runScoreFromCounts(counts) : linked.score;
   const tool = step?.tool ?? linked?.tool ?? run.name;
-  const label = linked?.recipe ?? (step === undefined ? run.name : stepLabel(step));
+  const label =
+    step === undefined ? (linked?.recipe ?? EM_DASH) : recipeCellLabel(step, linked?.recipe);
   const row = el('tr', {
     class: linked === undefined ? 'overview-run-row' : 'clickable overview-run-row',
     ...(linked === undefined ? {} : { onclick: () => deps.activateSession(linked) }),
@@ -269,8 +268,9 @@ function appendLedgerRunRow(
   );
   const runCell = el('td', { title: run.source });
   deps.appendToolBadge(runCell, 'suite');
+  runCell.append(el('span', { text: run.name, style: 'margin-left:8px;' + MUTED_STYLE }));
   row.append(runCell);
-  row.append(el('td', { text: run.name, title: run.id, style: MUTED_STYLE }));
+  row.append(el('td', { text: EM_DASH, title: run.id, style: MUTED_STYLE }));
   row.append(
     el('td', {
       text: formatScore(score),

@@ -37,7 +37,7 @@ import { resolveSession } from '@opensip-cli/session-store';
 
 import { GRAPH_LIVE_VIEW_KEY as GRAPH_LIVE_KEY } from '../../identity.js';
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
-import { resolveRecipeToRules } from '../../recipes/resolve.js';
+import { resolveRecipeWithRules } from '../../recipes/resolve.js';
 import { renderGraphLive } from '../graph-runner.js';
 import { executeGraph, resolveLiveEngineShards } from '../graph.js';
 import { runHeapPreflight } from '../heap-preflight.js';
@@ -113,6 +113,7 @@ function setUpGraphLiveView(cli: ToolCliContext): void {
         config?: GraphConfig;
         rules?: readonly Rule[];
         recipe?: string;
+        explicitRecipe?: string;
         exact?: boolean;
         shards?: readonly Shard[];
       },
@@ -144,6 +145,9 @@ async function dispatchGraphLiveView(
   // config-sourced unknown names tolerantly
   // falling back to `default` and explicit-flag typos still hard-failing.
   const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
+  const resolvedRecipe = resolveRecipeWithRules(recipeSelection.name, {
+    tolerant: recipeSelection.tolerant,
+  });
   // Resolve the build engine HERE, on the dispatch seam — `resolveLiveEngineShards`
   // needs the `cli` context (language registry + datastore) the React runner does
   // not hold. The SAME policy the static path uses (ADR-0032): sharded when
@@ -171,14 +175,17 @@ async function dispatchGraphLiveView(
     // runner sends this plain-data plan to the worker (ADR-0028).
     exact: opts.exact === true,
     shards,
-    // The recipe NAME (serializable) for the worker, which re-resolves rules
-    // itself (ADR-0028); `rules` below serves the in-process fallback path.
-    ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
+    // The RESOLVED recipe name (serializable) for the worker and session. The
+    // static path normalizes this same value before execution; carrying it here
+    // keeps TTY runs from dropping config/default recipe provenance.
+    recipe: resolvedRecipe.name,
+    // Preserve the original flag separately for the worker. Passing a
+    // config-sourced name as `recipe` would make the worker treat it as a
+    // strict explicit value and break ADR-0022's tolerant config fallback.
+    ...(opts.recipe === undefined ? {} : { explicitRecipe: opts.recipe }),
     // Pass the resolved rule subset into the live path. Avoids a second
     // scope read inside the React tree.
-    rules: resolveRecipeToRules(recipeSelection.name, {
-      tolerant: recipeSelection.tolerant,
-    }),
+    rules: resolvedRecipe.rules,
     // Honor the project's `graph:` config block in the interactive
     // path too — parity with `executeGraph` (graph.ts), which loads
     // it via the same helper. Loading here (not inside the React

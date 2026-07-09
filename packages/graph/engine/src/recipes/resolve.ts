@@ -37,6 +37,12 @@ interface RuleView {
   readonly rule: Rule;
 }
 
+/** The effective recipe name together with its resolved rule subset. */
+export interface ResolvedGraphRecipeRules {
+  readonly name: string;
+  readonly rules: readonly Rule[];
+}
+
 /**
  * Resolve a recipe name to its ordered rule subset. `undefined` resolves the
  * built-in `default` recipe (all rules).
@@ -50,11 +56,12 @@ interface RuleView {
  * `EXIT_CODES.CONFIGURATION_ERROR` (typo
  * protection).
  */
-export function resolveRecipeToRules(
+export function resolveRecipeWithRules(
   name = BUILTIN_DEFAULT_RECIPE,
   opts: { readonly tolerant?: boolean } = {},
-): readonly Rule[] {
+): ResolvedGraphRecipeRules {
   const recipes = currentGraphRecipes();
+  let effectiveName = name;
   let recipe = recipes.loadRecipe(name);
   if (!recipe && opts.tolerant === true && name !== BUILTIN_DEFAULT_RECIPE) {
     logger.warn({
@@ -64,6 +71,7 @@ export function resolveRecipeToRules(
       fallback: BUILTIN_DEFAULT_RECIPE,
       msg: `Configured graph recipe '${name}' not found; using '${BUILTIN_DEFAULT_RECIPE}'. If '${name}' is a recipe for another tool, move it under that tool's <tool>.recipe key (ADR-0022).`,
     });
+    effectiveName = BUILTIN_DEFAULT_RECIPE;
     recipe = recipes.loadRecipe(BUILTIN_DEFAULT_RECIPE);
   }
   if (!recipe) {
@@ -93,5 +101,12 @@ export function resolveRecipeToRules(
     if (scope) setCurrentRecipeUnitConfig(scope, armConfig);
   }
 
-  return selected.map((v) => v.rule);
+  return { name: effectiveName, rules: selected.map((v) => v.rule) };
+}
+
+export function resolveRecipeToRules(
+  name = BUILTIN_DEFAULT_RECIPE,
+  opts: { readonly tolerant?: boolean } = {},
+): readonly Rule[] {
+  return resolveRecipeWithRules(name, opts).rules;
 }

@@ -33,7 +33,7 @@ import {
 
 const log = createToolLogger('graph:cli');
 
-import { resolveRecipeToRules } from '../recipes/resolve.js';
+import { resolveRecipeWithRules } from '../recipes/resolve.js';
 
 import { planGraphExecution } from './graph-command-plan.js';
 import { executeMultiPathGraph } from './graph-multi-path-mode.js';
@@ -125,16 +125,17 @@ export async function executeGraph(
     // the `--workspace` path the parent resolves only to validate the name
     // (fail-fast); children re-resolve in their own scope.
     const recipeSelection = resolveGraphRecipeSelection(opts.cwd, opts.recipe);
-    const rules = resolveRecipeToRules(recipeSelection.name, {
+    const resolvedRecipe = resolveRecipeWithRules(recipeSelection.name, {
       tolerant: recipeSelection.tolerant,
     });
+    const rules = resolvedRecipe.rules;
     // Normalize opts.recipe to the RESOLVED name so the envelope/run-header,
     // dashboard sessions, and any `--workspace` children report what actually
     // ran. Pre-ADR-0022 the generic `mergeConfigDefaults` set opts.recipe from
     // config; that responsibility now lives here, tool-scoped — opts is the
     // request-scoped parsed-options bag the pre-action hook already augments, so
     // this is the single point that owns graph's recipe normalization.
-    (opts as { recipe?: string }).recipe = recipeSelection.name;
+    (opts as { recipe?: string }).recipe = resolvedRecipe.name;
     if (plan.shape === 'workspace') {
       const outcome = await executeWorkspaceGraph(opts, cli, profile);
       writeProfileIfRequested(opts, profile);

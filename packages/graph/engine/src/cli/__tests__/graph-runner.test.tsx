@@ -79,7 +79,7 @@ describe('renderGraphLive produce mapping', () => {
       onProgress: vi.fn(),
       result: Promise.resolve(liveGraphOutput()),
     }));
-    await renderGraphLive({ cwd: '/proj', verbose: false });
+    await renderGraphLive({ cwd: '/proj', verbose: false, recipe: 'default' });
     const outcome = await capturedSpec!.produce(vi.fn(), {
       setRunning: vi.fn(),
       setHeaderMetadata: vi.fn(),
@@ -91,6 +91,8 @@ describe('renderGraphLive produce mapping', () => {
     expect(outcome.done.table).toBeUndefined();
     expect(outcome.done.summary).toMatchObject({ passed: false, errors: 1, warnings: 0 });
     expect(outcome.session?.tool).toBe('graph');
+    expect(outcome.session?.recipe).toBe('default');
+    expect(outcome.envelope?.recipe).toBe('default');
   });
 
   it('includes verbose lines and the per-rule table when --verbose', async () => {

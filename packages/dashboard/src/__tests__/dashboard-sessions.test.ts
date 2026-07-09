@@ -193,6 +193,15 @@ describe('renderSessionTable / renderDetail', () => {
     expect(row.querySelectorAll('td')[2]?.getAttribute('title')).toBe('suite-run-1');
   });
 
+  it('renders an absent recipe as not applicable', () => {
+    const panel = loadEnv().render([
+      makeSession({ id: 'y-no-recipe', tool: 'yagni', recipe: undefined }),
+    ]);
+    const row = panel.querySelector('tbody tr')!;
+    expect(row.querySelectorAll('td')[1]?.textContent).toBe('—');
+    expect(row.querySelectorAll('td')[1]?.textContent).not.toBe('default');
+  });
+
   it('renders per-detector detail with a "Detector" column for a yagni payload', () => {
     const panel = loadEnv().render([
       makeSession({

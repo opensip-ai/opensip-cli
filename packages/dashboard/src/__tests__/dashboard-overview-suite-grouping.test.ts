@@ -216,6 +216,12 @@ function auditSuite(): { readonly sessions: StoredSession[]; readonly runs: Dash
         exitCode: 0,
         outcome: 'passed',
         durationMs: 1000,
+        effectiveArgs: {
+          args: [[]],
+          cache: true,
+          gateCompare: false,
+          projectContext: { cwd: '/home/dev/project', walkedUp: 0 },
+        },
         verdictSummary: { passed: true, errors: 0, warnings: 1, findings: 1 },
         sessionId: 'graph-1',
       }),
@@ -228,6 +234,11 @@ function auditSuite(): { readonly sessions: StoredSession[]; readonly runs: Dash
         command: 'yagni',
         stableId: 'yagni',
         durationMs: 4000,
+        effectiveArgs: {
+          args: [[]],
+          cloud: true,
+          projectContext: { cwd: '/home/dev/project', walkedUp: 0 },
+        },
         sessionId: 'yagni-1',
       }),
     ],
@@ -394,7 +405,8 @@ describe('Overview suite rows', () => {
     ]);
     expect(rowCells).toHaveLength(9);
     expect(rowCells[2].querySelector('.badge')?.textContent).toBe('SUITE');
-    expect(rowCells[3].textContent).toBe('audit');
+    expect(rowCells[2].textContent).toContain('audit');
+    expect(rowCells[3].textContent).toBe('—');
     expect(row.textContent).toContain('67%');
     expect(row.textContent).toContain('FAIL');
     expect(row.textContent).toContain('2/3');
@@ -410,16 +422,74 @@ describe('Overview suite rows', () => {
     expect(expander.classList.contains('open')).toBe(true);
     expect(expander.style.display).toBe('table-row');
     expect(row.querySelector('.overview-suite-arrow')?.textContent).toBe('▼');
-    expect(
-      childRows()
-        .map((r) => r.textContent ?? '')
-        .join('\n'),
-    ).toContain('agent-risk');
-    expect(
-      childRows()
-        .map((r) => r.textContent ?? '')
-        .join('\n'),
-    ).toContain('impact');
+    const [fitChild, graphChild, yagniChild] = childRows();
+    expect(cells(fitChild)[3].textContent).toBe('agent-risk');
+    expect(cells(graphChild)[2].textContent).toContain('impact');
+    expect(cells(graphChild)[3].textContent).toBe('—');
+    expect(cells(yagniChild)[3].textContent).toBe('—');
+    expect(graphChild.textContent).not.toContain('projectContext');
+    expect(yagniChild.textContent).not.toContain('projectContext');
+  });
+
+  it('renders only recipe metadata for linked and faulted implicit runs', () => {
+    const graphSession = makeSession('standalone-graph', '2026-07-07T19:56:40.000Z', {
+      tool: 'graph',
+      recipe: undefined,
+    });
+    const linkedRun = implicitRunForSession(graphSession, {
+      steps: [
+        makeStep({
+          id: 'step-standalone-graph',
+          runId: 'run-standalone-graph',
+          logicalStepKey: '0:graph:graph',
+          ordinal: 0,
+          tool: 'graph',
+          command: 'graph',
+          stableId: 'graph',
+          effectiveArgs: {
+            args: [[]],
+            cache: true,
+            gateCompare: false,
+            projectContext: { cwd: '/home/dev/project', walkedUp: 0 },
+          },
+          sessionId: graphSession.id,
+        }),
+      ],
+    });
+    const faultedRun = makeRun({
+      id: 'run-faulted-graph',
+      name: 'graph',
+      source: 'implicit-tool',
+      exitCode: 2,
+      aggregate: { steps: 1, passed: 0, failed: 0, faulted: 1, errors: 0, warnings: 0 },
+      steps: [
+        makeStep({
+          id: 'step-faulted-graph',
+          runId: 'run-faulted-graph',
+          logicalStepKey: '0:graph:graph',
+          ordinal: 0,
+          tool: 'graph',
+          command: 'graph',
+          stableId: 'graph',
+          effectiveArgs: {
+            recipe: 'agent-risk',
+            cache: true,
+            projectContext: { cwd: '/home/dev/project', walkedUp: 0 },
+          },
+          exitCode: 2,
+          outcome: 'faulted',
+          verdictSummary: undefined,
+        }),
+      ],
+    });
+
+    bootReport([graphSession], [linkedRun, faultedRun]);
+
+    const [linkedRow, faultedRow] = directRunRows();
+    expect(cells(linkedRow)[3].textContent).toBe('—');
+    expect(cells(faultedRow)[3].textContent).toBe('agent-risk');
+    expect(linkedRow.textContent).not.toContain('projectContext');
+    expect(faultedRow.textContent).not.toContain('projectContext');
   });
 
   it('does not reconstruct overview rows from sessions without ledger runs', () => {

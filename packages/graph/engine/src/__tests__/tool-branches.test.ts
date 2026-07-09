@@ -261,10 +261,42 @@ describe('graph interactive --exact path honors graph config', () => {
     // pre-resolved shard set the runner uses to pick its transport.
     const [, args] = renderLive.mock.calls[0] as [
       string,
-      { exact?: boolean; shards?: readonly unknown[] },
+      {
+        exact?: boolean;
+        explicitRecipe?: string;
+        recipe?: string;
+        shards?: readonly unknown[];
+      },
     ];
     expect(args.exact).toBe(false);
+    expect(args.recipe).toBe('default');
+    expect(args.explicitRecipe).toBeUndefined();
     expect(Array.isArray(args.shards)).toBe(true);
+  });
+
+  it('does not promote a tolerant config recipe into a strict worker flag', async () => {
+    currentAdapterRegistry().register(fakeAdapter(workDir));
+    writeFileSync(
+      join(workDir, 'opensip-cli.config.yml'),
+      'graph:\n  recipe: missing-config-recipe\n',
+      'utf8',
+    );
+    Object.assign(currentScope() ?? {}, {
+      configDocument: { graph: { recipe: 'missing-config-recipe' } },
+    });
+    const { cli, renderLive } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+
+    await withTTY(
+      true,
+      () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
+    );
+
+    const [, args] = renderLive.mock.calls[0] as [
+      string,
+      { explicitRecipe?: string; recipe?: string },
+    ];
+    expect(args.recipe).toBe('default');
+    expect(args.explicitRecipe).toBeUndefined();
   });
 });
 

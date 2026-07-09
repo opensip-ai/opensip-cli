@@ -160,7 +160,7 @@ export function renderSessionTable(
     );
     row.append(
       el('td', {
-        text: s.recipe ?? 'default',
+        text: s.recipe ?? '—',
         style: 'color:var(--text-muted)',
       }),
     );

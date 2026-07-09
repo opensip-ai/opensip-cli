@@ -82,7 +82,10 @@ export interface GraphRunnerArgs {
   readonly quiet?: boolean;
   readonly config?: GraphConfig;
   readonly rules?: readonly Rule[];
+  /** Effective recipe name recorded on the envelope/session. */
   readonly recipe?: string;
+  /** Original `--recipe` flag, used only when the worker re-resolves rules. */
+  readonly explicitRecipe?: string;
   readonly exact?: boolean;
   readonly shards?: readonly Shard[];
 }
@@ -138,7 +141,7 @@ export async function renderGraphLive(
             resolution: args.resolution,
             exact: args.exact,
             ...(sharded ? { shards: args.shards ?? [] } : {}),
-            ...(args.recipe === undefined ? {} : { recipe: args.recipe }),
+            ...(args.explicitRecipe === undefined ? {} : { recipe: args.explicitRecipe }),
           }),
           'utf8',
         );
@@ -188,6 +191,7 @@ export async function renderGraphLive(
 
           const envelope = buildGraphEnvelope({
             signals: finalized.signals,
+            recipe: args.recipe,
             runId: currentScope()?.runId ?? '',
             createdAt: new Date().toISOString(),
           });
