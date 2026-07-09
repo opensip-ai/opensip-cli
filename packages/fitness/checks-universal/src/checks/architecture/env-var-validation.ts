@@ -60,7 +60,7 @@ const IF_GUARD_PATTERN = /\bif\s*\(\s*(?:!\s*)?process\.env\.\w+/;
 // Captures the variable an env read is assigned to, so a guard on that variable
 // (possibly on a following line) can be recognised as safe. The gap is bounded
 // to a single statement (no `=`, no newline) to keep matching linear.
- 
+
 const ENV_CAPTURE_PATTERN = /(?:const|let|var)\s+(\w+)\s*=\s*[^=\n]*?process\.env\.\w+/;
 
 // Env var extraction pattern

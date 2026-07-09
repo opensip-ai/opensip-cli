@@ -39,7 +39,7 @@ const EXIT_MARKER_PATTERN = /^::exit::(\d+)$/;
  * ReDoS-safe: `[^(]+` is bounded by the `(` delimiter, the numeric groups match
  * digits only, and each group has a distinct fixed delimiter.
  */
- 
+
 const TS_ERROR_LINE_PATTERN = /^([^(]+)\((\d+),(\d+)\):\s*(error|warning)\s+(TS\d+):\s*(.+)$/;
 
 interface ParsedError {

@@ -228,7 +228,7 @@ function filterContentImpl(content: string): FilteredContent {
   // characters. Using spread [...] produces a code-point array and desynchronizes
   // after the first emoji/etc, corrupting all subsequent positions, signals, SARIF,
   // baselines, suppression matching, etc.
-   
+
   const chars = content.split('');
 
   // Depth counter, not a boolean — a `${ `inner` }` construct nests two templates
@@ -298,7 +298,7 @@ function filterContentImpl(content: string): FilteredContent {
   const commentLines = linesToSet(content, commentRegions);
 
   // Compute `codeNoComments` ... (same UTF-16 alignment requirement as above)
-   
+
   const charsNoComments = content.split('');
   for (const region of stringRegions) {
     for (let i = region.start; i < region.end; i++) {

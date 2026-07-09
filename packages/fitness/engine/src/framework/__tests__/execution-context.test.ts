@@ -41,7 +41,6 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
   // explicitly listed in `globalExcludes`. The fix threads the run's
   // globalExcludes through RunOptions into the matchFiles fallback.
 
-   
   function setupCachedFiles(): void {
     mkdirSync(join(testDir, 'src'), { recursive: true });
     mkdirSync(join(testDir, 'docs'), { recursive: true });

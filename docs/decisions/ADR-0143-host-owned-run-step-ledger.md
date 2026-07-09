@@ -16,7 +16,7 @@ superseded_by: null
 related: [ADR-0093, ADR-0051, ADR-0100, ADR-0084, ADR-0036, ADR-0111, ADR-0117, ADR-0135]
 tags: [cli, host-planes, persistence, sessions, suites, evidence, mcp]
 enforcement: mechanizable
-enforced-by: ['dashboard-overview-suite-grouping.test', 'dashboard-external-tab.test']
+enforced-by: ['script:dashboard-overview-suite-grouping.test', 'script:dashboard-external-tab.test']
 enforcement-reason: >
   Focused dashboard tests assert the overview read model is ledger-only: sessions
   without a run ledger do not produce Recent Activity rows, implicit one-step

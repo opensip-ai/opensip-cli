@@ -1,7 +1,6 @@
 import { formatDuration, formatScore } from '@opensip-cli/format';
 import { describe, it, expect } from 'vitest';
 
-
 /** Must match @opensip-cli/format goldens (ADR-0144 lexical identity). */
 const DURATION_GOLDENS: readonly [number, string][] = [
   [0, '0ms'],

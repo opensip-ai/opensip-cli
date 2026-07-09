@@ -134,7 +134,7 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
     if (content === undefined) continue;
     const sourceFile = getSharedSourceFile(filePath, content);
     if (!sourceFile) continue;
-     
+
     const visit = (node: ts.Node): void => {
       if (ts.isPropertyAccessExpression(node)) {
         const propertyName = node.name.text;

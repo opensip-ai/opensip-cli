@@ -40,10 +40,9 @@ const surfaceCache = new Map<string, PackagePublicSurface | null>();
 // Both patterns are anchored to line boundaries (gm) and use bounded
 // character classes — no nested quantifiers — so they run in linear
 // time over input.
- 
+
 const RE_EXPORT_NAMED_FROM = /^\s*export\s+(?:type\s+)?\{[^}\n]*\}\s+from\s+['"]([^'"]+)['"]/gm;
 const RE_EXPORT_STAR_FROM = /^\s*export\s+\*(?:\s+as\s+\w+)?\s+from\s+['"]([^'"]+)['"]/gm;
- 
 
 /**
  * Reset all memoized state. Intended for tests.

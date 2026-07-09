@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T16:41:32.405Z",
+  "generatedAt": "2026-07-09T22:18:05.738Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,24 +25,24 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 215,
+        "total": 216,
         "bySlug": {
           "no-markdown-references": 5,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 4,
           "one-outcome-shape": 1,
           "context-leakage": 1,
-          "duplicate-utility-functions": 6,
           "async-waterfall-detection": 5,
           "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
           "stream-buffer-size-limits": 1,
-          "module-coupling-fan-out": 4,
+          "module-coupling-fan-out": 6,
           "shipped-checks-must-be-generic": 9,
           "fitness-check-standards": 17,
           "null-safety": 7,
           "correlation-id-coverage": 6,
+          "duplicate-utility-functions": 5,
           "duplicate-implementation-detection": 10,
           "no-raw-regex-on-code": 1,
           "fastify-schema-coverage": 2,
@@ -101,19 +101,18 @@
         },
         "byPackage": {
           "cli": 6,
-          "cli-ui": 1,
           "contracts": 2,
           "core": 5,
           "dashboard": 1,
           "fitness/checks-dogfood": 9,
           "fitness/checks-typescript": 57,
           "fitness/checks-universal": 103,
-          "fitness/engine": 11,
+          "fitness/engine": 12,
           "graph/engine": 11,
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 2,
           "mcp": 2,
-          "simulation": 2,
+          "simulation": 3,
           "test-support": 2
         }
       },
@@ -125,20 +124,20 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 44,
+        "total": 45,
         "bySlug": {
           "no-markdown-references": 3,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 1,
           "one-outcome-shape": 1,
           "context-leakage": 1,
-          "duplicate-utility-functions": 2,
           "async-waterfall-detection": 5,
           "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
           "stream-buffer-size-limits": 1,
-          "module-coupling-fan-out": 4,
+          "module-coupling-fan-out": 6,
+          "duplicate-utility-functions": 1,
           "no-direct-stdout-in-tool-engine": 2,
           "only-documented-toolcli-seams": 2,
           "semgrep-scan": 1,
@@ -156,28 +155,27 @@
         },
         "byPackage": {
           "cli": 6,
-          "cli-ui": 1,
           "contracts": 2,
           "core": 5,
           "dashboard": 1,
-          "fitness/engine": 11,
+          "fitness/engine": 12,
           "graph/engine": 11,
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 2,
           "mcp": 2,
-          "simulation": 2
+          "simulation": 3
         }
       },
       "graph": {
-        "total": 33,
+        "total": 32,
         "byRuleId": {
           "graph:always-throws-branch": 1,
-          "graph:near-duplicate-function-body": 26,
+          "graph:near-duplicate-function-body": 25,
           "graph:cycle": 6
         },
         "byPackage": {
           "cli": 3,
-          "cli-ui": 2,
+          "cli-ui": 1,
           "core": 1,
           "fitness/engine": 1,
           "graph/engine": 5,
@@ -379,7 +377,7 @@
       },
       "module-coupling-fan-out": {
         "budget": 4,
-        "actual": 4
+        "actual": 6
       },
       "project-readme-existence": {
         "budget": 0,
@@ -454,11 +452,11 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 215,
+    "budgetGateFitness": 216,
     "budgetGateFitnessSlugs": 71,
-    "productRuntimeFitness": 44,
+    "productRuntimeFitness": 45,
     "productRuntimeFitnessSlugs": 26,
-    "productRuntimeGraph": 33,
+    "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
     "productRuntimeCombined": 77,
     "checkPackageFitness": 169,
@@ -480,10 +478,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -261,
-      "productRuntimeGraph": 26,
+      "productRuntimeFitness": -260,
+      "productRuntimeGraph": 25,
       "productRuntimeCombined": -235,
-      "budgetGateFitness": -327,
+      "budgetGateFitness": -326,
       "checkPackageFitness": -65,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
@@ -491,8 +489,14 @@
     "reopenCandidates": [],
     "acceptedHighCount": [
       {
+        "slug": "module-coupling-fan-out",
+        "count": 6,
+        "disposition": "b",
+        "kind": "fitness"
+      },
+      {
         "slug": "graph:near-duplicate-function-body",
-        "count": 26,
+        "count": 25,
         "disposition": "b",
         "kind": "graph"
       },

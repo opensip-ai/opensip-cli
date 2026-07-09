@@ -9,7 +9,7 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitne
  * Matches patterns like: expr!. or expr![ or expr!) where expr is an identifier.
  * Avoids matching !== and != comparisons.
  */
- 
+
 const NON_NULL_ASSERTION_REGEX = /([\w.[\]]+)!\s*[.[;,)]/g;
 
 /**

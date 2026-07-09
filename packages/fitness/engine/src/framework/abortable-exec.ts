@@ -80,7 +80,7 @@ export function execAbortable(
       // Shell mode (string command) — callers pass hardcoded commands (e.g., lint/test runners).
       // Array overload is preferred for untrusted input (no shell, no injection risk).
       // nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true -- shell=true required for string commands; input is developer-defined check commands, not user input
-       
+
       child = spawn(command, [], {
         cwd,
         env,

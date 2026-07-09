@@ -15,7 +15,7 @@ const fakeAdapter: LanguageAdapter = {
   fileExtensions: ['.fake'],
   parse: () => null,
   stripStrings: (s: string) => s.replaceAll(/"[^"]*"/g, '"___"'),
-   
+
   stripComments: (s: string) => s.replaceAll(/\/\/.*$/gm, ''),
 };
 

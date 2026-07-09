@@ -201,7 +201,7 @@ function nextUsesDestructuredBindings(current: AwaitInfo, next: AwaitInfo): bool
 
 function isAwaitingFunctionCall(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '');
-   
+
   return /\([^)]*\)\s*$/.test(afterAwait);
 }
 

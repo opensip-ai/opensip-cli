@@ -3,7 +3,6 @@
 export const INTERFACE_PATTERN =
   /^(?:export\s+)?interface\s+(\w+)(?:<[^>]{1,200}>)?(?:\s+extends\s+([\w,\s<>]+))?/;
 
- 
 export const INTERFACE_EXTENDS_CONTINUATION = /^\s{0,40}extends\s+([\w,\s<>]+?)\s*\{?\s*$/;
 
 export const CLASS_PATTERN =

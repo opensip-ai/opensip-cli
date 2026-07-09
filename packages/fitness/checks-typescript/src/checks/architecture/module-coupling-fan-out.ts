@@ -42,7 +42,7 @@ function isBarrelFile(content: string): boolean {
   // top-level statement scan.
   const stripped = content
     .replaceAll(/\/\*[\s\S]*?\*\//g, '')
-     
+
     .replaceAll(/\/\/.*$/gm, '');
 
   // Collapse multi-line `export { a, b, c } from '...'` blocks onto one

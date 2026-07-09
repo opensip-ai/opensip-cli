@@ -11,7 +11,6 @@ import * as path from 'node:path';
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const CLANG_TIDY_LINE =
-   
   /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/;
 
 /**

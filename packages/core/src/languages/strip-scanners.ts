@@ -328,7 +328,7 @@ export function scanCharLiteral(
  */
 export function applyRegions(src: string, regions: readonly Region[]): string {
   if (regions.length === 0) return src;
-   
+
   const buf = src.split('');
   for (const r of regions) {
     for (let i = r.start; i < r.end; i++) {

@@ -84,7 +84,7 @@ function parseDirectiveRest(
   reason: string | null;
 } | null {
   // Strip trailing block-comment terminators: `*/` (C-family) and `-->` (HTML).
-   
+
   const normalized = rest.replace(/\s*(?:\*\/|-->)\s*$/, '').trimEnd();
 
   const separatorIndex = normalized.indexOf(' -- ');

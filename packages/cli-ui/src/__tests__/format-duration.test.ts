@@ -1,7 +1,6 @@
 import { formatDuration } from '@opensip-cli/format';
 import { describe, it, expect } from 'vitest';
 
-
 /**
  * Smoke: cli-ui live surfaces import the shared formatter (ADR-0144).
  * Canonical goldens live in @opensip-cli/format.
