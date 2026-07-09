@@ -3,7 +3,7 @@ status: active
 last_verified: 2026-07-08
 owner: opensip-cli
 enforcement: mechanizable
-enforced-by: ['shipped:external-adapter-progress-private-bridge', 'script:polyglot-external-adapter-matrix-e2e.test.ts']
+enforced-by: ['local:external-adapter-progress-private-bridge', 'script:polyglot-external-adapter-matrix-e2e.test.ts']
 enforcement-reason: >
   The shipped progress-bridge check keeps the bridge private to the CLI host and
   external-tool-adapter substrate; the polyglot matrix E2E proves installed

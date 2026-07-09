@@ -47,6 +47,21 @@ export const DEFAULT_BASELINE_IDENTITY: BaselineIdentity = {
 /** Public JSON schema version for {@link SignalEnvelope}. */
 export const SIGNAL_ENVELOPE_SCHEMA_VERSION = 2 as const;
 
+/** Return true when a value has the structural shape of a SignalEnvelope. */
+export function isSignalEnvelope(value: unknown): value is SignalEnvelope {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as Partial<SignalEnvelope>;
+  return (
+    typeof candidate.tool === 'string' &&
+    typeof candidate.runId === 'string' &&
+    typeof candidate.createdAt === 'string' &&
+    typeof candidate.verdict === 'object' &&
+    candidate.verdict !== null &&
+    Array.isArray(candidate.units) &&
+    Array.isArray(candidate.signals)
+  );
+}
+
 /**
  * Run-level verdict header. `passed` ⇔ "no `critical`/`high` signals";
  * `score` is the canonical {@link passRate} over `summary`.

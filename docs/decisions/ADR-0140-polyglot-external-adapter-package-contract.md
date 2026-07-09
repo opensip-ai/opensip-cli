@@ -3,7 +3,7 @@ status: active
 last_verified: 2026-07-08
 owner: opensip-cli
 enforcement: mechanizable
-enforced-by: ['shipped:external-tool-adapter-contract', 'local:adapter-must-use-substrate', 'script:polyglot-external-adapter-matrix-e2e.test.ts']
+enforced-by: ['local:external-tool-adapter-contract', 'local:adapter-must-use-substrate', 'script:polyglot-external-adapter-matrix-e2e.test.ts']
 enforcement-reason: >
   The shipped check validates adapter package manifests and source seams, the
   local dogfood check hardens first-party adapter paths, and the matrix E2E proves

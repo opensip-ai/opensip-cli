@@ -1,4 +1,4 @@
-import { EXIT_CODES, mapToolErrorToExitCode } from "@opensip-cli/contracts";
+import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   NetworkError,
@@ -7,16 +7,13 @@ import {
   runWithScope,
   type ReportFailureDetail,
   type ToolCliContext,
-} from "@opensip-cli/core";
-import { DataStoreFactory } from "@opensip-cli/datastore";
-import { RunRepo, SessionRepo } from "@opensip-cli/session-store";
-import { describe, expect, it, vi } from "vitest";
+} from '@opensip-cli/core';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { RunRepo, SessionRepo } from '@opensip-cli/session-store';
+import { describe, expect, it, vi } from 'vitest';
 
-import {
-  createRunActionHooks,
-  createRunPlaneFactory,
-} from "../../bootstrap/run-plane.js";
-import { runCommandSpecAction } from "../run-command-spec-action.js";
+import { createRunActionHooks, createRunPlaneFactory } from '../../bootstrap/run-plane.js';
+import { runCommandSpecAction } from '../run-command-spec-action.js';
 
 function makeCtx(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
   return {
@@ -32,17 +29,17 @@ function makeCtx(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
   } as unknown as ToolCliContext;
 }
 
-describe("runCommandSpecAction", () => {
-  it("runs handler output through dispatch and lifecycle hooks", async () => {
+describe('runCommandSpecAction', () => {
+  it('runs handler output through dispatch and lifecycle hooks', async () => {
     const beginRun = vi.fn();
     const completeRun = vi.fn();
     const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-      name: "fixture",
-      description: "fixture",
+      name: 'fixture',
+      description: 'fixture',
       commonFlags: [],
-      scope: "project",
-      output: "command-result",
-      handler: () => ({ type: "help" }),
+      scope: 'project',
+      output: 'command-result',
+      handler: () => ({ type: 'help' }),
     });
     const ctx = makeCtx();
 
@@ -52,41 +49,37 @@ describe("runCommandSpecAction", () => {
     });
 
     expect(beginRun).toHaveBeenCalledTimes(1);
-    expect(completeRun).toHaveBeenCalledWith({ type: "help" });
-    expect(ctx.render).toHaveBeenCalledWith({ type: "help" });
+    expect(completeRun).toHaveBeenCalledWith({ type: 'help' });
+    expect(ctx.render).toHaveBeenCalledWith({ type: 'help' });
   });
 
-  it("skips handler and output when external dispatch handles the command", async () => {
-    const handler = vi.fn(() => ({ type: "help" }) as const);
+  it('skips handler and output when external dispatch handles the command', async () => {
+    const handler = vi.fn(() => ({ type: 'help' }) as const);
     const maybeDispatchExternal = vi.fn(() => Promise.resolve(true));
     const completeRun = vi.fn();
     const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-      name: "fixture",
-      description: "fixture",
+      name: 'fixture',
+      description: 'fixture',
       commonFlags: [],
-      scope: "project",
-      output: "command-result",
+      scope: 'project',
+      output: 'command-result',
       handler,
     });
     const ctx = makeCtx();
 
-    await runCommandSpecAction(spec, { _args: ["src"] }, ["src"], ctx, {
+    await runCommandSpecAction(spec, { _args: ['src'] }, ['src'], ctx, {
       maybeDispatchExternal,
       completeRun,
     });
 
-    expect(maybeDispatchExternal).toHaveBeenCalledWith(
-      "fixture",
-      { _args: ["src"] },
-      ["src"],
-    );
+    expect(maybeDispatchExternal).toHaveBeenCalledWith('fixture', { _args: ['src'] }, ['src']);
     expect(handler).not.toHaveBeenCalled();
     expect(completeRun).not.toHaveBeenCalled();
     expect(ctx.render).not.toHaveBeenCalled();
   });
 
-  it("persists an implicit one-step ledger run for verdict command completions", async () => {
-    const datastore = DataStoreFactory.open({ backend: "memory" });
+  it('persists an implicit one-step ledger run for verdict command completions', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const hooks = createRunActionHooks(
         createRunPlaneFactory({
@@ -94,18 +87,18 @@ describe("runCommandSpecAction", () => {
         }),
       );
       const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-        name: "fit",
-        description: "fixture",
+        name: 'fit',
+        description: 'fixture',
         commonFlags: [],
-        scope: "project",
-        output: "raw-stream",
-        rawStreamReason: "runtime-render-dispatch",
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
         producesVerdict: true,
         handler: () => ({
           session: {
-            tool: "fit",
-            cwd: "/proj",
-            recipe: "default",
+            tool: 'fit',
+            cwd: '/proj',
+            recipe: 'default',
             score: 100,
             passed: true,
             payload: {
@@ -123,11 +116,11 @@ describe("runCommandSpecAction", () => {
       const ctx = makeCtx({ getExitCode: vi.fn(() => EXIT_CODES.SUCCESS) });
       const scope = new RunScope({
         datastore: () => datastore,
-        runId: "scope-run",
+        runId: 'scope-run',
       });
 
       await runWithScope(scope, () =>
-        runCommandSpecAction(spec, { cwd: "/proj", _args: [] }, [], ctx, hooks),
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], ctx, hooks),
       );
 
       expect(new SessionRepo(datastore).count()).toBe(1);
@@ -135,9 +128,9 @@ describe("runCommandSpecAction", () => {
       const runs = runRepo.listRuns();
       expect(runs).toHaveLength(1);
       expect(runs[0]).toMatchObject({
-        name: "fit",
-        source: "implicit-tool",
-        correlationRunId: "scope-run",
+        name: 'fit',
+        source: 'implicit-tool',
+        correlationRunId: 'scope-run',
         aggregate: {
           steps: 1,
           passed: 1,
@@ -147,12 +140,12 @@ describe("runCommandSpecAction", () => {
           warnings: 0,
         },
       });
-      const steps = runRepo.listStepsForRun(runs[0]?.id ?? "");
+      const steps = runRepo.listStepsForRun(runs[0]?.id ?? '');
       expect(steps[0]).toMatchObject({
         ordinal: 0,
-        tool: "fit",
-        command: "fit",
-        outcome: "passed",
+        tool: 'fit',
+        command: 'fit',
+        outcome: 'passed',
         verdictSummary: { passed: true, errors: 0, warnings: 0, findings: 0 },
       });
       expect(steps[0]?.sessionId).toBeDefined();
@@ -161,22 +154,22 @@ describe("runCommandSpecAction", () => {
     }
   });
 
-  it("persists a faulted implicit ledger run when verdict commands throw before evidence is returned", async () => {
-    const datastore = DataStoreFactory.open({ backend: "memory" });
+  it('persists a faulted implicit ledger run when verdict commands throw before evidence is returned', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
       const hooks = createRunActionHooks(
         createRunPlaneFactory({
           getDatastore: () => datastore,
         }),
       );
-      const error = new ConfigurationError("bad config");
+      const error = new ConfigurationError('bad config');
       const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-        name: "fit",
-        description: "fixture",
+        name: 'fit',
+        description: 'fixture',
         commonFlags: [],
-        scope: "project",
-        output: "raw-stream",
-        rawStreamReason: "runtime-render-dispatch",
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
         producesVerdict: true,
         handler: () => {
           throw error;
@@ -190,11 +183,11 @@ describe("runCommandSpecAction", () => {
       const ctx = makeCtx({ setExitCode, getExitCode });
       const scope = new RunScope({
         datastore: () => datastore,
-        runId: "scope-run",
+        runId: 'scope-run',
       });
 
       await runWithScope(scope, () =>
-        runCommandSpecAction(spec, { cwd: "/proj", _args: [] }, [], ctx, hooks),
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], ctx, hooks),
       );
 
       expect(setExitCode).toHaveBeenCalledWith(mapToolErrorToExitCode(error));
@@ -203,9 +196,9 @@ describe("runCommandSpecAction", () => {
       const runs = runRepo.listRuns();
       expect(runs).toHaveLength(1);
       expect(runs[0]).toMatchObject({
-        name: "fit",
-        source: "implicit-tool",
-        correlationRunId: "scope-run",
+        name: 'fit',
+        source: 'implicit-tool',
+        correlationRunId: 'scope-run',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         aggregate: {
           steps: 1,
@@ -216,14 +209,14 @@ describe("runCommandSpecAction", () => {
           warnings: 0,
         },
       });
-      const steps = runRepo.listStepsForRun(runs[0]?.id ?? "");
+      const steps = runRepo.listStepsForRun(runs[0]?.id ?? '');
       expect(steps[0]).toMatchObject({
         ordinal: 0,
-        tool: "fit",
-        command: "fit",
-        outcome: "faulted",
+        tool: 'fit',
+        command: 'fit',
+        outcome: 'faulted',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        evidence: { missing: "session-or-envelope" },
+        evidence: { missing: 'session-or-envelope' },
       });
       expect(steps[0]?.sessionId).toBeUndefined();
       expect(steps[0]?.verdictSummary).toBeUndefined();
@@ -232,19 +225,17 @@ describe("runCommandSpecAction", () => {
     }
   });
 
-  it("captures reportFailure and skips dispatch when a reporting handler returns void", async () => {
-    const reportFailure = vi.fn((_detail: ReportFailureDetail) =>
-      Promise.resolve(),
-    );
+  it('captures reportFailure and skips dispatch when a reporting handler returns void', async () => {
+    const reportFailure = vi.fn((_detail: ReportFailureDetail) => Promise.resolve());
     const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-      name: "fixture",
-      description: "fixture",
+      name: 'fixture',
+      description: 'fixture',
       commonFlags: [],
-      scope: "project",
-      output: "command-result",
+      scope: 'project',
+      output: 'command-result',
       handler: async (_opts, cli) => {
         await cli.reportFailure?.({
-          message: "reported",
+          message: 'reported',
           exitCode: EXIT_CODES.CONFIGURATION_ERROR,
         });
       },
@@ -254,20 +245,20 @@ describe("runCommandSpecAction", () => {
     await runCommandSpecAction(spec, { _args: [] }, [], ctx);
 
     expect(reportFailure).toHaveBeenCalledWith({
-      message: "reported",
+      message: 'reported',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
     });
     expect(ctx.render).not.toHaveBeenCalled();
   });
 
-  it("maps ToolError through setExitCode when no reportFailure seam exists", async () => {
-    const error = new ConfigurationError("bad config");
+  it('maps ToolError through setExitCode when no reportFailure seam exists', async () => {
+    const error = new ConfigurationError('bad config');
     const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-      name: "fixture",
-      description: "fixture",
+      name: 'fixture',
+      description: 'fixture',
       commonFlags: [],
-      scope: "project",
-      output: "command-result",
+      scope: 'project',
+      output: 'command-result',
       handler: () => {
         throw error;
       },
@@ -280,17 +271,15 @@ describe("runCommandSpecAction", () => {
     expect(ctx.render).not.toHaveBeenCalled();
   });
 
-  it("routes ToolError through reportFailure when available", async () => {
-    const error = new NetworkError("upload failed");
-    const reportFailure = vi.fn((_detail: ReportFailureDetail) =>
-      Promise.resolve(),
-    );
+  it('routes ToolError through reportFailure when available', async () => {
+    const error = new NetworkError('upload failed');
+    const reportFailure = vi.fn((_detail: ReportFailureDetail) => Promise.resolve());
     const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
-      name: "fixture",
-      description: "fixture",
+      name: 'fixture',
+      description: 'fixture',
       commonFlags: [],
-      scope: "project",
-      output: "command-result",
+      scope: 'project',
+      output: 'command-result',
       handler: () => {
         throw error;
       },

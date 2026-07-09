@@ -1,13 +1,13 @@
-import { isPlainRecord, type Signal } from '@opensip-cli/core';
-
-import type {
-  RepairSignalRef,
-  RepairVerificationCommand,
-  RepairVerificationFailure,
-  RepairVerificationFindingMatch,
-  RepairVerificationResult,
-  SignalEnvelope,
+import {
+  isSignalEnvelope,
+  type RepairSignalRef,
+  type RepairVerificationCommand,
+  type RepairVerificationFailure,
+  type RepairVerificationFindingMatch,
+  type RepairVerificationResult,
+  type SignalEnvelope,
 } from '@opensip-cli/contracts';
+import { isPlainRecord, type Signal } from '@opensip-cli/core';
 
 const MAX_FAILURE_MESSAGE_LENGTH = 500;
 
@@ -85,10 +85,6 @@ function findingMatch(signal: Signal): RepairVerificationFindingMatch {
     ...(signal.line === undefined ? {} : { line: signal.line }),
     ...(signal.fingerprint === undefined ? {} : { fingerprint: signal.fingerprint }),
   };
-}
-
-function isSignalEnvelope(value: unknown): value is SignalEnvelope {
-  return isPlainRecord(value) && Array.isArray(value.signals) && Array.isArray(value.units);
 }
 
 function envelopeFromOutcome(value: unknown): SignalEnvelope | undefined {

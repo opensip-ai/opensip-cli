@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 release: v0.5.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -21,7 +21,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **154 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **152 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
@@ -29,11 +29,11 @@ Fixture coverage and [detection-quality measurement](./14-detection-quality.md) 
 
 ---
 
-## Universal  *(98 checks)*
+## Universal  *(96 checks)*
 
 Language-agnostic; runs against every project.
 
-### Architecture  *(18)*
+### Architecture  *(16)*
 
 | Slug | Description |
 |---|---|
@@ -41,8 +41,6 @@ Language-agnostic; runs against every project.
 | [`docker-version-sync`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/docker-version-sync.ts) | Validate Docker Node/pnpm versions match package.json |
 | [`empty-package-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/empty-package-detection.ts) | Detects packages with empty or commented-out exports |
 | [`env-var-validation`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/env-var-validation.ts) | Detects environment variable access without proper validation |
-| [`external-adapter-progress-private-bridge`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/external-adapter-progress-private-bridge.ts) | External adapter progress bridge helpers are private to the CLI worker shim and external-tool-adapter substrate |
-| [`external-tool-adapter-contract`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/external-tool-adapter-contract.ts) | External Tool Adapter packages must use defineExternalToolAdapter and delegate subprocess, output, session, and baseline effects to the substrate/host seams |
 | [`heavy-import-detection`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/heavy-import-detection.ts) | Detects heavy/deprecated library imports and excessive named imports that bloat bundle size |
 | [`interface-implementation-consistency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/modules/interface-implementation-consistency.ts) | Verifies interfaces match their implementations |
 | [`no-custom-event-emitter`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-universal/src/checks/architecture/no-custom-event-emitter.ts) | Detects direct EventEmitter usage that should use infrastructure/events |

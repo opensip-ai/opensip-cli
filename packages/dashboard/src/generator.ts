@@ -26,6 +26,7 @@ import type {
   DeclaredInputs,
 } from '@opensip-cli/contracts';
 
+/** A persisted host-owned run plus its ordered steps for dashboard rendering. */
 export interface DashboardRun extends StoredRun {
   readonly steps: readonly StoredRunStep[];
 }

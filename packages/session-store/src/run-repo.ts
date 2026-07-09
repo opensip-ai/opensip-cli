@@ -8,11 +8,13 @@ import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 
+/** Filters for querying the host-owned run ledger. */
 export interface RunListOptions {
   readonly limit?: number;
   readonly source?: StoredRun['source'];
 }
 
+/** Repository for persisted host-owned runs and ordered run steps. */
 export class RunRepo {
   private readonly datastore: DrizzleDataStore;
 
@@ -239,13 +241,17 @@ function stepFromRow(row: typeof runSteps.$inferSelect): StoredRunStep {
     stableId: row.stable_id,
     ...(row.effective_args == null
       ? {}
-      : { effectiveArgs: row.effective_args as StoredRunStep['effectiveArgs'] }),
+      : {
+          effectiveArgs: row.effective_args as StoredRunStep['effectiveArgs'],
+        }),
     exitCode: row.exit_code,
     outcome: row.outcome as StoredRunStep['outcome'],
     durationMs: row.duration_ms,
     ...(row.verdict_summary == null
       ? {}
-      : { verdictSummary: row.verdict_summary as StoredRunStep['verdictSummary'] }),
+      : {
+          verdictSummary: row.verdict_summary as StoredRunStep['verdictSummary'],
+        }),
     ...(row.session_id === null ? {} : { sessionId: row.session_id }),
     ...(row.evidence == null ? {} : { evidence: row.evidence }),
     ...(row.parent_step_id === null ? {} : { parentStepId: row.parent_step_id }),

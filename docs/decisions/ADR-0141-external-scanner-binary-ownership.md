@@ -3,7 +3,7 @@ status: active
 last_verified: 2026-07-08
 owner: opensip-cli
 enforcement: mechanizable
-enforced-by: ['shipped:external-tool-adapter-contract', 'script:polyglot-external-adapter-matrix-e2e.test.ts']
+enforced-by: ['local:external-tool-adapter-contract', 'script:polyglot-external-adapter-matrix-e2e.test.ts']
 enforcement-reason: >
   The adapter package contract keeps scanner execution on the substrate, while
   the matrix E2E exercises doctor/version success, broken binary pins, and scan

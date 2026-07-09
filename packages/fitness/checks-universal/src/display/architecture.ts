@@ -11,8 +11,6 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'docker-version-sync': ['🐳', 'Docker Version Sync'],
   'empty-package-detection': ['📦', 'Empty Package Detection'],
   'env-var-validation': ['🔧', 'Env Var Validation'],
-  'external-adapter-progress-private-bridge': ['🔒', 'External Adapter Progress Private Bridge'],
-  'external-tool-adapter-contract': ['🧩', 'External Tool Adapter Contract'],
   'file-length-limit': ['📏', 'File Length Limit'],
   'heavy-import-detection': ['📦', 'Heavy Import Detection'],
   'interface-implementation-consistency': ['📋', 'Interface Implementation Consistency'],
