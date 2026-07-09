@@ -15,12 +15,14 @@ const EPHEMERAL_OR_DIAGNOSTIC_ALLOWLIST = [
   /packages\/fitness\/engine\/src\/cli\/fit-runner\.tsx$/,
   /packages\/simulation\/engine\/src\/cli\/sim-runner\.tsx$/,
   /packages\/graph\/engine\/src\/cli\/graph-runner\.tsx$/,
+  // Same ephemeral worker-spec transport as fit/sim/graph live runners (tmpdir
+  // JSON for the off-thread worker argv; cleaned up in `finally`).
+  /packages\/yagni\/engine\/src\/cli\/yagni-runner\.tsx$/,
   /packages\/graph\/engine\/src\/cli\/orchestrate\/shard-runner\.ts$/,
   /packages\/graph\/engine\/src\/cli\/orchestrate\/resolution-trace\.ts$/,
   /packages\/graph\/engine\/src\/cli\/profile\.ts$/,
   /packages\/graph\/engine\/src\/cli\/equivalence-check-command\.ts$/,
 ];
-
 const RAW_FS_WRITE_PATTERNS = [
   /\bwriteFileSync\s*\(/,
   /\bappendFileSync\s*\(/,

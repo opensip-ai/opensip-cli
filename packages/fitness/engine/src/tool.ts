@@ -1,3 +1,4 @@
+// @fitness-ignore-file module-coupling-fan-out -- composition root: the fitness Tool descriptor wires every subcommand spec, scope contribution, check/recipe registries, and live-view setup; high intra-project fan-out is inherent to a tool-wiring file (same posture as packages/graph/engine/src/tool.ts).
 /**
  * fitnessTool — fitness as a Tool plugin.
  *

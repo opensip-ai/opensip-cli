@@ -1,3 +1,4 @@
+// @fitness-ignore-file module-coupling-fan-out -- composition root: the simulation Tool descriptor wires every subcommand spec, scope contribution, scenario/recipe registries, and live-view setup; high intra-project fan-out is inherent to a tool-wiring file (same posture as packages/graph/engine/src/tool.ts).
 /**
  * simulationTool — simulation as a Tool plugin.
  *
