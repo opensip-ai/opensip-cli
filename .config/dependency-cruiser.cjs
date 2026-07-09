@@ -438,7 +438,6 @@ module.exports = {
       to: { path: '^packages/(?!format/)' },
     },
 
-
     // -------------------------------------------------------------------
     // Layer enforcement — config depends on core (+ contracts) only.
     //

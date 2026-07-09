@@ -16,20 +16,13 @@ superseded_by: null
 related: [ADR-0051, ADR-0058, ADR-0117, ADR-0137, ADR-0143]
 tags: [cli, dashboard, mcp, presentation, format, architecture]
 enforcement: mechanizable
-enforced-by:
-  - 'depcruise:format-imports-nothing'
-  - 'depcruise:cli-ui-no-workspace-deps'
-  - 'depcruise:dashboard-imports-only-core-contracts'
-  - 'script:verify-gate-live'
-  - 'local:presentation-labels-via-format'
+enforced-by: ['depcruise:format-imports-nothing', 'depcruise:cli-ui-no-workspace-deps', 'depcruise:dashboard-imports-only-core-contracts', 'script:verify-gate-live', 'local:presentation-labels-via-format']
 enforcement-reason: >
   Mechanizable: (1) pure formatters + narrow display projections live only in
   @opensip-cli/format; (2) depcruise allowlists pin which packages may import
   format and forbid reimplementation sites; (3) a project-local fitness check
-  should forbid ad-hoc duration/score string construction outside the format
-  package and guard format from owning suite/count/status business aggregation.
-  Enforcers land with the implementation plan
-  (docs/plans/ready/host-owned-presentation-values/); until then NONE-YET.
+  forbids ad-hoc duration/score string construction outside the format package
+  and guards format from owning suite/count/status business aggregation.
 ```
 
 **Decision:** Canonical **raw facts** (for example `durationMs`, `score`, unit

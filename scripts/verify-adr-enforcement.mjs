@@ -62,7 +62,7 @@ function loadSlugOrigins() {
     for (const root of roots) {
       for (const file of sourceFiles(root)) {
         const text = readFileSync(file, 'utf8');
-        for (const m of text.matchAll(/slug: '([a-z0-9-]+)'/g)) {
+        for (const m of text.matchAll(/slug: ['\"]([a-z0-9-]+)['\"]/g)) {
           if (!origins.has(m[1])) origins.set(m[1], origin);
         }
       }
