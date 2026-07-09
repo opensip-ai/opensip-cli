@@ -478,9 +478,9 @@
   },
   "devDependencies": {
     "@opensip-cli/output": "workspace:*",
-    "@types/node": "^24.13.2",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

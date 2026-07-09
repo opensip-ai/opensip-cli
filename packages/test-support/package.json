@@ -25,8 +25,8 @@
     "@opensip-cli/tool-test-kit": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "vitest": "^4.1.9"
+    "@types/node": "^26.1.1",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=24"

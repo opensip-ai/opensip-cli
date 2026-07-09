@@ -37,9 +37,11 @@ allowBuilds:
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
-# OpenTelemetry 2026-06-11 update was intentionally taken before the
-# 24-hour release-age window elapsed.
+# Intentional early takes before the 24-hour release-age window elapsed.
+# Remove an entry once the version is past minimumReleaseAge (or after the
+# next routine dep refresh supersedes it).
 minimumReleaseAgeExclude:
+  # OpenTelemetry 2026-06-11 update
   - '@opentelemetry/api-logs@0.219.0'
   - '@opentelemetry/context-async-hooks@2.8.0'
   - '@opentelemetry/core@2.8.0'
@@ -52,6 +54,8 @@ minimumReleaseAgeExclude:
   - '@opentelemetry/sdk-metrics@2.8.0'
   - '@opentelemetry/sdk-trace-base@2.8.0'
   - '@opentelemetry/sdk-trace-node@2.8.0'
+  # 2026-07-09 dep refresh (vite patch only; rest of batch already aged in)
+  - 'vite@8.1.4'
 trustPolicy: no-downgrade
 trustLockfile: false
 blockExoticSubdeps: true
