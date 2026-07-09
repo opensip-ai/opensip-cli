@@ -221,7 +221,7 @@ async function runStep(args: {
     sessionId === undefined &&
     capturedEnvelope === undefined
   ) {
-    exitCode = EXIT_CODES.RUNTIME_ERROR;
+    if (exitCode === EXIT_CODES.SUCCESS) exitCode = EXIT_CODES.RUNTIME_ERROR;
     errorMessage = 'Verdict-producing suite step completed without session or captured evidence.';
     errorCode = 'RUN.EVIDENCE.MISSING';
   }

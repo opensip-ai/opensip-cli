@@ -128,6 +128,10 @@ function signalEnvelope(input: {
   } as SignalEnvelope;
 }
 
+function emitPassingEvidence(cli: ToolCliContext): void {
+  cli.emitEnvelope(signalEnvelope({ passed: true, findings: 0 }));
+}
+
 function externalProvenance(): ToolProvenance {
   return {
     source: 'installed',
@@ -199,8 +203,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -286,12 +291,14 @@ describe('runSuite', () => {
       order.push(`load:${owningTool.metadata.id}`);
       return Promise.resolve(1);
     });
-    const fit = helpCommand('fit', () => {
+    const fit = helpCommand('fit', (_opts, cli) => {
       order.push('run:fit');
+      emitPassingEvidence(cli);
       return { type: 'help' };
     });
-    const impact = helpCommand('impact', () => {
+    const impact = helpCommand('impact', (_opts, cli) => {
       order.push('run:impact');
+      emitPassingEvidence(cli);
       return { type: 'help' };
     });
     const fitness = tool(TOOL_ID, 'fitness', [fit]);
@@ -362,8 +369,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -385,8 +393,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -404,8 +413,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -466,8 +476,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -522,8 +533,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -570,8 +582,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -619,8 +632,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -660,8 +674,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: (opts) => {
+      handler: (opts, cli) => {
         seen.push(opts as Record<string, unknown>);
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -714,6 +729,7 @@ describe('runSuite', () => {
       producesVerdict: true,
       handler: (_opts, cli) => {
         cli.setExitCode(EXIT_CODES.REPORT_FAILED);
+        cli.emitEnvelope(signalEnvelope({ passed: false, findings: 0 }));
         return { type: 'help' };
       },
     });
@@ -835,7 +851,10 @@ describe('runSuite', () => {
   it('captures process.exit from a bundled step and restores process.exit afterward', async () => {
     // eslint-disable-next-line @typescript-eslint/unbound-method -- process.exit has no `this` contract; this test preserves identity for restoration.
     const originalExit = process.exit;
-    const after = vi.fn(() => ({ type: 'help' }) as const);
+    const after = vi.fn((_opts: unknown, cli: ToolCliContext) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' } as const;
+    });
     const exiting = defineCommand<unknown, ToolCliContext>({
       name: 'exit-step',
       description: 'fixture',
@@ -897,8 +916,9 @@ describe('runSuite', () => {
       scope: 'project',
       output: 'command-result',
       producesVerdict: true,
-      handler: () => {
+      handler: (_opts, cli) => {
         calls.push('after');
+        emitPassingEvidence(cli);
         return { type: 'help' };
       },
     });
@@ -965,7 +985,10 @@ describe('runSuite', () => {
     const external = helpCommand('external-run', () => {
       throw new Error('external handler should not run in-process');
     });
-    const bundled = helpCommand('bundled-ok', () => ({ type: 'help' }));
+    const bundled = helpCommand('bundled-ok', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
     const scope = new RunScope({ toolProvenance: [externalProvenance()] });
 
     const result = await runWithScope(scope, () =>
@@ -1031,6 +1054,7 @@ describe('runSuite', () => {
     });
     const failureWithoutFindings = helpCommand('failure-without-findings', (_opts, cli) => {
       cli.setExitCode(2);
+      cli.emitEnvelope(signalEnvelope({ passed: false, findings: 0 }));
       return { type: 'help' };
     });
     const fault = helpCommand('fault', () => {
@@ -1074,13 +1098,12 @@ describe('runSuite', () => {
     expect(result.exitCode).toBe(2);
     expect(result.aggregate).toEqual({
       steps: 6,
-      // `missing-output` (success exit, no envelope) is now a first-class `passed`
-      // — the old aggregate silently dropped it from all three counts, so a 6-step
-      // suite reported only 5 outcomes despite this test's own "without collapsing
-      // outcome classes" contract.
-      passed: 3,
+      // `failure-without-findings` is an evidence-backed failed verdict with zero
+      // signals. `missing-output` is deliberately evidence-less and now faults
+      // under the completion assertion instead of being silently counted passed.
+      passed: 2,
       failed: 2,
-      faulted: 1,
+      faulted: 2,
       errors: 2,
       warnings: 1,
     });
@@ -1100,9 +1123,10 @@ describe('runSuite', () => {
     ]);
     expect(result.reviewBrief?.degraded).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'missing-envelope', stepIndex: 3 }),
+        expect.objectContaining({ code: 'failing-verdict-without-signals', stepIndex: 3 }),
         expect.objectContaining({ code: 'step-fault', stepIndex: 4 }),
         expect.objectContaining({ code: 'missing-envelope', stepIndex: 4 }),
+        expect.objectContaining({ code: 'step-fault', stepIndex: 5 }),
         expect.objectContaining({ code: 'missing-envelope', stepIndex: 5 }),
       ]),
     );
@@ -1128,8 +1152,8 @@ describe('runSuite', () => {
       command: 'failure-without-findings',
       exitCode: 2,
       outcome: 'failed',
+      verdict: { passed: false, errors: 0, warnings: 0, findings: 0 },
     });
-    expect(result.steps[3]?.verdict).toBeUndefined();
     expect(result.steps[4]).toMatchObject({
       command: 'fault',
       exitCode: EXIT_CODES.RUNTIME_ERROR,
@@ -1139,8 +1163,10 @@ describe('runSuite', () => {
     expect(result.steps[4]?.verdict).toBeUndefined();
     expect(result.steps[5]).toMatchObject({
       command: 'missing-output',
-      exitCode: EXIT_CODES.SUCCESS,
-      outcome: 'passed',
+      exitCode: EXIT_CODES.RUNTIME_ERROR,
+      outcome: 'faulted',
+      error: 'Verdict-producing suite step completed without session or captured evidence.',
+      errorCode: 'RUN.EVIDENCE.MISSING',
     });
     expect(result.steps[5]?.verdict).toBeUndefined();
 
@@ -1193,7 +1219,10 @@ describe('runSuite', () => {
   });
 
   it('raises an envelope-backed fault but does not fail the suite exit by default (failOnFault false)', async () => {
-    const ok = helpCommand('ok', () => ({ type: 'help' }));
+    const ok = helpCommand('ok', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
     // A CHECK faulted: the tool RAN and emitted an envelope whose verdict is
     // faulted (result unknown) — distinct from the whole step crashing.
     const faultyCheck = helpCommand('faulty', async (_opts, cli) => {
