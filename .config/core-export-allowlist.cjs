@@ -500,7 +500,6 @@ const EXPORT_ALLOWLIST = {
   extractPayloadVersion: 'run-kernel',
   extractTimestamp: 'run-kernel',
   forEachWithConcurrency: 'run-kernel',
-  formatDuration: 'run-kernel',
   formatUnknownErrorMessage: 'run-kernel',
   generateId: 'run-kernel',
   generatePrefixedId: 'run-kernel',

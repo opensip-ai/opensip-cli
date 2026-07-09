@@ -5,6 +5,9 @@
  * Labels, not meaning: suite aggregation stays in dashboard/host code; this
  * check only blocks ad-hoc duration/score *string* construction outside
  * packages/format/.
+ *
+ * Uses raw content (no strip-strings-and-comments): the anti-patterns depend on
+ * literal `'s'`, `'%'`, and template text that stripping would blank.
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
@@ -16,16 +19,31 @@ const ALLOW_PATH = [
   /docs\//,
 ];
 
-/** durationMs / 1000 used for human labels (not catalog provenance wall clocks). */
-const DURATION_DIV_RE = /durationMs\s*\/\s*1000/;
-/** Classic dashboard/CLI ad-hoc seconds label. */
-const TOFIXED_S_RE = /\.toFixed\s*\(\s*1\s*\)\s*\+\s*['"]s['"]/;
-/** Local reimplementation of the shared formatter. */
-const LOCAL_FORMAT_DURATION_RE = /\bfunction\s+formatDuration\s*\(/;
-/** score + '%' style (not template-threshold rates). */
-const SCORE_PLUS_PCT_RE = /\bscore\s*\+\s*['"]%['"]/;
-/** `${s.score}%` / `${score}%` session-style labels. */
-const SCORE_TEMPLATE_RE = /\$\{\s*(?:s\.)?score\s*\}%/;
+/**
+ * Anti-patterns for human duration/score labels. Ordered for readable messages.
+ * Intentionally does not ban CSS width percentages (`width: … + rate + '%'`) —
+ * those lines are skipped via WIDTH_STYLE_LINE.
+ */
+const PATTERNS = [
+  [/durationMs\s*\/\s*1000/, 'durationMs / 1000 human label'],
+  [/\.toFixed\s*\(\s*1\s*\)\s*\+\s*['"]s['"]/, ".toFixed(1) + 's' human duration label"],
+  [/\bfunction\s+formatDuration\s*\(/, 'local formatDuration function'],
+  [/\bscore\s*\+\s*['"]%['"]/, "score + '%' human score label"],
+  [/\$\{\s*(?:s\.)?score\s*\}%/, '`${score}%` human score label'],
+  // Suite step style: `${Math.round(step.durationMs)}ms` or durationMs + 'ms'
+  [/Math\.round\s*\(\s*[^)]*durationMs[^)]*\)/, 'Math.round(durationMs) ad-hoc ms label'],
+  [/durationMs\s*\+\s*['"]ms['"]/, "durationMs + 'ms' ad-hoc label"],
+  [/\$\{[^}]*durationMs[^}]*\}ms/, 'template durationMs…ms ad-hoc label'],
+  // Recipe/catalog timeout (ms) rendered as seconds without formatDuration
+  [/\btimeout\s*\/\s*1000/, 'timeout / 1000 human duration label'],
+  [/\/\s*1000\s*\+\s*['"]s['"]/, "/ 1000 + 's' human duration label"],
+  // Pass-rate / percentage display (not CSS width — see WIDTH_STYLE_LINE skip)
+  [/\brate\s*\+\s*['"]%['"]/, "rate + '%' human percent label"],
+  [/\$\{\s*rate\s*\}%/, '`${rate}%` human percent label'],
+];
+
+/** CSS width percentage construction — not a presentation score label. */
+const WIDTH_STYLE_LINE = /\bwidth\s*:/;
 
 export function analyzePresentationLabelsViaFormat(content, filePath) {
   const normalized = filePath.replaceAll('\\', '/');
@@ -41,14 +59,11 @@ export function analyzePresentationLabelsViaFormat(content, filePath) {
 
   const violations = [];
   for (const [i, line] of content.split('\n').entries()) {
-    const patterns = [
-      [DURATION_DIV_RE, 'durationMs / 1000 human label'],
-      [TOFIXED_S_RE, ".toFixed(1) + 's' human duration label"],
-      [LOCAL_FORMAT_DURATION_RE, 'local formatDuration function'],
-      [SCORE_PLUS_PCT_RE, "score + '%' human score label"],
-      [SCORE_TEMPLATE_RE, '`${score}%` human score label'],
-    ];
-    for (const [re, kind] of patterns) {
+    if (WIDTH_STYLE_LINE.test(line) && /\brate\s*\+/.test(line)) {
+      // e.g. 'width:' + rate + '%' — layout, not a shared score label.
+      continue;
+    }
+    for (const [re, kind] of PATTERNS) {
       re.lastIndex = 0;
       if (!re.test(line)) continue;
       violations.push({
@@ -78,7 +93,7 @@ export const checks = [
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture'],
     fileTypes: ['ts', 'tsx'],
-    contentFilter: 'strip-strings-and-comments',
+    // Raw content: anti-patterns depend on string literals ('s', '%', template tails).
     analyze: (content, filePath) => analyzePresentationLabelsViaFormat(content, filePath),
   }),
 ];

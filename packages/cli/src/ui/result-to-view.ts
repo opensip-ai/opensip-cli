@@ -16,6 +16,7 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
+import { formatScore } from '@opensip-cli/format';
 import {
   line,
   group,
@@ -110,7 +111,7 @@ function sessionReplayView(result: SessionReplayResult): ViewNode {
       { text: `  ·  ${when}`, tone: 'muted' },
     ]),
     line([
-      { text: `${s.score}%`, tone: verdictTone },
+      { text: formatScore(s.score), tone: verdictTone },
       { text: '  ' },
       { text: s.passed ? 'PASS' : 'FAIL', tone: verdictTone },
       ...(s.recipe === undefined

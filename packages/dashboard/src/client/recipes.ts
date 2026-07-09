@@ -10,6 +10,8 @@
  * emitted Code Paths panel can reach for it by bare name.
  */
 
+import { formatDuration } from '@opensip-cli/format';
+
 import { el } from './el.js';
 
 /** A recipe catalog entry (tool domain vocabulary, read structurally). */
@@ -77,10 +79,10 @@ export function renderRecipesPanel(
     modeCell.append(el('span', { text: recipe.mode, style: modeColor + ';font-size:12px' }));
     row.append(modeCell);
 
-    // Timeout.
+    // Timeout (ms in catalog → shared duration label, ADR-0144).
     row.append(
       el('td', {
-        text: recipe.timeout / 1000 + 's',
+        text: formatDuration(recipe.timeout),
         style: 'color:var(--text-dim);font-size:12px',
       }),
     );
