@@ -1,29 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
-import { formatDuration } from '../format-duration.js';
+import { formatDuration } from '@opensip-cli/format';
 
-describe('formatDuration', () => {
-  it('keeps sub-second durations in milliseconds', () => {
-    expect(formatDuration(0)).toBe('0ms');
-    expect(formatDuration(450)).toBe('450ms');
-    expect(formatDuration(999)).toBe('999ms');
-  });
-
-  it('rounds fractional sub-second durations (performance.now() deltas)', () => {
-    expect(formatDuration(639.6488329999999)).toBe('640ms');
-    expect(formatDuration(0.4)).toBe('0ms');
-  });
-
-  it('uses seconds below the minute display boundary', () => {
-    expect(formatDuration(1000)).toBe('1.0s');
+/**
+ * Smoke: cli-ui live surfaces import the shared formatter (ADR-0144).
+ * Canonical goldens live in @opensip-cli/format.
+ */
+describe('cli-ui formatDuration import', () => {
+  it('resolves the shared formatter used by live tables and RunSummary', () => {
+    expect(formatDuration(19_850)).toBe('19.9s');
     expect(formatDuration(12_340)).toBe('12.3s');
-    expect(formatDuration(59_949)).toBe('59.9s');
-  });
-
-  it('uses minutes and seconds at minute scale', () => {
-    expect(formatDuration(59_950)).toBe('1m 0.0s');
-    expect(formatDuration(60_000)).toBe('1m 0.0s');
-    expect(formatDuration(119_999)).toBe('2m 0.0s');
-    expect(formatDuration(1_471_600)).toBe('24m 31.6s');
   });
 });

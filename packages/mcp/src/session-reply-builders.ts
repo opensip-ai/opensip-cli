@@ -25,6 +25,7 @@ export function runSummaryFromReplay(session: StoredSession, envelope: SignalEnv
     startedAt: session.startedAt,
     completedAt: session.completedAt,
     cwd: session.cwd,
+    durationMs: session.durationMs,
     score: session.score,
     passed: session.passed,
     ...(session.cliVersion === undefined ? {} : { cliVersion: session.cliVersion }),

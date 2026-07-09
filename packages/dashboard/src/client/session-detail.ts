@@ -12,6 +12,7 @@
 import { el } from './el.js';
 import { paginateGroupedRows } from './pagination.js';
 import { makeSortable } from './sortable.js';
+import { formatDuration } from '@opensip-cli/format';
 
 /** A finding inside a check/rule (read structurally from the tool payload). */
 interface Finding {
@@ -275,7 +276,7 @@ function appendCheckRow(
   if (ctx.showDuration)
     row.append(
       el('td', {
-        text: (check.durationMs ?? 0) > 0 ? check.durationMs + 'ms' : '0ms',
+        text: formatDuration(check.durationMs ?? 0),
         style: DIM,
       }),
     );

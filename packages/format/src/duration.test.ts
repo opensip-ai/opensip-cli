@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { formatDuration } from '../format.js';
+import { formatDuration } from './duration.js';
 
 describe('formatDuration', () => {
   it('renders sub-second durations as integer milliseconds', () => {
@@ -18,6 +18,7 @@ describe('formatDuration', () => {
     expect(formatDuration(1000)).toBe('1.0s');
     expect(formatDuration(1500)).toBe('1.5s');
     expect(formatDuration(12_340)).toBe('12.3s');
+    expect(formatDuration(19_850)).toBe('19.9s');
     expect(formatDuration(59_949)).toBe('59.9s');
   });
 
@@ -27,5 +28,12 @@ describe('formatDuration', () => {
     expect(formatDuration(61_500)).toBe('1m 1.5s');
     expect(formatDuration(119_999)).toBe('2m 0.0s');
     expect(formatDuration(1_471_600)).toBe('24m 31.6s');
+  });
+
+  it('falls back to 0ms for non-finite and negative inputs', () => {
+    expect(formatDuration(Number.NaN)).toBe('0ms');
+    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe('0ms');
+    expect(formatDuration(Number.NEGATIVE_INFINITY)).toBe('0ms');
+    expect(formatDuration(-1)).toBe('0ms');
   });
 });

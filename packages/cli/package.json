@@ -2,7 +2,7 @@
   "name": "opensip-cli",
   "version": "0.5.0",
   "license": "Apache-2.0",
-  "description": "OpenSIP CLI — codebase analysis from the command line (the CLI; `npm i -g opensip-cli`)",
+  "description": "OpenSIP CLI \u2014 codebase analysis from the command line (the CLI; `npm i -g opensip-cli`)",
   "keywords": [
     "opensip-cli",
     "static-analysis",
@@ -92,7 +92,8 @@
     "open": "^11.0.0",
     "react": "^19.2.7",
     "update-notifier": "^7.3.1",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "@opensip-cli/format": "workspace:*"
   },
   "devDependencies": {
     "@opensip-cli/checks-dogfood": "workspace:*",

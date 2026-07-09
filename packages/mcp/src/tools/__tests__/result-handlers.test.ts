@@ -410,6 +410,7 @@ describe('list_runs handler', () => {
       tool: 'fit',
       startedAt: 't',
       completedAt: 't',
+      durationMs: 1,
       score: 90,
       passed: true,
       showCommand: 'opensip sessions show s1 --json',

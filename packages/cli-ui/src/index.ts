@@ -49,7 +49,6 @@ export {
 } from './run-footer-hints.js';
 export { Spinner, type SpinnerProps, useSpinner, useStandaloneSpinner } from './spinner.js';
 export { ClockProvider, type ClockProviderProps, useClock, useTick } from './clock.js';
-export { formatDuration } from './format-duration.js';
 export { formatValidatedCell, parseValidatedCellCount } from './format-validated-cell.js';
 export { LiveProgress, useProgressState, type LiveProgressProps } from './live-progress.js';
 export {

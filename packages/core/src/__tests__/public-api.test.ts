@@ -175,7 +175,6 @@ const EXPECTED_VALUE_EXPORTS = [
   'fitnessEmptyCheckRegistryDiagnostic',
   'fitnessPluginLoadFailedDiagnostic',
   'forkAndSettle',
-  'formatDuration',
   'formatUnknownErrorMessage',
   'getWorkerLimits',
   'generateId',

@@ -1,10 +1,9 @@
 /**
- * @opensip-cli/cli-ui is a LEAF UI kit (host-owned-run-timing §11 #8): it must
- * carry ZERO `@opensip-cli/*` workspace dependencies, so tools that ship a live
- * view depend on the UI primitives without pulling in the dispatcher / kernel.
- * The dependency-cruiser rule `cli-ui-no-workspace-deps` enforces this on the
- * import graph; this test enforces it on the package MANIFEST itself (the two
- * are complementary — a stray declared-but-unused dep would slip past depcruise).
+ * @opensip-cli/cli-ui is a near-leaf UI kit: the only allowed workspace
+ * dependency is the pure `@opensip-cli/format` label package (ADR-0144).
+ * It must not pull core, contracts, the dispatcher, or tools. The
+ * dependency-cruiser rule `cli-ui-no-workspace-deps` enforces this on the
+ * import graph; this test enforces it on the package MANIFEST itself.
  */
 
 import { readFileSync } from 'node:fs';
@@ -22,17 +21,22 @@ const pkg = JSON.parse(
   optionalDependencies?: Record<string, string>;
 };
 
-describe('@opensip-cli/cli-ui — leaf package (no workspace deps)', () => {
+/** ADR-0144: pure presentation formatters only. */
+const ALLOWED_WORKSPACE_DEPS = new Set(['@opensip-cli/format']);
+
+describe('@opensip-cli/cli-ui — leaf package (format-only workspace dep)', () => {
   it('is the cli-ui package', () => {
     expect(pkg.name).toBe('@opensip-cli/cli-ui');
   });
 
-  for (const field of [
-    'dependencies',
-    'devDependencies',
-    'peerDependencies',
-    'optionalDependencies',
-  ] as const) {
+  it('may depend only on @opensip-cli/format among workspace packages', () => {
+    const names = Object.keys(pkg.dependencies ?? {});
+    const workspaceDeps = names.filter((n) => n.startsWith('@opensip-cli/'));
+    expect(workspaceDeps.every((n) => ALLOWED_WORKSPACE_DEPS.has(n))).toBe(true);
+    expect(workspaceDeps).toContain('@opensip-cli/format');
+  });
+
+  for (const field of ['devDependencies', 'peerDependencies', 'optionalDependencies'] as const) {
     it(`declares no @opensip-cli/* package in ${field}`, () => {
       const names = Object.keys(pkg[field] ?? {});
       const workspaceDeps = names.filter((n) => n.startsWith('@opensip-cli/'));

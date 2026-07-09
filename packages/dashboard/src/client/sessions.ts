@@ -16,6 +16,7 @@
 import { el } from './el.js';
 import { paginateTable } from './pagination.js';
 import { renderSessionDetail } from './session-detail.js';
+import { formatDuration, formatScore } from '@opensip-cli/format';
 
 // Shared dim-text inline style.
 const DIM = 'color:var(--text-dim)';
@@ -170,7 +171,7 @@ export function renderSessionTable(
       }),
     );
     const scoreCell = el('td', { style: 'font-weight:600;' + sc });
-    scoreCell.textContent = s.score + '%';
+    scoreCell.textContent = formatScore(s.score);
     row.append(scoreCell);
     const badgeCell = el('td');
     badgeCell.append(statusBadge(sessionStatus(s)));
@@ -183,7 +184,7 @@ export function renderSessionTable(
       }),
     );
     row.append(el('td', { text: '' + ((sm.errors ?? 0) + (sm.warnings ?? 0)) }));
-    row.append(el('td', { text: (s.durationMs / 1000).toFixed(1) + 's', style: DIM }));
+    row.append(el('td', { text: formatDuration(s.durationMs), style: DIM }));
     tbody.append(row);
   });
   table.append(tbody);

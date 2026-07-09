@@ -29,7 +29,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 |---|---|---|---|
 | `@opensip-cli/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `renderGateCompareLines`, `projectJsonScalarMetadata`, `logger`, `ToolError`, `ValidationError` |
 
-## Layer 2 — datastore, contracts, authoring helpers, tree-sitter, clone-detection, cli-ui, and cli-live
+## Layer 2 — datastore, contracts, authoring helpers, tree-sitter, clone-detection, format, cli-ui, and cli-live
 
 `@opensip-cli/datastore` is the SQLite + Drizzle persistence kernel; it sits between `core` and the rest of this layer and depends only on `core`. Tools and `session-store` own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness). Adding a new tool means adding a new schema module — datastore is paradigm-agnostic infrastructure.
 
@@ -40,6 +40,8 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 `@opensip-cli/tree-sitter` is the grammar-agnostic tree-sitter substrate (ADR-0010): the `web-tree-sitter` lifecycle (parser init/load) plus grammar-agnostic node accessors. Like `datastore` it imports `core` only (plus `web-tree-sitter`) and sits below the adapters that consume it — the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (via `graph-adapter-common`) share it so the WASM lifecycle and node-walking helpers live in exactly one place. A dependency-cruiser rule (`tree-sitter-imports-core-only`) pins it to that substrate position.
 
 `@opensip-cli/clone-detection` is the shared function-body clone-detection substrate (ADR-0064): body hashing, MinHash/LSH primitives, the tool-neutral `CloneCandidate` shape, and exact/near-duplicate curation policy. It imports no workspace package, so graph and yagni can both depend on it without a tool-to-tool edge.
+
+`@opensip-cli/format` is the pure presentation-label substrate (ADR-0144): `formatDuration`, `formatScore`, and narrow display projectors. It imports no workspace package so CLI, dashboard, and host history share one lexical path without layer cycles. Labels only — no suite/count aggregation.
 
 `@opensip-cli/cli-ui` is the shared Ink/React presentational substrate (`Banner`, `Spinner`, `RunHeader`, `theme`). It is intentionally below tools so a tool with a live view can render with the common UI kit without depending on the CLI composition root.
 
@@ -52,6 +54,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 | `@opensip-cli/tool-test-kit` | `packages/tool-test-kit/` | Public tool-author test helpers — in-memory `ToolCliContext` double, scope helpers, and command-spec output assertions. Depends on `core` + `contracts`, not the CLI composition root. | `createToolCliContextDouble`, `runCommandSpec`, `assertSignalEnvelope`, `assertCommandResult`, `makeTestScope` |
 | `@opensip-cli/tree-sitter` | `packages/tree-sitter/` | Grammar-agnostic `web-tree-sitter` substrate (ADR-0010) — WASM parser lifecycle + node accessors, shared by the fitness `lang-*` and graph tree-sitter adapters. Depends on `web-tree-sitter` (and `core`) only | `createParser`, `parseToTree`, `walkNodes`, `findEnclosing`, `nameOf`, `childrenOf`, `namedChildrenOf`, `nodeText` |
 | `@opensip-cli/clone-detection` | `packages/clone-detection/` | Shared function-body clone-detection substrate (ADR-0064) — body digest, MinHash/LSH signatures, tool-neutral clone candidate shape, exact and near-duplicate curation policy. Leaf package; no workspace imports. | `digestCanonicalBody`, `normalizeWhitespace`, `bodySignature`, `findDuplicateBodies`, `findNearDuplicates`, `isTestFilePath`, `CloneCandidate` |
+| `@opensip-cli/format` | `packages/format/` | Pure presentation formatters + narrow display projectors (ADR-0144) — shared duration/score human labels for CLI, report, and host history. Leaf package; no workspace imports. Labels only; no suite aggregation. | `formatDuration`, `formatScore`, `projectDurationDisplay`, `projectSessionDisplay` |
 | `@opensip-cli/cli-ui` | `packages/cli-ui/` | Shared Ink/React presentational primitives — Banner, Spinner, RunHeader, theme. Extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher. | `Banner`, `Spinner`, `RunHeader`, `theme` |
 | `@opensip-cli/cli-live` | `packages/cli-live/` | Shared live-run runtime — host glue, `produce()` lifecycle, and error scrubbing over the `cli-ui` LiveRun shell. Extracted so tool packages can render live progress without depending on `opensip-cli`. | `runToolLiveView`, `HostGlue`, `LiveRunSpec`, `LiveRunOutcome` |
 
@@ -176,11 +179,11 @@ Imports every layer below. The published binary.
 Last verified at v0.5.0 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **55 publishable packages** total (all at `0.5.0`), plus one workspace-private
+- **56 publishable packages** total (all at `0.5.0`), plus one workspace-private
   `@opensip-cli/test-support` package and the private root `@opensip-cli/root`:
   - Layer 1 (kernel): 1 — `core`
-  - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + cli-ui + cli-live): 7 —
-    `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `cli-ui`, `cli-live`
+  - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + format + cli-ui + cli-live): 8 —
+    `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `format`, `cli-ui`, `cli-live`
   - Layer 3 (config + targeting + session-store + output + dashboard + external-tool substrate + fitness language adapters): 12 —
     `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`,
     `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`, `external-tool-adapter`

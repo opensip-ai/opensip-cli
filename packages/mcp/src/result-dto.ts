@@ -28,6 +28,8 @@ export interface RunSummary {
   readonly completedAt: string;
   /** Project root/cwd recorded for the run. Optional for pre-scoping producers. */
   readonly cwd?: string;
+  /** Host-stamped tool duration in milliseconds (ADR-0144 semantic identity). */
+  readonly durationMs: number;
   readonly score: number;
   readonly passed: boolean;
   /** opensip-cli version that produced the run. Absent on legacy rows. */

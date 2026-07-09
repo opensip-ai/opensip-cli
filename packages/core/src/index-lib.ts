@@ -195,7 +195,6 @@ export { readPackageVersion } from './lib/package-version.js';
 // Lib — shared presentation formatters (duration, …) used by more than one
 // tool's CLI/report layer; centralized here since tools cannot depend on
 // each other.
-export { formatDuration } from './lib/format.js';
 
 // Lib — host-owned run timer (host-owned-run-timing). The single
 // RunTimer created by the CLI host at the command boundary; exposed to

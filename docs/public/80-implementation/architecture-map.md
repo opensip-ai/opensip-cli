@@ -16,6 +16,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 2 | `@opensip-cli/tree-sitter` | grammar-agnostic parser substrate |
 | 2 | `@opensip-cli/cli-ui` | shared Ink/React presentational primitives |
 | 2 | `@opensip-cli/clone-detection` | shared function-body clone-detection substrate (node:crypto only; ADR-0064) |
+| 2 | `@opensip-cli/format` | pure presentation formatters + display projectors (zero deps; ADR-0144) |
 | 2 | `@opensip-cli/tool-test-kit` | public test helpers for tool authors |
 | 3 | `@opensip-cli/cli-live` | shared live-run runtime (state machine + produce seam) |
 | 3 | `@opensip-cli/session-store` | session persistence over datastore/contracts |
@@ -35,7 +36,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |
 
-## Workspace packages (57)
+## Workspace packages (58)
 
 - `@opensip-cli/checks-cpp`
 - `@opensip-cli/checks-dogfood`
@@ -55,6 +56,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/datastore`
 - `@opensip-cli/external-tool-adapter`
 - `@opensip-cli/fitness`
+- `@opensip-cli/format`
 - `@opensip-cli/graph`
 - `@opensip-cli/graph-adapter-common`
 - `@opensip-cli/graph-go`
