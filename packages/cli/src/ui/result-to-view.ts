@@ -16,7 +16,6 @@
  * only forbids the reverse — cli-ui must never import contracts.
  */
 
-import { formatScore } from '@opensip-cli/format';
 import {
   line,
   group,
@@ -33,6 +32,7 @@ import {
   type ViewNode,
 } from '@opensip-cli/cli-ui';
 import { envelopeToResultSummary } from '@opensip-cli/contracts';
+import { formatScore } from '@opensip-cli/format';
 import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
 import { viewConfigMigrate, viewConfigSchema, viewConfigValidate } from './views/config-views.js';

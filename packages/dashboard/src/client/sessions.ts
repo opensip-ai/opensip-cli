@@ -13,10 +13,11 @@
  * emitted Code Paths panel calls it by bare name.
  */
 
+import { formatDuration, formatScore } from '@opensip-cli/format';
+
 import { el } from './el.js';
 import { paginateTable } from './pagination.js';
 import { renderSessionDetail } from './session-detail.js';
-import { formatDuration, formatScore } from '@opensip-cli/format';
 
 // Shared dim-text inline style.
 const DIM = 'color:var(--text-dim)';

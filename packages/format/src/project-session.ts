@@ -8,10 +8,10 @@
 import { formatDuration } from './duration.js';
 import { formatScore } from './score.js';
 
-export type DurationDisplay = {
+export interface DurationDisplay {
   readonly durationMs: number;
   readonly durationLabel: string;
-};
+}
 
 /**
  * Label a precomputed duration. Echoes the caller-supplied raw number;
@@ -24,17 +24,17 @@ export function projectDurationDisplay(durationMs: number): DurationDisplay {
   };
 }
 
-export type SessionDisplayInput = {
+export interface SessionDisplayInput {
   readonly durationMs: number;
   readonly score: number;
-};
+}
 
-export type SessionDisplay = {
+export interface SessionDisplay {
   readonly durationMs: number;
   readonly durationLabel: string;
   readonly score: number;
   readonly scoreLabel: string;
-};
+}
 
 /**
  * Labels a precomputed score + duration pair.

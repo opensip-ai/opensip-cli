@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { projectDurationDisplay, projectSessionDisplay } from './project-session.js';
+
 import * as formatApi from './index.js';
 
 describe('projectDurationDisplay', () => {

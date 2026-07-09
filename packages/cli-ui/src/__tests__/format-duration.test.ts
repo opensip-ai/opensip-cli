@@ -1,6 +1,6 @@
+import { formatDuration } from '@opensip-cli/format';
 import { describe, it, expect } from 'vitest';
 
-import { formatDuration } from '@opensip-cli/format';
 
 /**
  * Smoke: cli-ui live surfaces import the shared formatter (ADR-0144).

@@ -14,7 +14,6 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
-
 import { formatDuration, formatScore } from '@opensip-cli/format';
 
 import { formatBytes } from '../../format-bytes.js';

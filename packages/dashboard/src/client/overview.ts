@@ -13,12 +13,13 @@
  * it by bare name in the report's render block.
  */
 
+import { formatDuration, formatScore, projectSessionDisplay } from '@opensip-cli/format';
+
 import { el } from './el.js';
 import { appendLedgerRows, type LedgerRenderedRows } from './overview-ledger.js';
 import { paginateGroupedRows } from './pagination.js';
 import { scoreColorStyle, sessionStatus, statusBadge } from './sessions.js';
 import { activateTabForSession } from './tab-activators.js';
-import { formatDuration, formatScore, projectSessionDisplay } from '@opensip-cli/format';
 
 const DEFAULT_TOOL_BADGE_STYLE = 'background:var(--bg-hover);color:var(--text-muted)';
 const EMPTY_SUMMARY = {

@@ -21,10 +21,10 @@
  * was hand-retyped in graph's `writeRunSummaryPlain`.)
  */
 
+import { formatDuration } from '@opensip-cli/format';
 import { Box } from 'ink';
 import React from 'react';
 
-import { formatDuration } from '@opensip-cli/format';
 import { renderToInk } from './render-to-ink.js';
 import { useRunDuration } from './run-timing-provider.js';
 import { line, type Span, type ViewNode } from './view-model.js';

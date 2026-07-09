@@ -11,6 +11,7 @@
  */
 
 import { formatDuration } from '@opensip-cli/format';
+
 import { formatValidatedCell, parseValidatedCellCount } from './format-validated-cell.js';
 import {
   viewTable,

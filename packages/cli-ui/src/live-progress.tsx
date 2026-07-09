@@ -16,10 +16,10 @@
  * runners already provide both).
  */
 
+import { formatDuration } from '@opensip-cli/format';
 import { Box, Text } from 'ink';
 import React, { useEffect, useState } from 'react';
 
-import { formatDuration } from '@opensip-cli/format';
 import { Spinner, useSpinner } from './spinner.js';
 import { useTheme } from './theme.js';
 

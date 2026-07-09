@@ -1,6 +1,7 @@
+import { formatDuration, formatScore } from '@opensip-cli/format';
+
 import { el } from './el.js';
 import { scoreColorStyle, statusBadge } from './sessions.js';
-import { formatDuration, formatScore } from '@opensip-cli/format';
 
 const DIM_STYLE = 'color:var(--text-dim)';
 const MUTED_STYLE = 'color:var(--text-muted)';
