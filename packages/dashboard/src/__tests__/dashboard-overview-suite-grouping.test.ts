@@ -405,7 +405,7 @@ describe('Overview suite rows', () => {
     ]);
     expect(rowCells).toHaveLength(9);
     expect(rowCells[2].querySelector('.badge')?.textContent).toBe('SUITE');
-    expect(rowCells[2].textContent).toContain('audit');
+    expect(rowCells[2].textContent).toBe('SUITE');
     expect(rowCells[3].textContent).toBe('—');
     expect(row.textContent).toContain('67%');
     expect(row.textContent).toContain('FAIL');
@@ -424,7 +424,7 @@ describe('Overview suite rows', () => {
     expect(row.querySelector('.overview-suite-arrow')?.textContent).toBe('▼');
     const [fitChild, graphChild, yagniChild] = childRows();
     expect(cells(fitChild)[3].textContent).toBe('agent-risk');
-    expect(cells(graphChild)[2].textContent).toContain('impact');
+    expect(cells(graphChild)[2].textContent).toBe('GRAPH');
     expect(cells(graphChild)[3].textContent).toBe('—');
     expect(cells(yagniChild)[3].textContent).toBe('—');
     expect(graphChild.textContent).not.toContain('projectContext');
