@@ -12,7 +12,7 @@ import { executeImpact } from '../impact.js';
 
 import type { Catalog } from '../../types.js';
 import type { SignalEnvelope } from '@opensip-cli/contracts';
-import type { ToolCliContext } from '@opensip-cli/core';
+import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 function makeCatalog(over: Partial<Catalog> = {}): Catalog {
@@ -205,6 +205,62 @@ describe('executeImpact', () => {
     expect(rendered?.lines?.some((line) => line.includes('truncated'))).toBe(true);
     expect(rendered?.lines?.some((line) => line.includes('Verification coverage'))).toBe(true);
     expect(rendered?.lines?.some((line) => line.includes('Recommended next commands'))).toBe(true);
+    datastore.close();
+  });
+
+  it('builds a graph session contribution for human-facing impact runs', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const completion = await graphImpactCommandSpec.handler(
+      {
+        cwd: '/proj',
+        files: ['src/callee.ts'],
+      },
+      cli,
+    );
+    const session = (completion as ToolRunCompletion | undefined)?.session;
+
+    expect(session).toMatchObject({
+      tool: 'graph',
+      cwd: '/proj',
+      score: 100,
+      passed: true,
+    });
+    expect(session?.recipe).toBeUndefined();
+    expect(session?.payload).toMatchObject({
+      summary: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+        errors: 0,
+        warnings: 1,
+      },
+      checks: [
+        {
+          checkSlug: 'graph.impact.blast-radius',
+          passed: true,
+          violationCount: 1,
+        },
+      ],
+    });
+    datastore.close();
+  });
+
+  it('does not build an impact session contribution for JSON carrier mode', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const completion = await graphImpactCommandSpec.handler(
+      {
+        cwd: '/proj',
+        json: true,
+        files: ['src/callee.ts'],
+      },
+      cli,
+    );
+
+    expect(completion).toBeUndefined();
     datastore.close();
   });
 

@@ -24,11 +24,13 @@ import {
   type ChangedFileEntry,
   type Signal,
   type ToolCliContext,
+  type ToolSessionContribution,
 } from '@opensip-cli/core';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
+import { contributionFromSignals } from './graph-session-contribution.js';
 import { runGraph } from './orchestrate.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
@@ -157,6 +159,14 @@ function buildImpactEnvelope(result: GraphImpactResult, durationMs: number): Sig
     runFaulted: false,
     fingerprintStrategy: graphFingerprintStrategy,
   });
+}
+
+/** Build graph's generic session contribution for a human-facing `graph impact` run. */
+export function buildImpactSessionContribution(
+  opts: Pick<ImpactCommandOptions, 'cwd'>,
+  result: GraphImpactResult,
+): ToolSessionContribution {
+  return contributionFromSignals({ cwd: opts.cwd }, buildImpactSignals(result), [IMPACT_RULE_ID]);
 }
 
 function resolveImpactBasis(opts: ImpactCommandOptions): {

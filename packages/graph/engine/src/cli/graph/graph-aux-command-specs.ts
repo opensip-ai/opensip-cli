@@ -35,7 +35,7 @@ import { listGraphRules } from '../graph-list.js';
 import { runCatalogJsonMode } from '../graph-modes.js';
 import { listGraphRecipes } from '../graph-recipes.js';
 import { handleGraphError } from '../graph.js';
-import { executeImpact } from '../impact.js';
+import { buildImpactSessionContribution, executeImpact } from '../impact.js';
 import { executeLookup } from '../lookup.js';
 import { runGraph } from '../orchestrate.js';
 import { runSarifExportMode } from '../sarif-export.js';
@@ -43,7 +43,7 @@ import { executeShardWorker } from '../shard-worker.js';
 import { executeSymbolIndex } from '../symbol-index.js';
 
 import type { ResolutionMode } from '../../types.js';
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const log = createToolLogger('graph:cli');
@@ -690,7 +690,7 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   output: RAW_STREAM,
   rawStreamReason: 'runtime-render-dispatch',
   producesVerdict: true,
-  handler: async (rawOpts, cli): Promise<void> => {
+  handler: async (rawOpts, cli): Promise<ToolRunCompletion | void> => {
     const opts = rawOpts as {
       cwd: string;
       json?: boolean;
@@ -700,18 +700,20 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
       top?: string;
       noCache?: boolean;
     };
-    await executeImpact(
-      {
-        cwd: opts.cwd,
-        json: opts.json === true,
-        raw: opts.raw === true,
-        changed: opts.changed,
-        since: opts.since,
-        files: (opts as { files?: string[] }).files,
-        top: opts.top,
-        noCache: opts.noCache,
-      },
-      cli,
-    );
+    const commandOpts = {
+      cwd: opts.cwd,
+      json: opts.json === true,
+      raw: opts.raw === true,
+      changed: opts.changed,
+      since: opts.since,
+      files: (opts as { files?: string[] }).files,
+      top: opts.top,
+      noCache: opts.noCache,
+    };
+    const result = await executeImpact(commandOpts, cli);
+    if (commandOpts.json === true) return;
+    return {
+      session: buildImpactSessionContribution(commandOpts, result),
+    };
   },
 });

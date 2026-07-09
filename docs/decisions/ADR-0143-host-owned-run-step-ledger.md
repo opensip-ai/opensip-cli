@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 owner: opensip-cli
 ---
 
@@ -16,12 +16,12 @@ superseded_by: null
 related: [ADR-0093, ADR-0051, ADR-0100, ADR-0084, ADR-0036, ADR-0111, ADR-0117, ADR-0135]
 tags: [cli, host-planes, persistence, sessions, suites, evidence, mcp]
 enforcement: mechanizable
-enforced-by: ['NONE-YET']
+enforced-by: ['dashboard-overview-suite-grouping.test', 'dashboard-external-tab.test']
 enforcement-reason: >
-  Mechanizable invariants (single-writer persist, completion-time verdict evidence,
-  dashboard read-model prefers runs over child-session reconstruction) will be added
-  with the implementation spec via focused tests and dogfood checks. No enforcer
-  exists until the ledger ships.
+  Focused dashboard tests assert the overview read model is ledger-only: sessions
+  without a run ledger do not produce Recent Activity rows, implicit one-step
+  tool runs render from the ledger, and linked sessions are used only for
+  drill-in/detail enrichment.
 ```
 
 **Decision:** Add a host-owned, persisted **Run + RunStep** execution ledger as the
@@ -83,13 +83,19 @@ observed RunSteps.
 - Add SQLite tables `runs` and `run_steps` (names illustrative; exact schema in spec).
 - Dual-write: suites -> one Run + N steps; standalone verdict-producing commands ->
   implicit one-step Run.
-- Report, dashboard, and MCP read paths prefer the ledger; `sessions show` replay
-  remains for tool payloads during transition.
+- Dashboard Overview reads the ledger exclusively. `StoredSession` rows may enrich
+  linked steps for tool detail/navigation, but the browser must not reconstruct
+  Recent Activity rows or suite aggregates from sessions. If pre-ledger rows need
+  to appear in Overview, they must be explicitly backfilled into `runs` /
+  `run_steps` as `source: reconstructed`; there is no client fallback.
+- Report, dashboard, and MCP read paths use the ledger for run history; `sessions
+  show` replay remains for tool payloads and drill-in artifacts.
 - Step rows carry stable step ids, ordinals, effective args/selectors, envelope
   summaries, optional `session_id`, and reserved fields for `attempt`, `parent_step_id`,
   and `dependency` even while v1 execution stays serial-only.
 - Legacy rows may be backfilled as `source: reconstructed` when ordinals or effective
-  args are incomplete.
+  args are incomplete. This is an explicit datastore migration/projection step,
+  not a dashboard compatibility path.
 - Root-level suite aliases remain out of scope until ADR-0111 is explicitly superseded.
 - ADR-0093 remains active, but its "no suite-level record" consequence is retired;
   do not infer that suites must remain session-grouping-only in new code.

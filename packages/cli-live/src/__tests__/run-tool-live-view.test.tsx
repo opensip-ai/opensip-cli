@@ -238,6 +238,57 @@ describe('runToolLiveView', () => {
     expect(completion).toEqual({});
   }, 10_000);
 
+  it('renders the frozen host timer duration in the final summary', async () => {
+    const scope = makeScope();
+    const originalWrite = process.stdout.write.bind(process.stdout);
+    const stdoutCalls: string[] = [];
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk, ...args) => {
+      stdoutCalls.push(String(chunk));
+      return originalWrite(chunk, ...args);
+    });
+    const timer = {
+      startedAt: '2026-07-09T00:00:00.000Z',
+      startedAtEpochMs: 0,
+      elapsedMs: vi.fn(() => 9999),
+      snapshot: vi.fn(() => ({
+        startedAt: '2026-07-09T00:00:00.000Z',
+        completedAt: '2026-07-09T00:00:01.234Z',
+        durationMs: 1234,
+      })),
+      complete: vi.fn(() => ({
+        startedAt: '2026-07-09T00:00:00.000Z',
+        completedAt: '2026-07-09T00:00:01.234Z',
+        durationMs: 1234,
+      })),
+    };
+
+    try {
+      await runWithScope(scope, () =>
+        runToolLiveView(
+          {
+            tool: 'fit',
+            meta: { title: 'Test', description: 'Running' },
+            surface: { shape: 'pool', label: 'Working...' },
+            verbose: false,
+            quiet: true,
+            produce: () =>
+              Promise.resolve({
+                kind: 'done',
+                done: { summary: { passed: true, errors: 0, warnings: 0 } },
+              }),
+          },
+          { liveContext: { runSession: { timing: timer } } },
+        ),
+      );
+    } finally {
+      stdoutSpy.mockRestore();
+    }
+
+    expect(timer.complete).toHaveBeenCalledTimes(1);
+    expect(stdoutCalls.join('')).toContain('1.2s');
+    expect(stdoutCalls.join('')).not.toContain('10.0s');
+  }, 10_000);
+
   it('passes emit and setRunning helpers to produce()', async () => {
     const scope = makeScope();
     let helperSurface:

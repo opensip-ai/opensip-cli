@@ -161,6 +161,17 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
 
         logger.info({ evt: 'cli.liveview.run.complete', tool: spec.tool });
 
+        const completionSnapshot = glue.liveContext?.runSession.timing.complete();
+        const doneData: LiveRunDoneData = {
+          ...outcome.done,
+          summary: {
+            ...outcome.done.summary,
+            ...(outcome.done.summary.durationMs === undefined && completionSnapshot !== undefined
+              ? { durationMs: completionSnapshot.durationMs }
+              : {}),
+          },
+        };
+
         const completion: ToolRunCompletion = {
           ...(outcome.envelope === undefined ? {} : { envelope: outcome.envelope }),
           ...(outcome.session === undefined ? {} : { session: outcome.session }),
@@ -173,7 +184,7 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
           ...(spec.progressOnDone === true && doneSubscribe !== undefined
             ? { subscribe: doneSubscribe }
             : {}),
-          data: enrichDoneWithEnvelope(outcome.done, outcome.envelope),
+          data: enrichDoneWithEnvelope(doneData, outcome.envelope),
         });
         setTimeout(() => exit(), 50);
       } catch (error) {

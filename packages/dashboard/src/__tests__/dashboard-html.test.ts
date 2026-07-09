@@ -62,8 +62,8 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain('<!DOCTYPE html>');
     // Title should not have a score
     expect(html).toContain('<title>OpenSIP CLI</title>');
-    // The JS renders the "no sessions" message
-    expect(html).toContain('No sessions yet');
+    // The Overview tab is ledger-only and renders the no-runs message.
+    expect(html).toContain('No runs yet');
   });
 
   it('includes latest session pass rate in the title', () => {

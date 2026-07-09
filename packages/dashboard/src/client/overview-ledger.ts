@@ -5,6 +5,13 @@ import { scoreColorStyle, statusBadge } from './sessions.js';
 
 const DIM_STYLE = 'color:var(--text-dim)';
 const MUTED_STYLE = 'color:var(--text-muted)';
+const EMPTY_SUMMARY = {
+  total: 0,
+  passed: 0,
+  failed: 0,
+  errors: 0,
+  warnings: 0,
+} as const;
 
 type OverviewStatus = Parameters<typeof statusBadge>[0];
 
@@ -17,18 +24,8 @@ interface SummaryCounts {
   readonly warnings: number;
 }
 
-export interface LedgerRenderedRows {
-  readonly suiteRunIds: ReadonlySet<string>;
-  readonly sessionIds: ReadonlySet<string>;
-}
-
 interface OverviewLedgerDeps {
   readonly appendToolBadge: (cell: HTMLElement, tool: string) => void;
-  readonly appendSessionCells: (
-    row: HTMLElement,
-    session: DashboardSession,
-    child: boolean,
-  ) => void;
   readonly activateSession: (session: DashboardSession) => void;
 }
 
@@ -47,10 +44,28 @@ function runCounts(run: DashboardRun): SummaryCounts {
   };
 }
 
+function sessionCounts(session: DashboardSession): SummaryCounts {
+  const summary = session.payload?.summary ?? EMPTY_SUMMARY;
+  return {
+    total: summary.total ?? 0,
+    passed: summary.passed ?? 0,
+    failed: summary.failed ?? 0,
+    faulted: 0,
+    errors: summary.errors ?? 0,
+    warnings: summary.warnings ?? 0,
+  };
+}
+
 function runStatus(run: DashboardRun): OverviewStatus {
   if (run.aggregate.faulted > 0) return 'error';
   if (run.aggregate.failed > 0 || run.exitCode !== 0) return 'fail';
   if (run.aggregate.warnings > 0) return 'warn';
+  return 'pass';
+}
+
+function stepStatus(step: DashboardRunStep): OverviewStatus {
+  if (step.outcome === 'faulted') return 'error';
+  if (step.outcome === 'failed') return 'fail';
   return 'pass';
 }
 
@@ -78,13 +93,40 @@ function formatStepArgValue(value: unknown): string {
   }
 }
 
+function sortedSteps(run: DashboardRun): readonly DashboardRunStep[] {
+  return [...run.steps].sort(
+    (left, right) => left.ordinal - right.ordinal || left.attempt - right.attempt,
+  );
+}
+
+function linkedSessionForStep(
+  step: DashboardRunStep | undefined,
+  sessionsById: ReadonlyMap<string, DashboardSession>,
+): DashboardSession | undefined {
+  return step?.sessionId === undefined ? undefined : sessionsById.get(step.sessionId);
+}
+
+function appendBlankControlCell(row: HTMLElement): void {
+  row.append(el('td', { class: 'overview-row-control' }));
+}
+
+function appendTimestampCell(row: HTMLElement, iso: string | undefined): void {
+  row.append(
+    el('td', {
+      class: 'cell-nowrap',
+      text: iso === undefined ? '' : new Date(iso).toLocaleString(),
+      style: DIM_STYLE,
+    }),
+  );
+}
+
 function appendLedgerStepCells(
   row: HTMLElement,
   step: DashboardRunStep,
   deps: OverviewLedgerDeps,
 ): void {
-  row.append(el('td', { text: '' }));
-  row.append(el('td', { text: '', style: DIM_STYLE }));
+  appendBlankControlCell(row);
+  appendTimestampCell(row, undefined);
   const runCell = el('td');
   deps.appendToolBadge(runCell, step.tool);
   row.append(runCell);
@@ -97,7 +139,7 @@ function appendLedgerStepCells(
   );
   row.append(el('td', { text: step.outcome, style: DIM_STYLE }));
   const statusCell = el('td');
-  statusCell.append(statusBadge(ledgerStepStatus(step)));
+  statusCell.append(statusBadge(stepStatus(step)));
   row.append(statusCell);
   row.append(el('td', { text: step.verdictSummary?.passed === true ? '1/1' : '0/1' }));
   row.append(el('td', { text: String(step.verdictSummary?.findings ?? 0) }));
@@ -109,16 +151,94 @@ function appendLedgerStepCells(
   );
 }
 
-function ledgerStepStatus(step: DashboardRunStep): OverviewStatus {
-  if (step.outcome === 'faulted') return 'error';
-  if (step.outcome === 'failed') return 'fail';
-  return 'pass';
+function appendLinkedLedgerStepCells(
+  row: HTMLElement,
+  step: DashboardRunStep,
+  session: DashboardSession,
+  deps: OverviewLedgerDeps,
+): void {
+  const counts = sessionCounts(session);
+  appendBlankControlCell(row);
+  appendTimestampCell(row, session.startedAt);
+  const runCell = el('td');
+  deps.appendToolBadge(runCell, step.tool);
+  row.append(runCell);
+  row.append(
+    el('td', {
+      text: session.recipe ?? stepLabel(step),
+      title: step.logicalStepKey,
+      style: MUTED_STYLE,
+    }),
+  );
+  row.append(
+    el('td', {
+      text: formatScore(session.score),
+      style: 'font-weight:600;' + scoreColorStyle(session.score),
+    }),
+  );
+  const statusCell = el('td');
+  statusCell.append(statusBadge(stepStatus(step)));
+  row.append(statusCell);
+  row.append(el('td', { text: counts.passed + '/' + counts.total }));
+  row.append(el('td', { text: String(findingCount(counts)) }));
+  row.append(
+    el('td', {
+      text: formatDuration(step.durationMs),
+      style: DIM_STYLE,
+    }),
+  );
+}
+
+function appendImplicitRunRow(
+  tbody: HTMLElement,
+  run: DashboardRun,
+  sessionsById: ReadonlyMap<string, DashboardSession>,
+  deps: OverviewLedgerDeps,
+): void {
+  const [step] = sortedSteps(run);
+  const linked = linkedSessionForStep(step, sessionsById);
+  const counts = linked === undefined ? runCounts(run) : sessionCounts(linked);
+  const score = linked === undefined ? runScoreFromCounts(counts) : linked.score;
+  const tool = step?.tool ?? linked?.tool ?? run.name;
+  const label = linked?.recipe ?? (step === undefined ? run.name : stepLabel(step));
+  const row = el('tr', {
+    class: linked === undefined ? 'overview-run-row' : 'clickable overview-run-row',
+    ...(linked === undefined ? {} : { onclick: () => deps.activateSession(linked) }),
+  });
+  appendBlankControlCell(row);
+  appendTimestampCell(row, run.startedAt);
+  const runCell = el('td', { title: run.source });
+  deps.appendToolBadge(runCell, tool);
+  row.append(runCell);
+  row.append(el('td', { text: label, title: run.id, style: MUTED_STYLE }));
+  row.append(
+    el('td', {
+      text: formatScore(score),
+      style: 'font-weight:600;' + scoreColorStyle(score),
+    }),
+  );
+  const statusCell = el('td');
+  statusCell.append(statusBadge(runStatus(run)));
+  row.append(statusCell);
+  row.append(el('td', { text: counts.passed + '/' + counts.total }));
+  row.append(el('td', { text: '' + findingCount(counts) }));
+  row.append(
+    el('td', {
+      text: formatDuration(run.durationMs),
+      style: DIM_STYLE,
+    }),
+  );
+  tbody.append(row);
+}
+
+function runScoreFromCounts(counts: Pick<SummaryCounts, 'total' | 'passed'>): number {
+  return counts.total > 0 ? Math.round((counts.passed / counts.total) * 100) : 0;
 }
 
 function appendLedgerRunRow(
   tbody: HTMLElement,
   run: DashboardRun,
-  sourceSessions: readonly DashboardSession[],
+  sessionsById: ReadonlyMap<string, DashboardSession>,
   deps: OverviewLedgerDeps,
 ): void {
   const counts = runCounts(run);
@@ -182,20 +302,17 @@ function appendLedgerRunRow(
     class: 'data-table overview-suite-child-table',
   });
   const childBody = el('tbody');
-  const sessionsById = new Map(sourceSessions.map((session) => [session.id, session]));
-  [...run.steps]
-    .sort((left, right) => left.ordinal - right.ordinal || left.attempt - right.attempt)
-    .forEach((step) => {
-      const linked = step.sessionId === undefined ? undefined : sessionsById.get(step.sessionId);
-      const childRow = el('tr', {
-        class:
-          linked === undefined ? 'overview-suite-child-row' : 'clickable overview-suite-child-row',
-        ...(linked === undefined ? {} : { onclick: () => deps.activateSession(linked) }),
-      });
-      if (linked) deps.appendSessionCells(childRow, linked, true);
-      else appendLedgerStepCells(childRow, step, deps);
-      childBody.append(childRow);
+  sortedSteps(run).forEach((step) => {
+    const linked = step.sessionId === undefined ? undefined : sessionsById.get(step.sessionId);
+    const childRow = el('tr', {
+      class:
+        linked === undefined ? 'overview-suite-child-row' : 'clickable overview-suite-child-row',
+      ...(linked === undefined ? {} : { onclick: () => deps.activateSession(linked) }),
     });
+    if (linked) appendLinkedLedgerStepCells(childRow, step, linked, deps);
+    else appendLedgerStepCells(childRow, step, deps);
+    childBody.append(childRow);
+  });
   childTable.append(childBody);
   expanderContent.append(childTable);
   expanderCell.append(expanderContent);
@@ -208,15 +325,13 @@ export function appendLedgerRows(
   sourceRuns: readonly DashboardRun[],
   sourceSessions: readonly DashboardSession[],
   deps: OverviewLedgerDeps,
-): LedgerRenderedRows {
-  const suiteRunIds = new Set<string>();
-  const sessionIds = new Set<string>();
-  for (const run of sourceRuns.filter((candidate) => candidate.source !== 'implicit-tool')) {
-    appendLedgerRunRow(tbody, run, sourceSessions, deps);
-    if (run.legacySuiteRunId !== undefined) suiteRunIds.add(run.legacySuiteRunId);
-    for (const step of run.steps) {
-      if (step.sessionId !== undefined) sessionIds.add(step.sessionId);
+): void {
+  const sessionsById = new Map(sourceSessions.map((session) => [session.id, session]));
+  for (const run of sourceRuns) {
+    if (run.source === 'implicit-tool') {
+      appendImplicitRunRow(tbody, run, sessionsById, deps);
+      continue;
     }
+    appendLedgerRunRow(tbody, run, sessionsById, deps);
   }
-  return { suiteRunIds, sessionIds };
 }

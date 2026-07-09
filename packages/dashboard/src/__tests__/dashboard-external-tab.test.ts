@@ -27,6 +27,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
+import type { DashboardRun } from '../generator.js';
 import type { StoredSession } from '@opensip-cli/contracts';
 
 /** A masked secret preview (redacted at ingest) — never a raw credential. */
@@ -94,14 +95,66 @@ function fitSession(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
+function implicitRunForSession(session: StoredSession): DashboardRun {
+  const errors = summaryNumber(session, 'errors');
+  const warnings = summaryNumber(session, 'warnings');
+  return {
+    id: 'run-' + session.id,
+    name: session.tool,
+    source: 'implicit-tool',
+    cwd: session.cwd,
+    startedAt: session.startedAt,
+    completedAt: session.completedAt,
+    durationMs: session.durationMs,
+    exitCode: session.passed === false ? 1 : 0,
+    aggregate: {
+      steps: 1,
+      passed: session.passed === false ? 0 : 1,
+      failed: session.passed === false ? 1 : 0,
+      faulted: 0,
+      errors,
+      warnings,
+    },
+    steps: [
+      {
+        id: 'step-' + session.id,
+        runId: 'run-' + session.id,
+        logicalStepKey: '0:' + session.tool + ':' + session.tool,
+        ordinal: 0,
+        attempt: 1,
+        tool: session.tool,
+        command: session.tool,
+        stableId: session.tool,
+        exitCode: session.passed === false ? 1 : 0,
+        outcome: session.passed === false ? 'failed' : 'passed',
+        durationMs: session.durationMs,
+        verdictSummary: {
+          passed: session.passed !== false,
+          errors,
+          warnings,
+          findings: errors + warnings,
+        },
+        sessionId: session.id,
+      },
+    ],
+  };
+}
+
+function summaryNumber(session: StoredSession, key: 'errors' | 'warnings'): number {
+  const summary = (session.payload as { readonly summary?: Record<string, unknown> } | undefined)
+    ?.summary;
+  const value = summary?.[key];
+  return typeof value === 'number' ? value : 0;
+}
+
 /**
  * Render the full report HTML into the jsdom document and evaluate its inlined
  * <script> bodies in one sandbox — the same boot the live end-to-end validation
  * test uses. Modelled on that test's bootDashboard so the assertions run through
  * the real render block (`renderOverview(); …; renderExternalTab();`).
  */
-function bootReport(sessions: StoredSession[]): void {
-  const html = generateDashboardHtml({ sessions });
+function bootReport(sessions: StoredSession[], runs: readonly DashboardRun[] = []): void {
+  const html = generateDashboardHtml({ sessions, runs });
   document.documentElement.innerHTML = html
     .replace(/^[\s\S]*?<html[^>]*>/i, '')
     .replace(/<\/html>[\s\S]*$/i, '');
@@ -126,7 +179,8 @@ beforeEach(() => {
 
 describe('External Tools catch-all tab (Defect #3 — adapter findings render)', () => {
   it('emits an External Tools tab + panel and renders the adapter finding through the full path', () => {
-    bootReport([gitleaksSession()]);
+    const session = gitleaksSession();
+    bootReport([session], [implicitRunForSession(session)]);
 
     // The host-owned catch-all tab button + panel exist.
     const tab = document.querySelector('.tab[data-tab="external"]');
@@ -168,7 +222,8 @@ describe('External Tools catch-all tab (Defect #3 — adapter findings render)',
 
 describe('Overview row-click routing (Defect #2 — adapter row must not blank the report)', () => {
   it('routes an adapter session row to the External Tools tab without blanking the report', () => {
-    bootReport([gitleaksSession()]);
+    const session = gitleaksSession();
+    bootReport([session], [implicitRunForSession(session)]);
 
     // Overview starts active. Click the (only) adapter row in Recent Activity.
     expect(document.querySelector('#panel-overview')!.classList.contains('active')).toBe(true);
@@ -188,7 +243,9 @@ describe('Overview row-click routing (Defect #2 — adapter row must not blank t
   });
 
   it('still routes a registered-tool (fit) row to its own tab', () => {
-    bootReport([fitSession(), gitleaksSession()]);
+    const fit = fitSession();
+    const gitleaks = gitleaksSession();
+    bootReport([fit, gitleaks], [implicitRunForSession(fit), implicitRunForSession(gitleaks)]);
     // Click the fit row (find it by its FIT badge in Recent Activity).
     const rows = [...document.querySelectorAll<HTMLElement>('#panel-overview tbody tr.clickable')];
     const fitRow = rows.find((r) => r.textContent?.includes('FIT'));
