@@ -41,7 +41,7 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
   // explicitly listed in `globalExcludes`. The fix threads the run's
   // globalExcludes through RunOptions into the matchFiles fallback.
 
-  // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over describe-scoped `testDir`
+   
   function setupCachedFiles(): void {
     mkdirSync(join(testDir, 'src'), { recursive: true });
     mkdirSync(join(testDir, 'docs'), { recursive: true });

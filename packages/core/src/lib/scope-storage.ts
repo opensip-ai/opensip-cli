@@ -55,7 +55,7 @@ export function exitScope(): void {
   // is typed `AsyncLocalStorage<RunScope>` so `getStore()` stays non-nullable at
   // read sites; the cast is the one place we exercise the runtime's documented
   // "store may be undefined" contract to reset the slot.
-  // eslint-disable-next-line unicorn/no-useless-undefined -- the `undefined` is load-bearing: it is the slot-clear value for AsyncLocalStorage.enterWith, not a removable default.
+   
   (scopeStorage() as AsyncLocalStorage<RunScope | undefined>).enterWith(undefined);
 }
 

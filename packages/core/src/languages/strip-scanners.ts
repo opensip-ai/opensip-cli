@@ -328,7 +328,7 @@ export function scanCharLiteral(
  */
 export function applyRegions(src: string, regions: readonly Region[]): string {
   if (regions.length === 0) return src;
-  // eslint-disable-next-line unicorn/prefer-spread -- split('') keeps UTF-16 unit indexing; spread/Array.from use code points and break offsets
+   
   const buf = src.split('');
   for (const r of regions) {
     for (let i = r.start; i < r.end; i++) {

@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const CLANG_TIDY_LINE =
-  // eslint-disable-next-line sonarjs/slow-regex -- input is one bounded line of clang-tidy output; no real ReDoS exposure
+   
   /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/;
 
 /**

@@ -201,7 +201,7 @@ function nextUsesDestructuredBindings(current: AwaitInfo, next: AwaitInfo): bool
 
 function isAwaitingFunctionCall(expressionText: string): boolean {
   const afterAwait = expressionText.replace(/^await\s+/, '');
-  // eslint-disable-next-line sonarjs/slow-regex -- trailing call parens on a single await expression; bounded slice
+   
   return /\([^)]*\)\s*$/.test(afterAwait);
 }
 

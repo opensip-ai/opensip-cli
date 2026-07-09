@@ -134,7 +134,7 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
     if (content === undefined) continue;
     const sourceFile = getSharedSourceFile(filePath, content);
     if (!sourceFile) continue;
-    // eslint-disable-next-line unicorn/consistent-function-scoping -- closes over per-file sourceFile; hoisting would thread extra params through every callsite
+     
     const visit = (node: ts.Node): void => {
       if (ts.isPropertyAccessExpression(node)) {
         const propertyName = node.name.text;

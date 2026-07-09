@@ -9,7 +9,7 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitne
  * Matches patterns like: expr!. or expr![ or expr!) where expr is an identifier.
  * Avoids matching !== and != comparisons.
  */
-// eslint-disable-next-line sonarjs/slow-regex -- character class has no overlap; '!' acts as fixed delimiter
+ 
 const NON_NULL_ASSERTION_REGEX = /([\w.[\]]+)!\s*[.[;,)]/g;
 
 /**

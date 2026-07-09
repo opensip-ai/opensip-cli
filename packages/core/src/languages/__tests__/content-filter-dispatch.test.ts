@@ -15,7 +15,7 @@ const fakeAdapter: LanguageAdapter = {
   fileExtensions: ['.fake'],
   parse: () => null,
   stripStrings: (s: string) => s.replaceAll(/"[^"]*"/g, '"___"'),
-  // eslint-disable-next-line sonarjs/slow-regex -- test-only fixture stripping `// ...` line comments
+   
   stripComments: (s: string) => s.replaceAll(/\/\/.*$/gm, ''),
 };
 

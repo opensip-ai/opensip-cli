@@ -153,7 +153,7 @@ describe('warnIfInsecureOtlpEndpoint', () => {
     ['https remote', 'https://collector.example.com/v1/traces'],
     ['loopback localhost', 'http://localhost:4318/v1/traces'],
     ['loopback 127.0.0.1', 'http://127.0.0.1:4318'],
-    // eslint-disable-next-line sonarjs/no-clear-text-protocols -- IPv6 loopback test fixture: exercises the ::1 exemption in the helper.
+     
     ['loopback ::1', 'http://[::1]:4318'],
     ['malformed url', 'not a url'],
     ['non-http scheme (grpc)', 'grpc://collector.example.com:4317'],
