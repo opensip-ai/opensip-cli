@@ -18,8 +18,9 @@
  *   - sonarjs's cognitive-complexity left at default 15. The CLI's
  *     fit-command flow exceeds it; we add a per-file disable there
  *     rather than weaken the workspace setting.
- *   - unicorn's prevent-abbreviations is OFF — too many domain
- *     abbreviations (cwd, ctx, opts) we don't want to expand.
+ *   - unicorn's prevent-abbreviations AND name-replacements are OFF —
+ *     too many domain abbreviations (cwd, ctx, opts) we don't want to expand.
+ *     name-replacements is the Unicorn 71 successor and was disabled on upgrade.
  *   - unicorn's no-null is OFF — the codebase mixes null/undefined
  *     intentionally for serialized boundaries (JSON, schemas).
  *   - import-x/no-unresolved uses TypeScript resolver via the .ts
@@ -86,6 +87,70 @@ export default tseslint.config(
       'unicorn/prefer-string-raw': 'off',
       'unicorn/prefer-string-repeat': 'off',
       'unicorn/prefer-string-replace-all': 'off',
+      // Unicorn 71 made these recommended. Same posture as the v65 block:
+      // style / naming churn across thousands of call sites, not correctness.
+      // Revisit individually if a rule proves high-signal on new code.
+      'unicorn/name-replacements': 'off', // successor to prevent-abbreviations (already off)
+      'unicorn/consistent-boolean-name': 'off',
+      'unicorn/consistent-class-member-order': 'off',
+      'unicorn/consistent-conditional-object-spread': 'off',
+      'unicorn/consistent-existence-index-check': 'off',
+      'unicorn/consistent-function-scoping': 'off',
+      'unicorn/logical-assignment-operators': 'off',
+      'unicorn/max-nested-calls': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/no-computed-property-existence-check': 'off',
+      'unicorn/no-declarations-before-early-exit': 'off',
+      'unicorn/no-duplicate-if-branches': 'off',
+      'unicorn/no-duplicate-loops': 'off',
+      'unicorn/no-error-property-assignment': 'off',
+      'unicorn/no-for-each': 'off', // companion to no-array-for-each (already off)
+      'unicorn/no-global-object-property-assignment': 'off',
+      'unicorn/no-loop-iterable-mutation': 'off',
+      'unicorn/no-negated-array-predicate': 'off',
+      'unicorn/no-non-function-verb-prefix': 'off',
+      'unicorn/no-return-array-push': 'off',
+      'unicorn/no-subtraction-comparison': 'off',
+      'unicorn/no-top-level-assignment-in-function': 'off',
+      'unicorn/no-top-level-side-effects': 'off',
+      'unicorn/no-unnecessary-boolean-comparison': 'off',
+      'unicorn/no-unnecessary-splice': 'off',
+      'unicorn/no-unreadable-for-of-expression': 'off',
+      'unicorn/no-unsafe-string-replacement': 'off',
+      'unicorn/no-useless-coercion': 'off',
+      'unicorn/no-useless-concat': 'off',
+      'unicorn/no-useless-else': 'off',
+      'unicorn/no-useless-recursion': 'off',
+      'unicorn/no-useless-spread': 'off',
+      'unicorn/no-useless-template-literals': 'off',
+      'unicorn/prefer-abort-signal-timeout': 'off',
+      'unicorn/prefer-array-from-map': 'off',
+      'unicorn/prefer-await': 'off',
+      'unicorn/prefer-boolean-return': 'off',
+      'unicorn/prefer-continue': 'off',
+      'unicorn/prefer-direct-iteration': 'off',
+      'unicorn/prefer-dom-node-replace-children': 'off',
+      'unicorn/prefer-early-return': 'off',
+      'unicorn/prefer-else-if': 'off',
+      'unicorn/prefer-global-number-constants': 'off',
+      'unicorn/prefer-hoisting-branch-code': 'off',
+      'unicorn/prefer-iterator-to-array': 'off',
+      'unicorn/prefer-iterator-helpers': 'off',
+      'unicorn/prefer-minimal-ternary': 'off',
+      'unicorn/prefer-modern-dom-apis': 'off',
+      'unicorn/prefer-number-coercion': 'off',
+      'unicorn/prefer-number-is-safe-integer': 'off',
+      'unicorn/prefer-object-iterable-methods': 'off',
+      'unicorn/prefer-promise-with-resolvers': 'off',
+      'unicorn/prefer-promise-try': 'off',
+      'unicorn/prefer-scoped-selector': 'off',
+      'unicorn/prefer-set-methods': 'off',
+      'unicorn/prefer-simplified-conditions': 'off',
+      'unicorn/prefer-ternary': 'off',
+      'unicorn/prefer-type-literal-last': 'off',
+      'unicorn/prefer-unicode-code-point-escapes': 'off',
+      'unicorn/require-array-sort-compare': 'off',
+      'unicorn/no-incorrect-template-string-interpolation': 'off',
     },
   },
 
@@ -189,6 +254,68 @@ export default tseslint.config(
       'unicorn/prefer-string-raw': 'off',
       'unicorn/prefer-string-repeat': 'off',
       'unicorn/prefer-string-replace-all': 'off',
+      // Unicorn 71 — mirror the base-block disables for the TS rule layer.
+      'unicorn/name-replacements': 'off',
+      'unicorn/consistent-boolean-name': 'off',
+      'unicorn/consistent-class-member-order': 'off',
+      'unicorn/consistent-conditional-object-spread': 'off',
+      'unicorn/consistent-existence-index-check': 'off',
+      'unicorn/consistent-function-scoping': 'off',
+      'unicorn/logical-assignment-operators': 'off',
+      'unicorn/max-nested-calls': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/no-computed-property-existence-check': 'off',
+      'unicorn/no-declarations-before-early-exit': 'off',
+      'unicorn/no-duplicate-if-branches': 'off',
+      'unicorn/no-duplicate-loops': 'off',
+      'unicorn/no-error-property-assignment': 'off',
+      'unicorn/no-for-each': 'off',
+      'unicorn/no-global-object-property-assignment': 'off',
+      'unicorn/no-loop-iterable-mutation': 'off',
+      'unicorn/no-negated-array-predicate': 'off',
+      'unicorn/no-non-function-verb-prefix': 'off',
+      'unicorn/no-return-array-push': 'off',
+      'unicorn/no-subtraction-comparison': 'off',
+      'unicorn/no-top-level-assignment-in-function': 'off',
+      'unicorn/no-top-level-side-effects': 'off',
+      'unicorn/no-unnecessary-boolean-comparison': 'off',
+      'unicorn/no-unnecessary-splice': 'off',
+      'unicorn/no-unreadable-for-of-expression': 'off',
+      'unicorn/no-unsafe-string-replacement': 'off',
+      'unicorn/no-useless-coercion': 'off',
+      'unicorn/no-useless-concat': 'off',
+      'unicorn/no-useless-else': 'off',
+      'unicorn/no-useless-recursion': 'off',
+      'unicorn/no-useless-spread': 'off',
+      'unicorn/no-useless-template-literals': 'off',
+      'unicorn/prefer-abort-signal-timeout': 'off',
+      'unicorn/prefer-array-from-map': 'off',
+      'unicorn/prefer-await': 'off',
+      'unicorn/prefer-boolean-return': 'off',
+      'unicorn/prefer-continue': 'off',
+      'unicorn/prefer-direct-iteration': 'off',
+      'unicorn/prefer-dom-node-replace-children': 'off',
+      'unicorn/prefer-early-return': 'off',
+      'unicorn/prefer-else-if': 'off',
+      'unicorn/prefer-global-number-constants': 'off',
+      'unicorn/prefer-hoisting-branch-code': 'off',
+      'unicorn/prefer-iterator-to-array': 'off',
+      'unicorn/prefer-iterator-helpers': 'off',
+      'unicorn/prefer-minimal-ternary': 'off',
+      'unicorn/prefer-modern-dom-apis': 'off',
+      'unicorn/prefer-number-coercion': 'off',
+      'unicorn/prefer-number-is-safe-integer': 'off',
+      'unicorn/prefer-object-iterable-methods': 'off',
+      'unicorn/prefer-promise-with-resolvers': 'off',
+      'unicorn/prefer-promise-try': 'off',
+      'unicorn/prefer-scoped-selector': 'off',
+      'unicorn/prefer-set-methods': 'off',
+      'unicorn/prefer-simplified-conditions': 'off',
+      'unicorn/prefer-ternary': 'off',
+      'unicorn/prefer-type-literal-last': 'off',
+      'unicorn/prefer-unicode-code-point-escapes': 'off',
+      'unicorn/require-array-sort-compare': 'off',
+      'unicorn/no-incorrect-template-string-interpolation': 'off',
 
       // -- sonarjs opinions we soften -------------------------------------
       // Cognitive complexity stays at 15; opt-out files use a per-file
@@ -219,6 +346,15 @@ export default tseslint.config(
       // type-narrowing idiom; the type checker validates it. Disabled
       // to avoid flagging the pattern.
       'sonarjs/different-types-comparison': 'off',
+      // SonarJS 4.1 — test-assertion style nits (toBe(true) vs toBeTruthy,
+      // length checks, etc.). High volume, low signal for this codebase.
+      'sonarjs/prefer-specific-assertions': 'off',
+      'sonarjs/no-trivial-assertions': 'off',
+      'sonarjs/no-floating-point-equality': 'off',
+      'sonarjs/no-hardcoded-passwords': 'off',
+      // Super-linear regex on trusted build/source inputs; fitness and
+      // sonarjs/slow-regex (scripts) already cover the real ReDoS surface.
+      'sonarjs/super-linear-regex': 'off',
 
       // -- import hygiene -------------------------------------------------
       // eslint-plugin-import-x: the maintained fork of eslint-plugin-import.
@@ -562,12 +698,23 @@ export default tseslint.config(
       // Match the TS profile's file-agnostic opinion overrides (those are
       // .ts-scoped above; mirror them here so the rulesets stay consistent).
       'unicorn/prevent-abbreviations': 'off',
+      'unicorn/name-replacements': 'off',
       'unicorn/no-null': 'off',
       'unicorn/import-style': 'off',
       'unicorn/no-array-sort': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/no-return-array-push': 'off',
+      'unicorn/require-array-sort-compare': 'off',
+      'unicorn/prefer-number-coercion': 'off',
+      'unicorn/no-unreadable-for-of-expression': 'off',
+      'unicorn/consistent-boolean-name': 'off',
+      'unicorn/consistent-conditional-object-spread': 'off',
+      'unicorn/max-nested-calls': 'off',
       'sonarjs/no-os-command-from-path': 'off',
       'sonarjs/todo-tag': 'off',
       'sonarjs/pseudo-random': 'off',
+      'sonarjs/prefer-specific-assertions': 'off',
+      'sonarjs/super-linear-regex': 'off',
       // ReDoS hotspot. These scripts only ever run regexes against the repo's
       // own committed content (docs, check source) at build time — the threat
       // model (super-linear backtracking on attacker-controlled input) does

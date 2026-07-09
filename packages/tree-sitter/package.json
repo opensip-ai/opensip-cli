@@ -41,7 +41,7 @@
     "web-tree-sitter": "0.26.10"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "vitest": "^4.1.9"
+    "@types/node": "^24.13.3",
+    "vitest": "^4.1.10"
   }
 }

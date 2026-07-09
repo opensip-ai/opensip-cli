@@ -117,7 +117,7 @@ export function stripStringsAndComments(content: string): string {
     .replaceAll(DOUBLE_QUOTE_RE, '""')
     .replaceAll(BACKTICK_RE, '``');
   // Strip single-line comments (after string stripping to avoid matching // inside strings)
-  // eslint-disable-next-line sonarjs/slow-regex -- .*$ anchored to line end; linear scan
+   
   result = result.replaceAll(/\/\/.*$/gm, '');
   return result;
 }

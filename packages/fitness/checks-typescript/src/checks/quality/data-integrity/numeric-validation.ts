@@ -312,7 +312,7 @@ function hasRegexDigitGuard(
   if (!firstArg) return false;
   const argText = firstArg.getText(sourceFile);
   // Argument must be a match result subscript (e.g., `match[1]`, `retryAfterMatch[1]`)
-  // eslint-disable-next-line sonarjs/slow-regex -- simple pattern matching identifier[digit]; no backtracking risk
+   
   if (!/\w+\[\d+\]/.test(argText)) return false;
 
   // Look for regex with \d in nearby lines (broader window for variable-defined regex)

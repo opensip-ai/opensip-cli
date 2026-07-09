@@ -148,22 +148,10 @@ describe('runHeapPreflight', () => {
     // ONLY if we crank it high. To force the "already elevated" branch,
     // mock currentHeapLimitMb via vi: spy on v8.getHeapStatistics.
     const v8 = await import('node:v8');
+    // Cast: @types/node HeapInfo grows over time; only heap_size_limit is load-bearing here.
     const spy = vi.spyOn(v8.default, 'getHeapStatistics').mockReturnValue({
-      total_heap_size: 0,
-      total_heap_size_executable: 0,
-      total_physical_size: 0,
-      total_available_size: 0,
-      used_heap_size: 0,
       heap_size_limit: 64 * 1024 * 1024 * 1024, // 64 GB cap → already over 8192MB
-      malloced_memory: 0,
-      peak_malloced_memory: 0,
-      does_zap_garbage: 0,
-      number_of_native_contexts: 0,
-      number_of_detached_contexts: 0,
-      total_global_handles_size: 0,
-      used_global_handles_size: 0,
-      external_memory: 0,
-    });
+    } as ReturnType<typeof v8.default.getHeapStatistics>);
     try {
       const out = await runScopedHeapPreflight({ cwd: dir });
       expect(out).toBe(false); // already-elevated path

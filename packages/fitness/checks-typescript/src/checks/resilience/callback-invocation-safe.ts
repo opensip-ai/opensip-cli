@@ -50,7 +50,7 @@ const COLLECTION_NAMES = new Set([
 // about. Both regexes are bounded — they only consume identifier chars
 // and a few whitespace boundaries, never backtrack on user input.
 const FOREACH_HEAD_RE = /\b([A-Za-z_$][\w$]*)\s*\.\s*forEach\s*\(\s*/g;
-// eslint-disable-next-line sonarjs/slow-regex -- arrow header; bounded prefix optional groups, anchored at slice start
+ 
 const FOREACH_ARROW_RE = /^(?:async\s+)?\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*\{?\s*/;
 
 // `for (const <ident> of <receiver>) { ... }`

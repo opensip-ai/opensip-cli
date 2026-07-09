@@ -40,10 +40,10 @@ const surfaceCache = new Map<string, PackagePublicSurface | null>();
 // Both patterns are anchored to line boundaries (gm) and use bounded
 // character classes — no nested quantifiers — so they run in linear
 // time over input.
-/* eslint-disable sonarjs/slow-regex -- both patterns are linear: anchored to line start with `^` under the gm flag, and use negated character classes (`[^}\n]*`, `[^'"]+`) rather than nested quantifiers, so they cannot backtrack catastrophically */
+ 
 const RE_EXPORT_NAMED_FROM = /^\s*export\s+(?:type\s+)?\{[^}\n]*\}\s+from\s+['"]([^'"]+)['"]/gm;
 const RE_EXPORT_STAR_FROM = /^\s*export\s+\*(?:\s+as\s+\w+)?\s+from\s+['"]([^'"]+)['"]/gm;
-/* eslint-enable sonarjs/slow-regex */
+ 
 
 /**
  * Reset all memoized state. Intended for tests.

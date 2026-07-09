@@ -178,8 +178,8 @@
   },
   "devDependencies": {
     "@opensip-cli/graph-typescript": "workspace:*",
-    "@types/node": "^24.13.2",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

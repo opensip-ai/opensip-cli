@@ -84,7 +84,7 @@ function parseDirectiveRest(
   reason: string | null;
 } | null {
   // Strip trailing block-comment terminators: `*/` (C-family) and `-->` (HTML).
-  // eslint-disable-next-line sonarjs/slow-regex -- anchored at end-of-string, bounded \s* runs; no ReDoS exposure
+   
   const normalized = rest.replace(/\s*(?:\*\/|-->)\s*$/, '').trimEnd();
 
   const separatorIndex = normalized.indexOf(' -- ');
