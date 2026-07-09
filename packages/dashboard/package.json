@@ -2,7 +2,7 @@
   "name": "@opensip-cli/dashboard",
   "version": "0.5.0",
   "license": "Apache-2.0",
-  "description": "Self-contained HTML dashboard generator for OpenSIP CLI — renders the fit/sim/graph report from session data and graph catalogs",
+  "description": "Self-contained HTML dashboard generator for OpenSIP CLI \u2014 renders the fit/sim/graph report from session data and graph catalogs",
   "keywords": [
     "opensip-cli",
     "static-analysis",
@@ -39,7 +39,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-cli/contracts": "workspace:*"
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/format": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

@@ -72,7 +72,7 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 
 **Layer 1 — `@opensip-cli/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-cli/datastore`, `@opensip-cli/contracts`, `@opensip-cli/tree-sitter`, and `@opensip-cli/cli-ui`.** Four substrate packages above the kernel, each depending only on `core` — never on a tool.
+**Layer 2 — `@opensip-cli/datastore`, `@opensip-cli/contracts`, `@opensip-cli/tree-sitter`, `@opensip-cli/clone-detection`, `@opensip-cli/format`, and `@opensip-cli/cli-ui`.** Substrate packages above the kernel. Most depend only on `core`; leaf pure packages (`clone-detection`, `format`) depend on nothing. Never on a tool.
 
 - **`@opensip-cli/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
 - **`@opensip-cli/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandOutcome` wrapper the host stamps on every machine output, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. It is a contract facade, not a host runtime package: it may re-export small tool-facing helpers such as `defineCommand`, but the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` only. Does not import any tool.
@@ -175,7 +175,7 @@ A flat package can have any internal structure. With 56 workspace packages, the 
 
 Trade-offs are real. The 56-package layout is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 55 publishable packages (plus the private workspace-root `package.json` for tooling versions and private `@opensip-cli/test-support`). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 56 publishable packages (plus the private workspace-root `package.json` for tooling versions and private `@opensip-cli/test-support`). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)) is the antidote.
 

@@ -100,6 +100,18 @@ const EXTERNAL_GATE_PROBES = [
 // probes prove the shared clone substrate remains a leaf and yagni cannot regain
 // a graph engine/adapter production edge while still allowing test-only parity
 // fixtures to import the graph TypeScript adapter.
+
+// ADR-0144 format package leaf gate liveness.
+const ADR_0144_PROBES = [
+  {
+    file: 'packages/format/src/__gate_probe_contracts__.ts',
+    source:
+      "import { BUILTIN_DEFAULT_RECIPE } from '@opensip-cli/contracts';\n" +
+      'export const _gateProbe = BUILTIN_DEFAULT_RECIPE;\n',
+    rule: 'format-imports-nothing',
+  },
+];
+
 const ADR_0064_PROBES = [
   {
     file: 'packages/clone-detection/src/__gate_probe_contracts__.ts',
@@ -191,6 +203,11 @@ function verifyAdr0064GatesFire() {
   console.log(
     `verify-gate-live: OK — all ${ADR_0064_PROBES.length} ADR-0064 gates ` +
       'fired on a probe (clone-detection leaf + yagni-no-graph are live).',
+  );
+  verifyProbesFire(ADR_0144_PROBES, 'ADR-0144 format package leaf gate');
+  console.log(
+    `verify-gate-live: OK — all ${ADR_0144_PROBES.length} ADR-0144 gates ` +
+      'fired on a probe (format leaf is live).',
   );
 }
 

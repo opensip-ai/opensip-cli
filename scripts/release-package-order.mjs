@@ -92,6 +92,15 @@ export const RELEASE_PACKAGE_ORDER = [
     publishReason:
       'Single-sourced clone-detection primitives + algorithms consumed by graph and yagni',
   },
+  // Layer 2 — shared presentation formatters (zero deps; ADR-0144)
+  {
+    unscoped: 'format',
+    name: '@opensip-cli/format',
+    dir: 'packages/format',
+    filter: '@opensip-cli/format',
+    publishReason:
+      'Single-sourced human duration/score labels + display projectors for CLI, report, and host surfaces',
+  },
   // Layer 2 — session-store + output (extracted from contracts)
   {
     unscoped: 'session-store',

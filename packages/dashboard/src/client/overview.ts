@@ -18,6 +18,7 @@ import { appendLedgerRows, type LedgerRenderedRows } from './overview-ledger.js'
 import { paginateGroupedRows } from './pagination.js';
 import { scoreColorStyle, sessionStatus, statusBadge } from './sessions.js';
 import { activateTabForSession } from './tab-activators.js';
+import { formatDuration, formatScore, projectSessionDisplay } from '@opensip-cli/format';
 
 const DEFAULT_TOOL_BADGE_STYLE = 'background:var(--bg-hover);color:var(--text-muted)';
 const EMPTY_SUMMARY = {
@@ -106,7 +107,7 @@ function appendSessionCells(row: HTMLElement, s: DashboardSession, child = false
   row.append(el('td', { text: s.recipe ?? 'default', style: MUTED_STYLE }));
   row.append(
     el('td', {
-      text: s.score + '%',
+      text: formatScore(s.score),
       style: 'font-weight:600;' + scoreColorStyle(s.score),
     }),
   );
@@ -117,7 +118,7 @@ function appendSessionCells(row: HTMLElement, s: DashboardSession, child = false
   row.append(el('td', { text: '' + findingCount(counts) }));
   row.append(
     el('td', {
-      text: (s.durationMs / 1000).toFixed(1) + 's',
+      text: formatDuration(s.durationMs),
       style: DIM_STYLE,
     }),
   );
@@ -197,8 +198,13 @@ function appendSuiteRow(tbody: HTMLElement, suiteSessions: readonly DashboardSes
 
   const label = suiteLabel(suiteSessions);
   const counts = aggregateSuiteCounts(suiteSessions);
-  const score = aggregateSuiteScore(suiteSessions, counts);
-  const durationMs = suiteSessions.reduce((sum, s) => sum + s.durationMs, 0);
+  // Dashboard owns aggregate meaning (sum duration / suite score policy);
+  // labels come only from @opensip-cli/format (ADR-0144).
+  const display = projectSessionDisplay({
+    durationMs: suiteSessions.reduce((sum, s) => sum + s.durationMs, 0),
+    score: aggregateSuiteScore(suiteSessions, counts),
+  });
+  const score = display.score;
   const expanderId = 'overview-suite-' + Math.random().toString(36).slice(2, 8);
   const arrow = el('span', { class: 'overview-suite-arrow', text: '▶' });
 
@@ -238,7 +244,7 @@ function appendSuiteRow(tbody: HTMLElement, suiteSessions: readonly DashboardSes
   );
   row.append(
     el('td', {
-      text: score + '%',
+      text: display.scoreLabel,
       style: 'font-weight:600;' + scoreColorStyle(score),
     }),
   );
@@ -247,7 +253,7 @@ function appendSuiteRow(tbody: HTMLElement, suiteSessions: readonly DashboardSes
   row.append(statusCell);
   row.append(el('td', { text: counts.passed + '/' + counts.total }));
   row.append(el('td', { text: '' + findingCount(counts) }));
-  row.append(el('td', { text: (durationMs / 1000).toFixed(1) + 's', style: DIM_STYLE }));
+  row.append(el('td', { text: display.durationLabel, style: DIM_STYLE }));
   tbody.append(row);
 
   const expander = el('tr', {

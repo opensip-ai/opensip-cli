@@ -8,6 +8,7 @@ import {
   type Span,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
+import { formatDuration } from '@opensip-cli/format';
 
 import type {
   ReviewBrief,
@@ -69,7 +70,7 @@ function stepSummaryRow(step: SuiteStepSummary): Span[] {
     },
     verdictText(step),
     countsText(step),
-    { text: `${Math.round(step.durationMs)}ms`, dim: true },
+    { text: formatDuration(step.durationMs), dim: true },
     {
       text: step.error ?? '-',
       dim: step.error === undefined,

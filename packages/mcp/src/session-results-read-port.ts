@@ -314,6 +314,7 @@ function toRunSummary(s: HistorySession): RunSummary {
     startedAt: s.startedAt,
     completedAt: s.completedAt,
     cwd: s.cwd,
+    durationMs: s.durationMs,
     score: s.score,
     passed: s.passed,
     ...(s.cliVersion === undefined ? {} : { cliVersion: s.cliVersion }),

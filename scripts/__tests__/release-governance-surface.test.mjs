@@ -26,8 +26,8 @@ test('publishable count matches RELEASE_PACKAGE_ORDER', () => {
   const scopedCount = RELEASE_PACKAGE_ORDER.filter((p) =>
     p.name.startsWith('@opensip-cli/'),
   ).length;
-  assert.equal(publishableCount, 55);
-  assert.equal(scopedCount, 54);
+  assert.equal(publishableCount, 56);
+  assert.equal(scopedCount, 55);
   assert.equal(RELEASE_PACKAGE_ORDER.at(-1)?.name, 'opensip-cli');
 });
 

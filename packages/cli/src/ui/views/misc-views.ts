@@ -15,6 +15,8 @@ import {
   type ViewNode,
 } from '@opensip-cli/cli-ui';
 
+import { formatDuration, formatScore } from '@opensip-cli/format';
+
 import { formatBytes } from '../../format-bytes.js';
 
 import type {
@@ -118,11 +120,11 @@ function historyRow(s: StoredSession): Span[] {
     { text: s.suiteName ?? '-', dim: s.suiteName === undefined },
     { text: s.tool, tone: 'brand', bold: true },
     { text: new Date(s.startedAt).toLocaleString(), dim: true },
-    { text: `${s.score}%`, tone: scoreTone(s.score) },
+    { text: formatScore(s.score), tone: scoreTone(s.score) },
     { text: s.passed ? 'PASS' : 'FAIL', tone: s.passed ? 'success' : 'error' },
     { text: counts ? `${counts.passed}/${counts.total}` : '—' },
     { text: s.recipe ?? '', dim: true },
-    { text: `${(s.durationMs / 1000).toFixed(1)}s`, dim: true },
+    { text: formatDuration(s.durationMs), dim: true },
   ];
 }
 

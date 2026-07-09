@@ -19,7 +19,7 @@
 import { Box, Text } from 'ink';
 import React, { useEffect, useState } from 'react';
 
-import { formatDuration } from './format-duration.js';
+import { formatDuration } from '@opensip-cli/format';
 import { Spinner, useSpinner } from './spinner.js';
 import { useTheme } from './theme.js';
 

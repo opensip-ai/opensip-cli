@@ -1,5 +1,6 @@
 import { el } from './el.js';
 import { scoreColorStyle, statusBadge } from './sessions.js';
+import { formatDuration, formatScore } from '@opensip-cli/format';
 
 const DIM_STYLE = 'color:var(--text-dim)';
 const MUTED_STYLE = 'color:var(--text-muted)';
@@ -101,7 +102,7 @@ function appendLedgerStepCells(
   row.append(el('td', { text: String(step.verdictSummary?.findings ?? 0) }));
   row.append(
     el('td', {
-      text: (step.durationMs / 1000).toFixed(1) + 's',
+      text: formatDuration(step.durationMs),
       style: DIM_STYLE,
     }),
   );
@@ -151,7 +152,7 @@ function appendLedgerRunRow(
   row.append(el('td', { text: run.name, title: run.id, style: MUTED_STYLE }));
   row.append(
     el('td', {
-      text: score + '%',
+      text: formatScore(score),
       style: 'font-weight:600;' + scoreColorStyle(score),
     }),
   );
@@ -162,7 +163,7 @@ function appendLedgerRunRow(
   row.append(el('td', { text: '' + findingCount(counts) }));
   row.append(
     el('td', {
-      text: (run.durationMs / 1000).toFixed(1) + 's',
+      text: formatDuration(run.durationMs),
       style: DIM_STYLE,
     }),
   );

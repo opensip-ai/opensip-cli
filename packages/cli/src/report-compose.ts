@@ -90,6 +90,8 @@ async function composeReportInput(): Promise<HtmlReportInput> {
   const repo = datastore ? new SessionRepo(datastore) : undefined;
   const runRepo = datastore ? new RunRepo(datastore) : undefined;
   const sessions = repo ? orderSessionsForSuiteGrouping([...repo.list({ limit: 20 })]) : [];
+  // ADR-0144 Strategy A: sessions stay raw; the dashboard client labels
+  // duration/score via @opensip-cli/format — do not embed labels here.
   const recentRuns = runRepo ? [...runRepo.listRuns({ limit: 20 })] : [];
   const stepsByRun: ReadonlyMap<string, readonly StoredRunStep[]> = runRepo
     ? runRepo.listStepsForRuns(recentRuns.map((run) => run.id))

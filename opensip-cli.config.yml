@@ -49,8 +49,11 @@ targets:
     concerns: [backend, server, api]
     include:
       - 'packages/*/src/**/*.ts'
+      # TSX: cli-ui live surfaces (Ink) — ADR-0144 presentation-labels-via-format
+      - 'packages/*/src/**/*.tsx'
     exclude:
       - '**/*.test.ts'
+      - '**/*.test.tsx'
       - '**/__tests__/**'
       - '**/node_modules/**'
       - '**/dist/**'
@@ -65,8 +68,10 @@ targets:
     concerns: [cli]
     include:
       - 'packages/cli/src/**/*.ts'
+      - 'packages/cli/src/**/*.tsx'
     exclude:
       - '**/*.test.ts'
+      - '**/*.test.tsx'
       - '**/__tests__/**'
       - '**/node_modules/**'
       - '**/dist/**'
@@ -81,7 +86,9 @@ targets:
     concerns: [testing]
     include:
       - '**/*.test.ts'
+      - '**/*.test.tsx'
       - '**/__tests__/**/*.ts'
+      - '**/__tests__/**/*.tsx'
     exclude:
       - '**/node_modules/**'
       - '**/dist/**'
@@ -90,10 +97,11 @@ targets:
       - typescript
 
   all-ts:
-    description: All TypeScript files
+    description: All TypeScript / TSX files
     languages: [typescript]
     include:
       - '**/*.ts'
+      - '**/*.tsx'
     exclude:
       - '**/node_modules/**'
       - '**/dist/**'
@@ -180,6 +188,10 @@ checkOverrides:
   # Pin to all-ts so nested tool engines are covered if a partial implementation
   # starts before the decision is promoted into an implementation spec.
   deferred-run-pipeline-boundary: [all-ts]
+  # ADR-0144: human duration/score labels. Path-gates inside the check; pin to
+  # [backend, cli] so packages/cli-ui/**/*.tsx live surfaces are included (the
+  # default backend/cli globs now cover .tsx — see targets above).
+  presentation-labels-via-format: [backend, cli]
 
 # =============================================================================
 # Graph Configuration

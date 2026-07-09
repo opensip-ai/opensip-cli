@@ -11,6 +11,7 @@
  *   2. @opensip-cli/tree-sitter    — grammar-agnostic parser substrate
  *   2. @opensip-cli/cli-ui         — shared Ink/React presentational primitives
  *   2. @opensip-cli/clone-detection — shared function-body clone-detection substrate (node:crypto only; ADR-0064)
+ *   2. @opensip-cli/format          — pure presentation formatters + display projectors (zero deps; ADR-0144)
  *   2. @opensip-cli/tool-test-kit  — public test helpers for tool authors
  *   3. @opensip-cli/cli-live        — shared live-run runtime (state machine + produce seam)
  *   3. @opensip-cli/session-store  — session persistence over datastore/contracts
@@ -422,6 +423,21 @@ module.exports = {
       to: { path: '^packages/(?!clone-detection/)' },
     },
 
+    // ADR-0144 enforcement: @opensip-cli/format must remain a leaf package
+    // (no workspace deps) so cli-ui, dashboard, cli, and mcp can share one label path.
+    {
+      name: 'format-imports-nothing',
+      severity: 'error',
+      comment:
+        '@opensip-cli/format is a layer-2 LEAF: pure presentation formatters + narrow ' +
+        'display projectors with ZERO workspace deps (ADR-0144). It must import no other ' +
+        'workspace package so cli-ui (Ink leaf), dashboard, and the CLI host can all ' +
+        'share one lexical label path without layer cycles. Labels only — no suite/count ' +
+        'business aggregation belongs here.',
+      from: { path: '^packages/format/src/' },
+      to: { path: '^packages/(?!format/)' },
+    },
+
     // -------------------------------------------------------------------
     // Layer enforcement — config depends on core (+ contracts) only.
     //
@@ -601,12 +617,12 @@ module.exports = {
       severity: 'error',
       comment:
         'dashboard renders the self-contained HTML report from session data ' +
-        'and a graph catalog. It depends on core (logger, paths) and ' +
-        'contracts (StoredSession / CheckCatalogEntry / GraphCatalog types). ' +
-        'It must not depend on any tool engine, the CLI, language adapters, ' +
-        'or check packs.',
+        'and a graph catalog. It depends on core (logger, paths), contracts ' +
+        '(StoredSession / GraphCatalog types), and @opensip-cli/format ' +
+        '(human duration/score labels, ADR-0144). It must not depend on any ' +
+        'tool engine, the CLI, language adapters, or check packs.',
       from: { path: '^packages/dashboard/src/' },
-      to: { path: '^packages/(?!core/|contracts/|dashboard/)' },
+      to: { path: '^packages/(?!core/|contracts/|format/|dashboard/)' },
     },
 
     // -------------------------------------------------------------------
@@ -621,14 +637,15 @@ module.exports = {
       name: 'cli-ui-no-workspace-deps',
       severity: 'error',
       comment:
-        'cli-ui is a leaf package — Ink/React primitives only. It must not ' +
-        'depend on any other @opensip-cli/* package. Other packages depend ' +
-        'on it to share visual primitives across the CLI and tool live views.',
+        'cli-ui is Ink/React primitives plus pure presentation labels from ' +
+        '@opensip-cli/format only (ADR-0144). It must not depend on core, ' +
+        'contracts, tools, or any other workspace package. Formatters are ' +
+        'not re-exported from the cli-ui barrel — consumers import format ' +
+        'directly.',
       from: { path: '^packages/cli-ui/src/' },
-      // Resolved-path form: any workspace package EXCEPT cli-ui's own
-      // source (a leaf importing its own files is fine; importing any
-      // other package is the violation).
-      to: { path: '^packages/', pathNot: '^packages/cli-ui/' },
+      // Resolved-path form: any workspace package EXCEPT cli-ui itself and
+      // the pure format leaf (ADR-0144).
+      to: { path: '^packages/', pathNot: '^packages/(?:cli-ui|format)/' },
     },
 
     // -------------------------------------------------------------------
@@ -1097,7 +1114,7 @@ module.exports = {
       // and dashboard's own source (siblings). Node built-ins never match
       // `^packages/`, so they're implicitly allowed.
       to: {
-        path: '^packages/(?!(contracts|core|dashboard)/)',
+        path: '^packages/(?!(contracts|core|format|dashboard)/)',
       },
     },
     {

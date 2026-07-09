@@ -11,6 +11,8 @@
  * emitted Code Paths panel can reach for it by bare name.
  */
 
+import { formatScore } from '@opensip-cli/format';
+
 import { el } from './el.js';
 import { paginateGroupedRows, renderPageButtons, wirePagination } from './pagination.js';
 
@@ -172,7 +174,7 @@ function buildRateCell(rate: number): HTMLElement {
       el('span', { class: 'pass-rate-fill', style: 'width:' + rate + '%;background:' + rateColor }),
     );
     bar.append(track);
-    bar.append(el('span', { text: rate + '%', style: 'font-size:12px;color:' + rateColor }));
+    bar.append(el('span', { text: formatScore(rate), style: 'font-size:12px;color:' + rateColor }));
     rateCell.append(bar);
   } else {
     rateCell.textContent = EM_DASH;

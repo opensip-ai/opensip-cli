@@ -24,7 +24,7 @@
 import { Box } from 'ink';
 import React from 'react';
 
-import { formatDuration } from './format-duration.js';
+import { formatDuration } from '@opensip-cli/format';
 import { renderToInk } from './render-to-ink.js';
 import { useRunDuration } from './run-timing-provider.js';
 import { line, type Span, type ViewNode } from './view-model.js';
@@ -87,9 +87,10 @@ export function viewRunSummary({
  *  live summary line aligns with the run header + footer hints (both also at 2)
  *  instead of sitting flush-left against the indented rest of the output. */
 export function RunSummary(props: RunSummaryProps): React.ReactElement {
-  // When durationMs omitted, read from the RunTimingProvider (host timer).
-  // This makes the displayed duration match the value that will be (or was)
-  // recorded to StoredSession via the host `runSession.record` seam.
+  // When durationMs omitted, read from the RunTimingProvider (host RunTimer).
+  // ADR-0144 live vs final: the final summary must use the same host-stamped
+  // duration that is persisted as StoredSession.durationMs — never a second
+  // wall-clock sample after tool return. Live spinners may still tick separately.
   const resolvedDuration = props.durationMs ?? useRunDuration();
   const viewProps: RunSummaryProps = { ...props, durationMs: resolvedDuration };
   return (
