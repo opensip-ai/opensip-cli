@@ -1,5 +1,5 @@
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { sessionHostMetrics, sessions, sessionToolPayload } from '../schema/sessions.js';
@@ -60,6 +60,13 @@ beforeEach(() => {
 afterEach(() => {
   datastore.close();
 });
+
+function queryPlanDetails(query: string): string {
+  return datastore.db
+    .all<{ detail: string }>(sql.raw('EXPLAIN QUERY PLAN ' + query))
+    .map((row) => row.detail)
+    .join('\n');
+}
 
 describe('SessionRepo — save / get', () => {
   it('persists a session with its opaque payload and reads it back unchanged', () => {
@@ -149,6 +156,12 @@ describe('SessionRepo — list', () => {
     expect(onlyFit).toHaveLength(1);
     expect(onlyFit[0]?.id).toBe('fit-1');
   });
+
+  it('uses the global timestamp index for newest-first session history', () => {
+    const plan = queryPlanDetails('SELECT id FROM sessions ORDER BY "timestamp" DESC LIMIT 2');
+    expect(plan).toContain('sessions_timestamp_idx');
+    expect(plan).not.toContain('USE TEMP B-TREE');
+  });
 });
 
 describe('SessionRepo — purge / clearAll / count', () => {
@@ -157,6 +170,11 @@ describe('SessionRepo — purge / clearAll / count', () => {
     repo.save(makeSession({ id: 'a' }));
     repo.save(makeSession({ id: 'b' }));
     expect(repo.count()).toBe(2);
+  });
+
+  it('uses the global timestamp index for purge cutoffs', () => {
+    const plan = queryPlanDetails('SELECT id FROM sessions WHERE "timestamp" < 1780000000000');
+    expect(plan).toContain('sessions_timestamp_idx');
   });
 
   it('purge(date) deletes sessions older than the cutoff', () => {

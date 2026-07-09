@@ -57,6 +57,13 @@
       "when": 1783562556846,
       "tag": "0007_magical_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1783634867033,
+      "tag": "0008_sharp_leech",
+      "breakpoints": true
     }
   ]
 }

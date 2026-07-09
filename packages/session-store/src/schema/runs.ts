@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { sessions } from './sessions.js';
 
@@ -63,7 +63,7 @@ export const runSteps = sqliteTable(
   },
   (table) => [
     index('run_steps_run_order_idx').on(table.run_id, table.ordinal, table.attempt),
-    index('run_steps_session_id_idx').on(table.session_id),
+    uniqueIndex('run_steps_session_id_unique_idx').on(table.session_id),
     index('run_steps_stable_id_idx').on(table.stable_id),
   ],
 );

@@ -35,7 +35,10 @@ export const sessions = sqliteTable(
     /** Producing tool's engine (manifest) version. Nullable when the tool has none / legacy rows. */
     engine_version: text('engine_version'),
   },
-  (table) => [index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`)],
+  (table) => [
+    index('sessions_tool_timestamp_idx').on(table.tool, sql`${table.timestamp} DESC`),
+    index('sessions_timestamp_idx').on(sql`${table.timestamp} DESC`),
+  ],
 );
 
 /**

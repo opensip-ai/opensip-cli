@@ -106,6 +106,19 @@ describe('RunRepo', () => {
     expect(repo.getStepBySessionId('session-test-1')).toEqual(step);
   });
 
+  it('enforces at most one run step per linked session', () => {
+    new SessionRepo(datastore).save(makeSession());
+    repo.saveRunWithSteps(makeRun({ id: 'run-a' }), [
+      makeStep({ id: 'step-a', runId: 'run-a', sessionId: 'session-test-1' }),
+    ]);
+
+    expect(() =>
+      repo.saveRunWithSteps(makeRun({ id: 'run-b', legacySuiteRunId: 'suite-b' }), [
+        makeStep({ id: 'step-b', runId: 'run-b', sessionId: 'session-test-1' }),
+      ]),
+    ).toThrow(/UNIQUE constraint failed: run_steps\.session_id/);
+  });
+
   it('groups steps for multiple runs', () => {
     repo.saveRunWithSteps(makeRun({ id: 'run-a' }), [
       makeStep({ id: 'a-0', runId: 'run-a', ordinal: 0 }),

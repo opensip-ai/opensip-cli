@@ -54,9 +54,12 @@ describe('run ledger schema', () => {
     );
     expect(indexes.map((idx) => idx.config.name).sort()).toEqual([
       'run_steps_run_order_idx',
-      'run_steps_session_id_idx',
+      'run_steps_session_id_unique_idx',
       'run_steps_stable_id_idx',
     ]);
+    expect(
+      indexes.find((idx) => idx.config.name === 'run_steps_session_id_unique_idx')?.config,
+    ).toMatchObject({ unique: true });
     expect(foreignKeys).toHaveLength(2);
     const refs = foreignKeys.map((fk) => fk.reference());
     expect(refs.map((ref) => ref.foreignTable)).toEqual(expect.arrayContaining([runs, sessions]));

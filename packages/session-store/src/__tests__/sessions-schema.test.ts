@@ -4,16 +4,19 @@ import { describe, expect, it } from 'vitest';
 import { sessions, sessionToolPayload } from '../schema/sessions.js';
 
 describe('sessions schema', () => {
-  it('declares the (tool, timestamp DESC) lookup index on sessions', () => {
+  it('declares timestamp lookup indexes on sessions', () => {
     // getTableConfig() evaluates the table's index-builder callback, which is
     // otherwise dead from a coverage standpoint despite being load-bearing for
-    // the `list newest-first by tool` query path in session-repo.
+    // the `list newest-first` query paths in session-repo.
     const { indexes } = getTableConfig(sessions);
     const toolTimestampIdx = indexes.find(
       (idx) => idx.config.name === 'sessions_tool_timestamp_idx',
     );
+    const timestampIdx = indexes.find((idx) => idx.config.name === 'sessions_timestamp_idx');
     expect(toolTimestampIdx).toBeDefined();
     expect(toolTimestampIdx?.config.columns).toHaveLength(2);
+    expect(timestampIdx).toBeDefined();
+    expect(timestampIdx?.config.columns).toHaveLength(1);
   });
 
   it('keeps the sessions table free of tool-specific detail columns', () => {

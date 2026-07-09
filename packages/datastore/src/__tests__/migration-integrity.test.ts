@@ -130,6 +130,12 @@ describe('fresh database fully realizes the ORM schema', () => {
             .db.all<{ name: string }>(sql.raw(`PRAGMA table_info(${table})`))
             .map((r) => r.name),
         );
+      const indexes = (table: string): Set<string> =>
+        new Set(
+          requireDrizzleHandle(ds)
+            .db.all<{ name: string }>(sql.raw(`PRAGMA index_list(${table})`))
+            .map((r) => r.name),
+        );
 
       expect(cols('sessions').has('timestamp_iso')).toBe(true); // 0010
       expect(cols('sessions').has('run_outcome')).toBe(true); // 0002 (ADR-0060)
@@ -139,6 +145,9 @@ describe('fresh database fully realizes the ORM schema', () => {
       expect(cols('runs').has('legacy_suite_run_id')).toBe(true); // 0007 (run ledger)
       expect(cols('run_steps').has('logical_step_key')).toBe(true); // 0007 (run ledger)
       expect(cols('run_steps').has('session_id')).toBe(true); // 0007 (run ledger)
+      expect(indexes('sessions').has('sessions_timestamp_idx')).toBe(true); // 0008
+      expect(indexes('run_steps').has('run_steps_session_id_unique_idx')).toBe(true); // 0008
+      expect(indexes('run_steps').has('run_steps_session_id_idx')).toBe(false); // replaced in 0008
       // `stable_id` was added (ADR-0048) but never read/written; removed as dead.
       // Assert the squashed migration no longer carries it (no accidental reintro).
       expect(cols('tool_state').has('stable_id')).toBe(false);
