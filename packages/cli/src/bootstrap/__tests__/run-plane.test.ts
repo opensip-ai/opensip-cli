@@ -34,6 +34,7 @@ import {
   runWithSuiteRunContext,
   type RunPlaneFactory,
 } from '../run-plane.js';
+import * as sessionRetentionMod from '../session-retention.js';
 import { resolveCurrentSessionRetentionPolicy } from '../session-retention.js';
 
 type ExecuteYagniDetector = NonNullable<Parameters<typeof executeYagni>[2]>[number];
@@ -283,15 +284,15 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
     expect(row?.suiteName).toBe('security');
   });
 
-  it('freezes the lifecycle so a second persist reuses the same completion snapshot', () => {
+  it('is idempotent for repeated completion on the same invocation', () => {
     const inv = factory.current();
     const first = inv.completeAndPersist(contribution());
     const second = inv.completeAndPersist(contribution({ tool: 'graph' }));
-    // Different rows (different ids), identical frozen timing.
-    expect(second?.id).not.toBe(first?.id);
+    expect(second?.id).toBe(first?.id);
     expect(second?.startedAt).toBe(first?.startedAt);
     expect(second?.completedAt).toBe(first?.completedAt);
     expect(second?.durationMs).toBe(first?.durationMs);
+    expect(new SessionRepo(datastore).count()).toBe(1);
   });
 
   it('recordHostMetrics is a no-op before a session row exists', () => {
@@ -440,16 +441,19 @@ describe('completeLiveRender', () => {
     datastore.close();
   });
 
-  it('returns the completion unchanged and persists its session + ttyBusyMs', async () => {
+  it('returns the completion without session and persists its session + ttyBusyMs', async () => {
     const inv = factory.current();
-    const completion: ToolRunCompletion = { session: contribution() };
+    const envelope = { ok: true };
+    const result = { done: true };
+    const completion: ToolRunCompletion = { session: contribution(), envelope, result };
     const out = await inv.completeLiveRender(() => Promise.resolve(completion));
-    expect(out).toBe(completion);
+    expect(out).toEqual({ envelope, result });
     const id = inv.sessionId();
     expect(id).toBeDefined();
     const row = new SessionRepo(datastore).get(id!);
     expect(row?.tool).toBe('fit');
     expect(row?.hostMetrics?.ttyBusyMs).toBeGreaterThanOrEqual(0);
+    expect(new SessionRepo(datastore).count()).toBe(1);
   });
 
   it('persists nothing when the renderer returns void', async () => {
@@ -493,12 +497,102 @@ describe('createRunActionHooks', () => {
       session: contribution(),
     } satisfies ToolRunCompletion);
     expect(factory.current().sessionId()).toBeDefined();
+    expect(hooks.currentSessionId?.()).toBe(factory.current().sessionId());
   });
 
   it('completeRun is a no-op for a plain CommandResult (no session)', () => {
     const hooks = createRunActionHooks(factory);
     hooks.completeRun?.({ type: 'help' });
     expect(factory.current().sessionId()).toBeUndefined();
+  });
+
+  it('resetRun clears the current invocation so a later beginRun starts fresh', () => {
+    const hooks = createRunActionHooks(factory);
+    hooks.beginRun?.();
+    hooks.completeRun?.({ session: contribution() } satisfies ToolRunCompletion);
+    expect(factory.current().sessionId()).toBeDefined();
+    hooks.resetRun?.();
+    hooks.beginRun?.();
+    expect(factory.current().sessionId()).toBeUndefined();
+    expect(hooks.currentSessionId?.()).toBeUndefined();
+  });
+
+  it('warns and returns undefined when session persistence throws', () => {
+    const warn = vi.fn();
+    const memory = DataStoreFactory.open({ backend: 'memory' });
+    const saveSpy = vi.spyOn(SessionRepo.prototype, 'save').mockImplementation(() => {
+      throw new Error('disk full');
+    });
+    try {
+      const factoryWithBrokenSave = createRunPlaneFactory({
+        getDatastore: () => memory,
+        logger: { ...SILENT, warn },
+      });
+      expect(factoryWithBrokenSave.current().completeAndPersist(contribution())).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'cli.run-session.record_failed',
+          error: 'disk full',
+        }),
+      );
+    } finally {
+      saveSpy.mockRestore();
+      memory.close();
+    }
+  });
+
+  it('warns with a stringified error when session persistence throws a non-Error', () => {
+    const warn = vi.fn();
+    const memory = DataStoreFactory.open({ backend: 'memory' });
+    const saveSpy = vi.spyOn(SessionRepo.prototype, 'save').mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercises host handling of non-Error throwables.
+      throw 'disk string fault';
+    });
+    try {
+      const factoryWithBrokenSave = createRunPlaneFactory({
+        getDatastore: () => memory,
+        logger: { ...SILENT, warn },
+      });
+      expect(factoryWithBrokenSave.current().completeAndPersist(contribution())).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'cli.run-session.record_failed',
+          error: 'disk string fault',
+        }),
+      );
+    } finally {
+      saveSpy.mockRestore();
+      memory.close();
+    }
+  });
+
+  it('warns with a stringified error when session retention enforcement throws a non-Error', () => {
+    const warn = vi.fn();
+    const memory = DataStoreFactory.open({ backend: 'memory' });
+    const enforce = vi
+      .spyOn(sessionRetentionMod, 'enforceSessionRetention')
+      .mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercises host handling of non-Error throwables.
+        throw 'retention boom';
+      });
+    try {
+      const factoryWithRetention = createRunPlaneFactory({
+        getDatastore: () => memory,
+        sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
+        logger: { ...SILENT, warn },
+      });
+      const recorded = factoryWithRetention.current().completeAndPersist(contribution());
+      expect(recorded).toBeDefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evt: 'cli.run-session.retention_failed',
+          error: 'retention boom',
+        }),
+      );
+    } finally {
+      enforce.mockRestore();
+      memory.close();
+    }
   });
 
   it('round-trips a failing YAGNI verdict through host persistence into session summaries', async () => {

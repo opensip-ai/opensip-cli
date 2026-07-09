@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0143](ADR-0143-host-owned-run-step-ledger.md) — Host-owned persisted Run + RunStep ledger as canonical evidence for suites and standalone tool runs; retires ADR-0093's no-suite-level-record consequence; defers root suite aliases.
 - [ADR-0142](ADR-0142-dependency-check-offline-safe-default.md) — The OWASP Dependency-Check adapter runs with `--noupdate` by default; users prepare the vulnerability database outside OpenSIP unless a future explicit online mode is approved.
 - [ADR-0141](ADR-0141-external-scanner-binary-ownership.md) — OpenSIP adapter packages do not bundle or download scanner binaries; users own scanner installation/update, while adapter `doctor` reports readiness.
 - [ADR-0140](ADR-0140-polyglot-external-adapter-package-contract.md) — External scanner adapters use `defineExternalToolAdapter`, declare manifest/config/binary requirements, and delegate subprocess/output/session/baseline effects to the substrate and host seams.

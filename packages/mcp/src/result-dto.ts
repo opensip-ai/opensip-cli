@@ -9,7 +9,7 @@
  */
 
 import type { Freshness } from './symbol-dto.js';
-import type { ReviewBrief, SignalEnvelope } from '@opensip-cli/contracts';
+import type { ReviewBrief, RunStepReference, SignalEnvelope } from '@opensip-cli/contracts';
 import type {
   BaselineIdentityMetadata,
   SignalRepair,
@@ -36,6 +36,8 @@ export interface RunSummary {
   readonly engineVersion?: string;
   /** The `opensip sessions show … --json` command that replays this run. */
   readonly showCommand: string;
+  /** Optional link to the canonical Run/RunStep ledger row that owns this session. */
+  readonly ledger?: RunStepReference;
   /** Verdict counts when the stored payload carried a summary. */
   readonly summary?: RunVerdictSummary;
 }

@@ -136,6 +136,9 @@ describe('fresh database fully realizes the ORM schema', () => {
       expect(cols('sessions').has('suite_run_id')).toBe(true); // 0004 (suite grouping)
       expect(cols('sessions').has('suite_name')).toBe(true); // 0004 (suite grouping)
       expect(cols('session_tool_payload').has('payload_version')).toBe(true); // 0010
+      expect(cols('runs').has('legacy_suite_run_id')).toBe(true); // 0007 (run ledger)
+      expect(cols('run_steps').has('logical_step_key')).toBe(true); // 0007 (run ledger)
+      expect(cols('run_steps').has('session_id')).toBe(true); // 0007 (run ledger)
       // `stable_id` was added (ADR-0048) but never read/written; removed as dead.
       // Assert the squashed migration no longer carries it (no accidental reintro).
       expect(cols('tool_state').has('stable_id')).toBe(false);

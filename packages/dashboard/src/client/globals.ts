@@ -58,9 +58,53 @@ declare global {
     };
   }
 
+  interface DashboardRunStep {
+    id: string;
+    runId: string;
+    logicalStepKey: string;
+    ordinal: number;
+    attempt: number;
+    tool: string;
+    command: string;
+    stableId: string;
+    effectiveArgs?: Readonly<Record<string, unknown>>;
+    exitCode: number;
+    outcome: 'passed' | 'failed' | 'faulted';
+    durationMs: number;
+    verdictSummary?: {
+      passed: boolean;
+      errors: number;
+      warnings: number;
+      findings: number;
+    };
+    sessionId?: string;
+    evidence?: unknown;
+  }
+
+  interface DashboardRun {
+    id: string;
+    name: string;
+    source: string;
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+    exitCode: number;
+    aggregate: {
+      steps: number;
+      passed: number;
+      failed: number;
+      faulted: number;
+      errors: number;
+      warnings: number;
+    };
+    legacySuiteRunId?: string;
+    steps: readonly DashboardRunStep[];
+  }
+
   // ---- Generator-injected data globals (the report <script> const block) ----
 
   const sessions: readonly DashboardSession[];
+  const runs: readonly DashboardRun[];
   const fitSessions: readonly DashboardSession[];
   const simSessions: readonly DashboardSession[];
   const yagniSessions: readonly DashboardSession[];

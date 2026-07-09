@@ -6,5 +6,7 @@ export const DEFAULT_REVIEW_BRIEF_DEGRADATION_LIMIT = 20;
 export interface SuiteStepReviewInput {
   readonly stepIndex: number;
   readonly summary: SuiteStepSummary;
+  readonly effectiveArgs?: Readonly<Record<string, unknown>>;
+  readonly sessionId?: string;
   readonly capturedEnvelope?: SignalEnvelope;
 }

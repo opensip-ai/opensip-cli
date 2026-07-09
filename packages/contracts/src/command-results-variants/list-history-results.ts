@@ -1,3 +1,4 @@
+import type { RunStepReference } from '../run-types.js';
 import type { StoredSession } from '../session-types.js';
 
 export interface ListChecksResult {
@@ -27,6 +28,7 @@ export interface ListRecipesResult {
 }
 
 export interface HistorySession extends StoredSession {
+  readonly ledger?: RunStepReference;
   readonly summary?: {
     readonly total: number;
     readonly passed: number;

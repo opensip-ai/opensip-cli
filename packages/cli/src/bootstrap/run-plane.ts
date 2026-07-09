@@ -96,8 +96,9 @@ export interface RunPlaneInvocation {
   /**
    * Run a live render and own its completion: time the TTY occupancy, then —
    * if the renderer returned a `session` contribution — freeze the lifecycle,
-   * persist it, and record `ttyBusyMs`. Returns the renderer's completion
-   * unchanged so the caller can still read `.envelope` for egress.
+   * persist it, and record `ttyBusyMs`. Returns the renderer's completion with
+   * `.session` stripped so the caller can still read `.envelope` for egress
+   * without giving `completeRun` a second write opportunity.
    *
    * This is the live-path analogue of `completeAndPersist`: the renderer no
    * longer calls a session writer inside the Ink tree; the host persists here
@@ -128,6 +129,8 @@ export interface RunActionHooks {
   readonly completeRun?: (result: unknown) => void;
   /** Reset the invocation slot so a host-owned multi-step command can time the next step. */
   readonly resetRun?: () => void;
+  /** Current persisted session id for this command/step invocation, when one exists. */
+  readonly currentSessionId?: () => string | undefined;
   /**
    * ADR-0054 out-of-process dispatch seam. When present AND the owning tool is
    * EXTERNAL-provenance, the command action calls this INSTEAD of invoking
@@ -187,6 +190,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
   function makeInvocation(): RunPlaneInvocation {
     const lifecycle = createRunLifecycle();
     let sessionId: string | undefined;
+    let recordedSession: RecordedToolRunSession | undefined;
 
     function persist(
       contribution: ToolSessionContribution,
@@ -225,6 +229,14 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
           payload: contribution.payload,
         });
         sessionId = id;
+        recordedSession = {
+          id,
+          tool: contribution.tool,
+          startedAt: snapshot.startedAt,
+          completedAt: snapshot.completedAt,
+          durationMs: snapshot.durationMs,
+          ...suiteSessionFields(),
+        };
         // persistMs: host-side write cost, recorded on the sibling metrics row
         // (separate clock from canonical durationMs).
         repo.upsertHostMetrics(id, {
@@ -279,14 +291,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         });
         return;
       }
-      return {
-        id,
-        tool: contribution.tool,
-        startedAt: snapshot.startedAt,
-        completedAt: snapshot.completedAt,
-        durationMs: snapshot.durationMs,
-        ...suiteSessionFields(),
-      };
+      return recordedSession;
     }
 
     function recordHostMetrics(metrics: StoredSessionHostMetrics): void {
@@ -308,6 +313,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     function completeAndPersist(
       contribution: ToolSessionContribution,
     ): RecordedToolRunSession | undefined {
+      if (recordedSession !== undefined) return recordedSession;
       return persist(contribution, lifecycle.complete());
     }
 
@@ -323,6 +329,10 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         // calls inside this async fn by name. Nothing to await.
         completeAndPersist(completion.session);
         recordHostMetrics({ ttyBusyMs });
+        return {
+          ...(completion.result === undefined ? {} : { result: completion.result }),
+          ...(completion.envelope === undefined ? {} : { envelope: completion.envelope }),
+        };
       }
       return completion;
     }
@@ -395,5 +405,6 @@ export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
     resetRun: () => {
       factory.reset();
     },
+    currentSessionId: () => factory.current().sessionId(),
   };
 }

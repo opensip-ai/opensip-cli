@@ -13,6 +13,7 @@ export default {
   dialect: 'sqlite',
   schema: [
     '../session-store/src/schema/sessions.ts',
+    '../session-store/src/schema/runs.ts',
     // graph keeps its schema source for graphCatalog/graphShardFragment; its
     // baseline tables were removed from the schema (P3) so drizzle drops them.
     '../graph/engine/src/persistence/schema.ts',

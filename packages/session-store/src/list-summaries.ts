@@ -14,10 +14,17 @@
 
 import { buildToolIdentityIndex } from '@opensip-cli/core';
 
+import { RunRepo } from './run-repo.js';
 import { SessionRepo } from './session-repo.js';
 import { buildSuiteSessionGroups } from './suite-session-grouping.js';
 
-import type { HistoryResult, HistorySession, StoredSession } from '@opensip-cli/contracts';
+import type {
+  HistoryResult,
+  HistorySession,
+  RunStepReference,
+  StoredRunStep,
+  StoredSession,
+} from '@opensip-cli/contracts';
 import type { ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -42,9 +49,19 @@ export function listSessionSummaries(
   opts: ListSessionSummariesOptions = {},
 ): HistoryResult {
   const repo = new SessionRepo(store);
+  const runRepo = new RunRepo(store);
   const identityIndex =
     opts.registry === undefined ? undefined : buildToolIdentityIndex(opts.registry);
-  const sessions = repo.list(opts).map((s) => toHistorySession(s, opts.summaryOnly, identityIndex));
+  const sessions = repo
+    .list(opts)
+    .map((s) =>
+      toHistorySession(
+        s,
+        opts.summaryOnly,
+        identityIndex,
+        ledgerReferenceForStep(runRepo.getStepBySessionId(s.id)),
+      ),
+    );
   const suiteGroups = buildSuiteSessionGroups(sessions);
   return {
     type: 'history',
@@ -57,6 +74,7 @@ function toHistorySession(
   session: StoredSession,
   summaryOnly = false,
   identityIndex?: ReturnType<typeof buildToolIdentityIndex>,
+  ledger?: RunStepReference,
 ): HistorySession {
   const summary = sessionSummary(session.payload);
   const { payload, tool, ...rest } = session;
@@ -65,9 +83,28 @@ function toHistorySession(
   return {
     ...rest,
     tool: displayTool,
+    ...(ledger === undefined ? {} : { ledger }),
     ...(summaryOnly ? {} : { payload }),
     ...(summary === undefined ? {} : { summary }),
     showCommand: `opensip sessions show ${session.id} --json`,
+  };
+}
+
+export function resolveSessionLedgerReference(
+  store: DataStore,
+  sessionId: string,
+): RunStepReference | undefined {
+  return ledgerReferenceForStep(new RunRepo(store).getStepBySessionId(sessionId));
+}
+
+function ledgerReferenceForStep(step: StoredRunStep | null): RunStepReference | undefined {
+  if (step === null) return undefined;
+  return {
+    runId: step.runId,
+    stepId: step.id,
+    logicalStepKey: step.logicalStepKey,
+    ordinal: step.ordinal,
+    attempt: step.attempt,
   };
 }
 

@@ -133,6 +133,7 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
       const suiteInput: RunSuiteInput = {
         name,
         suite: resolved.suite,
+        source: resolved.source,
         tools: currentScope()?.tools.list() ?? [],
         ctx: ctx.toolContext,
         runActionHooks: ctx.toolRunActionHooks,

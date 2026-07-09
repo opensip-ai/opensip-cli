@@ -11,6 +11,8 @@
  */
 
 import {
+  type StoredRun,
+  type StoredRunStep,
   buildSignalEnvelope,
   type ToolSessionReplay,
   type CommandResult,
@@ -28,7 +30,7 @@ import {
   DEFAULT_TEST_BASELINE_IDENTITY,
   type DataStore,
 } from '@opensip-cli/datastore';
-import { SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
+import { RunRepo, SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionResultsReadPort } from '../session-results-read-port.js';
@@ -57,6 +59,39 @@ function makeSession(over: Partial<StoredSession> = {}): StoredSession {
     passed: false,
     durationMs: 30_000,
     payload: { summary: { total: 2, passed: 0, failed: 2, errors: 1, warnings: 1 } },
+    ...over,
+  };
+}
+
+function makeRun(over: Partial<StoredRun> = {}): StoredRun {
+  return {
+    id: 'run-ledger-1',
+    name: 'fit',
+    source: 'implicit-tool',
+    cwd: '/proj',
+    startedAt: '2026-05-21T12:00:00.000Z',
+    completedAt: '2026-05-21T12:00:30.000Z',
+    durationMs: 30_000,
+    exitCode: 1,
+    aggregate: { steps: 1, passed: 0, failed: 1, faulted: 0, errors: 1, warnings: 1 },
+    ...over,
+  };
+}
+
+function makeStep(over: Partial<StoredRunStep> = {}): StoredRunStep {
+  return {
+    id: 'step-ledger-1',
+    runId: 'run-ledger-1',
+    logicalStepKey: '0:fit:fit',
+    ordinal: 0,
+    attempt: 1,
+    tool: 'fit',
+    command: 'fit',
+    stableId: 'fit',
+    exitCode: 1,
+    outcome: 'failed',
+    durationMs: 30_000,
+    sessionId: 'fit-1',
     ...over,
   };
 }
@@ -230,6 +265,22 @@ describe('SessionResultsReadPort — listRuns', () => {
     expect(summary?.cliVersion).toBe('0.4.0');
     expect(summary?.engineVersion).toBe('0.4.0');
   });
+
+  it('carries ledger step references into RunSummary rows', () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-1' }));
+    new RunRepo(store).saveRunWithSteps(makeRun(), [makeStep()]);
+
+    const out = port().listRuns();
+
+    const summary = out.ok ? out.value.find((r) => r.id === 'fit-1') : undefined;
+    expect(summary?.ledger).toEqual({
+      runId: 'run-ledger-1',
+      stepId: 'step-ledger-1',
+      logicalStepKey: '0:fit:fit',
+      ordinal: 0,
+      attempt: 1,
+    });
+  });
 });
 
 describe('SessionResultsReadPort — latestFindings (severity/limit → replay filters)', () => {
@@ -274,11 +325,13 @@ describe('SessionResultsReadPort — latestFindings (severity/limit → replay f
 describe('SessionResultsReadPort — showRun', () => {
   it('replays a stored run by id with provenance + recommendedNext (never re-runs)', async () => {
     new SessionRepo(store).save(makeSession({ id: 'fit-1' }));
+    new RunRepo(store).saveRunWithSteps(makeRun(), [makeStep()]);
     const out = await port().showRun({ ref: 'fit-1' });
     expect(out.ok).toBe(true);
     if (out.ok) {
       expect(out.value.data.fidelity).toBe('projection');
       expect(out.value.session?.id).toBe('fit-1');
+      expect(out.value.session?.ledger?.stepId).toBe('step-ledger-1');
       expect(out.value.recommendedNext?.rerunCommand).toBe('opensip fit');
     }
     expect(replayCalls).toEqual(['fit']);

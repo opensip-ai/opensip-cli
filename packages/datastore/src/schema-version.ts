@@ -46,13 +46,13 @@ export const LEGACY_PRE_SQUASH_MAX_USER_VERSION = 14;
 export const SCHEMA_VERSION_OFFSET = LEGACY_PRE_SQUASH_MAX_USER_VERSION;
 
 /**
- * Current logical schema stamp for the bundled post-squash journal. Seven entries:
+ * Current logical schema stamp for the bundled post-squash journal. Eight entries:
  * the squash (0000) + the `stable_id` drop (0001) + `run_outcome` (0002) +
  * baseline identity meta (0003) + suite grouping (0004) + policy audit (0005) +
- * session cli/engine version (0006). Bump this in lockstep with the bundled
+ * session cli/engine version (0006) + run ledger (0007). Bump this in lockstep with the bundled
  * journal entry count (or fold into the offset on the next squash).
  */
-export const LOGICAL_SCHEMA_VERSION = SCHEMA_VERSION_OFFSET + 7;
+export const LOGICAL_SCHEMA_VERSION = SCHEMA_VERSION_OFFSET + 8;
 
 /**
  * The DB schema version this CLI supports = offset + bundled journal entries.

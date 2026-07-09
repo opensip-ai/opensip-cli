@@ -7,6 +7,7 @@ import {
   type SuiteStepSummary,
 } from '@opensip-cli/contracts';
 import {
+  commandProducesVerdict,
   currentLogger,
   currentScope,
   runEmbeddedRender,
@@ -18,6 +19,7 @@ import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
 import { truncateDerivedMessage } from '../../bootstrap/report-failure.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
 import { runCommandSpecAction } from '../run-command-spec-action.js';
+import { projectLedgerArgs } from '../run-ledger-projection.js';
 
 import { BUILT_IN_GRAPH_TOOL_ID } from './built-in-suites.js';
 import { createCapturingContext } from './capturing-context.js';
@@ -212,6 +214,17 @@ async function runStep(args: {
   const durationMs = Math.max(0, performance.now() - started);
   const envelopeStats = capture.getEnvelopeStats();
   const capturedEnvelope = capture.getEnvelope();
+  const sessionId = hooks.currentSessionId?.();
+  if (
+    errorMessage === undefined &&
+    commandProducesVerdict(args.step.spec) &&
+    sessionId === undefined &&
+    capturedEnvelope === undefined
+  ) {
+    exitCode = EXIT_CODES.RUNTIME_ERROR;
+    errorMessage = 'Verdict-producing suite step completed without session or captured evidence.';
+    errorCode = 'RUN.EVIDENCE.MISSING';
+  }
   const verification = verificationFromEnvelope(capturedEnvelope);
   const verdict =
     envelopeStats === undefined
@@ -264,6 +277,11 @@ async function runStep(args: {
   return {
     stepIndex: args.step.index,
     summary,
+    ...(() => {
+      const effectiveArgs = projectLedgerArgs(opts);
+      return effectiveArgs === undefined ? {} : { effectiveArgs };
+    })(),
+    ...(sessionId === undefined ? {} : { sessionId }),
     ...(capturedEnvelope === undefined ? {} : { capturedEnvelope }),
   };
 }

@@ -37,7 +37,7 @@ import {
   generateDashboardHtml,
   type DashboardInput as HtmlReportInput,
 } from '@opensip-cli/dashboard';
-import { orderSessionsForSuiteGrouping, SessionRepo } from '@opensip-cli/session-store';
+import { orderSessionsForSuiteGrouping, RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
 import { collectDeclaredInputsForTool } from './bootstrap/declared-inputs.js';
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
@@ -50,7 +50,7 @@ import {
 import { buildHostDispatchCtx, getCurrentProjectRoot } from './cli-context.js';
 import { launchReport } from './open-report.js';
 
-import type { ReportResult } from '@opensip-cli/contracts';
+import type { ReportResult, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /**
@@ -88,10 +88,16 @@ async function composeReportInput(): Promise<HtmlReportInput> {
   const log = scope.logger ?? defaultLogger;
   const datastore = scope.datastore() as DataStore | undefined;
   const repo = datastore ? new SessionRepo(datastore) : undefined;
+  const runRepo = datastore ? new RunRepo(datastore) : undefined;
   const sessions = repo ? orderSessionsForSuiteGrouping([...repo.list({ limit: 20 })]) : [];
+  const recentRuns = runRepo ? [...runRepo.listRuns({ limit: 20 })] : [];
+  const stepsByRun: ReadonlyMap<string, readonly StoredRunStep[]> = runRepo
+    ? runRepo.listStepsForRuns(recentRuns.map((run) => run.id))
+    : new Map<string, readonly StoredRunStep[]>();
 
   const input: HtmlReportInput = {
     sessions,
+    runs: recentRuns.map((run) => ({ ...run, steps: stepsByRun.get(run.id) ?? [] })),
     declaredInputs: collectDeclaredInputsForTool('report'),
   };
   const claimedKeys = new Map<string, string>();

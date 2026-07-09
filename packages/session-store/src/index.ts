@@ -20,6 +20,7 @@
  */
 
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
+export { RunRepo, type RunListOptions } from './run-repo.js';
 export { isSessionCwdWithin } from './session-cwd-scope.js';
 export {
   resolveSession,
@@ -49,7 +50,11 @@ export {
 // Read-only replay/list projections (ADR-0084) — the pure cores the CLI
 // `sessions list` / `sessions show` commands now adapt over, and the read API
 // `@opensip-cli/mcp` consumes WITHOUT naming `SessionRepo`.
-export { listSessionSummaries, type ListSessionSummariesOptions } from './list-summaries.js';
+export {
+  listSessionSummaries,
+  resolveSessionLedgerReference,
+  type ListSessionSummariesOptions,
+} from './list-summaries.js';
 export {
   buildSuiteSessionGroups,
   orderSessionsForSuiteGrouping,

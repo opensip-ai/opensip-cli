@@ -3,9 +3,10 @@ import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { listSessionSummaries } from '../list-summaries.js';
+import { RunRepo } from '../run-repo.js';
 import { SessionRepo } from '../session-repo.js';
 
-import type { StoredSession } from '@opensip-cli/contracts';
+import type { StoredRun, StoredRunStep, StoredSession } from '@opensip-cli/contracts';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -21,6 +22,38 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     payload: {
       summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
     },
+    ...overrides,
+  };
+}
+
+function makeRun(overrides: Partial<StoredRun> = {}): StoredRun {
+  return {
+    id: 'run-ledger-1',
+    name: 'audit',
+    source: 'configured-suite',
+    cwd: '/proj',
+    startedAt: '2026-05-21T12:00:00.000Z',
+    completedAt: '2026-05-21T12:00:01.000Z',
+    durationMs: 1000,
+    exitCode: 0,
+    aggregate: { steps: 1, passed: 1, failed: 0, faulted: 0, errors: 0, warnings: 0 },
+    ...overrides,
+  };
+}
+
+function makeStep(overrides: Partial<StoredRunStep> = {}): StoredRunStep {
+  return {
+    id: 'step-ledger-1',
+    runId: 'run-ledger-1',
+    logicalStepKey: '0:fit:fit',
+    ordinal: 0,
+    attempt: 1,
+    tool: 'fit',
+    command: 'fit',
+    stableId: 'fit',
+    exitCode: 0,
+    outcome: 'passed',
+    durationMs: 100,
     ...overrides,
   };
 }
@@ -71,6 +104,23 @@ describe('listSessionSummaries', () => {
     });
     expect(withSummary?.payload).toBeUndefined();
     expect(withoutSummary?.summary).toBeUndefined();
+  });
+
+  it('attaches ledger step references when a session is linked from run_steps', () => {
+    repo.save(makeSession({ id: 'FIT_LEDGER' }));
+    new RunRepo(datastore).saveRunWithSteps(makeRun(), [
+      makeStep({ sessionId: 'FIT_LEDGER', logicalStepKey: '0:fit:agent-risk' }),
+    ]);
+
+    const result = listSessionSummaries(datastore, { summaryOnly: true });
+
+    expect(result.sessions.find((session) => session.id === 'FIT_LEDGER')?.ledger).toEqual({
+      runId: 'run-ledger-1',
+      stepId: 'step-ledger-1',
+      logicalStepKey: '0:fit:agent-risk',
+      ordinal: 0,
+      attempt: 1,
+    });
   });
 
   it('filters by tool and limit and renders canonical tool names from a registry', () => {

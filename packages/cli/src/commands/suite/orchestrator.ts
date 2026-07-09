@@ -12,16 +12,19 @@ import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabiliti
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 
 import { buildReviewBrief } from './review-brief-builder.js';
+import { persistSuiteRun } from './run-ledger-persist.js';
 import { resolveSuiteScope } from './suite-scope.js';
 import { runStepsSerially, type SuiteStepEvent } from './suite-step-runner.js';
 import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
+import type { SuiteSource } from './built-in-suites.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
 import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
 
 export interface RunSuiteInput {
   readonly name: string;
   readonly suite: SuiteDefinition;
+  readonly source?: SuiteSource;
   readonly tools: readonly Tool[];
   readonly ctx: ToolCliContext;
   readonly runActionHooks: RunActionHooks;
@@ -39,6 +42,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   });
   const suiteRunId = generatePrefixedId('suite');
   const started = performance.now();
+  const startedAt = new Date();
   const log = currentLogger();
   const cwd = typeof input.suiteOpts.cwd === 'string' ? input.suiteOpts.cwd : process.cwd();
   const scope = resolveSuiteScope({
@@ -137,7 +141,8 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     aggregate,
   });
 
-  return {
+  const completedAt = new Date();
+  const result: SuiteRunResult = {
     type: 'suite-run',
     suite: suite.name,
     suiteRunId,
@@ -149,6 +154,15 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     reviewBrief,
     verbose: input.suiteOpts.verbose === true,
   };
+  persistSuiteRun({
+    result,
+    internalSteps,
+    source: input.source ?? 'configured',
+    cwd,
+    startedAt: startedAt.toISOString(),
+    completedAt: completedAt.toISOString(),
+  });
+  return result;
 }
 
 export function deriveSuiteAggregate(

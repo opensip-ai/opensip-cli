@@ -18,7 +18,17 @@ import { dashboardCss } from './css.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
-import type { StoredSession, GraphCatalog, DeclaredInputs } from '@opensip-cli/contracts';
+import type {
+  StoredRun,
+  StoredRunStep,
+  StoredSession,
+  GraphCatalog,
+  DeclaredInputs,
+} from '@opensip-cli/contracts';
+
+export interface DashboardRun extends StoredRun {
+  readonly steps: readonly StoredRunStep[];
+}
 
 /**
  * Inputs to the dashboard HTML generator.
@@ -35,6 +45,7 @@ import type { StoredSession, GraphCatalog, DeclaredInputs } from '@opensip-cli/c
  */
 export interface DashboardInput {
   sessions: StoredSession[];
+  runs?: readonly DashboardRun[];
   declaredInputs?: DeclaredInputs;
   // Tool-owned catalog data, consumed structurally by the dashboard's
   // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry
@@ -179,6 +190,7 @@ function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'liter
 export function generateDashboardHtml(input: DashboardInput): string {
   const {
     sessions,
+    runs = [],
     checkCatalog = [],
     recipeCatalog = [],
     graphCatalog = null,
@@ -200,6 +212,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // the page title well-formed in the pathological case.
   const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0;
   const safeDataJson = escapeForScriptContext(JSON.stringify(sessions));
+  const safeRunsJson = escapeForScriptContext(JSON.stringify(runs));
   const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog));
   const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog));
   const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog));
@@ -288,6 +301,7 @@ ${graphCatalogBlock}
 ${graphViewModelBlock}
 <script>
 const sessions = ${safeDataJson};
+const runs = ${safeRunsJson};
 const checkCatalog = ${safeCatalogJson};
 const recipeCatalog = ${safeRecipeJson};
 const graphRuleCatalog = ${safeGraphRuleCatalogJson};

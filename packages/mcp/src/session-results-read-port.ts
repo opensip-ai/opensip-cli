@@ -20,6 +20,7 @@ import {
   listSessionSummaries,
   resolveSession,
   resolveAndReplaySession,
+  resolveSessionLedgerReference,
   type SessionReplayFn,
 } from '@opensip-cli/session-store';
 
@@ -126,7 +127,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref, session);
     return ok({
       data: { fidelity: replay.fidelity, envelope: replay.envelope },
-      session: runSummaryFromReplay(session, replay.envelope),
+      session: this.withLedger(runSummaryFromReplay(session, replay.envelope), session.id),
       ...filterMeta(opts.filters, originalSignalCount, replay.envelope.signals.length),
       recommendedNext: recommendedNext(session),
     });
@@ -151,7 +152,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     const findings = replay.envelope.signals.map(toMcpFinding);
     return ok({
       data: findings,
-      session: runSummaryFromReplay(session, replay.envelope),
+      session: this.withLedger(runSummaryFromReplay(session, replay.envelope), session.id),
       ...filterMeta(filters, originalSignalCount, findings.length),
       recommendedNext: recommendedNext(session),
     });
@@ -246,8 +247,14 @@ export class SessionResultsReadPort implements ResultsReadPort {
       const repo = new BaselineRepo(this.store);
       return ok(
         repo.exists(opts.tool)
-          ? baselineComparisonReplay(repo, opts, session, replay.envelope)
-          : missingBaselineReplay(opts.tool, session, replay.envelope),
+          ? this.withReplayLedger(
+              baselineComparisonReplay(repo, opts, session, replay.envelope),
+              session.id,
+            )
+          : this.withReplayLedger(
+              missingBaselineReplay(opts.tool, session, replay.envelope),
+              session.id,
+            ),
       );
     } catch (error) {
       return err(
@@ -276,6 +283,17 @@ export class SessionResultsReadPort implements ResultsReadPort {
     return ok(resolved.session);
   }
 
+  private withReplayLedger<T>(replay: McpResultReplay<T>, sessionId: string): McpResultReplay<T> {
+    return replay.session === undefined
+      ? replay
+      : { ...replay, session: this.withLedger(replay.session, sessionId) };
+  }
+
+  private withLedger(summary: RunSummary, sessionId: string): RunSummary {
+    const ledger = resolveSessionLedgerReference(this.store, sessionId);
+    return ledger === undefined ? summary : { ...summary, ledger };
+  }
+
   private foreignSessionNotFound<T>(ref: string, session: StoredSession): Result<T, McpReadError> {
     logger.info({
       evt: 'mcp.results.scope.rejected',
@@ -301,6 +319,7 @@ function toRunSummary(s: HistorySession): RunSummary {
     ...(s.cliVersion === undefined ? {} : { cliVersion: s.cliVersion }),
     ...(s.engineVersion === undefined ? {} : { engineVersion: s.engineVersion }),
     showCommand: s.showCommand,
+    ...(s.ledger === undefined ? {} : { ledger: s.ledger }),
     ...(s.summary ? { summary: s.summary } : {}),
   };
 }

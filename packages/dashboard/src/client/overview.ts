@@ -13,15 +13,22 @@
  * it by bare name in the report's render block.
  */
 
-import { el } from './el.js';
-import { paginateGroupedRows } from './pagination.js';
-import { scoreColorStyle, sessionStatus, statusBadge } from './sessions.js';
-import { activateTabForSession } from './tab-activators.js';
+import { el } from "./el.js";
+import { paginateGroupedRows } from "./pagination.js";
+import { scoreColorStyle, sessionStatus, statusBadge } from "./sessions.js";
+import { activateTabForSession } from "./tab-activators.js";
 
-const DEFAULT_TOOL_BADGE_STYLE = 'background:var(--bg-hover);color:var(--text-muted)';
-const EMPTY_SUMMARY = { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } as const;
-const DIM_STYLE = 'color:var(--text-dim)';
-const MUTED_STYLE = 'color:var(--text-muted)';
+const DEFAULT_TOOL_BADGE_STYLE =
+  "background:var(--bg-hover);color:var(--text-muted)";
+const EMPTY_SUMMARY = {
+  total: 0,
+  passed: 0,
+  failed: 0,
+  errors: 0,
+  warnings: 0,
+} as const;
+const DIM_STYLE = "color:var(--text-dim)";
+const MUTED_STYLE = "color:var(--text-muted)";
 
 type OverviewStatus = Parameters<typeof statusBadge>[0];
 
@@ -29,6 +36,7 @@ interface SummaryCounts {
   total: number;
   passed: number;
   failed: number;
+  faulted?: number;
   errors: number;
   warnings: number;
 }
@@ -48,6 +56,17 @@ function findingCount(counts: SummaryCounts): number {
   return counts.errors + counts.warnings;
 }
 
+function runCounts(run: DashboardRun): SummaryCounts {
+  return {
+    total: run.aggregate.steps,
+    passed: run.aggregate.passed,
+    failed: run.aggregate.failed,
+    faulted: run.aggregate.faulted,
+    errors: run.aggregate.errors,
+    warnings: run.aggregate.warnings,
+  };
+}
+
 function activateSession(s: DashboardSession): void {
   // Tabs that need session-aware deep-linking (Code Paths today; future fit/sim
   // detail views) register an activator into the shared tabActivators registry.
@@ -62,50 +81,70 @@ function activateSession(s: DashboardSession): void {
   // #panel-overview — and activating nothing, which would blank the report.
   const tabName = s.tool in tabMap ? tabMap[s.tool] : externalTabId;
   const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
-  const activePanel = document.querySelector('#panel-' + tabName);
+  const activePanel = document.querySelector("#panel-" + tabName);
   if (!tab && !activePanel) return;
-  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-  if (tab) tab.classList.add('active');
-  if (activePanel) activePanel.classList.add('active');
+  document
+    .querySelectorAll(".tab")
+    .forEach((t) => t.classList.remove("active"));
+  document
+    .querySelectorAll(".tab-panel")
+    .forEach((p) => p.classList.remove("active"));
+  if (tab) tab.classList.add("active");
+  if (activePanel) activePanel.classList.add("active");
 }
 
 function appendToolBadge(cell: HTMLElement, tool: string): void {
   cell.append(
-    el('span', {
-      class: 'badge',
+    el("span", {
+      class: "badge",
       style: toolBadgeStyles[tool] ?? DEFAULT_TOOL_BADGE_STYLE,
       text: tool.toUpperCase(),
     }),
   );
 }
 
-function appendSessionCells(row: HTMLElement, s: DashboardSession, child = false): void {
+function appendSessionCells(
+  row: HTMLElement,
+  s: DashboardSession,
+  child = false,
+): void {
   const counts = summaryCounts(s);
-  row.append(el('td', { class: 'overview-row-control' }));
+  row.append(el("td", { class: "overview-row-control" }));
   row.append(
-    el('td', {
-      class: 'cell-nowrap',
+    el("td", {
+      class: "cell-nowrap",
       text: new Date(s.startedAt).toLocaleString(),
       style: DIM_STYLE,
     }),
   );
-  const toolCell = el('td', { class: child ? 'overview-suite-child-tool' : '' });
+  const toolCell = el("td", {
+    class: child ? "overview-suite-child-tool" : "",
+  });
   appendToolBadge(toolCell, s.tool);
   row.append(toolCell);
-  row.append(el('td', { text: s.recipe ?? 'default', style: MUTED_STYLE }));
+  row.append(el("td", { text: s.recipe ?? "default", style: MUTED_STYLE }));
   row.append(
-    el('td', { text: s.score + '%', style: 'font-weight:600;' + scoreColorStyle(s.score) }),
+    el("td", {
+      text: s.score + "%",
+      style: "font-weight:600;" + scoreColorStyle(s.score),
+    }),
   );
-  const statusCell = el('td');
+  const statusCell = el("td");
   statusCell.append(statusBadge(sessionStatus(s)));
   row.append(statusCell);
-  row.append(el('td', { text: counts.passed + '/' + counts.total }));
-  row.append(el('td', { text: '' + findingCount(counts) }));
-  row.append(el('td', { text: (s.durationMs / 1000).toFixed(1) + 's', style: DIM_STYLE }));
+  row.append(el("td", { text: counts.passed + "/" + counts.total }));
+  row.append(el("td", { text: "" + findingCount(counts) }));
+  row.append(
+    el("td", {
+      text: (s.durationMs / 1000).toFixed(1) + "s",
+      style: DIM_STYLE,
+    }),
+  );
 }
 
-function aggregateSuiteCounts(suiteSessions: readonly DashboardSession[]): SummaryCounts {
+function aggregateSuiteCounts(
+  suiteSessions: readonly DashboardSession[],
+): SummaryCounts {
   return suiteSessions.reduce<SummaryCounts>(
     (acc, s) => {
       const counts = summaryCounts(s);
@@ -120,13 +159,22 @@ function aggregateSuiteCounts(suiteSessions: readonly DashboardSession[]): Summa
   );
 }
 
-function aggregateSuiteStatus(suiteSessions: readonly DashboardSession[]): OverviewStatus {
+function aggregateSuiteStatus(
+  suiteSessions: readonly DashboardSession[],
+): OverviewStatus {
   const statuses = suiteSessions.map((s) => sessionStatus(s));
-  if (statuses.includes('error')) return 'error';
-  if (statuses.includes('fail')) return 'fail';
-  if (statuses.includes('degraded')) return 'degraded';
-  if (statuses.includes('warn')) return 'warn';
-  return 'pass';
+  if (statuses.includes("error")) return "error";
+  if (statuses.includes("fail")) return "fail";
+  if (statuses.includes("degraded")) return "degraded";
+  if (statuses.includes("warn")) return "warn";
+  return "pass";
+}
+
+function runStatus(run: DashboardRun): OverviewStatus {
+  if (run.aggregate.faulted > 0) return "error";
+  if (run.aggregate.failed > 0 || run.exitCode !== 0) return "fail";
+  if (run.aggregate.warnings > 0) return "warn";
+  return "pass";
 }
 
 function aggregateSuiteScore(
@@ -144,7 +192,7 @@ function suiteLabel(suiteSessions: readonly DashboardSession[]): string {
   return (
     suiteSessions.find((s) => s.suiteName !== undefined)?.suiteName ??
     latest?.suiteRunId ??
-    'unknown'
+    "unknown"
   );
 }
 
@@ -165,15 +213,18 @@ function groupSuiteSessionsByRunId(
 }
 
 function appendStandaloneRow(tbody: HTMLElement, s: DashboardSession): void {
-  const row = el('tr', {
-    class: 'clickable overview-session-row',
+  const row = el("tr", {
+    class: "clickable overview-session-row",
     onclick: () => activateSession(s),
   });
   appendSessionCells(row, s);
   tbody.append(row);
 }
 
-function appendSuiteRow(tbody: HTMLElement, suiteSessions: readonly DashboardSession[]): void {
+function appendSuiteRow(
+  tbody: HTMLElement,
+  suiteSessions: readonly DashboardSession[],
+): void {
   const [latest] = suiteSessions;
   if (latest === undefined) return;
 
@@ -181,54 +232,75 @@ function appendSuiteRow(tbody: HTMLElement, suiteSessions: readonly DashboardSes
   const counts = aggregateSuiteCounts(suiteSessions);
   const score = aggregateSuiteScore(suiteSessions, counts);
   const durationMs = suiteSessions.reduce((sum, s) => sum + s.durationMs, 0);
-  const expanderId = 'overview-suite-' + Math.random().toString(36).slice(2, 8);
-  const arrow = el('span', { class: 'overview-suite-arrow', text: '▶' });
+  const expanderId = "overview-suite-" + Math.random().toString(36).slice(2, 8);
+  const arrow = el("span", { class: "overview-suite-arrow", text: "▶" });
 
-  const row = el('tr', {
-    class: 'clickable overview-suite-summary-row',
-    'data-suite-run-id': latest.suiteRunId ?? '',
+  const row = el("tr", {
+    class: "clickable overview-suite-summary-row",
+    "data-suite-run-id": latest.suiteRunId ?? "",
     onclick: () => {
-      const exp = document.querySelector<HTMLElement>('#' + expanderId);
+      const exp = document.querySelector<HTMLElement>("#" + expanderId);
       if (!exp) return;
-      const isOpen = exp.classList.toggle('open');
-      exp.style.display = isOpen ? 'table-row' : 'none';
-      arrow.textContent = isOpen ? '▼' : '▶';
-      row.classList.toggle('expanded', isOpen);
+      const isOpen = exp.classList.toggle("open");
+      exp.style.display = isOpen ? "table-row" : "none";
+      arrow.textContent = isOpen ? "▼" : "▶";
+      row.classList.toggle("expanded", isOpen);
     },
   });
-  const arrowCell = el('td', { class: 'overview-row-control' });
+  const arrowCell = el("td", { class: "overview-row-control" });
   arrowCell.append(arrow);
   row.append(arrowCell);
   row.append(
-    el('td', {
-      class: 'cell-nowrap',
+    el("td", {
+      class: "cell-nowrap",
       text: new Date(latest.startedAt).toLocaleString(),
       style: DIM_STYLE,
     }),
   );
-  const runCell = el('td', {
-    title: suiteSessions.length + (suiteSessions.length === 1 ? ' run' : ' runs'),
+  const runCell = el("td", {
+    title:
+      suiteSessions.length + (suiteSessions.length === 1 ? " run" : " runs"),
   });
-  appendToolBadge(runCell, 'suite');
+  appendToolBadge(runCell, "suite");
   row.append(runCell);
-  row.append(el('td', { text: label, title: latest.suiteRunId ?? '', style: MUTED_STYLE }));
-  row.append(el('td', { text: score + '%', style: 'font-weight:600;' + scoreColorStyle(score) }));
-  const statusCell = el('td');
+  row.append(
+    el("td", {
+      text: label,
+      title: latest.suiteRunId ?? "",
+      style: MUTED_STYLE,
+    }),
+  );
+  row.append(
+    el("td", {
+      text: score + "%",
+      style: "font-weight:600;" + scoreColorStyle(score),
+    }),
+  );
+  const statusCell = el("td");
   statusCell.append(statusBadge(aggregateSuiteStatus(suiteSessions)));
   row.append(statusCell);
-  row.append(el('td', { text: counts.passed + '/' + counts.total }));
-  row.append(el('td', { text: '' + findingCount(counts) }));
-  row.append(el('td', { text: (durationMs / 1000).toFixed(1) + 's', style: DIM_STYLE }));
+  row.append(el("td", { text: counts.passed + "/" + counts.total }));
+  row.append(el("td", { text: "" + findingCount(counts) }));
+  row.append(
+    el("td", { text: (durationMs / 1000).toFixed(1) + "s", style: DIM_STYLE }),
+  );
   tbody.append(row);
 
-  const expander = el('tr', { id: expanderId, class: 'expander-row overview-suite-expander-row' });
-  const expanderCell = el('td', { colspan: '9', style: 'padding:0' });
-  const expanderContent = el('div', { class: 'expander-content overview-suite-expander-content' });
-  const childTable = el('table', { class: 'data-table overview-suite-child-table' });
-  const childBody = el('tbody');
+  const expander = el("tr", {
+    id: expanderId,
+    class: "expander-row overview-suite-expander-row",
+  });
+  const expanderCell = el("td", { colspan: "9", style: "padding:0" });
+  const expanderContent = el("div", {
+    class: "expander-content overview-suite-expander-content",
+  });
+  const childTable = el("table", {
+    class: "data-table overview-suite-child-table",
+  });
+  const childBody = el("tbody");
   suiteSessions.forEach((s) => {
-    const childRow = el('tr', {
-      class: 'clickable overview-suite-child-row',
+    const childRow = el("tr", {
+      class: "clickable overview-suite-child-row",
       onclick: () => activateSession(s),
     });
     appendSessionCells(childRow, s, true);
@@ -241,52 +313,261 @@ function appendSuiteRow(tbody: HTMLElement, suiteSessions: readonly DashboardSes
   tbody.append(expander);
 }
 
-export function renderOverview(): void {
-  const panel = document.querySelector('#panel-overview');
-  if (!panel) return;
-  if (sessions.length === 0) {
-    panel.append(el('div', { class: 'empty', text: 'No sessions yet.' }));
-    return;
+function stepLabel(step: DashboardRunStep): string {
+  const args = step.effectiveArgs;
+  if (args === undefined || Object.keys(args).length === 0) return step.command;
+  const rendered = Object.entries(args)
+    .map(([key, value]) => `${key}=${formatStepArgValue(value)}`)
+    .join(" ");
+  return `${step.command} ${rendered}`;
+}
+
+function formatStepArgValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "bigint") return `${value}n`;
+  if (typeof value === "symbol")
+    return value.description === undefined
+      ? "Symbol()"
+      : `Symbol(${value.description})`;
+  try {
+    return JSON.stringify(value) ?? "[unserializable]";
+  } catch {
+    return "[unserializable]";
   }
+}
 
-  const sec = el('div', { class: 'section' }, [el('h3', { text: 'Recent Activity' })]);
-  const table = el('table', { class: 'data-table sortable' });
-  const thead = el('thead');
-  const headerRow = el('tr');
-  [
-    '',
-    'Timestamp',
-    'Run',
-    'Recipe',
-    'Pass Rate',
-    'Status',
-    'Checks',
-    'Findings',
-    'Duration',
-  ].forEach((h) => {
-    headerRow.append(el('th', { text: h }));
+function appendLedgerStepCells(row: HTMLElement, step: DashboardRunStep): void {
+  row.append(el("td", { text: "" }));
+  row.append(el("td", { text: "", style: DIM_STYLE }));
+  const runCell = el("td");
+  appendToolBadge(runCell, step.tool);
+  row.append(runCell);
+  row.append(
+    el("td", {
+      text: stepLabel(step),
+      title: step.logicalStepKey,
+      style: MUTED_STYLE,
+    }),
+  );
+  row.append(el("td", { text: step.outcome, style: DIM_STYLE }));
+  const statusCell = el("td");
+  statusCell.append(statusBadge(ledgerStepStatus(step)));
+  row.append(statusCell);
+  row.append(
+    el("td", { text: step.verdictSummary?.passed === true ? "1/1" : "0/1" }),
+  );
+  row.append(el("td", { text: String(step.verdictSummary?.findings ?? 0) }));
+  row.append(
+    el("td", {
+      text: (step.durationMs / 1000).toFixed(1) + "s",
+      style: DIM_STYLE,
+    }),
+  );
+}
+
+function ledgerStepStatus(step: DashboardRunStep): OverviewStatus {
+  if (step.outcome === "faulted") return "error";
+  if (step.outcome === "failed") return "fail";
+  return "pass";
+}
+
+function appendLedgerRunRow(tbody: HTMLElement, run: DashboardRun): void {
+  const counts = runCounts(run);
+  const score =
+    counts.total > 0 ? Math.round((counts.passed / counts.total) * 100) : 0;
+  const expanderId = "overview-run-" + Math.random().toString(36).slice(2, 8);
+  const arrow = el("span", { class: "overview-suite-arrow", text: "▶" });
+  const row = el("tr", {
+    class: "clickable overview-suite-summary-row",
+    "data-suite-run-id": run.legacySuiteRunId ?? run.id,
+    onclick: () => {
+      const exp = document.querySelector<HTMLElement>("#" + expanderId);
+      if (!exp) return;
+      const isOpen = exp.classList.toggle("open");
+      exp.style.display = isOpen ? "table-row" : "none";
+      arrow.textContent = isOpen ? "▼" : "▶";
+      row.classList.toggle("expanded", isOpen);
+    },
   });
-  thead.append(headerRow);
-  table.append(thead);
+  const arrowCell = el("td", { class: "overview-row-control" });
+  arrowCell.append(arrow);
+  row.append(arrowCell);
+  row.append(
+    el("td", {
+      class: "cell-nowrap",
+      text: new Date(run.startedAt).toLocaleString(),
+      style: DIM_STYLE,
+    }),
+  );
+  const runCell = el("td", { title: run.source });
+  appendToolBadge(runCell, "suite");
+  row.append(runCell);
+  row.append(el("td", { text: run.name, title: run.id, style: MUTED_STYLE }));
+  row.append(
+    el("td", {
+      text: score + "%",
+      style: "font-weight:600;" + scoreColorStyle(score),
+    }),
+  );
+  const statusCell = el("td");
+  statusCell.append(statusBadge(runStatus(run)));
+  row.append(statusCell);
+  row.append(el("td", { text: counts.passed + "/" + counts.total }));
+  row.append(el("td", { text: "" + findingCount(counts) }));
+  row.append(
+    el("td", {
+      text: (run.durationMs / 1000).toFixed(1) + "s",
+      style: DIM_STYLE,
+    }),
+  );
+  tbody.append(row);
 
-  const tbody = el('tbody');
+  const expander = el("tr", {
+    id: expanderId,
+    class: "expander-row overview-suite-expander-row",
+  });
+  const expanderCell = el("td", { colspan: "9", style: "padding:0" });
+  const expanderContent = el("div", {
+    class: "expander-content overview-suite-expander-content",
+  });
+  const childTable = el("table", {
+    class: "data-table overview-suite-child-table",
+  });
+  const childBody = el("tbody");
+  const sessionsById = new Map(
+    sessions.map((session) => [session.id, session]),
+  );
+  [...run.steps]
+    .sort(
+      (left, right) =>
+        left.ordinal - right.ordinal || left.attempt - right.attempt,
+    )
+    .forEach((step) => {
+      const linked =
+        step.sessionId === undefined
+          ? undefined
+          : sessionsById.get(step.sessionId);
+      const childRow = el("tr", {
+        class:
+          linked === undefined
+            ? "overview-suite-child-row"
+            : "clickable overview-suite-child-row",
+        ...(linked === undefined
+          ? {}
+          : { onclick: () => activateSession(linked) }),
+      });
+      if (linked) appendSessionCells(childRow, linked, true);
+      else appendLedgerStepCells(childRow, step);
+      childBody.append(childRow);
+    });
+  childTable.append(childBody);
+  expanderContent.append(childTable);
+  expanderCell.append(expanderContent);
+  expander.append(expanderCell);
+  tbody.append(expander);
+}
+
+interface LedgerRenderedRows {
+  readonly suiteRunIds: ReadonlySet<string>;
+  readonly sessionIds: ReadonlySet<string>;
+}
+
+function appendLedgerRows(tbody: HTMLElement): LedgerRenderedRows {
+  const suiteRunIds = new Set<string>();
+  const sessionIds = new Set<string>();
+  for (const run of runs.filter(
+    (candidate) => candidate.source !== "implicit-tool",
+  )) {
+    appendLedgerRunRow(tbody, run);
+    if (run.legacySuiteRunId !== undefined)
+      suiteRunIds.add(run.legacySuiteRunId);
+    for (const step of run.steps) {
+      if (step.sessionId !== undefined) sessionIds.add(step.sessionId);
+    }
+  }
+  return { suiteRunIds, sessionIds };
+}
+
+function appendLegacySessionRows(
+  tbody: HTMLElement,
+  ledgerRows: LedgerRenderedRows,
+): void {
   const suiteRuns = groupSuiteSessionsByRunId(sessions);
   const renderedSuiteRunIds = new Set<string>();
   for (const session of sessions) {
+    if (ledgerRows.sessionIds.has(session.id)) continue;
     if (session.suiteRunId === undefined) {
       appendStandaloneRow(tbody, session);
       continue;
     }
-
-    if (renderedSuiteRunIds.has(session.suiteRunId)) continue;
+    if (
+      shouldSkipLegacySuite(
+        session.suiteRunId,
+        ledgerRows.suiteRunIds,
+        renderedSuiteRunIds,
+      )
+    ) {
+      continue;
+    }
     renderedSuiteRunIds.add(session.suiteRunId);
-    const suiteSessions = suiteRuns.get(session.suiteRunId) ?? [session];
-    appendSuiteRow(tbody, suiteSessions);
+    appendSuiteRow(tbody, suiteRuns.get(session.suiteRunId) ?? [session]);
   }
+}
+
+function shouldSkipLegacySuite(
+  suiteRunId: string,
+  ledgerSuiteRunIds: ReadonlySet<string>,
+  renderedSuiteRunIds: ReadonlySet<string>,
+): boolean {
+  return (
+    ledgerSuiteRunIds.has(suiteRunId) || renderedSuiteRunIds.has(suiteRunId)
+  );
+}
+
+function appendRecentActivityRows(tbody: HTMLElement): void {
+  appendLegacySessionRows(tbody, appendLedgerRows(tbody));
+}
+
+export function renderOverview(): void {
+  const panel = document.querySelector("#panel-overview");
+  if (!panel) return;
+  if (sessions.length === 0 && runs.length === 0) {
+    panel.append(el("div", { class: "empty", text: "No sessions yet." }));
+    return;
+  }
+
+  const sec = el("div", { class: "section" }, [
+    el("h3", { text: "Recent Activity" }),
+  ]);
+  const table = el("table", { class: "data-table sortable" });
+  const thead = el("thead");
+  const headerRow = el("tr");
+  [
+    "",
+    "Timestamp",
+    "Run",
+    "Recipe",
+    "Pass Rate",
+    "Status",
+    "Checks",
+    "Findings",
+    "Duration",
+  ].forEach((h) => {
+    headerRow.append(el("th", { text: h }));
+  });
+  thead.append(headerRow);
+  table.append(thead);
+
+  const tbody = el("tbody");
+  appendRecentActivityRows(tbody);
   table.append(tbody);
-  const pag = el('div', { class: 'pagination' });
-  pag.dataset.pageItemLabel = 'runs';
-  sec.append(el('div', { class: 'card' }, [table, pag]));
+  const pag = el("div", { class: "pagination" });
+  pag.dataset.pageItemLabel = "runs";
+  sec.append(el("div", { class: "card" }, [table, pag]));
   panel.append(sec);
   paginateGroupedRows(tbody, pag, 10);
 }

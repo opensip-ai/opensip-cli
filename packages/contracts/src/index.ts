@@ -304,6 +304,14 @@ export type {
   StoredSessionHostMetrics,
   ToolSessionReplay,
 } from './session-types.js';
+export type {
+  StoredRun,
+  StoredRunAggregate,
+  StoredRunSource,
+  StoredRunStep,
+  StoredRunVerdictSummary,
+  RunStepReference,
+} from './run-types.js';
 export type { ToolSessionRecord, ToolRunOutcome } from '@opensip-cli/core';
 export { deriveRunOutcome, inferStoredRunOutcome } from '@opensip-cli/core';
 
