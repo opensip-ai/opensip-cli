@@ -59,7 +59,6 @@ export interface RunSummaryProps {
  *   `{PASS|FAIL}  ({E} Errors, {W} Warnings) | Duration {dur}`
  */
 export function viewRunSummary({
-
   passed,
   faulted = false,
   errors,
