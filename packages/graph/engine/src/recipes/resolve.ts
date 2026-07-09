@@ -104,6 +104,13 @@ export function resolveRecipeWithRules(
   return { name: effectiveName, rules: selected.map((v) => v.rule) };
 }
 
+/**
+ * Resolve a recipe name to its ordered rule subset only.
+ *
+ * Thin convenience wrapper over {@link resolveRecipeWithRules} for callers that
+ * do not need the effective recipe name. Shares the same tolerance / unknown-
+ * recipe behaviour as that function.
+ */
 export function resolveRecipeToRules(
   name = BUILTIN_DEFAULT_RECIPE,
   opts: { readonly tolerant?: boolean } = {},
