@@ -61,10 +61,17 @@ function readWorkspacePackageManifests(repoRoot) {
       parts.length === 2 ? path.join(rootReal, parts[0]) : path.join(rootReal, parts[0], parts[1]);
     if (!fs.existsSync(parent)) continue;
     for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
       // Nested test fixtures are not workspace packages.
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       const dir = path.join(parent, entry.name);
+      // Follow symlinks so an escaping package symlink fails closed (Phase 3).
+      let st;
+      try {
+        st = fs.statSync(dir);
+      } catch {
+        continue;
+      }
+      if (!st.isDirectory()) continue;
       let realDir;
       try {
         realDir = fs.realpathSync(dir);
@@ -81,8 +88,8 @@ function readWorkspacePackageManifests(repoRoot) {
       if (seenDirs.has(realDir)) continue;
       seenDirs.add(realDir);
 
-      const st = fs.statSync(pkgPath);
-      if (st.size > MAX_MANIFEST_BYTES) {
+      const manifestStat = fs.statSync(pkgPath);
+      if (manifestStat.size > MAX_MANIFEST_BYTES) {
         throw new Error(`package.json exceeds 1 MiB: ${path.relative(rootReal, pkgPath)}`);
       }
       const raw = fs.readFileSync(pkgPath, 'utf8');

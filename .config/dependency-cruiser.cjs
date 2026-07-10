@@ -133,12 +133,13 @@ module.exports = {
         'owner-internal / test surfaces exposed via the `<pkg>/internal` subpath. ' +
         'Use the package public barrel, or promote the symbol into it. ' +
         'Sanctioned owner exceptions: session-store + graph persistence → ' +
-        'datastore/internal (ADR-0107); packages/mcp/ → graph/internal (ADR-0084, ' +
-        'temporary until graph/read lands); packages/test-support/ → fitness/internal ' +
-        '(private test facade). Owner exceptions are scoped rules below.',
+        'datastore/internal (ADR-0107); packages/test-support/ → fitness/internal ' +
+        '(private test facade). MCP must use @opensip-cli/graph/read (ADR-0147) and ' +
+        'has no internal exception. Owner exceptions are scoped rules below.',
       from: {
-        // MCP, session-store, graph catalog-repo, and private test-support are
+        // session-store, graph catalog-repo, and private test-support are
         // exempt from the generic rule; each has a scoped allowlist rule below.
+        // MCP is NOT exempt — production graph/internal imports fail this rule.
         pathNot: [
           '/__tests__/',
           String.raw`\.test\.(ts|tsx)$`,
@@ -211,11 +212,11 @@ module.exports = {
       name: 'mcp-imports-allowlist',
       severity: 'error',
       comment:
-        '@opensip-cli/mcp is a bundled Tool/server surface (ADR-0084). Production ' +
-        'source may import core, contracts, datastore, session-store, and the graph ' +
-        'engine (including the scoped graph/internal edge above) only. It must not ' +
-        'reach into cli, tool engines other than graph, check packs, language packs, ' +
-        'or graph adapter packs.',
+        '@opensip-cli/mcp is a bundled Tool/server surface (ADR-0084 / ADR-0147). ' +
+        'Production source may import core, contracts, datastore, session-store, and ' +
+        'the graph engine public surfaces (@opensip-cli/graph and @opensip-cli/graph/read) ' +
+        'only. It must not reach into cli, tool engines other than graph, check packs, ' +
+        'language packs, graph adapter packs, or graph/internal.',
       from: {
         path: '^packages/mcp/src/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],

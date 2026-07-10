@@ -36,7 +36,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (depends on tools) |
 
-## Workspace packages (58)
+## Workspace packages (58: 56 publishable, 2 private)
 
 - `@opensip-cli/checks-cpp`
 - `@opensip-cli/checks-dogfood`
@@ -97,7 +97,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/yagni`
 - `opensip-cli`
 
-## ToolCliContext seams
+## ToolCliContext seams (24)
 
 Tools and host command handlers must use only these documented methods on the
 per-run `ToolCliContext` (ADR-0051). See
@@ -112,14 +112,12 @@ per-run `ToolCliContext` (ADR-0051). See
 - `logger`
 - `reportFailure`
 - `setExitCode`
+- `getExitCode`
 - `emitJson`
 - `emitEnvelope`
 - `emitError`
-- `message`
-- `exitCode`
 - `emitRaw`
 - `deliverSignals`
-- `cwd`
 - `writeSarif`
 - `writeArtifact`
 - `ensureArtifactDir`
@@ -128,10 +126,7 @@ per-run `ToolCliContext` (ADR-0051). See
 - `exportBaselineSarif`
 - `exportBaselineFingerprints`
 - `toolState`
-- `get`
-- `put`
-- `delete`
-- `list`
+- `hostPlanes`
 
 ## Related docs
 
