@@ -107,12 +107,12 @@ export interface BuildPerRunScopeInput {
   };
   /**
    * Ambient datastore capability for this scope. `'local'` opens the project
-   * SQLite store lazily; `'host-rpc-only'` installs a denied thunk so external
+   * SQLite store lazily; `'host-rpc-only'` installs a denied thunk so isolated
    * workers cannot recover a local handle via `cli.scope` or `currentScope()`.
    * Resolved by bootstrap from the internal command path + host marker —
    * never from config, manifest, CLI option, or RPC.
    */
-  readonly datastoreAccess?: 'local' | 'host-rpc-only';
+  readonly datastoreAccess: 'local' | 'host-rpc-only';
 }
 
 /**
@@ -208,7 +208,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // and freeing the handle, which otherwise leaked for the process lifetime.
   // External workers get a denied thunk (ADR-0145): ambient access fails loud;
   // privileged effects cross host RPC only.
-  const datastoreAccess = input.datastoreAccess ?? 'local';
+  const datastoreAccess = input.datastoreAccess;
   const datastoreThunk =
     datastoreAccess === 'host-rpc-only'
       ? buildDeniedWorkerDatastoreThunk(logger)

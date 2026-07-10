@@ -2,6 +2,8 @@
  * Public graph/read error and identity types (ADR-0147).
  */
 
+import type { DataStore } from '@opensip-cli/datastore';
+
 /** Closed operation set for graph read failures. */
 export type GraphReadOperation = 'catalog-identity' | 'catalog-generation' | 'rebuild' | 'analysis';
 
@@ -23,8 +25,17 @@ export interface CatalogIdentity {
   readonly builtAt: string;
 }
 
+/**
+ * Minimal host input for rebuilding the persisted catalog through the public
+ * read boundary. Pipeline controls, rules, and progress callbacks remain
+ * orchestration-internal.
+ */
+export interface RebuildCatalogInput {
+  readonly cwd: string;
+  readonly datastore?: DataStore;
+}
+
 export type { CatalogVerdict, ValidationContext } from '../cache/invalidate.js';
 
 export type { Catalog, Indexes, FeatureColumn } from '../types.js';
 export type { GraphConfig } from '../types.js';
-export type { RunGraphInput, RunGraphResult } from '../cli/orchestrate.js';

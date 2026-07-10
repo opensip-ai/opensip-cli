@@ -6,7 +6,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 
 import { runGraph } from '../cli/orchestrate.js';
 
-import type { Catalog, GraphReadError, RunGraphInput } from './types.js';
+import type { Catalog, GraphReadError, RebuildCatalogInput } from './types.js';
 
 function rebuildError(code: string, message: string): GraphReadError {
   const truncated = message.length > 160 ? message.slice(0, 157) + '...' : message;
@@ -19,7 +19,7 @@ function rebuildError(code: string, message: string): GraphReadError {
  * Infrastructure throws ⇒ fixed bounded error (no raw message leak).
  */
 export async function rebuildCatalog(
-  input: RunGraphInput,
+  input: RebuildCatalogInput,
 ): Promise<Result<Catalog, GraphReadError>> {
   try {
     const result = await runGraph(input);

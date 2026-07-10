@@ -15,7 +15,12 @@
  * `data-purge`. Recorded as a plan deviation.
  */
 
-import { buildToolIdentityIndex, type Logger, type ToolRegistry } from '@opensip-cli/core';
+import {
+  buildToolIdentityIndex,
+  ConfigurationError,
+  type Logger,
+  type ToolRegistry,
+} from '@opensip-cli/core';
 import { BaselineRepo, ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 
@@ -32,16 +37,19 @@ import type { ToolsDataPurgeResult } from '@opensip-cli/contracts';
  * repository. Bind every SQLite value; never interpret an id as a path, glob,
  * or SQL fragment.
  *
- * @throws {Error} with a stable message when input is invalid
+ * @throws {ConfigurationError} with a stable code when input is invalid
  */
 export function assertToolDataPurgeId(toolId: string): string {
   const trimmed = toolId.trim();
   if (trimmed.length === 0) {
-    throw new Error('tools data-purge: tool id must be non-empty');
+    throw new ConfigurationError('tools data-purge: tool id must be non-empty', {
+      code: 'CONFIGURATION.TOOLS.DATA_PURGE_INVALID_ID',
+    });
   }
   if (isReservedHostPlaneIdentity(trimmed)) {
-    throw new Error(
+    throw new ConfigurationError(
       'tools data-purge: reserved host-plane identities cannot be purged by id; pass the ordinary tool id',
+      { code: 'CONFIGURATION.TOOLS.DATA_PURGE_RESERVED_ID' },
     );
   }
   return trimmed;
@@ -64,12 +72,7 @@ export function deriveToolDataPurgeIdForms(
     if (binding !== undefined) {
       const tool = registry.get(binding.canonicalName) ?? registry.get(safeId);
       if (tool !== undefined) {
-        try {
-          return [...toolOwnedKeys(tool)];
-        } catch {
-          // Fall through to identity-index forms if binder validation rejects
-          // (should not happen for admitted tools).
-        }
+        return [...toolOwnedKeys(tool)];
       }
       return [...new Set([binding.canonicalName, binding.layoutKey])];
     }
@@ -82,11 +85,7 @@ function stateIdentities(ordinaryForms: readonly string[]): readonly string[] {
   const out = new Set<string>();
   for (const form of ordinaryForms) {
     out.add(form);
-    try {
-      out.add(hostPlaneStateIdentity(form));
-    } catch {
-      // Skip forms that cannot map (empty/already-reserved should not appear).
-    }
+    out.add(hostPlaneStateIdentity(form));
   }
   return [...out];
 }
@@ -99,6 +98,7 @@ export function toolsDataPurge(
   logger?: Logger,
 ): ToolsDataPurgeResult {
   const safeId = assertToolDataPurgeId(toolId);
+  const safeForms = [...new Set(idForms.map(assertToolDataPurgeId))];
   const sessionRepo = new SessionRepo(datastore);
   const baselineRepo = new BaselineRepo(datastore);
   const stateRepo = new ToolStateRepo(datastore);
@@ -107,14 +107,14 @@ export function toolsDataPurge(
   let baselineEntries = 0;
   let baselineMeta = false;
   let stateRows = 0;
-  for (const form of idForms) {
+  for (const form of safeForms) {
     sessions += sessionRepo.clearForTool(form);
     const baseline = baselineRepo.clear(form);
     baselineEntries += baseline.entries;
     baselineMeta = baselineMeta || baseline.meta;
   }
   // State rows: clear ordinary + reserved host-plane identities (ADR-0146).
-  for (const identity of stateIdentities(idForms)) {
+  for (const identity of stateIdentities(safeForms)) {
     stateRows += stateRepo.clear(identity);
   }
 
@@ -130,7 +130,7 @@ export function toolsDataPurge(
   if (logger !== undefined) {
     logger.info({
       evt: 'cli.tools.data_purge.complete',
-      identityCount: idForms.length,
+      identityCount: safeForms.length,
       sessions,
       baselineEntries,
       baselineMeta,

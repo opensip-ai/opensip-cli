@@ -283,10 +283,12 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(reply.error.stack).toBeUndefined();
   });
 
-  it('preserves a string `code` but never stack or host exception text on fault', async () => {
-    // A thrown Error carrying a string `code` drives the `code` present arm.
-    // Stacks and raw host messages must not cross the worker IPC boundary.
-    const coded = new Error('coded host fault with /secret/path') as Error & { code?: string };
+  it('drops an unallowlisted error code, stack, and host exception text on fault', async () => {
+    // Arbitrary host errors may attach secret-bearing dynamic codes. Only the
+    // explicit stable-code allowlist may cross this boundary.
+    const coded = new Error('coded host fault with /secret/path') as Error & {
+      code?: string;
+    };
     coded.code = 'E_HOST_CODE';
     const ctx = {
       ...makeDispatchHostCtx().ctx,
@@ -304,10 +306,8 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error).toMatchObject({
-      message: 'host-RPC seam failed',
-      code: 'E_HOST_CODE',
-    });
+    expect(reply.error.message).toBe('host-RPC seam failed');
+    expect(reply.error.code).toBeUndefined();
     expect(reply.error.stack).toBeUndefined();
     expect(JSON.stringify(reply.error)).not.toContain('secret');
   });
@@ -355,6 +355,29 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(reply.error.code).toBeUndefined();
     expect(reply.error.stack).toBeUndefined();
     expect(JSON.stringify(reply.error)).not.toContain('secret');
+  });
+
+  it('returns bounded replies for null requests and null host faults', async () => {
+    const malformed = (await handleHostRpc(null, makeDispatchHostCtx().ctx)) as Extract<
+      RpcReply,
+      { ok: false }
+    >;
+    expect(malformed).toMatchObject({ rpcId: -1, ok: false });
+    expect(malformed.error.message).toBe('host-RPC seam failed');
+
+    const ctx = {
+      ...makeDispatchHostCtx().ctx,
+      getExitCode: () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- trust-boundary regression: arbitrary worker-facing host code may throw a non-Error.
+        throw null;
+      },
+    } as unknown as Parameters<typeof handleHostRpc>[1];
+    const nullFault = (await handleHostRpc({ rpcId: 7, seam: 'getExitCode' }, ctx)) as Extract<
+      RpcReply,
+      { ok: false }
+    >;
+    expect(nullFault).toMatchObject({ rpcId: 7, ok: false });
+    expect(nullFault.error).toEqual({ message: 'host-RPC seam failed' });
   });
 
   it('rejects unknown, cross-plane, and prototype hostPlane methods without a host call', async () => {
@@ -448,20 +471,20 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
 
   it('rejects an unrecognized seam with a structured error (fail loud, not a silent no-op)', async () => {
     const cap = makeDispatchHostCtx();
-    const reply = (await handleHostRpc(
-      { rpcId: 1, seam: 'totallyBogus' } as unknown as HostRpcRequest,
-      cap.ctx,
-    )) as Extract<RpcReply, { ok: false }>;
+    const reply = (await handleHostRpc({ rpcId: 1, seam: 'totallyBogus' }, cap.ctx)) as Extract<
+      RpcReply,
+      { ok: false }
+    >;
     expect(reply.ok).toBe(false);
     expect(reply.error.message).toBe('host-RPC seam failed');
   });
 
   it('rejects a malformed request (missing numeric rpcId) with a structured error', async () => {
     const cap = makeDispatchHostCtx();
-    const reply = (await handleHostRpc(
-      { seam: 'getExitCode' } as unknown as HostRpcRequest,
-      cap.ctx,
-    )) as Extract<RpcReply, { ok: false }>;
+    const reply = (await handleHostRpc({ seam: 'getExitCode' }, cap.ctx)) as Extract<
+      RpcReply,
+      { ok: false }
+    >;
     expect(reply.ok).toBe(false);
     expect(reply.error.message).toBe('host-RPC seam failed');
   });

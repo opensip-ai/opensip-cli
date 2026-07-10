@@ -17,6 +17,7 @@ import { buildHostDispatchCtx } from '../cli-context.js';
 import { internalCommandNames } from '../commands/internal-command-visibility.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
+import { bindToolCliContext } from './bind-tool-context.js';
 import { dispatchExternalToolHook } from './dispatch-external-tool-hook.js';
 import { EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 
@@ -123,14 +124,15 @@ export function buildCommandRegistrationInput(
     ...(cwd === undefined
       ? {}
       : {
-          dispatchExternalReplay: (provenance, stored: ToolSessionRecord) =>
-            dispatchExternalToolHook({
+          dispatchExternalReplay: (owningTool, provenance, stored: ToolSessionRecord) => {
+            return dispatchExternalToolHook({
               provenance,
               hook: 'sessionReplay',
               hookArg: stored,
               cwd,
-              ctx: buildHostDispatchCtx(),
-            }),
+              ctx: bindToolCliContext(owningTool, buildHostDispatchCtx()),
+            });
+          },
         }),
   });
 

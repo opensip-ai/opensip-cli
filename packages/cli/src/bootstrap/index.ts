@@ -47,6 +47,8 @@ import {
 import { shouldSkipInstalledToolDiscovery } from './skip-installed-plugins.js';
 import { readProjectTrustedToolIds } from './tool-trust.js';
 
+import type { ToolRuntimeExecutionMode } from './worker-datastore.js';
+
 export * from './bootstrap-exports.js';
 
 export interface BootstrapOptions {
@@ -76,6 +78,8 @@ export interface BootstrapOptions {
    * is set, so this is inert for standalone runs.
    */
   readonly cliEntryUrl: string;
+  /** Exact startup posture, validated before any external runtime discovery. */
+  readonly runtimeMode: ToolRuntimeExecutionMode;
 }
 
 /**
@@ -181,6 +185,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
           trustPolicy: bootstrapPolicy.policy,
           policyAudit: bootstrapPolicy.audit,
           bootstrapDiagnostics: getBootstrapDiagnosticsBuffer(),
+          runtimeMode: opts.runtimeMode,
         },
         builtInIds,
         provenance,
@@ -206,6 +211,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
         projectTrustedTools,
         trustPolicy: bootstrapPolicy.policy,
         policyAudit: bootstrapPolicy.audit,
+        runtimeMode: opts.runtimeMode,
       },
       builtInIds,
       provenance,

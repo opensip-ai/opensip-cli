@@ -291,6 +291,22 @@ Notable shape choices:
 - **Anonymous functions get angle-bracketed names** (`<arrow:...>`, `<module-init:...>`) so they can't collide with real identifiers.
 - **Optional `features` surface.** The catalog payload carries an optional `features` block (per-function `bodyLines` / `blast` / reachability, plus package-level `scc` and `packageCoupling` rows) computed by the engine's feature-derivation stage ([`pipeline/features.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/graph/engine/src/pipeline/features.ts)). Per [ADR-0006](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0006-derived-data-persistence-policy.md), features are a recomputed in-engine view for the rules and are **materialized into the catalog only when the producing run requests them** (for the decoupled dashboard); a default run persists no features.
 
+### Public catalog read boundary
+
+Cross-package consumers use `@opensip-cli/graph/read`
+([ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)).
+The subpath provides free functions for payload-free catalog identity reads,
+full generation loads, canonical index/feature/orphan/classification/fingerprint
+derivation, and bounded catalog rebuild. Storage and rebuild failures return a
+fixed `GraphReadError` `Result`; missing catalog remains `ok(null)`.
+
+`CatalogRepo`, rule instances, raw datastore handles, and `runGraph`
+orchestration stay private. MCP production consumes this public facade and maps
+its bounded errors; it does not import `@opensip-cli/graph/internal`. The
+identity probe selects only `language`, `cacheKey`, `filesFingerprint`, and
+`builtAt`, so frequent freshness checks do not parse payload or emit per-probe
+events.
+
 ## Cache invalidation
 
 [`cache/invalidate.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/graph/engine/src/cache/invalidate.ts) classifies a cached catalog into one of three verdicts:
@@ -342,9 +358,3 @@ These shapes trade cross-subtree edge fidelity for speed and memory. Use `--no-c
 - **[`02-rules-and-gating.md`](/docs/opensip-cli/40-graph/02-rules-and-gating/)** — the eleven rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-reference/01-cli-commands.md#graph`](/docs/opensip-cli/70-reference/01-cli-commands/)** — the CLI flag reference.
 - **`git -P log -- packages/graph`** — the perf-plan history landed in waves: heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild. The original perf plan documents were removed once each wave shipped; the commit history is the source of truth.
-
-### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
-
-- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
-- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
-- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

@@ -9,7 +9,7 @@
  * or the `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override), user-global is
  * trusted-by-default. Both are EXTERNAL provenance, so ADR-0054 M4-G applies: in the HOST the registration
  * registers a manifest-derived synthetic `Tool` (no runtime import); the dispatch
- * WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`) imports the real runtime.
+ * WORKER (the prevalidated exact command/marker mode) imports the real runtime.
  */
 
 import {
@@ -30,10 +30,10 @@ import { type PolicyAuditCollector } from './policy-audit.js';
 import { policyCiEvidenceFromEnv } from './policy-evidence.js';
 import { evaluatePolicyPep } from './policy-pep.js';
 import { synthesizeExternalTool } from './synthesize-external-tool.js';
-import { isHostRuntimeImportForbidden } from './tool-provenance.js';
 import { isProjectLocalToolTrusted } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
+import type { ToolRuntimeExecutionMode } from './worker-datastore.js';
 import type { ResolvedTrustPolicy } from '@opensip-cli/config';
 
 export type AuthoredAdmission = ToolAdmission;
@@ -141,8 +141,8 @@ export function admitUserGlobalTool(args: { readonly dir: string }): AuthoredAdm
  * Discover + admit + register AUTHORED Tool sidecars from the two authored
  * roots. ADR-0054 M4-G: authored tools are always EXTERNAL provenance, so the
  * HOST registers a manifest-derived synthetic Tool (no runtime import); the
- * dispatch WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`) imports the real runtime via
- * the shared `importToolRuntime` seam.
+ * prevalidated dispatch WORKER imports the real runtime via the shared
+ * `importToolRuntime` seam.
  */
 export async function discoverAndRegisterAuthoredTools(
   registry: ToolRegistry,
@@ -153,6 +153,7 @@ export async function discoverAndRegisterAuthoredTools(
     readonly projectTrustedTools?: ReadonlySet<string>;
     readonly trustPolicy?: ResolvedTrustPolicy;
     readonly policyAudit?: PolicyAuditCollector;
+    readonly runtimeMode: ToolRuntimeExecutionMode;
   },
   builtInIds: ReadonlySet<string>,
   provenance: ToolProvenance[] = [],
@@ -167,7 +168,11 @@ export async function discoverAndRegisterAuthoredTools(
       evaluatePolicyPep({
         policy: opts.trustPolicy,
         audit: opts.policyAudit,
-        subject: { kind: 'user-global-tool', id: manifest.id, source: 'user-global' },
+        subject: {
+          kind: 'user-global-tool',
+          id: manifest.id,
+          source: 'user-global',
+        },
         action: 'load',
         evidence: {
           legacyTrusted: true,
@@ -184,7 +189,7 @@ export async function discoverAndRegisterAuthoredTools(
         builtInIds,
         provenance,
         manifests,
-        env,
+        runtimeMode: opts.runtimeMode,
       });
     }
   }
@@ -203,7 +208,7 @@ export async function discoverAndRegisterAuthoredTools(
         builtInIds,
         provenance,
         manifests,
-        env,
+        runtimeMode: opts.runtimeMode,
       });
     }
   }
@@ -216,21 +221,21 @@ interface AuthoredRegisterArgs {
   readonly builtInIds: ReadonlySet<string>;
   readonly provenance: ToolProvenance[];
   readonly manifests: ToolPluginManifest[];
-  readonly env: NodeJS.ProcessEnv;
+  readonly runtimeMode: ToolRuntimeExecutionMode;
 }
 
 /** @throws {PluginIncompatibleError} When the authored tool runtime fails to load. */
 async function admitAndRegisterAuthored(args: AuthoredRegisterArgs): Promise<void> {
-  const { registry, admission, dir, builtInIds, provenance, manifests, env } = args;
+  const { registry, admission, dir, builtInIds, provenance, manifests, runtimeMode } = args;
   const { provenance: prov, manifest } = admission;
   if (builtInIds.has(prov.id)) return;
 
-  // ADR-0054 M4-G (capstone): authored tools are EXTERNAL. In the HOST, register
-  // a manifest-derived synthetic Tool — never import the untrusted runtime. The
-  // dispatch WORKER imports the real runtime (the isolation boundary). The trust
-  // gate already ran in `admitProjectLocalTool` (deny-by-default), so a
-  // untrusted tool never reaches here.
-  if (isHostRuntimeImportForbidden(env)) {
+  // ADR-0054 M4-G (capstone): authored tools are EXTERNAL. Outside the
+  // external-tool dispatch worker, register a manifest-derived synthetic Tool —
+  // never import the untrusted runtime. The trust gate already ran in
+  // `admitProjectLocalTool` (deny-by-default), so an untrusted tool never reaches
+  // here.
+  if (runtimeMode !== 'external-tool-worker') {
     const tool = synthesizeExternalTool(manifest);
     registry.register(tool);
     provenance.push(prov);

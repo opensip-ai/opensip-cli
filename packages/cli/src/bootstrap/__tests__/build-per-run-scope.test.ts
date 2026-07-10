@@ -66,6 +66,7 @@ function buildScopeWith(tools: readonly Tool[]) {
     provenance: [],
     logger,
     ui: { version: '0.0.0', update: undefined },
+    datastoreAccess: 'local',
   });
 }
 
@@ -135,7 +136,7 @@ describe('buildPerRunScope datastoreAccess', () => {
     expect(() => scope.dispose()).not.toThrow();
   });
 
-  it('defaults to local when datastoreAccess is omitted', () => {
+  it('uses explicit local datastore access for ordinary host scopes', () => {
     const scope = buildScopeWith([]);
     // Local mode returns a thunk that may open SQLite; we only assert the
     // callable is present and is not the denied code path without invoking open

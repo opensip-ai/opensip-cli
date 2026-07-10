@@ -1,8 +1,7 @@
 /**
  * The structured error the MCP read ports return in the failure arm of their
- * `Result<T, E>` (ADR-0084). Ports return `Result` across domain boundaries;
- * `throw` is reserved for genuine infra failures (SQLite/Drizzle, the
- * `runGraph` child build). This is a plain DTO — not a thrown `Error`.
+ * `Result<T, E>` (ADR-0084). Ports return `Result` across domain boundaries,
+ * including infrastructure failures. This is a plain DTO, not a thrown Error.
  */
 
 import type { GraphReadError } from '@opensip-cli/graph/read';
@@ -24,8 +23,26 @@ export function readError(code: string, message: string): McpReadError {
  * code/message (no raw SQLite/graph throw text).
  */
 export function fromGraphReadError(error: GraphReadError): McpReadError {
-  return {
-    code: error.code,
-    message: error.message,
-  };
+  switch (error.code) {
+    case 'GRAPH.READ.CATALOG_IDENTITY': {
+      return readError(error.code, 'Failed to read graph catalog identity');
+    }
+    case 'GRAPH.READ.CATALOG_GENERATION': {
+      return readError(error.code, 'Failed to load graph catalog generation');
+    }
+    case 'GRAPH.READ.REBUILD_EMPTY': {
+      return readError(error.code, 'Graph rebuild produced an empty catalog');
+    }
+    case 'GRAPH.READ.REBUILD_FAILED': {
+      return readError(error.code, 'Graph rebuild failed due to infrastructure error');
+    }
+    default: {
+      return readError('graph-read-failed', 'Graph read failed.');
+    }
+  }
+}
+
+/** Fixed fallback for an unexpected throw at the MCP refresh boundary. */
+export function unexpectedRefreshError(): McpReadError {
+  return readError('refresh-failed', 'Graph refresh failed due to an infrastructure error.');
 }

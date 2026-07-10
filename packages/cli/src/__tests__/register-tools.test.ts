@@ -393,7 +393,7 @@ describe('discoverAndRegisterToolPackages', () => {
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: empty, mode: 'walkUp' }] },
+          { sources: [{ dir: empty, mode: 'walkUp' }], runtimeMode: 'host' },
           new Set(),
         ),
       ).resolves.toBeUndefined();
@@ -441,9 +441,10 @@ const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
 const WALK_UP_SOURCES = {
   sources: WALK_UP_SOURCE_LIST,
   env: ALLOW_ALL_INSTALLED,
+  runtimeMode: 'host' as const,
 };
 /**
- * ADR-0054 M4-G: discovery in the dispatch WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`).
+ * ADR-0054 M4-G: discovery in the prevalidated dispatch WORKER mode.
  * The host NEVER imports an external runtime (it synthesizes a manifest-derived
  * Tool); the WORKER is the isolation boundary where the runtime import + the
  * runtime-shape checks (drift / malformed export / no-entry / import-throw) run.
@@ -452,6 +453,7 @@ const WALK_UP_SOURCES = {
  */
 const WALK_UP_SOURCES_WORKER = {
   sources: WALK_UP_SOURCE_LIST,
+  runtimeMode: 'external-tool-worker' as const,
   env: {
     [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_INSTALLED_IDS,
     OPENSIP_CLI_IN_TOOL_WORKER: '1',
@@ -619,6 +621,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           sources: WALK_UP_SOURCE_LIST,
           env: ALLOW_ALL_INSTALLED,
           bootstrapDiagnostics: collector,
+          runtimeMode: 'host',
         },
         BUILTIN_IDS,
       );
@@ -657,6 +660,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           sources: WALK_UP_SOURCE_LIST,
           env: ALLOW_ALL_INSTALLED,
           bootstrapDiagnostics: collector,
+          runtimeMode: 'host',
         },
         BUILTIN_IDS,
       );
@@ -703,6 +707,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           sources: WALK_UP_SOURCE_LIST,
           env: {},
           bootstrapDiagnostics: collector,
+          runtimeMode: 'host',
         },
         BUILTIN_IDS,
       );
@@ -745,6 +750,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       {
         sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
         env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: 'fixture-trust-allowed' },
+        runtimeMode: 'host',
       },
       BUILTIN_IDS,
     );
@@ -1003,7 +1009,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          {
+            sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
+            runtimeMode: 'host',
+          },
           BUILTIN_IDS,
         ),
       ).resolves.toBeUndefined();
@@ -1037,7 +1046,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          {
+            sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
+            runtimeMode: 'host',
+          },
           BUILTIN_IDS,
         ),
       ).resolves.toBeUndefined();

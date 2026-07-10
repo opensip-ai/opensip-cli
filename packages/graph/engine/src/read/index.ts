@@ -19,12 +19,11 @@ export type {
   GraphReadError,
   GraphReadOperation,
   CatalogIdentity,
+  RebuildCatalogInput,
   CatalogVerdict,
   ValidationContext,
   Catalog,
   Indexes,
   FeatureColumn,
   GraphConfig,
-  RunGraphInput,
-  RunGraphResult,
 } from './types.js';

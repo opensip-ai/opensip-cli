@@ -44,8 +44,8 @@ import {
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fitnessTool } from '@opensip-cli/fitness';
-import { executeFit } from '@opensip-cli/fitness/internal';
+import { fitnessTool } from '../../../tool.js';
+import { executeFit } from '../../fit.js';
 
 import type * as CheckLoaderModule from '../check-loader.js';
 import type { FitOptions } from '@opensip-cli/contracts';

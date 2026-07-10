@@ -7,7 +7,12 @@
  * fallbacks. The lazy repo + Date.now() stamps are exercised by construction.
  */
 
-import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { DataStoreFactory, ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildHostPlanes } from '../host-planes.js';
@@ -15,6 +20,19 @@ import { buildHostPlanes } from '../host-planes.js';
 import type { Logger } from '@opensip-cli/core';
 
 let ds: DataStore;
+const MIGRATIONS_DIR = fileURLToPath(new URL('../../../../datastore/migrations', import.meta.url));
+
+function copyPreHostPlaneMigrations(destination: string): void {
+  cpSync(MIGRATIONS_DIR, destination, { recursive: true });
+  rmSync(join(destination, '0009_host_plane_namespace.sql'));
+  rmSync(join(destination, 'meta', '0009_snapshot.json'));
+  const journalPath = join(destination, 'meta', '_journal.json');
+  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+    entries: { tag: string }[];
+  };
+  journal.entries = journal.entries.filter((entry) => entry.tag !== '0009_host_plane_namespace');
+  writeFileSync(journalPath, `${JSON.stringify(journal, null, 2)}\n`, 'utf8');
+}
 
 beforeEach(() => {
   ds = DataStoreFactory.open({ backend: 'memory' });
@@ -32,6 +50,42 @@ function planes(logger?: Logger) {
 }
 
 describe('host-planes — governance', () => {
+  it('reads a legacy host row after DataStoreFactory applies migration 0009', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'host-plane-cli-parity-'));
+    const oldMigrations = join(root, 'migrations-0008');
+    const dbPath = join(root, 'datastore.sqlite');
+    copyPreHostPlaneMigrations(oldMigrations);
+    let migrated: DataStore | undefined;
+    try {
+      const legacy = DataStoreFactory.open({
+        backend: 'sqlite',
+        path: dbPath,
+        migrationsFolder: oldMigrations,
+      });
+      new ToolStateRepo(legacy).put('fit', 'governance', { migrated: true });
+      legacy.close();
+
+      migrated = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
+      const hostPlanes = buildHostPlanes({
+        getDatastore: () => migrated!,
+      });
+      await expect(hostPlanes?.governance?.getGovernanceState('fit')).resolves.toEqual({
+        migrated: true,
+      });
+
+      const { hostPlaneStateIdentity } = await import('../host-plane-state.js');
+      expect(new ToolStateRepo(migrated).get(hostPlaneStateIdentity('fit'), 'governance')).toEqual({
+        migrated: true,
+      });
+      expect(new ToolStateRepo(migrated).get('fit', 'governance')).toEqual({
+        migrated: true,
+      });
+    } finally {
+      migrated?.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('records an installation and reads it back, then blocks/unblocks gate checkAllowed', async () => {
     const { governance } = planes();
     expect(await governance.getGovernanceState('fit')).toBeUndefined();

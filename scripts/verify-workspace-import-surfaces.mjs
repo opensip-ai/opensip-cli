@@ -9,7 +9,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -115,6 +115,13 @@ export function findUndeclaredImports(filePath, sourceText, allowed) {
     ) {
       checkSpec(node.moduleSpecifier.text, node.moduleSpecifier.getStart(sf));
     } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression !== undefined &&
+      ts.isStringLiteral(node.moduleReference.expression)
+    ) {
+      checkSpec(node.moduleReference.expression.text, node.moduleReference.expression.getStart(sf));
+    } else if (
       ts.isExportDeclaration(node) &&
       node.moduleSpecifier &&
       ts.isStringLiteral(node.moduleSpecifier)
@@ -165,8 +172,11 @@ export function verifyWorkspaceImportSurfaces(repoRoot = REPO_ROOT) {
       throw new Error(`package src escapes repository: ${pkg.relativeDir}`);
     }
     walkSrc(srcReal, rootReal, (file) => {
-      const text = readFileSync(file, 'utf8');
       const rel = relative(rootReal, file).split(sep).join('/');
+      if (statSync(file).size > MAX_SOURCE_BYTES) {
+        throw new Error(`source file exceeds 1 MiB: ${rel}`);
+      }
+      const text = readFileSync(file, 'utf8');
       for (const hit of findUndeclaredImports(rel, text, allowed)) {
         allHits.push(hit);
       }

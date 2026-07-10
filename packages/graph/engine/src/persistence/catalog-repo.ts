@@ -208,8 +208,7 @@ export class CatalogRepo {
       logger.error({
         evt: 'graph.catalog.read.error',
         module: MODULE_NAME,
-        msg: 'Failed to read catalog',
-        error: error instanceof Error ? error.message : String(error),
+        code: 'GRAPH.CATALOG.READ_FAILED',
       });
       throw error;
       /* v8 ignore stop */

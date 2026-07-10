@@ -71,6 +71,13 @@ The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mod
 
 [`packages/datastore`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/cli/src/index.ts)) and closes it on `process.exit`. Tool commands do not receive a raw datastore handle on `ToolCliContext`; they use the entered `RunScope` for read-owned internals and the host-owned seams (`toolState`, baseline/export seams, `writeArtifact`) for durable writes.
 
+The public `DataStore` is deliberately opaque: lifecycle, maintenance, and
+serialized write-lock coordination only. Raw Drizzle handles, table values, and
+transaction callbacks remain behind `@opensip-cli/datastore/internal` for the
+datastore owner, session-store, and graph persistence. General Tool/CLI business
+logic goes through repositories or documented host seams
+([ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)).
+
 Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure — **with one deliberate exception**: baseline persistence is a host-owned plane (ADR-0036). A tool that wants tool-specific tables (like graph's catalog cache) adds a schema module under its `src/persistence/schema.ts` and registers it in [`packages/datastore/drizzle.config.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/datastore/drizzle.config.ts); a tool that wants the **gate** (`--gate-save`/`--gate-compare`/export) adds *no schema at all* — it inherits the generic `tool_baseline_entries` / `tool_baseline_meta` pair (scoped by a `tool` column, [`packages/datastore/src/schema/baseline.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/datastore/src/schema/baseline.ts)) by stamping fingerprints on its signals. The schema registrations today:
 
 | Owner | Schema file | Tables |
@@ -118,6 +125,29 @@ host-only maintenance seam for `incrementalVacuum`, bounded full `VACUUM`, and
 file-size measurement. The in-memory test store does not expose maintenance.
 Existing file stores are converted on open with a one-time `VACUUM`; conversion
 failure is logged and non-fatal.
+
+---
+
+## Reserved host-plane state
+
+Ordinary Tool state and host compatibility state share the `tool_state` table
+but not an identity. Tool-owned rows use validated canonical/layout/stable keys;
+host compatibility rows use `@opensip-cli/host-plane:<toolId>`. One shared
+reserved-prefix predicate rejects that namespace during runtime Tool admission,
+owned-key derivation, binding, and explicit purge input before handler or state
+access. A bound Tool therefore cannot overwrite or enumerate its host rows.
+
+Migration `0009_host_plane_namespace` copies recognized legacy compatibility
+rows into the reserved identity. It preserves payload bytes and timestamps,
+does not delete the legacy row, never overwrites an existing reserved row, and
+is idempotent, including stored JSON `null`. This copy-only posture avoids
+guessing whether an ambiguous legacy key was host- or Tool-owned
+([ADR-0146](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0146-host-plane-reserved-state-namespace.md)).
+
+`opensip tools data-purge <tool-id>` resolves the Tool's admitted owned keys and
+clears sessions, baselines, ordinary state, and the corresponding reserved host
+compatibility rows. The reserved identity itself is never accepted as a command
+argument.
 
 ---
 
@@ -371,9 +401,3 @@ The whole `<project>/opensip-cli/` directory is also safe to delete; `opensip in
 - **[`../70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/)** — the HTML report's structure and the `report` command.
 - **[`../70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/)** — `opensip-cli.config.yml` schema (the one bit of project state that's not in `.runtime/`).
 - **[`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/)** — where datastore sits in the workspace layering.
-
-### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
-
-- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
-- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
-- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

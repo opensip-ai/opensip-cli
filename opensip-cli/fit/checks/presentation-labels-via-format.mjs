@@ -11,6 +11,8 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
+
 const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/|\/__fixtures__\/)/;
 const ALLOW_PATH = [
   /packages\/format\//,
@@ -18,6 +20,7 @@ const ALLOW_PATH = [
   /scripts\/perf\//,
   /docs\//,
 ];
+const TOOL_PRESENTATION_PATH = toolEnginePathRe();
 
 /**
  * Anti-patterns for human duration/score labels. Ordered for readable messages.
@@ -51,8 +54,8 @@ export function analyzePresentationLabelsViaFormat(content, filePath) {
   if (ALLOW_PATH.some((re) => re.test(normalized))) return [];
   // Only first-party presentation-ish packages — keep precision high.
   if (
-    !/packages\/(?:dashboard|cli-ui|cli|mcp)\//.test(normalized) &&
-    !/packages\/(?:fitness|graph|simulation|yagni)\/engine\/src\/cli\//.test(normalized)
+    !/packages\/(?:dashboard|cli-ui|cli)\//.test(normalized) &&
+    !TOOL_PRESENTATION_PATH.test(normalized)
   ) {
     return [];
   }

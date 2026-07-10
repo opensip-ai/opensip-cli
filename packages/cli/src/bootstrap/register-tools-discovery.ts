@@ -39,10 +39,10 @@ import { policyCiEvidenceFromEnv } from './policy-evidence.js';
 import { evaluatePolicyPep } from './policy-pep.js';
 import { verifyPackageProvenance } from './provenance-verifier.js';
 import { synthesizeExternalTool } from './synthesize-external-tool.js';
-import { isHostRuntimeImportForbidden } from './tool-provenance.js';
 import { resolveInstalledToolTrust, type ToolTrustReason } from './tool-trust.js';
 
 import type { ToolAdmission } from './tool-admission-types.js';
+import type { ToolRuntimeExecutionMode } from './worker-datastore.js';
 import type { ResolvedTrustPolicy } from '@opensip-cli/config';
 
 const BUNDLED_PACKAGE_NAMES = new Set<string>(BUNDLED_TOOL_PACKAGES);
@@ -161,6 +161,8 @@ export interface DiscoveryOptions {
   readonly policyAudit?: PolicyAuditCollector;
   /** Optional bootstrap diagnostics sink (defaults to the process-wide buffer). */
   readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
+  /** Prevalidated startup posture; never derive import authority from env alone. */
+  readonly runtimeMode: ToolRuntimeExecutionMode;
 }
 
 /**
@@ -237,6 +239,7 @@ async function registerDiscoveredInstalledPackage(
     readonly provenance: ToolProvenance[];
     readonly manifests: ToolPluginManifest[];
     readonly bootstrapDiagnostics?: BootstrapDiagnosticsCollector;
+    readonly runtimeMode: ToolRuntimeExecutionMode;
   },
 ): Promise<void> {
   const admission = admitInstalledTool(pkg, args.builtInIds, args.bootstrapDiagnostics);
@@ -292,12 +295,14 @@ async function registerDiscoveredInstalledPackage(
 
   // ADR-0054 M4-G (capstone): in the HOST, NEVER import the external runtime —
   // register a manifest-derived synthetic Tool (command shells from the static
-  // manifest; the worker imports the real runtime + runs the handler when a
+  // manifest; the external-tool worker imports the real runtime + runs the handler when a
   // command dispatches). The drift guard does not run host-side (there is no
   // runtime to compare; the manifest IS the host source of truth). Inside the
-  // dispatch WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`) the import path runs — the
-  // isolation boundary where the untrusted runtime legitimately loads.
-  if (isHostRuntimeImportForbidden(args.env)) {
+  // prevalidated external-tool dispatch-worker mode the import path runs — the
+  // isolation boundary where that runtime legitimately loads. Capability-pack
+  // workers remain on the synthetic path. Import authority is never derived
+  // from the environment marker alone.
+  if (args.runtimeMode !== 'external-tool-worker') {
     // Synchronous void registration (no import in the host); `void` marks the
     // floating call as deliberately non-promise (the synthesize path never awaits).
     void registerSyntheticExternalTool(args, admission, {
@@ -385,6 +390,7 @@ export async function discoverAndRegisterToolPackages(
         provenance,
         manifests,
         bootstrapDiagnostics,
+        runtimeMode: opts.runtimeMode,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);

@@ -1,5 +1,15 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { sql } from 'drizzle-orm';
@@ -27,6 +37,18 @@ const META_DIR = fileURLToPath(new URL('../../migrations/meta', import.meta.url)
 interface JournalEntry {
   idx: number;
   tag: string;
+}
+
+function copyPreHostPlaneMigrations(destination: string): void {
+  cpSync(MIGRATIONS_DIR, destination, { recursive: true });
+  rmSync(join(destination, '0009_host_plane_namespace.sql'));
+  rmSync(join(destination, 'meta', '0009_snapshot.json'));
+  const journalPath = join(destination, 'meta', '_journal.json');
+  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+    entries: JournalEntry[];
+  };
+  journal.entries = journal.entries.filter((entry) => entry.tag !== '0009_host_plane_namespace');
+  writeFileSync(journalPath, `${JSON.stringify(journal, null, 2)}\n`, 'utf8');
 }
 
 async function readJournal(): Promise<JournalEntry[]> {
@@ -160,6 +182,70 @@ describe('fresh database fully realizes the ORM schema', () => {
 });
 
 describe('0009 host-plane namespace copy-only migration', () => {
+  it('upgrades a real pre-0009 SQLite file through DataStoreFactory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'host-plane-migration-'));
+    const oldMigrations = join(root, 'migrations-0008');
+    const dbPath = join(root, 'datastore.sqlite');
+    copyPreHostPlaneMigrations(oldMigrations);
+
+    try {
+      const legacy = DataStoreFactory.open({
+        backend: 'sqlite',
+        path: dbPath,
+        migrationsFolder: oldMigrations,
+      });
+      requireDrizzleHandle(legacy).db.run(
+        sql.raw(`
+          INSERT INTO tool_state (tool, key, payload, updated_at) VALUES
+            ('fit', 'governance', '{"v":1}', 100),
+            ('fit', 'audit', 'null', 200),
+            ('fit', 'cursor', '{"keep":true}', 300),
+            ('@opensip-cli/host-plane:fit', 'governance', '{"existing":true}', 50);
+        `),
+      );
+      legacy.close();
+
+      const migrated = DataStoreFactory.open({
+        backend: 'sqlite',
+        path: dbPath,
+      });
+      const rows = requireDrizzleHandle(migrated).db.all<{
+        tool: string;
+        key: string;
+        payload: string;
+        updated_at: number;
+      }>(sql.raw('SELECT tool, key, payload, updated_at FROM tool_state ORDER BY tool, key'));
+      migrated.close();
+
+      expect(rows.find((row) => row.tool === 'fit' && row.key === 'governance')).toMatchObject({
+        payload: '{"v":1}',
+        updated_at: 100,
+      });
+      expect(rows.find((row) => row.tool === 'fit' && row.key === 'cursor')).toMatchObject({
+        payload: '{"keep":true}',
+      });
+      expect(
+        rows.find((row) => row.tool === '@opensip-cli/host-plane:fit' && row.key === 'governance'),
+      ).toMatchObject({ payload: '{"existing":true}', updated_at: 50 });
+      expect(
+        rows.find((row) => row.tool === '@opensip-cli/host-plane:fit' && row.key === 'audit'),
+      ).toMatchObject({ payload: 'null', updated_at: 200 });
+
+      // Reopening at the current schema is a row-for-row no-op.
+      const reopened = DataStoreFactory.open({
+        backend: 'sqlite',
+        path: dbPath,
+      });
+      const after = requireDrizzleHandle(reopened).db.all(
+        sql.raw('SELECT tool, key, payload, updated_at FROM tool_state ORDER BY tool, key'),
+      );
+      reopened.close();
+      expect(after).toEqual(rows);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('copies governance/audit/entitlements to reserved identity without delete/overwrite', () => {
     // Seed a pre-migration-shaped DB by applying migrations then inserting
     // ordinary rows and re-running the 0009 SQL via a second open is not needed

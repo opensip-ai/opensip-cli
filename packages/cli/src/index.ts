@@ -39,6 +39,7 @@ import {
   mountAllToolCommands,
   renderResult,
   buildCommandRegistrationInput,
+  resolveStartupExecutionMode,
 } from './bootstrap/index.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
@@ -90,6 +91,12 @@ const program = new Command('opensip')
   .exitOverride();
 
 async function main(): Promise<void> {
+  const userArgv = process.argv.slice(2);
+  // Resolve the exact internal-command + host-marker pair before startup tool
+  // discovery. A forged one-sided marker must fail before an external package's
+  // module can be evaluated in this process.
+  const runtimeMode = resolveStartupExecutionMode(userArgv, process.env);
+
   // Bare `opensip --version` / `-V` → the CLI version (host-owned), printed
   // before any bootstrap. A `--version` AFTER a subcommand is that tool's own
   // (handled by decorateToolPrimary's subcommand-local version option).
@@ -106,7 +113,6 @@ async function main(): Promise<void> {
   // Persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
-  const userArgv = process.argv.slice(2);
   const { provenance, manifests, bootstrapDiagnostics, startupTimings, trustPolicy, policyAudit } =
     await bootstrapCli({
       langRegistry,
@@ -115,6 +121,7 @@ async function main(): Promise<void> {
       cwd: process.cwd(),
       cliEntryUrl: import.meta.url,
       argv: userArgv,
+      runtimeMode,
     });
 
   const { ctx, runActionHooks, getExitCode } = buildToolCliContext({

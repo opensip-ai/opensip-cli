@@ -37,6 +37,7 @@
  *     runs untrusted code in-host.
  */
 
+import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -269,19 +270,26 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
    * Snapshot the project's opensip-cli/.runtime SQLite file (if any). Workers must
    * not open/mutate a local project store when ambient access is denied.
    */
-  function runtimeDbSnapshot(): { exists: boolean; size: number; mtimeMs: number } | null {
-    const dbPath = join(project.projectDir, 'opensip-cli', '.runtime', 'datastore.sqlite');
-    if (!existsSync(dbPath)) return null;
-    const st = statSync(dbPath);
-    return { exists: true, size: st.size, mtimeMs: st.mtimeMs };
+  function runtimeDbSnapshot(
+    projectDir = project.projectDir,
+  ): Record<string, { size: number; mtimeMs: number } | null> {
+    const dbPath = join(projectDir, 'opensip-cli', '.runtime', 'datastore.sqlite');
+    return Object.fromEntries(
+      ['', '-wal', '-shm'].map((suffix) => {
+        const path = `${dbPath}${suffix}`;
+        if (!existsSync(path)) return [suffix || 'main', null];
+        const stat = statSync(path);
+        return [suffix || 'main', { size: stat.size, mtimeMs: stat.mtimeMs }];
+      }),
+    );
   }
 
   it('ADR-0145: cli.scope.datastore() is denied with PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS (host survives)', async () => {
     const before = runtimeDbSnapshot();
     const cap = makeDispatchHostCtx();
-    await expect(dispatch(cap, 'ds-scope')).rejects.toThrow(
-      /DATASTORE_DIRECT_ACCESS|host-rpc-only|cannot open a local project datastore|failed/,
-    );
+    await expect(dispatch(cap, 'ds-scope')).rejects.toMatchObject({
+      code: 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
+    });
     expect(cap.envelopes).toHaveLength(0);
     expect(runtimeDbSnapshot()).toEqual(before);
   });
@@ -289,12 +297,81 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
   it('ADR-0145: currentScope().datastore() is denied ambiently (host survives, no local SQLite open)', async () => {
     const before = runtimeDbSnapshot();
     const cap = makeDispatchHostCtx();
-    await expect(dispatch(cap, 'ds-current')).rejects.toThrow(
-      /DATASTORE_DIRECT_ACCESS|host-rpc-only|cannot open a local project datastore|failed/,
-    );
+    await expect(dispatch(cap, 'ds-current')).rejects.toMatchObject({
+      code: 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
+    });
     expect(cap.envelopes).toHaveLength(0);
     // Worker must not create/mutate a child-local SQLite store.
     expect(runtimeDbSnapshot()).toEqual(before);
+  });
+
+  it('fails a real worker command without the host marker before handler or SQLite access', () => {
+    const before = runtimeDbSnapshot();
+    const env = { ...process.env };
+    delete env.OPENSIP_CLI_IN_TOOL_WORKER;
+    const child = spawnSync(
+      process.execPath,
+      [
+        CLI_SCRIPT,
+        '__tool-command-worker',
+        '/nonexistent/worker-spec.json',
+        '--cwd',
+        project.projectDir,
+      ],
+      { cwd: project.projectDir, env, encoding: 'utf8' },
+    );
+    expect(child.status).not.toBe(0);
+    expect(`${child.stdout}${child.stderr}`).toContain(
+      'Worker command path without OPENSIP_CLI_IN_TOOL_WORKER=1',
+    );
+    expect(runtimeDbSnapshot()).toEqual(before);
+  });
+
+  it('fails a forged worker marker on a normal command before handler or SQLite access', () => {
+    const malicious = makeInstalledFixtureProject({ importSentinel: true });
+    const before = runtimeDbSnapshot(malicious.projectDir);
+    const child = spawnSync(process.execPath, [CLI_SCRIPT, 'tools', 'list', '--json'], {
+      cwd: malicious.projectDir,
+      env: {
+        ...process.env,
+        [FIXTURE_TRUST_ENV]: FIXTURE_TOOL_ID,
+        OPENSIP_CLI_IN_TOOL_WORKER: '1',
+      },
+      encoding: 'utf8',
+    });
+    expect(child.status).not.toBe(0);
+    expect(`${child.stdout}${child.stderr}`).toContain(
+      'OPENSIP_CLI_IN_TOOL_WORKER=1 without an authorized internal worker command path',
+    );
+    expect(`${child.stdout}${child.stderr}`).not.toContain('"type":"tools-list"');
+    expect(malicious.importSentinelPath).toBeDefined();
+    expect(existsSync(malicious.importSentinelPath ?? '')).toBe(false);
+    expect(runtimeDbSnapshot(malicious.projectDir)).toEqual(before);
+  });
+
+  it('rejects a real installed runtime with a reserved metadata id before handler effects', async () => {
+    const malicious = makeInstalledFixtureProject({
+      runtimeMetadataId: '@opensip-cli/host-plane:victim',
+      handlerSentinel: true,
+    });
+    const before = runtimeDbSnapshot(malicious.projectDir);
+    const cap = makeDispatchHostCtx();
+    await expect(
+      dispatchExternalToolCommand({
+        provenance: { ...provenance(), resolvedPath: malicious.packageDir },
+        commandName: 'ext-run',
+        opts: { mode: 'rpc', cwd: malicious.projectDir },
+        positionals: [],
+        ctx: cap.ctx,
+        cliScript: CLI_SCRIPT,
+      }),
+    ).rejects.toThrow(/reserved host-plane|not registered|failed/);
+    expect(cap.calls).toEqual([]);
+    expect(cap.toolStateStore.size).toBe(0);
+    expect(cap.baselines).toEqual([]);
+    expect(malicious.handlerSentinelPath).toBeDefined();
+    expect(existsSync(malicious.handlerSentinelPath ?? '')).toBe(false);
+    expect(runtimeDbSnapshot(malicious.projectDir)).toEqual(before);
   });
 
   it('the host still dispatches a happy run AFTER containing a fault (host survived)', async () => {

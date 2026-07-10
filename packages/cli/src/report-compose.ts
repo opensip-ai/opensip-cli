@@ -39,6 +39,7 @@ import {
 } from '@opensip-cli/dashboard';
 import { orderSessionsForSuiteGrouping, RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
+import { bindToolCliContext } from './bootstrap/bind-tool-context.js';
 import { collectDeclaredInputsForTool } from './bootstrap/declared-inputs.js';
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
 import { type DispatchHostCtx } from './bootstrap/dispatch-replay-result.js';
@@ -99,7 +100,10 @@ async function composeReportInput(): Promise<HtmlReportInput> {
 
   const input: HtmlReportInput = {
     sessions,
-    runs: recentRuns.map((run) => ({ ...run, steps: stepsByRun.get(run.id) ?? [] })),
+    runs: recentRuns.map((run) => ({
+      ...run,
+      steps: stepsByRun.get(run.id) ?? [],
+    })),
     declaredInputs: collectDeclaredInputsForTool('report'),
   };
   const claimedKeys = new Map<string, string>();
@@ -158,11 +162,12 @@ async function collectExternalReportData(
   }
   try {
     const cwd = getCurrentProjectRoot();
+    const boundHostCtx = bindToolCliContext(tool, hostCtx);
     const result = await dispatchExternalToolHook({
       provenance: record,
       hook: 'collectReportData',
       cwd,
-      ctx: hostCtx,
+      ctx: boundHostCtx,
     });
     return (result ?? undefined) as Record<string, unknown> | undefined;
   } catch (error) {

@@ -132,6 +132,67 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
     expect(normalize(JSON.parse(installed.stdout))).toEqual(normalize(JSON.parse(bundled.stdout)));
   });
 
+  it('loads an explicitly configured fit pack through the real capability worker', () => {
+    const packageDir = join(testDir, 'node_modules', '@fixture', 'checks-worker');
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(
+      join(packageDir, 'package.json'),
+      JSON.stringify({
+        name: '@fixture/checks-worker',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: {
+          kind: 'fit-pack',
+          targetDomain: 'fit-pack',
+          targetDomainApiVersion: 1,
+        },
+      }),
+      'utf8',
+    );
+    writeFileSync(
+      join(packageDir, 'index.mjs'),
+      `export const checks = [{
+        config: {
+          id: '00000000-0000-4000-8000-00000000ca11',
+          slug: 'capability-worker-fixture',
+          tags: ['architecture'],
+          description: 'real capability worker fixture',
+          analysisMode: 'analyze',
+          scope: { type: 'all' },
+          itemType: 'file',
+          execute() { throw new Error('isolated execute path must not run in host'); },
+        },
+        getScope() { return { type: 'all' }; },
+        getMatcher() { return { matches: () => true }; },
+        run() { return Promise.resolve({ status: 'passed', violations: [] }); },
+      }];\n`,
+      'utf8',
+    );
+    writeFileSync(
+      join(testDir, 'opensip-cli.config.yml'),
+      [
+        'schemaVersion: 1',
+        'targets:',
+        '  src:',
+        '    description: source',
+        '    languages: [typescript]',
+        '    concerns: [backend]',
+        '    include: ["**/*.ts"]',
+        'plugins:',
+        '  checkPackages: ["@fixture/checks-worker"]',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const result = cli.run(['fit', 'list', '--json', '--cwd', testDir], {
+      cwd: testDir,
+      timeout: 120_000,
+    });
+    expect(result.exitCode, result.stderr).toBe(0);
+    expect(JSON.stringify(JSON.parse(result.stdout))).toContain('capability-worker-fixture');
+  }, 180_000);
+
   it('the `fit --json` CommandOutcome is identical (volatile fields normalized) + same exit code', () => {
     const bundled = cli.run(['fit', '--json', '--cwd', testDir], {
       cwd: testDir,

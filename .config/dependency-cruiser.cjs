@@ -88,9 +88,121 @@ const OTEL_SDK_FAMILY = String.raw`@opentelemetry[/+](sdk|exporter|context|propa
 // via `@opensip-cli/lang-*`.
 const TREE_SITTER_PARSER = String.raw`(^|[/+])web-tree-sitter([/+]|$)`;
 
+const path = require('node:path');
+const { readWorkspacePackageManifests } = require('../scripts/lib/workspace-package-manifests.cjs');
+const {
+  readProductionToolPackageInventory,
+} = require('../scripts/lib/workspace-tool-package-inventory.cjs');
+
+const REPO_ROOT = path.resolve(__dirname, '..');
+const WORKSPACE_PACKAGES = readWorkspacePackageManifests(REPO_ROOT);
+const WORKSPACE_PACKAGE_DIR_BY_NAME = new Map(
+  WORKSPACE_PACKAGES.map((pkg) => [pkg.name, pkg.relativeDir]),
+);
+const PRODUCTION_TOOL_PACKAGES = readProductionToolPackageInventory(REPO_ROOT);
+
+const DEFAULT_EXTERNAL_TOOL_ALLOWED_PACKAGES = Object.freeze([
+  '@opensip-cli/core',
+  '@opensip-cli/contracts',
+  '@opensip-cli/external-tool-adapter',
+]);
+
+const TOOL_ALLOWED_PACKAGES = Object.freeze({
+  '@opensip-cli/fitness': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/contracts',
+    '@opensip-cli/cli-live',
+    '@opensip-cli/cli-ui',
+    '@opensip-cli/config',
+    '@opensip-cli/datastore',
+    '@opensip-cli/session-store',
+    '@opensip-cli/targeting',
+  ]),
+  '@opensip-cli/graph': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/contracts',
+    '@opensip-cli/cli-live',
+    '@opensip-cli/cli-ui',
+    '@opensip-cli/clone-detection',
+    '@opensip-cli/config',
+    '@opensip-cli/datastore',
+    '@opensip-cli/session-store',
+  ]),
+  '@opensip-cli/mcp': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/contracts',
+    '@opensip-cli/datastore',
+    '@opensip-cli/graph',
+    '@opensip-cli/session-store',
+  ]),
+  '@opensip-cli/simulation': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/contracts',
+    '@opensip-cli/cli-live',
+    '@opensip-cli/cli-ui',
+    '@opensip-cli/config',
+    '@opensip-cli/datastore',
+    '@opensip-cli/session-store',
+  ]),
+  '@opensip-cli/yagni': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/contracts',
+    '@opensip-cli/cli-live',
+    '@opensip-cli/cli-ui',
+    '@opensip-cli/clone-detection',
+    '@opensip-cli/config',
+    '@opensip-cli/lang-typescript',
+  ]),
+});
+
+function escapeRegex(value) {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+
+function packageDirForRule(packageName) {
+  const relativeDir = WORKSPACE_PACKAGE_DIR_BY_NAME.get(packageName);
+  if (relativeDir === undefined) {
+    throw new Error(`dependency policy references unknown workspace package ${packageName}`);
+  }
+  if (!relativeDir.startsWith('packages/')) {
+    throw new Error(`dependency policy requires packages/ workspace root: ${relativeDir}`);
+  }
+  return relativeDir;
+}
+
+const TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES = PRODUCTION_TOOL_PACKAGES.map((tool) => {
+  const approvedNames = Object.hasOwn(TOOL_ALLOWED_PACKAGES, tool.name)
+    ? TOOL_ALLOWED_PACKAGES[tool.name]
+    : DEFAULT_EXTERNAL_TOOL_ALLOWED_PACKAGES;
+  const allowedDirs = [
+    tool.relativeDir,
+    ...approvedNames.map((packageName) => packageDirForRule(packageName)),
+  ];
+  const allowedFromPackagesRoot = allowedDirs
+    .map((relativeDir) => escapeRegex(relativeDir.slice('packages/'.length) + '/'))
+    .join('|');
+  const ruleName = tool.name.replace(/^@opensip-cli\//u, '').replace(/[^a-zA-Z0-9-]+/gu, '-');
+
+  return {
+    name: `tool-package-${ruleName}-imports-allowlist`,
+    severity: 'error',
+    comment:
+      `${tool.name} production imports are fail-closed from its manifest-derived source root. ` +
+      'New workspace dependencies require an explicit architecture-policy update.',
+    from: {
+      path: `^${escapeRegex(tool.sourceRoot)}`,
+      pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+    },
+    to: {
+      path: `^packages/(?!${allowedFromPackagesRoot})`,
+    },
+  };
+});
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
+    ...TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES,
     // -------------------------------------------------------------------
     // Generic hygiene
     // -------------------------------------------------------------------
@@ -206,23 +318,6 @@ module.exports = {
       },
       to: {
         path: String.raw`/src/internal\.ts$`,
-      },
-    },
-    {
-      name: 'mcp-imports-allowlist',
-      severity: 'error',
-      comment:
-        '@opensip-cli/mcp is a bundled Tool/server surface (ADR-0084 / ADR-0147). ' +
-        'Production source may import core, contracts, datastore, session-store, and ' +
-        'the graph engine public surfaces (@opensip-cli/graph and @opensip-cli/graph/read) ' +
-        'only. It must not reach into cli, tool engines other than graph, check packs, ' +
-        'language packs, graph adapter packs, or graph/internal.',
-      from: {
-        path: '^packages/mcp/src/',
-        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
-      },
-      to: {
-        path: '^packages/(?!core/|contracts/|datastore/|session-store/|graph/engine/|mcp/)',
       },
     },
     {
@@ -404,37 +499,6 @@ module.exports = {
         'pack, datastore, config, targeting, session-store, or the UI kits.',
       from: { path: '^packages/external-tool-adapter/src/' },
       to: { path: '^packages/(?!core/|contracts/|external-tool-adapter/)' },
-    },
-
-    // -------------------------------------------------------------------
-    // ADR-0090 — external tool adapters are layer-4: they import the substrate +
-    // core/contracts ONLY. Scoped by an EXPLICIT adapter allowlist so the `tool-`
-    // prefix does NOT collide with the layer-2 published `tool-test-kit` (Risk R8).
-    // Extend the alternation when a new @opensip-cli/tool-<scanner> adapter lands.
-    // -------------------------------------------------------------------
-    {
-      name: 'tool-adapters-import-substrate-core-contracts-only',
-      severity: 'error',
-      comment:
-        'An external tool adapter (tool-gitleaks / tool-osv-scanner / tool-trivy / the ' +
-        'polyglot scanner adapters: semgrep, ast-grep, ruff, golangci-lint, govulncheck, ' +
-        'cargo-deny, bandit, pip-audit, cargo-clippy, spotbugs, pmd, dependency-check, ' +
-        'cppcheck) is layer-4 (ADR-0090): it imports @opensip-cli/external-tool-adapter + ' +
-        'core + contracts ONLY — never cli, output, a tool engine, a check/graph/lang ' +
-        'pack, OR another adapter. The `from` captures the adapter package dir ($1) ' +
-        'so `to.pathNot` excludes its OWN intra-package relative imports; a sibling ' +
-        'adapter (a DIFFERENT tool-*) therefore still violates. An explicit allowlist ' +
-        '(not a bare `tool-` glob) avoids the layer-2 tool-test-kit collision.',
-      from: {
-        path:
-          '^packages/(tool-(?:gitleaks|osv-scanner|trivy|semgrep|ast-grep|ruff|' +
-          'golangci-lint|govulncheck|cargo-deny|bandit|pip-audit|cargo-clippy|' +
-          'spotbugs|pmd|dependency-check|cppcheck))/src/',
-      },
-      to: {
-        path: '^packages/(?!core/|contracts/|external-tool-adapter/)',
-        pathNot: '^packages/$1/',
-      },
     },
 
     // -------------------------------------------------------------------
@@ -1092,50 +1156,6 @@ module.exports = {
       },
       to: { path: TREE_SITTER_PARSER },
     },
-    {
-      // Audit 2026-05-29 (M1): the prior `graph-may-import-fitness-sarif`
-      // info-exception is gone. The only real graph→fitness edge was
-      // `reportToCloud`; SARIF formatting and cloud delivery moved to
-      // @opensip-cli/output and are applied at the CLI composition root,
-      // so graph and fitness have no peer cycle. Graph must now NOT import fitness at all — there
-      // is no sanctioned exception. (Breaking this cycle is what lets
-      // fitness read graph's catalog via CatalogRepo instead of raw SQL;
-      // see H1.) Production source only; test files may use devDeps.
-      name: 'graph-no-fitness',
-      severity: 'error',
-      comment:
-        'Graph must not import @opensip-cli/fitness. The former SARIF / ' +
-        'reportToCloud edge was removed by relocating output formatting ' +
-        'and delivery to @opensip-cli/output (audit 2026-05-29, M1).',
-      from: {
-        path: '^packages/graph/',
-        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
-      },
-      to: { path: '^packages/fitness/engine/' },
-    },
-    {
-      // Audit 2026-05-29 (L2): fitness and graph are now fully decoupled.
-      // The former sole sanctioned fitness→graph edge (the dashboard
-      // command reading graph's CatalogRepo) is gone — the CLI is now the
-      // dashboard composition root and each tool contributes its OWN
-      // dashboard data via `collectDashboardData`. Graph returns its
-      // `graphCatalog`; fitness returns its catalogs; neither reaches
-      // into the other. This rule is now strict (no exception).
-      // `@opensip-cli/graph($|/)` matches the engine only, not the
-      // graph-* adapter packs.
-      name: 'fitness-no-graph',
-      severity: 'error',
-      comment:
-        'fitness must not import @opensip-cli/graph. Cross-tool ' +
-        'dashboard composition is owned by the CLI; each tool contributes ' +
-        'its own dashboard data via the Tool.collectDashboardData seam.',
-      from: {
-        path: '^packages/fitness/',
-        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
-      },
-      to: { path: '^packages/graph/engine/' },
-    },
-
     // -------------------------------------------------------------------
     // graph dashboard — Code Paths panel architectural invariants. The
     // catalog-decoupling rule (dashboard consumes the graph catalog by JSON

@@ -10,12 +10,12 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-const { createToolPathPredicates, readProductionToolPackageInventory } = require(
+const { createToolPathPredicates } = require(
   join(REPO_ROOT, 'scripts/lib/workspace-tool-package-inventory.cjs'),
 );
 
 const predicates = createToolPathPredicates(REPO_ROOT);
-const inventory = readProductionToolPackageInventory(REPO_ROOT);
+const inventory = predicates.inventory;
 
 export const productionToolInventory = inventory;
 export const bundledToolPackageSegments = Object.freeze(
@@ -28,7 +28,7 @@ export const bundledToolPackageSegments = Object.freeze(
 );
 
 export const toolSeamPackageSegments = Object.freeze(
-  inventory.map((t) => {
+  [...inventory, ...(predicates.adapterSubstrate ? [predicates.adapterSubstrate] : [])].map((t) => {
     const m = /^@opensip-cli\/(.+)$/.exec(t.name);
     return m?.[1] ?? t.name;
   }),
@@ -47,18 +47,16 @@ export function toolEngineCliPathRe(suffix = '') {
 }
 
 export function toolDescriptorPathRe() {
-  // Match absolute or relative paths ending at a tool descriptor (test fixtures
-  // use `/repo/packages/.../tool.ts`; production fit uses repo-relative paths).
-  const descriptors = predicates.inventory
-    .filter((t) => !t.adapterSubstrate && typeof t.descriptorRelative === 'string')
-    .map((t) => t.descriptorRelative.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&'));
-  if (descriptors.length === 0) return /$^/;
-  return new RegExp(`(?:${descriptors.join('|')})$`);
+  return predicates.toolDescriptorPathRe();
+}
+
+export function bundledToolDescriptorPathRe() {
+  return predicates.bundledToolDescriptorPathRe();
 }
 
 export function toolPackagePathRe(suffix = '') {
   // Match any production tool package root (engine or package-root src).
-  const roots = inventory.filter((t) => !t.adapterSubstrate).map((t) => t.relativeDir + '/');
+  const roots = inventory.map((t) => t.relativeDir + '/');
   if (roots.length === 0) return /$^/;
   const escapeRe = (value) => value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
   return new RegExp(`(?:${roots.map(escapeRe).join('|')})${suffix}`);

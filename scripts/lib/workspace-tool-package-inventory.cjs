@@ -13,14 +13,52 @@ const path = require('node:path');
 const { readWorkspacePackageManifests } = require('./workspace-package-manifests.cjs');
 
 /**
+ * @param {string} parentReal
+ * @param {string} candidateReal
+ * @returns {boolean}
+ */
+function isContainedPath(parentReal, candidateReal) {
+  return candidateReal === parentReal || candidateReal.startsWith(parentReal + path.sep);
+}
+
+/**
+ * @param {string} rootReal
+ * @param {{ name: string, dir: string, relativeDir: string }} pkg
+ * @returns {{ sourceRoot: string, srcDir: string }}
+ */
+function readToolSourceRoot(rootReal, pkg) {
+  const srcLogicalPath = path.join(pkg.dir, 'src');
+  let srcDir;
+  try {
+    srcDir = fs.realpathSync(srcLogicalPath);
+  } catch (error) {
+    if (error !== null && typeof error === 'object' && error.code === 'ENOENT') {
+      throw new Error(`tool package ${pkg.name} has no src/ at ${pkg.relativeDir}`);
+    }
+    throw error;
+  }
+  if (!isContainedPath(pkg.dir, srcDir)) {
+    throw new Error(
+      `tool package ${pkg.name} source directory escapes package root: ${pkg.relativeDir}/src`,
+    );
+  }
+  if (!fs.statSync(srcDir).isDirectory()) {
+    throw new Error(`tool package ${pkg.name} has no src/ at ${pkg.relativeDir}`);
+  }
+  return {
+    srcDir,
+    sourceRoot: `${path.relative(rootReal, srcDir).split(path.sep).join('/')}/`,
+  };
+}
+
+/**
  * @typedef {object} ToolPackageRecord
  * @property {string} name
  * @property {string} relativeDir
  * @property {string} dir
  * @property {string} sourceRoot Repo-relative source root (posix, trailing slash)
- * @property {string} [descriptorRelative] Repo-relative tool.ts when present
+ * @property {string} descriptorRelative Repo-relative tool.ts
  * @property {boolean} bundled
- * @property {boolean} adapterSubstrate True for external-tool-adapter substrate
  * @property {object} opensipTools
  */
 
@@ -51,22 +89,26 @@ function readProductionToolPackageInventory(repoRoot) {
     if (ot === null || typeof ot !== 'object' || Array.isArray(ot)) continue;
     if (ot.kind !== 'tool') continue;
 
-    const srcDir = path.join(pkg.dir, 'src');
-    if (!fs.existsSync(srcDir)) {
-      throw new Error(`tool package ${pkg.name} has no src/ at ${pkg.relativeDir}`);
-    }
-    const sourceRoot = `${pkg.relativeDir}/src/`;
-    const descriptorCandidates = [
-      path.join(srcDir, 'tool.ts'),
-      path.join(pkg.dir, 'src', 'tool.ts'),
-    ];
-    let descriptorRelative;
-    for (const candidate of descriptorCandidates) {
-      if (fs.existsSync(candidate)) {
-        descriptorRelative = path.relative(rootReal, candidate).split(path.sep).join('/');
-        break;
+    const { sourceRoot, srcDir } = readToolSourceRoot(rootReal, pkg);
+    const descriptorLogicalPath = path.join(srcDir, 'tool.ts');
+    let descriptor;
+    try {
+      descriptor = fs.realpathSync(descriptorLogicalPath);
+    } catch (error) {
+      if (error !== null && typeof error === 'object' && error.code === 'ENOENT') {
+        throw new Error(`tool package ${pkg.name} has no src/tool.ts at ${pkg.relativeDir}`);
       }
+      throw error;
     }
+    if (!isContainedPath(srcDir, descriptor)) {
+      throw new Error(
+        `tool package ${pkg.name} descriptor escapes source root: ${pkg.relativeDir}/src/tool.ts`,
+      );
+    }
+    if (!fs.statSync(descriptor).isFile()) {
+      throw new Error(`tool package ${pkg.name} has no src/tool.ts at ${pkg.relativeDir}`);
+    }
+    const descriptorRelative = path.relative(rootReal, descriptor).split(path.sep).join('/');
 
     tools.push(
       Object.freeze({
@@ -74,9 +116,8 @@ function readProductionToolPackageInventory(repoRoot) {
         relativeDir: pkg.relativeDir,
         dir: pkg.dir,
         sourceRoot,
-        ...(descriptorRelative === undefined ? {} : { descriptorRelative }),
+        descriptorRelative,
         bundled: bundledNames.has(pkg.name),
-        adapterSubstrate: pkg.name === '@opensip-cli/external-tool-adapter',
         opensipTools: Object.freeze({ ...ot }),
       }),
     );
@@ -92,13 +133,32 @@ function readProductionToolPackageInventory(repoRoot) {
  */
 function createToolPathPredicates(repoRoot) {
   const inventory = readProductionToolPackageInventory(repoRoot);
-  const productionTools = inventory.filter((t) => !t.adapterSubstrate);
+  const packages = readWorkspacePackageManifests(repoRoot);
+  const substratePackage = packages.find(
+    (pkg) => pkg.name === '@opensip-cli/external-tool-adapter',
+  );
+  const adapterSubstrate =
+    substratePackage === undefined
+      ? undefined
+      : (() => {
+          const { sourceRoot } = readToolSourceRoot(
+            fs.realpathSync(path.resolve(repoRoot)),
+            substratePackage,
+          );
+          return Object.freeze({
+            name: substratePackage.name,
+            relativeDir: substratePackage.relativeDir,
+            dir: substratePackage.dir,
+            sourceRoot,
+            adapterSubstrate: true,
+          });
+        })();
+  const productionTools = inventory;
   const bundled = productionTools.filter((t) => t.bundled);
   const allRoots = productionTools.map((t) => t.sourceRoot);
   const bundledRoots = bundled.map((t) => t.sourceRoot);
   // External-tool-adapter substrate is intentionally non-tool for peer rules
   // but is tool-shaped for path seam checks when requested.
-  const substrate = inventory.find((t) => t.adapterSubstrate);
 
   function escapeRe(value) {
     return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
@@ -113,11 +173,12 @@ function createToolPathPredicates(repoRoot) {
     inventory,
     productionTools,
     bundledTools: bundled,
+    adapterSubstrate,
     toolEnginePathRe: (suffix = '') => rootsToRe(allRoots, suffix),
     bundledToolEnginePathRe: (suffix = '') => rootsToRe(bundledRoots, suffix),
     toolSeamPathRe: (suffix = '') => {
       const roots = [...allRoots];
-      if (substrate) roots.push(substrate.sourceRoot);
+      if (adapterSubstrate) roots.push(adapterSubstrate.sourceRoot);
       return rootsToRe(roots, suffix);
     },
     toolDescriptorPathRe: () => {
@@ -125,7 +186,12 @@ function createToolPathPredicates(repoRoot) {
         .map((t) => t.descriptorRelative)
         .filter((d) => typeof d === 'string');
       if (descriptors.length === 0) return /$^/;
-      return new RegExp(`^(?:${descriptors.map(escapeRe).join('|')})$`);
+      return new RegExp(`(?:^|/)(?:${descriptors.map(escapeRe).join('|')})$`);
+    },
+    bundledToolDescriptorPathRe: () => {
+      const descriptors = bundled.map((tool) => tool.descriptorRelative);
+      if (descriptors.length === 0) return /$^/;
+      return new RegExp(`(?:^|/)(?:${descriptors.map(escapeRe).join('|')})$`);
     },
     isToolSourcePath: (filePath) => {
       const norm = String(filePath).replaceAll('\\', '/');

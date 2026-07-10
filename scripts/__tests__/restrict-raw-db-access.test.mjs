@@ -26,6 +26,14 @@ describe('restrict-raw-db-access analyzer', () => {
     assert.ok(v.length > 0);
   });
 
+  it('flags a raw transaction alias with an unparenthesized arrow parameter', () => {
+    const v = mod.analyzeRawDbAccess(
+      'const ds = scope.datastore();\nds.transaction(tx => tx.select());\n',
+      'packages/cli/src/bootstrap/evil.ts',
+    );
+    assert.ok(v.some((x) => /transaction/i.test(x.message)));
+  });
+
   it('allows owner persistence transaction usage', () => {
     const v = mod.analyzeRawDbAccess(
       'this.datastore.transaction((tx) => { tx.insert(table); });\n',

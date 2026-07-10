@@ -21,20 +21,24 @@ import { EXIT_CODES, summarizeTargetConventions } from '@opensip-cli/contracts';
 import {
   definePrimaryCommand,
   EnvRegistry,
+  err,
   readPackageVersion,
   type EnvVarSpec,
+  type Result,
   type RunScope,
   type ToolCliContext,
 } from '@opensip-cli/core';
 import { rebuildCatalog } from '@opensip-cli/graph/read';
 
 import { workingTreeContextFromCatalog } from './freshness.js';
+import { fromGraphReadError } from './mcp-error.js';
 import { CliRepairWritePort } from './repair-write-port.js';
 import { McpStdioServer } from './server.js';
 import { SessionResultsReadPort } from './session-results-read-port.js';
 import { SqliteGraphReadPort } from './sqlite-graph-read-port.js';
 import { registerMcpTools } from './tools/register.js';
 
+import type { McpReadError } from './mcp-error.js';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { Catalog } from '@opensip-cli/graph';
 
@@ -108,19 +112,13 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     // the rebuilt catalog persists where the port reads it. v1 is the exact
     // single-program build (no cloud egress, no live render).
     const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
-    /**
-     * The `refresh_graph` rebuild thunk: runs the graph engine's programmatic
-     * build over the project root and returns the fresh catalog.
-     *
-     * @throws {Error} when the build discovers no source files (no catalog
-     *   produced) — surfaced to the refresh tool as an infra-boundary failure.
-     */
-    async function rebuild(): Promise<Catalog> {
+    /** Run the graph rebuild and preserve its bounded Result error contract. */
+    async function rebuild(): Promise<Result<Catalog, McpReadError>> {
       const outcome = await rebuildCatalog({ cwd: projectRoot, datastore: store });
       if (!outcome.ok) {
-        throw new Error(outcome.error.message);
+        return err(fromGraphReadError(outcome.error));
       }
-      return outcome.value;
+      return outcome;
     }
     const graph = new SqliteGraphReadPort({
       store,

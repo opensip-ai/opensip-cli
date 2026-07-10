@@ -65,7 +65,7 @@ function gen(): McpToolResult<GraphGeneration> {
 function fakeGraph(refresh: GraphReadPort['refresh']): GraphReadPort {
   return {
     refresh,
-    freshness: () => FRESH,
+    freshness: () => ok(FRESH),
   } as unknown as GraphReadPort;
 }
 
@@ -119,34 +119,61 @@ describe('refresh_graph observability', () => {
 
     const result = await handlers.get('refresh_graph')!({});
     expect(result.isError).toBe(true);
-    expect(recorded[0]?.attributes.outcome).toBe('error');
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.attributes).toEqual({ command: 'mcp', op: 'refresh', outcome: 'error' });
+    expect(error).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'mcp.refresh.run.error', code: 'refresh-unavailable' }),
     );
   });
 
-  it('records outcome:error and re-throws when the rebuild throws at the infra boundary', async () => {
+  it('maps an unexpected Error throw to a bounded result without logging raw details', async () => {
     const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
     const { server, handlers } = captureServer();
     registerRefreshGraph(
       server,
-      deps(fakeGraph(() => Promise.reject(new Error('child build blew up')))),
+      deps(
+        fakeGraph(() =>
+          Promise.reject(new Error('secret token at /private/project/datastore.sqlite')),
+        ),
+      ),
     );
 
-    await expect(handlers.get('refresh_graph')!({})).rejects.toThrow('child build blew up');
-    expect(recorded[0]?.attributes.outcome).toBe('error');
-    expect(error).toHaveBeenCalledWith(expect.objectContaining({ evt: 'mcp.refresh.run.error' }));
+    const result = await handlers.get('refresh_graph')!({});
+    const body = JSON.parse(
+      result.content[0]?.type === 'text' ? result.content[0].text : '{}',
+    ) as Record<string, unknown>;
+    expect(result.isError).toBe(true);
+    expect(body).toEqual({
+      error: {
+        code: 'refresh-failed',
+        message: 'Graph refresh failed due to an infrastructure error.',
+      },
+    });
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.attributes).toEqual({ command: 'mcp', op: 'refresh', outcome: 'error' });
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'mcp.refresh.run.error', code: 'refresh-failed' }),
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toMatch(/secret|private|sqlite|stack|cause/i);
+    expect(JSON.stringify(result)).not.toMatch(/secret|private|sqlite|stack|cause/i);
   });
 
-  it('coerces a non-Error throwable in the error log (records outcome:error, re-throws)', async () => {
-    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  it('maps a non-Error throw to the same bounded result', async () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
     const { server, handlers } = captureServer();
     registerRefreshGraph(
       server,
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- deliberately a non-Error throwable to exercise the String(error) coercion branch
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- deliberate boundary probe
       deps(fakeGraph(() => Promise.reject('bare string failure'))),
     );
-    await expect(handlers.get('refresh_graph')!({})).rejects.toBe('bare string failure');
-    expect(recorded[0]?.attributes.outcome).toBe('error');
+    const result = await handlers.get('refresh_graph')!({});
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).toContain('refresh-failed');
+    expect(JSON.stringify(result)).not.toContain('bare string failure');
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(error.mock.calls)).not.toContain('bare string failure');
+    expect(recorded).toHaveLength(1);
   });
 });

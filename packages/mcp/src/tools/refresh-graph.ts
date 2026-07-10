@@ -19,6 +19,8 @@
 
 import { getMeter, logger } from '@opensip-cli/core';
 
+import { unexpectedRefreshError } from '../mcp-error.js';
+
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -63,22 +65,24 @@ export function registerRefreshGraph(server: McpStdioServer, deps: McpToolDeps):
           recordRefreshLatency(durationMs, 'error');
           return errorResult(outcome.error);
         }
-        const freshness = deps.graph.freshness();
         logger.info({ evt: 'mcp.refresh.run.ok', module: LOG_MODULE, durationMs });
         recordRefreshLatency(durationMs, 'ok');
-        return jsonResult({ builtAt: outcome.value.data.builtAt, durationMs, freshness });
-      } catch (error) {
+        return jsonResult({
+          builtAt: outcome.value.data.builtAt,
+          durationMs,
+          freshness: outcome.value.freshness,
+        });
+      } catch {
         const durationMs = Date.now() - startedAt;
+        const failure = unexpectedRefreshError();
         logger.error({
           evt: 'mcp.refresh.run.error',
           module: LOG_MODULE,
-          error: error instanceof Error ? error.message : String(error),
+          code: failure.code,
           durationMs,
         });
         recordRefreshLatency(durationMs, 'error');
-        // A genuine build failure is an infra boundary: re-throw so the SDK emits
-        // a JSON-RPC error frame (the server's dispatch logs the decision point).
-        throw error;
+        return errorResult(failure);
       }
     },
   );

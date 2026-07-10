@@ -39,6 +39,7 @@ describe('workspace-export-map', () => {
   it('flags conditional and wildcard exports as diagnostics in a fixture tree', () => {
     const root = mkdtempSync(join(tmpdir(), 'export-map-root-'));
     try {
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
       // Minimal workspace shape packages/foo
       const pkgDir = join(root, 'packages', 'foo');
       mkdirSync(join(pkgDir, 'src'), { recursive: true });
@@ -53,7 +54,7 @@ describe('workspace-export-map', () => {
           },
         }),
       );
-      // pnpm-workspace globs are hardcoded; put under packages/*
+      // The fixture workspace declares packages/* above.
       const { diagnostics } = readWorkspaceExportMap(root);
       assert.ok(diagnostics.some((d) => /conditional|wildcard|unsupported/i.test(d)));
     } finally {
@@ -66,6 +67,7 @@ describe('workspace-export-map', () => {
     const outside = mkdtempSync(join(tmpdir(), 'manifest-out-'));
     try {
       mkdirSync(join(root, 'packages'), { recursive: true });
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
       writeFileSync(join(outside, 'package.json'), JSON.stringify({ name: '@opensip-cli/evil' }));
       symlinkSync(outside, join(root, 'packages', 'evil'));
       assert.throws(() => readWorkspacePackageManifests(root), /escapes repository root/);

@@ -5,7 +5,11 @@
 import { PluginIncompatibleError, SystemError, type Logger } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildDeniedWorkerDatastoreThunk, resolveDatastoreAccess } from '../worker-datastore.js';
+import {
+  buildDeniedWorkerDatastoreThunk,
+  resolveDatastoreAccess,
+  resolveStartupExecutionMode,
+} from '../worker-datastore.js';
 
 const logger: Logger = {
   debug: vi.fn(),
@@ -15,9 +19,16 @@ const logger: Logger = {
 };
 
 describe('resolveDatastoreAccess', () => {
-  it('selects host-rpc-only when command path and marker both agree', () => {
+  it('selects host-rpc-only when either worker command path and marker agree', () => {
     expect(
-      resolveDatastoreAccess('__tool-command-worker', { OPENSIP_CLI_IN_TOOL_WORKER: '1' }),
+      resolveDatastoreAccess('__tool-command-worker', {
+        OPENSIP_CLI_IN_TOOL_WORKER: '1',
+      }),
+    ).toBe('host-rpc-only');
+    expect(
+      resolveDatastoreAccess('__capability-pack-worker', {
+        OPENSIP_CLI_IN_TOOL_WORKER: '1',
+      }),
     ).toBe('host-rpc-only');
   });
 
@@ -44,6 +55,41 @@ describe('resolveDatastoreAccess', () => {
       expect(error).toBeInstanceOf(SystemError);
       expect((error as SystemError).code).toBe('SYSTEM.WORKER.MODE_MISMATCH');
     }
+  });
+});
+
+describe('resolveStartupExecutionMode', () => {
+  it('derives each worker authority only from the exact first command and marker pair', () => {
+    expect(
+      resolveStartupExecutionMode(
+        ['__tool-command-worker', '/project/spec.json', '--cwd', '/project'],
+        { OPENSIP_CLI_IN_TOOL_WORKER: '1' },
+      ),
+    ).toBe('external-tool-worker');
+    expect(
+      resolveStartupExecutionMode(
+        ['__capability-pack-worker', '/project/spec.json', '--cwd', '/project'],
+        { OPENSIP_CLI_IN_TOOL_WORKER: '1' },
+      ),
+    ).toBe('capability-pack-worker');
+    expect(resolveStartupExecutionMode(['tools', 'list'], {})).toBe('host');
+  });
+
+  it('rejects a forged marker before startup discovery', () => {
+    expect(() =>
+      resolveStartupExecutionMode(['tools', 'list'], {
+        OPENSIP_CLI_IN_TOOL_WORKER: '1',
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SYSTEM.WORKER.MODE_MISMATCH' }));
+  });
+
+  it('rejects the internal command without the host marker', () => {
+    expect(() =>
+      resolveStartupExecutionMode(['__tool-command-worker', '/project/spec.json'], {}),
+    ).toThrow(expect.objectContaining({ code: 'SYSTEM.WORKER.MODE_MISMATCH' }));
+    expect(() =>
+      resolveStartupExecutionMode(['__capability-pack-worker', '/project/spec.json'], {}),
+    ).toThrow(expect.objectContaining({ code: 'SYSTEM.WORKER.MODE_MISMATCH' }));
   });
 });
 

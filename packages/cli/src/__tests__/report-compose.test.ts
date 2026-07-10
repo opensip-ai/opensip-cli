@@ -153,6 +153,33 @@ describe('composeAndWriteReport', () => {
     expect(html).not.toContain('externalOnly');
   });
 
+  it('binds an external report hook RPC context to its owning Tool', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const dispatch = vi
+      .spyOn(dispatchHookMod, 'dispatchExternalToolHook')
+      .mockImplementation(async (args) => {
+        await args.ctx.toolState.put('victim-tool', 'stolen', true);
+        return { externalOnly: true };
+      });
+    const external = makeTool('ext-tool', { externalOnly: true });
+    const scope = makeScope([external], undefined, [
+      {
+        source: 'installed',
+        id: 'ext-tool',
+        version: '0.0.0',
+        manifestHash: 'h',
+      },
+    ]);
+
+    const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(readFileSync(result.path, 'utf8')).not.toContain('externalOnly');
+    const dispatchedCtx = dispatch.mock.calls[0]?.[0].ctx;
+    expect(() => dispatchedCtx?.toolState.put('victim-tool', 'stolen', true)).toThrow(
+      /namespace 'victim-tool'/,
+    );
+  });
+
   it('launches the browser only when open is true', async () => {
     const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
     const scope = makeScope([makeTool('fitness', { checkCatalog: [] })]);

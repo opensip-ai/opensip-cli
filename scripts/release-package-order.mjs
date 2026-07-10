@@ -29,12 +29,14 @@
 //   node scripts/release-package-order.mjs --print publish     # unscoped names (alias of names)
 //   node scripts/release-package-order.mjs --print bootstrap   # unscoped names (alias of names)
 
-import { promises as fs } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCOPE = '@opensip-cli/';
+const require = createRequire(import.meta.url);
+const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
 
 /**
  * The canonical ordered list of publishable package descriptors.
@@ -480,29 +482,9 @@ export const RELEASE_PACKAGE_ORDER = [
 ];
 
 // ---------------------------------------------------------------------
-// Workspace discovery (the ONE discovery implementation; verify-release.mjs
-// imports this rather than duplicating the walk).
+// Workspace discovery delegates to the canonical pnpm-workspace inventory;
+// verify-release.mjs imports these projections rather than duplicating a walk.
 // ---------------------------------------------------------------------
-
-async function pathExists(p) {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function maybeAdd(list, pkgPath, dir) {
-  if (!(await pathExists(pkgPath))) return;
-  const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
-  // Publishable = unscoped CLI name or @opensip-cli/* scope, AND not private.
-  const isScoped =
-    typeof pkg.name === 'string' && (pkg.name === 'opensip-cli' || pkg.name.startsWith(SCOPE));
-  if (isScoped && pkg.private !== true) {
-    list.push({ name: pkg.name, dir });
-  }
-}
 
 /**
  * Discover the publishable workspace package SET (unordered) from disk.
@@ -510,29 +492,10 @@ async function maybeAdd(list, pkgPath, dir) {
  *
  * @param {string} [repoRoot] defaults to this repo's root.
  */
-async function walkWorkspacePackages(repoRoot, onPackage) {
-  const baseDir = join(repoRoot, 'packages');
-  const topEntries = await fs.readdir(baseDir, { withFileTypes: true });
-
-  for (const top of topEntries) {
-    if (!top.isDirectory()) continue;
-    const topRel = join('packages', top.name);
-    const topPath = join(repoRoot, topRel);
-
-    await onPackage(join(topPath, 'package.json'), topRel);
-
-    const subEntries = await fs.readdir(topPath, { withFileTypes: true });
-    for (const sub of subEntries) {
-      if (!sub.isDirectory()) continue;
-      await onPackage(join(topPath, sub.name, 'package.json'), join(topRel, sub.name));
-    }
-  }
-}
-
 export async function discoverPublishablePackages(repoRoot = REPO_ROOT) {
-  const found = [];
-  await walkWorkspacePackages(repoRoot, (pkgPath, dir) => maybeAdd(found, pkgPath, dir));
-  return found;
+  return readWorkspacePackageManifests(repoRoot)
+    .filter((pkg) => !pkg.private && (pkg.name === 'opensip-cli' || pkg.name.startsWith(SCOPE)))
+    .map((pkg) => ({ name: pkg.name, dir: pkg.relativeDir }));
 }
 
 /**
@@ -540,23 +503,14 @@ export async function discoverPublishablePackages(repoRoot = REPO_ROOT) {
  * to ensure publishable packages do not depend on private internal packages.
  */
 export async function discoverAllScopedPackages(repoRoot = REPO_ROOT) {
-  const found = [];
-  await walkWorkspacePackages(repoRoot, async (pkgPath, dir) => {
-    if (!(await pathExists(pkgPath))) return;
-    const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8'));
-    if (
-      typeof pkg.name === 'string' &&
-      (pkg.name === 'opensip-cli' || pkg.name.startsWith(SCOPE))
-    ) {
-      found.push({
-        name: pkg.name,
-        dir,
-        private: pkg.private === true,
-        dependencies: pkg.dependencies ?? {},
-      });
-    }
-  });
-  return found;
+  return readWorkspacePackageManifests(repoRoot)
+    .filter((pkg) => pkg.name === 'opensip-cli' || pkg.name.startsWith(SCOPE))
+    .map((pkg) => ({
+      name: pkg.name,
+      dir: pkg.relativeDir,
+      private: pkg.private,
+      dependencies: pkg.manifest.dependencies ?? {},
+    }));
 }
 
 // ---------------------------------------------------------------------

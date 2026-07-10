@@ -434,6 +434,16 @@ different posture — **fault isolation**, not capability isolation:
 
 > An admitted external tool runs at full user privilege: it can read the filesystem (including `~/.ssh` and `.env`), and make arbitrary network calls. It is fault-isolated (a crash/hang/OOM does not take down the host), not capability-isolated.
 
+The worker does deny ambient OpenSIP datastore access. Both the exact internal
+worker command and the host-owned marker must select `host-rpc-only` mode;
+either alone fails before the handler runs. Privileged OpenSIP effects are the
+enumerated host RPC methods, not a general datastore or arbitrary host call.
+The child environment is an explicit allowlist plus manifest-declared env
+resources; additional names require `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH`. These
+controls do not reduce the current user's ordinary Node filesystem/network
+authority and must not be described as an OS sandbox
+([ADR-0145](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
+
 **In-process capability packs** (custom checks, graph adapters loaded via
 `plugins.<domain>`) are the **least isolated** extension surface: they load in the
 host process with import-error isolation only — no worker boundary. The external
@@ -454,9 +464,10 @@ What is enforced at admission:
   authored tools are admitted by `tools.trusted` (or the
   `OPENSIP_CLI_ALLOW_PROJECT_TOOLS` override). Installed tools are admitted by a
   managed `tools install` trust record (or the `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS`
-  override). The `*` wildcard admits all and emits a per-invocation
-  `cli.trust.wildcard_allowlist` deprecation warning (DEPRECATED — every matching
-  tool runs at full user privilege).
+  override). Trust entries are exact ids. A `*` entry is ignored and emits one
+  bounded `cli.trust.tool_wildcard_ignored` warning; it never admits a Tool.
+  Managed install records and committed exact project trust remain the normal
+  paths ([ADR-0145](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
 - Deny-by-default capability packs for marker-discovered in-process extensions.
   Bundled first-party packs are trusted, and exact packages listed in
   `plugins.checkPackages`, `plugins.scenarioPackages`, or `plugins.graphAdapters`
@@ -491,9 +502,3 @@ before enabling a new tool in CI.
 - [**Report**](/docs/opensip-cli/70-reference/06-dashboard/) — the HTML report's lifecycle (the renderer your Tool's findings end up in).
 - [**Package catalog**](/docs/opensip-cli/70-reference/02-package-catalog/) — the packages you can depend on.
 - [**Coding standards**](/docs/opensip-cli/80-implementation/04-coding-standards/) — the style and structure conventions used throughout opensip-cli (handy if you're contributing back).
-
-### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
-
-- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
-- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
-- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

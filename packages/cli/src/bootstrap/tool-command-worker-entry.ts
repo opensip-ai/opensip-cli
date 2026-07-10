@@ -103,16 +103,16 @@ function send(msg: DispatchWorkerMessage): void {
 
 /**
  * Build a structured `error` IPC message with a failure class (+ stack when
- * present). `code` carries the thrown error's canonical exit-class
- * `ToolErrorCode` when it originated as a typed `ToolError`, so the supervisor
- * can rebuild the right subclass on the host side and the frozen exit code
- * survives the worker boundary (the IPC flattens the prototype chain).
+ * present). `code` carries the canonical exit class while `detailCode` carries
+ * the original stable subcode, so the supervisor can rebuild the right subclass
+ * without discarding machine-readable capability diagnostics.
  */
 function errorMessage(
   message: string,
   failureClass: ToolCommandFailureClass,
   stack?: string,
   code?: string,
+  detailCode?: string,
 ): DispatchWorkerMessage {
   return {
     kind: 'error',
@@ -120,6 +120,7 @@ function errorMessage(
     failureClass,
     ...(stack === undefined ? {} : { stack }),
     ...(code === undefined ? {} : { code }),
+    ...(detailCode === undefined ? {} : { detailCode }),
   };
 }
 
@@ -209,7 +210,10 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
             mode: 'live' as const,
             suppressHumanRender: true,
             emit: (event: ExternalAdapterProgressEvent) => {
-              send({ kind: 'progress', event: { kind: 'adapter-progress', event } });
+              send({
+                kind: 'progress',
+                event: { kind: 'adapter-progress', event },
+              });
             },
           }
         : undefined;
@@ -321,6 +325,10 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
       // SystemError → exit 1 fallthrough. ConfigurationError ALSO rides
       // `failureClass: 'config-invalid'` above; this carry generalizes the rest.
       error instanceof ToolError ? canonicalToolErrorCode(error) : undefined,
+      // Keep the stable subcode separate from the canonical class. In particular,
+      // ADR-0145's direct-datastore denial must remain machine-identifiable after
+      // the worker boundary.
+      error instanceof ToolError ? error.code : undefined,
     );
   }
 }

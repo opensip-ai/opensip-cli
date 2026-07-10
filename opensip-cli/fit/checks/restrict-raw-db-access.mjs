@@ -126,7 +126,7 @@ const RAW_DB_ASSIGNMENT = new RegExp(
  * zero-arg arrow that is clearly the datastore API).
  */
 const RAW_TRANSACTION_ESCAPE =
-  /\.(?:datastore\s*\(\s*\)\s*)?\.?\s*transaction\s*\(\s*(?:async\s*)?\(\s*(?:tx|db)\b/;
+  /\.(?:datastore\s*\(\s*\)\s*)?\.?\s*transaction\s*\(\s*(?:async\s*)?(?:\(\s*(?:tx|db)\b|(?:tx|db)\s*=>)/;
 
 const SCOPE_DATASTORE_TRANSACTION =
   /(?:scope|cli\.scope|currentScope\s*\(\s*\))\s*(?:\.\s*datastore\s*\(\s*\)|\?\.\s*datastore\s*\(\s*\))\s*\.\s*transaction\s*\(/;

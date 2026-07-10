@@ -13,6 +13,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { err, ok } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { CatalogRepo } from '@opensip-cli/graph/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -20,6 +21,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { workingTreeContextFromCatalog } from '../freshness.js';
 import { SqliteGraphReadPort } from '../sqlite-graph-read-port.js';
 
+import type { McpReadError } from '../mcp-error.js';
+import type { Result } from '@opensip-cli/core';
 import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
 const BUILT_AT = '2026-05-22T00:00:00.000Z';
@@ -110,6 +113,11 @@ function seed(catalog: Catalog): void {
   new CatalogRepo(store).replaceAll(catalog);
 }
 
+function generationBuiltAt(port: SqliteGraphReadPort): string | undefined {
+  const outcome = port.getGeneration();
+  return outcome.ok ? outcome.value.data?.builtAt : undefined;
+}
+
 describe('SqliteGraphReadPort — missing catalog', () => {
   it('reports getGeneration ok with fresh:false (missing) and no auto-build', () => {
     const port = new SqliteGraphReadPort({ store });
@@ -133,6 +141,40 @@ describe('SqliteGraphReadPort — missing catalog', () => {
     const out = await port.refresh();
     expect(out.ok).toBe(false);
     expect(!out.ok && out.error.code).toBe('refresh-unavailable');
+  });
+
+  it('propagates one bounded load error from every public graph read', () => {
+    store.close();
+    const port = new SqliteGraphReadPort({ store });
+    const reads = [
+      port.getGeneration(),
+      port.resolveSymbolId('src/a.ts:1:0'),
+      port.searchSymbols('a'),
+      port.findBySpan('src/a.ts', 1),
+      port.callerGraph(),
+      port.calleeGraph(),
+      port.blast('src/a.ts:1:0'),
+      port.deadCode(),
+      port.architectureSummary(),
+    ];
+
+    for (const outcome of reads) {
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) {
+        expect(outcome.error).toEqual({
+          code: 'GRAPH.READ.CATALOG_GENERATION',
+          message: 'Failed to load graph catalog generation',
+        });
+        expect(JSON.stringify(outcome.error)).not.toMatch(/sqlite|secret|stack|cause/i);
+      }
+    }
+    expect(port.freshness()).toEqual({
+      ok: false,
+      error: {
+        code: 'GRAPH.READ.CATALOG_GENERATION',
+        message: 'Failed to load graph catalog generation',
+      },
+    });
   });
 });
 
@@ -234,11 +276,50 @@ describe('SqliteGraphReadPort — seeded catalog reads', () => {
   });
 });
 
+describe('SqliteGraphReadPort — structurally corrupt catalog', () => {
+  it('maps generation derivation failure to the same bounded Result for every read', () => {
+    const malformed = {
+      ...seededCatalog(),
+      functions: {
+        broken: { secretMaterial: 'do-not-leak' },
+      },
+    };
+    new CatalogRepo(store).replaceAll(malformed as unknown as Catalog);
+    const port = new SqliteGraphReadPort({ store });
+    const reads = [
+      port.getGeneration(),
+      port.resolveSymbolId('src/a.ts:1:0'),
+      port.searchSymbols('a'),
+      port.findBySpan('src/a.ts', 1),
+      port.callerGraph(),
+      port.calleeGraph(),
+      port.blast('src/a.ts:1:0'),
+      port.deadCode(),
+      port.architectureSummary(),
+      port.freshness(),
+    ];
+
+    for (const outcome of reads) {
+      expect(outcome).toEqual({
+        ok: false,
+        error: {
+          code: 'GRAPH.READ.CATALOG_GENERATION',
+          message: 'Failed to load graph catalog generation',
+        },
+      });
+      expect(JSON.stringify(outcome)).not.toMatch(/secretMaterial|do-not-leak|stack|cause/i);
+    }
+  });
+});
+
 describe('SqliteGraphReadPort — freshness', () => {
   it('reports fresh:true (unverified) when no freshness context is wired', () => {
     seed(seededCatalog());
     const port = new SqliteGraphReadPort({ store });
-    expect(port.freshness()).toEqual({ fresh: true, builtAt: BUILT_AT });
+    expect(port.freshness()).toEqual({
+      ok: true,
+      value: { fresh: true, builtAt: BUILT_AT },
+    });
   });
 
   it('a pre-fingerprint catalog still loads and classifies without throwing (forward-compat)', () => {
@@ -251,7 +332,8 @@ describe('SqliteGraphReadPort — freshness', () => {
       freshnessContext: workingTreeContextFromCatalog,
     });
     expect(() => port.freshness()).not.toThrow();
-    expect(port.freshness().fresh).toBe(true);
+    const freshness = port.freshness();
+    expect(freshness.ok && freshness.value.fresh).toBe(true);
     // Reads still work over the older-shaped occurrences.
     expect(port.searchSymbols('caller').ok).toBe(true);
   });
@@ -261,30 +343,70 @@ describe('SqliteGraphReadPort — generation snapshotting (TOCTOU-safe refresh)'
   it('an interleaved read sees the stable OLD generation until a slow refresh swaps', async () => {
     seed(seededCatalog(BUILT_AT));
     const NEW_BUILT_AT = '2026-06-01T00:00:00.000Z';
-    let releaseRebuild!: (catalog: Catalog) => void;
-    const rebuildGate = new Promise<Catalog>((resolve) => {
+    let releaseRebuild!: (result: Result<Catalog, McpReadError>) => void;
+    const rebuildGate = new Promise<Result<Catalog, McpReadError>>((resolve) => {
       releaseRebuild = resolve;
     });
     const port = new SqliteGraphReadPort({ store, rebuild: () => rebuildGate });
 
-    const builtAt = (): string | undefined => {
-      const out = port.getGeneration();
-      return out.ok ? out.value.data?.builtAt : undefined;
-    };
-
     // Pin the current generation.
-    expect(builtAt()).toBe(BUILT_AT);
+    expect(generationBuiltAt(port)).toBe(BUILT_AT);
 
     // Start a refresh but do not let the rebuild resolve yet.
     const refreshing = port.refresh();
     // Mid-rebuild, reads still see the OLD generation.
-    expect(builtAt()).toBe(BUILT_AT);
+    expect(generationBuiltAt(port)).toBe(BUILT_AT);
 
     // Let the rebuild complete; the generation swaps atomically on resolve.
-    releaseRebuild(seededCatalog(NEW_BUILT_AT));
+    releaseRebuild(ok(seededCatalog(NEW_BUILT_AT)));
     const result = await refreshing;
     expect(result.ok).toBe(true);
-    expect(builtAt()).toBe(NEW_BUILT_AT);
+    expect(generationBuiltAt(port)).toBe(NEW_BUILT_AT);
+  });
+
+  it('retains the prior generation after a typed rebuild error', async () => {
+    seed(seededCatalog(BUILT_AT));
+    const port = new SqliteGraphReadPort({
+      store,
+      rebuild: () =>
+        Promise.resolve(
+          err({
+            code: 'GRAPH.READ.REBUILD_FAILED',
+            message: 'Graph rebuild failed due to infrastructure error',
+          }),
+        ),
+    });
+    expect(generationBuiltAt(port)).toBe(BUILT_AT);
+
+    const refreshed = await port.refresh();
+    expect(refreshed).toEqual({
+      ok: false,
+      error: {
+        code: 'GRAPH.READ.REBUILD_FAILED',
+        message: 'Graph rebuild failed due to infrastructure error',
+      },
+    });
+    expect(generationBuiltAt(port)).toBe(BUILT_AT);
+  });
+
+  it('bounds an unexpected rebuild throw and retains the prior generation', async () => {
+    seed(seededCatalog(BUILT_AT));
+    const port = new SqliteGraphReadPort({
+      store,
+      rebuild: () => Promise.reject(new Error('secret token at /private/project/datastore.sqlite')),
+    });
+    expect(generationBuiltAt(port)).toBe(BUILT_AT);
+
+    const refreshed = await port.refresh();
+    expect(refreshed).toEqual({
+      ok: false,
+      error: {
+        code: 'refresh-failed',
+        message: 'Graph refresh failed due to an infrastructure error.',
+      },
+    });
+    expect(JSON.stringify(refreshed)).not.toMatch(/secret|private|sqlite|stack|cause/i);
+    expect(generationBuiltAt(port)).toBe(BUILT_AT);
   });
 });
 
@@ -344,7 +466,7 @@ describe('SqliteGraphReadPort — concurrent refresh serializes to one rebuild',
       rebuild: async () => {
         rebuilds += 1;
         await Promise.resolve();
-        return seededCatalog('2026-07-01T00:00:00.000Z');
+        return ok(seededCatalog('2026-07-01T00:00:00.000Z'));
       },
     });
     const [a, b] = await Promise.all([port.refresh(), port.refresh()]);

@@ -135,6 +135,32 @@ describe('bindToolCliContext', () => {
     ]);
   });
 
+  it('selects the actual primary command when a nested child is listed first', () => {
+    const tool = makeTool();
+    (tool as { identity: { name: string } }).identity = { name: 'simulation' };
+    (tool as { commandSpecs: Tool['commandSpecs'] }).commandSpecs = [
+      {
+        name: 'victim-stable-id',
+        parent: 'simulation',
+        description: 'nested child',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => ({ type: 'noop' }),
+      },
+      {
+        name: 'simulation',
+        description: 'primary',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => ({ type: 'noop' }),
+      },
+    ];
+    expect(toolOwnedKeys(tool)).not.toContain('victim-stable-id');
+    expect(toolOwnedKeys(tool)).toContain('simulation');
+  });
+
   it('preserves the lazy scope getter without reading it at bind time', () => {
     const { ctx, scopeReads } = makeContext();
     const bound = bindToolCliContext(makeTool(), ctx);

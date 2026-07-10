@@ -116,6 +116,7 @@ function baseInput(
     provenance: [],
     logger,
     ui: { version: '0.0.0', update: undefined },
+    datastoreAccess: 'local',
     ...overrides,
   };
 }

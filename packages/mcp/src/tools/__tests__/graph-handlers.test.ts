@@ -104,7 +104,7 @@ function fakeGraph(over: Partial<GraphReadPort> = {}): GraphReadPort {
         }),
       ),
     refresh: () => Promise.resolve(ok(wrap<GraphGeneration>({ builtAt: FRESH.builtAt ?? '' }))),
-    freshness: () => FRESH,
+    freshness: () => ok(FRESH),
   };
   return { ...base, ...over };
 }

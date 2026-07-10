@@ -136,7 +136,7 @@ export async function executePostBailoutBootstrap(
   // owning-tool resolution the preflight uses); fall back to parentCommand when
   // the command belongs to no tool (CLI-only commands have a 1:1 name).
   const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
-  // Exact worker command + host-injected marker must agree (ADR-0145).
+  // An exact internal worker command + host-injected marker must agree (ADR-0145).
   // Resolved before scope construction so a mismatch never reaches a handler
   // or opens SQLite.
   const datastoreAccess = resolveDatastoreAccess(plan.commandPath, process.env);

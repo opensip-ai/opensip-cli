@@ -7,6 +7,8 @@
 
 import {
   BASELINE_FORMAT_VERSION,
+  ConfigurationError,
+  PluginIncompatibleError,
   TOOL_LONG_TO_SHORT,
   ToolRegistry,
   type BaselineIdentityMetadata,
@@ -106,9 +108,23 @@ describe('toolsDataPurge', () => {
   });
 
   it('rejects empty and reserved-prefix purge ids before repository access', () => {
-    expect(() => toolsDataPurge('', ds)).toThrow(/non-empty/);
+    expect(() => toolsDataPurge('', ds)).toThrow(ConfigurationError);
     expect(() => toolsDataPurge('  ', ds)).toThrow(/non-empty/);
     expect(() => toolsDataPurge('@opensip-cli/host-plane:fit', ds)).toThrow(/reserved host-plane/);
+
+    new ToolStateRepo(ds).put('fitness', 'keep', { v: 1 });
+    expect(() => toolsDataPurge('fitness', ds, ['@opensip-cli/host-plane:fit'])).toThrow(
+      ConfigurationError,
+    );
+    expect(new ToolStateRepo(ds).get('fitness', 'keep')).toEqual({ v: 1 });
+  });
+
+  it('propagates an admitted Tool owned-key validation failure', () => {
+    const registry = new ToolRegistry();
+    const invalid = testTool({ name: 'invalid' });
+    (invalid.metadata as { id: string }).id = '@opensip-cli/host-plane:victim';
+    registry.register(invalid);
+    expect(() => deriveToolDataPurgeIdForms('invalid', registry)).toThrow(PluginIncompatibleError);
   });
 
   it('clears both ordinary and reserved host-plane state rows', async () => {
