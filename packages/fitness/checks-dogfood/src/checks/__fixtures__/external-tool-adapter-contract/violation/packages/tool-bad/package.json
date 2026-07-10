@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-bad",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Violation fixture package for the external adapter contract check",
   "dependencies": {

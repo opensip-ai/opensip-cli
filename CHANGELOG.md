@@ -2,6 +2,46 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.5.1] - 2026-07-09
+
+A presentation-identity and run-evidence patch. Human duration and score labels
+now share one pure package across CLI, report, and host history; MCP run
+summaries expose raw `durationMs`; and the host run ledger only suppresses a
+delegated supervisor row after proving the child wrote correlated evidence.
+
+### Added
+
+- `@opensip-cli/format` — pure, zero-dependency `formatDuration` / `formatScore`
+  and narrow display projectors (`projectDurationDisplay`,
+  `projectSessionDisplay`) so CLI, HTML report, and host history cannot drift
+  (ADR-0144).
+- Host-owned run/run-step ledger for suite and standalone tool runs, with
+  delegated-execution markers and child-evidence proof before supervisor-row
+  suppression.
+- Local fitness check `presentation-labels-via-format` and depcruise
+  `format-imports-nothing` leaf rule (with gate-live probe).
+- ADR enforcement frontmatter gate (`scripts/verify-adr-enforcement.mjs`) and
+  private dogfood pack for opensip-internal architecture checks.
+
+### Changed
+
+- CLI live UI, host session history, suite step tables, and the HTML dashboard
+  use `@opensip-cli/format` for duration and score labels (including recipe
+  timeouts and check pass-rate text).
+- MCP `RunSummary` includes host-stamped `durationMs` for agent semantic
+  identity (raw evidence; no human labels on MCP).
+- Graph heap re-exec preserves run correlation in the elevated child
+  environment.
+- Dependency toolchain refresh (Node types pinned to major 24).
+
+### Fixed
+
+- Report overview/ledger recipe columns stay bounded; overview is ledger-first.
+- Session history indexes hardened.
+- Dogfood fitness findings cleared (yagni ephemeral worker-spec allowlist,
+  composition-root fan-out exemptions, public-api JSDoc).
+- Cold dogfood gate and external-adapter fixture versioning for CI.
+
 ## [0.5.0] - 2026-07-07
 
 A polyglot external-tool and suite-verdict release. This adds the first wave of

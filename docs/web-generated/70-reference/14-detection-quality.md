@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.5.0
+release: v0.5.1
 title: "Detection Quality"
 audience: [contributors, ci-integrators]
 purpose: "Reference for the opensip-cli detection-quality measurement lane, labeled corpus, precision/recall/FPR metrics, and triage feedback loop."

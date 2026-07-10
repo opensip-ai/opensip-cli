@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.5.0
+release: v0.5.1
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-cli. Read this once before going deeper."

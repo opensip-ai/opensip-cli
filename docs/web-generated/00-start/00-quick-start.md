@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-08
-release: v0.5.0
+release: v0.5.1
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
 purpose: "From zero to a passing fitness run. Hands-on before the conceptual material."
