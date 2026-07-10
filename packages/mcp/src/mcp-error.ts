@@ -11,11 +11,25 @@ export interface McpReadError {
   readonly code: string;
   /** Human-readable detail (already scrubbed/truncated where relevant). */
   readonly message: string;
+  /** Optional bounded structured detail (refresh phase, duration, etc.). */
+  readonly details?: Readonly<Record<string, string | number | boolean | undefined>>;
 }
 
+/** Cursor / paging error codes (MCP Graph Audit Phase 0). */
+export type CursorErrorCode =
+  | 'cursor-invalid'
+  | 'cursor-project-mismatch'
+  | 'cursor-stale'
+  | 'cursor-query-mismatch'
+  | 'response-too-large';
+
 /** Build an {@link McpReadError}. */
-export function readError(code: string, message: string): McpReadError {
-  return { code, message };
+export function readError(
+  code: string,
+  message: string,
+  details?: Readonly<Record<string, string | number | boolean | undefined>>,
+): McpReadError {
+  return details === undefined ? { code, message } : { code, message, details };
 }
 
 /**
@@ -34,7 +48,7 @@ export function fromGraphReadError(error: GraphReadError): McpReadError {
       return readError(error.code, 'Graph rebuild produced an empty catalog');
     }
     case 'GRAPH.READ.REBUILD_FAILED': {
-      return readError(error.code, 'Graph rebuild failed due to infrastructure error');
+      return readError(error.code, 'Graph rebuild failed due to an infrastructure error');
     }
     default: {
       return readError('graph-read-failed', 'Graph read failed.');

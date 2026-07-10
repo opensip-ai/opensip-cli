@@ -14,6 +14,13 @@ export {
   computeGraphReadFilesFingerprint,
 } from './analysis.js';
 export { rebuildCatalog } from './rebuild.js';
+export { matchesGraphSourceFilter, matchesFilePrefix } from './source-filter.js';
+export {
+  toGraphSymbolRef,
+  GRAPH_SYMBOL_PATH_MAX,
+  GRAPH_SYMBOL_NAME_MAX,
+  GRAPH_SYMBOL_PACKAGE_MAX,
+} from './query-contracts.js';
 
 export type {
   GraphReadError,
@@ -27,3 +34,15 @@ export type {
   FeatureColumn,
   GraphConfig,
 } from './types.js';
+
+export type {
+  SourceScope,
+  GeneratedPolicy,
+  TraversalIdentity,
+  PackageEdgeKind,
+  GraphSourceFilter,
+  EffectiveGraphSourceFilter,
+  GraphReadCoverage,
+  GraphSymbolRef,
+  CallEdgeEvidence,
+} from './query-contracts.js';

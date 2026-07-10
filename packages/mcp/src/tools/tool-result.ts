@@ -1,10 +1,9 @@
 /**
  * Shared MCP tool-result helpers (ADR-0084).
  *
- * Every graph tool returns the same `{ data, freshness, truncated? }` envelope
- * (the {@link McpToolResult} the ports already produce); every result tool
- * returns an {@link McpResultReplay}. Both are serialized into a JSON-RPC reply
- * the SAME way: a single `text` content item carrying the pretty-printed JSON.
+ * Graph tools return {@link GraphToolResult} envelopes; result tools return
+ * {@link McpResultReplay}. Both are serialized into a JSON-RPC reply the SAME
+ * way: a single `text` content item carrying the pretty-printed JSON.
  *
  * We deliberately do NOT set `structuredContent` (no per-tool `outputSchema` is
  * declared — the SDK only honours `structuredContent` against an output schema),
@@ -17,12 +16,17 @@
  * frame; the server's `dispatch` logs the decision point).
  */
 
+import { assertJsonPayloadSize } from '../graph-query-page.js';
 import type { McpReadError } from '../mcp-error.js';
 import type { CallToolResult } from '../server.js';
 
 /** Serialize a successful tool payload as a single pretty-printed JSON text item. */
 export function jsonResult(payload: unknown): CallToolResult {
-  return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+  const sized = assertJsonPayloadSize(payload);
+  if (!sized.ok) {
+    return errorResult(sized.error);
+  }
+  return { content: [{ type: 'text', text: sized.value }] };
 }
 
 /** Surface a structured domain error as an `isError` result (machine-readable body). */

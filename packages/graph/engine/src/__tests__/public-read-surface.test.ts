@@ -26,6 +26,12 @@ const EXPECTED = [
   'evaluateGraphOrphans',
   'classifyGraphReadCatalog',
   'computeGraphReadFilesFingerprint',
+  'matchesGraphSourceFilter',
+  'matchesFilePrefix',
+  'toGraphSymbolRef',
+  'GRAPH_SYMBOL_PATH_MAX',
+  'GRAPH_SYMBOL_NAME_MAX',
+  'GRAPH_SYMBOL_PACKAGE_MAX',
 ].sort();
 
 const BUILT_AT = '2026-07-09T00:00:00.000Z';
@@ -120,6 +126,17 @@ describe('@opensip-cli/graph/read public surface', () => {
     ]) {
       expect(read).not.toHaveProperty(leak);
     }
+  });
+
+  it('reuses Spec 20 CatalogIdentity without a second identity contract', () => {
+    expectTypeOf<read.CatalogIdentity>().toEqualTypeOf<{
+      readonly language: string;
+      readonly cacheKey: string;
+      readonly filesFingerprint: string;
+      readonly builtAt: string;
+    }>();
+    expectTypeOf<read.GraphSymbolRef>().toHaveProperty('symbolId');
+    expectTypeOf<read.GraphSourceFilter>().toHaveProperty('sourceScope');
   });
 });
 

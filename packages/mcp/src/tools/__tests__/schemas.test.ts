@@ -1,24 +1,30 @@
 /**
- * Per-tool Zod boundary schemas (Task 6.1 §Hardening).
- *
- * Every MCP tool argument is validated by these field schemas BEFORE the handler
- * runs, so hostile input is rejected at the trust boundary and never reaches a
- * port: a malformed `symbolId`, a `..`-traversal / absolute `file`, an over-long
- * `query`, and out-of-range `depth`/`limit`.
+ * Per-tool Zod boundary schemas (Task 6.1 §Hardening + Phase 0 query contracts).
  */
 
 import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_DEPTH,
+  DEFAULT_LIMIT,
+  MAX_CURSOR_LEN,
   MAX_DEPTH,
   MAX_LIMIT,
+  MAX_PACKAGE_ARRAY,
   MAX_QUERY_LEN,
+  cursor,
   depth,
   filePath,
+  filePrefix,
+  groupBy,
+  kinds,
   limit,
+  packageArray,
+  pageLimit,
   query,
+  sourceScope,
   symbolId,
+  traversalIdentity,
 } from '../schemas.js';
 
 describe('symbolId schema', () => {
@@ -38,7 +44,15 @@ describe('symbolId schema', () => {
 
 describe('filePath schema', () => {
   it('accepts a project-relative path', () => {
-    expect(filePath().safeParse('packages/core/src/a.ts').success).toBe(true);
+    const parsed = filePath().safeParse('packages/core/src/a.ts');
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data).toBe('packages/core/src/a.ts');
+  });
+
+  it('normalizes backslashes to POSIX', () => {
+    const parsed = filePath().safeParse('src\\api\\x.ts');
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data).toBe('src/api/x.ts');
   });
 
   it('rejects an absolute POSIX path', () => {
@@ -49,9 +63,29 @@ describe('filePath schema', () => {
     expect(filePath().safeParse('C:\\windows\\system32').success).toBe(false);
   });
 
+  it('rejects UNC-style absolute paths', () => {
+    expect(filePath().safeParse('//server/share').success).toBe(false);
+  });
+
   it('rejects a ".." traversal escaping the project root', () => {
     expect(filePath().safeParse('../../etc/passwd').success).toBe(false);
     expect(filePath().safeParse('src/../../secret').success).toBe(false);
+  });
+
+  it('rejects empty segments and single-dot segments', () => {
+    expect(filePath().safeParse('src//a.ts').success).toBe(false);
+    expect(filePath().safeParse('src/./a.ts').success).toBe(false);
+  });
+
+  it('rejects control characters', () => {
+    expect(filePath().safeParse('src/a\u0000.ts').success).toBe(false);
+  });
+});
+
+describe('filePrefix schema', () => {
+  it('reuses the same path trust boundary', () => {
+    expect(filePrefix().safeParse('src/api').success).toBe(true);
+    expect(filePrefix().safeParse('../src').success).toBe(false);
   });
 });
 
@@ -96,5 +130,65 @@ describe('limit schema', () => {
 
   it('is optional', () => {
     expect(limit().safeParse(undefined).success).toBe(true);
+  });
+});
+
+describe('pageLimit schema', () => {
+  it('defaults to 100', () => {
+    const parsed = pageLimit().safeParse(undefined);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data).toBe(DEFAULT_LIMIT);
+  });
+
+  it('rejects above max 500', () => {
+    expect(pageLimit().safeParse(501).success).toBe(false);
+  });
+});
+
+describe('cursor schema', () => {
+  it('accepts base64url', () => {
+    expect(cursor().safeParse('abcABC123_-').success).toBe(true);
+  });
+
+  it('rejects non-base64url characters', () => {
+    expect(cursor().safeParse('abc+/=').success).toBe(false);
+  });
+
+  it('rejects oversized cursors', () => {
+    expect(cursor().safeParse('a'.repeat(MAX_CURSOR_LEN + 1)).success).toBe(false);
+  });
+});
+
+describe('packageArray / kinds enums', () => {
+  it('rejects duplicate packages and oversized arrays', () => {
+    expect(packageArray().safeParse(['a', 'a']).success).toBe(false);
+    expect(
+      packageArray().safeParse(
+        Array.from({ length: MAX_PACKAGE_ARRAY + 1 }, (_, i) => `p${String(i)}`),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown kind enums', () => {
+    expect(kinds().safeParse(['not-a-kind']).success).toBe(false);
+    expect(kinds().safeParse(['method']).success).toBe(true);
+  });
+});
+
+describe('shared enums', () => {
+  it('defaults sourceScope and groupBy and traversalIdentity', () => {
+    expect(sourceScope().safeParse(undefined).success && sourceScope().safeParse(undefined).data).toBe(
+      'all',
+    );
+    expect(groupBy().safeParse(undefined).success && groupBy().safeParse(undefined).data).toBe('none');
+    expect(
+      traversalIdentity().safeParse(undefined).success &&
+        traversalIdentity().safeParse(undefined).data,
+    ).toBe('occurrence');
+  });
+
+  it('rejects unknown enum values', () => {
+    expect(sourceScope().safeParse('prod').success).toBe(false);
+    expect(groupBy().safeParse('module').success).toBe(false);
   });
 });
