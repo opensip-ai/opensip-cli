@@ -398,8 +398,7 @@ const EXPORT_ALLOWLIST = {
   classifyModuleError: 'run-kernel',
   formatCliDiagnosticHuman: 'run-kernel',
   capabilityDiscoveryToCliDiagnostic: 'run-kernel',
-  fitnessEmptyCheckRegistryDiagnostic: 'run-kernel',
-  fitnessPluginLoadFailedDiagnostic: 'run-kernel',
+
   detectIntegrityFailure: 'run-kernel',
   isRelevantDiagnostic: 'run-kernel',
   scrubModuleNotFoundMessage: 'run-kernel',

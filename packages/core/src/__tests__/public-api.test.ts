@@ -172,8 +172,6 @@ const EXPECTED_VALUE_EXPORTS = [
   'extractPayloadVersion',
   'extractTimestamp',
   'filterSignalsBySuppressions',
-  'fitnessEmptyCheckRegistryDiagnostic',
-  'fitnessPluginLoadFailedDiagnostic',
   'forkAndSettle',
   'formatUnknownErrorMessage',
   'getWorkerLimits',
@@ -320,6 +318,9 @@ describe('@opensip-cli/core public barrel', () => {
       'filterSameCorePackages',
       'normalizeDiscovery',
       'resetContentFilterWarningForTests',
+      // Dead fitness policy removed from core (modular boundary Phase 2).
+      'fitnessEmptyCheckRegistryDiagnostic',
+      'fitnessPluginLoadFailedDiagnostic',
     ]) {
       expect(barrel).not.toHaveProperty(leak);
     }

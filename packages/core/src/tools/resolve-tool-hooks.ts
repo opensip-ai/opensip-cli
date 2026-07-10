@@ -3,9 +3,11 @@
  * New tools must use `extensionPoints` only via {@link defineTool}.
  */
 
+import { PluginIncompatibleError } from '../lib/errors.js';
 import {
   isContributionWithDisposer,
   type ContributeScopeResult,
+  type ScopeContribution,
   type ToolScope,
 } from '../lib/scope-types.js';
 
@@ -48,18 +50,83 @@ export function resolveToolHooks(tool: Tool): ResolvedToolHooks {
   };
 }
 
+const FORBIDDEN_SCOPE_CONTRIBUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
 /**
- * Install a tool's `contributeScope` contribution onto a {@link RunScope}.
- * Tests and tooling should use this instead of reading top-level hooks directly.
+ * Validate and install a plain {@link ScopeContribution} onto a RunScope.
+ * Shared by both bare and disposer-wrapped contribution forms.
+ *
+ * @throws {PluginIncompatibleError} PLUGIN.SCOPE_CONTRIBUTION_INVALID |
+ *   FORBIDDEN_KEY | COLLISION
+ */
+function installValidatedContribution(
+  scope: RunScope,
+  tool: Tool,
+  contribution: ScopeContribution,
+): void {
+  if (typeof contribution !== 'object' || contribution === null || Array.isArray(contribution)) {
+    throw new PluginIncompatibleError(
+      `tool '${tool.metadata.name || tool.metadata.id}' returned a non-object scope contribution`,
+      {
+        code: 'PLUGIN.SCOPE_CONTRIBUTION_INVALID',
+        diagnostic: 'contributeScope must return a plain object',
+      },
+    );
+  }
+
+  for (const key of Object.keys(contribution)) {
+    if (FORBIDDEN_SCOPE_CONTRIBUTION_KEYS.has(key)) {
+      throw new PluginIncompatibleError(
+        `tool '${tool.metadata.name || tool.metadata.id}' returned forbidden scope key '${key}'`,
+        {
+          code: 'PLUGIN.SCOPE_CONTRIBUTION_FORBIDDEN_KEY',
+          diagnostic: `forbidden scope key '${key}'`,
+        },
+      );
+    }
+    // `key in scope` (not own-property) so prototype members like dispose are
+    // protected against shadowing.
+    if (key in scope) {
+      throw new PluginIncompatibleError(
+        `tool '${tool.metadata.name || tool.metadata.id}' attempted to overwrite scope key '${key}'`,
+        {
+          code: 'PLUGIN.SCOPE_CONTRIBUTION_COLLISION',
+          diagnostic: `scope key '${key}' already exists`,
+        },
+      );
+    }
+  }
+
+  Object.assign(scope, contribution);
+}
+
+/**
+ * Install a tool's `contributeScope` contribution onto a {@link RunScope}
+ * after validating plain-object shape, forbidden keys, and existing-scope
+ * collisions. Tests, tooling, and CLI bootstrap all use this single installer
+ * so production and test contribution behavior cannot drift.
+ *
+ * Supports both bare {@link ScopeContribution} and
+ * `{ contribution, onDispose }` forms. The disposer is registered only after
+ * successful installation and exactly once.
+ *
+ * @throws {PluginIncompatibleError} when the contribution is invalid
  */
 export function applyToolContributeScope(scope: RunScope, tool: Tool): void {
-  const contribution = resolveToolHooks(tool).contributeScope?.();
-  if (contribution) {
-    if (isContributionWithDisposer(contribution)) {
-      Object.assign(scope, contribution.contribution);
-      if (contribution.onDispose) scope.onDispose(contribution.onDispose);
-      return;
-    }
-    Object.assign(scope, contribution);
+  const hook = resolveToolHooks(tool).contributeScope;
+  if (hook === undefined) return;
+  const contribution = hook();
+  // Absent hook or explicit `undefined` is a no-op; null/array/primitive fail.
+  if (contribution === undefined) return;
+  if (typeof contribution !== 'object' || contribution === null) {
+    installValidatedContribution(scope, tool, contribution as never);
+    return;
   }
+
+  if (isContributionWithDisposer(contribution)) {
+    installValidatedContribution(scope, tool, contribution.contribution);
+    if (contribution.onDispose) scope.onDispose(contribution.onDispose);
+    return;
+  }
+  installValidatedContribution(scope, tool, contribution);
 }

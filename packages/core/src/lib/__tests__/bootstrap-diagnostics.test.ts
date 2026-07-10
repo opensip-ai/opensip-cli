@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BootstrapDiagnosticsCollector, isRelevantDiagnostic } from '../bootstrap-diagnostics.js';
-import {
-  capabilityDiscoveryToCliDiagnostic,
-  fitnessEmptyCheckRegistryDiagnostic,
-  fitnessPluginLoadFailedDiagnostic,
-} from '../capability-diagnostic.js';
+import { capabilityDiscoveryToCliDiagnostic } from '../capability-diagnostic.js';
 import {
   CLI_DIAGNOSTIC_CODES,
   formatCliDiagnosticHuman,
@@ -124,18 +120,5 @@ describe('CLI diagnostic helpers', () => {
       }),
     );
 
-    expect(fitnessEmptyCheckRegistryDiagnostic()).toEqual(
-      expect.objectContaining({
-        severity: 'error',
-        code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_EMPTY_CHECK_REGISTRY,
-      }),
-    );
-    expect(fitnessPluginLoadFailedDiagnostic('boom')).toEqual(
-      expect.objectContaining({
-        severity: 'warning',
-        code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
-        message: expect.stringContaining('boom'),
-      }),
-    );
   });
 });

@@ -20,19 +20,16 @@
 
 import { resolveEffectiveCloudConfig } from '@opensip-cli/config';
 import {
+  applyToolContributeScope,
   BootstrapDiagnosticsCollector,
   createCapabilityRegistry,
-  isContributionWithDisposer,
   type CliDiagnostic,
   type LanguageRegistry,
   type Logger,
-  PluginIncompatibleError,
   type ProjectContext,
   resolveUserPaths,
   RunScope,
   resolveToolHooks,
-  type ScopeContribution,
-  type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
@@ -53,56 +50,6 @@ import { buildDeniedWorkerDatastoreThunk } from './worker-datastore.js';
 import type { loadCliDefaults } from './cli-defaults.js';
 import type { PolicyAuditCollector } from './policy-audit.js';
 import type { StartupTimingEvent } from './startup-timing.js';
-
-const FORBIDDEN_SCOPE_CONTRIBUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-
-/**
- * @throws {PluginIncompatibleError} When a tool returns an invalid scope
- * contribution or attempts to overwrite an existing scope key.
- */
-function installScopeContribution(
-  scope: RunScope,
-  tool: Tool,
-  contribution: ScopeContribution,
-): void {
-  if (typeof contribution !== 'object' || contribution === null || Array.isArray(contribution)) {
-    throw new PluginIncompatibleError(
-      `tool '${tool.metadata.name || tool.metadata.id}' returned a non-object scope contribution`,
-      {
-        code: 'PLUGIN.SCOPE_CONTRIBUTION_INVALID',
-        diagnostic: 'contributeScope must return a plain object',
-      },
-    );
-  }
-
-  for (const key of Object.keys(contribution)) {
-    if (FORBIDDEN_SCOPE_CONTRIBUTION_KEYS.has(key)) {
-      throw new PluginIncompatibleError(
-        `tool '${tool.metadata.name || tool.metadata.id}' returned forbidden scope key '${key}'`,
-        {
-          code: 'PLUGIN.SCOPE_CONTRIBUTION_FORBIDDEN_KEY',
-          diagnostic: `forbidden scope key '${key}'`,
-        },
-      );
-    }
-    // `key in scope` (not `hasOwnProperty`) so prototype members are protected
-    // too: `RunScope.dispose()` lives on the prototype, and an own-property
-    // shadow would silently hijack `disposeCurrentScope()`. This also rejects
-    // `Object.prototype` names; no namespaced tool subscope key collides with
-    // those, so the stricter check has no legitimate false positive.
-    if (key in scope) {
-      throw new PluginIncompatibleError(
-        `tool '${tool.metadata.name || tool.metadata.id}' attempted to overwrite scope key '${key}'`,
-        {
-          code: 'PLUGIN.SCOPE_CONTRIBUTION_COLLISION',
-          diagnostic: `scope key '${key}' already exists`,
-        },
-      );
-    }
-  }
-
-  Object.assign(scope, contribution);
-}
 
 /** Inputs required to build a fully wired per-run scope. */
 export interface BuildPerRunScopeInput {
@@ -359,25 +306,12 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   });
   scope.diagnostics.counter('tools.subscope_contributions', contributing.length);
 
-  // D7: each registered tool contributes its tool-specific subscope (e.g.
-  // `scope.simulation`, `scope.graph`) BEFORE the scope is entered. IoC (M4):
-  // the tool RETURNS its slot via `contributeScope()`; the kernel installs it
-  // with `Object.assign` (registration order; a tool with no hook is skipped).
-  //
-  // Disposer seam (parallel-tool-invocations Phase 1): a tool that owns a
-  // per-run resource needing teardown returns the wrapper form
-  // (`{ contribution, onDispose }`); we install `contribution` and register
-  // `onDispose` on `scope.onDispose(...)` so `dispose()` reclaims the resource.
-  // The bare-`ScopeContribution` form (graph/simulation) carries no disposer.
+  // D7: each selected tool contributes its tool-specific subscope BEFORE the
+  // scope is entered. Host-vs-worker selection (provenance / shouldRunHookInHost)
+  // is CLI-owned; validation + install + disposer registration is the single
+  // core helper `applyToolContributeScope` (no parallel installer path).
   for (const tool of contributing) {
-    const result = resolveToolHooks(tool).contributeScope?.();
-    if (!result) continue;
-    if (isContributionWithDisposer(result)) {
-      installScopeContribution(scope, tool, result.contribution);
-      if (result.onDispose) scope.onDispose(result.onDispose);
-    } else {
-      installScopeContribution(scope, tool, result);
-    }
+    applyToolContributeScope(scope, tool);
   }
 
   // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
