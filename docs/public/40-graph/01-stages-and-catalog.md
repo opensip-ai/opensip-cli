@@ -342,3 +342,9 @@ These shapes trade cross-subtree edge fidelity for speed and memory. Use `--no-c
 - **[`02-rules-and-gating.md`](./02-rules-and-gating.md)** — the eleven rules that consume the catalog, the gate workflow, and the SARIF integration.
 - **[`70-reference/01-cli-commands.md#graph`](../70-reference/01-cli-commands.md)** — the CLI flag reference.
 - **`git -P log -- packages/graph`** — the perf-plan history landed in waves: heap-sizing hint, freed Program, streamed write, sliced hashing, per-package scope, fused walk, parallel runner, transitive incremental rebuild. The original perf plan documents were removed once each wave shipped; the commit history is the source of truth.
+
+### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
+
+- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
+- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
+- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

@@ -141,3 +141,6 @@ its enforcement (an ADR without this section is incomplete):
 excepted here), [ADR-0006](ADR-0006-derived-data-persistence-policy.md) (catalog
 as derived data), [ADR-0030](ADR-0030-authored-tool-discovery.md) (tool trust
 tiers — `@opensip-cli/mcp` is bundled first-party and fails closed).
+
+### Boundary hardening amendments (2026-07-09)
+The production graph/internal exception is replaced by [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)'s public `@opensip-cli/graph/read` subpath.

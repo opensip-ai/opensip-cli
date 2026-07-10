@@ -162,3 +162,9 @@ documented here for completeness.
 | `TERM_PROGRAM` | Terminal program (e.g. `iTerm.app`); consulted for colour support. |
 | `NODE_OPTIONS` | Node flags; the graph heap-preflight reads/extends this before relaunch (pre-module). |
 | `OPENSIP_HEAP_ELEVATED` | Internal graph heap-preflight sentinel set on the relaunched child process to prevent recursive relaunch. |
+
+### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
+
+- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
+- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
+- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

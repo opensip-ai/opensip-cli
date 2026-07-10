@@ -491,3 +491,9 @@ before enabling a new tool in CI.
 - [**Report**](../70-reference/06-dashboard.md) — the HTML report's lifecycle (the renderer your Tool's findings end up in).
 - [**Package catalog**](../70-reference/02-package-catalog.md) — the packages you can depend on.
 - [**Coding standards**](../80-implementation/04-coding-standards.md) — the style and structure conventions used throughout opensip-cli (handy if you're contributing back).
+
+### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
+
+- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
+- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
+- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

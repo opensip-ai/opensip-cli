@@ -37,6 +37,9 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md) — Public `@opensip-cli/graph/read` free functions, complete export-source maps, manifest Tool inventory, and allowlist-shaped peer boundaries.
+- [ADR-0146](ADR-0146-host-plane-reserved-state-namespace.md) — Reserved `@opensip-cli/host-plane:<toolId>` state identities, copy-only migration 0009, shared reserved-prefix admission, reduced host-plane surface.
+- [ADR-0145](ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md) — Denied ambient worker datastore, exact command/marker worker mode, exact-id external trust (no `*` admission).
 - [ADR-0144](ADR-0144-host-owned-presentation-values.md) — Host-owned presentation values: raw facts stay in storage/contracts; human labels via `@opensip-cli/format` so CLI, report, and host history cannot drift.
 - [ADR-0143](ADR-0143-host-owned-run-step-ledger.md) — Host-owned persisted Run + RunStep ledger as canonical evidence for suites and standalone tool runs; retires ADR-0093's no-suite-level-record consequence; defers root suite aliases.
 - [ADR-0142](ADR-0142-dependency-check-offline-safe-default.md) — The OWASP Dependency-Check adapter runs with `--noupdate` by default; users prepare the vulnerability database outside OpenSIP unless a future explicit online mode is approved.

@@ -371,3 +371,9 @@ The whole `<project>/opensip-cli/` directory is also safe to delete; `opensip in
 - **[`../70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/)** — the HTML report's structure and the `report` command.
 - **[`../70-reference/03-configuration.md`](/docs/opensip-cli/70-reference/03-configuration/)** — `opensip-cli.config.yml` schema (the one bit of project state that's not in `.runtime/`).
 - **[`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/)** — where datastore sits in the workspace layering.
+
+### Modular boundary notes (ADR-0145 / ADR-0146 / ADR-0147)
+
+- External workers: exact command/marker mode; ambient datastore is `host-rpc-only` (denied thunk). Exact-id trust only (`*` ignored).
+- Public DataStore is lifecycle/maintenance/write-lock only; host planes use reserved `@opensip-cli/host-plane:<toolId>` identities (migration 0009 copy-only).
+- Graph consumers use `@opensip-cli/graph/read` for identity/generation/analysis/rebuild Results; MCP production does not import graph/internal.

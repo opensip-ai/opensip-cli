@@ -212,3 +212,7 @@ The `cli` imports the bundled language adapters to register them (Layer 5 → La
 - **[`04-contract-surfaces.md`](./04-contract-surfaces.md)** — the public edges this layer cake exposes. The Tool contract sits at the top of Layer 3; the JSON output sits across Layer 2.
 - **[`../70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)** — every package, by layer, with one-line role and key exports. Use this when you're hunting for a symbol.
 - **[`../80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md)** — the dep-cruiser config, rule by rule, with rationale.
+
+## Boundary hardening (ADR-0145/0146/0147)
+
+As of the modular-monolith boundary work: 58 workspace packages (56 publishable, two private: `test-support`, `checks-dogfood`). External workers use denied ambient datastore (`host-rpc-only`). Host planes store under `@opensip-cli/host-plane:<toolId>`. MCP consumes `@opensip-cli/graph/read` only.
