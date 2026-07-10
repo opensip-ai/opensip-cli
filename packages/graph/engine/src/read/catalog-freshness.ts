@@ -1,23 +1,27 @@
-function hasControlChar(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.codePointAt(i) ?? 0;
-    if (code <= 0x1f || code === 0x7f) return true;
-  }
-  return false;
-}
-
 /**
- * Graph-owned complete catalog input verification (MCP Graph Audit Phase 1).
+ * Graph-owned complete catalog input verification.
  *
- * Reruns adapter selection + discovery + cache-key assembly against the
- * producing run's provenance. Read-only: discovery/config/stats only.
+ * The verifier reruns only selection, discovery, and cache-input assembly. It
+ * never parses, walks, evaluates rules, or writes persistence.
  */
 
-import { isPathInside, err, ok, type Result } from '@opensip-cli/core';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { stampEngineVersion, type EngineMode } from '../cache/engine-version.js';
-import { classifyCatalog, computeFilesFingerprint } from '../cache/invalidate.js';
+import { isPathInside, err, ok, type Result, type LanguageAdapter } from '@opensip-cli/core';
+
+import { stampEngineVersion } from '../cache/engine-version.js';
+import { computeFilesFingerprint, parseFilesFingerprint } from '../cache/invalidate.js';
+import {
+  buildShardedCatalogCacheKey,
+  isSafeShardedCacheAnchor,
+} from '../cache/sharded-cache-key.js';
 import { resolveCanonicalFileSet } from '../cli/orchestrate/canonical-file-set.js';
+import {
+  resolveDefaultEngineShards,
+  type EngineShardPolicyResolution,
+} from '../cli/orchestrate/engine-shard-policy.js';
+import { compareCodePointStrings } from '../code-point-order.js';
+import { isSafeGraphAdapterDescriptor } from '../lang-adapter/descriptor-validation.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 
 import type {
@@ -25,53 +29,46 @@ import type {
   FreshnessReasonCode,
   FreshnessVerification,
 } from './query-contracts.js';
-import type { GraphReadError } from './types.js';
-import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
-import type { AdapterSelectionEvidence, Catalog } from '../types.js';
+import type { GraphAdapterRegistryReader, GraphReadError } from './types.js';
+import type { DiscoverOutput, GraphLanguageAdapter } from '../lang-adapter/types.js';
+import type {
+  AdapterSelectionEvidence,
+  Catalog,
+  CatalogShardCacheInput,
+  GraphConfig,
+} from '../types.js';
 
-/** Max adapters accepted in a registry snapshot before reject. */
 const MAX_ADAPTERS = 64;
-/** Max file extensions per adapter descriptor. */
-const MAX_EXTENSIONS = 32;
-/** Max discovered files. */
 const MAX_DISCOVERED_FILES = 1_000_000;
-/** Max cacheKey length. */
 const MAX_CACHE_KEY_LEN = 1024;
-/** Max change samples. */
 const MAX_CHANGE_SAMPLES = 50;
+const MAX_DISCOVERY_PATH_LEN = 4096;
+const MAX_SHARD_INPUTS = 10_000;
+const MAX_SHARD_ID_LEN = 256;
+const VERIFY_CACHE_KEY_ERROR = 'GRAPH.READ.VERIFY_CACHE_KEY';
+const VERIFY_DISCOVERY_ERROR = 'GRAPH.READ.VERIFY_DISCOVERY';
 
-/** Narrow registry reader used by verification (no ambient scope). */
-export interface GraphAdapterRegistryReader {
-  readonly size: number;
-  getAll(): readonly {
-    readonly id: string;
-    readonly adapter: GraphLanguageAdapter;
-  }[];
-  getById(id: string): { readonly adapter: GraphLanguageAdapter } | undefined;
-}
-
+/** Inputs used to verify that a persisted catalog still matches current graph inputs. */
 export interface VerifyCatalogInputsInput {
   readonly projectRoot: string;
   readonly catalog: Catalog;
   readonly adapters: GraphAdapterRegistryReader;
+  readonly languageAdapters: readonly LanguageAdapter[];
+  readonly graphConfig?: GraphConfig;
 }
 
 function graphReadError(code: string, message: string): GraphReadError {
-  const truncated = message.length > 160 ? `${message.slice(0, 157)}...` : message;
-  return { code, operation: 'catalog-generation', message: truncated };
+  const bounded = message.length > 160 ? `${message.slice(0, 157)}...` : message;
+  return { code, operation: 'catalog-generation', message: bounded };
 }
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-function partial(
-  reasonCode: FreshnessReasonCode,
-  reason: string,
-  builtFresh = false,
-): FreshnessVerification {
+function partial(reasonCode: FreshnessReasonCode, reason: string): FreshnessVerification {
   return {
-    fresh: builtFresh,
+    fresh: false,
     verifiedAt: nowIso(),
     verification: 'partial',
     reasonCode,
@@ -81,8 +78,8 @@ function partial(
 
 function complete(
   fresh: boolean,
-  reasonCode: FreshnessReasonCode | undefined,
-  reason: string | undefined,
+  reasonCode?: FreshnessReasonCode,
+  reason?: string,
   changes?: FreshnessChangeSummary,
 ): FreshnessVerification {
   return {
@@ -95,72 +92,57 @@ function complete(
   };
 }
 
-/**
- * Validate a single adapter descriptor before feeding it to the selector.
- */
+/** Validate a complete adapter descriptor before selection or discovery. */
 export function isSafeAdapterDescriptor(adapter: GraphLanguageAdapter): boolean {
-  if (typeof adapter.id !== 'string' || adapter.id.length === 0 || adapter.id.length > 64) {
-    return false;
-  }
-  if (hasControlChar(adapter.id)) return false;
-  if (
-    adapter.displayName !== undefined &&
-    (typeof adapter.displayName !== 'string' ||
-      adapter.displayName.length === 0 ||
-      adapter.displayName.length > 128 ||
-      hasControlChar(adapter.displayName))
-  ) {
-    return false;
-  }
-  if (!Array.isArray(adapter.fileExtensions) || adapter.fileExtensions.length > MAX_EXTENSIONS) {
-    return false;
-  }
-  for (const ext of adapter.fileExtensions) {
-    if (typeof ext !== 'string' || ext.length === 0 || ext.length > 32 || hasControlChar(ext)) {
-      return false;
-    }
-  }
-  return (
-    typeof adapter.discoverFiles === 'function' &&
-    typeof adapter.parseProject === 'function' &&
-    typeof adapter.walkProject === 'function' &&
-    typeof adapter.resolveCallSites === 'function' &&
-    typeof adapter.cacheKey === 'function'
-  );
+  return isSafeGraphAdapterDescriptor(adapter);
 }
 
-function validateRegistry(adapters: GraphAdapterRegistryReader): Result<void, GraphReadError> {
-  if (adapters.size > MAX_ADAPTERS) {
+function snapshotRegistry(
+  source: GraphAdapterRegistryReader,
+): Result<GraphAdapterRegistryReader, GraphReadError> {
+  const entries = source.getAll();
+  if (entries.length > MAX_ADAPTERS || source.size !== entries.length) {
     return err(
-      graphReadError(
-        'GRAPH.READ.VERIFY_REGISTRY',
-        `Adapter registry exceeds ${String(MAX_ADAPTERS)} entries`,
-      ),
+      graphReadError('GRAPH.READ.VERIFY_REGISTRY', 'Adapter registry snapshot is inconsistent'),
     );
   }
-  for (const entry of adapters.getAll()) {
-    if (!isSafeAdapterDescriptor(entry.adapter)) {
+  const map = new Map<string, GraphLanguageAdapter>();
+  for (const entry of entries) {
+    if (
+      entry.id !== entry.adapter.id ||
+      map.has(entry.id) ||
+      !isSafeGraphAdapterDescriptor(entry.adapter)
+    ) {
       return err(
         graphReadError(
           'GRAPH.READ.VERIFY_DESCRIPTOR',
-          'Adapter registry contains a hostile or incomplete descriptor',
+          'Adapter registry contains a hostile or inconsistent descriptor',
         ),
       );
     }
+    map.set(entry.id, entry.adapter);
   }
-  return ok(undefined);
+  const snapshotEntries = [...map].map(([id, adapter]) => ({ id, adapter }));
+  return ok({
+    size: snapshotEntries.length,
+    getAll: () => snapshotEntries,
+    getById: (id) => {
+      const adapter = map.get(id);
+      return adapter === undefined ? undefined : { adapter };
+    },
+  });
 }
 
 /**
  * Verify that a served catalog still matches complete current discovery inputs.
- * Absence of adapterSelection/engineMode ⇒ partial verification (never verified-fresh).
+ * Legacy metadata remains queryable but is never represented as verified fresh.
  */
 export async function verifyCatalogInputs(
   input: VerifyCatalogInputsInput,
 ): Promise<Result<FreshnessVerification, GraphReadError>> {
   try {
-    const registryOk = validateRegistry(input.adapters);
-    if (!registryOk.ok) return registryOk;
+    const registry = snapshotRegistry(input.adapters);
+    if (!registry.ok) return registry;
 
     const selection = input.catalog.adapterSelection;
     const engineMode = input.catalog.engineMode;
@@ -172,93 +154,65 @@ export async function verifyCatalogInputs(
         ),
       );
     }
-
-    const selected = selectAdapter(input.adapters, selection, input.projectRoot);
+    if (engineMode === 'sharded' && input.catalog.shardCacheInputs === undefined) {
+      return ok(
+        partial(
+          'verification-unavailable',
+          'Sharded catalog lacks producing cache-input provenance',
+        ),
+      );
+    }
+    const selected = selectAdapter(registry.value, selection, input.projectRoot);
     if (!selected.ok) return selected;
-    if (
-      selected.value.id !== selection.selectedId ||
-      selected.value.id !== input.catalog.language
-    ) {
+    if (selected.value.id !== selection.selectedId) {
       return ok(
         complete(false, 'selection-changed', 'Active adapter selection no longer matches catalog'),
       );
     }
-
-    const discovery = await selected.value.discoverFiles({ cwd: input.projectRoot });
-    const contained = validateDiscovery(discovery, input.projectRoot);
-    if (!contained.ok) return contained;
-
-    if (discovery.files.length > MAX_DISCOVERED_FILES) {
-      return err(
-        graphReadError(
-          'GRAPH.READ.VERIFY_DISCOVERY',
-          `Discovery returned more than ${String(MAX_DISCOVERED_FILES)} files`,
-        ),
-      );
-    }
-
-    const files = resolveCanonicalFileSet(discovery.files);
-    const resolutionMode = input.catalog.resolutionMode ?? 'exact';
-    const rawCacheKey = await selected.value.cacheKey({
-      projectDirAbs: discovery.projectDirAbs,
-      configPathAbs: discovery.configPathAbs,
-      compilerOptions: discovery.compilerOptions,
-      resolutionMode,
-    });
-    if (
-      typeof rawCacheKey !== 'string' ||
-      rawCacheKey.length === 0 ||
-      rawCacheKey.length > MAX_CACHE_KEY_LEN ||
-      hasControlChar(rawCacheKey)
-    ) {
-      return err(
-        graphReadError('GRAPH.READ.VERIFY_CACHE_KEY', 'Adapter cacheKey is malformed or oversized'),
-      );
-    }
-
-    const stampedMode: EngineMode = engineMode === 'sharded' ? 'sharded' : 'exact';
-    // Sharded catalogs use a different cache-key assembly; when provenance says
-    // sharded we still compare language + file fingerprint primarily and treat
-    // a key-prefix mismatch carefully.
-    const currentCacheKey =
-      engineMode === 'sharded'
-        ? input.catalog.cacheKey // file-set + language still checked via classifier axes we can recompute
-        : stampEngineVersion(rawCacheKey, stampedMode);
-
-    // For sharded catalogs, recompute only fingerprint + language; a full
-    // sharded cache key depends on fragment set. Compare fingerprint via
-    // classifier with the catalog's own cacheKey so we still detect language
-    // and file drift without inventing a fragment hash.
-    const ctxCacheKey = engineMode === 'sharded' ? input.catalog.cacheKey : currentCacheKey;
-    if (engineMode === 'sharded' && input.catalog.engineMode !== 'sharded') {
-      return ok(complete(false, 'engine-mode-changed', 'Engine mode no longer matches catalog'));
-    }
-
-    const verdict = classifyCatalog(input.catalog, {
-      currentLanguage: selected.value.id,
-      currentCacheKey: ctxCacheKey,
-      currentFiles: files,
-    });
-
-    if (verdict.kind === 'valid') {
-      // Still recompute fingerprint to surface added-file drift when cache keys
-      // match (exact path). classifyCatalog already diffs fingerprints.
-      return ok(complete(true, undefined, undefined));
-    }
-    if (verdict.kind === 'incremental') {
-      const changes = changeSummaryFromFiles(
-        filesFromFingerprint(input.catalog.filesFingerprint ?? ''),
-        files,
-        verdict.changedFiles,
-      );
+    if (selected.value.id !== input.catalog.language) {
       return ok(
-        complete(false, 'files-changed', 'Source files changed since catalog build', changes),
+        complete(false, 'language-changed', 'Catalog language no longer matches selection'),
       );
     }
-    // invalid
-    const reason = verdict.reason;
-    const reasonCode = mapInvalidReason(reason);
-    return ok(complete(false, reasonCode, `stale: ${reason}`));
+    const stampedEngineMode = engineModeFromCacheKey(input.catalog.cacheKey);
+    if (stampedEngineMode === undefined) {
+      return ok(
+        partial('verification-unavailable', 'Catalog cache key lacks engine-mode provenance'),
+      );
+    }
+    const engine = await verifyEnginePolicy(
+      input,
+      selected.value,
+      selection,
+      engineMode,
+      stampedEngineMode,
+    );
+    if (!engine.ok) return engine;
+    if (engine.value.verdict !== undefined) return ok(engine.value.verdict);
+
+    const currentInputs = await recomputeCatalogInputs({
+      adapter: selected.value,
+      catalog: input.catalog,
+      projectRoot: input.projectRoot,
+      currentShards: engine.value.policy.shards,
+    });
+    if (!currentInputs.ok) return currentInputs;
+    if (currentInputs.value.cacheKey !== input.catalog.cacheKey) {
+      return ok(complete(false, 'cache-key-changed', 'Catalog cache inputs changed'));
+    }
+
+    const currentFingerprint = computeFilesFingerprint(currentInputs.value.files);
+    if (currentFingerprint === input.catalog.filesFingerprint) {
+      return ok(complete(true));
+    }
+    const changes = changeSummary(
+      input.catalog.filesFingerprint ?? '',
+      currentFingerprint,
+      input.projectRoot,
+    );
+    return ok(
+      complete(false, 'files-changed', 'Source files changed since catalog build', changes),
+    );
   } catch {
     return err(
       graphReadError(
@@ -269,6 +223,122 @@ export async function verifyCatalogInputs(
   }
 }
 
+interface VerifiedEnginePolicy {
+  readonly policy: EngineShardPolicyResolution;
+  readonly verdict?: FreshnessVerification;
+}
+
+async function verifyEnginePolicy(
+  input: VerifyCatalogInputsInput,
+  adapter: GraphLanguageAdapter,
+  selection: AdapterSelectionEvidence,
+  engineMode: 'exact' | 'sharded',
+  stampedEngineMode: 'exact' | 'sharded',
+): Promise<Result<VerifiedEnginePolicy, GraphReadError>> {
+  const exactPolicy: EngineShardPolicyResolution = { shards: [] };
+  if (stampedEngineMode !== engineMode) {
+    return ok({
+      policy: exactPolicy,
+      verdict: complete(
+        false,
+        'engine-mode-changed',
+        'Catalog engine mode no longer matches cache inputs',
+      ),
+    });
+  }
+  // Exact may have been selected explicitly in a shardable repository. The
+  // payload does not persist that CLI choice, so verify its exact inputs rather
+  // than falsely comparing it with today's default sharding policy.
+  if (engineMode === 'exact') return ok({ policy: exactPolicy });
+
+  const policy = await resolveDefaultEngineShards({
+    projectRoot: input.projectRoot,
+    languageAdapters: input.languageAdapters,
+    graphAdapter: adapter,
+    graphConfig: input.graphConfig ?? {},
+    forcedLanguage: selection.mode === 'forced',
+    failureMode: 'verification-error',
+  });
+  if (policy.shards.length <= 1) {
+    return ok({
+      policy,
+      verdict: complete(
+        false,
+        'engine-mode-changed',
+        'Catalog engine mode no longer matches cache inputs',
+      ),
+    });
+  }
+  const expectedShards = shardAnchorsForPolicy(policy.shards, input.projectRoot);
+  if (!expectedShards.ok) return expectedShards;
+  return sameShardAnchors(expectedShards.value, input.catalog.shardCacheInputs ?? [])
+    ? ok({ policy })
+    : ok({
+        policy,
+        verdict: complete(
+          false,
+          'cache-key-changed',
+          'Active shard plan no longer matches catalog',
+        ),
+      });
+}
+
+function shardAnchorsForPolicy(
+  shards: readonly {
+    readonly id: string;
+    readonly rootDir: string;
+    readonly configPathAbs?: string;
+  }[],
+  projectRoot: string,
+): Result<readonly CatalogShardCacheInput[], GraphReadError> {
+  const anchors: CatalogShardCacheInput[] = [];
+  for (const shard of shards) {
+    const rootDir = projectRelativeAnchor(shard.rootDir, projectRoot);
+    if (rootDir === undefined) {
+      return err(
+        graphReadError(VERIFY_DISCOVERY_ERROR, 'Shard root escaped the configured project'),
+      );
+    }
+    const configPath =
+      shard.configPathAbs === undefined
+        ? undefined
+        : projectRelativeAnchor(shard.configPathAbs, projectRoot);
+    if (shard.configPathAbs !== undefined && configPath === undefined) {
+      return err(
+        graphReadError(VERIFY_DISCOVERY_ERROR, 'Shard config escaped the configured project'),
+      );
+    }
+    anchors.push({
+      shardId: shard.id,
+      rootDir,
+      ...(configPath === undefined ? {} : { configPath }),
+    });
+  }
+  anchors.sort((a, b) => compareCodePointStrings(a.shardId, b.shardId));
+  return ok(anchors);
+}
+
+function projectRelativeAnchor(path: string, projectRoot: string): string | undefined {
+  if (!isSafeAbsolutePath(path) || !isPathInside(path, projectRoot)) return undefined;
+  const value = relative(resolve(projectRoot), resolve(path));
+  if (isAbsolute(value) || value === '..' || value.startsWith(`..${sep}`)) return undefined;
+  return (value || '.').split(sep).join('/');
+}
+
+function sameShardAnchors(
+  expected: readonly CatalogShardCacheInput[],
+  persisted: readonly CatalogShardCacheInput[],
+): boolean {
+  const normalized = [...persisted].sort((a, b) => compareCodePointStrings(a.shardId, b.shardId));
+  return JSON.stringify(expected) === JSON.stringify(normalized);
+}
+
+function engineModeFromCacheKey(cacheKey: string): 'exact' | 'sharded' | undefined {
+  const match = /(?:^|\|)mode=(exact|sharded)\|/.exec(cacheKey);
+  const value = match?.[1];
+  return value === 'exact' || value === 'sharded' ? value : undefined;
+}
+
 function selectAdapter(
   adapters: GraphAdapterRegistryReader,
   selection: AdapterSelectionEvidence,
@@ -276,12 +346,11 @@ function selectAdapter(
 ): Result<GraphLanguageAdapter, GraphReadError> {
   try {
     const selector = new GraphAdapterSelector(adapters);
-    if (selection.mode === 'forced') {
-      const adapter = selector.pick({ cwd: projectRoot, language: selection.requestedId });
-      return ok(adapter);
-    }
-    const adapter = selector.pick({ cwd: projectRoot });
-    return ok(adapter);
+    return ok(
+      selection.mode === 'forced'
+        ? selector.pick({ cwd: projectRoot, language: selection.requestedId })
+        : selector.pick({ cwd: projectRoot }),
+    );
   } catch {
     return err(
       graphReadError(
@@ -292,109 +361,245 @@ function selectAdapter(
   }
 }
 
-function validateDiscovery(
-  discovery: {
-    readonly projectDirAbs: string;
+interface RecomputeCacheKeyInput {
+  readonly adapter: GraphLanguageAdapter;
+  readonly catalog: Catalog;
+  readonly projectRoot: string;
+  readonly currentShards: readonly {
+    readonly id: string;
     readonly files: readonly string[];
-    readonly configPathAbs?: string;
-  },
+  }[];
+}
+
+interface CurrentCatalogInputs {
+  readonly cacheKey: string;
+  readonly files: readonly string[];
+}
+
+async function recomputeCatalogInputs(
+  input: RecomputeCacheKeyInput,
+): Promise<Result<CurrentCatalogInputs, GraphReadError>> {
+  if (input.catalog.engineMode === 'sharded') {
+    return recomputeShardedInputs(input);
+  }
+  const discovery = await input.adapter.discoverFiles({
+    cwd: input.projectRoot,
+  });
+  const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
+  if (!discoveryCheck.ok) return discoveryCheck;
+  const raw = await input.adapter.cacheKey({
+    projectDirAbs: discovery.projectDirAbs,
+    configPathAbs: discovery.configPathAbs,
+    compilerOptions: discovery.compilerOptions,
+    resolutionMode: input.catalog.resolutionMode ?? 'exact',
+  });
+  const validated = validateRawCacheKey(raw);
+  return validated.ok
+    ? ok({
+        cacheKey: stampEngineVersion(validated.value, 'exact'),
+        files: resolveCanonicalFileSet(discovery.files),
+      })
+    : validated;
+}
+
+async function recomputeShardedInputs(
+  input: RecomputeCacheKeyInput,
+): Promise<Result<CurrentCatalogInputs, GraphReadError>> {
+  const shardInputs = input.catalog.shardCacheInputs ?? [];
+  if (shardInputs.length === 0 || shardInputs.length > MAX_SHARD_INPUTS) {
+    return err(graphReadError(VERIFY_CACHE_KEY_ERROR, 'Sharded cache-input set is malformed'));
+  }
+  const seen = new Set<string>();
+  const currentById = new Map(input.currentShards.map((shard) => [shard.id, shard]));
+  const keys: {
+    shardId: string;
+    rootDir: string;
+    configPath?: string;
+    cacheKey: string;
+  }[] = [];
+  const files: string[] = [];
+  for (const shard of shardInputs) {
+    const anchor = resolveShardAnchor(shard, input.projectRoot, seen);
+    if (!anchor.ok) return anchor;
+    const currentShard = currentById.get(shard.shardId);
+    if (currentShard === undefined) {
+      return err(graphReadError(VERIFY_CACHE_KEY_ERROR, 'Current shard plan is incomplete'));
+    }
+    const discovery = await input.adapter.discoverFiles({
+      cwd: anchor.value.rootDir,
+      ...(anchor.value.configPath === undefined
+        ? {}
+        : { configPathOverride: anchor.value.configPath }),
+    });
+    const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
+    if (!discoveryCheck.ok) return discoveryCheck;
+    files.push(...currentShard.files);
+    const raw = await input.adapter.cacheKey({
+      projectDirAbs: anchor.value.rootDir,
+      configPathAbs: anchor.value.configPath ?? discovery.configPathAbs,
+      resolutionMode: input.catalog.resolutionMode ?? 'exact',
+    });
+    const validated = validateRawCacheKey(raw);
+    if (!validated.ok) return validated;
+    keys.push({
+      shardId: shard.shardId,
+      rootDir: shard.rootDir,
+      ...(shard.configPath === undefined ? {} : { configPath: shard.configPath }),
+      cacheKey: stampEngineVersion(validated.value, 'sharded'),
+    });
+  }
+  return ok({
+    cacheKey: buildShardedCatalogCacheKey(keys),
+    files: resolveCanonicalFileSet(files),
+  });
+}
+
+function resolveShardAnchor(
+  shard: CatalogShardCacheInput,
+  projectRoot: string,
+  seen: Set<string>,
+): Result<{ readonly rootDir: string; readonly configPath?: string }, GraphReadError> {
+  if (
+    !isSafeBoundedText(shard.shardId, MAX_SHARD_ID_LEN) ||
+    seen.has(shard.shardId) ||
+    !isSafeShardedCacheAnchor(shard.rootDir, MAX_DISCOVERY_PATH_LEN) ||
+    (shard.configPath !== undefined &&
+      !isSafeShardedCacheAnchor(shard.configPath, MAX_DISCOVERY_PATH_LEN))
+  ) {
+    return err(graphReadError(VERIFY_CACHE_KEY_ERROR, 'Sharded cache-input anchor is malformed'));
+  }
+  seen.add(shard.shardId);
+  const rootDir = shard.rootDir === '.' ? projectRoot : resolve(projectRoot, shard.rootDir);
+  let configPath: string | undefined;
+  if (shard.configPath === '.') configPath = projectRoot;
+  else if (shard.configPath !== undefined) configPath = resolve(projectRoot, shard.configPath);
+  if (!isPathInside(rootDir, projectRoot)) {
+    return err(
+      graphReadError(VERIFY_CACHE_KEY_ERROR, 'Sharded root escaped the configured project'),
+    );
+  }
+  if (configPath !== undefined && !isPathInside(configPath, projectRoot)) {
+    return err(
+      graphReadError(VERIFY_CACHE_KEY_ERROR, 'Sharded config escaped the configured project'),
+    );
+  }
+  return ok({ rootDir, ...(configPath === undefined ? {} : { configPath }) });
+}
+
+function validateRawCacheKey(value: unknown): Result<string, GraphReadError> {
+  return typeof value === 'string' && isSafeBoundedText(value, MAX_CACHE_KEY_LEN)
+    ? ok(value)
+    : err(graphReadError(VERIFY_CACHE_KEY_ERROR, 'Adapter cacheKey is malformed or oversized'));
+}
+
+function validateDiscovery(
+  discovery: DiscoverOutput,
   projectRoot: string,
 ): Result<void, GraphReadError> {
-  // Allow equality even when realpath differs slightly — isPathInside covers
-  // containment; if root itself fails realpath, treat as partial via error.
+  if (discovery.files.length > MAX_DISCOVERED_FILES) {
+    return err(graphReadError(VERIFY_DISCOVERY_ERROR, 'Discovery returned too many files'));
+  }
   if (
-    !isPathInside(discovery.projectDirAbs, projectRoot) &&
-    discovery.projectDirAbs !== projectRoot &&
-    !isPathInside(projectRoot, discovery.projectDirAbs)
+    !isSafeAbsolutePath(discovery.projectDirAbs) ||
+    !isPathInside(discovery.projectDirAbs, projectRoot)
   ) {
     return err(
       graphReadError(
-        'GRAPH.READ.VERIFY_DISCOVERY',
+        VERIFY_DISCOVERY_ERROR,
         'Discovery project root escaped the configured project',
       ),
     );
   }
   if (
     discovery.configPathAbs !== undefined &&
-    !isPathInside(discovery.configPathAbs, projectRoot)
+    (!isSafeAbsolutePath(discovery.configPathAbs) ||
+      !isPathInside(discovery.configPathAbs, projectRoot))
   ) {
     return err(
       graphReadError(
-        'GRAPH.READ.VERIFY_DISCOVERY',
+        VERIFY_DISCOVERY_ERROR,
         'Discovery config path escaped the configured project',
       ),
     );
   }
+
+  let previous: string | undefined;
   for (const file of discovery.files) {
-    if (typeof file !== 'string' || file.length === 0 || hasControlChar(file)) {
-      return err(
-        graphReadError('GRAPH.READ.VERIFY_DISCOVERY', 'Discovery returned a malformed file path'),
-      );
-    }
-    if (!isPathInside(file, projectRoot)) {
+    if (!isSafeAbsolutePath(file) || !isPathInside(file, projectRoot)) {
       return err(
         graphReadError(
-          'GRAPH.READ.VERIFY_DISCOVERY',
-          'Discovery returned a file outside the configured project',
+          VERIFY_DISCOVERY_ERROR,
+          'Discovery returned a malformed or escaping file path',
         ),
       );
     }
+    if (previous !== undefined && file <= previous) {
+      return err(
+        graphReadError(VERIFY_DISCOVERY_ERROR, 'Discovery files must be sorted and deduplicated'),
+      );
+    }
+    previous = file;
   }
   return ok(undefined);
 }
 
-function mapInvalidReason(reason: string): FreshnessReasonCode {
-  if (reason === 'language-changed') return 'language-changed';
-  if (reason === 'cache-key-changed') return 'cache-key-changed';
-  if (reason.includes('file')) return 'files-changed';
-  return 'files-changed';
+function isSafeAbsolutePath(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_DISCOVERY_PATH_LEN &&
+    isAbsolute(value) &&
+    !hasControlChar(value)
+  );
 }
 
-function filesFromFingerprint(fingerprint: string): string[] {
-  const lines = fingerprint.split('\n');
-  const files: string[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (typeof line !== 'string' || line.length === 0) continue;
-    const pipe = line.indexOf('|');
-    files.push(pipe === -1 ? line : line.slice(0, pipe));
-  }
-  return files;
+function isSafeBoundedText(value: string, max: number): boolean {
+  return value.length > 0 && value.length <= max && !hasControlChar(value);
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- added/deleted/modified sample aggregation
-function changeSummaryFromFiles(
-  previous: readonly string[],
-  current: readonly string[],
-  changedAbs: readonly string[],
+function hasControlChar(value: string): boolean {
+  return /\p{Cc}/u.test(value);
+}
+
+function changeSummary(
+  previousFingerprint: string,
+  currentFingerprint: string,
+  projectRoot: string,
 ): FreshnessChangeSummary {
-  const prev = new Set(previous);
-  const curr = new Set(current);
-  let added = 0;
-  let deleted = 0;
-  const sample: string[] = [];
-  for (const f of curr) {
-    if (!prev.has(f)) {
-      added++;
-      if (sample.length < MAX_CHANGE_SAMPLES) sample.push(f);
-    }
+  const previous = parseFilesFingerprint(previousFingerprint);
+  const current = parseFilesFingerprint(currentFingerprint);
+  const changed: { path: string; kind: 'added' | 'modified' | 'deleted' }[] = [];
+  for (const [path, mark] of current) {
+    const previousMark = previous.get(path);
+    if (previousMark === undefined) changed.push({ path, kind: 'added' });
+    else if (previousMark !== mark) changed.push({ path, kind: 'modified' });
   }
-  for (const f of prev) {
-    if (!curr.has(f)) {
-      deleted++;
-      if (sample.length < MAX_CHANGE_SAMPLES) sample.push(f);
-    }
+  for (const path of previous.keys()) {
+    if (!current.has(path)) changed.push({ path, kind: 'deleted' });
   }
-  const modified = changedAbs.length;
-  for (const f of changedAbs) {
-    if (sample.length < MAX_CHANGE_SAMPLES && !sample.includes(f)) sample.push(f);
-  }
-  // Silence unused computeFilesFingerprint import if tree-shaken — keep available.
-  void computeFilesFingerprint;
-  return { added, modified, deleted, sample };
+  changed.sort(
+    (a, b) => compareCodePointStrings(a.path, b.path) || compareCodePointStrings(a.kind, b.kind),
+  );
+  return {
+    added: changed.filter((entry) => entry.kind === 'added').length,
+    modified: changed.filter((entry) => entry.kind === 'modified').length,
+    deleted: changed.filter((entry) => entry.kind === 'deleted').length,
+    sample: changed
+      .map((entry) => projectRelativeSample(entry.path, projectRoot))
+      .filter((value): value is string => value !== undefined)
+      .slice(0, MAX_CHANGE_SAMPLES),
+  };
 }
 
-// Re-export type for consumers that import from this module path.
+function projectRelativeSample(filePath: string, projectRoot: string): string | undefined {
+  const root = resolve(projectRoot);
+  const absolute = resolve(filePath);
+  const value = relative(root, absolute);
+  if (value.length === 0 || isAbsolute(value) || value === '..' || value.startsWith(`..${sep}`)) {
+    return undefined;
+  }
+  return value.split(sep).join('/');
+}
 
 export { type FreshnessVerification } from './query-contracts.js';
 export { type CatalogEngineMode } from '../types.js';

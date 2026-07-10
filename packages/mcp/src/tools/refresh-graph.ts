@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { unexpectedRefreshError } from '../mcp-error.js';
 
+import { strictInput } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -21,7 +22,12 @@ function recordRefreshLatency(durationMs: number, action: string, outcome: 'ok' 
   try {
     getMeter('opensip-cli')
       .createHistogram('opensip_cli.mcp.refresh.duration_ms')
-      .record(durationMs, { command: 'mcp', op: 'refresh_graph', action, outcome });
+      .record(durationMs, {
+        command: 'mcp',
+        op: 'refresh_graph',
+        action,
+        outcome,
+      });
   } catch {
     // Telemetry is best-effort.
   }
@@ -37,9 +43,9 @@ export function registerRefreshGraph(server: McpStdioServer, deps: McpToolDeps):
         'already persisted by `opensip graph` without rebuilding. Rebuilds only when the ' +
         'catalog is missing/stale, or when forceRebuild is true. EXPENSIVE when it rebuilds — ' +
         'do NOT loop it per query. Returns action (no-op|reloaded|rebuilt), generation, and freshness.',
-      inputSchema: {
+      inputSchema: strictInput({
         forceRebuild: z.boolean().optional(),
-      },
+      }),
     },
     async ({ forceRebuild }) => {
       const startedAt = Date.now();
@@ -52,8 +58,9 @@ export function registerRefreshGraph(server: McpStdioServer, deps: McpToolDeps):
           logger.error({
             evt: 'mcp.graph.refresh.failed',
             module: LOG_MODULE,
-            code: outcome.error.code,
+            outcome: 'failed',
             durationMs,
+            failedPhase: outcome.error.details?.failedPhase,
             priorGenerationAvailable: outcome.error.details?.priorGenerationAvailable,
           });
           recordRefreshLatency(durationMs, 'failed', 'error');
@@ -72,11 +79,12 @@ export function registerRefreshGraph(server: McpStdioServer, deps: McpToolDeps):
         return jsonResult(outcome.value);
       } catch {
         const durationMs = Date.now() - startedAt;
-        const failure = unexpectedRefreshError();
+        const failure = unexpectedRefreshError(durationMs);
         logger.error({
           evt: 'mcp.graph.refresh.failed',
           module: LOG_MODULE,
-          code: failure.code,
+          outcome: 'failed',
+          failedPhase: 'handler',
           durationMs,
         });
         recordRefreshLatency(durationMs, 'failed', 'error');

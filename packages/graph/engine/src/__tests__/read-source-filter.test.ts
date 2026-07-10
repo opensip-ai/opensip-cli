@@ -129,6 +129,7 @@ describe('toGraphSymbolRef', () => {
         inTestFile: true,
         definedInGenerated: false,
         line: 10,
+        endLine: 12,
         column: 2,
       }),
     );
@@ -158,5 +159,6 @@ describe('toGraphSymbolRef', () => {
         occ({ filePath: 'src/a.ts', qualifiedName: 'n'.repeat(GRAPH_SYMBOL_NAME_MAX + 1) }),
       ),
     ).toBeUndefined();
+    expect(toGraphSymbolRef(occ({ filePath: 'src/a.ts', line: 10, endLine: 9 }))).toBeUndefined();
   });
 });

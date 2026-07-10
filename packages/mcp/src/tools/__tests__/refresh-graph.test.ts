@@ -38,7 +38,10 @@ function installFakeMeter(): void {
   metrics.setGlobalMeterProvider(provider);
 }
 
-function captureServer(): { handlers: Map<string, Handler>; server: McpStdioServer } {
+function captureServer(): {
+  handlers: Map<string, Handler>;
+  server: McpStdioServer;
+} {
   const handlers = new Map<string, Handler>();
   const server = {
     register: (name: string, _config: unknown, cb: Handler) => {
@@ -60,13 +63,21 @@ function refreshResult(
 ): GraphToolResult<RefreshResult> {
   return {
     data: {
-      generation: { builtAt: FRESH.builtAt!, identity: 'g1:abc', source: 'refresh-rebuild' },
+      generation: {
+        builtAt: FRESH.builtAt!,
+        identity: 'g1:abc',
+        source: 'refresh-rebuild',
+      },
       action,
       durationMs: 12,
       priorGenerationAvailable: false,
     },
     context: {
-      project: { root: '/proj', scope: 'project', configPath: 'opensip-cli.config.yml' },
+      project: {
+        root: '/proj',
+        scope: 'project',
+        configPath: 'opensip-cli.config.yml',
+      },
       catalog: {
         status: 'loaded',
         builtAt: FRESH.builtAt,
@@ -83,7 +94,12 @@ function fakeGraph(refresh: GraphReadPort['refresh']): GraphReadPort {
 }
 
 function deps(graph: GraphReadPort): McpToolDeps {
-  return { graph, results: {} as McpToolDeps['results'], validToolIds: new Set() };
+  return {
+    graph,
+    results: {} as McpToolDeps['results'],
+    runtimeWiring: {} as McpToolDeps['runtimeWiring'],
+    validToolIds: new Set(),
+  };
 }
 
 beforeEach(() => {
@@ -121,8 +137,19 @@ describe('refresh_graph observability', () => {
       outcome: 'ok',
     });
     expect(info).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'mcp.graph.refresh.completed', module: 'mcp:refresh' }),
+      expect.objectContaining({
+        evt: 'mcp.graph.refresh.completed',
+        module: 'mcp:refresh',
+      }),
     );
+    expect(
+      info.mock.calls.filter(
+        ([entry]) =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          entry.evt === 'mcp.graph.refresh.completed',
+      ),
+    ).toHaveLength(1);
   });
 
   it('records outcome:error when refresh returns err', async () => {
@@ -132,7 +159,20 @@ describe('refresh_graph observability', () => {
       server,
       deps(
         fakeGraph(() =>
-          Promise.resolve(err({ code: 'refresh-unavailable', message: 'not wired' })),
+          Promise.resolve(
+            err({
+              code: 'graph-refresh-failed',
+              message: 'not wired',
+              details: {
+                failedPhase: 'rebuild',
+                outcome: 'failed',
+                projectKey: 'a'.repeat(24),
+                priorGenerationKey: 'missing',
+                currentGenerationKey: 'g1:current',
+                priorGenerationAvailable: false,
+              },
+            }),
+          ),
         ),
       ),
     );
@@ -146,8 +186,31 @@ describe('refresh_graph observability', () => {
       outcome: 'error',
     });
     expect(error).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'mcp.graph.refresh.failed', code: 'refresh-unavailable' }),
+      expect.objectContaining({
+        evt: 'mcp.graph.refresh.failed',
+        failedPhase: 'rebuild',
+        outcome: 'failed',
+      }),
     );
+    expect(JSON.stringify(error.mock.calls)).not.toMatch(
+      /projectKey|priorGenerationKey|currentGenerationKey/u,
+    );
+    expect(
+      error.mock.calls.filter(
+        ([entry]) =>
+          typeof entry === 'object' && entry !== null && entry.evt === 'mcp.graph.refresh.failed',
+      ),
+    ).toHaveLength(1);
+    const body = JSON.parse(result.content[0]?.type === 'text' ? result.content[0].text : '{}') as {
+      error?: { details?: Record<string, unknown> };
+    };
+    expect(body.error?.details).toMatchObject({
+      failedPhase: 'rebuild',
+      outcome: 'failed',
+      projectKey: 'a'.repeat(24),
+      priorGenerationKey: 'missing',
+      currentGenerationKey: 'g1:current',
+    });
   });
 
   it('maps unexpected throws to bounded result', async () => {
@@ -167,10 +230,11 @@ describe('refresh_graph observability', () => {
       result.content[0]?.type === 'text' ? result.content[0].text : '{}',
     ) as Record<string, unknown>;
     expect(result.isError).toBe(true);
-    expect(body).toEqual({
+    expect(body).toMatchObject({
       error: {
-        code: 'refresh-failed',
+        code: 'graph-refresh-failed',
         message: 'Graph refresh failed due to an infrastructure error.',
+        details: { failedPhase: 'handler', outcome: 'failed' },
       },
     });
     expect(JSON.stringify(error.mock.calls)).not.toMatch(/secret|private|sqlite/i);

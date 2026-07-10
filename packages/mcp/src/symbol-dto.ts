@@ -82,6 +82,6 @@ export interface GraphToolResult<T> {
   readonly coverage: GraphCoverage;
   /** Effective source filter applied before projection (when applicable). */
   readonly filter?: EffectiveGraphSourceFilter;
-  /** Optional bounded group summaries for the current page. */
+  /** Optional bounded group summaries for the full filtered or visited result set. */
   readonly groups?: readonly GraphGroupSummary[];
 }

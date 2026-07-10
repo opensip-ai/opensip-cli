@@ -10,15 +10,15 @@ import {
   encodeCursor,
   groupRows,
   pageRows,
-  type GraphQueryCursor,
+  type GraphQueryCursorInput,
 } from '../graph-query-page.js';
-import { jsonResult } from '../tools/tool-result.js';
+import { errorResult, jsonResult } from '../tools/tool-result.js';
 
-const PROJECT = 'abc123projectkey00000000';
+const PROJECT = 'abc123abcdef1234abc123ab';
 const GEN = 'g1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const QUERY = digestNormalizedQuery({ op: 'search', q: 'x' });
 
-function cursorFor(afterKey: string, overrides: Partial<GraphQueryCursor> = {}): string {
+function cursorFor(afterKey: string, overrides: Partial<GraphQueryCursorInput> = {}): string {
   return encodeCursor({
     v: 1,
     projectKey: PROJECT,
@@ -54,6 +54,26 @@ describe('decodeCursor / bindCursor', () => {
     expect(decodeCursor('not-json-but-urlsafe').ok).toBe(false);
   });
 
+  it('rejects a cursor whose scalar or composite position was tampered', () => {
+    const tamper = (raw: string, afterKey: string): string => {
+      const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Record<
+        string,
+        unknown
+      >;
+      parsed.afterKey = afterKey;
+      return Buffer.from(JSON.stringify(parsed), 'utf8').toString('base64url');
+    };
+    expect(decodeCursor(tamper(cursorFor('symbol-a'), 'symbol-b')).ok).toBe(false);
+    expect(
+      decodeCursor(
+        tamper(
+          cursorFor(JSON.stringify({ section: 'edges', after: 'a' })),
+          JSON.stringify({ section: 'hotspots', after: 'a' }),
+        ),
+      ).ok,
+    ).toBe(false);
+  });
+
   it('maps wrong project / generation / query to distinct codes', () => {
     const raw = cursorFor('k');
     const decoded = decodeCursor(raw);
@@ -61,7 +81,7 @@ describe('decodeCursor / bindCursor', () => {
     if (!decoded.ok) return;
 
     const wrongProject = bindCursor(decoded.value, {
-      projectKey: 'other-project-key-xxxxxx',
+      projectKey: 'def456abcdef1234abc123ab',
       generationKey: GEN,
       queryDigest: QUERY,
     });
@@ -96,6 +116,68 @@ describe('decodeCursor / bindCursor', () => {
     const decoded = decodeCursor(bad);
     expect(decoded.ok).toBe(false);
     expect(!decoded.ok && decoded.error.code).toBe('cursor-invalid');
+  });
+
+  it('rejects non-canonical keys, control-bearing sort keys, and unknown fields', () => {
+    expect(
+      decodeCursor(
+        Buffer.from(
+          JSON.stringify({
+            v: 1,
+            projectKey: PROJECT,
+            generationKey: 'g1:not-hex',
+            queryDigest: QUERY,
+            afterKey: 'x',
+          }),
+        ).toString('base64url'),
+      ).ok,
+    ).toBe(false);
+    expect(decodeCursor(cursorFor('bad\nkey')).ok).toBe(false);
+    expect(
+      decodeCursor(
+        Buffer.from(
+          JSON.stringify({
+            v: 1,
+            projectKey: PROJECT,
+            generationKey: GEN,
+            queryDigest: QUERY,
+            afterKey: 'x',
+            injected: true,
+          }),
+        ).toString('base64url'),
+      ).ok,
+    ).toBe(false);
+  });
+
+  it('rejects missing fields, wrong formats, unsupported versions, and oversized sort keys', () => {
+    const payload = (value: unknown) =>
+      Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+    expect(
+      decodeCursor(
+        payload({
+          v: 1,
+          projectKey: PROJECT,
+          generationKey: GEN,
+          queryDigest: QUERY,
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      decodeCursor(
+        payload({
+          v: 2,
+          projectKey: PROJECT,
+          generationKey: GEN,
+          queryDigest: QUERY,
+          afterKey: 'x',
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(decodeCursor(cursorFor('x', { projectKey: PROJECT.toUpperCase() })).ok).toBe(false);
+    expect(decodeCursor(cursorFor('x', { queryDigest: 'A'.repeat(32) })).ok).toBe(false);
+    expect(decodeCursor(cursorFor('x'.repeat(2049))).ok).toBe(false);
+    expect(decodeCursor(cursorFor('bad\u007Fkey')).ok).toBe(false);
+    expect(decodeCursor(cursorFor('bad\u0085key')).ok).toBe(false);
   });
 });
 
@@ -155,6 +237,63 @@ describe('pageRows', () => {
     expect(second.value.hasMore).toBe(false);
     expect(second.value.nextCursor).toBeUndefined();
   });
+
+  it('uses Unicode code-point order for continuation comparisons', () => {
+    const bmp = '\uE000';
+    const supplementary = '\u{10000}';
+    const ordered = [
+      { id: 'bmp', k: bmp },
+      { id: 'supplementary', k: supplementary },
+    ];
+    const first = pageRows(
+      ordered,
+      { projectKey: PROJECT, generationKey: GEN, queryDigest: QUERY, limit: 1 },
+      (row) => row.k,
+    );
+    expect(first.ok && first.value.rows[0]?.id).toBe('bmp');
+    if (!first.ok || first.value.nextCursor === undefined) return;
+    const second = pageRows(
+      ordered,
+      {
+        projectKey: PROJECT,
+        generationKey: GEN,
+        queryDigest: QUERY,
+        limit: 1,
+        cursor: first.value.nextCursor,
+      },
+      (row) => row.k,
+    );
+    expect(second.ok && second.value.rows[0]?.id).toBe('supplementary');
+  });
+
+  it('emits a reusable compact cursor for maximum-size Unicode row keys', () => {
+    const hugeKey = `${'\uE000'.repeat(1024)}|${'\u{10000}'.repeat(1024)}|${'x'.repeat(1024)}`;
+    const rows = [
+      { id: 'first', key: hugeKey },
+      { id: 'second', key: `${hugeKey}z` },
+    ];
+    const first = pageRows(
+      rows,
+      { projectKey: PROJECT, generationKey: GEN, queryDigest: QUERY, limit: 1 },
+      (row) => row.key,
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok || first.value.nextCursor === undefined) return;
+    expect(first.value.nextCursor.length).toBeLessThan(4096);
+    expect(decodeCursor(first.value.nextCursor).ok).toBe(true);
+    const second = pageRows(
+      rows,
+      {
+        projectKey: PROJECT,
+        generationKey: GEN,
+        queryDigest: QUERY,
+        limit: 1,
+        cursor: first.value.nextCursor,
+      },
+      (row) => row.key,
+    );
+    expect(second.ok && second.value.rows.map((row) => row.id)).toEqual(['second']);
+  });
 });
 
 describe('groupRows', () => {
@@ -169,6 +308,20 @@ describe('groupRows', () => {
     const grouped = groupRows(rows, 'package', (r) => r.p);
     expect(grouped.groups?.length).toBe(MAX_GROUP_KEYS);
     expect(grouped.groupTruncated).toBe(true);
+  });
+
+  it('counts the full input and orders group keys by code point', () => {
+    const bmp = '\uE000';
+    const supplementary = '\u{10000}';
+    const grouped = groupRows(
+      [{ p: supplementary }, { p: bmp }, { p: bmp }],
+      'package',
+      (row) => row.p,
+    );
+    expect(grouped.groups).toEqual([
+      { key: bmp, count: 2 },
+      { key: supplementary, count: 1 },
+    ]);
   });
 });
 
@@ -190,6 +343,18 @@ describe('assertJsonPayloadSize / jsonResult', () => {
     const text = tool.content[0]?.type === 'text' ? tool.content[0].text : '';
     expect(text.length).toBeLessThan(4096);
     expect(text).toContain('response-too-large');
+  });
+
+  it('applies the same final byte ceiling to structured error results', () => {
+    const tool = errorResult({
+      code: 'oversized-error',
+      message: 'x'.repeat(MAX_JSON_RESULT_BYTES),
+    });
+    const text = tool.content[0]?.type === 'text' ? tool.content[0].text : '';
+    expect(tool.isError).toBe(true);
+    expect(Buffer.byteLength(text, 'utf8')).toBeLessThan(MAX_JSON_RESULT_BYTES);
+    expect(text).toContain('response-too-large');
+    expect(text).not.toContain('oversized-error');
   });
 
   it('accepts a payload immediately under the ceiling', () => {

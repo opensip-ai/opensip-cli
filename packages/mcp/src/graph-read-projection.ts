@@ -1,13 +1,14 @@
 /** Pure DTO projections shared by the SQLite graph read operations. */
 
-import { toGraphSymbolRef, type GraphSymbolRef } from '@opensip-cli/graph/read';
+import { toGraphSymbolRef, type GraphSymbolRef, type Indexes } from '@opensip-cli/graph/read';
 
 import type { DeadCodeDto } from './graph-read-port.js';
 import type { Signal } from '@opensip-cli/core';
-import type { FunctionOccurrence, Indexes } from '@opensip-cli/graph';
 
 /** Project one graph occurrence into the public symbol DTO (or undefined if malformed). */
-export function toSymbolRef(occurrence: FunctionOccurrence): GraphSymbolRef | undefined {
+export function toSymbolRef(
+  occurrence: Parameters<typeof toGraphSymbolRef>[0],
+): GraphSymbolRef | undefined {
   return toGraphSymbolRef(occurrence);
 }
 
@@ -23,11 +24,17 @@ export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | u
   if (occurrence === undefined) return undefined;
   const symbol = toSymbolRef(occurrence);
   if (symbol === undefined) return undefined;
-  return { symbol, message: signal.message };
+  return {
+    symbol,
+    message: signal.message,
+    ruleId: 'graph:orphan-subtree',
+    reason: 'unreachable-from-inferred-entry-point',
+    ...(signal.suggestion === undefined ? {} : { suggestion: signal.suggestion }),
+  };
 }
 
 /** Clamp a caller-supplied limit to a positive integer, defaulting when absent. */
 export function clampLimit(limit: number | undefined, fallback: number): number {
-  if (limit === undefined || !Number.isFinite(limit) || limit <= 0) return fallback;
-  return Math.trunc(limit);
+  const selected = limit === undefined || !Number.isFinite(limit) || limit <= 0 ? fallback : limit;
+  return Math.min(500, Math.max(1, Math.trunc(selected)));
 }

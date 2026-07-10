@@ -8,11 +8,19 @@
  *
  * Filters (including module-init exclusion) run before the bounded top-K
  * window. Results are ordered by qualified name, file, line, column, symbolId
- * (code-point comparison). Retains at most `limit + 1` rows after `afterKey`.
+ * (code-point comparison). Continuation uses a compact hash identity, not the
+ * potentially large raw tuple.
  */
 
 import { err, ok, type Result } from '@opensip-cli/core';
 
+import {
+  codePointSortKey,
+  compareCodePointStrings,
+  matchesContinuationIdentity,
+} from '../code-point-order.js';
+
+import { boundedIterableGroups, insertBoundedTopK, type ReadGroupSummary } from './bounded-view.js';
 import {
   toGraphSymbolRef,
   type EffectiveGraphSourceFilter,
@@ -28,6 +36,7 @@ import type { Catalog, Indexes } from '../types.js';
 /** Match semantics for {@link searchSymbolOccurrences}. */
 export type SymbolSearchMatch = 'substring' | 'exact' | 'qualified';
 
+/** Match, filtering, grouping, and continuation options for symbol search. */
 export interface SymbolSearchQuery {
   readonly query: string;
   readonly match: SymbolSearchMatch;
@@ -35,18 +44,20 @@ export interface SymbolSearchQuery {
   /** Page size; builder retains at most `limit + 1` to prove another page. */
   readonly limit: number;
   /**
-   * Exclusive lower bound from a decoded cursor's `afterKey`.
-   * Only keys strictly greater (code-point order) are considered.
+   * Compact continuation token for the last row of the preceding page.
    */
   readonly afterKey?: string;
+  readonly groupBy?: 'none' | 'package' | 'file';
 }
 
+/** Bounded symbol-search results with effective filters and coverage metadata. */
 export interface SymbolSearchView {
   readonly symbols: readonly GraphSymbolRef[];
   /** True when more than `limit` matches exist after `afterKey`. */
   readonly hasMore: boolean;
   readonly effectiveFilter: EffectiveGraphSourceFilter;
   readonly coverage: GraphReadCoverage;
+  readonly groups?: readonly ReadGroupSummary[];
 }
 
 function searchError(message: string): GraphReadError {
@@ -54,26 +65,40 @@ function searchError(message: string): GraphReadError {
 }
 
 /**
- * Stable sort/page key: qualified\0file\0line\0col\0symbolId.
- * Code-point order on this string matches multi-field lexicographic order for
- * the numeric line/column fields when zero-padded; we compare fields separately
- * in {@link compareSymbolRefs} and use this string only for cursor keys.
+ * Printable stable key matching qualified/file/line/column/symbolId ordering.
  */
 export function symbolSearchStableKey(ref: GraphSymbolRef): string {
-  return `${ref.qualifiedName}\0${ref.filePath}\0${String(ref.line)}\0${String(ref.column)}\0${ref.symbolId}`;
+  return [
+    codePointSortKey(ref.qualifiedName),
+    codePointSortKey(ref.filePath),
+    String(ref.line).padStart(16, '0'),
+    String(ref.column).padStart(16, '0'),
+    codePointSortKey(ref.symbolId),
+  ].join('|');
 }
 
 /** Code-point multi-field comparison used for deterministic top-K order. */
 export function compareSymbolRefs(a: GraphSymbolRef, b: GraphSymbolRef): number {
-  if (a.qualifiedName < b.qualifiedName) return -1;
-  if (a.qualifiedName > b.qualifiedName) return 1;
-  if (a.filePath < b.filePath) return -1;
-  if (a.filePath > b.filePath) return 1;
+  const qualified = compareCodePointStrings(a.qualifiedName, b.qualifiedName);
+  if (qualified !== 0) return qualified;
+  const file = compareCodePointStrings(a.filePath, b.filePath);
+  if (file !== 0) return file;
   if (a.line !== b.line) return a.line - b.line;
   if (a.column !== b.column) return a.column - b.column;
-  if (a.symbolId < b.symbolId) return -1;
-  if (a.symbolId > b.symbolId) return 1;
-  return 0;
+  return compareCodePointStrings(a.symbolId, b.symbolId);
+}
+
+function* matchingSymbolRefs(
+  indexes: Indexes,
+  query: SymbolSearchQuery,
+): Generator<GraphSymbolRef> {
+  for (const occurrence of indexes.byOccId.values()) {
+    if (occurrence.kind === 'module-init') continue;
+    if (!matchesGraphSourceFilter(occurrence, query.filter)) continue;
+    if (!matchesQuery(occurrence, query.query, query.match)) continue;
+    const ref = toGraphSymbolRef(occurrence);
+    if (ref !== undefined) yield ref;
+  }
 }
 
 function matchesQuery(
@@ -98,6 +123,45 @@ function matchesQuery(
   }
 }
 
+function collectSearchWindow(
+  indexes: Indexes,
+  query: SymbolSearchQuery,
+  windowCap: number,
+): { readonly window: GraphSymbolRef[]; readonly omittedMalformed: number } {
+  const window: GraphSymbolRef[] = [];
+  let omittedMalformed = 0;
+  for (const occurrence of indexes.byOccId.values()) {
+    if (occurrence.kind === 'module-init') continue;
+    if (!matchesGraphSourceFilter(occurrence, query.filter)) continue;
+    if (!matchesQuery(occurrence, query.query, query.match)) continue;
+    const ref = toGraphSymbolRef(occurrence);
+    if (ref === undefined) {
+      omittedMalformed++;
+      continue;
+    }
+    if (
+      query.afterKey !== undefined &&
+      compareCodePointStrings(symbolSearchStableKey(ref), query.afterKey) <= 0
+    ) {
+      continue;
+    }
+    insertBoundedTopK(window, ref, windowCap, compareSymbolRefs);
+  }
+  return { window, omittedMalformed };
+}
+
+function resolveAfterStableKey(
+  indexes: Indexes,
+  query: SymbolSearchQuery,
+): string | null | undefined {
+  if (query.afterKey === undefined) return undefined;
+  for (const ref of matchingSymbolRefs(indexes, query)) {
+    const stableKey = symbolSearchStableKey(ref);
+    if (matchesContinuationIdentity(stableKey, query.afterKey)) return stableKey;
+  }
+  return null;
+}
+
 /**
  * Search catalog occurrences with filter-first semantics and a bounded top-K
  * window of size `limit + 1` after an optional exclusive `afterKey`.
@@ -112,61 +176,46 @@ export function searchSymbolOccurrences(
   try {
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
     const windowCap = limit + 1;
-    /** Bounded ascending window of the smallest matching keys after afterKey. */
-    const window: GraphSymbolRef[] = [];
-    let omittedMalformed = 0;
-    const needle = query.query;
-
-    for (const occ of indexes.byOccId.values()) {
-      if (occ.kind === 'module-init') continue;
-      if (!matchesGraphSourceFilter(occ, query.filter)) continue;
-      if (!matchesQuery(occ, needle, query.match)) continue;
-
-      const ref = toGraphSymbolRef(occ);
-      if (ref === undefined) {
-        omittedMalformed++;
-        continue;
-      }
-
-      if (query.afterKey !== undefined && symbolSearchStableKey(ref) <= query.afterKey) {
-        continue;
-      }
-
-      insertBoundedTopK(window, ref, windowCap);
+    const afterStableKey = resolveAfterStableKey(indexes, query);
+    if (afterStableKey === null) {
+      return err({
+        code: 'GRAPH.READ.CURSOR_INVALID',
+        operation: 'analysis',
+        message: 'Cursor continuation anchor is not present in this catalog view',
+      });
     }
+    const resolvedQuery = {
+      ...query,
+      ...(afterStableKey === undefined ? {} : { afterKey: afterStableKey }),
+    };
+    const { window, omittedMalformed } = collectSearchWindow(indexes, resolvedQuery, windowCap);
 
     const hasMore = window.length > limit;
     const symbols = hasMore ? window.slice(0, limit) : window;
     const reasons: string[] = [];
     if (omittedMalformed > 0) reasons.push('malformed-symbol-omitted');
+    const groupBy = query.groupBy ?? 'none';
+    const grouped =
+      groupBy === 'none'
+        ? undefined
+        : boundedIterableGroups(
+            () => matchingSymbolRefs(indexes, query),
+            (ref) => (groupBy === 'package' ? ref.package : ref.filePath),
+          );
+    if (grouped?.truncated === true) reasons.push('group-key-cap');
 
     return ok({
       symbols,
       hasMore,
       effectiveFilter: query.filter,
+      ...(grouped === undefined ? {} : { groups: grouped.groups }),
       coverage: {
-        complete: omittedMalformed === 0,
-        truncated: false,
+        complete: reasons.length === 0,
+        truncated: reasons.some((reason) => reason.endsWith('-cap')),
         reasons,
       },
     });
   } catch {
     return err(searchError('Failed to search symbol occurrences'));
   }
-}
-
-/**
- * Keep the `cap` smallest refs (by {@link compareSymbolRefs}) in ascending order.
- * O(n·cap) insertion; cap is the page window (limit+1 ≤ 501).
- */
-function insertBoundedTopK(window: GraphSymbolRef[], ref: GraphSymbolRef, cap: number): void {
-  if (window.length < cap) {
-    window.push(ref);
-    window.sort(compareSymbolRefs);
-    return;
-  }
-  const last = window.at(-1);
-  if (last === undefined || compareSymbolRefs(ref, last) >= 0) return;
-  window[window.length - 1] = ref;
-  window.sort(compareSymbolRefs);
 }

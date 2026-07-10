@@ -12,6 +12,7 @@ import {
   query as querySchema,
   searchMatch,
   sourceScope,
+  strictInput,
   visibilities,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
@@ -31,7 +32,7 @@ export function registerSearchSymbols(server: McpStdioServer, deps: McpToolDeps)
         'BEFORE the page limit. Returns symbolId ("<filePath>:<line>:<column>") + bodyHash — pass ' +
         'that symbolId to who_calls, callees_of, blast_radius, or trace_path. Use cursor from ' +
         'page.nextCursor for continuation; a missing catalog returns empty data (run refresh_graph).',
-      inputSchema: {
+      inputSchema: strictInput({
         query: querySchema(),
         match: searchMatch(),
         packages: packageArray(),
@@ -42,7 +43,7 @@ export function registerSearchSymbols(server: McpStdioServer, deps: McpToolDeps)
         sourceScope: sourceScope(),
         generated: generatedPolicy(),
         ...pageFields(),
-      },
+      }),
     },
     async (args) => {
       const outcome = await deps.graph.searchSymbols(args.query, {

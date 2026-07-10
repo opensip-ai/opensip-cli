@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-07-09
+last_verified: 2026-07-10
 owner: opensip-cli
 ---
 
@@ -13,45 +13,81 @@ date: 2026-07-09
 status: active
 supersedes: []
 superseded_by: null
-related: [ADR-0084, ADR-0147, ADR-0148, ADR-0003]
+related: [ADR-0003, ADR-0084, ADR-0109, ADR-0123, ADR-0130, ADR-0147, ADR-0148]
 tags: [mcp, graph, audit, package, runtime-wiring]
 enforcement: mechanizable
-enforced-by: ['script:graph-handlers', 'script:tool-descriptor', 'script:public-read-surface']
+enforced-by: ['script:public-read-surface.test.ts', 'script:graph-handlers.test.ts', 'script:live-runtime-wiring-read-port.test.ts', 'script:e2e-stdio.test.ts', 'depcruise:no-cross-package-internal', 'depcruise:mcp-graph-internal-scope', 'eslint:mcp-no-current-scope']
 enforcement-reason: >
-  Handler/port tests, exact 19-tool inventory, and graph/read surface locks prove
-  occurrence defaults, package/runtime evidence labels, and protocol-only tools.
+  Public API locks, SDK handler and hostile runtime-wiring tests, built stdio
+  inventory tests, dependency-cruiser, and the MCP currentScope import rule
+  enforce the evidence, bounds, injection, and package-boundary contracts.
 ```
 
-**Decision:** MCP audit evidence is precise by default, labelled by kind, and
-bounded on every high-volume path.
+## Decision
 
-- **Traversal identity** defaults to occurrence (`symbolId`). Body-twin-union is
-  explicit and built by filtering both endpoints of the canonical
-  `resolveCallee` occurrence edge stream before grouping by body hash — never by
-  filtering global `Indexes.callers`/`callees` after union.
-- **Package evidence** exposes call edges, import edges, why-depends samples, and
-  edge-kind-specific package SCCs as separate labelled rows. Combined views keep
-  labels; they do not invent one unlabeled count.
-- **Runtime wiring** is a separate injected port projecting admitted
-  registry/manifests/provenance/`CommandSpec` facts. It is not a static call
-  edge and does not import CLI/Commander.
-- **Paging** uses project/generation/query-bound base64url cursors; `page.nextCursor`
-  and `coverage.truncated` are independent. Default page 100, max 500; walks
-  depth ≤5 and ≤2,000 nodes; groups ≤500; final JSON ≤4 MiB.
-- **Protocol tools only:** `package_dependencies`, `why_depends`, `package_cycles`,
-  and `get_runtime_wiring` are MCP registrations inside `registerMcpTools`, not
-  OpenSIP Tool plugins. Final default inventory is 19 tools.
+MCP audit evidence is occurrence-precise by default, labelled by evidence kind
+and confidence, bounded on every high-volume path, and tied to one project,
+generation, and normalized query.
 
-All graph feature reads extend `@opensip-cli/graph/read` free functions returning
-`Result`. MCP never imports `CatalogRepo`, raw `Indexes`, or `graph/internal` in
-production.
+- **Call evidence:** traversal defaults to occurrence `symbolId`. Explicit
+  body-twin reachability first filters both endpoints of canonical occurrence
+  edges, then groups surviving occurrences by body hash. Excluded owners or
+  targets cannot leak back through a global twin adjacency.
+- **Package evidence:** call and import edges remain distinct. Combined views
+  preserve labels and proving samples; `why_depends` and package SCCs do not
+  turn different evidence sources into an unexplained count.
+- **Runtime evidence:** `RuntimeWiringReadPort` is an injected, immutable view of
+  captured admitted manifests, provenance, the live registry, CommandSpecs,
+  nesting, host-mount contracts, handler dispatch, and external worker posture.
+  It is not a source call graph. Accessor command surfaces are refused rather
+  than invoked, handler source is never stringified, and raw provenance paths or
+  manifest hashes are never exposed. Top-level host commands remain an explicit
+  coverage gap.
+- **Bounds:** default page size is 100 and maximum 500; page continuation and
+  coverage truncation are separate. Walk depth is at most 5 and visited nodes at
+  most 2,000. Runtime snapshots stop at 10,000 nodes and 20,000 edges, text at
+  256 characters, groups at 500, and final JSON at 4 MiB. A ceiling yields
+  partial coverage or a bounded typed error, never silent omission.
+- **Protocol:** strict schemas reject unknown keys and hostile enum/path/cursor
+  values. Cursors bind the project key, opaque generation/snapshot key, query
+  digest, and a compact `r1:` SHA-256 identity of the stable continuation key
+  (never the potentially large raw sort tuple). Tool-dispatch completion logs
+  carry only the registered tool name, bounded duration, and `ok`, `tool-error`,
+  or `thrown` outcome.
 
-**Alternatives:**
-- Keep body-twin default for all walks — rejected: misattributes callers across twins.
-- Fold runtime wiring into graph edges — rejected: confuses static and live evidence.
-- Ship package tools as OpenSIP Tool plugins — rejected: no gate/signal/session surface needed.
+The four protocol additions are `package_dependencies`, `why_depends`,
+`package_cycles`, and `get_runtime_wiring`. Together with the existing surface,
+the exact default inventory is 19; mutation opt-in adds only
+`repair_apply_verify` for 20. These are MCP registrations, not new OpenSIP Tool
+plugins or session-producing runs.
 
-**Consequences:**
-- Architecture audits can attribute call/import/runtime evidence honestly.
-- Agents page large fan-in without overflowing context.
-- Spec 20 boundary remains the sole sanctioned graph consumption path.
+All graph feature reads cross the free-function `@opensip-cli/graph/read`
+boundary and return `Result`. MCP production does not import graph repositories,
+rules, raw indexes, `graph/internal`, or ambient `currentScope` state.
+
+## Alternatives
+
+- Use one representative twin as the caller/callee result: rejected because the
+  chosen occurrence can have different owners, visibility, and edges.
+- Union twins before filtering endpoints: rejected because excluded test or
+  generated occurrences can fabricate production reachability.
+- Merge call/import/runtime evidence into one unlabeled graph: rejected because
+  an audit could no longer state what actually proves a boundary.
+- Derive live manifest/CommandSpec wiring from static calls only: rejected
+  because registration and function-valued dispatch are runtime composition.
+- Put runtime wiring into the graph engine: rejected because it would move host
+  vocabulary into the language-agnostic graph domain.
+- Return unbounded arrays or persist cursors: rejected for memory/context safety
+  and because cursors describe one ephemeral generation/query.
+
+## Consequences
+
+- Architecture audits can distinguish static call, import, and live runtime
+  composition evidence and report confidence/coverage honestly.
+- Large fan-in, package, twin, and wiring queries have deterministic continuation
+  and explicit hard-cap reasons.
+- Result replay remains independent and session-free; refresh remains the sole
+  graph mutation.
+- Spec 20 and ADR-0147 remain the sanctioned graph-consumption boundary.
+
+**Related plans and decisions:** [Spec 21](../plans/specs/21-mcp-graph-audit-readiness.md), its [ready plan](../plans/ready/mcp-graph-audit-readiness/plan.md), the [Spec 20 modular-boundary prerequisite](../plans/specs/20-modular-monolith-boundary-hardening.md), [ADR-0147](./ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md), [ADR-0148](./ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md), [ADR-0084](./ADR-0084-mcp-server-surface.md), [ADR-0003](./ADR-0003-per-occurrence-edge-keying.md), [ADR-0109](./ADR-0109-mcp-first-agent-guidance-init-refresh.md), [ADR-0123](./ADR-0123-impact-analysis-trust-foundation.md), and [ADR-0130](./ADR-0130-mcp-repo-scoped-session-reads.md).

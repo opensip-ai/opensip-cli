@@ -17,7 +17,7 @@ import {
   type RunScope,
   type ToolCliContext,
 } from '@opensip-cli/core';
-import { rebuildCatalog } from '@opensip-cli/graph/read';
+import { loadGraphReadConfig, rebuildCatalog, type Catalog } from '@opensip-cli/graph/read';
 
 import { LiveRuntimeWiringReadPort } from './live-runtime-wiring-read-port.js';
 import { fromGraphReadError } from './mcp-error.js';
@@ -29,7 +29,6 @@ import { registerMcpTools } from './tools/register.js';
 
 import type { McpReadError } from './mcp-error.js';
 import type { DataStore } from '@opensip-cli/datastore';
-import type { Catalog } from '@opensip-cli/graph';
 
 interface McpCommandOptions {
   readonly allowMutations?: boolean;
@@ -80,6 +79,7 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
 
     const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
     const configPath = scope.projectContext?.configPath ?? 'opensip-cli.config.yml';
+    const graphConfig = loadGraphReadConfig(projectRoot, configPath);
     // Capture graph adapters once from the entered scope — never currentScope().
     const graphScope = scope.graph;
     if (graphScope === undefined) {
@@ -95,7 +95,10 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     const adapters = graphScope.adapters;
 
     async function rebuild(): Promise<Result<Catalog, McpReadError>> {
-      const outcome = await rebuildCatalog({ cwd: projectRoot, datastore: store });
+      const outcome = await rebuildCatalog({
+        cwd: projectRoot,
+        datastore: store,
+      });
       if (!outcome.ok) {
         return err(fromGraphReadError(outcome.error));
       }
@@ -107,12 +110,18 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       projectRoot,
       configPath,
       adapters,
+      languageAdapters: scope.languages.list(),
+      config: graphConfig,
       rebuild,
       log: (evt, fields) => {
         logger.info({ evt, module: 'mcp:graph', ...fields });
       },
     });
-    const results = new SessionResultsReadPort({ store, projectRoot, tools: scope.tools });
+    const results = new SessionResultsReadPort({
+      store,
+      projectRoot,
+      tools: scope.tools,
+    });
     const runtimeWiring = new LiveRuntimeWiringReadPort({
       projectRoot,
       tools: scope.tools,

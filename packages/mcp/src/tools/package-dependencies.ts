@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
+import { packageSourceFilter, packageToolResult } from './package-tool-helpers.js';
 import {
-  packageArray,
   packageEdgeKind,
   pageFields,
-  productionGeneratedPolicy,
-  productionSourceScope,
   packageName,
+  sourceFilterFields,
+  strictInput,
 } from './schemas.js';
-import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
@@ -23,32 +22,25 @@ export function registerPackageDependencies(server: McpStdioServer, deps: McpToo
         'Default edgeKind is call (production resolved call coupling). Import edges come from ' +
         'module-init dependencies and may be partial on fast catalogs. Use why_depends for a ' +
         'specific package pair and package_cycles for SCCs.',
-      inputSchema: {
+      inputSchema: strictInput({
         edgeKind: packageEdgeKind(),
         package: packageName().optional(),
         direction: z.enum(['out', 'in', 'both']).default('out'),
-        packages: packageArray(),
-        sourceScope: productionSourceScope(),
-        generated: productionGeneratedPolicy(),
+        ...sourceFilterFields('production'),
         ...pageFields(),
-      },
+      }),
     },
-    async (args) => {
-      const outcome = await deps.graph.packageDependencies({
-        edgeKind: args.edgeKind,
-        package: args.package,
-        direction: args.direction,
-        filter: {
-          packages: args.packages,
-          sourceScope: args.sourceScope,
-          generated: args.generated,
-        },
-        limit: args.limit,
-        cursor: args.cursor,
-        groupBy: args.groupBy,
-      });
-      if (!outcome.ok) return errorResult(outcome.error);
-      return jsonResult(outcome.value);
-    },
+    async (args) =>
+      packageToolResult(
+        deps.graph.packageDependencies({
+          edgeKind: args.edgeKind,
+          package: args.package,
+          direction: args.direction,
+          filter: packageSourceFilter(args),
+          limit: args.limit,
+          cursor: args.cursor,
+          groupBy: args.groupBy,
+        }),
+      ),
   );
 }

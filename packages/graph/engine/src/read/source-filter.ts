@@ -2,6 +2,8 @@
  * One pure source-filter predicate for every public graph audit read view.
  */
 
+import { graphPackageOf } from './query-contracts.js';
+
 import type { FunctionOccurrence } from '../types.js';
 import type { GraphSourceFilter } from './query-contracts.js';
 
@@ -20,7 +22,7 @@ export function matchesGraphSourceFilter(
   if (!matchesGenerated(row.definedInGenerated, filter.generated)) return false;
 
   if (filter.packages !== undefined && filter.packages.length > 0) {
-    const packageName = row.package ?? packageFallback(row.filePath);
+    const packageName = graphPackageOf(row);
     if (!filter.packages.includes(packageName)) return false;
   }
 
@@ -93,7 +95,15 @@ export function matchesFilePrefix(filePath: string, filePrefix: string): boolean
   return filePath.startsWith(`${filePrefix}/`);
 }
 
-function packageFallback(filePath: string): string {
-  const first = filePath.split('/').find((segment) => segment.length > 0);
-  return first ?? '(unknown)';
+/** Whether a read uses the canonical production/non-generated evidence scope. */
+export function isCanonicalProductionFilter(filter: GraphSourceFilter): boolean {
+  return (
+    filter.sourceScope === 'production' &&
+    filter.generated === 'exclude' &&
+    filter.packages === undefined &&
+    filter.filePath === undefined &&
+    filter.filePrefix === undefined &&
+    filter.kinds === undefined &&
+    filter.visibilities === undefined
+  );
 }

@@ -32,8 +32,10 @@ export function jsonResult(payload: unknown): CallToolResult {
 
 /** Surface a structured domain error as an `isError` result (machine-readable body). */
 export function errorResult(error: McpReadError): CallToolResult {
+  const sized = assertJsonPayloadSize({ error });
+  const text = sized.ok ? sized.value : JSON.stringify({ error: sized.error }, null, 2);
   return {
-    content: [{ type: 'text', text: JSON.stringify({ error }, null, 2) }],
+    content: [{ type: 'text', text }],
     isError: true,
   };
 }

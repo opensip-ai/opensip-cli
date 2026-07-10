@@ -9,6 +9,7 @@ import {
   pageFields,
   productionGeneratedPolicy,
   productionSourceScope,
+  strictInput,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
@@ -26,14 +27,14 @@ export function registerGetArchitecture(server: McpStdioServer, deps: McpToolDep
         'hotspots (filtered before ranking), and bounded target convention counts when configured. ' +
         'Defaults to production/non-generated evidence. Use package_dependencies / package_cycles ' +
         'for exhaustive package evidence. Cursor continues package-edge pages.',
-      inputSchema: {
+      inputSchema: strictInput({
         packages: packageArray(),
         filePath: exactFilePath().optional(),
         filePrefix: filePrefix().optional(),
         sourceScope: productionSourceScope(),
         generated: productionGeneratedPolicy(),
         ...pageFields(),
-      },
+      }),
     },
     async (args) => {
       const outcome = await deps.graph.architectureSummary({

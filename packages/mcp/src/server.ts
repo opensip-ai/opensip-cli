@@ -21,21 +21,18 @@
  *      (`mcp.server.start|stop`, `mcp.tool.dispatch[.ok|.error]`). No `console.*`
  *      / `process.stdout.write` for diagnostics anywhere in the serve path.
  *
- * No tools are registered here yet — Phase 4 mounts the catalog onto this server
- * through the {@link McpStdioServer.register} seam (which guarantees the
- * scope-wrap for every handler). The server resolves its lifetime promise on
- * stdin EOF (or a SIGINT-driven graceful close); it never calls `process.exit`,
- * leaving the final exit code to the host command handler.
+ * The composition root mounts the bounded protocol catalog through
+ * {@link McpStdioServer.register}, which guarantees the scope wrapper for every
+ * handler. The server resolves its lifetime promise on stdin EOF (or a
+ * SIGINT-driven graceful close); it never calls `process.exit`, leaving the
+ * final exit code to the host command handler.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  configureLogger,
-  formatUnknownErrorMessage,
-  logger,
-  runWithScope,
-} from '@opensip-cli/core';
+import { configureLogger, logger, runWithScope } from '@opensip-cli/core';
+
+import { sanitizeMcpErrorMessage } from './mcp-error.js';
 
 import type { GraphReadPort } from './graph-read-port.js';
 import type { ResultsReadPort } from './results-read-port.js';
@@ -63,9 +60,9 @@ export interface McpStdioServerDeps {
    * fix for the SDK's EventEmitter dispatch dropping AsyncLocalStorage.
    */
   readonly scope: RunScope;
-  /** Pre-built graph read port (Phase 2). */
+  /** Pre-built graph read port. */
   readonly graph: GraphReadPort;
-  /** Pre-built results/history read port (Phase 2). */
+  /** Pre-built results/history read port. */
   readonly results: ResultsReadPort;
   /** Server version advertised in the handshake (the `@opensip-cli/mcp` version). */
   readonly version: string;
@@ -75,7 +72,7 @@ export interface McpStdioServerDeps {
  * A long-lived stdio MCP server bound to one captured {@link RunScope}.
  *
  * Construct with pre-built ports + the captured scope, register tools through
- * {@link register} (Phase 4), then `await serve()` — the promise resolves when
+ * {@link register}, then `await serve()` — the promise resolves when
  * the transport closes (stdin EOF / graceful SIGINT).
  */
 export class McpStdioServer {
@@ -83,9 +80,9 @@ export class McpStdioServer {
   private readonly transport: StdioServerTransport;
   private readonly scope: RunScope;
   private readonly version: string;
-  /** The graph read port handlers close over (Phase 4 reads it). */
+  /** The graph read port handlers close over. */
   readonly graph: GraphReadPort;
-  /** The results read port handlers close over (Phase 4 reads it). */
+  /** The results read port handlers close over. */
   readonly results: ResultsReadPort;
 
   constructor(deps: McpStdioServerDeps) {
@@ -131,7 +128,7 @@ export class McpStdioServer {
           module: LOG_MODULE,
           tool: name,
           outcome: result.isError === true ? 'tool-error' : 'ok',
-          durationMs: Date.now() - started,
+          durationMs: Math.max(0, Date.now() - started),
         });
         return result;
       } catch (error) {
@@ -141,11 +138,15 @@ export class McpStdioServer {
           evt: 'mcp.tool.dispatch.error',
           module: LOG_MODULE,
           tool: name,
-          outcome: 'failed',
-          durationMs: Date.now() - started,
-          error: formatUnknownErrorMessage(error),
+          outcome: 'thrown',
+          durationMs: Math.max(0, Date.now() - started),
         });
-        throw error;
+        throw new Error(
+          sanitizeMcpErrorMessage(error, {
+            projectRoot: this.scope.projectContext?.projectRoot,
+          }),
+          { cause: error },
+        );
       }
     });
   }
@@ -199,7 +200,11 @@ export class McpStdioServer {
       process.stdin.removeListener('end', shutdown);
       process.stdin.removeListener('close', shutdown);
       process.removeListener('SIGINT', shutdown);
-      logger.info({ evt: 'mcp.server.stop', module: LOG_MODULE, server: SERVER_NAME });
+      logger.info({
+        evt: 'mcp.server.stop',
+        module: LOG_MODULE,
+        server: SERVER_NAME,
+      });
     }
   }
 }

@@ -66,12 +66,17 @@ until the client closes stdin:
 | Command | `opensip` (or `node /path/to/opensip-cli/packages/cli/dist/index.js` when developing the CLI itself) |
 | Args | `mcp`, `--cwd`, `<absolute-project-path>` |
 | Transport | stdio (JSON-RPC on stdout; logs on stderr) |
-| Flags | Only `--cwd` matters for MCP — graph/result parameters are MCP tool args, not CLI flags |
+| Flags | `--cwd <path>` selects the project; optional `--allow-mutations` adds only `repair_apply_verify`. Graph/result parameters are MCP tool args, not CLI flags. |
 
 Use an **absolute path** for `--cwd` unless the client provides a project-root
 variable (Claude Code's `${CLAUDE_PROJECT_DIR}`). MCP result tools are scoped to
 that project root: runs recorded under another root are treated as not found
 ([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)).
+
+The server is read-only by default. To opt in to `repair_apply_verify`, append
+`--allow-mutations` to the registered args or set
+`OPENSIP_MCP_ALLOW_MUTATIONS=1` in the server environment. This adds only that
+20th tool; it does not change graph/result query parameters.
 
 ---
 
@@ -103,10 +108,26 @@ team standardizes in docs/onboarding.
 ### Verify
 
 1. Restart Cursor or reload MCP servers from Settings.
-2. Open the MCP panel — `opensip` should appear with **15 tools** (9 graph + 6 result/review). Mutating repair apply/verify is off by default; starting the server with `--allow-mutations` adds `repair_apply_verify` as a 16th tool.
+2. Open the MCP panel — `opensip` should appear with exactly **19 tools** (12 graph, one live runtime-wiring, and 6 result/review). Mutating repair apply/verify is off by default; starting the server with `--allow-mutations` adds only `repair_apply_verify` as a 20th tool.
 3. Ask the agent: *"Use OpenSIP to call `get_architecture` and summarize the graph."*
 4. Ask a result replay question: *"Use OpenSIP MCP to show the latest `fit`
    findings before deciding whether to re-run fit."*
+
+For graph answers, verify the configured project root, opaque `g1:` generation
+and source, freshness completeness/reasons, effective filters, evidence labels,
+coverage truncation/hard-cap reasons, and any continuation cursor. Project and
+generation cursor keys are distinct; keep filters stable across pages. Call
+`package_dependencies`, `why_depends`, or `package_cycles` for labelled
+call/import package evidence, and `get_runtime_wiring` for live
+manifest/registry/CommandSpec evidence that a static path cannot prove.
+See [ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md)
+for lifecycle/freshness, [ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md)
+for query/evidence bounds, and [ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
+for the public graph-read boundary.
+
+For symbol lookup, `search_symbols` defaults to a case-insensitive substring of
+the simple name. Set `match` to `exact` for a case-sensitive simple-name match or
+to `qualified` for a case-sensitive qualified-name match.
 
 ---
 
@@ -277,10 +298,13 @@ Once connected, steer the agent toward result-first and graph-aware queries:
 
 > Use OpenSIP `get_latest_findings` for tool `fit` — do not run `opensip fit` again.
 
-**Stale catalog:**
+**Catalog lifecycle:**
 
-> OpenSIP reports `freshness.fresh === false`. Call `refresh_graph` once, then
-> show blast radius for the symbol you found.
+> If a separate `opensip graph` just completed, make the next ordinary MCP graph
+> read and verify that it reports the new `g1:` generation with
+> `generationSource: persisted-auto-swap`; do not refresh merely to reload it.
+> Call `refresh_graph` only when missing/stale evidence explicitly requires a
+> fresh build, then show blast radius for the resolved symbol.
 
 See [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) for the broader
 Discover → Edit → Final CLI loops.
@@ -296,6 +320,8 @@ Discover → Edit → Final CLI loops.
 | Connected but no useful data | Empty catalog / no sessions | Run `opensip graph` and at least one `opensip fit` |
 | Run exists but `list_runs` does not show it | The run was recorded under a different project root | Verify with `opensip sessions list --json`, then restart MCP with the right `--cwd` |
 | `refresh_graph` times out | Large repo, default client timeout | Raise `tool_timeout_sec` (Codex) or per-server `timeout` in `.mcp.json` (Claude) |
+| Cursor is stale or rejected | Project, catalog generation, query filters, or cursor bytes changed | Restart at the first page; do not reuse or edit an opaque cursor |
+| Response is partial/truncated | Freshness evidence or a hard resource cap is incomplete | Inspect reasons, narrow filters, and continue `page.nextCursor` before making a completeness claim |
 | Tools missing after connect | Server still starting | Wait and recheck `/mcp`; Codex/Claude retry transient failures |
 | Claude ignores `.mcp.json` | Untrusted workspace | Run `claude` interactively and approve project MCP servers |
 

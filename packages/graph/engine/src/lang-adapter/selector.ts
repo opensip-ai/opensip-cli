@@ -65,7 +65,7 @@ export class GraphAdapterSelector {
     if (cwd !== undefined && cwd.length > 0) {
       const dominant = this.pickByFileDominance(cwd);
       if (dominant) return dominant;
-      this.warnNoMatchingAdapter(cwd);
+      this.warnNoMatchingAdapter();
     }
     return this.fallbackAdapter();
   }
@@ -86,7 +86,7 @@ export class GraphAdapterSelector {
     /* v8 ignore stop */
   }
 
-  private warnNoMatchingAdapter(cwd: string): void {
+  private warnNoMatchingAdapter(): void {
     logger.warn({
       evt: 'graph.lang_adapter.no_match',
       module: 'graph:lang-adapter',
@@ -97,7 +97,6 @@ export class GraphAdapterSelector {
         'adapter (e.g. @opensip-cli/graph-go, @opensip-cli/graph-java) ' +
         'or list it under plugins.graphAdapters in opensip-cli.config.yml.',
       registered: this.registry.getAll().map((entry) => entry.id),
-      cwd,
     });
   }
 

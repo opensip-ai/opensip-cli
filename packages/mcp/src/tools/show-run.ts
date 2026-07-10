@@ -9,7 +9,12 @@
 
 import { z } from 'zod';
 
-import { toolId as toolIdSchema } from './schemas.js';
+import {
+  boundedText,
+  sessionRef as sessionRefSchema,
+  strictInput,
+  toolId as toolIdSchema,
+} from './schemas.js';
 import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -28,12 +33,12 @@ export function registerShowRun(server: McpStdioServer, deps: McpToolDeps): void
         'shape as `opensip sessions show`. Replays persisted sessions and never re-runs ' +
         'fit/graph/yagni/sim. Do not grep .runtime/logs, read datastore.sqlite directly, or ' +
         're-run a CLI tool to answer stored-result questions.',
-      inputSchema: {
-        ref: z.string().min(1).max(128),
+      inputSchema: strictInput({
+        ref: sessionRefSchema(),
         tool: toolIdSchema().optional(),
-        filters: z.array(z.string().min(1).max(64)).max(16).optional(),
+        filters: z.array(boundedText(64, 'filter')).max(16).optional(),
         raw: z.boolean().optional(),
-      },
+      }),
     },
     async ({ ref, tool, filters, raw }) => {
       if (tool !== undefined && !deps.validToolIds.has(tool)) {

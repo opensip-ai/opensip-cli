@@ -1,26 +1,10 @@
 import { z } from 'zod';
 
-import { cursor, pageLimit } from './schemas.js';
+import { boundedName, cursor, pageLimit, strictInput } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
-
-const name256 = () =>
-  z
-    .string()
-    .min(1)
-    .max(256)
-    .refine(
-      (v) => {
-        for (let i = 0; i < v.length; i++) {
-          const c = v.codePointAt(i) ?? 0;
-          if (c <= 0x1f || c === 0x7f) return false;
-        }
-        return true;
-      },
-      { message: 'must not contain control characters' },
-    );
 
 export function registerGetRuntimeWiring(server: McpStdioServer, deps: McpToolDeps): void {
   server.register(
@@ -33,22 +17,18 @@ export function registerGetRuntimeWiring(server: McpStdioServer, deps: McpToolDe
         'source-level call graph — use trace_path from a separately resolved handler symbol for ' +
         'static calls. Edges are labelled by source (manifest/provenance/registry/command-spec/' +
         'host-contract) with confidence and unresolved static bridges.',
-      inputSchema: {
-        tool: name256().optional(),
-        command: name256().optional(),
-        provenanceSource: name256().optional(),
+      inputSchema: strictInput({
+        tool: boundedName('tool').optional(),
+        command: boundedName('command').optional(),
+        provenanceSource: z
+          .enum(['bundled', 'installed', 'user-global', 'project-local'])
+          .optional(),
         limit: pageLimit(),
         cursor: cursor(),
-        groupBy: z.enum(['none', 'package', 'file', 'tool', 'source']).default('none'),
-      },
+        groupBy: z.enum(['none', 'tool', 'source']).default('none'),
+      }),
     },
     async (args) => {
-      if (deps.runtimeWiring === undefined) {
-        return errorResult({
-          code: 'runtime-wiring-unavailable',
-          message: 'Runtime wiring port is not configured for this server.',
-        });
-      }
       const outcome = await deps.runtimeWiring.query({
         tool: args.tool,
         command: args.command,

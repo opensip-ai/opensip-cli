@@ -151,15 +151,35 @@ Projects can override built-in recipes in `opensip-cli.config.yml`.
 
 For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
 register `opensip mcp` as a stdio server instead of shelling out for every graph
-or findings query. By default the server exposes 15 read-only tools: graph traversal (`who_calls`,
-`blast_radius`, …), result replay (`get_latest_findings`, `show_run`, …), and
-review helpers (`review_change`, `compare_to_baseline`).
+or findings query. By default the server exposes exactly 19 tools: 12 graph
+tools (with `refresh_graph` the sole graph mutation), one read-only live
+runtime-wiring tool, and six persisted result/review tools. Mutation opt-in adds
+only `repair_apply_verify` for 20.
+
+Before using graph evidence, verify the canonical project context, distinct
+project and `g1:` generation identities, generation source, complete/partial
+freshness reasons, effective filters, evidence kind/confidence, truncation and
+hard-cap reasons, and cursor continuation. A newly persisted external
+`opensip graph` catalog auto-loads on the next ordinary read; do not call
+`refresh_graph` merely to reload it. Reserve refresh for missing/stale evidence
+that explicitly needs a new build.
+
+Use `package_dependencies`, `why_depends`, and `package_cycles` for labelled
+call/import boundary evidence. Use `get_runtime_wiring` for admitted
+manifest/registry/CommandSpec/host-mount paths that static traversal cannot
+prove. Direct source, configuration, and tests remain the final proof.
 
 For existing-result questions, MCP is the first source of truth. Do not grep
 `.runtime/logs`, read `datastore.sqlite` directly, or re-run `fit` / `graph` /
 `yagni` / `sim` just to answer what the last stored run reported; those are
 fallback/debug paths. See
 [ADR-0109](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
+Catalog auto-swap/freshness is governed by
+[ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md);
+bounded labelled query/runtime evidence by
+[ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md).
+MCP production reaches graph internals only through the public read facade in
+[ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.1/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md).
 
 Setup is client-specific (JSON vs TOML, config file locations, approval flows).
 See **[Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)** for copy-paste config for

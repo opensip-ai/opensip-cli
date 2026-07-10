@@ -53,11 +53,21 @@ describe('phantom-dependency-detection (AST)', () => {
         `import { thing } from 'declared-pkg'`,
         `import { readFileSync } from 'node:fs'`,
         `import { readFile } from 'fs/promises'`,
+        `import { DatabaseSync } from 'node:sqlite'`,
+        `import test from 'node:test'`,
         `import { local } from './local.js'`,
-        `export const y = thing + readFileSync.name + readFile.name + local`,
+        `export const y = thing + readFileSync.name + readFile.name + DatabaseSync.name + test.name + local`,
       ].join('\n'),
     });
     expect(matches).toEqual([]);
+  });
+
+  it('still treats a prefix-required builtin name without node: as an external package', async () => {
+    const matches = await phantomMatches({
+      path: 'a.ts',
+      content: `import { DatabaseSync } from 'sqlite'\nexport const y = DatabaseSync.name`,
+    });
+    expect(matches).toEqual(['sqlite']);
   });
 
   it('IGNORES import-like text inside a string literal (the AST invariant)', async () => {

@@ -10,6 +10,7 @@ import {
   packageArray,
   pageFields,
   sourceScope,
+  strictInput,
   visibilities,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
@@ -28,7 +29,7 @@ export function registerFindDeadCode(server: McpStdioServer, deps: McpToolDeps):
         'pagination. Each finding carries symbolId + reason. page.nextCursor continues a full ' +
         'orphan evaluation; coverage.truncated is reserved for hard evaluation caps, not paging. ' +
         'Reads the catalog only — no filesystem walk.',
-      inputSchema: {
+      inputSchema: strictInput({
         packages: packageArray(),
         filePath: exactFilePath().optional(),
         filePrefix: filePrefix().optional(),
@@ -37,7 +38,7 @@ export function registerFindDeadCode(server: McpStdioServer, deps: McpToolDeps):
         sourceScope: sourceScope(),
         generated: generatedPolicy(),
         ...pageFields(),
-      },
+      }),
     },
     async (args) => {
       const outcome = await deps.graph.deadCode({

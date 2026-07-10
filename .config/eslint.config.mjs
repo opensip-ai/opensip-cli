@@ -492,6 +492,32 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
+  // mcp-no-current-scope (ADR-0084 / ADR-0149) — MCP production handlers use captured, pre-built
+  // dependencies. The server may re-enter its captured scope with runWithScope,
+  // but production MCP code must never recover ambient state with currentScope.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['packages/mcp/src/**/*.ts'],
+    ignores: ['packages/mcp/src/**/__tests__/**', 'packages/mcp/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@opensip-cli/core',
+              importNames: ['currentScope'],
+              message:
+                'MCP production must use captured, pre-built dependencies. ' +
+                'Only runWithScope at the server dispatch boundary is permitted.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // ADR-0010 ratchet — a migrated graph adapter must not import web-tree-sitter.
   //
   // A migrated graph adapter parses via its @opensip-cli/lang-* package and

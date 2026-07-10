@@ -9,6 +9,7 @@ import {
   depth as depthSchema,
   pageFields,
   sourceFilterFields,
+  strictInput,
   symbolId as symbolIdSchema,
   traversalIdentity,
 } from './schemas.js';
@@ -34,13 +35,13 @@ export function registerCallWalkTool(
     {
       title: spec.title,
       description: spec.description,
-      inputSchema: {
+      inputSchema: strictInput({
         symbolId: symbolIdSchema(),
         depth: depthSchema(),
         identity: traversalIdentity(),
         ...sourceFilterFields(),
         ...pageFields(),
-      },
+      }),
     },
     async (args) => {
       const outcome = await graphPort.traverse({

@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
+import { compareCodePointStrings, continuationToken } from '../code-point-order.js';
 import { buildIndexes } from '../pipeline/indexes.js';
-import { buildArchitectureView } from '../read/architecture-view.js';
+import {
+  boundedArchitectureRows,
+  buildArchitectureView,
+  hotspotStableKey,
+  packageEdgeStableKey,
+} from '../read/architecture-view.js';
 import { type GraphSourceFilter } from '../read/query-contracts.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
+
+function reversed<T>(values: readonly T[]): T[] {
+  return values.reduceRight<T[]>((output, value) => {
+    output.push(value);
+    return output;
+  }, []);
+}
 
 function occ(
   partial: Partial<FunctionOccurrence> &
@@ -62,6 +75,14 @@ function makeCatalog(): Catalog {
               resolution: 'unknown',
               confidence: 'low',
               text: 'maybe()',
+            },
+            {
+              to: [],
+              line: 4,
+              column: 2,
+              resolution: 'unknown',
+              confidence: 'low',
+              text: 'duplicate persisted maybe()',
             },
           ],
         }),
@@ -138,23 +159,42 @@ describe('buildArchitectureView', () => {
     expect(ce.catalogResolutionMode).toBe('exact');
     expect(ce.resolvedCallSites).toBeGreaterThanOrEqual(1);
     expect(ce.resolvedTargets).toBeGreaterThanOrEqual(1);
-    expect(ce.unresolvedCallSites).toBeGreaterThanOrEqual(1);
+    expect(ce.unresolvedCallSites).toBe(1);
     expect(ce.confidence.high).toBeGreaterThanOrEqual(1);
     expect(ce.resolution.static).toBeGreaterThanOrEqual(1);
+    expect(ce.distributionCountUnit).toBe('resolved-targets-plus-unresolved-call-sites');
+    expect(ce.resolvedTargetConfidence.countUnit).toBe('resolved-targets');
+    expect(ce.unresolvedCallSiteConfidence.countUnit).toBe('unresolved-call-sites');
+    expect(ce.unresolvedCallSiteConfidence.values).toEqual({ low: 1 });
+    expect(ce.unresolvedCallSiteResolution.values).toEqual({ unknown: 1 });
+    expect(ce.nodeIdentity).toBe('occurrence');
+    expect(ce.sourceScope).toBe('production');
+    expect(ce.generated).toBe('exclude');
   });
 
   it('returns package edges (not only degree) for production default', () => {
     const result = view({ sourceScope: 'production', generated: 'exclude' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.packageCount).toBeGreaterThanOrEqual(2);
+    expect(result.value.packageCount.value).toBeGreaterThanOrEqual(2);
+    expect(result.value.packageCount).toMatchObject({
+      nodeIdentity: 'package',
+      sourceScope: 'production',
+      generated: 'exclude',
+    });
     expect(result.value.packageEdges.length).toBeGreaterThanOrEqual(1);
     const edge = result.value.packageEdges.find(
       (e) => e.fromPackage === 'pkg-a' && e.toPackage === 'pkg-b',
     );
     expect(edge).toBeDefined();
     expect(edge?.kind).toBe('call');
-    expect(edge?.countUnit).toBe('call-sites');
+    expect(edge?.countUnit).toBe('resolved-targets');
+    expect(edge).toMatchObject({
+      nodeIdentity: 'package',
+      sourceScope: 'production',
+      generated: 'exclude',
+      catalogResolutionMode: 'exact',
+    });
     expect((edge?.count ?? 0) > 0).toBe(true);
   });
 
@@ -168,6 +208,7 @@ describe('buildArchitectureView', () => {
       expect(h.symbol.definedInGenerated).toBe(false);
       if (h.symbol.bodyHash === 'h-target') {
         expect(h.twinCount).toBe(2);
+        expect(h.matchingTwinCount).toBe(2);
       }
     }
   });
@@ -208,5 +249,155 @@ describe('buildArchitectureView', () => {
     const result = view(filter);
     expect(result.ok && result.value.effectiveFilter).toEqual(filter);
     expect(result.ok && result.value.callEvidence.catalogResolutionMode).toBe('exact');
+  });
+
+  it('omits malformed rows and call edges from metrics with partial coverage', () => {
+    const catalog = makeCatalog();
+    const caller = catalog.functions.caller?.[0];
+    if (caller === undefined) throw new Error('caller fixture missing');
+    const malformedCall = {
+      to: ['h-target'],
+      line: 8,
+      column: 0,
+      resolution: 'invented',
+      confidence: 'certain',
+      text: 'bad()',
+    } as unknown as NonNullable<FunctionOccurrence['calls']>[number];
+    const malformedCatalog: Catalog = {
+      ...catalog,
+      functions: {
+        ...catalog.functions,
+        caller: [{ ...caller, calls: [...caller.calls, malformedCall] }],
+        malformed: [
+          occ({
+            bodyHash: 'h-malformed',
+            simpleName: 'malformed',
+            filePath: 'src/bad.ts',
+            package: 'bad',
+            line: 0,
+            calls: [
+              {
+                to: ['h-target'],
+                line: 2,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+      },
+    };
+    const result = buildArchitectureView(malformedCatalog, buildIndexes(malformedCatalog), {
+      filter: {
+        packages: ['pkg-a', 'pkg-b', 'pkg-c', 'gen', 'bad'],
+        sourceScope: 'all',
+        generated: 'include',
+      },
+      limit: 25,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.occurrenceCount.value).toBe(5);
+    expect(result.value.packageCount.value).toBe(4);
+    expect(result.value.packageEdges).not.toContainEqual(
+      expect.objectContaining({ fromPackage: 'bad' }),
+    );
+    expect(result.value.callEvidence.resolvedTargets).toBe(1);
+    expect(result.value.coverage).toEqual({
+      complete: false,
+      truncated: false,
+      reasons: ['malformed-call-edge-omitted', 'malformed-symbol-omitted'],
+    });
+  });
+
+  it('pages package edges and hotspots independently without repeating completed rows', () => {
+    const catalog = makeCatalog();
+    const indexes = buildIndexes(catalog);
+    const filter: GraphSourceFilter = { sourceScope: 'production', generated: 'exclude' };
+    const first = buildArchitectureView(catalog, indexes, { filter, limit: 1 });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const packageKey = first.value.packageEdges[0];
+    const hotspotKey = first.value.hotspots[0];
+    expect(packageKey).toBeDefined();
+    expect(hotspotKey).toBeDefined();
+    if (packageKey === undefined || hotspotKey === undefined) return;
+
+    const second = buildArchitectureView(catalog, indexes, {
+      filter,
+      limit: 1,
+      afterPackageEdgeKey: continuationToken(packageEdgeStableKey(packageKey)),
+      afterHotspotKey: continuationToken(hotspotStableKey(hotspotKey)),
+      packageEdgesDone: !first.value.packageEdgesHasMore,
+      hotspotsDone: !first.value.hotspotsHasMore,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    if (!first.value.packageEdgesHasMore) expect(second.value.packageEdges).toEqual([]);
+    if (!first.value.hotspotsHasMore) expect(second.value.hotspots).toEqual([]);
+    expect(second.value.packageEdges).not.toContainEqual(packageKey);
+    expect(second.value.hotspots).not.toContainEqual(hotspotKey);
+  });
+
+  it('computes group summaries over the full filtered orientation set, not one page', () => {
+    const catalog = makeCatalog();
+    const result = buildArchitectureView(catalog, buildIndexes(catalog), {
+      filter: { sourceScope: 'production', generated: 'exclude' },
+      limit: 1,
+      groupBy: 'file',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.hotspots).toHaveLength(1);
+    expect((result.value.groups?.length ?? 0) > result.value.hotspots.length).toBe(true);
+  });
+
+  it('keeps the actual deterministic top rows when candidates exceed the hard cap', () => {
+    const cap = 10_000;
+    const rows = Array.from({ length: cap + 1 }, (_, index) => ({
+      fromPackage: `pkg-${String(index).padStart(5, '0')}`,
+      toPackage: 'target',
+      kind: 'call' as const,
+      count: index === cap ? 99 : 1,
+      countUnit: 'resolved-targets' as const,
+      nodeIdentity: 'package' as const,
+      sourceScope: 'production' as const,
+      generated: 'exclude' as const,
+      catalogResolutionMode: 'exact' as const,
+    }));
+    const compare = (left: (typeof rows)[number], right: (typeof rows)[number]) =>
+      compareCodePointStrings(packageEdgeStableKey(left), packageEdgeStableKey(right));
+    const forward = boundedArchitectureRows(rows, cap, compare);
+    const reverse = boundedArchitectureRows(reversed(rows), cap, compare);
+    expect(forward.truncated).toBe(true);
+    expect(forward.rows).toEqual(reverse.rows);
+    expect(forward.rows[0]?.count).toBe(99);
+    expect(forward.rows).toHaveLength(cap);
+  });
+
+  it('chooses the same twin hotspot representative regardless of catalog insertion order', () => {
+    const forwardCatalog = makeCatalog();
+    const reverseCatalog: Catalog = {
+      ...forwardCatalog,
+      functions: Object.fromEntries(reversed(Object.entries(forwardCatalog.functions))),
+    };
+    const filter: GraphSourceFilter = { sourceScope: 'production', generated: 'exclude' };
+    const forward = buildArchitectureView(forwardCatalog, buildIndexes(forwardCatalog), {
+      filter,
+      limit: 25,
+    });
+    const reverse = buildArchitectureView(reverseCatalog, buildIndexes(reverseCatalog), {
+      filter,
+      limit: 25,
+    });
+    expect(forward.ok).toBe(true);
+    expect(reverse.ok).toBe(true);
+    if (!forward.ok || !reverse.ok) return;
+    expect(
+      forward.value.hotspots.find((row) => row.symbol.bodyHash === 'h-target')?.symbol.symbolId,
+    ).toBe('src/b/target.ts:1:0');
+    expect(reverse.value.hotspots).toEqual(forward.value.hotspots);
   });
 });

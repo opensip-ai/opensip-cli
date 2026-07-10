@@ -7,15 +7,11 @@
 
 import {
   depth as depthSchema,
-  exactFilePath,
-  filePrefix,
-  generatedPolicy,
-  kinds,
-  packageArray,
-  sourceScope,
+  pageFields,
+  sourceFilterFields,
+  strictInput,
   symbolId as symbolIdSchema,
   traversalIdentity,
-  visibilities,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
@@ -32,19 +28,14 @@ export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): vo
         'Default identity is occurrence-precise; identity=body-twin-union labels that any twin ' +
         'in a group may supply a hop. Distinguishes complete no-path from cap-truncated search ' +
         'via coverage.truncated. Returns ordered path plus hop evidence when available.',
-      inputSchema: {
+      inputSchema: strictInput({
         fromSymbolId: symbolIdSchema(),
         toSymbolId: symbolIdSchema(),
         depth: depthSchema(),
         identity: traversalIdentity(),
-        packages: packageArray(),
-        filePath: exactFilePath().optional(),
-        filePrefix: filePrefix().optional(),
-        kinds: kinds(),
-        visibilities: visibilities(),
-        sourceScope: sourceScope(),
-        generated: generatedPolicy(),
-      },
+        ...sourceFilterFields(),
+        ...pageFields(),
+      }),
     },
     async (args) => {
       const outcome = await deps.graph.traverse({
@@ -53,6 +44,9 @@ export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): vo
         goalSymbolId: args.toSymbolId,
         depth: args.depth,
         identity: args.identity,
+        limit: args.limit,
+        cursor: args.cursor,
+        groupBy: args.groupBy,
         filter: {
           packages: args.packages,
           filePath: args.filePath,

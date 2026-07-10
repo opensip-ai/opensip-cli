@@ -5,14 +5,20 @@
 import { err, ok, type Result } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { registerBlastRadius } from '../blast-radius.js';
-import { registerCalleesOf } from '../callees-of.js';
-import { registerFindDeadCode } from '../find-dead-code.js';
-import { registerGetArchitecture } from '../get-architecture.js';
-import { registerGetSymbol } from '../get-symbol.js';
-import { registerSearchSymbols } from '../search-symbols.js';
-import { registerTracePath } from '../trace-path.js';
-import { registerWhoCalls } from '../who-calls.js';
+import {
+  registerBlastRadius,
+  registerCalleesOf,
+  registerFindDeadCode,
+  registerGetArchitecture,
+  registerGetRuntimeWiring,
+  registerGetSymbol,
+  registerPackageCycles,
+  registerPackageDependencies,
+  registerSearchSymbols,
+  registerTracePath,
+  registerWhoCalls,
+  registerWhyDepends,
+} from './_graph-handler-registrations.js';
 
 import type {
   ArchitectureSummaryDto,
@@ -23,6 +29,7 @@ import type {
   TraversalSnapshot,
 } from '../../graph-read-port.js';
 import type { McpReadError } from '../../mcp-error.js';
+import type { RuntimeWiringReadPort } from '../../runtime-wiring-read-port.js';
 import type { CallToolResult, McpStdioServer } from '../../server.js';
 import type {
   Freshness,
@@ -102,15 +109,30 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
     findBySpan: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
     traverse: (query) => {
       const nodes = [
-        { symbol: symRef(), depth: 0 },
-        { symbol: symRef({ symbolId: 'src/b.ts:1:0' }), depth: 1 },
+        { symbol: symRef(), depth: 0, groupId: 'src/a.ts:10:2', groupTotal: 1 },
+        {
+          symbol: symRef({ symbolId: 'src/b.ts:1:0' }),
+          depth: 1,
+          groupId: 'src/b.ts:1:0',
+          groupTotal: 1,
+        },
       ];
       const data: TraversalSnapshot = {
         found: true,
         nodes,
         path: query.direction === 'path' ? nodes.map((n) => n.symbol) : undefined,
-        truncated: false,
-        identityMode: 'body-twin-union',
+        identityMode: query.identity ?? 'occurrence',
+        totalMembership: nodes.length,
+        counts: {
+          includedOccurrences: nodes.length,
+          excludedOccurrences: 0,
+          includedEdges: 1,
+          excludedEdges: 0,
+          countScope: 'visited',
+        },
+        unresolved: [],
+        unresolvedCounts: [],
+        unresolvedAttribution: 'owner-only',
       };
       return Promise.resolve(ok(wrap(data)));
     },
@@ -119,6 +141,8 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
         ok(
           wrap({
             symbol: symRef(),
+            members: [symRef()],
+            totalMembership: 1,
             direct: 2,
             transitive: 4,
             score: 4,
@@ -128,7 +152,16 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
       ),
     deadCode: () =>
       Promise.resolve(
-        ok(wrap([{ symbol: symRef(), message: 'orphan' }] as readonly DeadCodeDto[])),
+        ok(
+          wrap([
+            {
+              symbol: symRef(),
+              message: 'orphan',
+              ruleId: 'graph:orphan-subtree',
+              reason: 'unreachable-from-inferred-entry-point',
+            },
+          ] as readonly DeadCodeDto[]),
+        ),
       ),
     architectureSummary: () =>
       Promise.resolve(
@@ -153,17 +186,46 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
               unresolvedCallSites: 0,
               confidence: { high: 1 },
               resolution: { static: 1 },
+              distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
+              resolvedTargetConfidence: {
+                values: { high: 1 },
+                countUnit: 'resolved-targets',
+              },
+              resolvedTargetResolution: {
+                values: { static: 1 },
+                countUnit: 'resolved-targets',
+              },
+              unresolvedCallSiteConfidence: {
+                values: {},
+                countUnit: 'unresolved-call-sites',
+              },
+              unresolvedCallSiteResolution: {
+                values: {},
+                countUnit: 'unresolved-call-sites',
+              },
+              nodeIdentity: 'occurrence',
+              sourceScope: 'production',
+              generated: 'exclude',
               edgeKind: 'call',
               catalogResolutionMode: 'exact',
             },
-            packageCount: 1,
+            packageCount: {
+              value: 1,
+              nodeIdentity: 'package',
+              sourceScope: 'production',
+              generated: 'exclude',
+            },
             packageEdges: [
               {
                 fromPackage: 'pkg',
                 toPackage: 'other',
                 kind: 'call',
                 count: 1,
-                countUnit: 'call-sites',
+                countUnit: 'resolved-targets',
+                nodeIdentity: 'package',
+                sourceScope: 'production',
+                generated: 'exclude',
+                catalogResolutionMode: 'exact',
               },
             ],
             hotspots: [],
@@ -183,7 +245,10 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
       ),
     packageDependencies: () =>
       Promise.resolve(ok(wrap({ edgeKind: 'call', calls: [], imports: [] }))),
-    whyDepends: () => Promise.resolve(ok(wrap({ edgeKind: 'combined', calls: [], imports: [] }))),
+    whyDepends: () =>
+      Promise.resolve(
+        ok(wrap({ edgeKind: 'combined', calls: [], imports: [], totalMatchingEvidence: 0 })),
+      ),
     packageCycles: () => Promise.resolve(ok(wrap({ edgeKind: 'call', components: [] }))),
   };
   return { ...base, ...overrides };
@@ -193,6 +258,7 @@ function deps(graph: GraphReadPort): McpToolDeps {
   return {
     graph,
     results: {} as McpToolDeps['results'],
+    runtimeWiring: {} as McpToolDeps['runtimeWiring'],
     validToolIds: new Set(['fit', 'graph']),
   };
 }
@@ -333,6 +399,140 @@ describe('graph handlers (async GraphToolResult)', () => {
     });
   });
 
+  it('forwards dead-code and architecture filters, paging, and grouping', async () => {
+    const captured: Record<string, unknown> = {};
+    const graph = fakePort({
+      deadCode: (query) => {
+        captured.dead = query;
+        return Promise.resolve(ok(wrap([] as readonly DeadCodeDto[])));
+      },
+      architectureSummary: (query) => {
+        captured.architecture = query;
+        return fakePort().architectureSummary(query);
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerFindDeadCode(server, deps(graph));
+    registerGetArchitecture(server, deps(graph));
+    const args = {
+      packages: ['pkg'],
+      filePath: 'src/a.ts',
+      filePrefix: 'src',
+      sourceScope: 'test',
+      generated: 'only',
+      limit: 7,
+      cursor: 'cursor',
+      groupBy: 'file',
+    } as const;
+    await handlers.get('find_dead_code')!({
+      ...args,
+      kinds: ['method'],
+      visibilities: ['private'],
+    });
+    await handlers.get('get_architecture')!(args);
+    expect(captured.dead).toMatchObject({
+      limit: 7,
+      cursor: 'cursor',
+      groupBy: 'file',
+      filter: {
+        packages: ['pkg'],
+        filePath: 'src/a.ts',
+        filePrefix: 'src',
+        kinds: ['method'],
+        visibilities: ['private'],
+        sourceScope: 'test',
+        generated: 'only',
+      },
+    });
+    expect(captured.architecture).toMatchObject({
+      limit: 7,
+      cursor: 'cursor',
+      groupBy: 'file',
+      filter: {
+        packages: ['pkg'],
+        filePath: 'src/a.ts',
+        filePrefix: 'src',
+        sourceScope: 'test',
+        generated: 'only',
+      },
+    });
+  });
+
+  it('routes all package tools with full shared filters and bounded page fields', async () => {
+    const captured: Record<string, unknown> = {};
+    const graph = fakePort({
+      packageDependencies: (query) => {
+        captured.dependencies = query;
+        return Promise.resolve(ok(wrap({ edgeKind: 'combined', calls: [], imports: [] })));
+      },
+      whyDepends: (query) => {
+        captured.why = query;
+        return Promise.resolve(
+          ok(
+            wrap({
+              edgeKind: 'combined',
+              calls: [],
+              imports: [],
+              totalMatchingEvidence: 0,
+            }),
+          ),
+        );
+      },
+      packageCycles: (query) => {
+        captured.cycles = query;
+        return Promise.resolve(ok(wrap({ edgeKind: 'combined', components: [] })));
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerPackageDependencies(server, deps(graph));
+    registerWhyDepends(server, deps(graph));
+    registerPackageCycles(server, deps(graph));
+    const shared = {
+      edgeKind: 'combined',
+      packages: ['pkg-a'],
+      filePath: 'src/a.ts',
+      filePrefix: 'src',
+      kinds: ['method'],
+      visibilities: ['private'],
+      sourceScope: 'production',
+      generated: 'exclude',
+      limit: 9,
+      cursor: 'cursor',
+      groupBy: 'package',
+    } as const;
+    await handlers.get('package_dependencies')!({
+      ...shared,
+      package: 'pkg-a',
+      direction: 'both',
+    });
+    await handlers.get('why_depends')!({
+      ...shared,
+      fromPackage: 'pkg-a',
+      toPackage: 'pkg-b',
+    });
+    await handlers.get('package_cycles')!(shared);
+    expect(captured.dependencies).toMatchObject({
+      edgeKind: 'combined',
+      package: 'pkg-a',
+      direction: 'both',
+      limit: 9,
+      cursor: 'cursor',
+      groupBy: 'package',
+      filter: expect.objectContaining({ filePath: 'src/a.ts', kinds: ['method'] }),
+    });
+    expect(captured.why).toMatchObject({
+      fromPackage: 'pkg-a',
+      toPackage: 'pkg-b',
+      groupBy: 'package',
+      filter: expect.objectContaining({ visibilities: ['private'] }),
+    });
+    expect(captured.cycles).toMatchObject({
+      edgeKind: 'combined',
+      groupBy: 'package',
+      filter: expect.objectContaining({ packages: ['pkg-a'] }),
+    });
+  });
+
   it('maps port errors through errorResult', async () => {
     const graph = fakePort({
       searchSymbols: (): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> =>
@@ -344,5 +544,90 @@ describe('graph handlers (async GraphToolResult)', () => {
     const parsed = parseResult(result);
     expect(parsed.isError).toBe(true);
     expect((parsed.body.error as { code: string }).code).toBe('boom');
+  });
+
+  it('get_runtime_wiring forwards bounded filters/page/grouping to its injected port', async () => {
+    let captured: unknown;
+    const runtimeWiring: RuntimeWiringReadPort = {
+      query: (input) => {
+        captured = input;
+        return Promise.resolve(
+          ok({
+            context: { projectKey: 'abcdabcdabcdabcd', snapshotKey: `g1:${'a'.repeat(64)}` },
+            nodes: [
+              { id: 'command:alpha:inspect', kind: 'command', label: 'inspect', tool: 'alpha' },
+            ],
+            edges: [
+              {
+                from: 'command:alpha:inspect',
+                to: 'handler:alpha:inspect',
+                kind: 'command-dispatches-handler',
+                source: 'command-spec',
+                confidence: 'medium',
+                staticBridge: 'unresolved',
+              },
+            ],
+            page: { limit: 10, hasMore: false, edgeTruncated: false },
+            groups: [{ key: 'alpha', count: 1 }],
+            groupTruncated: false,
+            coverage: {
+              complete: true,
+              scope: 'captured-admitted-tool-registry',
+              truncated: false,
+              reasons: ['top-level-host-commands-outside-port'],
+            },
+            effectiveFilters: {
+              tool: 'alpha',
+              command: 'inspect',
+              provenanceSource: 'bundled',
+              limit: 10,
+              groupBy: 'tool',
+            },
+          }),
+        );
+      },
+    };
+    const { handlers, server } = captureServer();
+    registerGetRuntimeWiring(server, { ...deps(fakePort()), runtimeWiring });
+    const result = await handlers.get('get_runtime_wiring')!({
+      tool: 'alpha',
+      command: 'inspect',
+      provenanceSource: 'bundled',
+      limit: 10,
+      cursor: undefined,
+      groupBy: 'tool',
+    });
+    expect(parseResult(result)).toMatchObject({
+      isError: false,
+      body: {
+        edges: [
+          {
+            source: 'command-spec',
+            confidence: 'medium',
+            staticBridge: 'unresolved',
+          },
+        ],
+        groups: [{ key: 'alpha', count: 1 }],
+      },
+    });
+    expect(captured).toEqual({
+      tool: 'alpha',
+      command: 'inspect',
+      provenanceSource: 'bundled',
+      limit: 10,
+      cursor: undefined,
+      groupBy: 'tool',
+    });
+  });
+
+  it('get_runtime_wiring maps its injected port error', async () => {
+    const runtimeWiring: RuntimeWiringReadPort = {
+      query: () => Promise.resolve(err({ code: 'runtime-wiring-failed', message: 'failed' })),
+    };
+    const { handlers, server } = captureServer();
+    registerGetRuntimeWiring(server, { ...deps(fakePort()), runtimeWiring });
+    const parsed = parseResult(await handlers.get('get_runtime_wiring')!({}));
+    expect(parsed.isError).toBe(true);
+    expect(parsed.body.error).toMatchObject({ code: 'runtime-wiring-failed' });
   });
 });

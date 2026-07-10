@@ -98,8 +98,9 @@ function importedPackagesOf(
   byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
 ): Set<string> {
   const set = new Set<string>();
-  for (const dep of occ.dependencies ?? []) {
-    for (const targetHash of dep.to) {
+  const dependencies: readonly unknown[] = Array.isArray(occ.dependencies) ? occ.dependencies : [];
+  for (const dep of dependencies) {
+    for (const targetHash of stringTargetsOf(dep)) {
       const target = byBodyHash.get(targetHash);
       if (target) set.add(pkgOf(target));
     }
@@ -170,8 +171,9 @@ function collectOutgoing(
 ): Set<string> {
   const out = new Set<string>();
   for (const occ of occs) {
-    for (const edge of occ.calls) {
-      for (const target of edge.to) {
+    const calls: readonly unknown[] = Array.isArray(occ.calls) ? occ.calls : [];
+    for (const edge of calls) {
+      for (const target of stringTargetsOf(edge)) {
         /* v8 ignore next */
         if (!byBodyHash.has(target)) continue;
         out.add(target);
@@ -179,6 +181,15 @@ function collectOutgoing(
     }
   }
   return out;
+}
+
+function* stringTargetsOf(value: unknown): Iterable<string> {
+  if (typeof value !== 'object' || value === null) return;
+  const targets = (value as { to?: unknown }).to;
+  if (!Array.isArray(targets)) return;
+  for (const target of targets) {
+    if (typeof target === 'string') yield target;
+  }
 }
 
 function pushCaller(callers: Map<string, Set<string>>, target: string, caller: string): void {

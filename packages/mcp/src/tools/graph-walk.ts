@@ -8,8 +8,8 @@
  * port), symbol projection stays in graph (`buildSymbolIndexEntries`) — neither
  * is reinvented here, and `boundedBfs` is NEVER pushed down into `core`/`graph`.
  *
- * The walk is over a body-hash adjacency map (the graph engine's
- * `Indexes.callers` / `Indexes.callees`, twin-union per ADR-0003). It is:
+ * The walk is over opaque node ids supplied by the occurrence or explicit
+ * body-twin view. It is:
  *   - cycle-safe — a `visited` set guards re-entry,
  *   - depth-bounded — at most {@link HARD_MAX_DEPTH} BFS levels,
  *   - count-capped — stops at `cap` discovered nodes and reports `truncated`,
@@ -41,6 +41,8 @@ export interface BoundedBfsResult {
   readonly order: readonly string[];
   /** `node → predecessor` for every reached node (for path reconstruction). */
   readonly parents: ReadonlyMap<string, string>;
+  /** Exact BFS depth for every reached node, including `start` at depth 0. */
+  readonly depths: ReadonlyMap<string, number>;
   /** `true` iff `opts.goal` was provided and reached within the bounds. */
   readonly foundGoal: boolean;
   /** `true` iff a depth/node cap truncated the walk. */
@@ -67,24 +69,44 @@ export function boundedBfs(
   const state: WalkState = {
     visited: new Set<string>([start]),
     parents: new Map<string, string>(),
+    depths: new Map<string, number>([[start, 0]]),
     order: [],
   };
+  if (opts.goal === start) {
+    return {
+      order: [],
+      parents: state.parents,
+      depths: state.depths,
+      foundGoal: true,
+      truncated: false,
+    };
+  }
   let frontier: string[] = [start];
 
   for (let d = 0; d < maxDepth && frontier.length > 0; d++) {
     const step = expandFrontier(frontier, adjacency, state, cap, opts.goal);
     if (step.halt !== undefined) {
-      return { order: state.order, parents: state.parents, ...step.halt };
+      return { order: state.order, parents: state.parents, depths: state.depths, ...step.halt };
     }
     frontier = step.next;
   }
-  return { order: state.order, parents: state.parents, foundGoal: false, truncated: false };
+  const depthTruncated = frontier.some((node) =>
+    (adjacency.get(node) ?? []).some((neighbor) => !state.visited.has(neighbor)),
+  );
+  return {
+    order: state.order,
+    parents: state.parents,
+    depths: state.depths,
+    foundGoal: false,
+    truncated: depthTruncated,
+  };
 }
 
 /** Mutable accumulators threaded through the BFS frontier expansion. */
 interface WalkState {
   readonly visited: Set<string>;
   readonly parents: Map<string, string>;
+  readonly depths: Map<string, number>;
   readonly order: string[];
 }
 
@@ -106,11 +128,17 @@ function expandFrontier(
   for (const node of frontier) {
     for (const neighbor of adjacency.get(node) ?? []) {
       if (state.visited.has(neighbor)) continue;
+      // `cap` counts the start node. Only mark truncated when an additional
+      // reachable node exists beyond the ceiling, not merely when the ceiling
+      // is reached exactly.
+      if (state.visited.size >= cap) {
+        return { next, halt: { foundGoal: false, truncated: true } };
+      }
       state.visited.add(neighbor);
       state.parents.set(neighbor, node);
+      state.depths.set(neighbor, (state.depths.get(node) ?? 0) + 1);
       state.order.push(neighbor);
       if (neighbor === goal) return { next, halt: { foundGoal: true, truncated: false } };
-      if (state.order.length >= cap) return { next, halt: { foundGoal: false, truncated: true } };
       next.push(neighbor);
     }
   }

@@ -7,44 +7,21 @@
  * port (never `currentScope()`, never a run-command entry point).
  */
 
-import { registerBlastRadius } from './blast-radius.js';
-import { registerCalleesOf } from './callees-of.js';
-import { registerFindDeadCode } from './find-dead-code.js';
-import { registerGetArchitecture } from './get-architecture.js';
 import { registerGetRuntimeWiring } from './get-runtime-wiring.js';
-import { registerGetSymbol } from './get-symbol.js';
-import { registerPackageCycles } from './package-cycles.js';
-import { registerPackageDependencies } from './package-dependencies.js';
-import { registerRefreshGraph } from './refresh-graph.js';
+import { registerGraphTools } from './register-graph-tools.js';
 import { registerResultTools } from './register-result-tools.js';
 import { registerRepairApplyVerify } from './repair-apply-verify.js';
-import { registerSearchSymbols } from './search-symbols.js';
-import { registerTracePath } from './trace-path.js';
-import { registerWhoCalls } from './who-calls.js';
-import { registerWhyDepends } from './why-depends.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
 
 /**
- * Register MCP tools. Default inventory is 19 read tools
- * (15 original + package_dependencies + why_depends + package_cycles + get_runtime_wiring).
- * Mutation-enabled mode adds write tools.
+ * Register the exact 19-tool default protocol inventory. `refresh_graph` is the
+ * sole graph mutation; explicit mutation mode adds only `repair_apply_verify`.
  */
 export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): void {
   // ── Graph tools (over GraphReadPort) ──────────────────────────────
-  registerSearchSymbols(server, deps);
-  registerGetSymbol(server, deps);
-  registerWhoCalls(server, deps);
-  registerCalleesOf(server, deps);
-  registerTracePath(server, deps);
-  registerBlastRadius(server, deps);
-  registerFindDeadCode(server, deps);
-  registerGetArchitecture(server, deps);
-  registerPackageDependencies(server, deps);
-  registerWhyDepends(server, deps);
-  registerPackageCycles(server, deps);
-  registerRefreshGraph(server, deps);
+  registerGraphTools(server, deps);
 
   // ── Live wiring (not static graph) ────────────────────────────────
   registerGetRuntimeWiring(server, deps);

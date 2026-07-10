@@ -3,9 +3,108 @@
  * Shared by occurrence SCC features and package-cycle queries.
  */
 
+import { compareCodePointStrings } from '../code-point-order.js';
+
 interface TarjanFrame {
   readonly v: string;
+  readonly adjacent: readonly string[];
   ai: number;
+}
+
+interface TarjanState {
+  readonly result: string[][];
+  readonly index: Map<string, number>;
+  readonly lowlink: Map<string, number>;
+  readonly onStack: Set<string>;
+  readonly stack: string[];
+  nextIndex: number;
+}
+
+function createFrame(node: string, neighbors: (v: string) => readonly string[]): TarjanFrame {
+  return { v: node, adjacent: neighbors(node), ai: 0 };
+}
+
+function discover(v: string, state: TarjanState): void {
+  state.index.set(v, state.nextIndex);
+  state.lowlink.set(v, state.nextIndex);
+  state.nextIndex++;
+  state.stack.push(v);
+  state.onStack.add(v);
+}
+
+function popComponent(root: string, state: TarjanState): void {
+  const members: string[] = [];
+  for (;;) {
+    const member = state.stack.pop();
+    if (member === undefined) break;
+    state.onStack.delete(member);
+    members.push(member);
+    if (member === root) break;
+  }
+  members.sort(compareCodePointStrings);
+  state.result.push(members);
+}
+
+function updateParentLowlink(
+  child: string,
+  work: readonly TarjanFrame[],
+  state: TarjanState,
+): void {
+  const parent = work.at(-1)?.v;
+  if (parent === undefined) return;
+  const childLow = state.lowlink.get(child);
+  const parentLow = state.lowlink.get(parent);
+  if (childLow !== undefined && parentLow !== undefined && childLow < parentLow) {
+    state.lowlink.set(parent, childLow);
+  }
+}
+
+function updateBackEdgeLowlink(v: string, next: string, state: TarjanState): void {
+  if (!state.onStack.has(next)) return;
+  const nextIndex = state.index.get(next);
+  const currentLow = state.lowlink.get(v);
+  if (nextIndex !== undefined && currentLow !== undefined && nextIndex < currentLow) {
+    state.lowlink.set(v, nextIndex);
+  }
+}
+
+function advanceFrame(
+  frame: TarjanFrame,
+  nodeSet: ReadonlySet<string>,
+  neighbors: (v: string) => readonly string[],
+  work: TarjanFrame[],
+  state: TarjanState,
+): boolean {
+  const next = frame.adjacent[frame.ai++];
+  if (next === undefined || !nodeSet.has(next)) return false;
+  if (state.index.has(next)) {
+    updateBackEdgeLowlink(frame.v, next, state);
+  } else {
+    work.push(createFrame(next, neighbors));
+  }
+  return true;
+}
+
+function visitRoot(
+  start: string,
+  nodeSet: ReadonlySet<string>,
+  neighbors: (v: string) => readonly string[],
+  state: TarjanState,
+): void {
+  const work: TarjanFrame[] = [createFrame(start, neighbors)];
+  while (work.length > 0) {
+    const frame = work.at(-1);
+    if (frame === undefined) break;
+    const v = frame.v;
+    if (!state.index.has(v)) discover(v, state);
+
+    if (advanceFrame(frame, nodeSet, neighbors, work, state)) continue;
+    if (frame.ai <= frame.adjacent.length) continue;
+
+    if (state.lowlink.get(v) === state.index.get(v)) popComponent(v, state);
+    work.pop();
+    updateParentLowlink(v, work, state);
+  }
 }
 
 /**
@@ -13,65 +112,24 @@ interface TarjanFrame {
  * members are sorted; input node order is preserved for discovery order.
  * Stack-safe iterative Tarjan; O(V+E).
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan SCC algorithm
 export function stronglyConnectedComponents(
   nodes: readonly string[],
   neighbors: (v: string) => readonly string[],
 ): readonly (readonly string[])[] {
-  const result: string[][] = [];
-  const index = new Map<string, number>();
-  const lowlink = new Map<string, number>();
-  const onStack = new Set<string>();
-  const stack: string[] = [];
-  let nextIndex = 0;
+  const uniqueNodes = [...new Set(nodes)];
+  const nodeSet = new Set(uniqueNodes);
+  const state: TarjanState = {
+    result: [],
+    index: new Map(),
+    lowlink: new Map(),
+    onStack: new Set(),
+    stack: [],
+    nextIndex: 0,
+  };
 
-  for (const start of nodes) {
-    if (index.has(start)) continue;
-    const work: TarjanFrame[] = [{ v: start, ai: 0 }];
-    while (work.length > 0) {
-      const frame = work.at(-1)!;
-      const v = frame.v;
-      if (frame.ai === 0) {
-        index.set(v, nextIndex);
-        lowlink.set(v, nextIndex);
-        nextIndex++;
-        stack.push(v);
-        onStack.add(v);
-      }
-      const adjV = neighbors(v);
-      let descended = false;
-      while (frame.ai < adjV.length) {
-        const w = adjV[frame.ai++];
-        if (w === undefined) continue;
-        if (!index.has(w)) {
-          work.push({ v: w, ai: 0 });
-          descended = true;
-          break;
-        } else if (onStack.has(w)) {
-          const iw = index.get(w)!;
-          if (iw < lowlink.get(v)!) lowlink.set(v, iw);
-        }
-      }
-      if (descended) continue;
-      if (lowlink.get(v) === index.get(v)) {
-        const members: string[] = [];
-        for (;;) {
-          const w = stack.pop()!;
-          onStack.delete(w);
-          members.push(w);
-          if (w === v) break;
-        }
-        members.sort();
-        result.push(members);
-      }
-      work.pop();
-      if (work.length > 0) {
-        const parent = work.at(-1)!.v;
-        if (lowlink.get(v)! < lowlink.get(parent)!) {
-          lowlink.set(parent, lowlink.get(v)!);
-        }
-      }
-    }
+  for (const start of uniqueNodes) {
+    if (!state.index.has(start)) visitRoot(start, nodeSet, neighbors, state);
   }
-  return result;
+  state.result.sort((a, b) => compareCodePointStrings(a[0] ?? '', b[0] ?? ''));
+  return state.result;
 }

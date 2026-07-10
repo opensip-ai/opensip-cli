@@ -1,11 +1,3 @@
-function hasControlChar(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.codePointAt(i) ?? 0;
-    if (code <= 0x1f || code === 0x7f) return true;
-  }
-  return false;
-}
-
 /**
  * Per-tool Zod input field schemas (ADR-0084 §Hardening, Phase 7 + MCP Graph Audit).
  *
@@ -20,6 +12,13 @@ function hasControlChar(value: string): boolean {
  */
 
 import { z } from 'zod';
+
+import { hasControlCharacter, safeNormalizeProjectRelativePath } from './schema-validation.js';
+
+/** Build a strict SDK input object so unknown MCP arguments are rejected, not stripped. */
+export function strictInput<T extends z.ZodRawShape>(shape: T): z.ZodObject<T> {
+  return z.strictObject(shape);
+}
 
 /** Hard depth cap on bounded adjacency walks (bounds memory). */
 export const MAX_DEPTH = 5;
@@ -41,51 +40,75 @@ export const MAX_PACKAGE_LEN = 256;
 export const MAX_PACKAGE_ARRAY = 50;
 /** Max unique kind/visibility enum entries. */
 export const MAX_ENUM_ARRAY = 16;
-/** Hard visited-node ceiling for graph walks. */
-const MAX_WALK_NODES = 2000;
-void MAX_WALK_NODES;
-
 function controlFreeString(max: number, label: string) {
   return z
     .string()
     .min(1)
     .max(max)
-    .refine((value) => !hasControlChar(value), {
+    .refine((value) => !hasControlCharacter(value), {
       message: `${label} must not contain control characters`,
     });
 }
 
+/** Generic bounded, non-empty, control-free protocol text. */
+export const boundedText = (max: number, label = 'value') => controlFreeString(max, label);
+
+interface SymbolIdParts {
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+}
+
+function parseSymbolIdParts(value: string): SymbolIdParts | undefined {
+  const match = /^(.*):(\d+):(\d+)$/.exec(value);
+  return match === null
+    ? undefined
+    : {
+        filePath: match[1] ?? '',
+        line: Number(match[2]),
+        column: Number(match[3]),
+      };
+}
+
+function isValidSymbolId(value: string): boolean {
+  const parts = parseSymbolIdParts(value);
+  return (
+    parts !== undefined &&
+    parts.filePath.length <= MAX_PATH_LEN &&
+    Number.isSafeInteger(parts.line) &&
+    parts.line >= 1 &&
+    Number.isSafeInteger(parts.column) &&
+    safeNormalizeProjectRelativePath(parts.filePath) !== undefined
+  );
+}
+
+function isValidProjectRelativePath(raw: string): boolean {
+  return safeNormalizeProjectRelativePath(raw) !== undefined;
+}
+
 /**
  * A `symbolId` in the canonical `"${filePath}:${line}:${column}"` shape. The
- * trailing two colon-groups must be integers; the leading file segment is
- * unconstrained here (the port resolves it — an unknown id is a structured
- * not-found, not a validation error).
+ * trailing two colon-groups must be integers and the leading file segment uses
+ * the same project-relative trust boundary as file filters.
  */
 export const symbolId = () =>
   z
     .string()
     .min(3)
-    .max(MAX_PATH_LEN + 16)
+    .max(MAX_PATH_LEN + 40)
     .regex(/^.+:\d+:\d+$/, 'symbolId must be "<filePath>:<line>:<column>"')
-    .refine((value) => !hasControlChar(value), {
+    .refine((value) => !hasControlCharacter(value), {
       message: 'symbolId must not contain control characters',
+    })
+    .refine(
+      isValidSymbolId,
+      'symbolId file must be a normalized project-relative path without traversal',
+    )
+    .overwrite((value) => {
+      const match = /^(.*):(\d+):(\d+)$/.exec(value);
+      if (match === null) return value;
+      return `${(match[1] ?? '').replaceAll('\\', '/')}:${match[2] ?? ''}:${match[3] ?? ''}`;
     });
-
-/**
- * Normalize client slash styles to POSIX project-relative form and reject
- * absolute paths, empty segments, and traversal.
- */
-export function normalizeProjectRelativePath(raw: string): string {
-  const posix = raw.replaceAll('\\', '/');
-  if (posix.startsWith('/') || /^[A-Za-z]:\//.test(posix) || posix.startsWith('//')) {
-    throw new Error('file must be a project-relative path (not absolute)');
-  }
-  const segments = posix.split('/');
-  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
-    throw new Error('file must not contain empty, ".", or ".." path segments');
-  }
-  return posix;
-}
 
 /**
  * A project-relative file path constrained to the project root: no absolute
@@ -97,20 +120,14 @@ export const filePath = () =>
     .string()
     .min(1)
     .max(MAX_PATH_LEN)
-    .refine((p) => !hasControlChar(p), {
+    .refine((p) => !hasControlCharacter(p), {
       message: 'file must not contain control characters',
     })
-    .transform((raw, ctx) => {
-      try {
-        return normalizeProjectRelativePath(raw);
-      } catch (error) {
-        ctx.addIssue({
-          code: 'custom',
-          message: error instanceof Error ? error.message : 'invalid file path',
-        });
-        return z.NEVER;
-      }
-    });
+    .refine(
+      isValidProjectRelativePath,
+      'file must be a normalized project-relative path without traversal',
+    )
+    .overwrite((raw) => raw.replaceAll('\\', '/'));
 
 /** Exact project-relative path filter (alias of {@link filePath}). */
 export const exactFilePath = () => filePath();
@@ -145,7 +162,10 @@ export const cursor = () =>
     .optional();
 
 /** Package / tool / command name value. */
-export const packageName = () => controlFreeString(MAX_PACKAGE_LEN, 'package');
+export const boundedName = (label = 'name') => controlFreeString(MAX_PACKAGE_LEN, label);
+
+/** Package-name specialization for package evidence queries. */
+export const packageName = () => boundedName('package');
 
 /** Bounded unique package list (max 50). */
 export const packageArray = () =>

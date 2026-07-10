@@ -30,8 +30,8 @@
 
 import { posix } from 'node:path';
 
-import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
+import { buildShardedCatalogCacheKey } from '../../cache/sharded-cache-key.js';
 import { buildExportIndex } from '../../cross-package/export-index.js';
 import { resolveCrossPackageCall } from '../../cross-package/resolve.js';
 import { createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
@@ -147,9 +147,12 @@ export function mergeShardFragments(
     // row but build structurally incompatible catalogs — can never read each
     // other's row: a mode switch is a clean `cacheKey` mismatch (a rebuild),
     // never a silent cross-engine read of a clobbered row.
-    cacheKey: stampEngineVersion(
-      `sharded-${String(fragments.length)}-${hashKeys(fragments)}`,
-      'sharded',
+    cacheKey: buildShardedCatalogCacheKey(
+      fragments.map((fragment) => ({
+        shardId: fragment.cacheKey,
+        rootDir: '.',
+        cacheKey: fragment.cacheKey,
+      })),
     ),
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
@@ -244,12 +247,6 @@ function addFragmentOccurrences(
       else functions[name] = [occ];
     }
   }
-}
-
-function hashKeys(fragments: readonly Catalog[]): string {
-  // Order-independent join of shard cacheKeys (shards may complete in any
-  // order); kept short and deterministic.
-  return [...fragments.map((f) => f.cacheKey)].sort().join('+').slice(0, 64);
 }
 
 // ── Task 2.2: resolve cross-boundary calls ────────────────────────

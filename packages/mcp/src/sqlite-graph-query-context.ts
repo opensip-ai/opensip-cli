@@ -1,0 +1,346 @@
+import { isAbsolute, relative, resolve, sep } from 'node:path';
+
+import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
+
+import { freshnessFromVerification, missingFreshness } from './freshness.js';
+import { bindCursor, decodeCursor, encodeCursor, type GroupSummary } from './graph-query-page.js';
+import { readError } from './mcp-error.js';
+
+import type { CatalogGeneration, GraphGenerationController } from './catalog-generation.js';
+import type { ArchitectureSummaryDto, CatalogStatus } from './graph-read-port.js';
+import type { McpReadError } from './mcp-error.js';
+import type {
+  Freshness,
+  GraphCoverage,
+  GraphEvidenceContext,
+  GraphToolResult,
+} from './symbol-dto.js';
+import type { GraphSourceFilter } from '@opensip-cli/graph/read';
+
+const CURSOR_VERSION = 1 as const;
+const LOG_QUERY_FAILED = 'mcp.graph.query.failed';
+const LOG_QUERY_COMPLETED = 'mcp.graph.query.completed';
+
+interface EnvelopeOptions {
+  readonly coverage?: GraphCoverage;
+  readonly page?: { readonly limit: number; readonly nextCursor?: string };
+  readonly filter?: GraphSourceFilter;
+  readonly groups?: readonly GroupSummary[];
+}
+
+type QueryIdentityMode = 'occurrence' | 'body-twin-union' | 'package' | 'mixed' | 'not-applicable';
+
+interface QueryLogContext {
+  readonly identityMode: QueryIdentityMode;
+  readonly sourceScope: GraphSourceFilter['sourceScope'];
+}
+
+function resultDataCount(data: unknown): number {
+  if (Array.isArray(data)) return data.length;
+  if (data === undefined || data === null) return 0;
+  return 1;
+}
+
+function projectRelativeConfigPath(projectRoot: string, configPath: string): string {
+  if (/\p{Cc}/u.test(configPath)) return '<invalid-config-path>';
+  const root = resolve(projectRoot);
+  const absolute = resolve(root, configPath);
+  const value = relative(root, absolute);
+  if (value === '..' || value.startsWith(`..${sep}`) || isAbsolute(value)) {
+    return '<outside-project>';
+  }
+  return (value || '.').split(sep).join('/');
+}
+
+/** Construction dependencies for the package-internal SQLite query context. */
+export interface SqliteGraphQueryContextDeps {
+  readonly projectRoot: string;
+  readonly configPath?: string;
+  readonly log?: (
+    evt: string,
+    fields: Record<string, string | number | boolean | undefined>,
+  ) => void;
+}
+
+/**
+ * Shared lifecycle, envelope, cursor, and logging behavior for SQLite graph
+ * reads. Query-specific projections remain on {@link SqliteGraphReadPort}.
+ */
+export class SqliteGraphQueryContext {
+  readonly projectKey: string;
+  private readonly projectRoot: string;
+  private readonly configPath: string;
+  private readonly log: SqliteGraphQueryContextDeps['log'];
+
+  constructor(
+    private readonly controller: GraphGenerationController,
+    deps: SqliteGraphQueryContextDeps,
+  ) {
+    this.projectRoot = deps.projectRoot;
+    this.configPath = projectRelativeConfigPath(
+      deps.projectRoot,
+      deps.configPath ?? 'opensip-cli.config.yml',
+    );
+    this.projectKey = ephemeralProjectCacheKey(deps.projectRoot);
+    this.log = deps.log;
+  }
+
+  async runQuery<T>(
+    operation: string,
+    metadata: QueryLogContext,
+    project: (
+      gen: CatalogGeneration | undefined,
+      freshness: Freshness,
+    ) => GraphToolResult<T> | Result<GraphToolResult<T>, McpReadError>,
+  ): Promise<Result<GraphToolResult<T>, McpReadError>> {
+    const started = Date.now();
+    try {
+      const captured = await this.controller.capture();
+      if (!captured.ok) {
+        this.logQueryFailure(operation, started, metadata);
+        return captured;
+      }
+      const gen = captured.value;
+      const freshness = await this.freshnessFor(gen);
+      if (!freshness.ok) {
+        this.logQueryFailure(operation, started, metadata);
+        return freshness;
+      }
+      const projected = project(gen, freshness.value);
+      if ('ok' in projected && !projected.ok) {
+        this.logQueryFailure(operation, started, metadata);
+        return projected;
+      }
+      const result = 'ok' in projected ? projected.value : projected;
+      this.log?.(LOG_QUERY_COMPLETED, {
+        operation,
+        identityMode: metadata.identityMode,
+        sourceScope: metadata.sourceScope,
+        resultCount: resultDataCount(result.data),
+        coverageComplete: result.coverage.complete,
+        coverageTruncated: result.coverage.truncated,
+        outcome: 'ok',
+        durationMs: Date.now() - started,
+      });
+      return ok(result);
+    } catch {
+      this.logQueryFailure(operation, started, metadata);
+      return err(
+        readError('graph-query-failed', 'Graph query failed due to an infrastructure error.'),
+      );
+    }
+  }
+
+  async freshnessFor(gen: CatalogGeneration | undefined): Promise<Result<Freshness, McpReadError>> {
+    if (gen === undefined) return ok(missingFreshness());
+    const verified = await this.controller.verifyCurrent(gen);
+    if (!verified.ok) return verified;
+    return ok(freshnessFromVerification(verified.value, gen.builtAt));
+  }
+
+  envelope<T>(
+    data: T,
+    gen: CatalogGeneration | undefined,
+    freshness: Freshness,
+    options?: EnvelopeOptions,
+  ): GraphToolResult<T> {
+    const coverage = options?.coverage ?? {
+      complete: true,
+      truncated: false,
+      reasons: [],
+    };
+    return {
+      data,
+      context: this.contextFor(gen),
+      freshness,
+      ...(options?.page === undefined ? {} : { page: options.page }),
+      coverage,
+      ...(options?.filter === undefined ? {} : { filter: options.filter }),
+      ...(options?.groups === undefined ? {} : { groups: options.groups }),
+    };
+  }
+
+  resolveFilter(
+    partial: Partial<GraphSourceFilter> | undefined,
+    defaults: 'discover' | 'production',
+  ): GraphSourceFilter {
+    if (defaults === 'production') return this.defaultProductionFilter(partial);
+    return {
+      sourceScope: partial?.sourceScope ?? 'all',
+      generated: partial?.generated ?? 'include',
+      ...(partial?.packages === undefined ? {} : { packages: partial.packages }),
+      ...(partial?.filePath === undefined ? {} : { filePath: partial.filePath }),
+      ...(partial?.filePrefix === undefined ? {} : { filePrefix: partial.filePrefix }),
+      ...(partial?.kinds === undefined ? {} : { kinds: partial.kinds }),
+      ...(partial?.visibilities === undefined ? {} : { visibilities: partial.visibilities }),
+    };
+  }
+
+  defaultProductionFilter(partial?: Partial<GraphSourceFilter>): GraphSourceFilter {
+    return {
+      sourceScope: partial?.sourceScope ?? 'production',
+      generated: partial?.generated ?? 'exclude',
+      ...(partial?.packages === undefined ? {} : { packages: partial.packages }),
+      ...(partial?.filePath === undefined ? {} : { filePath: partial.filePath }),
+      ...(partial?.filePrefix === undefined ? {} : { filePrefix: partial.filePrefix }),
+      ...(partial?.kinds === undefined ? {} : { kinds: partial.kinds }),
+      ...(partial?.visibilities === undefined ? {} : { visibilities: partial.visibilities }),
+    };
+  }
+
+  resolveAfterKey(
+    cursor: string | undefined,
+    binding: {
+      projectKey: string;
+      generationKey: string;
+      queryDigest: string;
+    },
+  ): Result<string | undefined, McpReadError> {
+    if (cursor === undefined) return ok(undefined);
+    const decoded = decodeCursor(cursor);
+    if (!decoded.ok) return decoded;
+    const bound = bindCursor(decoded.value, binding);
+    if (!bound.ok) return bound;
+    return ok(bound.value.afterKey);
+  }
+
+  nextCursorFor(
+    binding: {
+      projectKey: string;
+      generationKey: string;
+      queryDigest: string;
+    },
+    afterKey: string,
+  ): string {
+    return encodeCursor({
+      v: CURSOR_VERSION,
+      projectKey: binding.projectKey,
+      generationKey: binding.generationKey,
+      queryDigest: binding.queryDigest,
+      afterKey,
+    });
+  }
+
+  async catalogStatus(): Promise<Result<CatalogStatus, McpReadError>> {
+    const started = Date.now();
+    const metadata: QueryLogContext = {
+      identityMode: 'not-applicable',
+      sourceScope: 'all',
+    };
+    const captured = await this.controller.capture();
+    if (!captured.ok) {
+      this.logQueryFailure('catalogStatus', started, metadata);
+      return captured;
+    }
+    const gen = captured.value;
+    const freshness = await this.freshnessFor(gen);
+    if (!freshness.ok) {
+      this.logQueryFailure('catalogStatus', started, metadata);
+      return freshness;
+    }
+    this.log?.(LOG_QUERY_COMPLETED, {
+      operation: 'catalogStatus',
+      identityMode: metadata.identityMode,
+      sourceScope: metadata.sourceScope,
+      resultCount: 1,
+      coverageComplete: freshness.value.verification === 'complete',
+      coverageTruncated: false,
+      outcome: 'ok',
+      durationMs: Date.now() - started,
+    });
+    return ok({ context: this.contextFor(gen), freshness: freshness.value });
+  }
+
+  private contextFor(gen: CatalogGeneration | undefined): GraphEvidenceContext {
+    if (gen === undefined) {
+      return {
+        project: {
+          root: this.projectRoot,
+          scope: 'project',
+          configPath: this.configPath,
+        },
+        catalog: { status: 'missing' },
+      };
+    }
+    return {
+      project: {
+        root: this.projectRoot,
+        scope: 'project',
+        configPath: this.configPath,
+      },
+      catalog: {
+        status: 'loaded',
+        builtAt: gen.builtAt,
+        language: gen.catalog.language,
+        resolutionMode: gen.catalog.resolutionMode ?? 'exact',
+        engineMode: gen.catalog.engineMode,
+        identity: gen.key,
+        loadedAt: gen.loadedAt,
+        generationSource: gen.source,
+      },
+    };
+  }
+
+  private logQueryFailure(operation: string, started: number, metadata: QueryLogContext): void {
+    this.log?.(LOG_QUERY_FAILED, {
+      operation,
+      identityMode: metadata.identityMode,
+      sourceScope: metadata.sourceScope,
+      resultCount: 0,
+      coverageComplete: false,
+      coverageTruncated: false,
+      outcome: 'failed',
+      durationMs: Date.now() - started,
+    });
+  }
+}
+
+/** Builds the zero-catalog architecture response with explicit count semantics. */
+export function emptyArchitecture(filter: GraphSourceFilter): ArchitectureSummaryDto {
+  return {
+    languages: [],
+    occurrenceCount: {
+      value: 0,
+      nodeIdentity: 'occurrence',
+      sourceScope: filter.sourceScope,
+      generated: filter.generated,
+    },
+    uniqueBodyCount: {
+      value: 0,
+      nodeIdentity: 'body-hash',
+      sourceScope: filter.sourceScope,
+      generated: filter.generated,
+    },
+    callEvidence: {
+      resolvedCallSites: 0,
+      resolvedTargets: 0,
+      unresolvedCallSites: 0,
+      confidence: {},
+      resolution: {},
+      distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
+      resolvedTargetConfidence: { values: {}, countUnit: 'resolved-targets' },
+      resolvedTargetResolution: { values: {}, countUnit: 'resolved-targets' },
+      unresolvedCallSiteConfidence: {
+        values: {},
+        countUnit: 'unresolved-call-sites',
+      },
+      unresolvedCallSiteResolution: {
+        values: {},
+        countUnit: 'unresolved-call-sites',
+      },
+      nodeIdentity: 'occurrence',
+      sourceScope: filter.sourceScope,
+      generated: filter.generated,
+      edgeKind: 'call',
+      catalogResolutionMode: 'exact',
+    },
+    packageCount: {
+      value: 0,
+      nodeIdentity: 'package',
+      sourceScope: filter.sourceScope,
+      generated: filter.generated,
+    },
+    packageEdges: [],
+    hotspots: [],
+  };
+}

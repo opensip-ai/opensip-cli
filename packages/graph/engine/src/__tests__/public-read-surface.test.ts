@@ -20,6 +20,7 @@ vi.mock('../cli/orchestrate.js', () => ({ runGraph: runGraphMock }));
 const EXPECTED = [
   'readCatalogIdentity',
   'loadCatalogGeneration',
+  'loadGraphReadConfig',
   'rebuildCatalog',
   'buildGraphReadIndexes',
   'deriveGraphReadFeatures',
@@ -28,7 +29,12 @@ const EXPECTED = [
   'computeGraphReadFilesFingerprint',
   'matchesGraphSourceFilter',
   'matchesFilePrefix',
+  'compareCodePointStrings',
+  'codePointSortKey',
+  'continuationToken',
   'toGraphSymbolRef',
+  'graphPackageOf',
+  'toGraphPackageName',
   'GRAPH_SYMBOL_PATH_MAX',
   'GRAPH_SYMBOL_NAME_MAX',
   'GRAPH_SYMBOL_PACKAGE_MAX',
@@ -37,6 +43,9 @@ const EXPECTED = [
   'buildOccurrenceCallView',
   'buildPackageEvidence',
   'buildPackageScc',
+  'packageDependencyStableKey',
+  'packageCallEvidenceStableKey',
+  'packageImportEvidenceStableKey',
   'searchSymbolOccurrences',
   'symbolSearchStableKey',
   'compareSymbolRefs',
@@ -148,6 +157,9 @@ describe('@opensip-cli/graph/read public surface', () => {
     }>();
     expectTypeOf<read.GraphSymbolRef>().toHaveProperty('symbolId');
     expectTypeOf<read.GraphSourceFilter>().toHaveProperty('sourceScope');
+    expectTypeOf<read.PackageDependencyEvidence>().toEqualTypeOf<
+      read.PackageCallEvidence | read.PackageImportEvidence
+    >();
   });
 });
 
@@ -182,8 +194,14 @@ describe('@opensip-cli/graph/read catalog Results', () => {
   it('preserves missing as ok(null) for identity and generation reads', () => {
     const store = DataStoreFactory.open({ backend: 'memory' });
     try {
-      expect(read.readCatalogIdentity(store)).toEqual({ ok: true, value: null });
-      expect(read.loadCatalogGeneration(store)).toEqual({ ok: true, value: null });
+      expect(read.readCatalogIdentity(store)).toEqual({
+        ok: true,
+        value: null,
+      });
+      expect(read.loadCatalogGeneration(store)).toEqual({
+        ok: true,
+        value: null,
+      });
     } finally {
       store.close();
     }
@@ -194,7 +212,10 @@ describe('@opensip-cli/graph/read catalog Results', () => {
     try {
       const catalog = makeCatalog();
       new CatalogRepo(store).replaceAll(catalog);
-      expect(read.loadCatalogGeneration(store)).toEqual({ ok: true, value: catalog });
+      expect(read.loadCatalogGeneration(store)).toEqual({
+        ok: true,
+        value: catalog,
+      });
     } finally {
       store.close();
     }
@@ -250,7 +271,12 @@ describe('@opensip-cli/graph/read algorithm parity', () => {
     const files = ['/definitely/missing/a.ts', '/definitely/missing/b.ts'];
     const stableSignals = (
       signals: readonly { readonly id: string; readonly createdAt: string }[],
-    ) => signals.map((signal) => ({ ...signal, id: '<dynamic>', createdAt: '<dynamic>' }));
+    ) =>
+      signals.map((signal) => ({
+        ...signal,
+        id: '<dynamic>',
+        createdAt: '<dynamic>',
+      }));
 
     expect(read.buildGraphReadIndexes(catalog)).toEqual(indexes);
     expect(read.deriveGraphReadFeatures(catalog, indexes, {}, columns)).toEqual(features);
@@ -271,6 +297,39 @@ describe('@opensip-cli/graph/read rebuild Result', () => {
     await expect(read.rebuildCatalog({ cwd: '/project' })).resolves.toEqual({
       ok: true,
       value: catalog,
+    });
+    expect(runGraphMock).toHaveBeenCalledWith({
+      cwd: '/project',
+      noCache: true,
+    });
+  });
+
+  it('persists a cache-bypassing rebuild before returning it', async () => {
+    const store = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const catalog = makeCatalog();
+      runGraphMock.mockResolvedValue({ catalog });
+      await expect(read.rebuildCatalog({ cwd: '/project', datastore: store })).resolves.toEqual({
+        ok: true,
+        value: catalog,
+      });
+      expect(new CatalogRepo(store).loadFullCatalog()).toEqual(catalog);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('maps persistence failures without returning an unpersisted generation', async () => {
+    const store = DataStoreFactory.open({ backend: 'memory' });
+    store.close();
+    runGraphMock.mockResolvedValue({ catalog: makeCatalog() });
+    await expect(read.rebuildCatalog({ cwd: '/project', datastore: store })).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'GRAPH.READ.REBUILD_FAILED',
+        operation: 'rebuild',
+        message: 'Graph rebuild failed due to infrastructure error',
+      },
     });
   });
 

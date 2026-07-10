@@ -12,6 +12,7 @@ import { unavailableGraphStatus } from '../freshness.js';
 import {
   filePath as filePathSchema,
   limit as limitSchema,
+  strictInput,
   suiteName as suiteNameSchema,
   suiteRunId as suiteRunIdSchema,
 } from './schemas.js';
@@ -31,12 +32,12 @@ export function registerReviewChange(server: McpStdioServer, deps: McpToolDeps):
         'from persisted suite step sessions, includes graph freshness, and never re-runs ' +
         'fit/graph/yagni/sim. Do not grep .runtime/logs, read datastore.sqlite directly, ' +
         'or re-run a CLI tool to answer stored review questions.',
-      inputSchema: {
+      inputSchema: strictInput({
         suiteRunId: suiteRunIdSchema().optional(),
         suite: suiteNameSchema().optional(),
         files: z.array(filePathSchema()).max(100).optional(),
         limit: limitSchema(),
-      },
+      }),
     },
     async ({ suiteRunId, suite, files, limit }) => {
       let graphFreshness = unavailableGraphStatus();

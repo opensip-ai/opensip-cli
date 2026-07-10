@@ -10,6 +10,7 @@ import { z } from 'zod';
 import {
   limit as limitSchema,
   sessionRef as sessionRefSchema,
+  strictInput,
   toolId as toolIdSchema,
 } from './schemas.js';
 import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
@@ -27,12 +28,12 @@ export function registerCompareToBaseline(server: McpStdioServer, deps: McpToolD
         'against that tool’s saved baseline. It replays the persisted session, reads ' +
         'stored baseline fingerprints, returns added/unchanged/resolved counts, and ' +
         'never re-runs the underlying tool.',
-      inputSchema: {
+      inputSchema: strictInput({
         tool: toolIdSchema(),
         ref: sessionRefSchema().optional(),
         limit: limitSchema(),
         includeResolved: z.boolean().optional(),
-      },
+      }),
     },
     async ({ tool, ref, limit, includeResolved }) => {
       if (!deps.validToolIds.has(tool)) return unknownToolError(tool, deps.validToolIds);

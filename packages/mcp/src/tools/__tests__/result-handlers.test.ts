@@ -93,6 +93,7 @@ function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])
         ),
     } as unknown as McpToolDeps['graph'],
     results,
+    runtimeWiring: {} as McpToolDeps['runtimeWiring'],
     validToolIds,
   };
 }

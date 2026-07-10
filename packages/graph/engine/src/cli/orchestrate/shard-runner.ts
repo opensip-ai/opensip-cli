@@ -91,7 +91,6 @@ function correlationLogFields(c: RunCorrelation | undefined): Record<string, str
   };
   const traceId = currentTraceparent() ?? c.traceId;
   if (traceId !== undefined) fields.traceId = traceId;
-  if (c.repo !== undefined) fields.repo = c.repo;
   if (c.repoId !== undefined) fields.repoId = c.repoId;
   if (c.tenantId !== undefined) fields.tenantId = c.tenantId;
   return fields;
@@ -159,9 +158,8 @@ export interface ShardFailure {
   readonly exitCode: number;
   /**
    * The FULL captured stderr — drives the user-facing message and stays
-   * UNTRUNCATED here (M4). The parent's structured `shard_failed` event caps a
-   * separate `stderrPreview` (~500c) independently, so a long stderr is never
-   * lost from the failure surface.
+   * UNTRUNCATED here (M4). Structured events expose only bounded presence and
+   * length metadata; they never copy worker output into shared logs.
    */
   readonly stderr: string;
   /** Machine-filterable failure taxonomy ({@link FailureClass}); absent on a clean exit. */
@@ -240,9 +238,8 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   failures.sort((a, b) => Number(a.shardId > b.shardId) - Number(a.shardId < b.shardId));
 
   // One structured per-shard event per failure (the runner is the emitter, not
-  // the merge stage). `stderrPreview` is a SEPARATE ~500c cap for the structured
-  // log; the full `failure.stderr` stays untouched on the returned ShardFailure
-  // (M4) so the user-facing message keeps the complete output.
+  // the merge stage). The full `failure.stderr` stays on ShardFailure for the
+  // user-facing error but never enters structured logs.
   for (const failure of failures) {
     runLogger.error({
       evt: 'graph.shard.runner.shard_failed',
@@ -251,7 +248,8 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
       shardId: failure.shardId,
       exitCode: failure.exitCode,
       ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
-      stderrPreview: failure.stderr.slice(0, 500),
+      stderrPresent: failure.stderr.length > 0,
+      stderrLength: failure.stderr.length,
     });
     // `subprocess.failed` milestone — one per failed shard, keyed by `shardId`
     // so a `--json` consumer can filter `events` down to a single shard.

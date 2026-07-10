@@ -1,242 +1,111 @@
-/**
- * Production live runtime wiring projection from captured RunScope facts.
- */
+/** Production read port over one immutable captured runtime-wiring snapshot. */
 
-import {
-  buildToolIdentityIndex,
-  ok,
-  type Result,
-  type ToolPluginManifest,
-  type ToolProvenance,
-  type ToolRegistry,
-} from '@opensip-cli/core';
+import { err, ok, type Result } from '@opensip-cli/core';
 
+import { digestNormalizedQuery, pageRows } from './graph-query-page.js';
 import { readError, type McpReadError } from './mcp-error.js';
+import {
+  MAX_RUNTIME_EDGES,
+  resolveCanonicalRuntimeTool,
+  type LiveRuntimeWiringDeps,
+  type RuntimeToolIdentityIndex,
+} from './runtime-wiring-capture.js';
+import { filterRuntimeSnapshot, groupRuntimeNodes } from './runtime-wiring-filter.js';
+import {
+  buildRuntimeWiringSnapshot,
+  type RuntimeWiringSnapshot,
+} from './runtime-wiring-snapshot.js';
 
 import type {
-  RuntimeWiringEdge,
-  RuntimeWiringNode,
   RuntimeWiringQuery,
   RuntimeWiringReadPort,
   RuntimeWiringResult,
 } from './runtime-wiring-read-port.js';
 
-const MAX_NODES = 10_000;
-const MAX_EDGES = 20_000;
-const MAX_TEXT = 256;
+const MAX_PAGE_EDGES_PER_NODE = 4;
 
-export interface LiveRuntimeWiringDeps {
-  readonly projectRoot: string;
-  readonly tools: ToolRegistry;
-  readonly manifests: readonly ToolPluginManifest[];
-  readonly provenance: readonly ToolProvenance[];
-}
+export type { LiveRuntimeWiringDeps } from './runtime-wiring-capture.js';
 
+/** Deterministic, session-free runtime-wiring reader for the captured host state. */
 export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
-  private readonly snapshot: RuntimeWiringResult;
+  private readonly snapshot: RuntimeWiringSnapshot;
+  private readonly identityIndex: RuntimeToolIdentityIndex;
 
   constructor(deps: LiveRuntimeWiringDeps) {
-    this.snapshot = buildSnapshot(deps);
+    this.snapshot = buildRuntimeWiringSnapshot(deps);
+    this.identityIndex = this.snapshot.identityIndex;
   }
 
   async query(input: RuntimeWiringQuery): Promise<Result<RuntimeWiringResult, McpReadError>> {
     await Promise.resolve();
     try {
-      const limit = Math.min(500, Math.max(1, Math.trunc(input.limit ?? 100)));
-      let nodes = this.snapshot.nodes;
-      let edges = this.snapshot.edges;
-      if (input.tool !== undefined) {
-        nodes = nodes.filter((n) => n.tool === input.tool || n.id.includes(input.tool!));
-        const ids = new Set(nodes.map((n) => n.id));
-        edges = edges.filter((e) => ids.has(e.from) || ids.has(e.to));
-      }
-      if (input.command !== undefined) {
-        nodes = nodes.filter((n) => n.kind === 'command' && n.label.includes(input.command!));
-        const ids = new Set(nodes.map((n) => n.id));
-        edges = edges.filter((e) => ids.has(e.from) || ids.has(e.to));
-      }
-      if (input.provenanceSource !== undefined) {
-        edges = edges.filter((e) => e.source === input.provenanceSource);
-      }
-      const truncated =
-        nodes.length > limit || this.snapshot.coverage.truncated || edges.length > limit * 2;
-      return ok({
-        nodes: nodes.slice(0, limit),
-        edges: edges.slice(0, limit * 2),
-        page: { limit },
-        coverage: {
-          complete: !truncated && this.snapshot.coverage.complete,
-          truncated,
-          reasons: [
-            ...this.snapshot.coverage.reasons,
-            ...(nodes.length > limit ? ['page-limit'] : []),
-          ],
+      const limit = Math.max(1, Math.min(500, Math.trunc(input.limit ?? 100)));
+      const groupBy = input.groupBy ?? 'none';
+      const canonicalTool =
+        input.tool === undefined
+          ? undefined
+          : resolveCanonicalRuntimeTool(input.tool, this.identityIndex);
+      const effectiveFilters = {
+        tool: canonicalTool,
+        command: input.command?.toLowerCase(),
+        provenanceSource: input.provenanceSource,
+        limit,
+        groupBy,
+      };
+      const filtered = filterRuntimeSnapshot(this.snapshot, input, canonicalTool);
+      const queryDigest = digestNormalizedQuery(effectiveFilters);
+      const page = pageRows(
+        filtered.nodes,
+        {
+          projectKey: this.snapshot.projectKey,
+          generationKey: this.snapshot.snapshotKey,
+          queryDigest,
+          limit,
+          cursor: input.cursor,
         },
-        effectiveFilters: input,
+        (node) => node.id,
+      );
+      if (!page.ok) return page;
+      const pageIds = new Set(page.value.rows.map((node) => node.id));
+      const pageEdges = filtered.edges.filter(
+        (edge) => pageIds.has(edge.from) || pageIds.has(edge.to),
+      );
+      const edgeLimit = Math.min(MAX_RUNTIME_EDGES, limit * MAX_PAGE_EDGES_PER_NODE);
+      const edgeTruncated = pageEdges.length > edgeLimit;
+      const grouped = groupRuntimeNodes(filtered.nodes, groupBy);
+      const pageReasons = [
+        ...(edgeTruncated ? ['page-edge-cap'] : []),
+        ...(grouped.groupTruncated ? ['group-key-cap'] : []),
+      ];
+      const coverage =
+        pageReasons.length > 0
+          ? {
+              ...this.snapshot.coverage,
+              complete: false,
+              truncated: true,
+              reasons: [...new Set([...this.snapshot.coverage.reasons, ...pageReasons])],
+            }
+          : this.snapshot.coverage;
+      return ok({
+        context: {
+          projectKey: this.snapshot.projectKey,
+          snapshotKey: this.snapshot.snapshotKey,
+        },
+        nodes: page.value.rows,
+        edges: pageEdges.slice(0, edgeLimit),
+        page: {
+          limit,
+          hasMore: page.value.hasMore,
+          nextCursor: page.value.nextCursor,
+          edgeTruncated,
+        },
+        groups: grouped.groups,
+        groupTruncated: grouped.groupTruncated,
+        coverage,
+        effectiveFilters,
       });
     } catch {
-      return {
-        ok: false,
-        error: readError('runtime-wiring-failed', 'Failed to query runtime wiring snapshot.'),
-      };
+      return err(readError('runtime-wiring-failed', 'Failed to query runtime wiring snapshot.'));
     }
   }
-}
-
-function bound(text: string): string {
-  let cleaned = '';
-  for (let i = 0; i < text.length; i++) {
-    const code = text.codePointAt(i) ?? 0;
-    if (code > 0x1f && code !== 0x7f) cleaned += text[i] ?? '';
-  }
-  return cleaned.length > MAX_TEXT ? cleaned.slice(0, MAX_TEXT) : cleaned;
-}
-
-// eslint-disable-next-line sonarjs/cognitive-complexity -- one-pass registry/manifest/command snapshot builder
-function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
-  const nodes: RuntimeWiringNode[] = [];
-  const edges: RuntimeWiringEdge[] = [];
-  const reasons: string[] = [];
-  let truncated = false;
-
-  // Canonical identity index — proves alias/layout resolution is reused.
-  void buildToolIdentityIndex(deps.tools);
-
-  const tools = deps.tools.list();
-  const provById = new Map<string, ToolProvenance>();
-  for (const p of deps.provenance) {
-    const record = p as unknown as Record<string, unknown>;
-    let id: string | undefined;
-    if (typeof record.toolId === 'string') id = record.toolId;
-    else if (typeof record.id === 'string') id = record.id;
-    else if (typeof record.stableId === 'string') id = record.stableId;
-    if (id !== undefined) provById.set(id, p);
-  }
-
-  for (const manifest of deps.manifests) {
-    if (nodes.length >= MAX_NODES) {
-      truncated = true;
-      reasons.push('node-cap');
-      break;
-    }
-    const m = manifest as unknown as Record<string, unknown>;
-    let midRaw = 'manifest';
-    if (typeof m.id === 'string') midRaw = m.id;
-    else if (typeof m.name === 'string') midRaw = m.name;
-    const mid = bound(midRaw);
-    nodes.push({
-      id: `manifest:${mid}`,
-      kind: 'manifest',
-      label: mid,
-      source: 'manifest',
-    });
-  }
-
-  for (const tool of tools) {
-    if (nodes.length >= MAX_NODES) {
-      truncated = true;
-      reasons.push('node-cap');
-      break;
-    }
-    const toolKey = tool.identity.layoutKey ?? tool.identity.name;
-    const tid = `tool:${bound(toolKey)}`;
-    nodes.push({
-      id: tid,
-      kind: 'tool',
-      label: bound(tool.identity.name),
-      tool: bound(toolKey),
-      source: 'registry',
-    });
-
-    const toolRecord = tool as unknown as Record<string, unknown>;
-    const stable = typeof toolRecord.stableId === 'string' ? toolRecord.stableId : undefined;
-    const prov =
-      (stable === undefined ? undefined : provById.get(stable)) ??
-      provById.get(toolKey) ??
-      provById.get(tool.identity.name);
-    if (prov === undefined) {
-      reasons.push('unmatched-provenance');
-    } else {
-      const record = prov as unknown as Record<string, unknown>;
-      const source = typeof record.source === 'string' ? bound(record.source) : 'provenance';
-      // Whitelist posture only — never resolvedPath or manifestHash.
-      const posture =
-        typeof record.workerPosture === 'string' ? bound(record.workerPosture) : undefined;
-      edges.push({
-        from: `manifest:${source}`,
-        to: tid,
-        kind: posture === undefined ? 'manifest-admission' : `manifest-admission:${posture}`,
-        source: 'provenance',
-        confidence: 'high',
-      });
-    }
-
-    for (const spec of tool.commandSpecs ?? []) {
-      if (nodes.length >= MAX_NODES || edges.length >= MAX_EDGES) {
-        truncated = true;
-        reasons.push(nodes.length >= MAX_NODES ? 'node-cap' : 'edge-cap');
-        break;
-      }
-      const cmdName = bound(spec.name);
-      const cid = `command:${bound(toolKey)}:${cmdName}`;
-      nodes.push({
-        id: cid,
-        kind: 'command',
-        label: cmdName,
-        tool: bound(toolKey),
-        source: 'command-spec',
-      });
-      edges.push(
-        {
-          from: tid,
-          to: cid,
-          kind: 'registry-command-ownership',
-          source: 'registry',
-          confidence: 'high',
-        },
-        {
-          from: cid,
-          to: cid,
-          kind: 'host-mount-contract',
-          source: 'host-contract',
-          confidence: 'medium',
-          staticBridge: 'partial',
-        },
-      );
-      // Handler dispatch is logical only — never invoke handlers or toString.
-      const hid = `handler:${cid}`;
-      nodes.push({
-        id: hid,
-        kind: 'handler',
-        label: bound(`${cmdName}#handler`),
-        tool: bound(toolKey),
-        source: 'command-spec',
-      });
-      edges.push({
-        from: cid,
-        to: hid,
-        kind: 'command-handler-dispatch',
-        source: 'command-spec',
-        confidence: 'medium',
-        staticBridge: 'unresolved',
-      });
-    }
-  }
-
-  return {
-    nodes,
-    edges,
-    coverage: {
-      complete: !truncated,
-      truncated,
-      reasons: [
-        ...new Set([
-          ...reasons,
-          'tool-command-wiring-complete-for-admitted-registry',
-          'top-level-host-commands-not-observed',
-        ]),
-      ],
-    },
-    effectiveFilters: {},
-  };
 }

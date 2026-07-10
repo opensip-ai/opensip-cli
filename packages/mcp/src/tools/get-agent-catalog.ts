@@ -7,6 +7,7 @@
  * show_run, list_runs) before re-running anything.
  */
 
+import { strictInput } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -24,6 +25,7 @@ export function registerGetAgentCatalog(server: McpStdioServer, deps: McpToolDep
         'replay persisted sessions and never re-run fit/graph/yagni/sim. Do not grep ' +
         '.runtime/logs, read datastore.sqlite directly, or re-run a CLI tool to answer ' +
         'stored-result questions.',
+      inputSchema: strictInput({}),
     },
     () => {
       const outcome = deps.results.agentCatalog();

@@ -1,23 +1,18 @@
-/**
- * Labelled architecture audit metrics over filtered catalog evidence.
- *
- * Metrics keep distinct units/scopes:
- * - occurrence count vs unique body-hash count
- * - resolved call-site/target counts vs unresolved call-sites
- * - confidence/resolution distributions with edge-kind + catalog mode labels
- * - canonical FeatureTable.edge package call rows (production/non-generated default)
- * - blast hotspots filtered before ranking (body-twin score semantics)
- *
- * Target-convention summaries stay MCP/host-side; they are not computed here.
- */
+/** Labelled, filtered, bounded architecture orientation metrics. */
 
 import { err, ok, type Result } from '@opensip-cli/core';
 
-import { buildFeatures } from '../pipeline/features.js';
-import { buildOccurrenceCallGraph } from '../pipeline/occurrence-call-graph.js';
-import { pkgOf } from '../resolve-callee.js';
-
 import {
+  codePointSortKey,
+  compareCodePointStrings,
+  matchesContinuationIdentity,
+} from '../code-point-order.js';
+import { buildFeatures } from '../pipeline/features.js';
+import { occurrenceCallGraphFor } from '../pipeline/occurrence-call-graph.js';
+
+import { boundedGroups, insertBoundedTopK, type ReadGroupSummary } from './bounded-view.js';
+import {
+  toGraphPackageName,
   toGraphSymbolRef,
   type EffectiveGraphSourceFilter,
   type GeneratedPolicy,
@@ -26,20 +21,21 @@ import {
   type GraphSymbolRef,
   type SourceScope,
 } from './query-contracts.js';
-import { matchesGraphSourceFilter } from './source-filter.js';
+import { isCanonicalProductionFilter, matchesGraphSourceFilter } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
-import type { Catalog, Indexes, PackageEdgeFeature } from '../types.js';
+import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
 export interface ArchitectureViewQuery {
   readonly filter: GraphSourceFilter;
-  /** Cap for package edge + hotspot orientation rows (retains limit+1 each). */
   readonly limit: number;
   readonly afterPackageEdgeKey?: string;
   readonly afterHotspotKey?: string;
+  readonly packageEdgesDone?: boolean;
+  readonly hotspotsDone?: boolean;
+  readonly groupBy?: 'none' | 'package' | 'file';
 }
 
-/** Count labelled with node identity and source/generated scope. */
 export interface LabelledNodeCount {
   readonly value: number;
   readonly nodeIdentity: 'occurrence' | 'body-hash';
@@ -47,16 +43,35 @@ export interface LabelledNodeCount {
   readonly generated: GeneratedPolicy;
 }
 
+export interface LabelledPackageCount {
+  readonly value: number;
+  readonly nodeIdentity: 'package';
+  readonly sourceScope: SourceScope;
+  readonly generated: GeneratedPolicy;
+}
+
+export interface LabelledDistribution {
+  readonly values: Readonly<Record<string, number>>;
+  readonly countUnit: 'resolved-targets' | 'unresolved-call-sites';
+}
+
 export interface CallEvidenceMetrics {
-  /** Resolved call-site rows with at least one surviving target under the filter. */
   readonly resolvedCallSites: number;
-  /** Resolved occurrence→occurrence target edges under the filter. */
   readonly resolvedTargets: number;
   readonly unresolvedCallSites: number;
+  /** Aggregate compatibility views; `distributionCountUnit` makes the mixed unit explicit. */
   readonly confidence: Readonly<Record<string, number>>;
   readonly resolution: Readonly<Record<string, number>>;
+  readonly distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites';
+  readonly resolvedTargetConfidence: LabelledDistribution;
+  readonly resolvedTargetResolution: LabelledDistribution;
+  readonly unresolvedCallSiteConfidence: LabelledDistribution;
+  readonly unresolvedCallSiteResolution: LabelledDistribution;
+  readonly nodeIdentity: 'occurrence';
+  readonly sourceScope: SourceScope;
+  readonly generated: GeneratedPolicy;
   readonly edgeKind: 'call';
-  readonly catalogResolutionMode: 'exact' | 'fast' | undefined;
+  readonly catalogResolutionMode: 'exact' | 'fast';
 }
 
 export interface ArchitecturePackageEdgeRow {
@@ -64,7 +79,11 @@ export interface ArchitecturePackageEdgeRow {
   readonly toPackage: string;
   readonly kind: 'call';
   readonly count: number;
-  readonly countUnit: 'call-sites';
+  readonly countUnit: 'resolved-targets';
+  readonly nodeIdentity: 'package';
+  readonly sourceScope: SourceScope;
+  readonly generated: GeneratedPolicy;
+  readonly catalogResolutionMode: 'exact' | 'fast';
 }
 
 export interface ArchitectureHotspot {
@@ -74,6 +93,11 @@ export interface ArchitectureHotspot {
   readonly score: number;
   readonly identityMode: 'body-twin-union';
   readonly twinCount: number;
+  readonly matchingTwinCount: number;
+  readonly sourceScope: SourceScope;
+  readonly generated: GeneratedPolicy;
+  readonly edgeKind: 'call';
+  readonly catalogResolutionMode: 'exact' | 'fast';
 }
 
 export interface ArchitectureView {
@@ -81,271 +105,496 @@ export interface ArchitectureView {
   readonly occurrenceCount: LabelledNodeCount;
   readonly uniqueBodyCount: LabelledNodeCount;
   readonly callEvidence: CallEvidenceMetrics;
-  readonly packageCount: number;
+  readonly packageCount: LabelledPackageCount;
   readonly packageEdges: readonly ArchitecturePackageEdgeRow[];
   readonly packageEdgesHasMore: boolean;
   readonly hotspots: readonly ArchitectureHotspot[];
   readonly hotspotsHasMore: boolean;
   readonly effectiveFilter: EffectiveGraphSourceFilter;
   readonly coverage: GraphReadCoverage;
+  readonly groups?: readonly ReadGroupSummary[];
 }
+
+interface ArchitectureCounts {
+  readonly occurrenceCount: number;
+  readonly bodyHashes: ReadonlySet<string>;
+  readonly packageNames: ReadonlySet<string>;
+}
+
+const MAX_ORIENTATION_ROWS = 10_000;
+const DESCENDING_KEY_CEILING = Number.MAX_SAFE_INTEGER;
+const MALFORMED_SYMBOL_REASON = 'malformed-symbol-omitted';
+const MALFORMED_CALL_REASON = 'malformed-call-edge-omitted';
 
 function archError(message: string): GraphReadError {
   return { code: 'GRAPH.READ.ARCHITECTURE_VIEW', operation: 'analysis', message };
 }
 
+function resolutionMode(catalog: Catalog): 'exact' | 'fast' {
+  return catalog.resolutionMode ?? 'exact';
+}
+
+function descendingIntegerKey(value: number): string {
+  const normalized = Math.max(0, Math.min(DESCENDING_KEY_CEILING, Math.trunc(value)));
+  return String(DESCENDING_KEY_CEILING - normalized).padStart(16, '0');
+}
+
 export function packageEdgeStableKey(row: ArchitecturePackageEdgeRow): string {
-  return `${row.fromPackage}\0${row.toPackage}`;
+  return [
+    descendingIntegerKey(row.count),
+    codePointSortKey(row.fromPackage),
+    codePointSortKey(row.toPackage),
+  ].join('|');
 }
 
 export function hotspotStableKey(row: ArchitectureHotspot): string {
-  // Score desc, then symbolId asc — encode score as inverted padded for string order.
-  const scoreKey = String(1_000_000_000 - Math.trunc(row.score * 1000)).padStart(12, '0');
-  return `${scoreKey}\0${row.symbol.symbolId}`;
+  return [descendingIntegerKey(row.score * 2), codePointSortKey(row.symbol.symbolId)].join('|');
 }
 
-function isCanonicalPackagePath(filter: GraphSourceFilter): boolean {
-  return (
-    filter.sourceScope === 'production' &&
-    filter.generated === 'exclude' &&
-    filter.packages === undefined &&
-    filter.filePath === undefined &&
-    filter.filePrefix === undefined &&
-    filter.kinds === undefined &&
-    filter.visibilities === undefined
-  );
+function comparePackageEdges(a: ArchitecturePackageEdgeRow, b: ArchitecturePackageEdgeRow) {
+  return compareCodePointStrings(packageEdgeStableKey(a), packageEdgeStableKey(b));
 }
 
-/**
- * Build labelled architecture metrics for the filtered catalog generation.
- */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- labelled multi-metric architecture aggregation
-export function buildArchitectureView(
+function compareHotspots(a: ArchitectureHotspot, b: ArchitectureHotspot) {
+  return compareCodePointStrings(hotspotStableKey(a), hotspotStableKey(b));
+}
+
+/** Internal deterministic top-K helper, exported only for direct regression tests. */
+export function boundedArchitectureRows<T>(
+  rows: Iterable<T>,
+  cap: number,
+  compare: (left: T, right: T) => number,
+): { readonly rows: readonly T[]; readonly truncated: boolean } {
+  const selected: T[] = [];
+  let total = 0;
+  for (const row of rows) {
+    total++;
+    insertBoundedTopK(selected, row, cap, compare);
+  }
+  return { rows: selected, truncated: total > cap };
+}
+
+function countArchitectureNodes(
+  indexes: Indexes,
+  filter: GraphSourceFilter,
+  reasons: Set<string>,
+): ArchitectureCounts {
+  const bodyHashes = new Set<string>();
+  const packageNames = new Set<string>();
+  let occurrenceCount = 0;
+  for (const occurrence of indexes.byOccId.values()) {
+    if (occurrence.kind === 'module-init' || !matchesGraphSourceFilter(occurrence, filter))
+      continue;
+    const symbol = toGraphSymbolRef(occurrence);
+    if (symbol === undefined) {
+      reasons.add(MALFORMED_SYMBOL_REASON);
+      continue;
+    }
+    occurrenceCount++;
+    bodyHashes.add(symbol.bodyHash);
+    packageNames.add(symbol.package);
+  }
+  return { occurrenceCount, bodyHashes, packageNames };
+}
+
+function increment(values: Record<string, number>, key: string): void {
+  values[key] = (values[key] ?? 0) + 1;
+}
+
+function noteMalformedCalls(malformedCalls: number, reasons: Set<string>): void {
+  if (malformedCalls > 0) reasons.add(MALFORMED_CALL_REASON);
+}
+
+function buildCallMetrics(
   catalog: Catalog,
   indexes: Indexes,
-  query: ArchitectureViewQuery,
-): Result<ArchitectureView, GraphReadError> {
-  try {
-    const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
-    const filter = query.filter;
-    const reasons: string[] = [];
+  filter: GraphSourceFilter,
+  reasons: Set<string>,
+): CallEvidenceMetrics {
+  const graph = occurrenceCallGraphFor(indexes);
+  noteMalformedCalls(graph.malformedCalls, reasons);
+  const resolvedConfidence: Record<string, number> = {};
+  const resolvedResolution: Record<string, number> = {};
+  const unresolvedConfidence: Record<string, number> = {};
+  const unresolvedResolution: Record<string, number> = {};
+  const resolvedSiteKeys = new Set<string>();
+  const unresolvedSites = new Map<
+    string,
+    { readonly confidence: string; readonly resolution: string }
+  >();
+  let resolvedTargets = 0;
 
-    // --- occurrence / body counts ---
-    const bodyHashes = new Set<string>();
-    let occurrenceCount = 0;
-    for (const occ of indexes.byOccId.values()) {
-      if (occ.kind === 'module-init') continue;
-      if (!matchesGraphSourceFilter(occ, filter)) continue;
-      occurrenceCount++;
-      bodyHashes.add(occ.bodyHash);
+  for (const edge of graph.edges) {
+    if (
+      !matchesGraphSourceFilter(edge.owner, filter) ||
+      !matchesGraphSourceFilter(edge.target, filter)
+    ) {
+      continue;
     }
-
-    // --- call evidence from occurrence call graph ---
-    const graph = buildOccurrenceCallGraph(indexes);
-    const confidence: Record<string, number> = {};
-    const resolution: Record<string, number> = {};
-    let resolvedCallSites = 0;
-    let resolvedTargets = 0;
-    let unresolvedCallSites = 0;
-
-    // Group resolved edges by owner+callSite to count call-sites vs targets.
-    const resolvedSiteKeys = new Set<string>();
-    for (const edge of graph.edges) {
-      if (
-        !matchesGraphSourceFilter(edge.owner, filter) ||
-        !matchesGraphSourceFilter(edge.target, filter)
-      ) {
-        continue;
-      }
-      const siteKey = `${edge.fromOccId}\0${String(edge.callSite.line)}\0${String(edge.callSite.column)}`;
-      if (!resolvedSiteKeys.has(siteKey)) {
-        resolvedSiteKeys.add(siteKey);
-        resolvedCallSites++;
-      }
-      resolvedTargets++;
-      confidence[edge.confidence] = (confidence[edge.confidence] ?? 0) + 1;
-      resolution[edge.resolution] = (resolution[edge.resolution] ?? 0) + 1;
+    const owner = toGraphSymbolRef(edge.owner);
+    const target = toGraphSymbolRef(edge.target);
+    if (owner === undefined || target === undefined) {
+      reasons.add(MALFORMED_SYMBOL_REASON);
+      continue;
     }
-    for (const u of graph.unresolved) {
-      if (!matchesGraphSourceFilter(u.owner, filter)) continue;
-      unresolvedCallSites++;
-      confidence[u.confidence] = (confidence[u.confidence] ?? 0) + 1;
-      resolution[u.resolution] = (resolution[u.resolution] ?? 0) + 1;
-    }
-
-    // --- package edges ---
-    let packageEdgesAll: ArchitecturePackageEdgeRow[] = [];
-    const packageNames = new Set<string>();
-
-    if (isCanonicalPackagePath(filter)) {
-      const features = buildFeatures(catalog, indexes, {}, ['packageCoupling']);
-      for (const [name] of features.package) packageNames.add(name);
-      packageEdgesAll = features.edge
-        .filter((e: PackageEdgeFeature) => e.callerPackage !== e.calleePackage)
-        .map((e: PackageEdgeFeature) => ({
-          fromPackage: e.callerPackage,
-          toPackage: e.calleePackage,
-          kind: 'call' as const,
-          count: e.count,
-          countUnit: 'call-sites' as const,
-        }));
-    } else {
-      const buckets = new Map<string, ArchitecturePackageEdgeRow>();
-      for (const edge of graph.edges) {
-        if (
-          !matchesGraphSourceFilter(edge.owner, filter) ||
-          !matchesGraphSourceFilter(edge.target, filter)
-        ) {
-          continue;
-        }
-        const fromP = pkgOf(edge.owner);
-        const toP = pkgOf(edge.target);
-        packageNames.add(fromP);
-        packageNames.add(toP);
-        if (fromP === toP) continue;
-        const key = `${fromP}\0${toP}`;
-        const existing = buckets.get(key);
-        if (existing === undefined) {
-          buckets.set(key, {
-            fromPackage: fromP,
-            toPackage: toP,
-            kind: 'call',
-            count: 1,
-            countUnit: 'call-sites',
-          });
-        } else {
-          buckets.set(key, { ...existing, count: existing.count + 1 });
-        }
-      }
-      // Also count filtered packages with no edges.
-      for (const occ of indexes.byOccId.values()) {
-        if (occ.kind === 'module-init') continue;
-        if (!matchesGraphSourceFilter(occ, filter)) continue;
-        packageNames.add(pkgOf(occ));
-      }
-      packageEdgesAll = [...buckets.values()];
-    }
-
-    packageEdgesAll.sort((a, b) => {
-      const scoreA = a.count;
-      const scoreB = b.count;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      if (a.fromPackage < b.fromPackage) return -1;
-      if (a.fromPackage > b.fromPackage) return 1;
-      if (a.toPackage < b.toPackage) return -1;
-      if (a.toPackage > b.toPackage) return 1;
-      return 0;
-    });
-
-    const packageEdgesWindow = sliceAfterKey(
-      packageEdgesAll,
-      limit,
-      query.afterPackageEdgeKey,
-      packageEdgeStableKey,
+    resolvedSiteKeys.add(
+      `${owner.symbolId}\0${String(edge.callSite.line)}\0${String(edge.callSite.column)}`,
     );
-
-    // --- blast hotspots (filter occurrences first, rank by body-twin score) ---
-    const features = buildFeatures(catalog, indexes, {}, ['blast']);
-    const twinCounts = new Map<string, number>();
-    for (const occ of indexes.byOccId.values()) {
-      if (occ.kind === 'module-init') continue;
-      twinCounts.set(occ.bodyHash, (twinCounts.get(occ.bodyHash) ?? 0) + 1);
+    resolvedTargets++;
+    increment(resolvedConfidence, edge.confidence);
+    increment(resolvedResolution, edge.resolution);
+  }
+  for (const unresolved of graph.unresolved) {
+    if (!matchesGraphSourceFilter(unresolved.owner, filter)) continue;
+    const owner = toGraphSymbolRef(unresolved.owner);
+    if (owner === undefined) {
+      reasons.add(MALFORMED_SYMBOL_REASON);
+      continue;
     }
+    const siteKey = `${owner.symbolId}\0${String(unresolved.callSite.line)}\0${String(
+      unresolved.callSite.column,
+    )}`;
+    const candidate = {
+      confidence: unresolved.confidence,
+      resolution: unresolved.resolution,
+    };
+    const prior = unresolvedSites.get(siteKey);
+    if (
+      prior === undefined ||
+      compareCodePointStrings(
+        `${candidate.confidence}|${candidate.resolution}`,
+        `${prior.confidence}|${prior.resolution}`,
+      ) < 0
+    ) {
+      unresolvedSites.set(siteKey, candidate);
+    }
+  }
+  for (const unresolved of unresolvedSites.values()) {
+    increment(unresolvedConfidence, unresolved.confidence);
+    increment(unresolvedResolution, unresolved.resolution);
+  }
 
-    const hotspotCandidates: ArchitectureHotspot[] = [];
-    const seenBodies = new Set<string>();
-    for (const occ of indexes.byOccId.values()) {
-      if (occ.kind === 'module-init') continue;
-      if (!matchesGraphSourceFilter(occ, filter)) continue;
-      if (seenBodies.has(occ.bodyHash)) continue;
-      seenBodies.add(occ.bodyHash);
-      const blast = features.function.get(occ.bodyHash)?.blast;
-      if (blast === undefined) continue;
-      const symbol = toGraphSymbolRef(occ);
-      if (symbol === undefined) {
-        reasons.push('malformed-symbol-omitted');
-        continue;
+  const confidence = { ...resolvedConfidence };
+  const resolution = { ...resolvedResolution };
+  for (const [key, value] of Object.entries(unresolvedConfidence)) {
+    confidence[key] = (confidence[key] ?? 0) + value;
+  }
+  for (const [key, value] of Object.entries(unresolvedResolution)) {
+    resolution[key] = (resolution[key] ?? 0) + value;
+  }
+
+  return {
+    resolvedCallSites: resolvedSiteKeys.size,
+    resolvedTargets,
+    unresolvedCallSites: unresolvedSites.size,
+    confidence,
+    resolution,
+    distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
+    resolvedTargetConfidence: { values: resolvedConfidence, countUnit: 'resolved-targets' },
+    resolvedTargetResolution: { values: resolvedResolution, countUnit: 'resolved-targets' },
+    unresolvedCallSiteConfidence: {
+      values: unresolvedConfidence,
+      countUnit: 'unresolved-call-sites',
+    },
+    unresolvedCallSiteResolution: {
+      values: unresolvedResolution,
+      countUnit: 'unresolved-call-sites',
+    },
+    nodeIdentity: 'occurrence',
+    sourceScope: filter.sourceScope,
+    generated: filter.generated,
+    edgeKind: 'call',
+    catalogResolutionMode: resolutionMode(catalog),
+  };
+}
+
+function packageEdgeRow(
+  catalog: Catalog,
+  filter: GraphSourceFilter,
+  fromPackage: string,
+  toPackage: string,
+  count: number,
+): ArchitecturePackageEdgeRow {
+  return {
+    fromPackage,
+    toPackage,
+    kind: 'call',
+    count,
+    countUnit: 'resolved-targets',
+    nodeIdentity: 'package',
+    sourceScope: filter.sourceScope,
+    generated: filter.generated,
+    catalogResolutionMode: resolutionMode(catalog),
+  };
+}
+
+function canonicalPackageEdges(
+  catalog: Catalog,
+  indexes: Indexes,
+  filter: GraphSourceFilter,
+  reasons: Set<string>,
+  cachedFeatures: FeatureTable | undefined,
+): ArchitecturePackageEdgeRow[] {
+  const features = cachedFeatures ?? buildFeatures(catalog, indexes, {}, ['packageCoupling']);
+  const rows: ArchitecturePackageEdgeRow[] = [];
+  for (const edge of features.edge) {
+    const from = toGraphPackageName(edge.callerPackage);
+    const to = toGraphPackageName(edge.calleePackage);
+    if (from === undefined || to === undefined) {
+      reasons.add('malformed-package-omitted');
+      continue;
+    }
+    rows.push(packageEdgeRow(catalog, filter, from, to, edge.count));
+  }
+  return rows;
+}
+
+function filteredPackageEdges(
+  catalog: Catalog,
+  indexes: Indexes,
+  filter: GraphSourceFilter,
+  reasons: Set<string>,
+): ArchitecturePackageEdgeRow[] {
+  const buckets = new Map<string, ArchitecturePackageEdgeRow>();
+  const graph = occurrenceCallGraphFor(indexes);
+  noteMalformedCalls(graph.malformedCalls, reasons);
+  for (const edge of graph.edges) {
+    if (
+      !matchesGraphSourceFilter(edge.owner, filter) ||
+      !matchesGraphSourceFilter(edge.target, filter)
+    ) {
+      continue;
+    }
+    const owner = toGraphSymbolRef(edge.owner);
+    const target = toGraphSymbolRef(edge.target);
+    if (owner === undefined || target === undefined) {
+      reasons.add(MALFORMED_SYMBOL_REASON);
+      continue;
+    }
+    const from = owner.package;
+    const to = target.package;
+    const key = `${from}\0${to}`;
+    const current = buckets.get(key);
+    if (current !== undefined) {
+      buckets.set(key, { ...current, count: current.count + 1 });
+      continue;
+    }
+    buckets.set(key, packageEdgeRow(catalog, filter, from, to, 1));
+  }
+  return [...buckets.values()];
+}
+
+function buildPackageEdges(
+  catalog: Catalog,
+  indexes: Indexes,
+  filter: GraphSourceFilter,
+  reasons: Set<string>,
+  cachedFeatures: FeatureTable | undefined,
+): ArchitecturePackageEdgeRow[] {
+  const rows = isCanonicalProductionFilter(filter)
+    ? canonicalPackageEdges(catalog, indexes, filter, reasons, cachedFeatures)
+    : filteredPackageEdges(catalog, indexes, filter, reasons);
+  const selected = boundedArchitectureRows(rows, MAX_ORIENTATION_ROWS, comparePackageEdges);
+  if (selected.truncated) reasons.add('package-edge-cap');
+  return [...selected.rows];
+}
+
+function buildHotspots(
+  catalog: Catalog,
+  indexes: Indexes,
+  filter: GraphSourceFilter,
+  reasons: Set<string>,
+  cachedFeatures: FeatureTable | undefined,
+): ArchitectureHotspot[] {
+  const features = cachedFeatures ?? buildFeatures(catalog, indexes, {}, ['blast']);
+  const allTwinCounts = new Map<string, number>();
+  const matchingTwinCounts = new Map<string, number>();
+  const representatives = new Map<string, GraphSymbolRef>();
+  for (const occurrence of indexes.byOccId.values()) {
+    if (occurrence.kind === 'module-init') continue;
+    const symbol = toGraphSymbolRef(occurrence);
+    if (symbol === undefined) {
+      reasons.add(MALFORMED_SYMBOL_REASON);
+      continue;
+    }
+    allTwinCounts.set(symbol.bodyHash, (allTwinCounts.get(symbol.bodyHash) ?? 0) + 1);
+    if (matchesGraphSourceFilter(symbol, filter)) {
+      matchingTwinCounts.set(symbol.bodyHash, (matchingTwinCounts.get(symbol.bodyHash) ?? 0) + 1);
+      const prior = representatives.get(symbol.bodyHash);
+      if (prior === undefined || compareCodePointStrings(symbol.symbolId, prior.symbolId) < 0) {
+        representatives.set(symbol.bodyHash, symbol);
       }
-      hotspotCandidates.push({
+    }
+  }
+
+  const rows: ArchitectureHotspot[] = [];
+  let candidateCount = 0;
+  for (const [bodyHash, symbol] of representatives) {
+    const blast = features.function.get(bodyHash)?.blast;
+    if (blast === undefined) continue;
+    candidateCount++;
+    insertBoundedTopK(
+      rows,
+      {
         symbol,
         direct: blast.direct,
         transitive: blast.transitive,
         score: blast.score,
         identityMode: 'body-twin-union',
-        twinCount: twinCounts.get(occ.bodyHash) ?? 1,
-      });
-    }
-    hotspotCandidates.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      if (a.symbol.symbolId < b.symbol.symbolId) return -1;
-      if (a.symbol.symbolId > b.symbol.symbolId) return 1;
-      return 0;
-    });
-    const hotspotsWindow = sliceAfterKey(
-      hotspotCandidates,
-      limit,
+        twinCount: allTwinCounts.get(bodyHash) ?? 1,
+        matchingTwinCount: matchingTwinCounts.get(bodyHash) ?? 1,
+        sourceScope: filter.sourceScope,
+        generated: filter.generated,
+        edgeKind: 'call',
+        catalogResolutionMode: resolutionMode(catalog),
+      },
+      MAX_ORIENTATION_ROWS,
+      compareHotspots,
+    );
+  }
+  if (candidateCount > MAX_ORIENTATION_ROWS) reasons.add('hotspot-cap');
+  return rows;
+}
+
+function pageSorted<T>(
+  rows: readonly T[],
+  limit: number,
+  afterKey: string | undefined,
+  done: boolean,
+  keyOf: (row: T) => string,
+): { rows: readonly T[]; hasMore: boolean } {
+  if (done) return { rows: [], hasMore: false };
+  const window: T[] = [];
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (afterKey !== undefined && compareCodePointStrings(key, afterKey) <= 0) continue;
+    insertBoundedTopK(window, row, limit + 1, (a, b) =>
+      compareCodePointStrings(keyOf(a), keyOf(b)),
+    );
+  }
+  const hasMore = window.length > limit;
+  return { rows: hasMore ? window.slice(0, limit) : window, hasMore };
+}
+
+function resolveStableAnchor<T>(
+  rows: readonly T[],
+  continuationIdentity: string | undefined,
+  done: boolean,
+  keyOf: (row: T) => string,
+): string | null | undefined {
+  if (continuationIdentity === undefined || done) return undefined;
+  for (const row of rows) {
+    const stableKey = keyOf(row);
+    if (matchesContinuationIdentity(stableKey, continuationIdentity)) return stableKey;
+  }
+  return null;
+}
+
+function architectureGroups(
+  packageEdges: readonly ArchitecturePackageEdgeRow[],
+  hotspots: readonly ArchitectureHotspot[],
+  groupBy: 'none' | 'package' | 'file',
+) {
+  if (groupBy === 'none') return;
+  if (groupBy === 'file') {
+    return boundedGroups(hotspots, (row) => row.symbol.filePath);
+  }
+  return boundedGroups(
+    [
+      ...packageEdges.map((row) => ({ package: row.fromPackage })),
+      ...hotspots.map((row) => ({ package: row.symbol.package })),
+    ],
+    (row) => row.package,
+  );
+}
+
+/** Build labelled architecture metrics for one filtered catalog generation. */
+export function buildArchitectureView(
+  catalog: Catalog,
+  indexes: Indexes,
+  query: ArchitectureViewQuery,
+  cachedFeatures?: FeatureTable,
+): Result<ArchitectureView, GraphReadError> {
+  try {
+    const filter = query.filter;
+    const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
+    const reasons = new Set<string>();
+    if (resolutionMode(catalog) === 'fast') reasons.add('fast-resolution-approximate');
+    const counts = countArchitectureNodes(indexes, filter, reasons);
+    const packageEdges = buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures);
+    const hotspots = buildHotspots(catalog, indexes, filter, reasons, cachedFeatures);
+    const packageAfter = resolveStableAnchor(
+      packageEdges,
+      query.afterPackageEdgeKey,
+      query.packageEdgesDone === true,
+      packageEdgeStableKey,
+    );
+    const hotspotAfter = resolveStableAnchor(
+      hotspots,
       query.afterHotspotKey,
+      query.hotspotsDone === true,
       hotspotStableKey,
     );
+    if (packageAfter === null || hotspotAfter === null) {
+      return err({
+        code: 'GRAPH.READ.CURSOR_INVALID',
+        operation: 'analysis',
+        message: 'Cursor continuation anchor is not present in this architecture view',
+      });
+    }
+    const packagePage = pageSorted(
+      packageEdges,
+      limit,
+      packageAfter,
+      query.packageEdgesDone === true,
+      packageEdgeStableKey,
+    );
+    const hotspotPage = pageSorted(
+      hotspots,
+      limit,
+      hotspotAfter,
+      query.hotspotsDone === true,
+      hotspotStableKey,
+    );
+    const grouped = architectureGroups(packageEdges, hotspots, query.groupBy ?? 'none');
+    if (grouped?.truncated === true) reasons.add('group-key-cap');
+    const callEvidence = buildCallMetrics(catalog, indexes, filter, reasons);
+    const reasonValues = [...reasons].sort(compareCodePointStrings);
 
-    const uniqueReasons = [...new Set(reasons)];
     return ok({
       languages: [catalog.language],
       occurrenceCount: {
-        value: occurrenceCount,
+        value: counts.occurrenceCount,
         nodeIdentity: 'occurrence',
         sourceScope: filter.sourceScope,
         generated: filter.generated,
       },
       uniqueBodyCount: {
-        value: bodyHashes.size,
+        value: counts.bodyHashes.size,
         nodeIdentity: 'body-hash',
         sourceScope: filter.sourceScope,
         generated: filter.generated,
       },
-      callEvidence: {
-        resolvedCallSites,
-        resolvedTargets,
-        unresolvedCallSites,
-        confidence,
-        resolution,
-        edgeKind: 'call',
-        catalogResolutionMode: catalog.resolutionMode,
+      callEvidence,
+      packageCount: {
+        value: counts.packageNames.size,
+        nodeIdentity: 'package',
+        sourceScope: filter.sourceScope,
+        generated: filter.generated,
       },
-      packageCount: packageNames.size,
-      packageEdges: packageEdgesWindow.rows,
-      packageEdgesHasMore: packageEdgesWindow.hasMore,
-      hotspots: hotspotsWindow.rows,
-      hotspotsHasMore: hotspotsWindow.hasMore,
+      packageEdges: packagePage.rows,
+      packageEdgesHasMore: packagePage.hasMore,
+      hotspots: hotspotPage.rows,
+      hotspotsHasMore: hotspotPage.hasMore,
       effectiveFilter: filter,
       coverage: {
-        complete: uniqueReasons.length === 0,
-        truncated: false,
-        reasons: uniqueReasons,
+        complete: reasonValues.length === 0,
+        truncated: reasonValues.some((reason) => reason.endsWith('-cap')),
+        reasons: reasonValues,
       },
+      ...(grouped === undefined ? {} : { groups: grouped.groups }),
     });
   } catch {
     return err(archError('Failed to build architecture view'));
   }
-}
-
-function sliceAfterKey<T>(
-  sorted: readonly T[],
-  limit: number,
-  afterKey: string | undefined,
-  keyOf: (row: T) => string,
-): { rows: readonly T[]; hasMore: boolean } {
-  const out: T[] = [];
-  let hasMore = false;
-  for (const row of sorted) {
-    const key = keyOf(row);
-    if (afterKey !== undefined && key <= afterKey) continue;
-    if (out.length < limit) {
-      out.push(row);
-      continue;
-    }
-    hasMore = true;
-    break;
-  }
-  return { rows: out, hasMore };
 }

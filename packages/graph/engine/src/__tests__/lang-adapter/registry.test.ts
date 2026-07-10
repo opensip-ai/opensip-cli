@@ -206,9 +206,11 @@ describe('pickAdapter — multi-adapter dominance', () => {
         const payload = warnSpy.mock.calls[0]?.[0] as {
           evt: string;
           registered: string[];
+          cwd?: string;
         };
         expect(payload.evt).toBe('graph.lang_adapter.no_match');
         expect(payload.registered).toEqual(expect.arrayContaining(['typescript', 'python']));
+        expect(payload.cwd).toBeUndefined();
       } finally {
         warnSpy.mockRestore();
       }

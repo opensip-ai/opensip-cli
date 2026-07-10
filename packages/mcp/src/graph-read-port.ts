@@ -9,9 +9,22 @@
 
 import type { McpReadError } from './mcp-error.js';
 import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
-import type { TargetConventionSummary } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
-import type { GraphSourceFilter, TraversalIdentity } from '@opensip-cli/graph/read';
+import type {
+  ArchitectureHotspot,
+  ArchitecturePackageEdgeRow,
+  CallEdgeEvidence,
+  CallEvidenceMetrics,
+  LabelledNodeCount,
+  LabelledPackageCount,
+  PackageCallEvidence,
+  PackageCallEvidenceRow,
+  PackageCycleProofEdge,
+  PackageImportEvidence,
+  PackageImportEvidenceRow,
+  GraphSourceFilter,
+  TraversalIdentity,
+} from '@opensip-cli/graph/read';
 
 type GroupByMode = 'none' | 'package' | 'file';
 type PackageEdgeKindParam = 'call' | 'import' | 'combined';
@@ -26,17 +39,23 @@ export interface GraphGeneration {
 /** A blast-radius score for one symbol (graph's canonical scoring). */
 export interface BlastDto {
   readonly symbol: SymbolRef;
+  readonly members: readonly SymbolRef[];
+  readonly totalMembership: number;
   readonly direct: number;
   readonly transitive: number;
   readonly score: number;
   readonly identityMode: 'body-twin-union';
   readonly twinCount?: number;
+  readonly filteringLimitations?: readonly string[];
 }
 
 /** One dead-code (orphan) finding projected from `graph:orphan-subtree`. */
 export interface DeadCodeDto {
   readonly symbol: SymbolRef;
   readonly message: string;
+  readonly ruleId: 'graph:orphan-subtree';
+  readonly reason: 'unreachable-from-inferred-entry-point';
+  readonly suggestion?: string;
 }
 
 /** Phase 1 traversal snapshot (body-twin walk; Phase 2 widens evidence). */
@@ -44,13 +63,52 @@ export interface TraversalSnapshot {
   readonly found: boolean;
   readonly nodes: readonly TraversalNodeDto[];
   readonly path?: readonly SymbolRef[];
-  readonly truncated: boolean;
+  readonly hops?: readonly TraversalHopDto[];
+  readonly weakestConfidence?: CallEdgeEvidence['confidence'];
   readonly identityMode: TraversalIdentity;
+  readonly totalMembership: number;
+  readonly counts: {
+    readonly includedOccurrences: number;
+    readonly excludedOccurrences: number;
+    readonly includedEdges: number;
+    readonly excludedEdges: number;
+    readonly countScope: 'visited';
+  };
+  readonly unresolved: readonly {
+    readonly ownerSymbolId: string;
+    readonly resolution: string;
+    readonly confidence: string;
+    readonly callSite: {
+      readonly filePath: string;
+      readonly line: number;
+      readonly column: number;
+    };
+    readonly targetHashes: readonly string[];
+    readonly totalTargetHashes: number;
+  }[];
+  readonly unresolvedCounts: readonly {
+    readonly resolution: string;
+    readonly confidence: string;
+    readonly count: number;
+  }[];
+  readonly unresolvedAttribution: 'owner-only';
 }
 
 export interface TraversalNodeDto {
   readonly symbol: SymbolRef;
   readonly depth: number;
+  readonly groupId: string;
+  readonly groupTotal: number;
+  readonly incomingEvidence?: CallEdgeEvidence;
+  readonly anyTwinMaySupplyHop?: boolean;
+}
+
+export interface TraversalHopDto {
+  readonly fromGroupId: string;
+  readonly toGroupId: string;
+  readonly evidence: readonly CallEdgeEvidence[];
+  readonly weakestConfidence?: CallEdgeEvidence['confidence'];
+  readonly anyTwinMaySupplyHop: boolean;
 }
 
 /** Options for {@link GraphReadPort.traverse}. */
@@ -66,41 +124,15 @@ export interface TraversalQuery {
   readonly groupBy?: GroupByMode;
 }
 
-/** Labelled node count from graph architecture view. */
-export interface LabelledCountDto {
-  readonly value: number;
-  readonly nodeIdentity: 'occurrence' | 'body-hash';
-  readonly sourceScope: string;
-  readonly generated: string;
-}
-
-/** One package call edge orientation row. */
-export interface ArchitecturePackageEdgeDto {
-  readonly fromPackage: string;
-  readonly toPackage: string;
-  readonly kind: 'call';
-  readonly count: number;
-  readonly countUnit: 'call-sites';
-}
-
 /** A compact, labelled architecture overview. */
 export interface ArchitectureSummaryDto {
   readonly languages: readonly string[];
-  readonly occurrenceCount: LabelledCountDto;
-  readonly uniqueBodyCount: LabelledCountDto;
-  readonly callEvidence: {
-    readonly resolvedCallSites: number;
-    readonly resolvedTargets: number;
-    readonly unresolvedCallSites: number;
-    readonly confidence: Readonly<Record<string, number>>;
-    readonly resolution: Readonly<Record<string, number>>;
-    readonly edgeKind: 'call';
-    readonly catalogResolutionMode: 'exact' | 'fast' | undefined;
-  };
-  readonly packageCount: number;
-  readonly packageEdges: readonly ArchitecturePackageEdgeDto[];
-  readonly hotspots: readonly BlastDto[];
-  readonly targetConventions?: readonly TargetConventionSummary[];
+  readonly occurrenceCount: LabelledNodeCount;
+  readonly uniqueBodyCount: LabelledNodeCount;
+  readonly callEvidence: CallEvidenceMetrics;
+  readonly packageCount: LabelledPackageCount;
+  readonly packageEdges: readonly ArchitecturePackageEdgeRow[];
+  readonly hotspots: readonly ArchitectureHotspot[];
 }
 
 export interface SearchSymbolsOptions {
@@ -164,7 +196,12 @@ export interface GraphReadPort {
   /** Blast radius of `symbolId` — graph's canonical `buildFeatures` scoring. */
   blast(
     symbolId: string,
-    opts?: { limit?: number; cursor?: string },
+    opts?: {
+      limit?: number;
+      cursor?: string;
+      filter?: Partial<GraphSourceFilter>;
+      groupBy?: GroupByMode;
+    },
   ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>>;
   /** Orphan (dead-code) symbols via public orphan evaluation. */
   deadCode(
@@ -186,9 +223,7 @@ export interface GraphReadPort {
     query: PackageDependenciesQuery,
   ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>>;
   /** Evidence for why package A depends on package B. */
-  whyDepends(
-    query: WhyDependsQuery,
-  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>>;
+  whyDepends(query: WhyDependsQuery): Promise<Result<GraphToolResult<WhyDependsDto>, McpReadError>>;
   /** Package SCCs/cycles for a selected edge kind. */
   packageCycles(
     query: PackageCyclesQuery,
@@ -212,6 +247,7 @@ export interface WhyDependsQuery {
   readonly filter?: Partial<GraphSourceFilter>;
   readonly limit?: number;
   readonly cursor?: string;
+  readonly groupBy?: GroupByMode;
 }
 
 export interface PackageCyclesQuery {
@@ -219,19 +255,27 @@ export interface PackageCyclesQuery {
   readonly filter?: Partial<GraphSourceFilter>;
   readonly limit?: number;
   readonly cursor?: string;
+  readonly groupBy?: GroupByMode;
 }
 
 export interface PackageDependenciesDto {
   readonly edgeKind: PackageEdgeKindParam;
-  readonly calls: readonly unknown[];
-  readonly imports: readonly unknown[];
+  readonly calls: readonly PackageCallEvidenceRow[];
+  readonly imports: readonly PackageImportEvidenceRow[];
+}
+
+export interface WhyDependsDto {
+  readonly edgeKind: PackageEdgeKindParam;
+  readonly calls: readonly PackageCallEvidence[];
+  readonly imports: readonly PackageImportEvidence[];
+  readonly totalMatchingEvidence: number;
 }
 
 export interface PackageCyclesDto {
   readonly edgeKind: PackageEdgeKindParam;
   readonly components: readonly {
     readonly packages: readonly string[];
-    readonly proofEdges: readonly unknown[];
+    readonly proofEdges: readonly PackageCycleProofEdge[];
     readonly totalProofEdges: number;
   }[];
 }

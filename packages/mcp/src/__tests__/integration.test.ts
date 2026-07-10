@@ -97,6 +97,7 @@ function buildGraphPort(): GraphReadPort {
     store,
     projectRoot: dir,
     adapters: runWithScopeSync(scope, () => currentAdapterRegistry()),
+    languageAdapters: scope.languages.list(),
     rebuild,
   });
 }

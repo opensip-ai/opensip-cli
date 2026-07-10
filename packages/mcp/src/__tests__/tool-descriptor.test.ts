@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { mcpTool, MCP_IDENTITY, MCP_STABLE_ID } from '../index.js';
 import { registerMcpTools } from '../tools/register.js';
@@ -16,6 +17,28 @@ import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
 import type { McpStdioServer } from '../server.js';
 import type { McpToolDeps } from '../tools/types.js';
+
+const DEFAULT_TOOL_NAMES = [
+  'search_symbols',
+  'get_symbol',
+  'who_calls',
+  'callees_of',
+  'trace_path',
+  'blast_radius',
+  'find_dead_code',
+  'get_architecture',
+  'package_dependencies',
+  'why_depends',
+  'package_cycles',
+  'refresh_graph',
+  'get_runtime_wiring',
+  'get_agent_catalog',
+  'list_runs',
+  'show_run',
+  'get_latest_findings',
+  'review_change',
+  'compare_to_baseline',
+] as const;
 
 describe('mcpTool descriptor', () => {
   it('declares the mcp identity, one command, and the graph-adapter registrar', () => {
@@ -41,35 +64,14 @@ describe('registerMcpTools', () => {
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(),
     };
 
     registerMcpTools(server, deps);
 
     expect(names).toHaveLength(19);
-    expect(new Set(names)).toEqual(
-      new Set([
-        'search_symbols',
-        'get_symbol',
-        'who_calls',
-        'callees_of',
-        'trace_path',
-        'blast_radius',
-        'find_dead_code',
-        'get_architecture',
-        'package_dependencies',
-        'why_depends',
-        'package_cycles',
-        'refresh_graph',
-        'get_runtime_wiring',
-        'get_agent_catalog',
-        'list_runs',
-        'show_run',
-        'get_latest_findings',
-        'review_change',
-        'compare_to_baseline',
-      ]),
-    );
+    expect(new Set(names)).toEqual(new Set(DEFAULT_TOOL_NAMES));
   });
 
   it('adds repair_apply_verify only when mutation is explicitly enabled', () => {
@@ -83,6 +85,7 @@ describe('registerMcpTools', () => {
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(['fit']),
       mutationsEnabled: true,
       repairWrite: {} as RepairWritePort,
@@ -91,7 +94,39 @@ describe('registerMcpTools', () => {
     registerMcpTools(server, deps);
 
     expect(names).toHaveLength(20);
-    expect(names).toContain('repair_apply_verify');
+    expect(new Set(names)).toEqual(new Set([...DEFAULT_TOOL_NAMES, 'repair_apply_verify']));
+  });
+
+  it('registers every default and opt-in tool with a strict object schema', () => {
+    const configs = new Map<string, { readonly inputSchema?: unknown }>();
+    const server = {
+      register: (name: string, config: { readonly inputSchema?: unknown }) => {
+        configs.set(name, config);
+        return undefined;
+      },
+    } as unknown as McpStdioServer;
+    const deps: McpToolDeps = {
+      graph: {} as GraphReadPort,
+      results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
+      validToolIds: new Set(['fit']),
+      mutationsEnabled: true,
+      repairWrite: {} as RepairWritePort,
+    };
+
+    registerMcpTools(server, deps);
+
+    expect(configs.size).toBe(20);
+    for (const [name, config] of configs) {
+      expect(config.inputSchema, `${name} must declare an input schema`).toBeInstanceOf(
+        z.ZodObject,
+      );
+      const schema = config.inputSchema as z.ZodObject;
+      expect(schema.toJSONSchema(), `${name} must reject unknown keys`).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+      });
+    }
   });
 
   it('describes result tools as persisted replay and warns against log/sqlite/rerun fallbacks', () => {
@@ -105,6 +140,7 @@ describe('registerMcpTools', () => {
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(),
     };
 
@@ -131,6 +167,7 @@ describe('registerMcpTools', () => {
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(),
     };
 

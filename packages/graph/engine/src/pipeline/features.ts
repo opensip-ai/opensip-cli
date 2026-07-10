@@ -22,7 +22,7 @@ import { logger } from '@opensip-cli/core';
 import { pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 
-import { buildOccurrenceCallGraph } from './occurrence-call-graph.js';
+import { occurrenceCallGraphFor } from './occurrence-call-graph.js';
 import { stronglyConnectedComponents } from './strongly-connected-components.js';
 
 import type {
@@ -241,7 +241,7 @@ function computeProdReachable(catalog: Catalog, indexes: Indexes): Set<string> {
     const occ = indexes.byBodyHash.get(ep.bodyHash);
     /* v8 ignore next */
     if (!occ) continue;
-    if (occ.inTestFile) continue;
+    if (occ.inTestFile || occ.definedInGenerated) continue;
     seeds.add(ep.bodyHash);
   }
   return bfsForward(seeds, indexes);
@@ -287,7 +287,7 @@ function bfsForward(seeds: ReadonlySet<string>, indexes: Indexes): Set<string> {
  * Singletons included; members sorted; package-crossing labels preserved.
  */
 export function computeSccs(indexes: Indexes): SccFeatures[] {
-  const graph = buildOccurrenceCallGraph(indexes);
+  const graph = occurrenceCallGraphFor(indexes);
   const components = stronglyConnectedComponents(graph.nodes, (v) => graph.forward.get(v) ?? []);
   return components.map((members) => toSccFeatures(members, graph.byOccId));
 }
@@ -336,12 +336,12 @@ function computePackageCoupling(indexes: Indexes): {
     // phantom cross-package edges (and phantom cycles). Skip test occurrences on
     // BOTH ends, mirroring how every other production-gating rule skips
     // `occ.inTestFile`.
-    if (occ.inTestFile) continue;
+    if (occ.inTestFile || occ.definedInGenerated) continue;
     const callerPkg = pkgOf(occ);
     for (const callEdge of occ.calls) {
       for (const target of callEdge.to) {
         const callee = resolveCallee(target, occ, indexes);
-        if (!callee || callee.inTestFile) continue;
+        if (!callee || callee.inTestFile || callee.definedInGenerated) continue;
         const calleePkg = pkgOf(callee);
         let row = counts.get(callerPkg);
         if (!row) {

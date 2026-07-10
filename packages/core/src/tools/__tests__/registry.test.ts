@@ -89,6 +89,29 @@ describe('ToolRegistry', () => {
     expect(reg.list()).toHaveLength(1);
   });
 
+  it('values lazily iterates tools in registration order', () => {
+    const a = stub('a');
+    const b = stub('b');
+    reg.register(a);
+    reg.register(b);
+
+    const iterator = reg.values();
+    expect(iterator.next()).toEqual({ value: a, done: false });
+    expect(iterator.next()).toEqual({ value: b, done: false });
+    expect(iterator.next()).toEqual({ value: undefined, done: true });
+  });
+
+  it('supports direct iteration without routing through list()', () => {
+    const a = stub('a');
+    const b = stub('b');
+    reg.register(a);
+    reg.register(b);
+    const listSpy = vi.spyOn(reg, 'list');
+
+    expect([...reg]).toEqual([a, b]);
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
   describe('register with sourcePackage (third-party discovery path)', () => {
     it('registers when no incumbent exists', () => {
       const t = stub('a');

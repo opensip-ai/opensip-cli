@@ -95,6 +95,16 @@ export type ResolutionMode = 'exact' | 'fast';
 export type CatalogEngineMode = 'exact' | 'sharded';
 
 /**
+ * One producing shard's cache-input anchor. Paths are project-relative POSIX;
+ * `.` denotes the configured project root.
+ */
+export interface CatalogShardCacheInput {
+  readonly shardId: string;
+  readonly rootDir: string;
+  readonly configPath?: string;
+}
+
+/**
  * How the active graph language adapter was selected for the producing run.
  * Forced = explicit `--language` / `language` input; auto = file-dominance or
  * registry fallback. Optional on pre-feature catalogs — absence means freshness
@@ -376,6 +386,8 @@ export interface Catalog {
    * pre-feature catalogs; absence yields partial freshness verification.
    */
   readonly engineMode?: CatalogEngineMode;
+  /** Producing shard inputs; absent on exact and legacy catalogs. */
+  readonly shardCacheInputs?: readonly CatalogShardCacheInput[];
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
   /**
    * Re-export facts captured at walk time (see {@link ReExportRecord}). Present

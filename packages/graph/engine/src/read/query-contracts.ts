@@ -1,9 +1,5 @@
 function hasControlChar(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.codePointAt(i) ?? 0;
-    if (code <= 0x1f || code === 0x7f) return true;
-  }
-  return false;
+  return /\p{Cc}/u.test(value);
 }
 
 /**
@@ -13,6 +9,8 @@ function hasControlChar(value: string): boolean {
  * These types are free-function inputs/outputs for `@opensip-cli/graph/read`.
  * Reuse Spec 20's {@link CatalogIdentity} from `./types.js` — do not redeclare it.
  */
+
+import { pkgOf } from '../resolve-callee.js';
 
 import type {
   CallConfidence,
@@ -116,10 +114,11 @@ export interface GraphSymbolRef {
 
 /** Resolved call-edge evidence (never includes call-expression text). */
 export interface CallEdgeEvidence {
+  readonly kind: 'call';
   readonly from: GraphSymbolRef;
   readonly to: GraphSymbolRef;
-  readonly callSite: {
-    readonly filePath: string;
+  readonly source: {
+    readonly file: string;
     readonly line: number;
     readonly column: number;
   };
@@ -128,13 +127,77 @@ export interface CallEdgeEvidence {
   readonly crossShard: boolean;
 }
 
+/** Resolved call evidence crossing a canonical package boundary. */
+export interface PackageCallEvidence extends CallEdgeEvidence {
+  readonly fromPackage: string;
+  readonly toPackage: string;
+  readonly kind: 'call';
+}
+
+/** One module-level import statement and its package-resolution outcome. */
+export interface PackageImportEvidence {
+  readonly fromPackage: string;
+  readonly toPackage: string | null;
+  readonly target: string;
+  readonly kind: 'import';
+  readonly resolution: 'internal' | 'external' | 'unresolved';
+  readonly specifier: string;
+  readonly importSite: {
+    readonly filePath: string;
+    readonly line: number;
+    readonly column: number;
+  };
+}
+
+/** Canonical concrete proof row for one package dependency. */
+export type PackageDependencyEvidence = PackageCallEvidence | PackageImportEvidence;
+
 /** Bounds for control-free projection fields. */
 export const GRAPH_SYMBOL_PATH_MAX = 1024;
 export const GRAPH_SYMBOL_NAME_MAX = 512;
 export const GRAPH_SYMBOL_PACKAGE_MAX = 256;
 
-function isControlFreeBounded(value: string, max: number): boolean {
-  return value.length > 0 && value.length <= max && !hasControlChar(value);
+const FUNCTION_KINDS: ReadonlySet<unknown> = new Set([
+  'function-declaration',
+  'function-expression',
+  'arrow',
+  'method',
+  'constructor',
+  'getter',
+  'setter',
+  'module-init',
+]);
+const VISIBILITIES: ReadonlySet<unknown> = new Set(['exported', 'module-local', 'private']);
+
+function isSafeGraphProjectionText(value: unknown, max: number): value is string {
+  return (
+    typeof value === 'string' && value.length > 0 && value.length <= max && !hasControlChar(value)
+  );
+}
+
+function isProjectRelativePosixPath(value: string): boolean {
+  if (
+    value.startsWith('/') ||
+    value.startsWith('\\') ||
+    value.includes('\\') ||
+    /^[A-Za-z]:/.test(value)
+  ) {
+    return false;
+  }
+  const segments = value.split('/');
+  return segments.every((segment) => segment.length > 0 && segment !== '.' && segment !== '..');
+}
+
+/** Canonical graph package attribution, including the legacy `pkgOf` fallback. */
+export function graphPackageOf(
+  occurrence: Pick<FunctionOccurrence, 'package' | 'filePath'>,
+): string {
+  return pkgOf(occurrence);
+}
+
+/** Validate a package label before it crosses the public read boundary. */
+export function toGraphPackageName(value: string): string | undefined {
+  return isSafeGraphProjectionText(value, GRAPH_SYMBOL_PACKAGE_MAX) ? value : undefined;
 }
 
 /**
@@ -143,21 +206,28 @@ function isControlFreeBounded(value: string, max: number): boolean {
  * caller can omit the row with partial coverage rather than truncate identity.
  */
 export function toGraphSymbolRef(occurrence: FunctionOccurrence): GraphSymbolRef | undefined {
-  const packageName = occurrence.package ?? packageFallback(occurrence.filePath);
   if (
-    !isControlFreeBounded(occurrence.filePath, GRAPH_SYMBOL_PATH_MAX) ||
-    !isControlFreeBounded(occurrence.simpleName, GRAPH_SYMBOL_NAME_MAX) ||
-    !isControlFreeBounded(occurrence.qualifiedName, GRAPH_SYMBOL_NAME_MAX) ||
-    !isControlFreeBounded(packageName, GRAPH_SYMBOL_PACKAGE_MAX) ||
-    !isControlFreeBounded(occurrence.bodyHash, GRAPH_SYMBOL_NAME_MAX)
+    !isSafeGraphProjectionText(occurrence.filePath, GRAPH_SYMBOL_PATH_MAX) ||
+    !isProjectRelativePosixPath(occurrence.filePath) ||
+    !isSafeGraphProjectionText(occurrence.simpleName, GRAPH_SYMBOL_NAME_MAX) ||
+    !isSafeGraphProjectionText(occurrence.qualifiedName, GRAPH_SYMBOL_NAME_MAX) ||
+    !isSafeGraphProjectionText(occurrence.bodyHash, GRAPH_SYMBOL_NAME_MAX)
   ) {
     return undefined;
   }
+  const packageName = graphPackageOf(occurrence);
   if (
-    !Number.isFinite(occurrence.line) ||
+    !isSafeGraphProjectionText(packageName, GRAPH_SYMBOL_PACKAGE_MAX) ||
+    !FUNCTION_KINDS.has(occurrence.kind) ||
+    !VISIBILITIES.has(occurrence.visibility) ||
+    typeof occurrence.inTestFile !== 'boolean' ||
+    typeof occurrence.definedInGenerated !== 'boolean' ||
+    !Number.isSafeInteger(occurrence.line) ||
     occurrence.line < 1 ||
-    !Number.isFinite(occurrence.column) ||
-    occurrence.column < 0
+    !Number.isSafeInteger(occurrence.column) ||
+    occurrence.column < 0 ||
+    !Number.isSafeInteger(occurrence.endLine) ||
+    occurrence.endLine < occurrence.line
   ) {
     return undefined;
   }
@@ -175,10 +245,4 @@ export function toGraphSymbolRef(occurrence: FunctionOccurrence): GraphSymbolRef
     inTestFile: occurrence.inTestFile,
     definedInGenerated: occurrence.definedInGenerated,
   };
-}
-
-/** Top-level path segment fallback when `occurrence.package` is absent. */
-function packageFallback(filePath: string): string {
-  const first = filePath.split('/').find((segment) => segment.length > 0);
-  return first ?? '(unknown)';
 }

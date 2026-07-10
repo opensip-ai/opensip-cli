@@ -234,6 +234,50 @@ describe('runGraph orchestrator', () => {
     });
   });
 
+  it('leaves legacy cache hits untouched and stamps provenance on a later rebuild', async () => {
+    await inGraphScope(async () => {
+      let activeKey = 'legacy-stable';
+      const adapter = fakeAdapter({ projectDir, cacheKey: activeKey });
+      vi.spyOn(adapter, 'cacheKey').mockImplementation(() => activeKey);
+      currentAdapterRegistry().register(adapter);
+
+      await runGraph({ cwd: projectDir, rules: [], datastore });
+      const repo = new CatalogRepo(datastore);
+      const produced = repo.loadFullCatalog();
+      expect(produced).not.toBeNull();
+      if (produced === null) return;
+      const {
+        adapterSelection: _selection,
+        engineMode: _engineMode,
+        shardCacheInputs: _shards,
+        ...legacy
+      } = produced;
+      void _selection;
+      void _engineMode;
+      void _shards;
+      repo.replaceAll(legacy);
+
+      const replace = vi.spyOn(CatalogRepo.prototype, 'replaceAll');
+      const cached = await runGraph({ cwd: projectDir, rules: [], datastore });
+      expect(cached.cacheHit).toBe(true);
+      expect(cached.catalog?.adapterSelection).toBeUndefined();
+      expect(cached.catalog?.engineMode).toBeUndefined();
+      expect(replace).not.toHaveBeenCalled();
+
+      const priorIdentity = repo.readIdentity();
+      activeKey = 'rebuilt-key';
+      const rebuilt = await runGraph({ cwd: projectDir, rules: [], datastore });
+      expect(rebuilt.cacheHit).toBe(false);
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(rebuilt.catalog?.adapterSelection).toEqual({
+        mode: 'auto',
+        selectedId: 'fake',
+      });
+      expect(rebuilt.catalog?.engineMode).toBe('exact');
+      expect(repo.readIdentity()?.cacheKey).not.toBe(priorIdentity?.cacheKey);
+    });
+  });
+
   it('runs rules against the produced catalog + indexes', async () => {
     await inGraphScope(async () => {
       currentAdapterRegistry().register(

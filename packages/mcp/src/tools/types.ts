@@ -20,7 +20,7 @@ export interface McpToolDeps {
   /** Pre-built results/history read port (result tools). */
   readonly results: ResultsReadPort;
   /** Live declarative tool/manifest/CommandSpec wiring (not static graph). */
-  readonly runtimeWiring?: RuntimeWiringReadPort;
+  readonly runtimeWiring: RuntimeWiringReadPort;
   /** The live registered tool ids — `get_latest_findings`/`show_run` validate `tool` against these. */
   readonly validToolIds: ReadonlySet<string>;
   /** Bounded target convention summaries captured from the served project scope. */
