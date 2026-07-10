@@ -8,6 +8,7 @@
 
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
 import {
+  buildOccurrenceCallView,
   buildPackageEvidence,
   buildPackageScc,
   deriveGraphReadFeatures,
@@ -66,6 +67,22 @@ function resultDataCount(data: unknown): number {
   if (Array.isArray(data)) return data.length;
   if (data === undefined || data === null) return 0;
   return 1;
+}
+
+function resolveWalkNode(
+  gen: CatalogGeneration,
+  viewNodes: readonly (SymbolRef | undefined)[],
+  key: string,
+  identity: 'occurrence' | 'body-twin-union',
+): SymbolRef | undefined {
+  if (identity === 'occurrence') {
+    const occ = gen.indexes.byOccId.get(key);
+    if (occ !== undefined) return toSymbolRef(occ);
+    return viewNodes.find((n) => n?.symbolId === key);
+  }
+  const occ = gen.indexes.byBodyHash.get(key);
+  if (occ !== undefined) return toSymbolRef(occ);
+  return viewNodes.find((n) => n?.bodyHash === key);
 }
 
 export interface SqliteGraphReadPortDeps {
@@ -349,7 +366,42 @@ export class SqliteGraphReadPort implements GraphReadPort {
           { limit },
         );
       }
-      const startHash = startOcc.bodyHash;
+
+      const filter: GraphSourceFilter = {
+        sourceScope: query.filter?.sourceScope ?? 'all',
+        generated: query.filter?.generated ?? 'include',
+        ...(query.filter?.packages === undefined ? {} : { packages: query.filter.packages }),
+        ...(query.filter?.filePath === undefined ? {} : { filePath: query.filter.filePath }),
+        ...(query.filter?.filePrefix === undefined ? {} : { filePrefix: query.filter.filePrefix }),
+        ...(query.filter?.kinds === undefined ? {} : { kinds: query.filter.kinds }),
+        ...(query.filter?.visibilities === undefined
+          ? {}
+          : { visibilities: query.filter.visibilities }),
+      };
+      const view = buildOccurrenceCallView(gen.catalog, gen.indexes, {
+        filter,
+        identity,
+        startSymbolId: query.startSymbolId,
+      });
+      if (!view.ok) {
+        return this.envelope(
+          { found: false, nodes: [], truncated: false, identityMode: identity },
+          gen,
+          freshness,
+          { complete: false, truncated: false, reasons: ['occurrence-view-failed'] },
+          { limit },
+        );
+      }
+
+      const startKey =
+        identity === 'body-twin-union' ? startOcc.bodyHash : query.startSymbolId;
+      const adj =
+        query.direction === 'callers' || query.direction === 'path'
+          ? query.direction === 'callers'
+            ? view.value.reverse
+            : view.value.forward
+          : view.value.forward;
+
       if (query.direction === 'path') {
         if (query.goalSymbolId === undefined) {
           return this.envelope(
@@ -378,19 +430,18 @@ export class SqliteGraphReadPort implements GraphReadPort {
             freshness,
           );
         }
-        const walk = boundedBfs(gen.indexes.callees, startHash, {
+        const goalKey =
+          identity === 'body-twin-union' ? goalOcc.bodyHash : query.goalSymbolId;
+        const walk = boundedBfs(adj, startKey, {
           depth,
           cap: 2000,
-          goal: goalOcc.bodyHash,
+          goal: goalKey,
         });
-        const pathHashes = walk.foundGoal
-          ? reconstructPath(walk.parents, startHash, goalOcc.bodyHash)
+        const pathKeys = walk.foundGoal
+          ? reconstructPath(walk.parents, startKey, goalKey)
           : [];
-        const path = pathHashes
-          .map((h) => {
-            const occ = gen.indexes.byBodyHash.get(h);
-            return occ === undefined ? undefined : toSymbolRef(occ);
-          })
+        const path = pathKeys
+          .map((key) => resolveWalkNode(gen, view.value.nodes, key, identity))
           .filter((s): s is SymbolRef => s !== undefined);
         return this.envelope(
           {
@@ -411,21 +462,18 @@ export class SqliteGraphReadPort implements GraphReadPort {
         );
       }
 
-      const edges = query.direction === 'callers' ? gen.indexes.callers : gen.indexes.callees;
-      const walk = boundedBfs(edges, startHash, { depth, cap: 2000 });
+      const walk = boundedBfs(adj, startKey, { depth, cap: 2000 });
       const nodes: { symbol: SymbolRef; depth: number }[] = [];
       const self = toSymbolRef(startOcc);
       if (self !== undefined) nodes.push({ symbol: self, depth: 0 });
       let pageTruncated = false;
       let depthCounter = 1;
-      for (const hash of walk.order) {
+      for (const key of walk.order) {
         if (nodes.length >= limit) {
           pageTruncated = true;
           break;
         }
-        const occ = gen.indexes.byBodyHash.get(hash);
-        if (occ === undefined) continue;
-        const ref = toSymbolRef(occ);
+        const ref = resolveWalkNode(gen, view.value.nodes, key, identity);
         if (ref !== undefined) {
           nodes.push({ symbol: ref, depth: depthCounter });
           depthCounter++;

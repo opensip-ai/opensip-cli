@@ -158,7 +158,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     });
     expect(walk.ok).toBe(true);
     if (!walk.ok) return;
-    expect(walk.value.data.identityMode).toBe('body-twin-union');
+    expect(walk.value.data.identityMode).toBe('occurrence');
     expect(walk.value.context.catalog.identity).toBe(search.value.context.catalog.identity);
   });
 
