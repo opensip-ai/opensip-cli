@@ -4,8 +4,8 @@
  *
  * Every data-table in the dashboard paginates at 10 rows/page (or
  * 10 groups/page when expander rows are present). The grouped variant
- * keeps a data row and its trailing `.expander-row` together so they
- * page as one unit.
+ * keeps a data row and its trailing `.expander-row` siblings together so they
+ * page as one unit (one expander, or N suite child rows).
  *
  * `renderPageButtons` is shared between both paginators and the checks catalog's
  * inline paginator; it is a PURE renderer — each button carries its target page
@@ -25,6 +25,27 @@ import { el } from './el.js';
 
 /** Page-navigation handler: jump to a zero-based page index. */
 type GoToPage = (page: number) => void;
+
+/**
+ * Group each data row with zero or more immediately trailing `.expander-row`
+ * siblings (session detail uses one; overview suite steps use many). Sort and
+ * pagination both use this so children never detach from their summary row.
+ */
+export function collectGroupedTableRows(tbody: Element): HTMLElement[][] {
+  const allRows = [...tbody.children] as HTMLElement[];
+  const groups: HTMLElement[][] = [];
+  for (let i = 0; i < allRows.length; i++) {
+    const row = allRows[i];
+    if (row.classList.contains('expander-row')) continue;
+    const group = [row];
+    while (i + 1 < allRows.length && allRows[i + 1].classList.contains('expander-row')) {
+      i += 1;
+      group.push(allRows[i]);
+    }
+    groups.push(group);
+  }
+  return groups;
+}
 
 /**
  * Per-container slot holding the CURRENT navigation handler. The delegated
@@ -162,17 +183,7 @@ export function paginateGroupedRows(
   paginationContainer: HTMLElement,
   pageSize: number,
 ): void {
-  const allRows = [...tbody.children] as HTMLElement[];
-  const groups: HTMLElement[][] = [];
-  for (let i = 0; i < allRows.length; i++) {
-    const row = allRows[i];
-    if (row.classList.contains('expander-row')) continue;
-    const group = [row];
-    if (i + 1 < allRows.length && allRows[i + 1].classList.contains('expander-row')) {
-      group.push(allRows[i + 1]);
-    }
-    groups.push(group);
-  }
+  const groups = collectGroupedTableRows(tbody);
 
   const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
   const itemLabel = paginationContainer.dataset.pageItemLabel ?? 'checks';

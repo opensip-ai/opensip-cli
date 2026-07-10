@@ -37,11 +37,18 @@ export function dashboardCssDataTable(): string {
 .data-table tr.selected { background: var(--bg-hover); border-left: 2px solid var(--accent); }
 .overview-row-control { width: 28px; min-width: 28px; text-align: center; color: var(--text-dim); }
 .overview-suite-arrow { display: inline-block; width: 14px; font-size: 11px; color: var(--accent); }
-.overview-suite-expander-content { padding: 0 12px 10px 40px; background: var(--bg); }
-.overview-suite-child-table { margin: 0; }
-.overview-suite-child-table td { background: transparent; }
-.overview-suite-child-row td { font-size: 12px; color: var(--text-muted); }
-.data-table td.overview-suite-child-tool { padding-left: 20px; }
+/* Suite steps are sibling <tr>s (same column model as the header) — no nested
+   table and no left indent. Darker page-bg cells set them apart from the
+   suite summary (which sits on the card surface). */
+.overview-suite-child-row td {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg);
+}
+.data-table tr.overview-suite-child-row:hover td {
+  background: color-mix(in srgb, var(--bg) 55%, var(--bg-hover) 45%);
+}
+.overview-suite-child-row td .badge { opacity: 0.92; }
 
 /* Check rows and findings */
 .check-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
