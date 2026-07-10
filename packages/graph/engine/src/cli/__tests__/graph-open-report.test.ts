@@ -7,7 +7,9 @@ import type { ToolCliContext } from '@opensip-cli/core';
 
 const h = vi.hoisted(() => ({
   executeGraph: vi.fn(),
-  runHeapPreflight: vi.fn(() => Promise.resolve(false)),
+  runHeapPreflight: vi.fn((): Promise<false | { readonly startedAt: string }> =>
+    Promise.resolve(false),
+  ),
 }));
 
 vi.mock('../graph.js', async (importOriginal) => {
@@ -57,10 +59,24 @@ function mockCli(): {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.runHeapPreflight.mockResolvedValue(false);
   h.executeGraph.mockResolvedValue({ envelope, session: { tool: 'graph', cwd: '/repo' } });
 });
 
 describe('graph --open report delivery', () => {
+  it('returns a delegated completion when the heap-preflight child ran the command', async () => {
+    const { ctx, maybeOpenReport } = mockCli();
+    h.runHeapPreflight.mockResolvedValueOnce({ startedAt: '2026-07-09T23:22:19.000Z' });
+
+    const completion = await graphCommandSpec.handler({ cwd: '/repo' }, ctx);
+
+    expect(completion).toEqual({
+      execution: { kind: 'delegated', startedAt: '2026-07-09T23:22:19.000Z' },
+    });
+    expect(h.executeGraph).not.toHaveBeenCalled();
+    expect(maybeOpenReport).not.toHaveBeenCalled();
+  });
+
   it('calls the host report-open seam after a non-gate run', async () => {
     const { ctx, maybeOpenReport } = mockCli();
 

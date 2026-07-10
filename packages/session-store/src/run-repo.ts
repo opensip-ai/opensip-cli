@@ -1,6 +1,6 @@
 import { ValidationError } from '@opensip-cli/core';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 
 import { runs, runSteps } from './schema/runs.js';
 
@@ -132,6 +132,33 @@ export class RunRepo {
       .where(eq(runSteps.session_id, sessionId))
       .get();
     return row === undefined ? null : stepFromRow(row);
+  }
+
+  /** Whether this delegation already persisted its exact implicit run evidence. */
+  hasImplicitRunForCommand(
+    correlationRunId: string,
+    tool: string,
+    command: string,
+    delegatedAt: string,
+  ): boolean {
+    const delegatedAtMs = new Date(delegatedAt).getTime();
+    if (!Number.isFinite(delegatedAtMs)) return false;
+    const row = this.datastore.db
+      .select({ id: runs.id })
+      .from(runs)
+      .innerJoin(runSteps, eq(runSteps.run_id, runs.id))
+      .where(
+        and(
+          eq(runs.source, 'implicit-tool'),
+          eq(runs.correlation_run_id, correlationRunId),
+          eq(runSteps.tool, tool),
+          eq(runSteps.command, command),
+          gte(runs.started_at, delegatedAtMs),
+        ),
+      )
+      .limit(1)
+      .get();
+    return row !== undefined;
   }
 
   private validateRun(run: StoredRun): void {

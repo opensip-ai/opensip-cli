@@ -93,6 +93,11 @@ export interface ToolSessionContribution {
  *   handler already produced) — optional so a live renderer that only persists
  *   can return just `session`.
  * - `session` is the generic-session contribution the host persists.
+ * - `execution: { kind: 'delegated', startedAt }` marks a supervisor process
+ *   whose subprocess owns the authoritative run evidence. The host only
+ *   suppresses the supervisor's standalone ledger row after proving that a
+ *   correlated child row for the same tool and command was persisted no earlier
+ *   than that child launch; otherwise the normal missing-evidence fault remains.
  *
  * The host receives this and owns the rest; the tool supplies no lifecycle
  * timing and performs no generic-session write.
@@ -101,6 +106,10 @@ export interface ToolRunCompletion {
   readonly result?: unknown;
   readonly envelope?: unknown;
   readonly session?: ToolSessionContribution;
+  readonly execution?: {
+    readonly kind: 'delegated';
+    readonly startedAt: string;
+  };
 }
 
 /**

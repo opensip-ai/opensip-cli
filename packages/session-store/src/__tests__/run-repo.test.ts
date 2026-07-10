@@ -106,6 +106,46 @@ describe('RunRepo', () => {
     expect(repo.getStepBySessionId('session-test-1')).toEqual(step);
   });
 
+  it('finds an implicit run by exact correlation id, tool, and command', () => {
+    repo.saveRunWithSteps(
+      makeRun({
+        id: 'implicit-run',
+        source: 'implicit-tool',
+        correlationRunId: 'correlation-1',
+      }),
+      [
+        makeStep({
+          id: 'implicit-step',
+          runId: 'implicit-run',
+          tool: 'graph',
+          command: 'graph',
+        }),
+      ],
+    );
+
+    const beforeRun = '2026-07-08T11:59:59.000Z';
+    expect(repo.hasImplicitRunForCommand('correlation-1', 'graph', 'graph', beforeRun)).toBe(true);
+    expect(repo.hasImplicitRunForCommand('other-correlation', 'graph', 'graph', beforeRun)).toBe(
+      false,
+    );
+    expect(repo.hasImplicitRunForCommand('correlation-1', 'fit', 'graph', beforeRun)).toBe(false);
+    expect(repo.hasImplicitRunForCommand('correlation-1', 'graph', 'impact', beforeRun)).toBe(
+      false,
+    );
+    expect(
+      repo.hasImplicitRunForCommand('correlation-1', 'graph', 'graph', '2026-07-08T12:00:00.001Z'),
+    ).toBe(false);
+    expect(repo.hasImplicitRunForCommand('correlation-1', 'graph', 'graph', 'invalid')).toBe(false);
+  });
+
+  it('does not treat a suite run as delegated implicit-run evidence', () => {
+    repo.saveRunWithSteps(makeRun({ correlationRunId: 'correlation-1' }), [makeStep()]);
+
+    expect(
+      repo.hasImplicitRunForCommand('correlation-1', 'fit', 'fitness', '2026-07-08T11:59:59.000Z'),
+    ).toBe(false);
+  });
+
   it('enforces at most one run step per linked session', () => {
     new SessionRepo(datastore).save(makeSession());
     repo.saveRunWithSteps(makeRun({ id: 'run-a' }), [

@@ -28,6 +28,7 @@ import { projectEnvelopeEvidence, projectLedgerArgs } from './run-ledger-project
 import type { DataStore } from '@opensip-cli/datastore';
 
 const CLI_VERSION = readPackageVersion(import.meta.url);
+const MODULE_TAG = 'cli:standalone-run-ledger';
 
 export interface PersistStandaloneRunInput<TCtx extends CommandMountContext> {
   readonly spec: CommandSpec<unknown, TCtx>;
@@ -49,12 +50,13 @@ export function persistStandaloneRun<TCtx extends CommandMountContext>(
   if (datastore === undefined) return;
 
   try {
+    if (shouldSkipProvenDelegation(input, datastore, scope?.runId, log)) return;
     const projection = buildStandaloneLedgerProjection(input, datastore, scope?.runId);
     const { run, step, missingEvidence, sessionId, tool, command } = projection;
     new RunRepo(datastore).saveRunWithSteps(run, [step]);
     log.info?.({
       evt: 'cli.run-ledger.standalone_recorded',
-      module: 'cli:standalone-run-ledger',
+      module: MODULE_TAG,
       runId: run.id,
       tool,
       command,
@@ -63,7 +65,7 @@ export function persistStandaloneRun<TCtx extends CommandMountContext>(
     if (missingEvidence) {
       log.warn?.({
         evt: 'cli.run-ledger.standalone_missing_evidence',
-        module: 'cli:standalone-run-ledger',
+        module: MODULE_TAG,
         runId: run.id,
         tool,
         command,
@@ -73,11 +75,54 @@ export function persistStandaloneRun<TCtx extends CommandMountContext>(
   } catch (error) {
     log.warn?.({
       evt: 'cli.run-ledger.standalone_record_failed',
-      module: 'cli:standalone-run-ledger',
+      module: MODULE_TAG,
       command: commandLabel(input.spec),
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+/**
+ * Suppress a subprocess supervisor row only after its child has written the
+ * authoritative implicit run for this exact invocation. The completion marker
+ * alone is deliberately insufficient: a child that crashes before persistence
+ * must still leave the parent missing-evidence fault in the ledger.
+ */
+function shouldSkipProvenDelegation<TCtx extends CommandMountContext>(
+  input: PersistStandaloneRunInput<TCtx>,
+  datastore: DataStore,
+  correlationRunId: string | undefined,
+  log: ReturnType<typeof currentLogger>,
+): boolean {
+  if (!isDelegatedCompletion(input.result)) return false;
+  const tool = input.spec.parent ?? input.spec.name;
+  const command = commandLabel(input.spec);
+  const delegatedAt = input.result.execution?.startedAt;
+  const proven =
+    correlationRunId !== undefined &&
+    delegatedAt !== undefined &&
+    new RunRepo(datastore).hasImplicitRunForCommand(correlationRunId, tool, command, delegatedAt);
+  if (proven) {
+    log.info?.({
+      evt: 'cli.run-ledger.delegated_parent_skipped',
+      module: MODULE_TAG,
+      correlationRunId,
+      tool,
+      command,
+      delegatedAt,
+    });
+    return true;
+  }
+  log.warn?.({
+    evt: 'cli.run-ledger.delegated_evidence_missing',
+    module: MODULE_TAG,
+    ...(correlationRunId === undefined ? {} : { correlationRunId }),
+    tool,
+    command,
+    ...(delegatedAt === undefined ? {} : { delegatedAt }),
+    msg: 'Delegated command returned without a correlated child run; recording a missing-evidence fault.',
+  });
+  return false;
 }
 
 function shouldSkipStandaloneRun<TCtx extends CommandMountContext>(
@@ -99,7 +144,7 @@ function resolveDatastore(
   } catch (error) {
     log.debug?.({
       evt: 'cli.run-ledger.datastore_unavailable',
-      module: 'cli:standalone-run-ledger',
+      module: MODULE_TAG,
       error: error instanceof Error ? error.message : String(error),
     });
     return undefined;
@@ -253,6 +298,16 @@ function extractSignalEnvelope(value: unknown): SignalEnvelope | undefined {
     if (isSignalEnvelope(nested.envelope)) return nested.envelope;
   }
   return undefined;
+}
+
+function isDelegatedCompletion(value: unknown): value is ToolRunCompletion {
+  const execution = (value as ToolRunCompletion | null)?.execution;
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    execution?.kind === 'delegated' &&
+    typeof execution.startedAt === 'string'
+  );
 }
 
 function verdictSummaryFrom(

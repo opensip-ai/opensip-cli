@@ -24,7 +24,13 @@ import { spawn } from 'node:child_process';
 import os from 'node:os';
 import v8 from 'node:v8';
 
-import { createToolLogger } from '@opensip-cli/core';
+import {
+  CORRELATION_ENV,
+  correlationToEnv,
+  createToolLogger,
+  currentScope,
+  type RunCorrelation,
+} from '@opensip-cli/core';
 
 import { pickAdapter } from '../lang-adapter/registry.js';
 
@@ -56,6 +62,11 @@ export interface PreflightInput {
    * either way, so telemetry / log consumers lose nothing when it's off.
    */
   readonly verbose?: boolean;
+}
+
+export interface HeapPreflightDelegation {
+  /** Wall-clock boundary used by the host to reject older correlated evidence. */
+  readonly startedAt: string;
 }
 
 /**
@@ -93,14 +104,14 @@ export function systemHasMemoryFor(targetMb: number): boolean {
 
 /**
  * Run preflight. Returns `false` to indicate the caller should
- * continue normally; `true` means we are re-execing and the caller
- * should not proceed (process will exit shortly via the spawned child).
- *
- * The promise that resolves to `true` actually never resolves in
- * practice — the parent process exits when the child does. But TS
- * needs a return type for callers that want to short-circuit.
+ * continue normally; `true` means the elevated child completed the
+ * actual command and the caller must return a delegated completion.
+ * That handoff prevents the host from recording a second, evidence-free
+ * standalone run for this lightweight parent process.
  */
-export async function runHeapPreflight(input: PreflightInput): Promise<boolean> {
+export async function runHeapPreflight(
+  input: PreflightInput,
+): Promise<HeapPreflightDelegation | false> {
   if (process.env[SENTINEL_ENV] === '1') {
     // We are the elevated child. Do nothing.
     return false;
@@ -155,8 +166,9 @@ export async function runHeapPreflight(input: PreflightInput): Promise<boolean> 
   }
 
   /* v8 ignore start */
+  const startedAt = new Date().toISOString();
   await reExecWithHeap(targetMb, fileCount, currentMb, input.verbose === true);
-  return true;
+  return { startedAt };
   /* v8 ignore stop */
 }
 
@@ -173,11 +185,6 @@ async function reExecWithHeap(
   currentMb: number,
   verbose: boolean,
 ): Promise<void> {
-  const flag = `--max-old-space-size=${String(targetMb)}`;
-  const existingNodeOptions = process.env.NODE_OPTIONS ?? '';
-  const mergedNodeOptions =
-    existingNodeOptions.length > 0 ? `${existingNodeOptions} ${flag}` : flag;
-
   // Structured log always fires — telemetry/log consumers see every
   // elevation regardless of verbosity.
   log.info({
@@ -197,11 +204,7 @@ async function reExecWithHeap(
   }
 
   const child = spawn(process.execPath, process.argv.slice(1), {
-    env: {
-      ...process.env,
-      NODE_OPTIONS: mergedNodeOptions,
-      [SENTINEL_ENV]: '1',
-    },
+    env: buildHeapChildEnv(targetMb, process.env, currentScope()?.correlation),
     stdio: 'inherit',
   });
 
@@ -220,3 +223,33 @@ async function reExecWithHeap(
   });
 }
 /* v8 ignore stop */
+
+/**
+ * Build the elevated child's environment. The active run correlation is spread
+ * after the inherited process environment so stale `OPENSIP_*` values cannot
+ * replace the parent scope assembled for this invocation. In particular,
+ * `OPENSIP_RUN_ID` lets the child's pre-action hook inherit the same ledger run.
+ *
+ * Exported from this private module only so the subprocess handoff can be tested
+ * without spawning a second Vitest process; it is not part of the package API.
+ */
+export function buildHeapChildEnv(
+  targetMb: number,
+  parentEnv: NodeJS.ProcessEnv,
+  correlation: RunCorrelation | undefined,
+): NodeJS.ProcessEnv {
+  const flag = `--max-old-space-size=${String(targetMb)}`;
+  const existingNodeOptions = parentEnv.NODE_OPTIONS ?? '';
+  const mergedNodeOptions =
+    existingNodeOptions.length > 0 ? `${existingNodeOptions} ${flag}` : flag;
+
+  const inheritedEnv = { ...parentEnv };
+  for (const name of Object.keys(CORRELATION_ENV)) delete inheritedEnv[name];
+
+  return {
+    ...inheritedEnv,
+    ...(correlation ? correlationToEnv(correlation) : {}),
+    NODE_OPTIONS: mergedNodeOptions,
+    [SENTINEL_ENV]: '1',
+  };
+}

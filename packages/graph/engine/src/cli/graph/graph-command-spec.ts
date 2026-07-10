@@ -203,10 +203,11 @@ async function dispatchGraphLiveView(
  * host-owned-run-timing Phase 3: the static render path RETURNS a
  * {@link ToolRunCompletion} carrying the run's `session` contribution; the host
  * run plane persists it after this handler resolves (graph no longer writes the
- * generic session row itself). The early-return branches (show / list-files /
- * heap-preflight re-exec / TTY live view) return `void` — the live view path
+ * generic session row itself). The show / list-files / TTY live view branches
+ * return `void` — the live view path
  * persists its own session via `renderLive`, and the other branches produce no
- * session.
+ * session. A heap-preflight re-exec returns a delegated completion after its
+ * elevated child finishes, so the host does not persist a duplicate parent run.
  */
 async function runGraphCommand(
   rawOpts: unknown,
@@ -250,10 +251,10 @@ async function runGraphCommand(
   }
   // Preflight runs BEFORE any heavy work. If the repo's file count
   // exceeds a threshold AND the current heap cap is too low, this
-  // re-execs the process with elevated `--max-old-space-size`. The
-  // re-execing parent never returns from this call (it `process.exit`s
-  // with the child's code), so `returned === true` only matters for
-  // the type checker. Skipped when the user has expressed an explicit
+  // re-execs the process with elevated `--max-old-space-size`. The parent
+  // waits for that child and propagates its exit code, then returns a delegated
+  // completion so the host does not record a second evidence-free run. Skipped
+  // when the user has expressed an explicit
   // scope (positional paths, --workspace, or --language): those runs
   // either touch a fraction of files (positional/language) or spawn
   // child processes per unit (workspace) and don't need the global
@@ -261,12 +262,12 @@ async function runGraphCommand(
   const hasExplicitScope =
     paths.length > 0 || opts.workspace === true || typeof opts.language === 'string';
   if (!hasExplicitScope) {
-    const reExecing = await runHeapPreflight({
+    const delegation = await runHeapPreflight({
       cwd: opts.cwd,
       verbose: opts.verbose === true,
     });
     /* v8 ignore next */
-    if (reExecing) return;
+    if (delegation) return { execution: { kind: 'delegated', ...delegation } };
   }
 
   // Determinism (ADR-0032, superseding ADR-0031): TTY selects only the RENDERER
