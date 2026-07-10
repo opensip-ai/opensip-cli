@@ -119,6 +119,5 @@ describe('CLI diagnostic helpers', () => {
         logRef: 'capability.bad_export',
       }),
     );
-
   });
 });

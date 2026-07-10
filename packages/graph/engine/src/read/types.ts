@@ -3,11 +3,7 @@
  */
 
 /** Closed operation set for graph read failures. */
-export type GraphReadOperation =
-  | 'catalog-identity'
-  | 'catalog-generation'
-  | 'rebuild'
-  | 'analysis';
+export type GraphReadOperation = 'catalog-identity' | 'catalog-generation' | 'rebuild' | 'analysis';
 
 /**
  * Bounded graph-package boundary error. Fixed message ≤160 chars; never carries
@@ -27,10 +23,7 @@ export interface CatalogIdentity {
   readonly builtAt: string;
 }
 
-export type {
-  CatalogVerdict,
-  ValidationContext,
-} from '../cache/invalidate.js';
+export type { CatalogVerdict, ValidationContext } from '../cache/invalidate.js';
 
 export type { Catalog, Indexes, FeatureColumn } from '../types.js';
 export type { GraphConfig } from '../types.js';

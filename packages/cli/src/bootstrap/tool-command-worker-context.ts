@@ -124,8 +124,7 @@ function planeMethod<P extends HostPlaneKind, R>(
   plane: P,
   method: HostPlaneMethodName<P>,
 ): (...args: readonly unknown[]) => Promise<R> {
-  return (...args) =>
-    rpc<R>(client, { seam: 'hostPlane', plane, method, args } as HostRpcCall);
+  return (...args) => rpc<R>(client, { seam: 'hostPlane', plane, method, args } as HostRpcCall);
 }
 
 /**

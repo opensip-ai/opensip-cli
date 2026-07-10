@@ -119,7 +119,7 @@ export function applyToolContributeScope(scope: RunScope, tool: Tool): void {
   // Absent hook or explicit `undefined` is a no-op; null/array/primitive fail.
   if (contribution === undefined) return;
   if (typeof contribution !== 'object' || contribution === null) {
-    installValidatedContribution(scope, tool, contribution as never);
+    installValidatedContribution(scope, tool, contribution);
     return;
   }
 

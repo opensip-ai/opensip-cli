@@ -23,7 +23,7 @@ const DENIED_CODE = 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS' as const;
 export function buildDeniedWorkerDatastoreThunk(logger: Logger): DatastoreThunk {
   // Cast via unknown: the body always throws (never returns DataStore), so TS
   // would otherwise reject the DatastoreThunk callable shape.
-  const thunk = ((() => {
+  const thunk = (() => {
     logger.warn({
       evt: 'cli.worker.datastore.access_denied',
       module: 'cli:worker-datastore',
@@ -37,7 +37,7 @@ export function buildDeniedWorkerDatastoreThunk(logger: Logger): DatastoreThunk 
         diagnostic: 'host-rpc-only: ambient datastore denied',
       },
     );
-  }) as unknown) as DatastoreThunk;
+  }) as unknown as DatastoreThunk;
   // Dispose is a no-op: nothing was opened.
   thunk.dispose = (): void => {
     // Intentionally empty — denied thunk never materialises a connection.

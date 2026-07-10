@@ -1,222 +1,80 @@
 {
   "//": "depcruise-only. Generated from workspace package exports. Maps @opensip-cli/* to package SOURCE. NOT used for tsc builds.",
   "extends": "../tsconfig.json",
-  "include": [
-    "../packages/**/*.ts"
-  ],
+  "include": ["../packages/**/*.ts"],
   "compilerOptions": {
     "baseUrl": "..",
     "paths": {
-      "@opensip-cli/checks-cpp": [
-        "packages/fitness/checks-cpp/src/index.ts"
-      ],
-      "@opensip-cli/checks-dogfood": [
-        "packages/fitness/checks-dogfood/src/index.ts"
-      ],
-      "@opensip-cli/checks-go": [
-        "packages/fitness/checks-go/src/index.ts"
-      ],
-      "@opensip-cli/checks-java": [
-        "packages/fitness/checks-java/src/index.ts"
-      ],
-      "@opensip-cli/checks-python": [
-        "packages/fitness/checks-python/src/index.ts"
-      ],
-      "@opensip-cli/checks-rust": [
-        "packages/fitness/checks-rust/src/index.ts"
-      ],
-      "@opensip-cli/checks-typescript": [
-        "packages/fitness/checks-typescript/src/index.ts"
-      ],
-      "@opensip-cli/checks-universal": [
-        "packages/fitness/checks-universal/src/index.ts"
-      ],
-      "@opensip-cli/cli-live": [
-        "packages/cli-live/src/index.ts"
-      ],
-      "@opensip-cli/cli-ui": [
-        "packages/cli-ui/src/index.ts"
-      ],
-      "@opensip-cli/clone-detection": [
-        "packages/clone-detection/src/index.ts"
-      ],
-      "@opensip-cli/config": [
-        "packages/config/src/index.ts"
-      ],
-      "@opensip-cli/contracts": [
-        "packages/contracts/src/index.ts"
-      ],
-      "@opensip-cli/core": [
-        "packages/core/src/index.ts"
-      ],
-      "@opensip-cli/core/errors": [
-        "packages/core/src/lib/errors.ts"
-      ],
-      "@opensip-cli/core/languages": [
-        "packages/core/src/languages/index.ts"
-      ],
-      "@opensip-cli/core/languages/parse-cache.js": [
-        "packages/core/src/languages/parse-cache.ts"
-      ],
-      "@opensip-cli/core/logger": [
-        "packages/core/src/lib/logger.ts"
-      ],
-      "@opensip-cli/core/plugins": [
-        "packages/core/src/plugins/index.ts"
-      ],
-      "@opensip-cli/core/signal": [
-        "packages/core/src/types/signal.ts"
-      ],
-      "@opensip-cli/core/types": [
-        "packages/core/src/types/index.ts"
-      ],
-      "@opensip-cli/dashboard": [
-        "packages/dashboard/src/index.ts"
-      ],
-      "@opensip-cli/datastore": [
-        "packages/datastore/src/index.ts"
-      ],
-      "@opensip-cli/datastore/internal": [
-        "packages/datastore/src/internal.ts"
-      ],
-      "@opensip-cli/external-tool-adapter": [
-        "packages/external-tool-adapter/src/index.ts"
-      ],
-      "@opensip-cli/fitness": [
-        "packages/fitness/engine/src/index.ts"
-      ],
-      "@opensip-cli/fitness/internal": [
-        "packages/fitness/engine/src/internal.ts"
-      ],
-      "@opensip-cli/format": [
-        "packages/format/src/index.ts"
-      ],
-      "@opensip-cli/graph": [
-        "packages/graph/engine/src/index.ts"
-      ],
-      "@opensip-cli/graph-adapter-common": [
-        "packages/graph/graph-adapter-common/src/index.ts"
-      ],
-      "@opensip-cli/graph-go": [
-        "packages/graph/graph-go/src/index.ts"
-      ],
-      "@opensip-cli/graph-java": [
-        "packages/graph/graph-java/src/index.ts"
-      ],
-      "@opensip-cli/graph-python": [
-        "packages/graph/graph-python/src/index.ts"
-      ],
-      "@opensip-cli/graph-rust": [
-        "packages/graph/graph-rust/src/index.ts"
-      ],
-      "@opensip-cli/graph-typescript": [
-        "packages/graph/graph-typescript/src/index.ts"
-      ],
-      "@opensip-cli/graph/internal": [
-        "packages/graph/engine/src/internal.ts"
-      ],
-      "@opensip-cli/graph/read": [
-        "packages/graph/engine/src/read/index.ts"
-      ],
-      "@opensip-cli/lang-cpp": [
-        "packages/languages/lang-cpp/src/index.ts"
-      ],
-      "@opensip-cli/lang-go": [
-        "packages/languages/lang-go/src/index.ts"
-      ],
-      "@opensip-cli/lang-java": [
-        "packages/languages/lang-java/src/index.ts"
-      ],
-      "@opensip-cli/lang-python": [
-        "packages/languages/lang-python/src/index.ts"
-      ],
-      "@opensip-cli/lang-rust": [
-        "packages/languages/lang-rust/src/index.ts"
-      ],
-      "@opensip-cli/lang-typescript": [
-        "packages/languages/lang-typescript/src/index.ts"
-      ],
-      "@opensip-cli/mcp": [
-        "packages/mcp/src/index.ts"
-      ],
-      "@opensip-cli/output": [
-        "packages/output/src/index.ts"
-      ],
-      "@opensip-cli/session-store": [
-        "packages/session-store/src/index.ts"
-      ],
-      "@opensip-cli/simulation": [
-        "packages/simulation/engine/src/index.ts"
-      ],
-      "@opensip-cli/simulation/internal": [
-        "packages/simulation/engine/src/internal.ts"
-      ],
-      "@opensip-cli/targeting": [
-        "packages/targeting/src/index.ts"
-      ],
-      "@opensip-cli/test-support": [
-        "packages/test-support/src/index.ts"
-      ],
-      "@opensip-cli/tool-ast-grep": [
-        "packages/tool-ast-grep/src/index.ts"
-      ],
-      "@opensip-cli/tool-bandit": [
-        "packages/tool-bandit/src/index.ts"
-      ],
-      "@opensip-cli/tool-cargo-clippy": [
-        "packages/tool-cargo-clippy/src/index.ts"
-      ],
-      "@opensip-cli/tool-cargo-deny": [
-        "packages/tool-cargo-deny/src/index.ts"
-      ],
-      "@opensip-cli/tool-cppcheck": [
-        "packages/tool-cppcheck/src/index.ts"
-      ],
-      "@opensip-cli/tool-dependency-check": [
-        "packages/tool-dependency-check/src/index.ts"
-      ],
-      "@opensip-cli/tool-gitleaks": [
-        "packages/tool-gitleaks/src/index.ts"
-      ],
-      "@opensip-cli/tool-golangci-lint": [
-        "packages/tool-golangci-lint/src/index.ts"
-      ],
-      "@opensip-cli/tool-govulncheck": [
-        "packages/tool-govulncheck/src/index.ts"
-      ],
-      "@opensip-cli/tool-osv-scanner": [
-        "packages/tool-osv-scanner/src/index.ts"
-      ],
-      "@opensip-cli/tool-pip-audit": [
-        "packages/tool-pip-audit/src/index.ts"
-      ],
-      "@opensip-cli/tool-pmd": [
-        "packages/tool-pmd/src/index.ts"
-      ],
-      "@opensip-cli/tool-ruff": [
-        "packages/tool-ruff/src/index.ts"
-      ],
-      "@opensip-cli/tool-semgrep": [
-        "packages/tool-semgrep/src/index.ts"
-      ],
-      "@opensip-cli/tool-spotbugs": [
-        "packages/tool-spotbugs/src/index.ts"
-      ],
-      "@opensip-cli/tool-test-kit": [
-        "packages/tool-test-kit/src/index.ts"
-      ],
-      "@opensip-cli/tool-trivy": [
-        "packages/tool-trivy/src/index.ts"
-      ],
-      "@opensip-cli/tree-sitter": [
-        "packages/tree-sitter/src/index.ts"
-      ],
-      "@opensip-cli/yagni": [
-        "packages/yagni/engine/src/index.ts"
-      ],
-      "opensip-cli": [
-        "packages/cli/src/index.ts"
-      ]
+      "@opensip-cli/checks-cpp": ["packages/fitness/checks-cpp/src/index.ts"],
+      "@opensip-cli/checks-dogfood": ["packages/fitness/checks-dogfood/src/index.ts"],
+      "@opensip-cli/checks-go": ["packages/fitness/checks-go/src/index.ts"],
+      "@opensip-cli/checks-java": ["packages/fitness/checks-java/src/index.ts"],
+      "@opensip-cli/checks-python": ["packages/fitness/checks-python/src/index.ts"],
+      "@opensip-cli/checks-rust": ["packages/fitness/checks-rust/src/index.ts"],
+      "@opensip-cli/checks-typescript": ["packages/fitness/checks-typescript/src/index.ts"],
+      "@opensip-cli/checks-universal": ["packages/fitness/checks-universal/src/index.ts"],
+      "@opensip-cli/cli-live": ["packages/cli-live/src/index.ts"],
+      "@opensip-cli/cli-ui": ["packages/cli-ui/src/index.ts"],
+      "@opensip-cli/clone-detection": ["packages/clone-detection/src/index.ts"],
+      "@opensip-cli/config": ["packages/config/src/index.ts"],
+      "@opensip-cli/contracts": ["packages/contracts/src/index.ts"],
+      "@opensip-cli/core": ["packages/core/src/index.ts"],
+      "@opensip-cli/core/errors": ["packages/core/src/lib/errors.ts"],
+      "@opensip-cli/core/languages": ["packages/core/src/languages/index.ts"],
+      "@opensip-cli/core/languages/parse-cache.js": ["packages/core/src/languages/parse-cache.ts"],
+      "@opensip-cli/core/logger": ["packages/core/src/lib/logger.ts"],
+      "@opensip-cli/core/plugins": ["packages/core/src/plugins/index.ts"],
+      "@opensip-cli/core/signal": ["packages/core/src/types/signal.ts"],
+      "@opensip-cli/core/types": ["packages/core/src/types/index.ts"],
+      "@opensip-cli/dashboard": ["packages/dashboard/src/index.ts"],
+      "@opensip-cli/datastore": ["packages/datastore/src/index.ts"],
+      "@opensip-cli/datastore/internal": ["packages/datastore/src/internal.ts"],
+      "@opensip-cli/external-tool-adapter": ["packages/external-tool-adapter/src/index.ts"],
+      "@opensip-cli/fitness": ["packages/fitness/engine/src/index.ts"],
+      "@opensip-cli/fitness/internal": ["packages/fitness/engine/src/internal.ts"],
+      "@opensip-cli/format": ["packages/format/src/index.ts"],
+      "@opensip-cli/graph": ["packages/graph/engine/src/index.ts"],
+      "@opensip-cli/graph-adapter-common": ["packages/graph/graph-adapter-common/src/index.ts"],
+      "@opensip-cli/graph-go": ["packages/graph/graph-go/src/index.ts"],
+      "@opensip-cli/graph-java": ["packages/graph/graph-java/src/index.ts"],
+      "@opensip-cli/graph-python": ["packages/graph/graph-python/src/index.ts"],
+      "@opensip-cli/graph-rust": ["packages/graph/graph-rust/src/index.ts"],
+      "@opensip-cli/graph-typescript": ["packages/graph/graph-typescript/src/index.ts"],
+      "@opensip-cli/graph/internal": ["packages/graph/engine/src/internal.ts"],
+      "@opensip-cli/graph/read": ["packages/graph/engine/src/read/index.ts"],
+      "@opensip-cli/lang-cpp": ["packages/languages/lang-cpp/src/index.ts"],
+      "@opensip-cli/lang-go": ["packages/languages/lang-go/src/index.ts"],
+      "@opensip-cli/lang-java": ["packages/languages/lang-java/src/index.ts"],
+      "@opensip-cli/lang-python": ["packages/languages/lang-python/src/index.ts"],
+      "@opensip-cli/lang-rust": ["packages/languages/lang-rust/src/index.ts"],
+      "@opensip-cli/lang-typescript": ["packages/languages/lang-typescript/src/index.ts"],
+      "@opensip-cli/mcp": ["packages/mcp/src/index.ts"],
+      "@opensip-cli/output": ["packages/output/src/index.ts"],
+      "@opensip-cli/session-store": ["packages/session-store/src/index.ts"],
+      "@opensip-cli/simulation": ["packages/simulation/engine/src/index.ts"],
+      "@opensip-cli/simulation/internal": ["packages/simulation/engine/src/internal.ts"],
+      "@opensip-cli/targeting": ["packages/targeting/src/index.ts"],
+      "@opensip-cli/test-support": ["packages/test-support/src/index.ts"],
+      "@opensip-cli/tool-ast-grep": ["packages/tool-ast-grep/src/index.ts"],
+      "@opensip-cli/tool-bandit": ["packages/tool-bandit/src/index.ts"],
+      "@opensip-cli/tool-cargo-clippy": ["packages/tool-cargo-clippy/src/index.ts"],
+      "@opensip-cli/tool-cargo-deny": ["packages/tool-cargo-deny/src/index.ts"],
+      "@opensip-cli/tool-cppcheck": ["packages/tool-cppcheck/src/index.ts"],
+      "@opensip-cli/tool-dependency-check": ["packages/tool-dependency-check/src/index.ts"],
+      "@opensip-cli/tool-gitleaks": ["packages/tool-gitleaks/src/index.ts"],
+      "@opensip-cli/tool-golangci-lint": ["packages/tool-golangci-lint/src/index.ts"],
+      "@opensip-cli/tool-govulncheck": ["packages/tool-govulncheck/src/index.ts"],
+      "@opensip-cli/tool-osv-scanner": ["packages/tool-osv-scanner/src/index.ts"],
+      "@opensip-cli/tool-pip-audit": ["packages/tool-pip-audit/src/index.ts"],
+      "@opensip-cli/tool-pmd": ["packages/tool-pmd/src/index.ts"],
+      "@opensip-cli/tool-ruff": ["packages/tool-ruff/src/index.ts"],
+      "@opensip-cli/tool-semgrep": ["packages/tool-semgrep/src/index.ts"],
+      "@opensip-cli/tool-spotbugs": ["packages/tool-spotbugs/src/index.ts"],
+      "@opensip-cli/tool-test-kit": ["packages/tool-test-kit/src/index.ts"],
+      "@opensip-cli/tool-trivy": ["packages/tool-trivy/src/index.ts"],
+      "@opensip-cli/tree-sitter": ["packages/tree-sitter/src/index.ts"],
+      "@opensip-cli/yagni": ["packages/yagni/engine/src/index.ts"],
+      "opensip-cli": ["packages/cli/src/index.ts"]
     }
   }
 }

@@ -20,8 +20,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
-import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { analyzeNullSafety } from '../checks/quality/data-integrity/null-safety.js';

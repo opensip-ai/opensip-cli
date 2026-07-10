@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
-import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

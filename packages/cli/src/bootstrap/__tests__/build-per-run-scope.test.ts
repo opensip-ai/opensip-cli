@@ -129,9 +129,7 @@ describe('buildPerRunScope datastoreAccess', () => {
     try {
       scope.datastore();
     } catch (error) {
-      expect((error as PluginIncompatibleError).code).toBe(
-        'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
-      );
+      expect((error as PluginIncompatibleError).code).toBe('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS');
     }
     // Dispose must be safe (no open connection).
     expect(() => scope.dispose()).not.toThrow();

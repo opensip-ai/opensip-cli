@@ -68,5 +68,3 @@ export function capabilityDiscoveryToCliDiagnostic(
     logRef: diagnostic.evt,
   };
 }
-
-

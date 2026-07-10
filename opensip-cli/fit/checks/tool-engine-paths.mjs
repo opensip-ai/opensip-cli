@@ -10,10 +10,9 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-const {
-  createToolPathPredicates,
-  readProductionToolPackageInventory,
-} = require(join(REPO_ROOT, 'scripts/lib/workspace-tool-package-inventory.cjs'));
+const { createToolPathPredicates, readProductionToolPackageInventory } = require(
+  join(REPO_ROOT, 'scripts/lib/workspace-tool-package-inventory.cjs'),
+);
 
 const predicates = createToolPathPredicates(REPO_ROOT);
 const inventory = readProductionToolPackageInventory(REPO_ROOT);
@@ -48,14 +47,18 @@ export function toolEngineCliPathRe(suffix = '') {
 }
 
 export function toolDescriptorPathRe() {
-  return predicates.toolDescriptorPathRe();
+  // Match absolute or relative paths ending at a tool descriptor (test fixtures
+  // use `/repo/packages/.../tool.ts`; production fit uses repo-relative paths).
+  const descriptors = predicates.inventory
+    .filter((t) => !t.adapterSubstrate && typeof t.descriptorRelative === 'string')
+    .map((t) => t.descriptorRelative.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&'));
+  if (descriptors.length === 0) return /$^/;
+  return new RegExp(`(?:${descriptors.join('|')})$`);
 }
 
 export function toolPackagePathRe(suffix = '') {
   // Match any production tool package root (engine or package-root src).
-  const roots = inventory
-    .filter((t) => !t.adapterSubstrate)
-    .map((t) => t.relativeDir + '/');
+  const roots = inventory.filter((t) => !t.adapterSubstrate).map((t) => t.relativeDir + '/');
   if (roots.length === 0) return /$^/;
   const escapeRe = (value) => value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
   return new RegExp(`(?:${roots.map(escapeRe).join('|')})${suffix}`);

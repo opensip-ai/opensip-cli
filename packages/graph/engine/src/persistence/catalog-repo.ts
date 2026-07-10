@@ -99,7 +99,6 @@ export class CatalogRepo {
     };
   }
 
-
   /**
    * Replace the catalog with a fresh value. Mirrors v1's atomic
    * tmp-file + rename write — the upsert is a single statement, and

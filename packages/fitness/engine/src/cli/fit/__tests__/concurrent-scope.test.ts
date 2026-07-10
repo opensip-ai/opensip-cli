@@ -42,12 +42,13 @@ import {
   currentScope,
   runWithScope,
 } from '@opensip-cli/core';
-import { fitnessTool } from '@opensip-cli/fitness';
-import { executeFit } from '@opensip-cli/fitness/internal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FitOptions } from '@opensip-cli/contracts';
+import { fitnessTool } from '@opensip-cli/fitness';
+import { executeFit } from '@opensip-cli/fitness/internal';
+
 import type * as CheckLoaderModule from '../check-loader.js';
+import type { FitOptions } from '@opensip-cli/contracts';
 
 // Seed a stub check so executeFit reaches the recipe path (ADR-0060 fail-closed
 // when the registry is empty). Check packs are intentionally not loaded — only

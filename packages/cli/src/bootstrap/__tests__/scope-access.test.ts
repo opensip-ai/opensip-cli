@@ -11,10 +11,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { SystemError, resolveProjectPaths, type ProjectContext } from '@opensip-cli/core';
+import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
 import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
 

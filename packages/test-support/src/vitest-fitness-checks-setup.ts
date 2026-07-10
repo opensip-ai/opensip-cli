@@ -25,8 +25,9 @@
 import { enterScope } from '@opensip-cli/core';
 import { beforeEach } from 'vitest';
 
-import { fitnessTestFileCache } from './index.js';
 import { makeFitnessTestScope } from './with-scope.js';
+
+import { fitnessTestFileCache } from './index.js';
 
 beforeEach(() => {
   // Start from a full fitness subscope (checks/recipes/load + a fresh cache),

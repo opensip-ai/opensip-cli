@@ -64,6 +64,4 @@ if (missing.length > 0 || wrong.length > 0 || extra.length > 0) {
   process.exit(1);
 }
 
-console.error(
-  `verify-depcruise-export-paths OK (${entries.length} export(s) mapped)`,
-);
+console.error(`verify-depcruise-export-paths OK (${entries.length} export(s) mapped)`);

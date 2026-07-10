@@ -9,11 +9,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { RunScope, runWithScope } from '@opensip-cli/core';
-import {
-  fitnessTestFileCache,
-  setCurrentRecipeCheckConfig,
-  clearCurrentRecipeCheckConfig,
-} from '@opensip-cli/fitness';
+import { setCurrentRecipeCheckConfig, clearCurrentRecipeCheckConfig } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';

@@ -20,7 +20,7 @@ function writeFixture(cwd: string, relPath: string, content: string): string {
 
 async function runPolicy(cwd: string) {
   return packageSupplyChainPolicy.run(cwd, {
-    fitnessTestFileCache,
+    fileCache: fitnessTestFileCache,
     targetFiles: [join(cwd, 'package.json')],
   });
 }

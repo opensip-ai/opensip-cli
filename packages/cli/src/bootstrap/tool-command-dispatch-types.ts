@@ -260,8 +260,7 @@ export const HOST_PLANE_METHODS = Object.freeze({
   entitlements: Object.freeze(['check', 'recordUsage', 'getLicenseState'] as const),
 });
 
-export type HostPlaneMethodName<P extends HostPlaneKind> =
-  (typeof HOST_PLANE_METHODS)[P][number];
+export type HostPlaneMethodName<P extends HostPlaneKind> = (typeof HOST_PLANE_METHODS)[P][number];
 
 /** The serializable subset of `deliverSignals`'s opts (no functions/handles). */
 export interface DeliverSignalsOpts {

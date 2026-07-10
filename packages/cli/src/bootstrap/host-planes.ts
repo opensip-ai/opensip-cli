@@ -14,6 +14,8 @@
  */
 import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
+import { hostPlaneStateIdentity } from './host-plane-state.js';
+
 import type {
   HostGovernance,
   HostAudit,
@@ -21,8 +23,6 @@ import type {
   Logger,
   ToolCliContext,
 } from '@opensip-cli/core';
-
-import { hostPlaneStateIdentity } from './host-plane-state.js';
 
 /**
  * Build the hostPlanes bag.

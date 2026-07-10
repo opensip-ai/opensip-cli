@@ -10,9 +10,7 @@ const {
   readProductionToolPackageInventory,
   createToolPathPredicates,
 } = require('../lib/workspace-tool-package-inventory.cjs');
-const {
-  readWorkspacePackageManifests,
-} = require('../lib/workspace-package-manifests.cjs');
+const { readWorkspacePackageManifests } = require('../lib/workspace-package-manifests.cjs');
 
 describe('workspace package manifests', () => {
   it('returns unique package names and 58 workspace packages', () => {

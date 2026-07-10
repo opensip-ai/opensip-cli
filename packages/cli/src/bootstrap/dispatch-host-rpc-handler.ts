@@ -18,6 +18,8 @@
 
 import { canonicalToolErrorCode, ToolError } from '@opensip-cli/core';
 
+import { HOST_PLANE_METHODS } from './tool-command-dispatch-types.js';
+
 import type {
   DeliverSignalsOpts,
   HostPlaneKind,
@@ -25,7 +27,6 @@ import type {
   HostRpcRequest,
   RpcReply,
 } from './tool-command-dispatch-types.js';
-import { HOST_PLANE_METHODS } from './tool-command-dispatch-types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 /** A host plane impl is a record of async methods (governance/audit/entitlements). */
@@ -87,7 +88,8 @@ function validateHostRpcRequest(request: HostRpcRequest): void {
     }
     // Wire payloads may carry arbitrary strings; validate via string form so
     // prototype/unknown method names are rejected before property lookup.
-    const method = String((request as { method?: unknown }).method ?? '');
+    const rawMethod = (request as { method?: unknown }).method;
+    const method = typeof rawMethod === 'string' ? rawMethod : '';
     const allowed = HOST_PLANE_METHODS[request.plane] as readonly string[];
     if (
       method.length === 0 ||
@@ -226,19 +228,29 @@ export async function handleHostRpc(
     const value = await performHostRpc(request, ctx);
     return { kind: 'rpc-reply', rpcId: request.rpcId, ok: true, value };
   } catch (error) {
-    // Bounded generic seam failure only — never echo host exception text,
-    // stacks, paths, keys, or secrets across the worker IPC boundary (ADR-0146).
+    // Bounded failure reply — never echo host stacks, paths, or arbitrary
+    // exception text across the worker IPC boundary (ADR-0146). Known stable
+    // codes may map to fixed, allowlisted user messages; everything else uses
+    // a generic seam message.
     const code =
       (error as { code?: unknown }).code !== undefined &&
       typeof (error as { code?: unknown }).code === 'string'
         ? (error as { code: string }).code
         : undefined;
+    const FIXED_CODE_MESSAGES: Readonly<Record<string, string>> = {
+      'CONFIGURATION.GATE.BASELINE_MISSING':
+        'No baseline found for this tool — run with --gate-save first',
+    };
+    const message =
+      code !== undefined && FIXED_CODE_MESSAGES[code] !== undefined
+        ? FIXED_CODE_MESSAGES[code]
+        : 'host-RPC seam failed';
     return {
       kind: 'rpc-reply',
       rpcId: request.rpcId,
       ok: false,
       error: {
-        message: 'host-RPC seam failed',
+        message,
         ...(code === undefined ? {} : { code }),
         // Carry the canonical exit-class code for a typed ToolError (e.g. a
         // compareBaseline BASELINE_MISSING rejection → CONFIGURATION_ERROR) so the

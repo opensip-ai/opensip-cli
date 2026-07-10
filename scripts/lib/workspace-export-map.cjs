@@ -10,9 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const {
-  readWorkspacePackageManifests,
-} = require('./workspace-package-manifests.cjs');
+const { readWorkspacePackageManifests } = require('./workspace-package-manifests.cjs');
 
 /**
  * @typedef {object} ExportMapEntry
@@ -93,7 +91,11 @@ function readWorkspaceExportMap(repoRoot) {
       }
     } else if (typeof exportsField === 'string') {
       flat['.'] = exportsField;
-    } else if (typeof exportsField === 'object' && exportsField !== null && !Array.isArray(exportsField)) {
+    } else if (
+      typeof exportsField === 'object' &&
+      exportsField !== null &&
+      !Array.isArray(exportsField)
+    ) {
       for (const [key, value] of Object.entries(exportsField)) {
         if (typeof value === 'string') {
           flat[key] = value;
@@ -102,9 +104,7 @@ function readWorkspaceExportMap(repoRoot) {
             `${pkg.relativeDir}: conditional export '${key}' is not supported (require exact string targets)`,
           );
         } else {
-          diagnostics.push(
-            `${pkg.relativeDir}: export '${key}' has unsupported value type`,
-          );
+          diagnostics.push(`${pkg.relativeDir}: export '${key}' has unsupported value type`);
         }
       }
     } else {
@@ -113,9 +113,7 @@ function readWorkspaceExportMap(repoRoot) {
 
     for (const [exportPath, distTarget] of Object.entries(flat)) {
       if (exportPath.includes('*')) {
-        diagnostics.push(
-          `${pkg.relativeDir}: wildcard export '${exportPath}' is not supported`,
-        );
+        diagnostics.push(`${pkg.relativeDir}: wildcard export '${exportPath}' is not supported`);
         continue;
       }
       if (typeof distTarget !== 'string' || !distTarget.startsWith('./dist/')) {
@@ -139,9 +137,7 @@ function readWorkspaceExportMap(repoRoot) {
       }
       const sourceReal = fs.realpathSync(sourceFile);
       if (!sourceReal.startsWith(pkg.dir + path.sep) && sourceReal !== pkg.dir) {
-        diagnostics.push(
-          `${pkg.relativeDir}: export '${exportPath}' source escapes package root`,
-        );
+        diagnostics.push(`${pkg.relativeDir}: export '${exportPath}' source escapes package root`);
         continue;
       }
       const sub =
@@ -153,9 +149,7 @@ function readWorkspaceExportMap(repoRoot) {
       const specifier = `${pkg.name}${sub === '' ? '' : sub.startsWith('/') ? sub : `/${sub}`}`;
       // Normalize: '@opensip-cli/foo/read' from './read'
       const normalizedSpecifier =
-        exportPath === '.'
-          ? pkg.name
-          : `${pkg.name}/${exportPath.replace(/^\.\//, '')}`;
+        exportPath === '.' ? pkg.name : `${pkg.name}/${exportPath.replace(/^\.\//, '')}`;
 
       entries.push(
         Object.freeze({
@@ -164,10 +158,7 @@ function readWorkspaceExportMap(repoRoot) {
           specifier: normalizedSpecifier,
           distTarget,
           sourceFile: sourceReal,
-          relativeSource: path
-            .relative(rootReal, sourceReal)
-            .split(path.sep)
-            .join('/'),
+          relativeSource: path.relative(rootReal, sourceReal).split(path.sep).join('/'),
         }),
       );
     }

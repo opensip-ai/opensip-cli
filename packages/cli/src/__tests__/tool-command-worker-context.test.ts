@@ -192,7 +192,7 @@ describe('buildWorkerContext — scope identity (ADR-0145)', () => {
     );
     const scope = new RunScope({
       runId: 'r',
-      datastore: denied as never,
+      datastore: denied,
     });
     const ctx = buildWorkerContext({
       scope,

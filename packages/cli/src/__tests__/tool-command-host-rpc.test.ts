@@ -386,7 +386,7 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     const cap = makeDispatchHostCtx();
     for (const rpcId of [-1, 1.5, Number.NaN] as const) {
       const reply = (await handleHostRpc(
-        { rpcId: rpcId as never, seam: 'getExitCode' },
+        { rpcId: rpcId, seam: 'getExitCode' },
         cap.ctx,
       )) as Extract<RpcReply, { ok: false }>;
       expect(reply.ok).toBe(false);

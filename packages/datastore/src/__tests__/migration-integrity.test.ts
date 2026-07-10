@@ -233,9 +233,9 @@ describe('0009 host-plane namespace copy-only migration', () => {
         updated_at: 500,
       });
       // No double-prefix.
-      expect(rows.some((r) => r.tool.includes('@opensip-cli/host-plane:@opensip-cli/host-plane:'))).toBe(
-        false,
-      );
+      expect(
+        rows.some((r) => r.tool.includes('@opensip-cli/host-plane:@opensip-cli/host-plane:')),
+      ).toBe(false);
 
       // Second application is a row-for-row no-op.
       const before = JSON.stringify(rows);

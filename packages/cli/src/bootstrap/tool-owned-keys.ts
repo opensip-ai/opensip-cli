@@ -36,22 +36,26 @@ interface OwnedKeyCandidate {
  * @throws {PluginIncompatibleError} when any candidate begins with the reserved
  *   host-plane prefix — validation completes before any seam is callable.
  */
+function asNonEmptyString(value: unknown): string {
+  return typeof value === 'string' && value.length > 0 ? value : '';
+}
+
 export function toolOwnedKeys(tool: Tool): ReadonlySet<string> {
   const hooks = resolveToolHooks(tool);
   const identity = tool.identity;
   const candidates: OwnedKeyCandidate[] = [
-    { field: 'metadata.id', value: tool.metadata.id },
-    { field: 'metadata.name', value: tool.metadata.name },
-    { field: 'primaryCommand', value: primaryCommandName(tool) ?? '' },
-    { field: 'identity.layoutKey', value: identity?.layoutKey ?? '' },
-    { field: 'sessionReplay.tool', value: hooks.sessionReplay?.tool ?? '' },
-    { field: 'config.namespace', value: hooks.config?.namespace ?? '' },
+    { field: 'metadata.id', value: asNonEmptyString(tool.metadata.id) },
+    { field: 'metadata.name', value: asNonEmptyString(tool.metadata.name) },
+    { field: 'primaryCommand', value: asNonEmptyString(primaryCommandName(tool)) },
+    { field: 'identity.layoutKey', value: asNonEmptyString(identity?.layoutKey) },
+    { field: 'sessionReplay.tool', value: asNonEmptyString(hooks.sessionReplay?.tool) },
+    { field: 'config.namespace', value: asNonEmptyString(hooks.config?.namespace) },
   ];
   for (const alias of identity?.aliases ?? []) {
-    candidates.push({ field: 'identity.aliases', value: alias });
+    candidates.push({ field: 'identity.aliases', value: asNonEmptyString(alias) });
   }
 
-  const present = candidates.filter((c): c is OwnedKeyCandidate => c.value.length > 0);
+  const present = candidates.filter((c) => c.value.length > 0);
 
   for (const candidate of present) {
     if (isReservedHostPlaneIdentity(candidate.value)) {

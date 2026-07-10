@@ -10,9 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const {
-  readWorkspacePackageManifests,
-} = require('./workspace-package-manifests.cjs');
+const { readWorkspacePackageManifests } = require('./workspace-package-manifests.cjs');
 
 /**
  * @typedef {object} ToolPackageRecord
@@ -55,9 +53,7 @@ function readProductionToolPackageInventory(repoRoot) {
 
     const srcDir = path.join(pkg.dir, 'src');
     if (!fs.existsSync(srcDir)) {
-      throw new Error(
-        `tool package ${pkg.name} has no src/ at ${pkg.relativeDir}`,
-      );
+      throw new Error(`tool package ${pkg.name} has no src/ at ${pkg.relativeDir}`);
     }
     const sourceRoot = `${pkg.relativeDir}/src/`;
     const descriptorCandidates = [
@@ -67,10 +63,7 @@ function readProductionToolPackageInventory(repoRoot) {
     let descriptorRelative;
     for (const candidate of descriptorCandidates) {
       if (fs.existsSync(candidate)) {
-        descriptorRelative = path
-          .relative(rootReal, candidate)
-          .split(path.sep)
-          .join('/');
+        descriptorRelative = path.relative(rootReal, candidate).split(path.sep).join('/');
         break;
       }
     }
@@ -132,9 +125,7 @@ function createToolPathPredicates(repoRoot) {
         .map((t) => t.descriptorRelative)
         .filter((d) => typeof d === 'string');
       if (descriptors.length === 0) return /$^/;
-      return new RegExp(
-        `^(?:${descriptors.map(escapeRe).join('|')})$`,
-      );
+      return new RegExp(`^(?:${descriptors.map(escapeRe).join('|')})$`);
     },
     isToolSourcePath: (filePath) => {
       const norm = String(filePath).replaceAll('\\', '/');

@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 
 import { RunScope, runWithScope } from '@opensip-cli/core';
 import { setCurrentRecipeCheckConfig } from '@opensip-cli/fitness';
-import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { createTypeCheckedProgram } from '@opensip-cli/lang-typescript';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -30,11 +30,11 @@ function write(rel: string, content: string): string {
   return abs;
 }
 
-/** A scope carrying the fitness fitnessTestFileCache + a fresh shared-Program cell. */
+/** A scope carrying the fitness fileCache + a fresh shared-Program cell. */
 function scopeWithFitness(): RunScope {
   const scope = new RunScope();
   Object.assign(scope, {
-    fitness: { fitnessTestFileCache, tsProgram: { value: undefined } },
+    fitness: { fileCache: fitnessTestFileCache, tsProgram: { value: undefined } },
   });
   return scope;
 }

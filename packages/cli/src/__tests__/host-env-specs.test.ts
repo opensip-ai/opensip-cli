@@ -197,8 +197,12 @@ describe('hostEnv reads (CLI infra)', () => {
   });
 
   it('documents exact-id admission and ignored wildcard for installed/project tool allowlists', () => {
-    const installed = CLI_INFRA_ENV_SPECS.find((s) => s.canonical === 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS');
-    const project = CLI_INFRA_ENV_SPECS.find((s) => s.canonical === 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS');
+    const installed = CLI_INFRA_ENV_SPECS.find(
+      (s) => s.canonical === 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
+    );
+    const project = CLI_INFRA_ENV_SPECS.find(
+      (s) => s.canonical === 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
+    );
     expect(installed?.docs).toMatch(/exact match only/i);
     expect(installed?.docs).toMatch(/IGNORED/i);
     expect(installed?.docs).not.toMatch(/admit all ambient/i);

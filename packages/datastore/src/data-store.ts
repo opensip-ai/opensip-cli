@@ -27,7 +27,7 @@ export interface DatastoreMaintenance {
  * repositories that need atomic multi-statement work narrow to
  * {@link DrizzleDataStore} via `@opensip-cli/datastore/internal`.
  */
-export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
+export interface DataStore<_TSchema extends Record<string, unknown> = Record<string, unknown>> {
   readonly maintenance?: DatastoreMaintenance;
   close(): void;
   /** Serialize datastore-file writes (no-op for in-memory backends). */

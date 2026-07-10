@@ -27,7 +27,7 @@ import {
 
 import { createGeneration } from './catalog-generation.js';
 import { classifyFreshness, missingFreshness, unverifiedFreshness } from './freshness.js';
-import { readError } from './mcp-error.js';
+import { fromGraphReadError, readError } from './mcp-error.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type {
@@ -78,6 +78,8 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private readonly config: GraphConfig;
   private generation: CatalogGeneration | undefined;
   private loaded = false;
+  /** Bounded load error when public graph/read fails (not a missing catalog). */
+  private loadError: McpReadError | undefined;
   // Per-generation memoized derivations (reset on (re)load / refresh). Freshness
   // is deliberately NOT memoized: a long-lived server must re-verify the working
   // tree on each read so a mid-session file mutation flips `fresh` to false.
@@ -98,13 +100,13 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private current(): CatalogGeneration | undefined {
     if (!this.loaded) {
       // Public graph/read Result facade — missing catalog is ok(null); storage
-      // failures surface as err and are treated as no generation here (caller
-      // paths that need typed errors use loadCatalogGeneration directly).
+      // failures surface as err (mapped via fromGraphReadError).
       const loaded = loadCatalogGeneration(this.store);
       if (loaded.ok) {
-        this.generation =
-          loaded.value === null ? undefined : createGeneration(loaded.value);
+        this.loadError = undefined;
+        this.generation = loaded.value === null ? undefined : createGeneration(loaded.value);
       } else {
+        this.loadError = fromGraphReadError(loaded.error);
         this.generation = undefined;
       }
       this.loaded = true;
@@ -146,6 +148,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
 
   getGeneration(): Result<McpToolResult<GraphGeneration | undefined>, McpReadError> {
     const gen = this.current();
+    if (this.loadError !== undefined) return err(this.loadError);
     return ok(this.wrap(gen === undefined ? undefined : { builtAt: gen.builtAt }));
   }
 
@@ -239,12 +242,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   ): ReadonlyMap<string, { direct: number; transitive: number; score: number }> {
     if (this.blastCache !== undefined) return this.blastCache;
     const columns: readonly FeatureColumn[] = ['blast'];
-    const features = deriveGraphReadFeatures(
-      gen.catalog,
-      gen.indexes,
-      this.config,
-      columns,
-    );
+    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
     const out = new Map<string, { direct: number; transitive: number; score: number }>();
     for (const [hash, row] of features.function) {
       if (row.blast !== undefined) {
@@ -263,18 +261,8 @@ export class SqliteGraphReadPort implements GraphReadPort {
     const gen = this.current();
     if (gen === undefined) return ok(this.wrap([] as readonly DeadCodeDto[]));
     const columns: readonly FeatureColumn[] = ['reachableFromEntry'];
-    const features = deriveGraphReadFeatures(
-      gen.catalog,
-      gen.indexes,
-      this.config,
-      columns,
-    );
-    const signals = evaluateGraphOrphans(
-      gen.catalog,
-      gen.indexes,
-      this.config,
-      features,
-    );
+    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
+    const signals = evaluateGraphOrphans(gen.catalog, gen.indexes, this.config, features);
     const entries: DeadCodeDto[] = [];
     let truncated = false;
     for (const signal of signals) {
@@ -296,12 +284,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       );
     }
     const columns: readonly FeatureColumn[] = ['packageCoupling'];
-    const features = deriveGraphReadFeatures(
-      gen.catalog,
-      gen.indexes,
-      this.config,
-      columns,
-    );
+    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
     const cap = clampLimit(limit, DEFAULT_ARCH_LIMIT);
     const rows: ArchitecturePackageDto[] = [];
     for (const [name, row] of features.package) {

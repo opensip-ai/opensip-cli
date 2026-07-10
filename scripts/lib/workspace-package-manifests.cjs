@@ -58,9 +58,7 @@ function readWorkspacePackageManifests(repoRoot) {
       }
     }
     const parent =
-      parts.length === 2
-        ? path.join(rootReal, parts[0])
-        : path.join(rootReal, parts[0], parts[1]);
+      parts.length === 2 ? path.join(rootReal, parts[0]) : path.join(rootReal, parts[0], parts[1]);
     if (!fs.existsSync(parent)) continue;
     for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
@@ -85,9 +83,7 @@ function readWorkspacePackageManifests(repoRoot) {
 
       const st = fs.statSync(pkgPath);
       if (st.size > MAX_MANIFEST_BYTES) {
-        throw new Error(
-          `package.json exceeds 1 MiB: ${path.relative(rootReal, pkgPath)}`,
-        );
+        throw new Error(`package.json exceeds 1 MiB: ${path.relative(rootReal, pkgPath)}`);
       }
       const raw = fs.readFileSync(pkgPath, 'utf8');
       /** @type {Record<string, unknown>} */
@@ -102,9 +98,7 @@ function readWorkspacePackageManifests(repoRoot) {
         );
       }
       if (typeof manifest.name !== 'string' || manifest.name.length === 0) {
-        throw new Error(
-          `package.json missing name: ${path.relative(rootReal, pkgPath)}`,
-        );
+        throw new Error(`package.json missing name: ${path.relative(rootReal, pkgPath)}`);
       }
       if (seenNames.has(manifest.name)) {
         throw new Error(

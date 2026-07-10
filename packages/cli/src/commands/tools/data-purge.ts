@@ -15,12 +15,7 @@
  * `data-purge`. Recorded as a plan deviation.
  */
 
-import {
-  buildToolIdentityIndex,
-  type Logger,
-  type Tool,
-  type ToolRegistry,
-} from '@opensip-cli/core';
+import { buildToolIdentityIndex, type Logger, type ToolRegistry } from '@opensip-cli/core';
 import { BaselineRepo, ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 
@@ -70,7 +65,7 @@ export function deriveToolDataPurgeIdForms(
       const tool = registry.get(binding.canonicalName) ?? registry.get(safeId);
       if (tool !== undefined) {
         try {
-          return [...toolOwnedKeys(tool as Tool)];
+          return [...toolOwnedKeys(tool)];
         } catch {
           // Fall through to identity-index forms if binder validation rejects
           // (should not happen for admitted tools).

@@ -5,10 +5,7 @@
 import { PluginIncompatibleError, SystemError, type Logger } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  buildDeniedWorkerDatastoreThunk,
-  resolveDatastoreAccess,
-} from '../worker-datastore.js';
+import { buildDeniedWorkerDatastoreThunk, resolveDatastoreAccess } from '../worker-datastore.js';
 
 const logger: Logger = {
   debug: vi.fn(),
@@ -58,9 +55,7 @@ describe('buildDeniedWorkerDatastoreThunk', () => {
     try {
       thunk();
     } catch (error) {
-      expect((error as PluginIncompatibleError).code).toBe(
-        'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
-      );
+      expect((error as PluginIncompatibleError).code).toBe('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS');
     }
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({

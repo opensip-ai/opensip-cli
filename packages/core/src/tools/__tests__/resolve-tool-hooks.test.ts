@@ -115,9 +115,7 @@ describe('applyToolContributeScope', () => {
         commands: [{ name: 'b', description: 'b' }],
         extensionPoints: { contributeScope: () => bad as never },
       } as Tool;
-      expect(() => applyToolContributeScope(new RunScope(), tool)).toThrow(
-        PluginIncompatibleError,
-      );
+      expect(() => applyToolContributeScope(new RunScope(), tool)).toThrow(PluginIncompatibleError);
     }
   });
 
