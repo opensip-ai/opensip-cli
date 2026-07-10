@@ -237,11 +237,4 @@ export class BaselineRepo {
   }
 }
 
-/** Test/helper default identity matching the host default strategy. */
-export const DEFAULT_TEST_BASELINE_IDENTITY: BaselineIdentityMetadata = {
-  baselineFormatVersion: BASELINE_FORMAT_VERSION,
-  fingerprintStrategyId: 'opensip.default.rule-file-line-col',
-  fingerprintStrategyVersion: 1,
-};
-
 export type { BaselineIdentityMetadata } from '@opensip-cli/core';

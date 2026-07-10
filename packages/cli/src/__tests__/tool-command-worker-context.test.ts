@@ -179,3 +179,30 @@ describe('buildWorkerContext — host-only seams fail loud', () => {
     expect(() => ctx.renderLive('k', {})).toThrow(UnsupportedSeamError);
   });
 });
+
+describe('buildWorkerContext — scope identity (ADR-0145)', () => {
+  it('exposes the same already-restricted scope and does not replace/re-enable datastore', () => {
+    const acc: ResultAccumulator = {};
+    const { client } = makeStubClient();
+    const denied = Object.assign(
+      () => {
+        throw new Error('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS');
+      },
+      { dispose: () => undefined },
+    );
+    const scope = new RunScope({
+      runId: 'r',
+      datastore: denied as never,
+    });
+    const ctx = buildWorkerContext({
+      scope,
+      timing: createRunTimer(),
+      acc,
+      rpcClient: client,
+    });
+    // Same object identity — builder does not wrap or replace the scope.
+    expect(ctx.scope).toBe(scope);
+    // Ambient thunk remains the denied one.
+    expect(() => ctx.scope.datastore()).toThrow(/DATASTORE_DIRECT_ACCESS/);
+  });
+});

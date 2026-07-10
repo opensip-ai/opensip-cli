@@ -14,9 +14,9 @@ import { SystemError, resolveProjectPaths, type ProjectContext } from '@opensip-
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
+import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 
-import type { DataStore } from '@opensip-cli/datastore';
+import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
 
 /** A scope whose datastore thunk throws the given error. */
 function scopeThrowing(error: unknown) {
@@ -77,8 +77,10 @@ describe('buildDatastoreThunk lifecycle', () => {
     expect(thunk()).toBe(first); // cached on subsequent access
 
     thunk.dispose();
-    // The closed connection rejects further use...
-    expect(() => first.transaction(() => 1)).toThrow();
+    // Public repository operation on the closed handle must fail (no raw
+    // transaction escape on DataStore — ADR-0145 / opaque handle).
+    const closedRepo = new ToolStateRepo(first);
+    expect(() => closedRepo.get('tool', 'k')).toThrow();
     // ...and the next access transparently reopens a fresh connection.
     const second = thunk();
     expect(second).not.toBe(first);

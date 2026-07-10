@@ -169,6 +169,10 @@ export interface BuildWorkerContextInput {
 /**
  * Build the worker-side {@link ToolCliContext} shim. FRR seams record into
  * `acc`; RPC seams upcall via `rpcClient`; the live-view seams fail loud.
+ *
+ * The `scope` is the same already-restricted RunScope the worker bootstrap built
+ * (local project/config/parse state; ambient datastore denied). This builder
+ * does not replace, re-enable, or re-wrap the datastore thunk.
  */
 export function buildWorkerContext(input: BuildWorkerContextInput): ToolCliContext {
   const { scope, timing, acc, rpcClient, adapterProgress } = input;

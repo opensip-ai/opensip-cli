@@ -13,7 +13,7 @@ export interface DataStoreLockContext {
   readonly onLockEvent?: (event: FileLockEvent) => void;
 }
 
-/** Public persistence handle: lifecycle plus transaction, but no raw query escape hatch. */
+/** Optional vacuum/size maintenance operations on a file-backed store. */
 export interface DatastoreMaintenance {
   incrementalVacuum(): void;
   fullVacuum(): void;
@@ -22,30 +22,34 @@ export interface DatastoreMaintenance {
 
 /**
  * Host-owned persistence handle used by repositories and CLI bootstrap code.
- * It exposes lifecycle, transaction, and serialized write-lock primitives while
- * keeping raw database access behind narrower datastore-owned interfaces.
+ * It exposes lifecycle, maintenance, and serialized write-lock coordination
+ * only. There is no raw query or transaction callback on this surface —
+ * repositories that need atomic multi-statement work narrow to
+ * {@link DrizzleDataStore} via `@opensip-cli/datastore/internal`.
  */
 export interface DataStore<TSchema extends Record<string, unknown> = Record<string, unknown>> {
   readonly maintenance?: DatastoreMaintenance;
   close(): void;
-  transaction<T>(fn: (tx: DrizzleHandle<TSchema>) => T): T;
   /** Serialize datastore-file writes (no-op for in-memory backends). */
   withWriteLock<T>(operation: string, fn: () => T): T;
 }
 
 /**
- * Persistence-layer handle that exposes the raw Drizzle DB. Repository modules
- * can narrow to this shape when they own the table boundary; general consumers
- * should stay on {@link DataStore}.
+ * Persistence-layer handle that exposes the raw Drizzle DB and transaction
+ * callback. Repository modules can narrow to this shape when they own the
+ * table boundary; general consumers must stay on {@link DataStore}.
  *
- * Direct query calls must stay inside `src/persistence/`, `session-store`, or
- * `datastore`. Cross-module business code should go through the owning
- * repository/API; `restrict-raw-db-access` guards that boundary.
+ * Direct query/transaction calls must stay inside `src/persistence/`,
+ * `session-store`, or `datastore`. Cross-module business code should go
+ * through the owning repository/API; `restrict-raw-db-access` guards that
+ * boundary.
  */
 export interface DrizzleDataStore<
   TSchema extends Record<string, unknown> = Record<string, unknown>,
 > extends DataStore<TSchema> {
   readonly db: DrizzleHandle<TSchema>;
+  /** Multi-statement atomic work for owner repositories only. */
+  transaction<T>(fn: (tx: DrizzleHandle<TSchema>) => T): T;
 }
 
 /**

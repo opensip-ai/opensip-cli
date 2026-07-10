@@ -37,7 +37,7 @@
  *     runs untrusted code in-host.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -263,6 +263,38 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
     await expect(dispatch(cap, 'rpc-fail')).rejects.toThrow(/faulted for key boom|failed/);
     // No envelope replayed (the handler never reached its emit).
     expect(cap.envelopes).toHaveLength(0);
+  });
+
+  /**
+   * Snapshot the project's opensip-cli/.runtime SQLite file (if any). Workers must
+   * not open/mutate a local project store when ambient access is denied.
+   */
+  function runtimeDbSnapshot(): { exists: boolean; size: number; mtimeMs: number } | null {
+    const dbPath = join(project.projectDir, 'opensip-cli', '.runtime', 'datastore.sqlite');
+    if (!existsSync(dbPath)) return null;
+    const st = statSync(dbPath);
+    return { exists: true, size: st.size, mtimeMs: st.mtimeMs };
+  }
+
+  it('ADR-0145: cli.scope.datastore() is denied with PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS (host survives)', async () => {
+    const before = runtimeDbSnapshot();
+    const cap = makeDispatchHostCtx();
+    await expect(dispatch(cap, 'ds-scope')).rejects.toThrow(
+      /DATASTORE_DIRECT_ACCESS|host-rpc-only|cannot open a local project datastore|failed/,
+    );
+    expect(cap.envelopes).toHaveLength(0);
+    expect(runtimeDbSnapshot()).toEqual(before);
+  });
+
+  it('ADR-0145: currentScope().datastore() is denied ambiently (host survives, no local SQLite open)', async () => {
+    const before = runtimeDbSnapshot();
+    const cap = makeDispatchHostCtx();
+    await expect(dispatch(cap, 'ds-current')).rejects.toThrow(
+      /DATASTORE_DIRECT_ACCESS|host-rpc-only|cannot open a local project datastore|failed/,
+    );
+    expect(cap.envelopes).toHaveLength(0);
+    // Worker must not create/mutate a child-local SQLite store.
+    expect(runtimeDbSnapshot()).toEqual(before);
   });
 
   it('the host still dispatches a happy run AFTER containing a fault (host survived)', async () => {

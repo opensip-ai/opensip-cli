@@ -19,10 +19,13 @@
  * and runs ITS command handler against the WORKER-side `ToolCliContext` shim
  * (`tool-command-worker-context.ts`): FRR seams (render/json/envelope/raw/error/
  * exit) record the value and return it once in the {@link ToolCommandResult}; the
- * host-RPC seams (datastore / egress / SARIF / baselines / toolState / hostPlanes
- * / report-open / exit-code re-affirm) UPCALL the host over the rpc-reply channel
- * (the host performs the privileged effect — datastore/network/FS/exit stay
- * host-owned). Only the live-view seams fail loud (`unsupported-seam`).
+ * host-RPC seams (egress / SARIF / baselines / toolState / hostPlanes /
+ * report-open / exit-code re-affirm) UPCALL the host over the rpc-reply channel
+ * (the host performs the privileged effect — network/FS/exit stay host-owned).
+ * The ambient RunScope datastore thunk is DENIED in workers (ADR-0145 /
+ * `host-rpc-only`): `cli.scope.datastore()` and `currentScope().datastore()` fail
+ * loud with PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS. Only the live-view seams fail
+ * loud as `unsupported-seam`.
  *
  * A handler that calls `process.exit`, throws, crashes the native layer, or spins
  * the event loop is contained: the supervisor turns a premature child exit /
@@ -145,7 +148,8 @@ function readSpec(specPath: string): ToolCommandWorkerSpec | DispatchWorkerMessa
  * `currentScope()` here is the FULL per-run scope the CLI bootstrap built for the
  * `__tool-command-worker` subcommand (project/config/registries/contributeScope),
  * so the handler reads `cli.scope.toolConfig`/`cli.scope.<subscope>`/checks
- * worker-LOCAL while datastore/egress cross to the host via the RPC shim.
+ * worker-LOCAL. Datastore access is host-RPC-only: the ambient thunk is denied
+ * (ADR-0145); privileged effects cross to the host via the RPC shim.
  */
 async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWorkerMessage> {
   const tool = resolveTool(spec);

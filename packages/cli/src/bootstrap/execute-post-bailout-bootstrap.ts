@@ -29,6 +29,7 @@ import {
   renderRelevantBootstrapDiagnostics,
 } from './render-bootstrap-diagnostics.js';
 import { createStartupTimer, type StartupTimingEvent } from './startup-timing.js';
+import { resolveDatastoreAccess } from './worker-datastore.js';
 
 import type { PreActionBootstrapPlan } from './plan-pre-action-bootstrap.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';
@@ -135,6 +136,10 @@ export async function executePostBailoutBootstrap(
   // owning-tool resolution the preflight uses); fall back to parentCommand when
   // the command belongs to no tool (CLI-only commands have a 1:1 name).
   const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
+  // Exact worker command + host-injected marker must agree (ADR-0145).
+  // Resolved before scope construction so a mismatch never reaches a handler
+  // or opens SQLite.
+  const datastoreAccess = resolveDatastoreAccess(plan.commandPath, process.env);
   const { owningTool, scope } = preActionTimer.measure(PRE_ACTION_PHASES.buildScope, () => {
     const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandPath);
     const toolName = resolvedOwningTool?.metadata.id ?? parentCommand;
@@ -157,6 +162,7 @@ export async function executePostBailoutBootstrap(
         noCloud,
         logger: runLogger,
         ui: { version, update },
+        datastoreAccess,
       }),
     };
   });

@@ -189,9 +189,22 @@ describe('hostEnv reads (CLI infra)', () => {
       'my-plugin',
       'other-tool',
     ]);
+    // `*` is retained as a token so admission can emit the ignore warning;
+    // it is never silently coerced away.
     process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS = '*';
     expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_INSTALLED_TOOLS')).toEqual(['*']);
     delete process.env.OPENSIP_CLI_ALLOW_INSTALLED_TOOLS;
+  });
+
+  it('documents exact-id admission and ignored wildcard for installed/project tool allowlists', () => {
+    const installed = CLI_INFRA_ENV_SPECS.find((s) => s.canonical === 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS');
+    const project = CLI_INFRA_ENV_SPECS.find((s) => s.canonical === 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS');
+    expect(installed?.docs).toMatch(/exact match only/i);
+    expect(installed?.docs).toMatch(/IGNORED/i);
+    expect(installed?.docs).not.toMatch(/admit all ambient/i);
+    expect(project?.docs).toMatch(/exact match only/i);
+    expect(project?.docs).toMatch(/IGNORED/i);
+    expect(project?.docs).not.toMatch(/admit all project-authored/i);
   });
 
   it('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS coerces on whitespace AND comma and preserves wildcard as a plain token', () => {

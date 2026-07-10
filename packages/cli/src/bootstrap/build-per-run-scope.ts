@@ -48,6 +48,7 @@ import { admitCapabilityPackage } from './load-tool-capabilities.js';
 import { flushPolicyAuditEvents } from './policy-audit-flush.js';
 import { resolvePolicyForRun } from './run-policy.js';
 import { shouldRunHookInHost } from './tool-provenance.js';
+import { buildDeniedWorkerDatastoreThunk } from './worker-datastore.js';
 
 import type { loadCliDefaults } from './cli-defaults.js';
 import type { PolicyAuditCollector } from './policy-audit.js';
@@ -157,6 +158,14 @@ export interface BuildPerRunScopeInput {
     readonly version: string;
     readonly update: string | undefined;
   };
+  /**
+   * Ambient datastore capability for this scope. `'local'` opens the project
+   * SQLite store lazily; `'host-rpc-only'` installs a denied thunk so external
+   * workers cannot recover a local handle via `cli.scope` or `currentScope()`.
+   * Resolved by bootstrap from the internal command path + host marker —
+   * never from config, manifest, CLI option, or RPC.
+   */
+  readonly datastoreAccess?: 'local' | 'host-rpc-only';
 }
 
 /**
@@ -250,7 +259,13 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // Lazy datastore thunk; its `dispose` (registered on the scope below) closes
   // the cached SQLite connection on teardown — checkpointing/truncating the WAL
   // and freeing the handle, which otherwise leaked for the process lifetime.
-  const datastoreThunk = buildDatastoreThunk(project, logger, input.parentCommand);
+  // External workers get a denied thunk (ADR-0145): ambient access fails loud;
+  // privileged effects cross host RPC only.
+  const datastoreAccess = input.datastoreAccess ?? 'local';
+  const datastoreThunk =
+    datastoreAccess === 'host-rpc-only'
+      ? buildDeniedWorkerDatastoreThunk(logger)
+      : buildDatastoreThunk(project, logger, input.parentCommand);
   const scope = new RunScope({
     logger,
     projectContext: project,
@@ -258,10 +273,10 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     tools,
     signalSink,
     runId,
-    // Closure-based lazy datastore. SQLite is materialised only on
-    // first access. The thunk captures `project` so non-action paths
-    // (post-action handlers, error printers) that read via
-    // `getOrOpenDatastore()` find the same instance.
+    // Closure-based lazy datastore (or denied worker thunk). Local mode
+    // materialises SQLite only on first access. The thunk captures `project`
+    // so non-action paths that read via `getOrOpenDatastore()` find the same
+    // instance. Worker mode never opens a local store.
     datastore: datastoreThunk,
     // `graphCatalog` is NOT wired here — the graph tool installs it via its
     // `contributeScope()` hook (ADR-0085), so the host never statically imports

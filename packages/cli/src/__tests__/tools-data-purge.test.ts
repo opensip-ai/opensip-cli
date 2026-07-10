@@ -5,13 +5,15 @@
  * live: purging 'fitness' missed a 'fit' session.
  */
 
-import { TOOL_LONG_TO_SHORT, ToolRegistry, type Tool, type ToolIdentity } from '@opensip-cli/core';
 import {
-  BaselineRepo,
-  DataStoreFactory,
-  DEFAULT_TEST_BASELINE_IDENTITY,
-  ToolStateRepo,
-} from '@opensip-cli/datastore';
+  BASELINE_FORMAT_VERSION,
+  TOOL_LONG_TO_SHORT,
+  ToolRegistry,
+  type BaselineIdentityMetadata,
+  type Tool,
+  type ToolIdentity,
+} from '@opensip-cli/core';
+import { BaselineRepo, DataStoreFactory, ToolStateRepo } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -19,6 +21,13 @@ import { deriveToolDataPurgeIdForms, toolsDataPurge } from '../commands/tools/da
 
 import type { StoredSession } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
+
+/** Local test fixture — not a runtime export. */
+const DEFAULT_TEST_BASELINE_IDENTITY: BaselineIdentityMetadata = {
+  baselineFormatVersion: BASELINE_FORMAT_VERSION,
+  fingerprintStrategyId: 'opensip.default.rule-file-line-col',
+  fingerprintStrategyVersion: 1,
+};
 
 let ds: DataStore;
 

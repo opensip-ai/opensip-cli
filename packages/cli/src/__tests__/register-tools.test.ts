@@ -414,9 +414,28 @@ describe('discoverAndRegisterToolPackages', () => {
 
 const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
-/** Installed npm tools are deny-by-default; tests that expect load opt in via `*`. */
+/**
+ * Exact fixture tool ids staged by this suite. ADR-0145: wildcard `*` no longer
+ * admits installed tools — tests must name the concrete ids they need.
+ */
+const FIXTURE_INSTALLED_IDS = [
+  'fixture-valid',
+  'fixture-dup-a',
+  'fixture-dup-b',
+  'fitness',
+  'fixture-drift',
+  'fixture-host-synth',
+  'fixture-bad',
+  'fixture-no-entry',
+  'fixture-future',
+  'fixture-throws',
+  'fixture-admits-then-throws',
+  'fixture-trust-allowed',
+  'fixture-no-apiv',
+].join(',');
+/** Installed npm tools are deny-by-default; tests that expect load opt in via exact ids. */
 const ALLOW_ALL_INSTALLED: NodeJS.ProcessEnv = {
-  [INSTALLED_TOOL_ALLOWLIST_ENV]: '*',
+  [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_INSTALLED_IDS,
 };
 const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
 const WALK_UP_SOURCES = {
@@ -429,11 +448,14 @@ const WALK_UP_SOURCES = {
  * Tool); the WORKER is the isolation boundary where the runtime import + the
  * runtime-shape checks (drift / malformed export / no-entry / import-throw) run.
  * Tests that assert those import-path skip behaviors therefore exercise the worker
- * path. Trust is still required (deny-by-default), so the allowlist stays `*`.
+ * path. Trust is still required (deny-by-default), so the allowlist names exact ids.
  */
 const WALK_UP_SOURCES_WORKER = {
   sources: WALK_UP_SOURCE_LIST,
-  env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*', OPENSIP_CLI_IN_TOOL_WORKER: '1' },
+  env: {
+    [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_INSTALLED_IDS,
+    OPENSIP_CLI_IN_TOOL_WORKER: '1',
+  },
 };
 
 interface Fixture {

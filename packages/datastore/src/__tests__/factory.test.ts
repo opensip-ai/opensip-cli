@@ -191,18 +191,20 @@ describe('DataStoreMigrationError', () => {
   });
 });
 
-describe('DataStore.transaction', () => {
-  it('passes a tx handle through and returns its return value', () => {
+describe('DrizzleDataStore.transaction (internal handle)', () => {
+  it('passes a tx handle through and returns its return value', async () => {
+    const { requireDrizzleHandle } = await import('../data-store.js');
     const ds = DataStoreFactory.open({ backend: 'memory' });
-    const result = ds.transaction(() => 42);
+    const result = requireDrizzleHandle(ds).transaction(() => 42);
     expect(result).toBe(42);
     ds.close();
   });
 
-  it('rolls back on a thrown error', () => {
+  it('rolls back on a thrown error', async () => {
+    const { requireDrizzleHandle } = await import('../data-store.js');
     const ds = DataStoreFactory.open({ backend: 'memory' });
     expect(() =>
-      ds.transaction(() => {
+      requireDrizzleHandle(ds).transaction(() => {
         throw new Error('boom');
       }),
     ).toThrow('boom');

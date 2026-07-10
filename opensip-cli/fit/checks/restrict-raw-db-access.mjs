@@ -12,18 +12,18 @@
  * adopters per `opensip-cli/fit/checks/README.md`.
  *
  * WHY: ADR-0009 ("public-API surface policy") + the `tables-only-in-persistence`
- * rule in `.config/dependency-cruiser.cjs`: `DataStore.db` (a raw Drizzle handle,
- * `packages/datastore/src/data-store.ts`) is intentionally PUBLIC. The
- * architecture gate confines *table symbols* to their owning persistence
- * layer, so a stray module cannot pair the public `db` handle with a foreign
- * table to bypass that table's repository. But dependency-cruiser
- * structurally CANNOT restrict raw `.db` *property access* itself: the
+ * rule in `.config/dependency-cruiser.cjs`. The public `DataStore` handle
+ * exposes only lifecycle, maintenance, and write-lock coordination — no
+ * `transaction` callback and no raw query escape hatch. Raw Drizzle access
+ * (`db`, `transaction`) lives on internal `DrizzleDataStore` via
+ * `@opensip-cli/datastore/internal`. Dependency-cruiser confines *table
+ * symbols* to their owning persistence layer, but structurally CANNOT
+ * restrict raw `.db` / `.transaction` *property access* itself: the
  * `options.includeOnly: '^packages/'` config drops every node_modules edge
- * before rules run, so a rule targeting the `drizzle-orm` query builder is
- * inert (the same reason `not-to-dev-dep` cannot fire). The residual gap —
- * a future module reaching `<datastore>.db.select(...)` / `.run(sql`...`)` to
- * query tables directly instead of going through an owner repository — has no
- * IMPORT edge to catch. This check closes that gap with a call-shape rule.
+ * before rules run. The residual gap — a future module reaching
+ * `<datastore>.db.select(...)` / `.transaction(...)` to query tables
+ * directly instead of going through an owner repository — has no IMPORT
+ * edge to catch. This check closes that gap with a call-shape rule.
  *
  * DETECTION — regex on `strip-strings-and-comments`-filtered content (NOT AST).
  * Both string literals AND comment bodies are blanked before `analyze` runs, so
@@ -117,6 +117,20 @@ const RAW_DB_ASSIGNMENT = new RegExp(
   'g',
 );
 
+/**
+ * Raw transaction escape via the public handle (no longer on DataStore, but
+ * still a capability leak if called through ambient scope / a local alias).
+ * Matches `scope.datastore().transaction(...)`, `store.transaction((tx) =>`,
+ * and similar — not domain `repository.transaction(work)` without a callback
+ * that looks like a Drizzle tx receiver (heuristic: arg named `tx`/`db` or
+ * zero-arg arrow that is clearly the datastore API).
+ */
+const RAW_TRANSACTION_ESCAPE =
+  /\.(?:datastore\s*\(\s*\)\s*)?\.?\s*transaction\s*\(\s*(?:async\s*)?\(\s*(?:tx|db)\b/;
+
+const SCOPE_DATASTORE_TRANSACTION =
+  /(?:scope|cli\.scope|currentScope\s*\(\s*\))\s*(?:\.\s*datastore\s*\(\s*\)|\?\.\s*datastore\s*\(\s*\))\s*\.\s*transaction\s*\(/;
+
 function escapeRegExp(value) {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
@@ -171,6 +185,21 @@ export function analyzeRawDbAccess(content, filePath) {
       rawDbAliases.add(alias);
     }
     const usesRawDbAlias = [...rawDbAliases].some((alias) => rawDbAliasQuery(alias).test(line));
+    if (SCOPE_DATASTORE_TRANSACTION.test(line) || RAW_TRANSACTION_ESCAPE.test(line)) {
+      violations.push({
+        message:
+          'Raw datastore `transaction(...)` used outside the persistence ' +
+          'boundary. Public `DataStore` no longer lends a transaction callback; ' +
+          'atomic multi-statement work belongs on internal `DrizzleDataStore` ' +
+          'inside owner repositories (ADR-0009, ADR-0107).',
+        severity: 'error',
+        line: i + 1,
+        suggestion:
+          'Route persistence through the owning repository. Do not call ' +
+          '`scope.datastore().transaction(...)` from tool or CLI action code.',
+      });
+      continue;
+    }
     if (RAW_DB_QUERY.test(line) || usesRawDbAlias) {
       violations.push({
         message:
