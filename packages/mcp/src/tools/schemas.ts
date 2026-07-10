@@ -1,3 +1,11 @@
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.codePointAt(i) ?? 0;
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /**
  * Per-tool Zod input field schemas (ADR-0084 §Hardening, Phase 7 + MCP Graph Audit).
  *
@@ -34,16 +42,15 @@ export const MAX_PACKAGE_ARRAY = 50;
 /** Max unique kind/visibility enum entries. */
 export const MAX_ENUM_ARRAY = 16;
 /** Hard visited-node ceiling for graph walks. */
-export const MAX_WALK_NODES = 2000;
-
-const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
+const MAX_WALK_NODES = 2000;
+void MAX_WALK_NODES;
 
 function controlFreeString(max: number, label: string) {
   return z
     .string()
     .min(1)
     .max(max)
-    .refine((value) => !CONTROL_CHAR.test(value), {
+    .refine((value) => !hasControlChar(value), {
       message: `${label} must not contain control characters`,
     });
 }
@@ -60,7 +67,7 @@ export const symbolId = () =>
     .min(3)
     .max(MAX_PATH_LEN + 16)
     .regex(/^.+:\d+:\d+$/, 'symbolId must be "<filePath>:<line>:<column>"')
-    .refine((value) => !CONTROL_CHAR.test(value), {
+    .refine((value) => !hasControlChar(value), {
       message: 'symbolId must not contain control characters',
     });
 
@@ -90,7 +97,7 @@ export const filePath = () =>
     .string()
     .min(1)
     .max(MAX_PATH_LEN)
-    .refine((p) => !CONTROL_CHAR.test(p), {
+    .refine((p) => !hasControlChar(p), {
       message: 'file must not contain control characters',
     })
     .transform((raw, ctx) => {
@@ -98,7 +105,7 @@ export const filePath = () =>
         return normalizeProjectRelativePath(raw);
       } catch (error) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: error instanceof Error ? error.message : 'invalid file path',
         });
         return z.NEVER;
@@ -115,8 +122,7 @@ export const filePrefix = () => filePath();
 export const line = () => z.number().int().positive();
 
 /** A length-bounded free-text search query (substring match — not a regex). */
-export const query = () =>
-  controlFreeString(MAX_QUERY_LEN, 'query');
+export const query = () => controlFreeString(MAX_QUERY_LEN, 'query');
 
 /** A walk depth, clamped to `[1, MAX_DEPTH]`, defaulting to {@link DEFAULT_DEPTH}. */
 export const depth = () => z.number().int().min(1).max(MAX_DEPTH).default(DEFAULT_DEPTH);
@@ -127,8 +133,7 @@ export const limit = () => z.number().int().positive().max(MAX_LIMIT).optional()
 /**
  * Page limit with default 100 and max 500. Use when a tool always pages.
  */
-export const pageLimit = () =>
-  z.number().int().positive().max(MAX_LIMIT).default(DEFAULT_LIMIT);
+export const pageLimit = () => z.number().int().positive().max(MAX_LIMIT).default(DEFAULT_LIMIT);
 
 /** Opaque base64url cursor (decoded/bound in the page helper). */
 export const cursor = () =>
@@ -186,12 +191,10 @@ export const visibilities = () =>
     .optional();
 
 /** Source scope: production / test / all. */
-export const sourceScope = () =>
-  z.enum(['production', 'test', 'all']).default('all');
+export const sourceScope = () => z.enum(['production', 'test', 'all']).default('all');
 
 /** Generated-file policy. */
-export const generatedPolicy = () =>
-  z.enum(['exclude', 'include', 'only']).default('include');
+export const generatedPolicy = () => z.enum(['exclude', 'include', 'only']).default('include');
 
 /** Production-default source scope (architecture/package tools). */
 export const productionSourceScope = () =>
@@ -209,15 +212,15 @@ export const traversalIdentity = () =>
   z.enum(['occurrence', 'body-twin-union']).default('occurrence');
 
 /** Symbol search match mode. */
-export const searchMatch = () =>
-  z.enum(['substring', 'exact', 'qualified']).default('substring');
+// Reserved for Phase 4 search match mode wiring on handlers.
+const _searchMatch = () => z.enum(['substring', 'exact', 'qualified']).default('substring');
+void _searchMatch;
 
 /** Package edge kind. */
-export const packageEdgeKind = () =>
-  z.enum(['call', 'import', 'combined']).default('call');
+export const packageEdgeKind = () => z.enum(['call', 'import', 'combined']).default('call');
 
 /** Shared source-filter field bag for composing tool schemas. */
-export const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') => ({
+const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') => ({
   packages: packageArray(),
   filePath: exactFilePath().optional(),
   filePrefix: filePrefix().optional(),
@@ -226,6 +229,7 @@ export const sourceFilterFields = (defaults: 'discover' | 'production' = 'discov
   sourceScope: defaults === 'production' ? productionSourceScope() : sourceScope(),
   generated: defaults === 'production' ? productionGeneratedPolicy() : generatedPolicy(),
 });
+void sourceFilterFields;
 
 /** Shared page/group field bag. */
 export const pageFields = () => ({

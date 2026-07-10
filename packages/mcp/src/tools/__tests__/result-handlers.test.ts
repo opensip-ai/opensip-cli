@@ -77,14 +77,20 @@ const GRAPH_FRESH = {
 function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])): McpToolDeps {
   return {
     graph: {
-      catalogStatus: async () =>
-        ok({
-          context: {
-            project: { root: '/proj', scope: 'project' as const, configPath: 'opensip-cli.config.yml' },
-            catalog: { status: 'loaded' as const, builtAt: GRAPH_FRESH.builtAt },
-          },
-          freshness: GRAPH_FRESH,
-        }),
+      catalogStatus: () =>
+        Promise.resolve(
+          ok({
+            context: {
+              project: {
+                root: '/proj',
+                scope: 'project' as const,
+                configPath: 'opensip-cli.config.yml',
+              },
+              catalog: { status: 'loaded' as const, builtAt: GRAPH_FRESH.builtAt },
+            },
+            freshness: GRAPH_FRESH,
+          }),
+        ),
     } as unknown as McpToolDeps['graph'],
     results,
     validToolIds,
@@ -368,11 +374,13 @@ describe('review_change handler', () => {
     registerReviewChange(server, {
       ...base,
       graph: {
-        catalogStatus: async () =>
-          err({
-            code: 'GRAPH.READ.CATALOG_GENERATION',
-            message: 'Failed to load graph catalog generation',
-          }),
+        catalogStatus: () =>
+          Promise.resolve(
+            err({
+              code: 'GRAPH.READ.CATALOG_GENERATION',
+              message: 'Failed to load graph catalog generation',
+            }),
+          ),
       } as unknown as McpToolDeps['graph'],
     });
 

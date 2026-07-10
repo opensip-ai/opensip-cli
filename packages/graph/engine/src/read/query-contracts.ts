@@ -1,3 +1,11 @@
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.codePointAt(i) ?? 0;
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /**
  * Feature-specific plain-data contracts for public graph audit reads
  * (MCP Graph Audit Readiness, Phase 0).
@@ -125,10 +133,8 @@ export const GRAPH_SYMBOL_PATH_MAX = 1024;
 export const GRAPH_SYMBOL_NAME_MAX = 512;
 export const GRAPH_SYMBOL_PACKAGE_MAX = 256;
 
-const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
-
 function isControlFreeBounded(value: string, max: number): boolean {
-  return value.length > 0 && value.length <= max && !CONTROL_CHAR.test(value);
+  return value.length > 0 && value.length <= max && !hasControlChar(value);
 }
 
 /**

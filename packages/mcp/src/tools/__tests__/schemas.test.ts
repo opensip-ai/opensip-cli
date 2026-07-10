@@ -177,10 +177,12 @@ describe('packageArray / kinds enums', () => {
 
 describe('shared enums', () => {
   it('defaults sourceScope and groupBy and traversalIdentity', () => {
-    expect(sourceScope().safeParse(undefined).success && sourceScope().safeParse(undefined).data).toBe(
-      'all',
+    expect(
+      sourceScope().safeParse(undefined).success && sourceScope().safeParse(undefined).data,
+    ).toBe('all');
+    expect(groupBy().safeParse(undefined).success && groupBy().safeParse(undefined).data).toBe(
+      'none',
     );
-    expect(groupBy().safeParse(undefined).success && groupBy().safeParse(undefined).data).toBe('none');
     expect(
       traversalIdentity().safeParse(undefined).success &&
         traversalIdentity().safeParse(undefined).data,

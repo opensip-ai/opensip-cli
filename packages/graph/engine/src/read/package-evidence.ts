@@ -4,12 +4,16 @@
 
 import { err, ok, type Result } from '@opensip-cli/core';
 
+import { buildFeatures } from '../pipeline/features.js';
 import { buildOccurrenceCallGraph } from '../pipeline/occurrence-call-graph.js';
 import { stronglyConnectedComponents } from '../pipeline/strongly-connected-components.js';
 import { pkgOf } from '../resolve-callee.js';
-import { buildFeatures } from '../pipeline/features.js';
 
-import { toGraphSymbolRef, type GraphSourceFilter, type PackageEdgeKind } from './query-contracts.js';
+import {
+  toGraphSymbolRef,
+  type GraphSourceFilter,
+  type PackageEdgeKind,
+} from './query-contracts.js';
 import { matchesGraphSourceFilter } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
@@ -62,7 +66,11 @@ export interface PackageEvidenceView {
 
 export interface PackageCycleComponent {
   readonly packages: readonly string[];
-  readonly proofEdges: readonly { readonly from: string; readonly to: string; readonly kind: string }[];
+  readonly proofEdges: readonly {
+    readonly from: string;
+    readonly to: string;
+    readonly kind: string;
+  }[];
   readonly totalProofEdges: number;
 }
 
@@ -78,6 +86,15 @@ export interface PackageSccView {
 const MAX_SPECIFIER = 512;
 const MAX_PROOF = 50;
 
+function stripControls(value: string): string {
+  let out = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.codePointAt(i) ?? 0;
+    if (code > 0x1f && code !== 0x7f) out += value[i];
+  }
+  return out;
+}
+
 function peError(message: string): GraphReadError {
   return { code: 'GRAPH.READ.PACKAGE_EVIDENCE', operation: 'analysis', message };
 }
@@ -86,6 +103,7 @@ function peError(message: string): GraphReadError {
  * Build package call/import evidence.
  * Default production/non-generated call counts reuse FeatureTable.edge.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- single package evidence aggregation over call+import filters
 export function buildPackageEvidence(
   catalog: Catalog,
   indexes: Indexes,
@@ -94,7 +112,7 @@ export function buildPackageEvidence(
   try {
     const reasons: string[] = [];
     let calls: PackageCallEvidenceRow[] = [];
-    let imports: PackageImportEvidenceRow[] = [];
+    const imports: PackageImportEvidenceRow[] = [];
 
     if (query.edgeKind === 'call' || query.edgeKind === 'combined') {
       const useCanonical =
@@ -208,11 +226,11 @@ export function buildPackageEvidence(
           const specifier =
             dep.specifier.length > MAX_SPECIFIER
               ? dep.specifier.slice(0, MAX_SPECIFIER)
-              : dep.specifier.replaceAll(/[\u0000-\u001f\u007f]/g, '');
+              : stripControls(dep.specifier);
           let toPackage: string | null = null;
           let external = dep.to.length === 0;
           if (dep.to.length > 0) {
-            const target = indexes.byBodyHash.get(dep.to[0]!);
+            const target = indexes.byBodyHash.get(dep.to[0]);
             if (target) toPackage = pkgOf(target);
             else external = true;
           }
@@ -249,6 +267,7 @@ export function buildPackageEvidence(
 }
 
 /** Package SCCs over selected edge kind. */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- package SCC projection with proof edges
 export function buildPackageScc(
   catalog: Catalog,
   indexes: Indexes,
@@ -276,7 +295,7 @@ export function buildPackageScc(
     const components = stronglyConnectedComponents(nodes, (v) => [...(adj.get(v) ?? [])]);
     const out: PackageCycleComponent[] = [];
     for (const members of components) {
-      if (members.length < 2 && !(members.length === 1 && adj.get(members[0]!)?.has(members[0]!))) {
+      if (members.length < 2 && !(members.length === 1 && adj.get(members[0])?.has(members[0]))) {
         continue;
       }
       const memberSet = new Set(members);

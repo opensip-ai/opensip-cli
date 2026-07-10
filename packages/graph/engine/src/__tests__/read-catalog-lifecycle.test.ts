@@ -5,8 +5,9 @@ import {
   verifyCatalogInputs,
   type GraphAdapterRegistryReader,
 } from '../read/index.js';
-import type { Catalog } from '../types.js';
+
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
+import type { Catalog } from '../types.js';
 
 function stubAdapter(id: string, files: readonly string[] = []): GraphLanguageAdapter {
   return {

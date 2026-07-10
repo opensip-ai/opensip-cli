@@ -8,15 +8,19 @@ import { err, ok, type Result } from '@opensip-cli/core';
 import { buildOccurrenceCallGraph } from '../pipeline/occurrence-call-graph.js';
 import { occId } from '../resolve-callee.js';
 
-import { toGraphSymbolRef, type CallEdgeEvidence, type GraphSourceFilter } from './query-contracts.js';
+import {
+  toGraphSymbolRef,
+  type CallEdgeEvidence,
+  type GraphSourceFilter,
+} from './query-contracts.js';
 import { matchesGraphSourceFilter } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
-import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 import type {
   OccurrenceCallGraph,
   ResolvedOccurrenceEdge,
 } from '../pipeline/occurrence-call-graph.js';
+import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
 export interface OccurrenceCallViewQuery {
   readonly filter: GraphSourceFilter;
@@ -59,6 +63,7 @@ function viewError(message: string): GraphReadError {
  * Build an occurrence- or twin-filtered call view.
  * Twin mode filters BOTH endpoints before grouping by body hash.
  */
+
 export function buildOccurrenceCallView(
   _catalog: Catalog,
   indexes: Indexes,
@@ -89,9 +94,7 @@ export function buildOccurrenceCallView(
     if (query.identity === 'body-twin-union') {
       return ok(projectTwinView(include, keptEdges, graph, excludedOccurrences, excludedEdges));
     }
-    return ok(
-      projectOccurrenceView(include, keptEdges, graph, excludedOccurrences, excludedEdges),
-    );
+    return ok(projectOccurrenceView(include, keptEdges, graph, excludedOccurrences, excludedEdges));
   } catch {
     return err(viewError('Failed to build occurrence call view'));
   }

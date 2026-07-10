@@ -55,15 +55,9 @@ export type {
   CatalogEngineMode,
 } from './query-contracts.js';
 
-export type {
-  GraphAdapterRegistryReader,
-  VerifyCatalogInputsInput,
-} from './catalog-freshness.js';
+export type { GraphAdapterRegistryReader, VerifyCatalogInputsInput } from './catalog-freshness.js';
 
-export type {
-  OccurrenceCallViewQuery,
-  OccurrenceCallView,
-} from './occurrence-call-view.js';
+export type { OccurrenceCallViewQuery, OccurrenceCallView } from './occurrence-call-view.js';
 
 export type {
   PackageEvidenceQuery,

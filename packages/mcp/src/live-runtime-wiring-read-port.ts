@@ -6,7 +6,6 @@ import {
   buildToolIdentityIndex,
   ok,
   type Result,
-  type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
@@ -41,6 +40,7 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
   }
 
   async query(input: RuntimeWiringQuery): Promise<Result<RuntimeWiringResult, McpReadError>> {
+    await Promise.resolve();
     try {
       const limit = Math.min(500, Math.max(1, Math.trunc(input.limit ?? 100)));
       let nodes = this.snapshot.nodes;
@@ -84,10 +84,15 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
 }
 
 function bound(text: string): string {
-  const cleaned = text.replaceAll(/[\u0000-\u001f\u007f]/g, '');
+  let cleaned = '';
+  for (let i = 0; i < text.length; i++) {
+    const code = text.codePointAt(i) ?? 0;
+    if (code > 0x1f && code !== 0x7f) cleaned += text[i] ?? '';
+  }
   return cleaned.length > MAX_TEXT ? cleaned.slice(0, MAX_TEXT) : cleaned;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- one-pass registry/manifest/command snapshot builder
 function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
   const nodes: RuntimeWiringNode[] = [];
   const edges: RuntimeWiringEdge[] = [];
@@ -97,18 +102,14 @@ function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
   // Canonical identity index — proves alias/layout resolution is reused.
   void buildToolIdentityIndex(deps.tools);
 
-  const tools = deps.tools.list() as readonly Tool[];
+  const tools = deps.tools.list();
   const provById = new Map<string, ToolProvenance>();
   for (const p of deps.provenance) {
     const record = p as unknown as Record<string, unknown>;
-    const id =
-      typeof record['toolId'] === 'string'
-        ? record['toolId']
-        : typeof record['id'] === 'string'
-          ? record['id']
-          : typeof record['stableId'] === 'string'
-            ? record['stableId']
-            : undefined;
+    let id: string | undefined;
+    if (typeof record.toolId === 'string') id = record.toolId;
+    else if (typeof record.id === 'string') id = record.id;
+    else if (typeof record.stableId === 'string') id = record.stableId;
     if (id !== undefined) provById.set(id, p);
   }
 
@@ -119,7 +120,10 @@ function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
       break;
     }
     const m = manifest as unknown as Record<string, unknown>;
-    const mid = bound(String(m['id'] ?? m['name'] ?? 'manifest'));
+    let midRaw = 'manifest';
+    if (typeof m.id === 'string') midRaw = m.id;
+    else if (typeof m.name === 'string') midRaw = m.name;
+    const mid = bound(midRaw);
     nodes.push({
       id: `manifest:${mid}`,
       kind: 'manifest',
@@ -145,19 +149,19 @@ function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
     });
 
     const toolRecord = tool as unknown as Record<string, unknown>;
-    const stable =
-      typeof toolRecord['stableId'] === 'string' ? toolRecord['stableId'] : undefined;
+    const stable = typeof toolRecord.stableId === 'string' ? toolRecord.stableId : undefined;
     const prov =
-      (stable !== undefined ? provById.get(stable) : undefined) ??
+      (stable === undefined ? undefined : provById.get(stable)) ??
       provById.get(toolKey) ??
       provById.get(tool.identity.name);
-    if (prov !== undefined) {
+    if (prov === undefined) {
+      reasons.push('unmatched-provenance');
+    } else {
       const record = prov as unknown as Record<string, unknown>;
-      const source =
-        typeof record['source'] === 'string' ? bound(record['source']) : 'provenance';
+      const source = typeof record.source === 'string' ? bound(record.source) : 'provenance';
       // Whitelist posture only — never resolvedPath or manifestHash.
       const posture =
-        typeof record['workerPosture'] === 'string' ? bound(record['workerPosture']) : undefined;
+        typeof record.workerPosture === 'string' ? bound(record.workerPosture) : undefined;
       edges.push({
         from: `manifest:${source}`,
         to: tid,
@@ -165,8 +169,6 @@ function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
         source: 'provenance',
         confidence: 'high',
       });
-    } else {
-      reasons.push('unmatched-provenance');
     }
 
     for (const spec of tool.commandSpecs ?? []) {
@@ -184,21 +186,23 @@ function buildSnapshot(deps: LiveRuntimeWiringDeps): RuntimeWiringResult {
         tool: bound(toolKey),
         source: 'command-spec',
       });
-      edges.push({
-        from: tid,
-        to: cid,
-        kind: 'registry-command-ownership',
-        source: 'registry',
-        confidence: 'high',
-      });
-      edges.push({
-        from: cid,
-        to: cid,
-        kind: 'host-mount-contract',
-        source: 'host-contract',
-        confidence: 'medium',
-        staticBridge: 'partial',
-      });
+      edges.push(
+        {
+          from: tid,
+          to: cid,
+          kind: 'registry-command-ownership',
+          source: 'registry',
+          confidence: 'high',
+        },
+        {
+          from: cid,
+          to: cid,
+          kind: 'host-mount-contract',
+          source: 'host-contract',
+          confidence: 'medium',
+          staticBridge: 'partial',
+        },
+      );
       // Handler dispatch is logical only — never invoke handlers or toString.
       const hid = `handler:${cid}`;
       nodes.push({

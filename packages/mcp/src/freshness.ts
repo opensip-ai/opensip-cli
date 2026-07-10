@@ -6,8 +6,8 @@
  * {@link Freshness} DTO and supplies the degraded status used by `review_change`.
  */
 
-import type { FreshnessVerification } from '@opensip-cli/graph/read';
 import type { Freshness } from './symbol-dto.js';
+import type { FreshnessVerification } from '@opensip-cli/graph/read';
 
 /** Freshness for an absent catalog — empty data, explicit refresh required. */
 export function missingFreshness(): Freshness {

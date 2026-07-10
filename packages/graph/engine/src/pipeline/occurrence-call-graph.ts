@@ -49,6 +49,7 @@ export interface OccurrenceCallGraph {
  * Build the occurrence-level call graph with one resolveCallee pass.
  * Polymorphic targets remain distinct edge facts; adjacency neighbors are deduped.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- single resolveCallee pass over all occurrences
 export function buildOccurrenceCallGraph(indexes: Indexes): OccurrenceCallGraph {
   const byOccId = new Map<string, FunctionOccurrence>();
   const edges: ResolvedOccurrenceEdge[] = [];

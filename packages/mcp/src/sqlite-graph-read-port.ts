@@ -21,10 +21,7 @@ import {
   type GraphSourceFilter,
 } from '@opensip-cli/graph/read';
 
-import {
-  GraphGenerationController,
-  type CatalogGeneration,
-} from './catalog-generation.js';
+import { GraphGenerationController, type CatalogGeneration } from './catalog-generation.js';
 import { freshnessFromVerification, missingFreshness } from './freshness.js';
 import { clampLimit, edgeCount, toDeadCodeDto, toSymbolRef } from './graph-read-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
@@ -38,7 +35,6 @@ import type {
   CatalogStatus,
   DeadCodeDto,
   DeadCodeQuery,
-  GraphGeneration,
   GraphReadPort,
   PackageCyclesDto,
   PackageCyclesQuery,
@@ -66,6 +62,12 @@ const DEFAULT_SEARCH_LIMIT = 50;
 const DEFAULT_ARCH_LIMIT = 25;
 const DEFAULT_WALK_LIMIT = 100;
 
+function resultDataCount(data: unknown): number {
+  if (Array.isArray(data)) return data.length;
+  if (data === undefined || data === null) return 0;
+  return 1;
+}
+
 export interface SqliteGraphReadPortDeps {
   readonly store: DataStore;
   readonly projectRoot: string;
@@ -74,7 +76,10 @@ export interface SqliteGraphReadPortDeps {
   readonly rebuild: () => Promise<Result<Catalog, McpReadError>>;
   readonly config?: GraphConfig;
   readonly targetConventions?: readonly TargetConventionSummary[];
-  readonly log?: (evt: string, fields: Record<string, string | number | boolean | undefined>) => void;
+  readonly log?: (
+    evt: string,
+    fields: Record<string, string | number | boolean | undefined>,
+  ) => void;
 }
 
 export class SqliteGraphReadPort implements GraphReadPort {
@@ -90,10 +95,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private blastCache:
     | {
         readonly key: string;
-        readonly scores: ReadonlyMap<
-          string,
-          { direct: number; transitive: number; score: number }
-        >;
+        readonly scores: ReadonlyMap<string, { direct: number; transitive: number; score: number }>;
       }
     | undefined;
 
@@ -142,7 +144,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       this.log?.('mcp.graph.query.completed', {
         operation,
         identityMode: 'body-twin-union',
-        resultCount: Array.isArray(result.data) ? result.data.length : result.data === undefined ? 0 : 1,
+        resultCount: resultDataCount(result.data),
         coverageComplete: result.coverage.complete,
         coverageTruncated: result.coverage.truncated,
         outcome: 'ok',
@@ -155,7 +157,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
         outcome: 'failed',
         durationMs: Date.now() - started,
       });
-      return err(readError('graph-query-failed', 'Graph query failed due to an infrastructure error.'));
+      return err(
+        readError('graph-query-failed', 'Graph query failed due to an infrastructure error.'),
+      );
     }
   }
 
@@ -209,15 +213,16 @@ export class SqliteGraphReadPort implements GraphReadPort {
     data: T,
     gen: CatalogGeneration | undefined,
     freshness: Freshness,
-    coverage: GraphCoverage = { complete: true, truncated: false, reasons: [] },
+    coverage?: GraphCoverage,
     page?: { limit: number; nextCursor?: string },
   ): GraphToolResult<T> {
+    const cov = coverage ?? { complete: true, truncated: false, reasons: [] };
     return {
       data,
       context: this.contextFor(gen),
       freshness,
       ...(page === undefined ? {} : { page }),
-      coverage,
+      coverage: cov,
     };
   }
 
@@ -237,11 +242,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
         return this.envelope(undefined, gen, freshness);
       }
       const occ = gen.indexes.byOccId.get(symbolId);
-      return this.envelope(
-        occ === undefined ? undefined : toSymbolRef(occ),
-        gen,
-        freshness,
-      );
+      return this.envelope(occ === undefined ? undefined : toSymbolRef(occ), gen, freshness);
     });
   }
 
@@ -251,11 +252,17 @@ export class SqliteGraphReadPort implements GraphReadPort {
   ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
     return this.runQuery('searchSymbols', (gen, freshness) => {
       if (gen === undefined) {
-        return this.envelope([] as readonly SymbolRef[], gen, freshness, {
-          complete: true,
-          truncated: false,
-          reasons: [],
-        }, { limit: clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT) });
+        return this.envelope(
+          [] as readonly SymbolRef[],
+          gen,
+          freshness,
+          {
+            complete: true,
+            truncated: false,
+            reasons: [],
+          },
+          { limit: clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT) },
+        );
       }
       const limit = clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT);
       const needle = query.toLowerCase();
@@ -308,6 +315,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   async traverse(
     query: TraversalQuery,
   ): Promise<Result<GraphToolResult<TraversalSnapshot>, McpReadError>> {
+    // eslint-disable-next-line sonarjs/cognitive-complexity -- path vs walk projection branches
     return this.runQuery('traverse', (gen, freshness) => {
       const limit = clampLimit(query.limit, DEFAULT_WALK_LIMIT);
       const depth = query.depth ?? 5;
@@ -403,10 +411,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
         );
       }
 
-      const edges =
-        query.direction === 'callers' ? gen.indexes.callers : gen.indexes.callees;
+      const edges = query.direction === 'callers' ? gen.indexes.callers : gen.indexes.callees;
       const walk = boundedBfs(edges, startHash, { depth, cap: 2000 });
-      const nodes: Array<{ symbol: SymbolRef; depth: number }> = [];
+      const nodes: { symbol: SymbolRef; depth: number }[] = [];
       const self = toSymbolRef(startOcc);
       if (self !== undefined) nodes.push({ symbol: self, depth: 0 });
       let pageTruncated = false;
@@ -458,9 +465,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
       if (score === undefined) return this.envelope(undefined, gen, freshness);
       const symbol = toSymbolRef(occ);
       if (symbol === undefined) return this.envelope(undefined, gen, freshness);
-      const twinCount = gen.indexes.byBodyHash.has(occ.bodyHash)
-        ? [...gen.indexes.byOccId.values()].filter((o) => o.bodyHash === occ.bodyHash).length
-        : 1;
+      const twinCount = [...gen.indexes.byOccId.values()].filter(
+        (o) => o.bodyHash === occ.bodyHash,
+      ).length;
       return this.envelope(
         {
           symbol,
@@ -477,7 +484,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private blastScores(
     gen: CatalogGeneration,
   ): ReadonlyMap<string, { direct: number; transitive: number; score: number }> {
-    if (this.blastCache !== undefined && this.blastCache.key === gen.key) {
+    if (this.blastCache?.key === gen.key) {
       return this.blastCache.scores;
     }
     const columns: readonly FeatureColumn[] = ['blast'];
@@ -607,9 +614,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
     return ranked.slice(0, cap);
   }
 
-  private defaultProductionFilter(
-    partial?: Partial<GraphSourceFilter>,
-  ): GraphSourceFilter {
+  private defaultProductionFilter(partial?: Partial<GraphSourceFilter>): GraphSourceFilter {
     return {
       sourceScope: partial?.sourceScope ?? 'production',
       generated: partial?.generated ?? 'exclude',
@@ -630,26 +635,23 @@ export class SqliteGraphReadPort implements GraphReadPort {
         return this.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness);
       }
       const filter = this.defaultProductionFilter(query.filter);
-      const packages =
-        query.package === undefined
-          ? undefined
-          : query.direction === 'in'
-            ? { toPackage: query.package }
-            : query.direction === 'both'
-              ? {}
-              : { fromPackage: query.package };
+      let packages: { fromPackage?: string; toPackage?: string } | undefined;
+      if (query.package !== undefined) {
+        if (query.direction === 'in') packages = { toPackage: query.package };
+        else if (query.direction === 'both') packages = {};
+        else packages = { fromPackage: query.package };
+      }
       const view = buildPackageEvidence(gen.catalog, gen.indexes, {
         edgeKind,
         filter,
         ...packages,
       });
       if (!view.ok) {
-        return this.envelope(
-          { edgeKind, calls: [], imports: [] },
-          gen,
-          freshness,
-          { complete: false, truncated: false, reasons: ['package-evidence-failed'] },
-        );
+        return this.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness, {
+          complete: false,
+          truncated: false,
+          reasons: ['package-evidence-failed'],
+        });
       }
       let calls = view.value.calls;
       let imports = view.value.imports;
@@ -674,7 +676,8 @@ export class SqliteGraphReadPort implements GraphReadPort {
         gen,
         freshness,
         {
-          complete: view.value.coverage.complete && calls.length <= limit && imports.length <= limit,
+          complete:
+            view.value.coverage.complete && calls.length <= limit && imports.length <= limit,
           truncated: calls.length > limit || imports.length > limit,
           reasons: [
             ...view.value.coverage.reasons,
@@ -701,12 +704,11 @@ export class SqliteGraphReadPort implements GraphReadPort {
         toPackage: query.toPackage,
       });
       if (!view.ok) {
-        return this.envelope(
-          { edgeKind, calls: [], imports: [] },
-          gen,
-          freshness,
-          { complete: false, truncated: false, reasons: ['package-evidence-failed'] },
-        );
+        return this.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness, {
+          complete: false,
+          truncated: false,
+          reasons: ['package-evidence-failed'],
+        });
       }
       const limit = clampLimit(query.limit, DEFAULT_ARCH_LIMIT);
       return this.envelope(
@@ -736,12 +738,11 @@ export class SqliteGraphReadPort implements GraphReadPort {
         filter: this.defaultProductionFilter(query.filter),
       });
       if (!view.ok) {
-        return this.envelope(
-          { edgeKind, components: [] },
-          gen,
-          freshness,
-          { complete: false, truncated: false, reasons: ['package-scc-failed'] },
-        );
+        return this.envelope({ edgeKind, components: [] }, gen, freshness, {
+          complete: false,
+          truncated: false,
+          reasons: ['package-scc-failed'],
+        });
       }
       const limit = clampLimit(query.limit, DEFAULT_ARCH_LIMIT);
       return this.envelope(
@@ -771,7 +772,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
         action: 'failed',
         outcome: 'failed',
         durationMs: Date.now() - started,
-        priorGenerationAvailable: outcome.error.details?.['priorGenerationAvailable'] === true,
+        priorGenerationAvailable: outcome.error.details?.priorGenerationAvailable === true,
       });
       return outcome;
     }
@@ -802,4 +803,4 @@ export class SqliteGraphReadPort implements GraphReadPort {
 void toGraphSymbolRef;
 void fromGraphReadError;
 
-export type { GraphGeneration };
+export { type GraphGeneration } from './graph-read-port.js';

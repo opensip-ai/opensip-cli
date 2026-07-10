@@ -2,6 +2,9 @@
  * SqliteGraphReadPort against a real in-memory DataStore (Phase 1 cutover).
  */
 
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { ok } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { CatalogRepo } from '@opensip-cli/graph/internal';
@@ -9,12 +12,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SqliteGraphReadPort } from '../sqlite-graph-read-port.js';
 
+import type { Catalog, FunctionOccurrence, GraphLanguageAdapter } from '@opensip-cli/graph';
 import type { GraphAdapterRegistryReader } from '@opensip-cli/graph/read';
-import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
-import type { GraphLanguageAdapter } from '@opensip-cli/graph';
 
 const BUILT_AT = '2026-05-22T00:00:00.000Z';
-const PROJECT = '/tmp/opensip-mcp-test-project';
+const PROJECT = join(tmpdir(), 'opensip-mcp-test-project');
 
 function fnOcc(
   over: Partial<FunctionOccurrence> & {
@@ -111,7 +113,7 @@ function makePort(store: DataStore): SqliteGraphReadPort {
     store,
     projectRoot: PROJECT,
     adapters: stubAdapters(),
-    rebuild: async () => ok(seededCatalog()),
+    rebuild: () => Promise.resolve(ok(seededCatalog())),
   });
 }
 
@@ -148,7 +150,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(search.value.data.some((s) => s.simpleName === 'caller')).toBe(true);
     expect(search.value.data[0]?.package).toBe('pkg');
 
-    const start = search.value.data[0]!.symbolId;
+    const start = search.value.data[0].symbolId;
     const walk = await port.traverse({
       direction: 'callees',
       startSymbolId: start,

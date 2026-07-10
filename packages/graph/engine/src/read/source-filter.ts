@@ -3,7 +3,6 @@
  */
 
 import type { FunctionOccurrence } from '../types.js';
-
 import type { GraphSourceFilter } from './query-contracts.js';
 
 /**
@@ -13,12 +12,7 @@ import type { GraphSourceFilter } from './query-contracts.js';
 export function matchesGraphSourceFilter(
   row: Pick<
     FunctionOccurrence,
-    | 'filePath'
-    | 'package'
-    | 'kind'
-    | 'visibility'
-    | 'inTestFile'
-    | 'definedInGenerated'
+    'filePath' | 'package' | 'kind' | 'visibility' | 'inTestFile' | 'definedInGenerated'
   >,
   filter: GraphSourceFilter,
 ): boolean {
@@ -30,13 +24,15 @@ export function matchesGraphSourceFilter(
     if (!filter.packages.includes(packageName)) return false;
   }
 
-  if (filter.kinds !== undefined && filter.kinds.length > 0) {
-    if (!filter.kinds.includes(row.kind)) return false;
-  }
+  if (filter.kinds !== undefined && filter.kinds.length > 0 && !filter.kinds.includes(row.kind))
+    return false;
 
-  if (filter.visibilities !== undefined && filter.visibilities.length > 0) {
-    if (!filter.visibilities.includes(row.visibility)) return false;
-  }
+  if (
+    filter.visibilities !== undefined &&
+    filter.visibilities.length > 0 &&
+    !filter.visibilities.includes(row.visibility)
+  )
+    return false;
 
   if (filter.filePath !== undefined && row.filePath !== filter.filePath) {
     return false;

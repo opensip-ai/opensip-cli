@@ -8,9 +8,12 @@ import {
   toGraphSymbolRef,
   type GraphSourceFilter,
 } from '../read/index.js';
+
 import type { FunctionOccurrence } from '../types.js';
 
-function occ(partial: Partial<FunctionOccurrence> & Pick<FunctionOccurrence, 'filePath'>): FunctionOccurrence {
+function occ(
+  partial: Partial<FunctionOccurrence> & Pick<FunctionOccurrence, 'filePath'>,
+): FunctionOccurrence {
   return {
     bodyHash: 'hash',
     simpleName: 'fn',
@@ -50,18 +53,24 @@ describe('matchesGraphSourceFilter', () => {
   it('filters by source scope', () => {
     const production = occ({ filePath: 'src/a.ts', inTestFile: false });
     const test = occ({ filePath: 'src/a.test.ts', inTestFile: true });
-    expect(matchesGraphSourceFilter(production, { ...baseFilter(), sourceScope: 'production' })).toBe(
-      true,
+    expect(
+      matchesGraphSourceFilter(production, { ...baseFilter(), sourceScope: 'production' }),
+    ).toBe(true);
+    expect(matchesGraphSourceFilter(test, { ...baseFilter(), sourceScope: 'production' })).toBe(
+      false,
     );
-    expect(matchesGraphSourceFilter(test, { ...baseFilter(), sourceScope: 'production' })).toBe(false);
     expect(matchesGraphSourceFilter(test, { ...baseFilter(), sourceScope: 'test' })).toBe(true);
-    expect(matchesGraphSourceFilter(production, { ...baseFilter(), sourceScope: 'test' })).toBe(false);
+    expect(matchesGraphSourceFilter(production, { ...baseFilter(), sourceScope: 'test' })).toBe(
+      false,
+    );
   });
 
   it('filters by generated policy', () => {
     const generated = occ({ filePath: 'gen/a.ts', definedInGenerated: true });
     const source = occ({ filePath: 'src/a.ts', definedInGenerated: false });
-    expect(matchesGraphSourceFilter(generated, { ...baseFilter(), generated: 'exclude' })).toBe(false);
+    expect(matchesGraphSourceFilter(generated, { ...baseFilter(), generated: 'exclude' })).toBe(
+      false,
+    );
     expect(matchesGraphSourceFilter(source, { ...baseFilter(), generated: 'exclude' })).toBe(true);
     expect(matchesGraphSourceFilter(generated, { ...baseFilter(), generated: 'only' })).toBe(true);
     expect(matchesGraphSourceFilter(source, { ...baseFilter(), generated: 'only' })).toBe(false);
@@ -84,21 +93,17 @@ describe('matchesGraphSourceFilter', () => {
         filePrefix: 'src/api',
       }),
     ).toBe(true);
-    expect(
-      matchesGraphSourceFilter(row, { ...baseFilter(), packages: ['other'] }),
-    ).toBe(false);
-    expect(
-      matchesGraphSourceFilter(row, { ...baseFilter(), kinds: ['arrow'] }),
-    ).toBe(false);
-    expect(
-      matchesGraphSourceFilter(row, { ...baseFilter(), visibilities: ['private'] }),
-    ).toBe(false);
-    expect(
-      matchesGraphSourceFilter(row, { ...baseFilter(), filePath: 'src/other.ts' }),
-    ).toBe(false);
-    expect(
-      matchesGraphSourceFilter(row, { ...baseFilter(), filePrefix: 'src/api-old' }),
-    ).toBe(false);
+    expect(matchesGraphSourceFilter(row, { ...baseFilter(), packages: ['other'] })).toBe(false);
+    expect(matchesGraphSourceFilter(row, { ...baseFilter(), kinds: ['arrow'] })).toBe(false);
+    expect(matchesGraphSourceFilter(row, { ...baseFilter(), visibilities: ['private'] })).toBe(
+      false,
+    );
+    expect(matchesGraphSourceFilter(row, { ...baseFilter(), filePath: 'src/other.ts' })).toBe(
+      false,
+    );
+    expect(matchesGraphSourceFilter(row, { ...baseFilter(), filePrefix: 'src/api-old' })).toBe(
+      false,
+    );
   });
 
   it('requires both exact path and prefix when both are set', () => {
@@ -147,9 +152,7 @@ describe('toGraphSymbolRef', () => {
     expect(
       toGraphSymbolRef(occ({ filePath: 'x'.repeat(GRAPH_SYMBOL_PATH_MAX + 1) })),
     ).toBeUndefined();
-    expect(
-      toGraphSymbolRef(occ({ filePath: 'src/a.ts', simpleName: 'a\u0000b' })),
-    ).toBeUndefined();
+    expect(toGraphSymbolRef(occ({ filePath: 'src/a.ts', simpleName: 'a\u0000b' }))).toBeUndefined();
     expect(
       toGraphSymbolRef(
         occ({ filePath: 'src/a.ts', qualifiedName: 'n'.repeat(GRAPH_SYMBOL_NAME_MAX + 1) }),

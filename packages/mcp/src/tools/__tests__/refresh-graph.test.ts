@@ -55,7 +55,9 @@ const FRESH: Freshness = {
   verification: 'complete',
 };
 
-function refreshResult(action: RefreshResult['action'] = 'rebuilt'): GraphToolResult<RefreshResult> {
+function refreshResult(
+  action: RefreshResult['action'] = 'rebuilt',
+): GraphToolResult<RefreshResult> {
   return {
     data: {
       generation: { builtAt: FRESH.builtAt!, identity: 'g1:abc', source: 'refresh-rebuild' },
@@ -99,16 +101,16 @@ describe('refresh_graph observability', () => {
     const { server, handlers } = captureServer();
     registerRefreshGraph(
       server,
-      deps(fakeGraph(async () => ok(refreshResult('rebuilt')))),
+      deps(fakeGraph(() => Promise.resolve(ok(refreshResult('rebuilt'))))),
     );
 
     const result = await handlers.get('refresh_graph')!({});
     const body = JSON.parse(
       result.content[0]?.type === 'text' ? result.content[0].text : '{}',
     ) as Record<string, unknown>;
-    expect((body['data'] as { action: string }).action).toBe('rebuilt');
-    expect(body['freshness']).toBeDefined();
-    expect(body['context']).toBeDefined();
+    expect((body.data as { action: string }).action).toBe('rebuilt');
+    expect(body.freshness).toBeDefined();
+    expect(body.context).toBeDefined();
 
     expect(recorded).toHaveLength(1);
     expect(recorded[0]?.name).toBe('opensip_cli.mcp.refresh.duration_ms');
@@ -129,8 +131,8 @@ describe('refresh_graph observability', () => {
     registerRefreshGraph(
       server,
       deps(
-        fakeGraph(async () =>
-          err({ code: 'refresh-unavailable', message: 'not wired' }),
+        fakeGraph(() =>
+          Promise.resolve(err({ code: 'refresh-unavailable', message: 'not wired' })),
         ),
       ),
     );

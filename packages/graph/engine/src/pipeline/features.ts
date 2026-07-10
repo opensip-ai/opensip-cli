@@ -288,10 +288,7 @@ function bfsForward(seeds: ReadonlySet<string>, indexes: Indexes): Set<string> {
  */
 export function computeSccs(indexes: Indexes): SccFeatures[] {
   const graph = buildOccurrenceCallGraph(indexes);
-  const components = stronglyConnectedComponents(
-    graph.nodes,
-    (v) => graph.forward.get(v) ?? [],
-  );
+  const components = stronglyConnectedComponents(graph.nodes, (v) => graph.forward.get(v) ?? []);
   return components.map((members) => toSccFeatures(members, graph.byOccId));
 }
 

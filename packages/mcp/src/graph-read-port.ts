@@ -11,10 +11,10 @@ import type { McpReadError } from './mcp-error.js';
 import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { TargetConventionSummary } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
-import type {
-  GraphSourceFilter,
-  TraversalIdentity,
-} from '@opensip-cli/graph/read';
+import type { GraphSourceFilter, TraversalIdentity } from '@opensip-cli/graph/read';
+
+type GroupByMode = 'none' | 'package' | 'file';
+type PackageEdgeKindParam = 'call' | 'import' | 'combined';
 
 /** Identity of the in-memory catalog generation a read was served from. */
 export interface GraphGeneration {
@@ -63,7 +63,7 @@ export interface TraversalQuery {
   readonly filter?: Partial<GraphSourceFilter>;
   readonly limit?: number;
   readonly cursor?: string;
-  readonly groupBy?: 'none' | 'package' | 'file';
+  readonly groupBy?: GroupByMode;
 }
 
 /** One package-coupling row in the architecture summary. */
@@ -89,21 +89,21 @@ export interface SearchSymbolsOptions {
   readonly cursor?: string;
   readonly match?: 'substring' | 'exact' | 'qualified';
   readonly filter?: Partial<GraphSourceFilter>;
-  readonly groupBy?: 'none' | 'package' | 'file';
+  readonly groupBy?: GroupByMode;
 }
 
 export interface DeadCodeQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly filter?: Partial<GraphSourceFilter>;
-  readonly groupBy?: 'none' | 'package' | 'file';
+  readonly groupBy?: GroupByMode;
 }
 
 export interface ArchitectureQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly filter?: Partial<GraphSourceFilter>;
-  readonly groupBy?: 'none' | 'package' | 'file';
+  readonly groupBy?: GroupByMode;
 }
 
 export interface RefreshResult {
@@ -122,7 +122,9 @@ export interface GraphReadPort {
   /** Project/catalog context + freshness without serving query data. */
   catalogStatus(): Promise<Result<CatalogStatus, McpReadError>>;
   /** Resolve a `file:line:col` symbolId to its {@link SymbolRef}. */
-  resolveSymbolId(symbolId: string): Promise<Result<GraphToolResult<SymbolRef | undefined>, McpReadError>>;
+  resolveSymbolId(
+    symbolId: string,
+  ): Promise<Result<GraphToolResult<SymbolRef | undefined>, McpReadError>>;
   /** Search symbols (Phase 1: simple-name substring; Phase 4 widens). */
   searchSymbols(
     query: string,
@@ -175,39 +177,39 @@ export interface GraphReadPort {
 }
 
 export interface PackageDependenciesQuery {
-  readonly edgeKind?: 'call' | 'import' | 'combined';
+  readonly edgeKind?: PackageEdgeKindParam;
   readonly package?: string;
   readonly direction?: 'out' | 'in' | 'both';
   readonly filter?: Partial<GraphSourceFilter>;
   readonly limit?: number;
   readonly cursor?: string;
-  readonly groupBy?: 'none' | 'package' | 'file';
+  readonly groupBy?: GroupByMode;
 }
 
 export interface WhyDependsQuery {
   readonly fromPackage: string;
   readonly toPackage: string;
-  readonly edgeKind?: 'call' | 'import' | 'combined';
+  readonly edgeKind?: PackageEdgeKindParam;
   readonly filter?: Partial<GraphSourceFilter>;
   readonly limit?: number;
   readonly cursor?: string;
 }
 
 export interface PackageCyclesQuery {
-  readonly edgeKind?: 'call' | 'import' | 'combined';
+  readonly edgeKind?: PackageEdgeKindParam;
   readonly filter?: Partial<GraphSourceFilter>;
   readonly limit?: number;
   readonly cursor?: string;
 }
 
 export interface PackageDependenciesDto {
-  readonly edgeKind: 'call' | 'import' | 'combined';
+  readonly edgeKind: PackageEdgeKindParam;
   readonly calls: readonly unknown[];
   readonly imports: readonly unknown[];
 }
 
 export interface PackageCyclesDto {
-  readonly edgeKind: 'call' | 'import' | 'combined';
+  readonly edgeKind: PackageEdgeKindParam;
   readonly components: readonly {
     readonly packages: readonly string[];
     readonly proofEdges: readonly unknown[];

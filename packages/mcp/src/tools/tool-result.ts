@@ -17,6 +17,7 @@
  */
 
 import { assertJsonPayloadSize } from '../graph-query-page.js';
+
 import type { McpReadError } from '../mcp-error.js';
 import type { CallToolResult } from '../server.js';
 

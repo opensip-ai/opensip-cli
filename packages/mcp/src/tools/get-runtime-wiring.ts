@@ -1,6 +1,7 @@
+import { z } from 'zod';
+
 import { cursor, pageLimit } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
-import { z } from 'zod';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
@@ -10,9 +11,16 @@ const name256 = () =>
     .string()
     .min(1)
     .max(256)
-    .refine((v) => !/[\u0000-\u001f\u007f]/.test(v), {
-      message: 'must not contain control characters',
-    });
+    .refine(
+      (v) => {
+        for (let i = 0; i < v.length; i++) {
+          const c = v.codePointAt(i) ?? 0;
+          if (c <= 0x1f || c === 0x7f) return false;
+        }
+        return true;
+      },
+      { message: 'must not contain control characters' },
+    );
 
 export function registerGetRuntimeWiring(server: McpStdioServer, deps: McpToolDeps): void {
   server.register(

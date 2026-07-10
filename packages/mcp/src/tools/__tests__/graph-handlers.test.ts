@@ -95,13 +95,16 @@ function symRef(over: Partial<SymbolRef> = {}): SymbolRef {
 
 function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
   const base: GraphReadPort = {
-    catalogStatus: async () => ok({ context: CONTEXT, freshness: FRESH }),
-    resolveSymbolId: async (id) =>
-      ok(wrap(id === 'src/a.ts:10:2' ? symRef() : undefined)),
-    searchSymbols: async () => ok(wrap([symRef()] as readonly SymbolRef[])),
-    findBySpan: async () => ok(wrap([symRef()] as readonly SymbolRef[])),
-    traverse: async (query) => {
-      const nodes = [{ symbol: symRef(), depth: 0 }, { symbol: symRef({ symbolId: 'src/b.ts:1:0' }), depth: 1 }];
+    catalogStatus: () => Promise.resolve(ok({ context: CONTEXT, freshness: FRESH })),
+    resolveSymbolId: (id) =>
+      Promise.resolve(ok(wrap(id === 'src/a.ts:10:2' ? symRef() : undefined))),
+    searchSymbols: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    findBySpan: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    traverse: (query) => {
+      const nodes = [
+        { symbol: symRef(), depth: 0 },
+        { symbol: symRef({ symbolId: 'src/b.ts:1:0' }), depth: 1 },
+      ];
       const data: TraversalSnapshot = {
         found: true,
         nodes,
@@ -109,42 +112,51 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
         truncated: false,
         identityMode: 'body-twin-union',
       };
-      return ok(wrap(data));
+      return Promise.resolve(ok(wrap(data)));
     },
-    blast: async () =>
-      ok(
-        wrap({
-          symbol: symRef(),
-          direct: 2,
-          transitive: 4,
-          score: 4,
-          identityMode: 'body-twin-union',
-        } satisfies BlastDto),
+    blast: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            symbol: symRef(),
+            direct: 2,
+            transitive: 4,
+            score: 4,
+            identityMode: 'body-twin-union',
+          } satisfies BlastDto),
+        ),
       ),
-    deadCode: async () =>
-      ok(wrap([{ symbol: symRef(), message: 'orphan' }] as readonly DeadCodeDto[])),
-    architectureSummary: async () =>
-      ok(
-        wrap({
-          functionCount: 1,
-          edgeCount: 1,
-          languages: ['typescript'],
-          packages: [{ name: 'pkg', couplingOut: 1, couplingIn: 0 }],
-          hotspots: [],
-        } satisfies ArchitectureSummaryDto),
+    deadCode: () =>
+      Promise.resolve(
+        ok(wrap([{ symbol: symRef(), message: 'orphan' }] as readonly DeadCodeDto[])),
       ),
-    refresh: async () =>
-      ok(
-        wrap({
-          generation: { builtAt: FRESH.builtAt!, identity: 'g1:abc' },
-          action: 'rebuilt',
-          durationMs: 1,
-          priorGenerationAvailable: false,
-        } satisfies RefreshResult),
+    architectureSummary: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            functionCount: 1,
+            edgeCount: 1,
+            languages: ['typescript'],
+            packages: [{ name: 'pkg', couplingOut: 1, couplingIn: 0 }],
+            hotspots: [],
+          } satisfies ArchitectureSummaryDto),
+        ),
       ),
-    packageDependencies: async () => ok(wrap({ edgeKind: 'call', calls: [], imports: [] })),
-    whyDepends: async () => ok(wrap({ edgeKind: 'combined', calls: [], imports: [] })),
-    packageCycles: async () => ok(wrap({ edgeKind: 'call', components: [] })),
+    refresh: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            generation: { builtAt: FRESH.builtAt!, identity: 'g1:abc' },
+            action: 'rebuilt',
+            durationMs: 1,
+            priorGenerationAvailable: false,
+          } satisfies RefreshResult),
+        ),
+      ),
+    packageDependencies: () =>
+      Promise.resolve(ok(wrap({ edgeKind: 'call', calls: [], imports: [] }))),
+    whyDepends: () => Promise.resolve(ok(wrap({ edgeKind: 'combined', calls: [], imports: [] }))),
+    packageCycles: () => Promise.resolve(ok(wrap({ edgeKind: 'call', components: [] }))),
   };
   return { ...base, ...overrides };
 }
@@ -169,7 +181,7 @@ describe('graph handlers (async GraphToolResult)', () => {
       freshness: FRESH,
       coverage: COVERAGE,
     });
-    expect(Array.isArray(parsed.body['data'])).toBe(true);
+    expect(Array.isArray(parsed.body.data)).toBe(true);
   });
 
   it('get_symbol returns candidates with context', async () => {
@@ -178,7 +190,7 @@ describe('graph handlers (async GraphToolResult)', () => {
     const result = await handlers.get('get_symbol')!({ file: 'src/a.ts', line: 10 });
     const parsed = parseResult(result);
     expect(parsed.isError).toBe(false);
-    expect(parsed.body['context']).toEqual(CONTEXT);
+    expect(parsed.body.context).toEqual(CONTEXT);
   });
 
   it('who_calls and callees_of await traverse', async () => {
@@ -189,8 +201,8 @@ describe('graph handlers (async GraphToolResult)', () => {
       const result = await handlers.get(name)!({ symbolId: 'src/a.ts:10:2', depth: 2 });
       const parsed = parseResult(result);
       expect(parsed.isError).toBe(false);
-      expect(parsed.body['context']).toEqual(CONTEXT);
-      expect(parsed.body['coverage']).toBeDefined();
+      expect(parsed.body.context).toEqual(CONTEXT);
+      expect(parsed.body.coverage).toBeDefined();
       expect(parsed.body).not.toHaveProperty('truncated');
     }
   });
@@ -218,8 +230,8 @@ describe('graph handlers (async GraphToolResult)', () => {
     const result = await handlers.get('blast_radius')!({ symbolId: 'src/a.ts:10:2' });
     const parsed = parseResult(result);
     expect(parsed.isError).toBe(false);
-    const data = parsed.body['data'] as Record<string, unknown>;
-    expect(data['identityMode']).toBe('body-twin-union');
+    const data = parsed.body.data as Record<string, unknown>;
+    expect(data.identityMode).toBe('body-twin-union');
   });
 
   it('find_dead_code and get_architecture await async port', async () => {
@@ -230,20 +242,20 @@ describe('graph handlers (async GraphToolResult)', () => {
     const arch = parseResult(await handlers.get('get_architecture')!({ limit: 10 }));
     expect(dead.isError).toBe(false);
     expect(arch.isError).toBe(false);
-    expect(dead.body['context']).toEqual(CONTEXT);
-    expect(arch.body['context']).toEqual(CONTEXT);
+    expect(dead.body.context).toEqual(CONTEXT);
+    expect(arch.body.context).toEqual(CONTEXT);
   });
 
   it('maps port errors through errorResult', async () => {
     const graph = fakePort({
-      searchSymbols: async (): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> =>
-        err({ code: 'boom', message: 'failed' }),
+      searchSymbols: (): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> =>
+        Promise.resolve(err({ code: 'boom', message: 'failed' })),
     });
     const { handlers, server } = captureServer();
     registerSearchSymbols(server, deps(graph));
     const result = await handlers.get('search_symbols')!({ query: 'x' });
     const parsed = parseResult(result);
     expect(parsed.isError).toBe(true);
-    expect((parsed.body['error'] as { code: string }).code).toBe('boom');
+    expect((parsed.body.error as { code: string }).code).toBe('boom');
   });
 });

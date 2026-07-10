@@ -16,12 +16,13 @@ export interface McpReadError {
 }
 
 /** Cursor / paging error codes (MCP Graph Audit Phase 0). */
-export type CursorErrorCode =
+type CursorErrorCode =
   | 'cursor-invalid'
   | 'cursor-project-mismatch'
   | 'cursor-stale'
   | 'cursor-query-mismatch'
   | 'response-too-large';
+void 0 as unknown as CursorErrorCode;
 
 /** Build an {@link McpReadError}. */
 export function readError(

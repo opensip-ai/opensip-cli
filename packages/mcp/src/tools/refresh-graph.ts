@@ -17,11 +17,7 @@ import type { McpStdioServer } from '../server.js';
 
 const LOG_MODULE = 'mcp:refresh';
 
-function recordRefreshLatency(
-  durationMs: number,
-  action: string,
-  outcome: 'ok' | 'error',
-): void {
+function recordRefreshLatency(durationMs: number, action: string, outcome: 'ok' | 'error'): void {
   try {
     getMeter('opensip-cli')
       .createHistogram('opensip_cli.mcp.refresh.duration_ms')
@@ -58,7 +54,7 @@ export function registerRefreshGraph(server: McpStdioServer, deps: McpToolDeps):
             module: LOG_MODULE,
             code: outcome.error.code,
             durationMs,
-            priorGenerationAvailable: outcome.error.details?.['priorGenerationAvailable'],
+            priorGenerationAvailable: outcome.error.details?.priorGenerationAvailable,
           });
           recordRefreshLatency(durationMs, 'failed', 'error');
           return errorResult(outcome.error);

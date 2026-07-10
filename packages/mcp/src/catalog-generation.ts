@@ -15,15 +15,15 @@ import {
   type CatalogIdentity,
   type FreshnessVerification,
   type Indexes,
+  type GraphAdapterRegistryReader,
 } from '@opensip-cli/graph/read';
 
 import { fromGraphReadError, readError, type McpReadError } from './mcp-error.js';
 
-import type { GraphAdapterRegistryReader } from '@opensip-cli/graph/read';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /** Burst window for reusing a completed freshness verdict (ms). */
-export const FRESHNESS_BURST_MS = 2_000;
+export const FRESHNESS_BURST_MS = 2000;
 
 export type GenerationSource = 'initial-load' | 'persisted-auto-swap' | 'refresh-rebuild';
 
@@ -90,9 +90,14 @@ export interface GenerationControllerDeps {
     projectRoot: string;
     catalog: Catalog;
     adapters: GraphAdapterRegistryReader;
-  }) => Promise<Result<FreshnessVerification, { code: string; message: string; operation?: string }>>;
+  }) => Promise<
+    Result<FreshnessVerification, { code: string; message: string; operation?: string }>
+  >;
   readonly rebuild: () => Promise<Result<Catalog, McpReadError>>;
-  readonly log?: (evt: string, fields: Record<string, string | number | boolean | undefined>) => void;
+  readonly log?: (
+    evt: string,
+    fields: Record<string, string | number | boolean | undefined>,
+  ) => void;
 }
 
 /**
@@ -102,7 +107,11 @@ export class GraphGenerationController {
   private generation: CatalogGeneration | undefined;
   private loadError: McpReadError | undefined;
   private freshnessCache:
-    | { readonly key: string; readonly verifiedAtMs: number; readonly verdict: FreshnessVerification }
+    | {
+        readonly key: string;
+        readonly verifiedAtMs: number;
+        readonly verdict: FreshnessVerification;
+      }
     | undefined;
   private inFlightVerify: Promise<Result<FreshnessVerification, McpReadError>> | undefined;
   private inFlightRefresh: Promise<Result<RefreshOutcome, McpReadError>> | undefined;
@@ -132,45 +141,47 @@ export class GraphGenerationController {
     }
   }
 
-  private async syncPersistedGeneration(): Promise<
-    Result<CatalogGeneration | undefined, McpReadError>
-  > {
+  private syncPersistedGeneration(): Promise<Result<CatalogGeneration | undefined, McpReadError>> {
     const started = Date.now();
     try {
       const hadPrior = this.generation !== undefined;
       const source: GenerationSource = hadPrior ? 'persisted-auto-swap' : 'initial-load';
       const first = this.probeAndMaybeLoad(source);
-      if (!first.ok) return first;
+      if (!first.ok) return Promise.resolve(first);
       // Writer race: re-probe once if identity flipped during load.
       const second = this.probeAndMaybeLoad(
         this.generation === undefined ? 'initial-load' : 'persisted-auto-swap',
       );
-      if (!second.ok) return second;
+      if (!second.ok) return Promise.resolve(second);
       // If still churning, keep prior generation and report error.
       const idNow = this.deps.readIdentity(this.deps.store);
       if (!idNow.ok) {
         this.loadError = mapIdentityError(idNow.error);
-        return err(this.loadError);
+        return Promise.resolve(err(this.loadError));
       }
       if (
-        this.generation !== undefined &&
         idNow.value !== null &&
+        this.generation?.key !== undefined &&
         catalogGenerationKey(idNow.value) !== this.generation.key
       ) {
         this.deps.log?.('mcp.graph.generation.churn', {
           durationMs: Date.now() - started,
           outcome: 'failed',
         });
-        return err(
-          readError(
-            'catalog-churn',
-            'Persisted catalog identity changed repeatedly during load; prior generation retained.',
+        return Promise.resolve(
+          err(
+            readError(
+              'catalog-churn',
+              'Persisted catalog identity changed repeatedly during load; prior generation retained.',
+            ),
           ),
         );
       }
-      return ok(this.generation);
+      return Promise.resolve(ok(this.generation));
     } catch {
-      return err(readError('catalog-sync-failed', 'Failed to synchronize graph catalog generation.'));
+      return Promise.resolve(
+        err(readError('catalog-sync-failed', 'Failed to synchronize graph catalog generation.')),
+      );
     }
   }
 
@@ -195,7 +206,7 @@ export class GraphGenerationController {
       return ok(undefined);
     }
     const key = catalogGenerationKey(identity);
-    if (this.generation !== undefined && this.generation.key === key) {
+    if (this.generation?.key === key) {
       return ok(this.generation);
     }
     const loaded = this.deps.loadCatalog(this.deps.store);
@@ -238,8 +249,7 @@ export class GraphGenerationController {
   ): Promise<Result<FreshnessVerification, McpReadError>> {
     const now = Date.now();
     if (
-      this.freshnessCache !== undefined &&
-      this.freshnessCache.key === gen.key &&
+      this.freshnessCache?.key === gen.key &&
       now - this.freshnessCache.verifiedAtMs < FRESHNESS_BURST_MS
     ) {
       return ok(this.freshnessCache.verdict);
@@ -274,12 +284,9 @@ export class GraphGenerationController {
       verifiedAtMs: Date.now(),
       verdict,
     };
-    const evt =
-      verdict.verification === 'complete'
-        ? 'mcp.graph.freshness.complete'
-        : verdict.verification === 'partial'
-          ? 'mcp.graph.freshness.partial'
-          : 'mcp.graph.freshness.failed';
+    let evt = 'mcp.graph.freshness.failed';
+    if (verdict.verification === 'complete') evt = 'mcp.graph.freshness.complete';
+    else if (verdict.verification === 'partial') evt = 'mcp.graph.freshness.partial';
     this.deps.log?.(evt, {
       reasonCode: verdict.reasonCode,
       durationMs: Date.now() - started,

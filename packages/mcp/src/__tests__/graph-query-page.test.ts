@@ -108,12 +108,16 @@ describe('pageRows', () => {
   ];
 
   it('returns the first page and a nextCursor when more exist', () => {
-    const page = pageRows(rows, {
-      projectKey: PROJECT,
-      generationKey: GEN,
-      queryDigest: QUERY,
-      limit: 2,
-    }, (r) => r.k);
+    const page = pageRows(
+      rows,
+      {
+        projectKey: PROJECT,
+        generationKey: GEN,
+        queryDigest: QUERY,
+        limit: 2,
+      },
+      (r) => r.k,
+    );
     expect(page.ok).toBe(true);
     if (!page.ok) return;
     expect(page.value.rows.map((r) => r.id)).toEqual(['a', 'b']);
@@ -122,21 +126,29 @@ describe('pageRows', () => {
   });
 
   it('continues from afterKey without reordering', () => {
-    const first = pageRows(rows, {
-      projectKey: PROJECT,
-      generationKey: GEN,
-      queryDigest: QUERY,
-      limit: 2,
-    }, (r) => r.k);
+    const first = pageRows(
+      rows,
+      {
+        projectKey: PROJECT,
+        generationKey: GEN,
+        queryDigest: QUERY,
+        limit: 2,
+      },
+      (r) => r.k,
+    );
     expect(first.ok && first.value.nextCursor).toBeTruthy();
     if (!first.ok || first.value.nextCursor === undefined) return;
-    const second = pageRows(rows, {
-      projectKey: PROJECT,
-      generationKey: GEN,
-      queryDigest: QUERY,
-      limit: 2,
-      cursor: first.value.nextCursor,
-    }, (r) => r.k);
+    const second = pageRows(
+      rows,
+      {
+        projectKey: PROJECT,
+        generationKey: GEN,
+        queryDigest: QUERY,
+        limit: 2,
+        cursor: first.value.nextCursor,
+      },
+      (r) => r.k,
+    );
     expect(second.ok).toBe(true);
     if (!second.ok) return;
     expect(second.value.rows.map((r) => r.id)).toEqual(['c', 'd']);

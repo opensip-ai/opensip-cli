@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { catalogGenerationKey, createGeneration } from '../catalog-generation.js';
+
 import type { Catalog } from '@opensip-cli/graph';
 
 const identity = {

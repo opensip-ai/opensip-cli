@@ -13,6 +13,7 @@ interface TarjanFrame {
  * members are sorted; input node order is preserved for discovery order.
  * Stack-safe iterative Tarjan; O(V+E).
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan SCC algorithm
 export function stronglyConnectedComponents(
   nodes: readonly string[],
   neighbors: (v: string) => readonly string[],

@@ -67,11 +67,13 @@ function stableStringify(value: unknown): string {
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+    const parts = value.map((item) => stableStringify(item));
+    return '[' + parts.join(',') + ']';
   }
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record).sort();
-  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+  const parts = keys.map((key) => JSON.stringify(key) + ':' + stableStringify(record[key]));
+  return '{' + parts.join(',') + '}';
 }
 
 /** Encode a cursor as base64url JSON. */
@@ -94,13 +96,13 @@ export function decodeCursor(raw: string): Result<GraphQueryCursor, McpReadError
       return err(readError('cursor-invalid', 'Cursor payload is not an object.'));
     }
     const obj = parsed as Record<string, unknown>;
-    if (obj['v'] !== CURSOR_VERSION) {
+    if (obj.v !== CURSOR_VERSION) {
       return err(readError('cursor-invalid', 'Unsupported cursor version.'));
     }
-    const projectKey = obj['projectKey'];
-    const generationKey = obj['generationKey'];
-    const queryDigest = obj['queryDigest'];
-    const afterKey = obj['afterKey'];
+    const projectKey = obj.projectKey;
+    const generationKey = obj.generationKey;
+    const queryDigest = obj.queryDigest;
+    const afterKey = obj.afterKey;
     if (
       typeof projectKey !== 'string' ||
       typeof generationKey !== 'string' ||
@@ -145,7 +147,9 @@ export function bindCursor(
     return err(readError('cursor-project-mismatch', 'Cursor belongs to a different project.'));
   }
   if (cursor.generationKey !== binding.generationKey) {
-    return err(readError('cursor-stale', 'Cursor generation no longer matches the loaded catalog.'));
+    return err(
+      readError('cursor-stale', 'Cursor generation no longer matches the loaded catalog.'),
+    );
   }
   if (cursor.queryDigest !== binding.queryDigest) {
     return err(readError('cursor-query-mismatch', 'Cursor query no longer matches this request.'));
@@ -223,7 +227,11 @@ export function groupRows<T>(
     const key = keyOf(row, mode);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  const sorted = [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const sorted = [...counts.entries()].sort(([a], [b]) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
   const truncated = sorted.length > MAX_GROUP_KEYS;
   const slice = sorted.slice(0, MAX_GROUP_KEYS);
   return {

@@ -1,3 +1,11 @@
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.codePointAt(i) ?? 0;
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /**
  * Graph-owned complete catalog input verification (MCP Graph Audit Phase 1).
  *
@@ -9,8 +17,8 @@ import { isPathInside, err, ok, type Result } from '@opensip-cli/core';
 
 import { stampEngineVersion, type EngineMode } from '../cache/engine-version.js';
 import { classifyCatalog, computeFilesFingerprint } from '../cache/invalidate.js';
-import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 import { resolveCanonicalFileSet } from '../cli/orchestrate/canonical-file-set.js';
+import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 
 import type {
   FreshnessChangeSummary,
@@ -18,8 +26,8 @@ import type {
   FreshnessVerification,
 } from './query-contracts.js';
 import type { GraphReadError } from './types.js';
-import type { AdapterSelectionEvidence, Catalog, CatalogEngineMode } from '../types.js';
 import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
+import type { AdapterSelectionEvidence, Catalog } from '../types.js';
 
 /** Max adapters accepted in a registry snapshot before reject. */
 const MAX_ADAPTERS = 64;
@@ -31,8 +39,6 @@ const MAX_DISCOVERED_FILES = 1_000_000;
 const MAX_CACHE_KEY_LEN = 1024;
 /** Max change samples. */
 const MAX_CHANGE_SAMPLES = 50;
-
-const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
 
 /** Narrow registry reader used by verification (no ambient scope). */
 export interface GraphAdapterRegistryReader {
@@ -96,22 +102,21 @@ export function isSafeAdapterDescriptor(adapter: GraphLanguageAdapter): boolean 
   if (typeof adapter.id !== 'string' || adapter.id.length === 0 || adapter.id.length > 64) {
     return false;
   }
-  if (CONTROL_CHAR.test(adapter.id)) return false;
-  if (adapter.displayName !== undefined) {
-    if (
-      typeof adapter.displayName !== 'string' ||
+  if (hasControlChar(adapter.id)) return false;
+  if (
+    adapter.displayName !== undefined &&
+    (typeof adapter.displayName !== 'string' ||
       adapter.displayName.length === 0 ||
       adapter.displayName.length > 128 ||
-      CONTROL_CHAR.test(adapter.displayName)
-    ) {
-      return false;
-    }
+      hasControlChar(adapter.displayName))
+  ) {
+    return false;
   }
   if (!Array.isArray(adapter.fileExtensions) || adapter.fileExtensions.length > MAX_EXTENSIONS) {
     return false;
   }
   for (const ext of adapter.fileExtensions) {
-    if (typeof ext !== 'string' || ext.length === 0 || ext.length > 32 || CONTROL_CHAR.test(ext)) {
+    if (typeof ext !== 'string' || ext.length === 0 || ext.length > 32 || hasControlChar(ext)) {
       return false;
     }
   }
@@ -170,7 +175,10 @@ export async function verifyCatalogInputs(
 
     const selected = selectAdapter(input.adapters, selection, input.projectRoot);
     if (!selected.ok) return selected;
-    if (selected.value.id !== selection.selectedId || selected.value.id !== input.catalog.language) {
+    if (
+      selected.value.id !== selection.selectedId ||
+      selected.value.id !== input.catalog.language
+    ) {
       return ok(
         complete(false, 'selection-changed', 'Active adapter selection no longer matches catalog'),
       );
@@ -201,7 +209,7 @@ export async function verifyCatalogInputs(
       typeof rawCacheKey !== 'string' ||
       rawCacheKey.length === 0 ||
       rawCacheKey.length > MAX_CACHE_KEY_LEN ||
-      CONTROL_CHAR.test(rawCacheKey)
+      hasControlChar(rawCacheKey)
     ) {
       return err(
         graphReadError('GRAPH.READ.VERIFY_CACHE_KEY', 'Adapter cacheKey is malformed or oversized'),
@@ -243,7 +251,9 @@ export async function verifyCatalogInputs(
         files,
         verdict.changedFiles,
       );
-      return ok(complete(false, 'files-changed', 'Source files changed since catalog build', changes));
+      return ok(
+        complete(false, 'files-changed', 'Source files changed since catalog build', changes),
+      );
     }
     // invalid
     const reason = verdict.reason;
@@ -290,19 +300,24 @@ function validateDiscovery(
   },
   projectRoot: string,
 ): Result<void, GraphReadError> {
-  if (!isPathInside(discovery.projectDirAbs, projectRoot) && discovery.projectDirAbs !== projectRoot) {
-    // Allow equality even when realpath differs slightly — isPathInside covers
-    // containment; if root itself fails realpath, treat as partial via error.
-    if (!isPathInside(projectRoot, discovery.projectDirAbs)) {
-      return err(
-        graphReadError(
-          'GRAPH.READ.VERIFY_DISCOVERY',
-          'Discovery project root escaped the configured project',
-        ),
-      );
-    }
+  // Allow equality even when realpath differs slightly — isPathInside covers
+  // containment; if root itself fails realpath, treat as partial via error.
+  if (
+    !isPathInside(discovery.projectDirAbs, projectRoot) &&
+    discovery.projectDirAbs !== projectRoot &&
+    !isPathInside(projectRoot, discovery.projectDirAbs)
+  ) {
+    return err(
+      graphReadError(
+        'GRAPH.READ.VERIFY_DISCOVERY',
+        'Discovery project root escaped the configured project',
+      ),
+    );
   }
-  if (discovery.configPathAbs !== undefined && !isPathInside(discovery.configPathAbs, projectRoot)) {
+  if (
+    discovery.configPathAbs !== undefined &&
+    !isPathInside(discovery.configPathAbs, projectRoot)
+  ) {
     return err(
       graphReadError(
         'GRAPH.READ.VERIFY_DISCOVERY',
@@ -311,7 +326,7 @@ function validateDiscovery(
     );
   }
   for (const file of discovery.files) {
-    if (typeof file !== 'string' || file.length === 0 || CONTROL_CHAR.test(file)) {
+    if (typeof file !== 'string' || file.length === 0 || hasControlChar(file)) {
       return err(
         graphReadError('GRAPH.READ.VERIFY_DISCOVERY', 'Discovery returned a malformed file path'),
       );
@@ -347,6 +362,7 @@ function filesFromFingerprint(fingerprint: string): string[] {
   return files;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- added/deleted/modified sample aggregation
 function changeSummaryFromFiles(
   previous: readonly string[],
   current: readonly string[],
@@ -379,4 +395,6 @@ function changeSummaryFromFiles(
 }
 
 // Re-export type for consumers that import from this module path.
-export type { CatalogEngineMode, FreshnessVerification };
+
+export { type FreshnessVerification } from './query-contracts.js';
+export { type CatalogEngineMode } from '../types.js';

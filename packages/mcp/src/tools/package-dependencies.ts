@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   packageArray,
   packageEdgeKind,
@@ -7,7 +9,6 @@ import {
   packageName,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
-import { z } from 'zod';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
