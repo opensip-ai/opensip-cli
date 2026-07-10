@@ -3,7 +3,11 @@
   "version": "0.5.1",
   "license": "Apache-2.0",
   "description": "Pure, zero-dependency human presentation formatters and display projections for OpenSIP CLI surfaces (ADR-0144)",
-  "keywords": ["opensip-cli", "static-analysis", "code-quality"],
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/opensip-ai/opensip-cli.git",
