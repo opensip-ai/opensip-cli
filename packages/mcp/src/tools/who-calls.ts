@@ -1,5 +1,5 @@
 /**
- * `who_calls` — bounded reverse call walk.
+ * `who_calls` — bounded reverse call walk (occurrence-precise by default).
  */
 
 import { registerCallWalkTool } from './call-walk-tool.js';
@@ -13,8 +13,11 @@ export function registerWhoCalls(server: McpStdioServer, deps: McpToolDeps): voi
     title: 'Who calls a symbol',
     description:
       'Find the callers of a symbol (reverse call graph), out to `depth` levels (default 5, ' +
-      'max 5). Pass a symbolId from search_symbols/get_symbol. Phase 1 walks body-twin-union ' +
-      'adjacency; results include project/catalog context and coverage (walk-node-cap).',
+      'max 5; hard walk-node cap 2000). Default identity is occurrence-precise; pass ' +
+      'identity=body-twin-union for endpoint-filtered twin reachability (never the global ' +
+      'body-hash union). Filters (package/filePath/filePrefix/kinds/sourceScope/generated) ' +
+      'apply to both edge endpoints before grouping. page.nextCursor is independent of ' +
+      'coverage.truncated. Pass symbolId from search_symbols/get_symbol.',
     direction: 'callers',
   });
 }

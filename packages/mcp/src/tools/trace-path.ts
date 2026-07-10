@@ -5,7 +5,18 @@
  * freshness share a single immutable generation.
  */
 
-import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
+import {
+  depth as depthSchema,
+  exactFilePath,
+  filePrefix,
+  generatedPolicy,
+  kinds,
+  packageArray,
+  sourceScope,
+  symbolId as symbolIdSchema,
+  traversalIdentity,
+  visibilities,
+} from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -17,35 +28,43 @@ export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): vo
     {
       title: 'Trace a call path',
       description:
-        'Find a forward call path from one symbol to another (fromSymbolId reaches toSymbolId ' +
-        'through calls), within `depth` levels (default 5, max 5). Pass symbolIds from ' +
-        'search_symbols/get_symbol. Returns the ordered path, or { found: false } when none ' +
-        'exists within the bound.',
+        'Find a forward call path from one symbol to another within `depth` (default 5, max 5). ' +
+        'Default identity is occurrence-precise; identity=body-twin-union labels that any twin ' +
+        'in a group may supply a hop. Distinguishes complete no-path from cap-truncated search ' +
+        'via coverage.truncated. Returns ordered path plus hop evidence when available.',
       inputSchema: {
         fromSymbolId: symbolIdSchema(),
         toSymbolId: symbolIdSchema(),
         depth: depthSchema(),
+        identity: traversalIdentity(),
+        packages: packageArray(),
+        filePath: exactFilePath().optional(),
+        filePrefix: filePrefix().optional(),
+        kinds: kinds(),
+        visibilities: visibilities(),
+        sourceScope: sourceScope(),
+        generated: generatedPolicy(),
       },
     },
-    async ({ fromSymbolId, toSymbolId, depth }) => {
+    async (args) => {
       const outcome = await deps.graph.traverse({
         direction: 'path',
-        startSymbolId: fromSymbolId,
-        goalSymbolId: toSymbolId,
-        depth,
-        identity: 'occurrence',
+        startSymbolId: args.fromSymbolId,
+        goalSymbolId: args.toSymbolId,
+        depth: args.depth,
+        identity: args.identity,
+        filter: {
+          packages: args.packages,
+          filePath: args.filePath,
+          filePrefix: args.filePrefix,
+          kinds: args.kinds,
+          visibilities: args.visibilities,
+          sourceScope: args.sourceScope,
+          generated: args.generated,
+        },
       });
       if (!outcome.ok) return errorResult(outcome.error);
-      const { data, context, freshness, coverage } = outcome.value;
-      return jsonResult({
-        data: {
-          found: data.found,
-          path: data.path ?? [],
-        },
-        context,
-        freshness,
-        coverage,
-      });
+      return jsonResult(outcome.value);
     },
   );
 }

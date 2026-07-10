@@ -5,7 +5,20 @@
  * so a single immutable generation is captured for the whole walk.
  */
 
-import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
+import {
+  depth as depthSchema,
+  exactFilePath,
+  filePrefix,
+  generatedPolicy,
+  groupBy,
+  kinds,
+  packageArray,
+  pageFields,
+  sourceScope,
+  symbolId as symbolIdSchema,
+  traversalIdentity,
+  visibilities,
+} from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
@@ -31,35 +44,39 @@ export function registerCallWalkTool(
       inputSchema: {
         symbolId: symbolIdSchema(),
         depth: depthSchema(),
+        identity: traversalIdentity(),
+        packages: packageArray(),
+        filePath: exactFilePath().optional(),
+        filePrefix: filePrefix().optional(),
+        kinds: kinds(),
+        visibilities: visibilities(),
+        sourceScope: sourceScope(),
+        generated: generatedPolicy(),
+        ...pageFields(),
+        groupBy: groupBy(),
       },
     },
-    async ({ symbolId, depth }) => {
+    async (args) => {
       const outcome = await graphPort.traverse({
         direction: spec.direction,
-        startSymbolId: symbolId,
-        depth,
-        identity: 'occurrence',
+        startSymbolId: args.symbolId,
+        depth: args.depth,
+        identity: args.identity,
+        limit: args.limit,
+        cursor: args.cursor,
+        groupBy: args.groupBy,
+        filter: {
+          packages: args.packages,
+          filePath: args.filePath,
+          filePrefix: args.filePrefix,
+          kinds: args.kinds,
+          visibilities: args.visibilities,
+          sourceScope: args.sourceScope,
+          generated: args.generated,
+        },
       });
       if (!outcome.ok) return errorResult(outcome.error);
-      const { data, context, freshness, coverage, page } = outcome.value;
-      if (!data.found && data.nodes.length === 0) {
-        // Distinguish missing start from empty walk: check context + empty nodes.
-        // When catalog loaded but start unknown, nodes is empty and found is false.
-        return jsonResult({
-          data: data.nodes.map((n) => n.symbol),
-          context,
-          freshness,
-          coverage,
-          page,
-        });
-      }
-      return jsonResult({
-        data: data.nodes.map((n) => n.symbol),
-        context,
-        freshness,
-        coverage,
-        page,
-      });
+      return jsonResult(outcome.value);
     },
   );
 }
