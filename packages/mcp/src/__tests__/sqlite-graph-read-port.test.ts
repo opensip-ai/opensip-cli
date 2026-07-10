@@ -187,4 +187,98 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(second.value.context.catalog.identity).not.toBe(firstId);
     expect(second.value.context.catalog.generationSource).toBe('persisted-auto-swap');
   });
+
+  it('search applies kind filter before limit and supports exact/qualified match', async () => {
+    new CatalogRepo(store).replaceAll({
+      ...seededCatalog(),
+      functions: {
+        save: [
+          fnOcc({
+            bodyHash: 'h-save',
+            simpleName: 'save',
+            filePath: 'src/a.ts',
+            kind: 'function-declaration',
+          }),
+        ],
+        saveBaseline: [
+          fnOcc({
+            bodyHash: 'h-sb',
+            simpleName: 'saveBaseline',
+            qualifiedName: 'fit.saveBaseline',
+            filePath: 'src/b.ts',
+            kind: 'method',
+          }),
+        ],
+        Save: [
+          fnOcc({
+            bodyHash: 'h-Save',
+            simpleName: 'Save',
+            filePath: 'src/c.ts',
+            kind: 'function-declaration',
+          }),
+        ],
+      },
+    });
+    const port = makePort(store);
+
+    // With limit=1 and kind=method, post-limit filtering would miss the method.
+    const filtered = await port.searchSymbols('save', {
+      match: 'substring',
+      limit: 1,
+      filter: { kinds: ['method'], sourceScope: 'all', generated: 'include' },
+    });
+    expect(filtered.ok).toBe(true);
+    if (!filtered.ok) return;
+    expect(filtered.value.data).toHaveLength(1);
+    expect(filtered.value.data[0]?.kind).toBe('method');
+    expect(filtered.value.filter?.kinds).toEqual(['method']);
+
+    const exact = await port.searchSymbols('save', {
+      match: 'exact',
+      filter: { sourceScope: 'all', generated: 'include' },
+    });
+    expect(exact.ok && exact.value.data.every((s) => s.simpleName === 'save')).toBe(true);
+
+    const qualified = await port.searchSymbols('fit.saveBaseline', {
+      match: 'qualified',
+      filter: { sourceScope: 'all', generated: 'include' },
+    });
+    expect(qualified.ok && qualified.value.data).toHaveLength(1);
+  });
+
+  it('architecture returns labelled metrics and production defaults', async () => {
+    new CatalogRepo(store).replaceAll(seededCatalog());
+    const port = makePort(store);
+    const arch = await port.architectureSummary({ limit: 10 });
+    expect(arch.ok).toBe(true);
+    if (!arch.ok) return;
+    expect(arch.value.data.occurrenceCount.nodeIdentity).toBe('occurrence');
+    expect(arch.value.data.uniqueBodyCount.nodeIdentity).toBe('body-hash');
+    expect(arch.value.data.callEvidence.edgeKind).toBe('call');
+    expect(arch.value.filter?.sourceScope).toBe('production');
+    expect(arch.value.filter?.generated).toBe('exclude');
+    expect(Array.isArray(arch.value.data.packageEdges)).toBe(true);
+    expect(Array.isArray(arch.value.data.hotspots)).toBe(true);
+  });
+
+  it('deadCode filters before pagination and rejects stale cursors', async () => {
+    new CatalogRepo(store).replaceAll(seededCatalog());
+    const port = makePort(store);
+    const first = await port.deadCode({
+      limit: 1,
+      filter: { sourceScope: 'all', generated: 'include' },
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.value.data.length).toBeLessThanOrEqual(1);
+    if (first.value.page?.nextCursor !== undefined) {
+      const stale = await port.deadCode({
+        limit: 1,
+        cursor: first.value.page.nextCursor,
+        filter: { sourceScope: 'production', generated: 'exclude' },
+      });
+      expect(stale.ok).toBe(false);
+      if (!stale.ok) expect(stale.error.code).toBe('cursor-query-mismatch');
+    }
+  });
 });

@@ -66,26 +66,45 @@ export interface TraversalQuery {
   readonly groupBy?: GroupByMode;
 }
 
-/** One package-coupling row in the architecture summary. */
-export interface ArchitecturePackageDto {
-  readonly name: string;
-  readonly couplingOut: number;
-  readonly couplingIn: number;
+/** Labelled node count from graph architecture view. */
+export interface LabelledCountDto {
+  readonly value: number;
+  readonly nodeIdentity: 'occurrence' | 'body-hash';
+  readonly sourceScope: string;
+  readonly generated: string;
 }
 
-/** A compact architecture overview. */
+/** One package call edge orientation row. */
+export interface ArchitecturePackageEdgeDto {
+  readonly fromPackage: string;
+  readonly toPackage: string;
+  readonly kind: 'call';
+  readonly count: number;
+  readonly countUnit: 'call-sites';
+}
+
+/** A compact, labelled architecture overview. */
 export interface ArchitectureSummaryDto {
-  readonly functionCount: number;
-  readonly edgeCount: number;
   readonly languages: readonly string[];
-  readonly packages: readonly ArchitecturePackageDto[];
+  readonly occurrenceCount: LabelledCountDto;
+  readonly uniqueBodyCount: LabelledCountDto;
+  readonly callEvidence: {
+    readonly resolvedCallSites: number;
+    readonly resolvedTargets: number;
+    readonly unresolvedCallSites: number;
+    readonly confidence: Readonly<Record<string, number>>;
+    readonly resolution: Readonly<Record<string, number>>;
+    readonly edgeKind: 'call';
+    readonly catalogResolutionMode: 'exact' | 'fast' | undefined;
+  };
+  readonly packageCount: number;
+  readonly packageEdges: readonly ArchitecturePackageEdgeDto[];
   readonly hotspots: readonly BlastDto[];
   readonly targetConventions?: readonly TargetConventionSummary[];
 }
 
 export interface SearchSymbolsOptions {
   readonly limit?: number;
-  readonly kind?: string;
   readonly cursor?: string;
   readonly match?: 'substring' | 'exact' | 'qualified';
   readonly filter?: Partial<GraphSourceFilter>;
@@ -149,11 +168,11 @@ export interface GraphReadPort {
   ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>>;
   /** Orphan (dead-code) symbols via public orphan evaluation. */
   deadCode(
-    query?: DeadCodeQuery | number,
+    query?: DeadCodeQuery,
   ): Promise<Result<GraphToolResult<readonly DeadCodeDto[]>, McpReadError>>;
-  /** Package-coupling architecture overview. */
+  /** Labelled architecture overview (production/non-generated default). */
   architectureSummary(
-    query?: ArchitectureQuery | number,
+    query?: ArchitectureQuery,
   ): Promise<Result<GraphToolResult<ArchitectureSummaryDto>, McpReadError>>;
   /**
    * Sole graph mutation: sync/verify and optionally rebuild.

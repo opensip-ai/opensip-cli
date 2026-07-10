@@ -274,8 +274,13 @@ describe('McpStdioServer repo scoping observability', () => {
         module: 'mcp:server',
         server: 'opensip-cli-mcp',
         version: '0.0.0-test',
-        projectRoot: '/repo',
+        projectScope: 'project',
       }),
     );
+    // Absolute project paths must not appear on the shared stderr start event.
+    const startPayload = info.mock.calls.find(
+      (call) => (call[0] as { evt?: string } | undefined)?.evt === 'mcp.server.start',
+    )?.[0] as Record<string, unknown> | undefined;
+    expect(startPayload).not.toHaveProperty('projectRoot');
   });
 });

@@ -37,6 +37,12 @@ const EXPECTED = [
   'buildOccurrenceCallView',
   'buildPackageEvidence',
   'buildPackageScc',
+  'searchSymbolOccurrences',
+  'symbolSearchStableKey',
+  'compareSymbolRefs',
+  'buildArchitectureView',
+  'packageEdgeStableKey',
+  'hotspotStableKey',
 ].sort();
 
 const BUILT_AT = '2026-07-09T00:00:00.000Z';

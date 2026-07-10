@@ -24,6 +24,16 @@ export {
 export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
 export { buildOccurrenceCallView } from './occurrence-call-view.js';
 export { buildPackageEvidence, buildPackageScc } from './package-evidence.js';
+export {
+  searchSymbolOccurrences,
+  symbolSearchStableKey,
+  compareSymbolRefs,
+} from './symbol-search.js';
+export {
+  buildArchitectureView,
+  packageEdgeStableKey,
+  hotspotStableKey,
+} from './architecture-view.js';
 
 export type {
   GraphReadError,
@@ -67,3 +77,14 @@ export type {
   PackageCycleComponent,
   PackageSccView,
 } from './package-evidence.js';
+
+export type { SymbolSearchMatch, SymbolSearchQuery, SymbolSearchView } from './symbol-search.js';
+
+export type {
+  ArchitectureViewQuery,
+  LabelledNodeCount,
+  CallEvidenceMetrics,
+  ArchitecturePackageEdgeRow,
+  ArchitectureHotspot,
+  ArchitectureView,
+} from './architecture-view.js';

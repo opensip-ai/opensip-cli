@@ -212,15 +212,13 @@ export const traversalIdentity = () =>
   z.enum(['occurrence', 'body-twin-union']).default('occurrence');
 
 /** Symbol search match mode. */
-// Reserved for Phase 4 search match mode wiring on handlers.
-const _searchMatch = () => z.enum(['substring', 'exact', 'qualified']).default('substring');
-void _searchMatch;
+export const searchMatch = () => z.enum(['substring', 'exact', 'qualified']).default('substring');
 
 /** Package edge kind. */
 export const packageEdgeKind = () => z.enum(['call', 'import', 'combined']).default('call');
 
 /** Shared source-filter field bag for composing tool schemas. */
-const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') => ({
+export const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') => ({
   packages: packageArray(),
   filePath: exactFilePath().optional(),
   filePrefix: filePrefix().optional(),
@@ -229,7 +227,6 @@ const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') =>
   sourceScope: defaults === 'production' ? productionSourceScope() : sourceScope(),
   generated: defaults === 'production' ? productionGeneratedPolicy() : generatedPolicy(),
 });
-void sourceFilterFields;
 
 /** Shared page/group field bag. */
 export const pageFields = () => ({

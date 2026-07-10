@@ -153,9 +153,11 @@ async function resolveCatalogForIndex(
 /**
  * The pure symbol-entry core: flatten every non-`module-init` occurrence in the
  * catalog into a flat {@link SymbolEntry} list (the keyless counterpart to
- * {@link buildArtifact}). Shared with `@opensip-cli/mcp`'s `search_symbols` so
- * MCP returns the SAME shape as `graph symbol-index` without re-deriving symbol
- * metadata from raw AST (ADR-0084). No CLI side effects — data → data.
+ * {@link buildArtifact}). This is the CLI `graph symbol-index` artifact
+ * projection; MCP audit search uses `@opensip-cli/graph/read`
+ * `searchSymbolOccurrences`, which projects the richer GraphSymbolRef shape
+ * (source/package/test/generated metadata the artifact intentionally omits).
+ * Both consume catalog occurrences. No CLI side effects — data → data.
  */
 export function buildSymbolIndexEntries(catalog: Catalog): SymbolEntry[] {
   const entries: SymbolEntry[] = [];

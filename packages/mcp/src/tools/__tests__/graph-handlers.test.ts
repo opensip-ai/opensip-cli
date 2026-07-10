@@ -134,10 +134,38 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
       Promise.resolve(
         ok(
           wrap({
-            functionCount: 1,
-            edgeCount: 1,
             languages: ['typescript'],
-            packages: [{ name: 'pkg', couplingOut: 1, couplingIn: 0 }],
+            occurrenceCount: {
+              value: 1,
+              nodeIdentity: 'occurrence',
+              sourceScope: 'production',
+              generated: 'exclude',
+            },
+            uniqueBodyCount: {
+              value: 1,
+              nodeIdentity: 'body-hash',
+              sourceScope: 'production',
+              generated: 'exclude',
+            },
+            callEvidence: {
+              resolvedCallSites: 1,
+              resolvedTargets: 1,
+              unresolvedCallSites: 0,
+              confidence: { high: 1 },
+              resolution: { static: 1 },
+              edgeKind: 'call',
+              catalogResolutionMode: 'exact',
+            },
+            packageCount: 1,
+            packageEdges: [
+              {
+                fromPackage: 'pkg',
+                toPackage: 'other',
+                kind: 'call',
+                count: 1,
+                countUnit: 'call-sites',
+              },
+            ],
             hotspots: [],
           } satisfies ArchitectureSummaryDto),
         ),
@@ -244,6 +272,65 @@ describe('graph handlers (async GraphToolResult)', () => {
     expect(arch.isError).toBe(false);
     expect(dead.body.context).toEqual(CONTEXT);
     expect(arch.body.context).toEqual(CONTEXT);
+    const archData = arch.body.data as Record<string, unknown>;
+    expect(archData.occurrenceCount).toBeDefined();
+    expect(archData.uniqueBodyCount).toBeDefined();
+    expect(archData.callEvidence).toBeDefined();
+    expect(archData.packageEdges).toBeDefined();
+  });
+
+  it('get_architecture injects target conventions without changing graph metrics', async () => {
+    const { handlers, server } = captureServer();
+    const graph = fakePort();
+    registerGetArchitecture(server, {
+      ...deps(graph),
+      targetConventions: [
+        {
+          target: 'backend',
+          entrypointCount: 2,
+          alwaysUsedCount: 1,
+          usedExportCount: 0,
+        },
+      ],
+    });
+    const arch = parseResult(await handlers.get('get_architecture')!({}));
+    expect(arch.isError).toBe(false);
+    const data = arch.body.data as { targetConventions?: unknown[]; occurrenceCount?: unknown };
+    expect(data.occurrenceCount).toBeDefined();
+    expect(Array.isArray(data.targetConventions)).toBe(true);
+  });
+
+  it('search_symbols forwards match + filter options without post-limit kind filter', async () => {
+    let captured: unknown;
+    const graph = fakePort({
+      searchSymbols: (q, opts) => {
+        captured = { q, opts };
+        return Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[])));
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerSearchSymbols(server, deps(graph));
+    const result = await handlers.get('search_symbols')!({
+      query: 'saveBaseline',
+      match: 'exact',
+      kinds: ['method'],
+      sourceScope: 'production',
+      generated: 'exclude',
+      limit: 10,
+    });
+    expect(parseResult(result).isError).toBe(false);
+    expect(captured).toMatchObject({
+      q: 'saveBaseline',
+      opts: {
+        match: 'exact',
+        limit: 10,
+        filter: {
+          kinds: ['method'],
+          sourceScope: 'production',
+          generated: 'exclude',
+        },
+      },
+    });
   });
 
   it('maps port errors through errorResult', async () => {

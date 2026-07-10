@@ -8,14 +8,19 @@
 
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
 import {
+  buildArchitectureView,
   buildOccurrenceCallView,
   buildPackageEvidence,
   buildPackageScc,
   deriveGraphReadFeatures,
   evaluateGraphOrphans,
+  hotspotStableKey,
   loadCatalogGeneration,
+  matchesGraphSourceFilter,
+  packageEdgeStableKey,
   readCatalogIdentity,
-  toGraphSymbolRef,
+  searchSymbolOccurrences,
+  symbolSearchStableKey,
   verifyCatalogInputs,
   type GraphAdapterRegistryReader,
   type GraphConfig,
@@ -24,12 +29,19 @@ import {
 
 import { GraphGenerationController, type CatalogGeneration } from './catalog-generation.js';
 import { freshnessFromVerification, missingFreshness } from './freshness.js';
-import { clampLimit, edgeCount, toDeadCodeDto, toSymbolRef } from './graph-read-projection.js';
+import {
+  bindCursor,
+  decodeCursor,
+  digestNormalizedQuery,
+  encodeCursor,
+  groupRows,
+  type GroupSummary,
+} from './graph-query-page.js';
+import { clampLimit, toDeadCodeDto, toSymbolRef } from './graph-read-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
 import { boundedBfs, reconstructPath } from './tools/graph-walk.js';
 
 import type {
-  ArchitecturePackageDto,
   ArchitectureQuery,
   ArchitectureSummaryDto,
   BlastDto,
@@ -59,9 +71,14 @@ import type { TargetConventionSummary } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { Catalog, FeatureColumn } from '@opensip-cli/graph';
 
-const DEFAULT_SEARCH_LIMIT = 50;
+const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
 const DEFAULT_WALK_LIMIT = 100;
+const CURSOR_VERSION = 1 as const;
+const LOG_QUERY_FAILED = 'mcp.graph.query.failed';
+const LOG_QUERY_COMPLETED = 'mcp.graph.query.completed';
+const OUTCOME_FAILED = 'failed';
+const OUTCOME_OK = 'ok';
 
 function resultDataCount(data: unknown): number {
   if (Array.isArray(data)) return data.length;
@@ -148,9 +165,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
     try {
       const captured = await this.controller.capture();
       if (!captured.ok) {
-        this.log?.('mcp.graph.query.failed', {
+        this.log?.(LOG_QUERY_FAILED, {
           operation,
-          outcome: 'failed',
+          outcome: OUTCOME_FAILED,
           durationMs: Date.now() - started,
         });
         return captured;
@@ -158,20 +175,20 @@ export class SqliteGraphReadPort implements GraphReadPort {
       const gen = captured.value;
       const freshness = await this.freshnessFor(gen);
       const result = project(gen, freshness);
-      this.log?.('mcp.graph.query.completed', {
+      this.log?.(LOG_QUERY_COMPLETED, {
         operation,
         identityMode: 'body-twin-union',
         resultCount: resultDataCount(result.data),
         coverageComplete: result.coverage.complete,
         coverageTruncated: result.coverage.truncated,
-        outcome: 'ok',
+        outcome: OUTCOME_OK,
         durationMs: Date.now() - started,
       });
       return ok(result);
     } catch {
-      this.log?.('mcp.graph.query.failed', {
+      this.log?.(LOG_QUERY_FAILED, {
         operation,
-        outcome: 'failed',
+        outcome: OUTCOME_FAILED,
         durationMs: Date.now() - started,
       });
       return err(
@@ -232,6 +249,10 @@ export class SqliteGraphReadPort implements GraphReadPort {
     freshness: Freshness,
     coverage?: GraphCoverage,
     page?: { limit: number; nextCursor?: string },
+    extras?: {
+      filter?: GraphSourceFilter;
+      groups?: readonly GroupSummary[];
+    },
   ): GraphToolResult<T> {
     const cov = coverage ?? { complete: true, truncated: false, reasons: [] };
     return {
@@ -240,6 +261,94 @@ export class SqliteGraphReadPort implements GraphReadPort {
       freshness,
       ...(page === undefined ? {} : { page }),
       coverage: cov,
+      ...(extras?.filter === undefined ? {} : { filter: extras.filter }),
+      ...(extras?.groups === undefined ? {} : { groups: extras.groups }),
+    };
+  }
+
+  private resolveFilter(
+    partial: Partial<GraphSourceFilter> | undefined,
+    defaults: 'discover' | 'production',
+  ): GraphSourceFilter {
+    if (defaults === 'production') return this.defaultProductionFilter(partial);
+    return {
+      sourceScope: partial?.sourceScope ?? 'all',
+      generated: partial?.generated ?? 'include',
+      ...(partial?.packages === undefined ? {} : { packages: partial.packages }),
+      ...(partial?.filePath === undefined ? {} : { filePath: partial.filePath }),
+      ...(partial?.filePrefix === undefined ? {} : { filePrefix: partial.filePrefix }),
+      ...(partial?.kinds === undefined ? {} : { kinds: partial.kinds }),
+      ...(partial?.visibilities === undefined ? {} : { visibilities: partial.visibilities }),
+    };
+  }
+
+  /**
+   * Decode/bind a cursor for the current project/generation/query.
+   * Returns afterKey or a typed cursor error.
+   */
+  private resolveAfterKey(
+    cursor: string | undefined,
+    binding: {
+      projectKey: string;
+      generationKey: string;
+      queryDigest: string;
+    },
+  ): Result<string | undefined, McpReadError> {
+    if (cursor === undefined) return ok(undefined);
+    const decoded = decodeCursor(cursor);
+    if (!decoded.ok) return decoded;
+    const bound = bindCursor(decoded.value, binding);
+    if (!bound.ok) return bound;
+    return ok(bound.value.afterKey);
+  }
+
+  private nextCursorFor(
+    binding: {
+      projectKey: string;
+      generationKey: string;
+      queryDigest: string;
+    },
+    afterKey: string,
+  ): string {
+    return encodeCursor({
+      v: CURSOR_VERSION,
+      projectKey: binding.projectKey,
+      generationKey: binding.generationKey,
+      queryDigest: binding.queryDigest,
+      afterKey,
+    });
+  }
+
+  private emptyArchitecture(filter: GraphSourceFilter): ArchitectureSummaryDto {
+    return {
+      languages: [],
+      occurrenceCount: {
+        value: 0,
+        nodeIdentity: 'occurrence',
+        sourceScope: filter.sourceScope,
+        generated: filter.generated,
+      },
+      uniqueBodyCount: {
+        value: 0,
+        nodeIdentity: 'body-hash',
+        sourceScope: filter.sourceScope,
+        generated: filter.generated,
+      },
+      callEvidence: {
+        resolvedCallSites: 0,
+        resolvedTargets: 0,
+        unresolvedCallSites: 0,
+        confidence: {},
+        resolution: {},
+        edgeKind: 'call',
+        catalogResolutionMode: undefined,
+      },
+      packageCount: 0,
+      packageEdges: [],
+      hotspots: [],
+      ...(this.targetConventions === undefined
+        ? {}
+        : { targetConventions: this.targetConventions }),
     };
   }
 
@@ -267,47 +376,127 @@ export class SqliteGraphReadPort implements GraphReadPort {
     query: string,
     opts?: SearchSymbolsOptions,
   ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
-    return this.runQuery('searchSymbols', (gen, freshness) => {
+    const started = Date.now();
+    const operation = 'searchSymbols';
+    try {
+      const captured = await this.controller.capture();
+      if (!captured.ok) {
+        this.log?.(LOG_QUERY_FAILED, {
+          operation,
+          outcome: OUTCOME_FAILED,
+          durationMs: Date.now() - started,
+        });
+        return captured;
+      }
+      const gen = captured.value;
+      const freshness = await this.freshnessFor(gen);
+      const limit = clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT);
+      const match = opts?.match ?? 'substring';
+      const filter = this.resolveFilter(opts?.filter, 'discover');
+      const groupBy = opts?.groupBy ?? 'none';
+      const normalizedQuery = {
+        op: 'searchSymbols',
+        query,
+        match,
+        filter,
+        groupBy,
+      };
+      const queryDigest = digestNormalizedQuery(normalizedQuery);
+
       if (gen === undefined) {
-        return this.envelope(
+        const result = this.envelope(
           [] as readonly SymbolRef[],
           gen,
           freshness,
-          {
-            complete: true,
-            truncated: false,
-            reasons: [],
-          },
-          { limit: clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT) },
+          { complete: true, truncated: false, reasons: [] },
+          { limit },
+          { filter },
         );
+        this.log?.(LOG_QUERY_COMPLETED, {
+          operation,
+          resultCount: 0,
+          coverageComplete: true,
+          coverageTruncated: false,
+          outcome: OUTCOME_OK,
+          durationMs: Date.now() - started,
+        });
+        return ok(result);
       }
-      const limit = clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT);
-      const needle = query.toLowerCase();
-      const matches: SymbolRef[] = [];
-      let truncated = false;
-      for (const occ of gen.indexes.byOccId.values()) {
-        if (occ.kind === 'module-init') continue;
-        if (opts?.kind !== undefined && occ.kind !== opts.kind) continue;
-        if (!occ.simpleName.toLowerCase().includes(needle)) continue;
-        if (matches.length >= limit) {
-          truncated = true;
-          break;
-        }
-        const ref = toSymbolRef(occ);
-        if (ref !== undefined) matches.push(ref);
+
+      const binding = {
+        projectKey: this.projectKey,
+        generationKey: gen.key,
+        queryDigest,
+      };
+      const after = this.resolveAfterKey(opts?.cursor, binding);
+      if (!after.ok) {
+        this.log?.(LOG_QUERY_FAILED, {
+          operation,
+          outcome: OUTCOME_FAILED,
+          durationMs: Date.now() - started,
+        });
+        return after;
       }
-      return this.envelope(
-        matches,
+
+      const searched = searchSymbolOccurrences(gen.catalog, gen.indexes, {
+        query,
+        match,
+        filter,
+        limit,
+        ...(after.value === undefined ? {} : { afterKey: after.value }),
+      });
+      if (!searched.ok) {
+        return err(fromGraphReadError(searched.error));
+      }
+
+      const symbols = searched.value.symbols;
+      const grouped = groupRows(symbols, groupBy, (row, mode) =>
+        mode === 'package' ? row.package : row.filePath,
+      );
+      const lastSymbol = symbols.at(-1);
+      const nextCursor =
+        searched.value.hasMore && lastSymbol !== undefined
+          ? this.nextCursorFor(binding, symbolSearchStableKey(lastSymbol))
+          : undefined;
+
+      const coverageReasons = [
+        ...searched.value.coverage.reasons,
+        ...(grouped.groupTruncated ? ['group-key-cap'] : []),
+      ];
+      const result = this.envelope(
+        symbols,
         gen,
         freshness,
         {
-          complete: !truncated,
-          truncated,
-          reasons: truncated ? ['search-limit'] : [],
+          complete: coverageReasons.length === 0,
+          truncated: coverageReasons.includes('malformed-symbol-omitted'),
+          reasons: coverageReasons,
         },
-        { limit },
+        { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
+        {
+          filter: searched.value.effectiveFilter,
+          ...(grouped.groups === undefined ? {} : { groups: grouped.groups }),
+        },
       );
-    });
+      this.log?.(LOG_QUERY_COMPLETED, {
+        operation,
+        resultCount: symbols.length,
+        coverageComplete: result.coverage.complete,
+        coverageTruncated: result.coverage.truncated,
+        outcome: OUTCOME_OK,
+        durationMs: Date.now() - started,
+      });
+      return ok(result);
+    } catch {
+      this.log?.(LOG_QUERY_FAILED, {
+        operation,
+        outcome: OUTCOME_FAILED,
+        durationMs: Date.now() - started,
+      });
+      return err(
+        readError('graph-query-failed', 'Graph query failed due to an infrastructure error.'),
+      );
+    }
   }
 
   async findBySpan(
@@ -393,14 +582,11 @@ export class SqliteGraphReadPort implements GraphReadPort {
         );
       }
 
-      const startKey =
-        identity === 'body-twin-union' ? startOcc.bodyHash : query.startSymbolId;
-      const adj =
-        query.direction === 'callers' || query.direction === 'path'
-          ? query.direction === 'callers'
-            ? view.value.reverse
-            : view.value.forward
-          : view.value.forward;
+      const startKey = identity === 'body-twin-union' ? startOcc.bodyHash : query.startSymbolId;
+      let adj = view.value.forward;
+      if (query.direction === 'callers') {
+        adj = view.value.reverse;
+      }
 
       if (query.direction === 'path') {
         if (query.goalSymbolId === undefined) {
@@ -430,16 +616,13 @@ export class SqliteGraphReadPort implements GraphReadPort {
             freshness,
           );
         }
-        const goalKey =
-          identity === 'body-twin-union' ? goalOcc.bodyHash : query.goalSymbolId;
+        const goalKey = identity === 'body-twin-union' ? goalOcc.bodyHash : query.goalSymbolId;
         const walk = boundedBfs(adj, startKey, {
           depth,
           cap: 2000,
           goal: goalKey,
         });
-        const pathKeys = walk.foundGoal
-          ? reconstructPath(walk.parents, startKey, goalKey)
-          : [];
+        const pathKeys = walk.foundGoal ? reconstructPath(walk.parents, startKey, goalKey) : [];
         const path = pathKeys
           .map((key) => resolveWalkNode(gen, view.value.nodes, key, identity))
           .filter((s): s is SymbolRef => s !== undefined);
@@ -552,114 +735,210 @@ export class SqliteGraphReadPort implements GraphReadPort {
   }
 
   async deadCode(
-    query?: DeadCodeQuery | number,
+    query?: DeadCodeQuery,
   ): Promise<Result<GraphToolResult<readonly DeadCodeDto[]>, McpReadError>> {
-    const limit = typeof query === 'number' ? query : query?.limit;
-    return this.runQuery('deadCode', (gen, freshness) => {
+    const started = Date.now();
+    const operation = 'deadCode';
+    try {
+      const captured = await this.controller.capture();
+      if (!captured.ok) {
+        this.log?.(LOG_QUERY_FAILED, {
+          operation,
+          outcome: OUTCOME_FAILED,
+          durationMs: Date.now() - started,
+        });
+        return captured;
+      }
+      const gen = captured.value;
+      const freshness = await this.freshnessFor(gen);
+      const limit = clampLimit(query?.limit, DEFAULT_SEARCH_LIMIT);
+      const filter = this.resolveFilter(query?.filter, 'discover');
+      const groupBy = query?.groupBy ?? 'none';
+      const queryDigest = digestNormalizedQuery({ op: 'deadCode', filter, groupBy });
+
       if (gen === undefined) {
-        return this.envelope([] as readonly DeadCodeDto[], gen, freshness);
+        return ok(
+          this.envelope(
+            [] as readonly DeadCodeDto[],
+            gen,
+            freshness,
+            { complete: true, truncated: false, reasons: [] },
+            { limit },
+            { filter },
+          ),
+        );
       }
-      const columns: readonly FeatureColumn[] = ['reachableFromEntry'];
-      const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
-      const signals = evaluateGraphOrphans(gen.catalog, gen.indexes, this.config, features);
-      const entries: DeadCodeDto[] = [];
-      let truncated = false;
-      for (const signal of signals) {
-        if (limit !== undefined && entries.length >= limit) {
-          truncated = true;
-          break;
-        }
-        const dto = toDeadCodeDto(signal, gen.indexes);
-        if (dto !== undefined) entries.push(dto);
-      }
-      return this.envelope(
-        entries,
+
+      const binding = {
+        projectKey: this.projectKey,
+        generationKey: gen.key,
+        queryDigest,
+      };
+      const after = this.resolveAfterKey(query?.cursor, binding);
+      if (!after.ok) return after;
+
+      const page = pageDeadCode(gen, this.config, filter, limit, after.value);
+      const grouped = groupRows(page.rows, groupBy, (row, mode) =>
+        mode === 'package' ? row.symbol.package : row.symbol.filePath,
+      );
+      const last = page.rows.at(-1);
+      const nextCursor =
+        page.hasMore && last !== undefined
+          ? this.nextCursorFor(binding, symbolSearchStableKey(last.symbol))
+          : undefined;
+
+      const result = this.envelope(
+        page.rows,
         gen,
         freshness,
         {
-          complete: !truncated,
-          truncated,
-          reasons: truncated ? ['page-limit'] : [],
+          complete: true,
+          truncated: false,
+          reasons: grouped.groupTruncated ? ['group-key-cap'] : [],
         },
-        { limit: clampLimit(limit, DEFAULT_SEARCH_LIMIT) },
+        { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
+        {
+          filter,
+          ...(grouped.groups === undefined ? {} : { groups: grouped.groups }),
+        },
       );
-    });
+      this.log?.(LOG_QUERY_COMPLETED, {
+        operation,
+        resultCount: page.rows.length,
+        coverageComplete: true,
+        coverageTruncated: false,
+        outcome: OUTCOME_OK,
+        durationMs: Date.now() - started,
+      });
+      return ok(result);
+    } catch {
+      this.log?.(LOG_QUERY_FAILED, {
+        operation,
+        outcome: OUTCOME_FAILED,
+        durationMs: Date.now() - started,
+      });
+      return err(
+        readError('graph-query-failed', 'Graph query failed due to an infrastructure error.'),
+      );
+    }
   }
 
   async architectureSummary(
-    query?: ArchitectureQuery | number,
+    query?: ArchitectureQuery,
   ): Promise<Result<GraphToolResult<ArchitectureSummaryDto>, McpReadError>> {
-    const limit = typeof query === 'number' ? query : query?.limit;
-    return this.runQuery('architectureSummary', (gen, freshness) => {
+    const started = Date.now();
+    const operation = 'architectureSummary';
+    try {
+      const captured = await this.controller.capture();
+      if (!captured.ok) {
+        this.log?.(LOG_QUERY_FAILED, {
+          operation,
+          outcome: OUTCOME_FAILED,
+          durationMs: Date.now() - started,
+        });
+        return captured;
+      }
+      const gen = captured.value;
+      const freshness = await this.freshnessFor(gen);
+      const limit = clampLimit(query?.limit, DEFAULT_ARCH_LIMIT);
+      const filter = this.resolveFilter(query?.filter, 'production');
+      const groupBy = query?.groupBy ?? 'none';
+      const normalizedQuery = { op: 'architectureSummary', filter, groupBy };
+      const queryDigest = digestNormalizedQuery(normalizedQuery);
+
       if (gen === undefined) {
-        return this.envelope(
-          {
-            functionCount: 0,
-            edgeCount: 0,
-            languages: [],
-            packages: [],
-            hotspots: [],
-            ...(this.targetConventions === undefined
-              ? {}
-              : { targetConventions: this.targetConventions }),
-          },
-          gen,
-          freshness,
+        return ok(
+          this.envelope(
+            this.emptyArchitecture(filter),
+            gen,
+            freshness,
+            { complete: true, truncated: false, reasons: [] },
+            { limit },
+            { filter },
+          ),
         );
       }
-      const columns: readonly FeatureColumn[] = ['packageCoupling'];
-      const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
-      const cap = clampLimit(limit, DEFAULT_ARCH_LIMIT);
-      const rows: ArchitecturePackageDto[] = [];
-      for (const [name, row] of features.package) {
-        rows.push({
-          name,
-          couplingOut: row.couplingOut,
-          couplingIn: row.couplingIn,
-        });
+
+      const binding = {
+        projectKey: this.projectKey,
+        generationKey: gen.key,
+        queryDigest,
+      };
+      const after = this.resolveAfterKey(query?.cursor, binding);
+      if (!after.ok) return after;
+
+      // Cursor afterKey applies to package edges; hotspots use the same page size.
+      const view = buildArchitectureView(gen.catalog, gen.indexes, {
+        filter,
+        limit,
+        ...(after.value === undefined ? {} : { afterPackageEdgeKey: after.value }),
+      });
+      if (!view.ok) {
+        return err(fromGraphReadError(view.error));
       }
-      rows.sort((a, b) => b.couplingOut + b.couplingIn - (a.couplingOut + a.couplingIn));
-      const packages = rows.slice(0, cap);
-      const hotspots = this.topHotspots(gen, cap);
-      return this.envelope(
-        {
-          functionCount: gen.indexes.byBodyHash.size,
-          edgeCount: edgeCount(gen.indexes),
-          languages: [gen.catalog.language],
-          packages,
-          hotspots,
-          ...(this.targetConventions === undefined
-            ? {}
-            : { targetConventions: this.targetConventions }),
-        },
+
+      const packageEdges = view.value.packageEdges;
+      const hotspots: BlastDto[] = view.value.hotspots.map((h) => ({
+        symbol: h.symbol,
+        direct: h.direct,
+        transitive: h.transitive,
+        score: h.score,
+        identityMode: h.identityMode,
+        twinCount: h.twinCount,
+      }));
+
+      const grouped = groupRows(packageEdges, groupBy, (row, mode) =>
+        mode === 'package' ? row.fromPackage : `${row.fromPackage}->${row.toPackage}`,
+      );
+
+      const hasMore = view.value.packageEdgesHasMore || view.value.hotspotsHasMore;
+      const nextCursor = architectureNextCursor(hasMore, packageEdges, hotspots, (afterKey) =>
+        this.nextCursorFor(binding, afterKey),
+      );
+
+      const data: ArchitectureSummaryDto = {
+        languages: view.value.languages,
+        occurrenceCount: view.value.occurrenceCount,
+        uniqueBodyCount: view.value.uniqueBodyCount,
+        callEvidence: view.value.callEvidence,
+        packageCount: view.value.packageCount,
+        packageEdges,
+        hotspots,
+        ...(this.targetConventions === undefined
+          ? {}
+          : { targetConventions: this.targetConventions }),
+      };
+
+      const result = this.envelope(
+        data,
         gen,
         freshness,
+        view.value.coverage,
+        { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
         {
-          complete: packages.length >= rows.length,
-          truncated: packages.length < rows.length,
-          reasons: packages.length < rows.length ? ['page-limit'] : [],
+          filter: view.value.effectiveFilter,
+          ...(grouped.groups === undefined ? {} : { groups: grouped.groups }),
         },
-        { limit: cap },
       );
-    });
-  }
-
-  private topHotspots(gen: CatalogGeneration, cap: number): BlastDto[] {
-    const scores = this.blastScores(gen);
-    const ranked: BlastDto[] = [];
-    for (const [hash, score] of scores) {
-      const occ = gen.indexes.byBodyHash.get(hash);
-      if (occ === undefined) continue;
-      const symbol = toSymbolRef(occ);
-      if (symbol === undefined) continue;
-      ranked.push({
-        symbol,
-        ...score,
-        identityMode: 'body-twin-union',
+      this.log?.(LOG_QUERY_COMPLETED, {
+        operation,
+        resultCount: packageEdges.length + hotspots.length,
+        coverageComplete: result.coverage.complete,
+        coverageTruncated: result.coverage.truncated,
+        outcome: OUTCOME_OK,
+        durationMs: Date.now() - started,
       });
+      return ok(result);
+    } catch {
+      this.log?.(LOG_QUERY_FAILED, {
+        operation,
+        outcome: OUTCOME_FAILED,
+        durationMs: Date.now() - started,
+      });
+      return err(
+        readError('graph-query-failed', 'Graph query failed due to an infrastructure error.'),
+      );
     }
-    ranked.sort((a, b) => b.score - a.score);
-    return ranked.slice(0, cap);
   }
 
   private defaultProductionFilter(partial?: Partial<GraphSourceFilter>): GraphSourceFilter {
@@ -818,7 +1097,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
     if (!outcome.ok) {
       this.log?.('mcp.graph.refresh.failed', {
         action: 'failed',
-        outcome: 'failed',
+        outcome: OUTCOME_FAILED,
         durationMs: Date.now() - started,
         priorGenerationAvailable: outcome.error.details?.priorGenerationAvailable === true,
       });
@@ -839,7 +1118,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
     };
     this.log?.('mcp.graph.refresh.completed', {
       action: outcome.value.action,
-      outcome: 'ok',
+      outcome: OUTCOME_OK,
       durationMs: outcome.value.durationMs,
       priorGenerationAvailable: outcome.value.priorGenerationAvailable,
     });
@@ -847,8 +1126,77 @@ export class SqliteGraphReadPort implements GraphReadPort {
   }
 }
 
-// silence unused import if tree-shaken differently
-void toGraphSymbolRef;
-void fromGraphReadError;
-
 export { type GraphGeneration } from './graph-read-port.js';
+
+/** Filter-first orphan projection, sorted, then limited after `afterKey`. */
+function pageDeadCode(
+  gen: CatalogGeneration,
+  config: GraphConfig,
+  filter: GraphSourceFilter,
+  limit: number,
+  afterKey: string | undefined,
+): { rows: DeadCodeDto[]; hasMore: boolean } {
+  const columns: readonly FeatureColumn[] = ['reachableFromEntry'];
+  const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, config, columns);
+  const signals = evaluateGraphOrphans(gen.catalog, gen.indexes, config, features);
+  const filtered: DeadCodeDto[] = [];
+  for (const signal of signals) {
+    const dto = toDeadCodeDto(signal, gen.indexes);
+    if (dto === undefined) continue;
+    if (!matchesGraphSourceFilter(dto.symbol, filter)) continue;
+    filtered.push(dto);
+  }
+  filtered.sort((a, b) => {
+    const ka = symbolSearchStableKey(a.symbol);
+    const kb = symbolSearchStableKey(b.symbol);
+    if (ka < kb) return -1;
+    if (ka > kb) return 1;
+    return 0;
+  });
+  const rows: DeadCodeDto[] = [];
+  let hasMore = false;
+  for (const row of filtered) {
+    const key = symbolSearchStableKey(row.symbol);
+    if (afterKey !== undefined && key <= afterKey) continue;
+    if (rows.length < limit) {
+      rows.push(row);
+      continue;
+    }
+    hasMore = true;
+    break;
+  }
+  return { rows, hasMore };
+}
+
+function architectureNextCursor(
+  hasMore: boolean,
+  packageEdges: readonly { fromPackage: string; toPackage: string }[],
+  hotspots: readonly BlastDto[],
+  encode: (afterKey: string) => string,
+): string | undefined {
+  if (!hasMore) return undefined;
+  const lastEdge = packageEdges.at(-1);
+  if (lastEdge !== undefined) {
+    return encode(
+      packageEdgeStableKey({
+        fromPackage: lastEdge.fromPackage,
+        toPackage: lastEdge.toPackage,
+        kind: 'call',
+        count: 0,
+        countUnit: 'call-sites',
+      }),
+    );
+  }
+  const lastHotspot = hotspots.at(-1);
+  if (lastHotspot === undefined) return undefined;
+  return encode(
+    hotspotStableKey({
+      symbol: lastHotspot.symbol,
+      direct: lastHotspot.direct,
+      transitive: lastHotspot.transitive,
+      score: lastHotspot.score,
+      identityMode: 'body-twin-union',
+      twinCount: lastHotspot.twinCount ?? 1,
+    }),
+  );
+}

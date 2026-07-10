@@ -1,8 +1,15 @@
 /**
- * `get_architecture` — compact codebase overview.
+ * `get_architecture` — labelled, bounded codebase orientation overview.
  */
 
-import { limit as limitSchema } from './schemas.js';
+import {
+  exactFilePath,
+  filePrefix,
+  packageArray,
+  pageFields,
+  productionGeneratedPolicy,
+  productionSourceScope,
+} from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -14,19 +21,37 @@ export function registerGetArchitecture(server: McpStdioServer, deps: McpToolDep
     {
       title: 'Architecture overview',
       description:
-        'High-level shape of the codebase: function/edge counts, languages, the most-coupled ' +
-        'packages, the highest blast-radius hotspots, and bounded target convention counts when ' +
-        'configured. A cheap first call to orient before drilling in with who_calls/blast_radius. ' +
-        'Use `limit` to cap rows.',
+        'Labelled orientation view: occurrence vs unique-body counts, resolved/unresolved call ' +
+        'evidence with confidence/resolution distributions, top package call edges, blast ' +
+        'hotspots (filtered before ranking), and bounded target convention counts when configured. ' +
+        'Defaults to production/non-generated evidence. Use package_dependencies / package_cycles ' +
+        'for exhaustive package evidence. Cursor continues package-edge pages.',
       inputSchema: {
-        limit: limitSchema(),
+        packages: packageArray(),
+        filePath: exactFilePath().optional(),
+        filePrefix: filePrefix().optional(),
+        sourceScope: productionSourceScope(),
+        generated: productionGeneratedPolicy(),
+        ...pageFields(),
       },
     },
-    async ({ limit }) => {
-      const outcome = await deps.graph.architectureSummary(limit);
+    async (args) => {
+      const outcome = await deps.graph.architectureSummary({
+        limit: args.limit,
+        cursor: args.cursor,
+        groupBy: args.groupBy,
+        filter: {
+          packages: args.packages,
+          filePath: args.filePath,
+          filePrefix: args.filePrefix,
+          sourceScope: args.sourceScope,
+          generated: args.generated,
+        },
+      });
       if (!outcome.ok) return errorResult(outcome.error);
       const targetConventions = deps.targetConventions ?? [];
       if (targetConventions.length === 0) return jsonResult(outcome.value);
+      // Host/config projection only — does not change graph metric labels.
       return jsonResult({
         ...outcome.value,
         data: {

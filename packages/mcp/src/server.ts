@@ -122,10 +122,17 @@ export class McpStdioServer {
     run: () => CallToolResult | Promise<CallToolResult>,
   ): Promise<CallToolResult> {
     return runWithScope(this.scope, async () => {
+      const started = Date.now();
       logger.info({ evt: 'mcp.tool.dispatch', module: LOG_MODULE, tool: name });
       try {
         const result = await run();
-        logger.info({ evt: 'mcp.tool.dispatch.ok', module: LOG_MODULE, tool: name });
+        logger.info({
+          evt: 'mcp.tool.dispatch.ok',
+          module: LOG_MODULE,
+          tool: name,
+          outcome: result.isError === true ? 'tool-error' : 'ok',
+          durationMs: Date.now() - started,
+        });
         return result;
       } catch (error) {
         // The SDK converts a thrown handler into a JSON-RPC error frame; we log
@@ -134,6 +141,8 @@ export class McpStdioServer {
           evt: 'mcp.tool.dispatch.error',
           module: LOG_MODULE,
           tool: name,
+          outcome: 'failed',
+          durationMs: Date.now() - started,
           error: formatUnknownErrorMessage(error),
         });
         throw error;
@@ -157,7 +166,8 @@ export class McpStdioServer {
       module: LOG_MODULE,
       server: SERVER_NAME,
       version: this.version,
-      projectRoot: this.scope.projectContext?.projectRoot ?? process.cwd(),
+      // Never log absolute project paths on the shared stderr sink.
+      projectScope: 'project',
     });
 
     const closed = new Promise<void>((resolve) => {

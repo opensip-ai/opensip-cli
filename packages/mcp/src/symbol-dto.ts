@@ -7,6 +7,7 @@
  */
 
 import type {
+  EffectiveGraphSourceFilter,
   FreshnessChangeSummary,
   FreshnessReasonCode,
   GraphSymbolRef,
@@ -63,6 +64,12 @@ export interface GraphCoverage {
   readonly reasons: readonly string[];
 }
 
+/** Group summary from bounded `groupBy` projection. */
+export interface GraphGroupSummary {
+  readonly key: string;
+  readonly count: number;
+}
+
 /**
  * Shared graph-read envelope. `page.nextCursor` and `coverage.truncated` are
  * independent — never conflate pagination with incomplete evidence.
@@ -73,4 +80,8 @@ export interface GraphToolResult<T> {
   readonly freshness: Freshness;
   readonly page?: GraphPageMeta;
   readonly coverage: GraphCoverage;
+  /** Effective source filter applied before projection (when applicable). */
+  readonly filter?: EffectiveGraphSourceFilter;
+  /** Optional bounded group summaries for the current page. */
+  readonly groups?: readonly GraphGroupSummary[];
 }
