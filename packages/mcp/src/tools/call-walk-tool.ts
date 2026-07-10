@@ -38,7 +38,7 @@ export function registerCallWalkTool(
         direction: spec.direction,
         startSymbolId: symbolId,
         depth,
-        identity: 'body-twin-union',
+        identity: 'occurrence',
       });
       if (!outcome.ok) return errorResult(outcome.error);
       const { data, context, freshness, coverage, page } = outcome.value;

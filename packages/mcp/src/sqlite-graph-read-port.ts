@@ -319,7 +319,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
     return this.runQuery('traverse', (gen, freshness) => {
       const limit = clampLimit(query.limit, DEFAULT_WALK_LIMIT);
       const depth = query.depth ?? 5;
-      const identity = query.identity ?? 'body-twin-union';
+      const identity = query.identity ?? 'occurrence';
       if (gen === undefined) {
         return this.envelope(
           {
