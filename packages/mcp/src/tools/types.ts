@@ -11,6 +11,7 @@
 import type { GraphReadPort } from '../graph-read-port.js';
 import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
+import type { RuntimeWiringReadPort } from '../runtime-wiring-read-port.js';
 import type { TargetConventionSummary } from '@opensip-cli/contracts';
 
 export interface McpToolDeps {
@@ -18,6 +19,8 @@ export interface McpToolDeps {
   readonly graph: GraphReadPort;
   /** Pre-built results/history read port (result tools). */
   readonly results: ResultsReadPort;
+  /** Live declarative tool/manifest/CommandSpec wiring (not static graph). */
+  readonly runtimeWiring?: RuntimeWiringReadPort;
   /** The live registered tool ids — `get_latest_findings`/`show_run` validate `tool` against these. */
   readonly validToolIds: ReadonlySet<string>;
   /** Bounded target convention summaries captured from the served project scope. */

@@ -22,6 +22,8 @@ export {
   GRAPH_SYMBOL_PACKAGE_MAX,
 } from './query-contracts.js';
 export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
+export { buildOccurrenceCallView } from './occurrence-call-view.js';
+export { buildPackageEvidence, buildPackageScc } from './package-evidence.js';
 
 export type {
   GraphReadError,
@@ -57,3 +59,17 @@ export type {
   GraphAdapterRegistryReader,
   VerifyCatalogInputsInput,
 } from './catalog-freshness.js';
+
+export type {
+  OccurrenceCallViewQuery,
+  OccurrenceCallView,
+} from './occurrence-call-view.js';
+
+export type {
+  PackageEvidenceQuery,
+  PackageCallEvidenceRow,
+  PackageImportEvidenceRow,
+  PackageEvidenceView,
+  PackageCycleComponent,
+  PackageSccView,
+} from './package-evidence.js';

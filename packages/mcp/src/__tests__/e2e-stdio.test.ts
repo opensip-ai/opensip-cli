@@ -228,11 +228,11 @@ afterAll(() => {
 });
 
 describe('MCP e2e over real stdio', () => {
-  it('handshakes and lists all 15 tools', async () => {
+  it('handshakes and lists all 19 tools', async () => {
     const conn = await connect(fixtureA);
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(15);
+      expect(tools.tools).toHaveLength(19);
       const names = tools.tools.map((t) => t.name).sort();
       expect(names).toContain('get_symbol');
       expect(names).toContain('who_calls');
@@ -240,6 +240,10 @@ describe('MCP e2e over real stdio', () => {
       expect(names).toContain('review_change');
       expect(names).toContain('compare_to_baseline');
       expect(names).toContain('refresh_graph');
+      expect(names).toContain('package_dependencies');
+      expect(names).toContain('why_depends');
+      expect(names).toContain('package_cycles');
+      expect(names).toContain('get_runtime_wiring');
     } finally {
       await conn.client.close();
     }
@@ -249,7 +253,7 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(fixtureA, { allowMutations: true });
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(16);
+      expect(tools.tools).toHaveLength(20);
       expect(tools.tools.map((t) => t.name)).toContain('repair_apply_verify');
     } finally {
       await conn.client.close();

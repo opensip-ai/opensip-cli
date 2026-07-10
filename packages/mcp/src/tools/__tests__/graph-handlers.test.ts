@@ -142,6 +142,9 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
           priorGenerationAvailable: false,
         } satisfies RefreshResult),
       ),
+    packageDependencies: async () => ok(wrap({ edgeKind: 'call', calls: [], imports: [] })),
+    whyDepends: async () => ok(wrap({ edgeKind: 'combined', calls: [], imports: [] })),
+    packageCycles: async () => ok(wrap({ edgeKind: 'call', components: [] })),
   };
   return { ...base, ...overrides };
 }

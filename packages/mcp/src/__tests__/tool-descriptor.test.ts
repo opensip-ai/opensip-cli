@@ -3,7 +3,7 @@
  *
  * Asserts the bundled tool descriptor (`mcp` identity, the single `mcp` command,
  * the `mcp-graph-adapter` capability registrar) and that `registerMcpTools`
- * mounts all 15 tools (9 graph + 6 result/review) through the server's register seam.
+ * mounts all 19 tools (13 graph/package/wiring + 6 result/review) through the server's register seam.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -30,7 +30,7 @@ describe('mcpTool descriptor', () => {
 });
 
 describe('registerMcpTools', () => {
-  it('mounts all 15 MCP tools (9 graph + 6 result/review) on the server', () => {
+  it('mounts all 19 MCP tools (13 graph/package/wiring + 6 result/review) on the server', () => {
     const names: string[] = [];
     const server = {
       register: (name: string) => {
@@ -46,7 +46,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(15);
+    expect(names).toHaveLength(19);
     expect(new Set(names)).toEqual(
       new Set([
         'search_symbols',
@@ -57,7 +57,11 @@ describe('registerMcpTools', () => {
         'blast_radius',
         'find_dead_code',
         'get_architecture',
+        'package_dependencies',
+        'why_depends',
+        'package_cycles',
         'refresh_graph',
+        'get_runtime_wiring',
         'get_agent_catalog',
         'list_runs',
         'show_run',
@@ -86,7 +90,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(16);
+    expect(names).toHaveLength(20);
     expect(names).toContain('repair_apply_verify');
   });
 

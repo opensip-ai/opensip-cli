@@ -19,6 +19,7 @@ import {
 } from '@opensip-cli/core';
 import { rebuildCatalog } from '@opensip-cli/graph/read';
 
+import { LiveRuntimeWiringReadPort } from './live-runtime-wiring-read-port.js';
 import { fromGraphReadError } from './mcp-error.js';
 import { CliRepairWritePort } from './repair-write-port.js';
 import { McpStdioServer } from './server.js';
@@ -112,6 +113,12 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
       },
     });
     const results = new SessionResultsReadPort({ store, projectRoot, tools: scope.tools });
+    const runtimeWiring = new LiveRuntimeWiringReadPort({
+      projectRoot,
+      tools: scope.tools,
+      manifests: scope.toolManifests,
+      provenance: scope.toolProvenance,
+    });
     const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
     const repairWrite = mutationEnabled
       ? new CliRepairWritePort({
@@ -133,6 +140,7 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     void registerMcpTools(server, {
       graph,
       results,
+      runtimeWiring,
       validToolIds,
       targetConventions,
       ...(repairWrite === undefined ? {} : { repairWrite }),

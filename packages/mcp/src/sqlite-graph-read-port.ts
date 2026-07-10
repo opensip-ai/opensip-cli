@@ -8,6 +8,8 @@
 
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
 import {
+  buildPackageEvidence,
+  buildPackageScc,
   deriveGraphReadFeatures,
   evaluateGraphOrphans,
   loadCatalogGeneration,
@@ -16,6 +18,7 @@ import {
   verifyCatalogInputs,
   type GraphAdapterRegistryReader,
   type GraphConfig,
+  type GraphSourceFilter,
 } from '@opensip-cli/graph/read';
 
 import {
@@ -37,10 +40,15 @@ import type {
   DeadCodeQuery,
   GraphGeneration,
   GraphReadPort,
+  PackageCyclesDto,
+  PackageCyclesQuery,
+  PackageDependenciesDto,
+  PackageDependenciesQuery,
   RefreshResult,
   SearchSymbolsOptions,
   TraversalQuery,
   TraversalSnapshot,
+  WhyDependsQuery,
 } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
 import type {
@@ -597,6 +605,160 @@ export class SqliteGraphReadPort implements GraphReadPort {
     }
     ranked.sort((a, b) => b.score - a.score);
     return ranked.slice(0, cap);
+  }
+
+  private defaultProductionFilter(
+    partial?: Partial<GraphSourceFilter>,
+  ): GraphSourceFilter {
+    return {
+      sourceScope: partial?.sourceScope ?? 'production',
+      generated: partial?.generated ?? 'exclude',
+      ...(partial?.packages === undefined ? {} : { packages: partial.packages }),
+      ...(partial?.filePath === undefined ? {} : { filePath: partial.filePath }),
+      ...(partial?.filePrefix === undefined ? {} : { filePrefix: partial.filePrefix }),
+      ...(partial?.kinds === undefined ? {} : { kinds: partial.kinds }),
+      ...(partial?.visibilities === undefined ? {} : { visibilities: partial.visibilities }),
+    };
+  }
+
+  async packageDependencies(
+    query: PackageDependenciesQuery,
+  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>> {
+    const edgeKind = query.edgeKind ?? 'call';
+    return this.runQuery('packageDependencies', (gen, freshness) => {
+      if (gen === undefined) {
+        return this.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness);
+      }
+      const filter = this.defaultProductionFilter(query.filter);
+      const packages =
+        query.package === undefined
+          ? undefined
+          : query.direction === 'in'
+            ? { toPackage: query.package }
+            : query.direction === 'both'
+              ? {}
+              : { fromPackage: query.package };
+      const view = buildPackageEvidence(gen.catalog, gen.indexes, {
+        edgeKind,
+        filter,
+        ...packages,
+      });
+      if (!view.ok) {
+        return this.envelope(
+          { edgeKind, calls: [], imports: [] },
+          gen,
+          freshness,
+          { complete: false, truncated: false, reasons: ['package-evidence-failed'] },
+        );
+      }
+      let calls = view.value.calls;
+      let imports = view.value.imports;
+      if (query.package !== undefined && query.direction === 'both') {
+        calls = calls.filter(
+          (c) => c.fromPackage === query.package || c.toPackage === query.package,
+        );
+        imports = imports.filter(
+          (c) => c.fromPackage === query.package || c.toPackage === query.package,
+        );
+      } else if (query.package !== undefined && query.direction === 'in') {
+        calls = calls.filter((c) => c.toPackage === query.package);
+        imports = imports.filter((c) => c.toPackage === query.package);
+      }
+      const limit = clampLimit(query.limit, DEFAULT_ARCH_LIMIT);
+      return this.envelope(
+        {
+          edgeKind,
+          calls: calls.slice(0, limit),
+          imports: imports.slice(0, limit),
+        },
+        gen,
+        freshness,
+        {
+          complete: view.value.coverage.complete && calls.length <= limit && imports.length <= limit,
+          truncated: calls.length > limit || imports.length > limit,
+          reasons: [
+            ...view.value.coverage.reasons,
+            ...(calls.length > limit || imports.length > limit ? ['page-limit'] : []),
+          ],
+        },
+        { limit },
+      );
+    });
+  }
+
+  async whyDepends(
+    query: WhyDependsQuery,
+  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>> {
+    const edgeKind = query.edgeKind ?? 'combined';
+    return this.runQuery('whyDepends', (gen, freshness) => {
+      if (gen === undefined) {
+        return this.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness);
+      }
+      const view = buildPackageEvidence(gen.catalog, gen.indexes, {
+        edgeKind,
+        filter: this.defaultProductionFilter(query.filter),
+        fromPackage: query.fromPackage,
+        toPackage: query.toPackage,
+      });
+      if (!view.ok) {
+        return this.envelope(
+          { edgeKind, calls: [], imports: [] },
+          gen,
+          freshness,
+          { complete: false, truncated: false, reasons: ['package-evidence-failed'] },
+        );
+      }
+      const limit = clampLimit(query.limit, DEFAULT_ARCH_LIMIT);
+      return this.envelope(
+        {
+          edgeKind,
+          calls: view.value.calls.slice(0, limit),
+          imports: view.value.imports.slice(0, limit),
+        },
+        gen,
+        freshness,
+        view.value.coverage,
+        { limit },
+      );
+    });
+  }
+
+  async packageCycles(
+    query: PackageCyclesQuery,
+  ): Promise<Result<GraphToolResult<PackageCyclesDto>, McpReadError>> {
+    const edgeKind = query.edgeKind ?? 'call';
+    return this.runQuery('packageCycles', (gen, freshness) => {
+      if (gen === undefined) {
+        return this.envelope({ edgeKind, components: [] }, gen, freshness);
+      }
+      const view = buildPackageScc(gen.catalog, gen.indexes, {
+        edgeKind,
+        filter: this.defaultProductionFilter(query.filter),
+      });
+      if (!view.ok) {
+        return this.envelope(
+          { edgeKind, components: [] },
+          gen,
+          freshness,
+          { complete: false, truncated: false, reasons: ['package-scc-failed'] },
+        );
+      }
+      const limit = clampLimit(query.limit, DEFAULT_ARCH_LIMIT);
+      return this.envelope(
+        {
+          edgeKind,
+          components: view.value.components.slice(0, limit).map((c) => ({
+            packages: c.packages,
+            proofEdges: c.proofEdges,
+            totalProofEdges: c.totalProofEdges,
+          })),
+        },
+        gen,
+        freshness,
+        view.value.coverage,
+        { limit },
+      );
+    });
   }
 
   async refresh(opts?: {

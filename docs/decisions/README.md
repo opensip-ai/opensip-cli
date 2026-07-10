@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0149](ADR-0149-bounded-labelled-mcp-audit-evidence.md) — Occurrence-default traversal, labelled package/runtime evidence, and bounded MCP audit queries (19 tools).
+- [ADR-0148](ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md) — `g1:` catalog identity, persisted auto-swap, complete freshness verification, refresh-only rebuild.
 - [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md) — Public `@opensip-cli/graph/read` free functions, complete export-source maps, manifest Tool inventory, and allowlist-shaped peer boundaries.
 - [ADR-0146](ADR-0146-host-plane-reserved-state-namespace.md) — Reserved `@opensip-cli/host-plane:<toolId>` state identities, copy-only migration 0009, shared reserved-prefix admission, reduced host-plane surface.
 - [ADR-0145](ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md) — Denied ambient worker datastore, exact command/marker worker mode, exact-id external trust (no `*` admission).

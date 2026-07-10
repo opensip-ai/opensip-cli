@@ -160,4 +160,57 @@ export interface GraphReadPort {
   refresh(opts?: {
     forceRebuild?: boolean;
   }): Promise<Result<GraphToolResult<RefreshResult>, McpReadError>>;
+  /** Package call/import dependency rows. */
+  packageDependencies(
+    query: PackageDependenciesQuery,
+  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>>;
+  /** Evidence for why package A depends on package B. */
+  whyDepends(
+    query: WhyDependsQuery,
+  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>>;
+  /** Package SCCs/cycles for a selected edge kind. */
+  packageCycles(
+    query: PackageCyclesQuery,
+  ): Promise<Result<GraphToolResult<PackageCyclesDto>, McpReadError>>;
+}
+
+export interface PackageDependenciesQuery {
+  readonly edgeKind?: 'call' | 'import' | 'combined';
+  readonly package?: string;
+  readonly direction?: 'out' | 'in' | 'both';
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly groupBy?: 'none' | 'package' | 'file';
+}
+
+export interface WhyDependsQuery {
+  readonly fromPackage: string;
+  readonly toPackage: string;
+  readonly edgeKind?: 'call' | 'import' | 'combined';
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+export interface PackageCyclesQuery {
+  readonly edgeKind?: 'call' | 'import' | 'combined';
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+export interface PackageDependenciesDto {
+  readonly edgeKind: 'call' | 'import' | 'combined';
+  readonly calls: readonly unknown[];
+  readonly imports: readonly unknown[];
+}
+
+export interface PackageCyclesDto {
+  readonly edgeKind: 'call' | 'import' | 'combined';
+  readonly components: readonly {
+    readonly packages: readonly string[];
+    readonly proofEdges: readonly unknown[];
+    readonly totalProofEdges: number;
+  }[];
 }
