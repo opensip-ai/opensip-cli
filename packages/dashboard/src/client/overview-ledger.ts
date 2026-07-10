@@ -116,9 +116,6 @@ function appendStepRunCell(
 ): void {
   const runCell = el('td', { title: step.command });
   deps.appendToolBadge(runCell, step.tool);
-  if (step.command !== step.tool) {
-    runCell.append(el('span', { text: step.command, style: 'margin-left:8px;' + MUTED_STYLE }));
-  }
   row.append(runCell);
 }
 
@@ -268,7 +265,6 @@ function appendLedgerRunRow(
   );
   const runCell = el('td', { title: run.source });
   deps.appendToolBadge(runCell, 'suite');
-  runCell.append(el('span', { text: run.name, style: 'margin-left:8px;' + MUTED_STYLE }));
   row.append(runCell);
   row.append(el('td', { text: EM_DASH, title: run.id, style: MUTED_STYLE }));
   row.append(
