@@ -11,15 +11,14 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
-import { toolEnginePathRe } from './tool-engine-paths.mjs';
+import { toolSeamPathRe } from './tool-engine-paths.mjs';
 
-const TOOL_ENGINE_TS_PATH = toolEnginePathRe('.*\\.ts$');
-const EXTERNAL_ADAPTER_TS_PATH = /packages\/external-tool-adapter\/src\/.*\.ts$/;
+const TOOL_SEAM_TS_PATH = toolSeamPathRe('.*\\.ts$');
 const TEST_PATH = /(?:\.test\.tsx?$|\/__tests__\/)/;
 const DIRECT_BASELINE_SEAM_RE = /\bcli\.(?:saveBaseline|compareBaseline)\s*\(/;
 
 function isCheckedPath(filePath) {
-  return TOOL_ENGINE_TS_PATH.test(filePath) || EXTERNAL_ADAPTER_TS_PATH.test(filePath);
+  return TOOL_SEAM_TS_PATH.test(filePath);
 }
 
 export function analyzeSharedGateDispatch(content, filePath) {

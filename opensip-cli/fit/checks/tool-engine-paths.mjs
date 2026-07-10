@@ -1,69 +1,73 @@
-import { readFileSync } from 'node:fs';
+/**
+ * tool-engine-paths — production Tool path predicates derived from workspace
+ * package manifests (opensipTools.kind === 'tool'), not hardcoded lists.
+ */
+
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const manifestUrl = new URL(
-  '../../../packages/cli/src/bootstrap/bundled-tools.manifest.json',
-  import.meta.url,
-);
+const require = createRequire(import.meta.url);
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-const manifest = JSON.parse(readFileSync(fileURLToPath(manifestUrl), 'utf8'));
+const {
+  createToolPathPredicates,
+  readProductionToolPackageInventory,
+} = require(join(REPO_ROOT, 'scripts/lib/workspace-tool-package-inventory.cjs'));
 
+const predicates = createToolPathPredicates(REPO_ROOT);
+const inventory = readProductionToolPackageInventory(REPO_ROOT);
+
+export const productionToolInventory = inventory;
 export const bundledToolPackageSegments = Object.freeze(
-  [...(manifest.bundledPackages ?? [])]
-    .map((name) => /^@opensip-cli\/([^/]+)$/.exec(name)?.[1])
-    .filter((segment) => typeof segment === 'string' && segment.length > 0),
+  inventory
+    .filter((t) => t.bundled)
+    .map((t) => {
+      const m = /^@opensip-cli\/(.+)$/.exec(t.name);
+      return m?.[1] ?? t.name;
+    }),
 );
 
-// ADR-0090 adapter/scanner packages are tool-shaped, but their production code
-// lives directly under package-root src/ rather than <tool>/engine/src/.
-const adr0090AdapterPackageSegments = Object.freeze([
-  'external-tool-adapter',
-  'tool-gitleaks',
-  'tool-osv-scanner',
-  'tool-trivy',
-]);
-
-export const toolSeamPackageSegments = Object.freeze([
-  ...bundledToolPackageSegments,
-  ...adr0090AdapterPackageSegments,
-]);
-
-function escapeRe(value) {
-  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
-}
-
-const bundledToolSegmentAlternation = bundledToolPackageSegments.map(escapeRe).join('|');
-const bundledToolEngineRoots = bundledToolPackageSegments.map((segment) =>
-  segment === 'mcp' ? 'packages/mcp/src/' : `packages/${segment}/engine/src/`,
+export const toolSeamPackageSegments = Object.freeze(
+  inventory.map((t) => {
+    const m = /^@opensip-cli\/(.+)$/.exec(t.name);
+    return m?.[1] ?? t.name;
+  }),
 );
-const bundledToolEngineRootAlternation = bundledToolEngineRoots.map(escapeRe).join('|');
-const adapterToolRoots = adr0090AdapterPackageSegments.map((segment) => `packages/${segment}/src/`);
-const toolSeamRootAlternation = [...bundledToolEngineRoots, ...adapterToolRoots]
-  .map(escapeRe)
-  .join('|');
 
 export function toolEnginePathRe(suffix = '') {
-  return new RegExp(`(?:${bundledToolEngineRootAlternation})${suffix}`);
+  return predicates.toolEnginePathRe(suffix);
 }
 
 export function toolSeamPathRe(suffix = '') {
-  return new RegExp(`(?:${toolSeamRootAlternation})${suffix}`);
+  return predicates.toolSeamPathRe(suffix);
 }
 
 export function toolEngineCliPathRe(suffix = '') {
-  return toolEnginePathRe(`cli/${suffix}`);
+  return predicates.toolEnginePathRe(`cli/${suffix}`);
 }
 
 export function toolDescriptorPathRe() {
-  return toolEnginePathRe('tool\\.ts$');
+  return predicates.toolDescriptorPathRe();
 }
 
 export function toolPackagePathRe(suffix = '') {
-  return new RegExp(`packages/(?:${bundledToolSegmentAlternation})/${suffix}`);
+  // Match any production tool package root (engine or package-root src).
+  const roots = inventory
+    .filter((t) => !t.adapterSubstrate)
+    .map((t) => t.relativeDir + '/');
+  if (roots.length === 0) return /$^/;
+  const escapeRe = (value) => value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  return new RegExp(`(?:${roots.map(escapeRe).join('|')})${suffix}`);
 }
 
 export function toolPackageSegmentForPath(filePath) {
   const norm = String(filePath).replaceAll('\\', '/');
-  if (/packages\/mcp\/src\//.test(norm)) return 'mcp';
-  return new RegExp(`packages/(${bundledToolSegmentAlternation})/engine/src/`).exec(norm)?.[1];
+  for (const tool of inventory) {
+    if (norm.includes(tool.sourceRoot) || norm.includes(tool.relativeDir + '/')) {
+      const m = /^@opensip-cli\/(.+)$/.exec(tool.name);
+      return m?.[1] ?? tool.name;
+    }
+  }
+  return undefined;
 }

@@ -4,7 +4,10 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolEnginePathRe } from './tool-engine-paths.mjs';
+
 const FREEFORM_REMEDIATION_RE = /\bsuggestedAction\s*:/g;
+const BUNDLED_TOOL_SRC = toolEnginePathRe('.*\\.ts$');
 
 function relPath(filePath) {
   return String(filePath).replaceAll('\\', '/');
@@ -22,10 +25,8 @@ function isTestOrFixture(filePath) {
 
 function isFirstPartyToolSource(filePath) {
   const rel = relPath(filePath);
-  return (
-    /(?:^|\/)packages\/(?:fitness|graph|simulation|yagni)\/[^/]+\/src\/.*\.ts$/.test(rel) &&
-    !isTestOrFixture(rel)
-  );
+  // Bundled production tools only (narrower than all Tool packages).
+  return BUNDLED_TOOL_SRC.test(rel) && !isTestOrFixture(rel);
 }
 
 function lineOf(content, index) {

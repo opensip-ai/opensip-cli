@@ -130,16 +130,53 @@ module.exports = {
       severity: 'error',
       comment:
         "Production code must not import a package's `src/internal.ts` barrel — those are " +
-        'test-only surfaces exposed via the `<pkg>/internal` subpath for cross-package test ' +
-        'suites (ADR-0009). Use the package public barrel, or promote the symbol into it. ' +
-        'The sole sanctioned exception is `packages/mcp/` → `graph/internal` (ADR-0084), ' +
-        'governed by the narrowly-scoped `mcp-graph-internal-scope` rule below.',
+        'owner-internal / test surfaces exposed via the `<pkg>/internal` subpath. ' +
+        'Use the package public barrel, or promote the symbol into it. ' +
+        'Sanctioned owner exceptions: session-store + graph persistence → ' +
+        'datastore/internal (ADR-0107); packages/mcp/ → graph/internal (ADR-0084, ' +
+        'temporary until graph/read lands). Owner exceptions are scoped rules below.',
       from: {
-        // `packages/mcp/` is exempt from the GENERIC rule; its single allowed
-        // internal edge (graph/internal only) is governed by the scoped rule below.
-        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`, '^packages/mcp/'],
+        // MCP, session-store, and graph catalog-repo owners are exempt from the
+        // generic rule; each has a scoped allowlist rule below.
+        pathNot: [
+          '/__tests__/',
+          String.raw`\.test\.(ts|tsx)$`,
+          '^packages/mcp/',
+          '^packages/session-store/',
+          String.raw`^packages/graph/engine/src/persistence/`,
+        ],
       },
       to: { path: String.raw`/src/internal\.ts$` },
+    },
+    {
+      name: 'session-store-datastore-internal-only',
+      severity: 'error',
+      comment:
+        'session-store is a sanctioned persistence owner of @opensip-cli/datastore/internal ' +
+        '(ADR-0107). It may import only datastore/internal — no other package internal barrel.',
+      from: {
+        path: '^packages/session-store/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: String.raw`/src/internal\.ts$`,
+        pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
+      },
+    },
+    {
+      name: 'graph-persistence-datastore-internal-only',
+      severity: 'error',
+      comment:
+        'graph engine persistence/ is a sanctioned owner of @opensip-cli/datastore/internal ' +
+        '(ADR-0107). It may import only datastore/internal — no other package internal barrel.',
+      from: {
+        path: String.raw`^packages/graph/engine/src/persistence/`,
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: String.raw`/src/internal\.ts$`,
+        pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
+      },
     },
     {
       name: 'mcp-graph-internal-scope',
@@ -147,7 +184,8 @@ module.exports = {
       comment:
         'ADR-0084: `@opensip-cli/mcp` may import `@opensip-cli/graph/internal` (read-only, ' +
         'in-monorepo) — and ONLY graph/internal. Any other `*/src/internal.ts` import from ' +
-        'packages/mcp/ is forbidden (use the package public barrel).',
+        'packages/mcp/ is forbidden (use the package public barrel). Replaced by ' +
+        '@opensip-cli/graph/read in Phase 5 of modular boundary hardening.',
       from: {
         path: '^packages/mcp/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
