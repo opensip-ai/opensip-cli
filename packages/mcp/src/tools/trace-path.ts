@@ -1,20 +1,22 @@
 /**
- * `trace_path` — shortest forward call path `from → … → to` (ADR-0084, Task 4.2).
+ * `trace_path` — shortest forward call path `from → … → to`.
  *
- * The third caller of the shared {@link boundedBfs}: resolves both symbolIds via
- * the port, runs a goal-directed BFS over the forward-call adjacency, and (on a
- * hit) reconstructs the path via the BFS parent map. No path within the depth
- * bound returns `{ found: false, path: [] }` — not an error.
+ * Routes through one `GraphReadPort.traverse` call so path, context, and
+ * freshness share a single immutable generation.
  */
 
-import { boundedBfs, MAX_WALK_NODES, reconstructPath } from './graph-walk.js';
-import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
-import { errorResult, failure, jsonResult } from './tool-result.js';
+import {
+  depth as depthSchema,
+  pageFields,
+  sourceFilterFields,
+  strictInput,
+  symbolId as symbolIdSchema,
+  traversalIdentity,
+} from './schemas.js';
+import { errorResult, jsonResult } from './tool-result.js';
 
-import type { PathTraceDto } from '../graph-read-port.js';
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
-import type { SymbolRef } from '../symbol-dto.js';
 
 export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): void {
   server.register(
@@ -22,47 +24,41 @@ export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): vo
     {
       title: 'Trace a call path',
       description:
-        'Find a forward call path from one symbol to another (fromSymbolId reaches toSymbolId ' +
-        'through calls), within `depth` levels (default 5, max 5). Pass symbolIds from ' +
-        'search_symbols/get_symbol. Returns the ordered path, or { found: false } when none ' +
-        'exists within the bound.',
-      inputSchema: {
+        'Find a forward call path from one symbol to another within `depth` (default 5, max 5). ' +
+        'Default identity is occurrence-precise; identity=body-twin-union labels that any twin ' +
+        'in a group may supply a hop. Distinguishes complete no-path from cap-truncated search ' +
+        'via coverage.truncated. Returns ordered path plus hop evidence when available.',
+      inputSchema: strictInput({
         fromSymbolId: symbolIdSchema(),
         toSymbolId: symbolIdSchema(),
         depth: depthSchema(),
-      },
+        identity: traversalIdentity(),
+        ...sourceFilterFields(),
+        ...pageFields(),
+      }),
     },
-    ({ fromSymbolId, toSymbolId, depth }) => {
-      const from = deps.graph.resolveSymbolId(fromSymbolId);
-      if (!from.ok) return errorResult(from.error);
-      const to = deps.graph.resolveSymbolId(toSymbolId);
-      if (!to.ok) return errorResult(to.error);
-      const fromRef = from.value.data;
-      const toRef = to.value.data;
-      if (fromRef === undefined || toRef === undefined) {
-        const missing = fromRef === undefined ? fromSymbolId : toSymbolId;
-        return failure(
-          'symbol-not-found',
-          `Unknown symbolId "${missing}". Obtain valid symbolIds from search_symbols or get_symbol.`,
-        );
-      }
-      const graph = deps.graph.calleeGraph();
-      if (!graph.ok) return errorResult(graph.error);
-      const { data: snapshot, freshness } = graph.value;
-      const walk = boundedBfs(snapshot.edges, fromRef.bodyHash, {
-        depth,
-        cap: MAX_WALK_NODES,
-        goal: toRef.bodyHash,
+    async (args) => {
+      const outcome = await deps.graph.traverse({
+        direction: 'path',
+        startSymbolId: args.fromSymbolId,
+        goalSymbolId: args.toSymbolId,
+        depth: args.depth,
+        identity: args.identity,
+        limit: args.limit,
+        cursor: args.cursor,
+        groupBy: args.groupBy,
+        filter: {
+          packages: args.packages,
+          filePath: args.filePath,
+          filePrefix: args.filePrefix,
+          kinds: args.kinds,
+          visibilities: args.visibilities,
+          sourceScope: args.sourceScope,
+          generated: args.generated,
+        },
       });
-      if (!walk.foundGoal) {
-        const data: PathTraceDto = { found: false, path: [] };
-        return jsonResult({ data, freshness, ...(walk.truncated ? { truncated: true } : {}) });
-      }
-      const path: SymbolRef[] = reconstructPath(walk.parents, fromRef.bodyHash, toRef.bodyHash)
-        .map((hash) => snapshot.resolve(hash))
-        .filter((ref): ref is SymbolRef => ref !== undefined);
-      const data: PathTraceDto = { found: true, path };
-      return jsonResult({ data, freshness });
+      if (!outcome.ok) return errorResult(outcome.error);
+      return jsonResult(outcome.value);
     },
   );
 }

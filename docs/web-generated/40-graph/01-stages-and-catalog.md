@@ -307,6 +307,31 @@ identity probe selects only `language`, `cacheKey`, `filesFingerprint`, and
 `builtAt`, so frequent freshness checks do not parse payload or emit per-probe
 events.
 
+### Long-lived MCP catalog generations
+
+Catalog payloads may also record canonical adapter-selection provenance
+(`forced` or `auto`) and engine mode (`exact` or `sharded`). These optional
+fields evolve the existing JSON payload; they add no SQLite column, migration,
+or catalog-version bump. A pre-feature payload remains readable, but freshness
+verification reports partial coverage instead of inventing missing provenance.
+
+A long-lived MCP reader probes the persisted identity before each graph query.
+When another `opensip graph` process atomically replaces the catalog row, the
+next read loads and swaps to that immutable generation without building again.
+Responses and cursors expose only an opaque `g1:` SHA-256 generation key, never
+the raw language/cache/fingerprint/built-at tuple. The core project key remains
+a separate cursor binding. Ordinary reads never build; `refresh_graph` owns an
+explicit rebuild only after missing/stale evidence or a forced request. See
+[ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md).
+
+Occurrence, package, and runtime-wiring audit evidence stays labelled and
+bounded. Runtime manifest/registry/CommandSpec wiring is projected by MCP's
+injected live port and is not written into this static catalog. Cross-package
+readers remain restricted to the public graph-read boundary
+([ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md));
+query semantics and ceilings are recorded in
+[ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md).
+
 ## Cache invalidation
 
 [`cache/invalidate.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/packages/graph/engine/src/cache/invalidate.ts) classifies a cached catalog into one of three verdicts:

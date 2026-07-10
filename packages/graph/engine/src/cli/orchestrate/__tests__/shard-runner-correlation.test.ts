@@ -7,9 +7,8 @@
  *     JSON carries `correlation` WITHOUT `runId`, and the child sees the parent's
  *     `OPENSIP_RUN_ID` in its env;
  *   - a non-zero exit yields a `ShardFailure { failureClass: 'exit_nonzero' }` and
- *     a structured `graph.shard.runner.shard_failed` event whose `stderrPreview`
- *     is capped at 500 chars while the returned `ShardFailure.stderr` stays FULL
- *     (M4);
+ *     a structured `graph.shard.runner.shard_failed` event carrying only stderr
+ *     presence/length while returned `ShardFailure.stderr` stays FULL (M4);
  *   - a hung shard past a SHORT injected kill-timeout settles as
  *     `failureClass: 'timeout'` (M3) — never an indefinite hang;
  *   - an OLD-build spec WITHOUT a `correlation` field still builds (wire-compat,
@@ -31,8 +30,8 @@ import { runShardsInParallel } from '../shard-runner.js';
 import type { Shard } from '../shard-model.js';
 
 // The fixture worker, invoked as `node <script> graph-shard-worker <specPath>`.
-//  - `fail:<id>`  → exit 3 with a LONG stderr (proves the 500-char preview cap
-//                   while the full stderr survives on the ShardFailure).
+//  - `fail:<id>`  → exit 3 with a LONG stderr (proves structured logs omit the
+//                   content while the full stderr survives on ShardFailure).
 //  - `sleep:<id>` → sleep well past the injected short kill-timeout (proves M3).
 //  - anything else → emit a ShardBuildResult whose `fragment.cacheKey` carries an
 //    env+spec snapshot: the OPENSIP_RUN_ID the child saw and whether the spec had
@@ -88,7 +87,8 @@ interface CapturedLog {
   readonly shardId?: string;
   readonly exitCode?: number;
   readonly failureClass?: string;
-  readonly stderrPreview?: string;
+  readonly stderrPresent?: boolean;
+  readonly stderrLength?: number;
   readonly runId?: string;
 }
 
@@ -185,7 +185,7 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     expect(snap.specCorrelation?.workerKind).toBe('shard');
   });
 
-  it('emits graph.shard.runner.shard_failed (exit_nonzero) with a ≤500-char preview; full stderr untruncated (M4)', async () => {
+  it('emits graph.shard.runner.shard_failed without stderr content; full stderr remains untruncated (M4)', async () => {
     captureLogs();
     const out = await runWithCorrelation([shard('fail:x')]);
 
@@ -195,7 +195,7 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     expect(failure.exitCode).toBe(3);
     expect(failure.failureClass).toBe('exit_nonzero');
     // The returned ShardFailure.stderr is the FULL captured output (M4): the
-    // fixture writes ~1000 chars of 'boom ' — well over the 500-char preview cap.
+    // fixture writes ~1000 chars of 'boom '.
     expect(failure.stderr.length).toBeGreaterThan(500);
     expect(failure.stderr).toContain('for fail:x');
 
@@ -205,8 +205,11 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     expect(event?.exitCode).toBe(3);
     expect(event?.failureClass).toBe('exit_nonzero');
     expect(event?.runId).toBe('RUN_test');
-    // The structured event's preview is independently capped at 500 chars.
-    expect((event?.stderrPreview ?? '').length).toBeLessThanOrEqual(500);
+    expect(event?.stderrPresent).toBe(true);
+    expect(event?.stderrLength).toBe(failure.stderr.length);
+    expect(event).not.toHaveProperty('stderr');
+    expect(event).not.toHaveProperty('stderrPreview');
+    expect(JSON.stringify(event)).not.toContain('boom');
   });
 
   it('kills a hung shard at the injected timeout → failureClass timeout (M3)', async () => {

@@ -12,6 +12,8 @@
  * by the boundary pass and labeled `crossShard: true` / `'syntactic'`.
  */
 
+import { relative, sep } from 'node:path';
+
 import {
   currentLogger,
   currentScope,
@@ -22,6 +24,8 @@ import {
   type Span,
 } from '@opensip-cli/core';
 
+import { buildShardedCatalogCacheKey } from '../../cache/sharded-cache-key.js';
+import { compareCodePointStrings } from '../../code-point-order.js';
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
 import {
@@ -30,8 +34,7 @@ import {
   toPersistedFeatures,
 } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
-import { evaluateRules } from '../../rules/evaluate-rules.js';
-import { currentRules } from '../../rules/registry.js';
+import { evaluateRules, resolveRuleSet } from '../../rules/evaluate-rules.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
 import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
@@ -43,85 +46,16 @@ import {
 import { planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard, ShardBuildResult, ShardRunStats } from './shard-model.js';
-import type { GraphProgressCallback, GraphStage } from './types.js';
-import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
-import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type {
-  Catalog,
-  FeatureColumn,
-  FeatureTable,
-  GraphConfig,
-  Indexes,
-  ResolutionMode,
-  ResolutionStats,
-  Rule,
-} from '../../types.js';
+  GraphProgressCallback,
+  GraphStage,
+  RunShardedInput,
+  RunShardedResult,
+} from './types.js';
+import type { CatalogRepo } from '../../persistence/catalog-repo.js';
+import type { Catalog, GraphConfig } from '../../types.js';
 
-/**
- * Input to {@link runShardedGraph}: the planned shards plus the shared build
- * context (project root, worker entry script, language adapter, resolution
- * tier, cache/persistence handles, and optional rules/config overrides).
- */
-export interface RunShardedInput {
-  readonly shards: readonly Shard[];
-  /** Common project root — every fragment's filePaths resolve against it. */
-  readonly projectRoot: string;
-  /** CLI entry script (`process.argv[1]`) for spawning shard workers. */
-  readonly cliScript: string;
-  readonly adapter: GraphLanguageAdapter;
-  /** Optional adapter id requested by the parent `graph --language <id>` run. */
-  readonly language?: string;
-  readonly resolutionMode: ResolutionMode;
-  readonly concurrency?: number;
-  readonly useCache: boolean;
-  readonly catalogRepo: CatalogRepo | null;
-  readonly config?: GraphConfig;
-  readonly rules?: readonly Rule[];
-  /**
-   * Dashboard feature columns to materialize into the persisted catalog
-   * (ADR-0006). The sharded build is the producing run for multi-package
-   * repos, so it persists the same columns as the single path. Unioned with
-   * the rule set's `featureDeps`.
-   */
-  readonly emitFeatures?: readonly FeatureColumn[];
-  /**
-   * Optional structured progress callback (ADR-0032). The sharded build maps its
-   * work onto the SAME seven canonical {@link GraphStage}s the single-program
-   * (`runGraph`) path emits, so the live renderer (`graph-runner.tsx`) shows the
-   * identical "Code Graph" checklist for the sharded default and `--exact`:
-   *   - `discover` — total file count across all shards
-   *   - `parse`    — the parallel shard phase (sub-label: shard count)
-   *   - `walk`     — merge the per-shard fragments into the unified catalog
-   *   - `resolve`  — recover cross-package edges across shard boundaries
-   *   - `index`    — derive reverse indexes over the merged catalog
-   *   - `features` — derive the feature columns
-   *   - `rules`    — evaluate the rule set
-   * Non-interactive callers (json/gate/report) leave it undefined — a no-op.
-   */
-  readonly onProgress?: GraphProgressCallback;
-}
-
-/**
- * Result of {@link runShardedGraph}: the unified catalog and derived indexes,
- * the rule signals evaluated over it, cross-shard resolution stats, and
- * cache/failure metadata (whether every shard was a cache hit, and the ids of
- * any shards whose worker failed).
- */
-export interface RunShardedResult {
-  readonly catalog: Catalog;
-  readonly indexes: Indexes;
-  readonly signals: readonly Signal[];
-  readonly resolutionStats: ResolutionStats;
-  /** True when every shard was reused from cache (no worker ran). */
-  readonly cacheHit: boolean;
-  /** Shard ids whose worker failed (build proceeds with the rest). */
-  readonly failedShardIds: readonly string[];
-  /** Engine-computed feature table over the merged global catalog (only the
-   *  requested columns populated). */
-  readonly features: FeatureTable;
-  /** Per-run sharded-build statistics (mirrored into the --profile summary). */
-  readonly shardStats: ShardRunStats;
-}
+export type { RunShardedInput, RunShardedResult } from './types.js';
 
 /** Run the full sharded build and return a unified RunGraphResult-shaped value. */
 export async function runShardedGraph(input: RunShardedInput): Promise<RunShardedResult> {
@@ -187,7 +121,8 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
       // Complementary to the runner's structured `shard_failed`; enriched with
       // the failureClass now carried on ShardFailure (Task 1.2) when present.
       ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
-      stderr: failure.stderr.slice(0, 500),
+      stderrPresent: failure.stderr.length > 0,
+      stderrLength: failure.stderr.length,
     });
   }
   const shardWord = shards.length === 1 ? 'shard' : 'shards';
@@ -201,7 +136,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // fragment count being merged + the ids of any shards whose worker failed,
   // stamped with the run/trace ids so it pivots to the same run as the runner's
   // events. `traceId` is omitted when OTel is off (currentTraceparent → undefined).
-  // `parentCommand` (+ tool/repo) is stamped so the operator's
+  // `parentCommand` (+ tool) is stamped so the operator's
   // `runId`/`parentCommand` filter returns the merge line too (GAP e — no
   // un-attributed shard lines).
   const mergeCorrelation = currentScope()?.correlation;
@@ -214,7 +149,6 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
       ? {}
       : { parentCommand: mergeCorrelation.parentCommand }),
     ...(mergeCorrelation?.tool === undefined ? {} : { tool: mergeCorrelation.tool }),
-    ...(mergeCorrelation?.repo === undefined ? {} : { repo: mergeCorrelation.repo }),
     ...(mergeTraceId === undefined ? {} : { traceId: mergeTraceId }),
     fragmentCount: fragments.length,
     failedShardIds: built.failures.map((f) => f.shardId),
@@ -252,7 +186,44 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     boundaryCalls,
     manifestIndex,
   );
-  const catalog = stampAndConstrainPackages(resolved, projectRoot);
+  const stamped = stampAndConstrainPackages(resolved, projectRoot);
+  const successfulShardIds = new Set(fragments.map((fragment) => fragment.shardId));
+  const shardCacheInputs = shards
+    .filter((shard) => successfulShardIds.has(shard.id))
+    .map((shard) => ({
+      shardId: shard.id,
+      rootDir: projectRelativePath(projectRoot, shard.rootDir),
+      ...(shard.configPathAbs === undefined
+        ? {}
+        : {
+            configPath: projectRelativePath(projectRoot, shard.configPathAbs),
+          }),
+    }))
+    .sort((a, b) => compareCodePointStrings(a.shardId, b.shardId));
+  const fragmentCacheKeys = new Map(
+    fragments.map((fragment) => [fragment.shardId, fragment.fragment.cacheKey]),
+  );
+  // Parent-run selection provenance (not independently selected per shard).
+  const requested = input.language?.trim();
+  const catalog: Catalog = {
+    ...stamped,
+    cacheKey: buildShardedCatalogCacheKey(
+      shardCacheInputs.map((shard) => ({
+        ...shard,
+        cacheKey: fragmentCacheKeys.get(shard.shardId) ?? '',
+      })),
+    ),
+    adapterSelection:
+      requested !== undefined && requested.length > 0
+        ? {
+            mode: 'forced',
+            requestedId: requested,
+            selectedId: stamped.language,
+          }
+        : { mode: 'auto', selectedId: stamped.language },
+    engineMode: 'sharded',
+    shardCacheInputs,
+  };
   emitStage(
     onProgress,
     'resolve',
@@ -267,7 +238,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   emitStageStart(onProgress, 'index');
   const indexes = buildIndexes(catalog);
   emitStage(onProgress, 'index', Date.now() - indexStart);
-  const ruleSet = input.rules ?? currentRules();
+  const ruleSet = resolveRuleSet(input.rules);
   const config: GraphConfig = input.config ?? {};
   const requestedColumns = unionFeatureDeps(ruleSet, input.emitFeatures);
   const featuresStart = Date.now();
@@ -330,6 +301,11 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   };
 }
 
+function projectRelativePath(projectRoot: string, absolutePath: string): string {
+  const value = relative(projectRoot, absolutePath).split(sep).join('/');
+  return value.length === 0 ? '.' : value;
+}
+
 /**
  * Persist the rebuilt shard fragments, prune fragments for removed shards, and
  * write the unified catalog — best-effort (a failed catalog write is logged, not
@@ -346,7 +322,7 @@ function persistShardedCatalog(
   catalogRepo.pruneShardFragmentsExcept(shards.map((s) => s.id));
   try {
     catalogRepo.replaceAll(catalogToPersist);
-  } catch (error) {
+  } catch {
     /* v8 ignore next */
     // Best-effort write: the freshly-built catalog is returned regardless.
     // replaceAll already logged the underlying error; note the continuation
@@ -354,7 +330,7 @@ function persistShardedCatalog(
     currentLogger().debug({
       evt: 'graph.sharded.cache_write_skipped',
       module: 'graph:sharded',
-      err: error instanceof Error ? error.message : String(error),
+      reason: 'catalog-write-failed',
     });
   }
 }

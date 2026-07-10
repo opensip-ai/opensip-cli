@@ -2,9 +2,14 @@
  * Public rebuild facade over runGraph.
  */
 
-import { err, ok, type Result } from '@opensip-cli/core';
+import { currentScope, err, ok, type Result } from '@opensip-cli/core';
 
-import { runGraph } from '../cli/orchestrate.js';
+import { resolveDefaultEngineShards } from '../cli/orchestrate/engine-shard-policy.js';
+import { loadGraphConfig, runGraph, runShardedGraph } from '../cli/orchestrate.js';
+import { currentAdapterRegistry } from '../lang-adapter/registry.js';
+import { GraphAdapterSelector } from '../lang-adapter/selector.js';
+import { CatalogRepo } from '../persistence/catalog-repo.js';
+import { currentRules } from '../rules/registry.js';
 
 import type { Catalog, GraphReadError, RebuildCatalogInput } from './types.js';
 
@@ -22,17 +27,59 @@ export async function rebuildCatalog(
   input: RebuildCatalogInput,
 ): Promise<Result<Catalog, GraphReadError>> {
   try {
-    const result = await runGraph(input);
+    const result = await runCanonicalRebuild(input);
+    if (result.failedShardIds !== undefined && result.failedShardIds.length > 0) {
+      return err(
+        rebuildError(
+          'GRAPH.READ.REBUILD_FAILED',
+          'Graph rebuild did not complete every configured shard',
+        ),
+      );
+    }
     const catalog = result.catalog;
     if (catalog === null || catalog === undefined) {
       return err(
         rebuildError('GRAPH.READ.REBUILD_EMPTY', 'Graph rebuild produced an empty catalog'),
       );
     }
+    if (input.datastore !== undefined) new CatalogRepo(input.datastore).replaceAll(catalog);
     return ok(catalog);
   } catch {
     return err(
       rebuildError('GRAPH.READ.REBUILD_FAILED', 'Graph rebuild failed due to infrastructure error'),
     );
   }
+}
+
+interface CanonicalRebuildResult {
+  readonly catalog: Catalog | null;
+  readonly failedShardIds?: readonly string[];
+}
+
+async function runCanonicalRebuild(input: RebuildCatalogInput): Promise<CanonicalRebuildResult> {
+  const scope = currentScope();
+  if (scope === undefined) return runGraph({ ...input, noCache: true });
+  const adapter = new GraphAdapterSelector(currentAdapterRegistry()).pick({
+    cwd: input.cwd,
+  });
+  const graphConfig = loadGraphConfig(input.cwd);
+  const policy = await resolveDefaultEngineShards({
+    projectRoot: input.cwd,
+    languageAdapters: scope.languages.list(),
+    graphAdapter: adapter,
+    graphConfig,
+    forcedLanguage: false,
+  });
+  if (policy.shards.length <= 1) return runGraph({ ...input, noCache: true });
+  return runShardedGraph({
+    shards: policy.shards,
+    projectRoot: input.cwd,
+    cliScript: process.argv[1] ?? '',
+    adapter,
+    resolutionMode: 'exact',
+    useCache: false,
+    config: graphConfig,
+    rules: currentRules(),
+    catalogRepo: null,
+  });
 }

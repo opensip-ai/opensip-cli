@@ -48,7 +48,19 @@ export class ToolRegistry {
   }
 
   list(): readonly Tool[] {
-    return this.inner.getAll().map((r) => r.tool);
+    return [...this.values()];
+  }
+
+  /** Iterate registered tools in insertion order without allocating a snapshot array. */
+  *values(): IterableIterator<Tool> {
+    for (const registered of this.inner.values()) {
+      yield registered.tool;
+    }
+  }
+
+  /** Iterate registered tools in insertion order without allocating a snapshot array. */
+  [Symbol.iterator](): IterableIterator<Tool> {
+    return this.values();
   }
 
   get(id: string): Tool | undefined {

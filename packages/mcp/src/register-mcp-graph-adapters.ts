@@ -14,10 +14,13 @@
  * bundled-pack lookup (keyed by markerKind) loads the same `graph-*` adapter packs
  * under MCP's domain and routes each contribution through this registrar.
  */
-import { currentAdapterRegistry, type GraphLanguageAdapter } from '@opensip-cli/graph';
+import { currentAdapterRegistry } from '@opensip-cli/graph';
 
 import type { CapabilityRegistrar } from '@opensip-cli/core';
 
 export const registerMcpGraphAdapter: CapabilityRegistrar = (contribution) => {
-  currentAdapterRegistry().register(contribution as GraphLanguageAdapter);
+  type GraphAdapterContribution = Parameters<
+    ReturnType<typeof currentAdapterRegistry>['register']
+  >[0];
+  currentAdapterRegistry().register(contribution as GraphAdapterContribution);
 };

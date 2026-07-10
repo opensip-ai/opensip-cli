@@ -11,6 +11,7 @@
 import {
   limit as limitSchema,
   severity as severitySchema,
+  strictInput,
   toolId as toolIdSchema,
 } from './schemas.js';
 import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
@@ -30,11 +31,11 @@ export function registerGetLatestFindings(server: McpStdioServer, deps: McpToolD
         '(errors/warnings/all) and capped with `limit`. Replays the persisted session and ' +
         'never re-runs fit/graph/yagni/sim. Do not grep .runtime/logs, read datastore.sqlite ' +
         'directly, or re-run a CLI tool to answer stored-result questions.',
-      inputSchema: {
+      inputSchema: strictInput({
         tool: toolIdSchema(),
         severity: severitySchema(),
         limit: limitSchema(),
-      },
+      }),
     },
     async ({ tool, severity, limit }) => {
       if (!deps.validToolIds.has(tool)) return unknownToolError(tool, deps.validToolIds);

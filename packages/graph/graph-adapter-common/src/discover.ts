@@ -51,7 +51,7 @@ export function createDiscover(
     logger.info({
       evt: 'graph.discover.start',
       module,
-      projectDir: input.cwd,
+      projectScope: 'project',
     });
 
     const projectDirAbs = normalizeProjectDir(input.cwd);
@@ -65,8 +65,8 @@ export function createDiscover(
     logger.info({
       evt: 'graph.discover.complete',
       module,
-      projectDir: projectDirAbs,
-      configPath: configPathAbs ?? '(none)',
+      projectScope: 'project',
+      configDetected: configPathAbs !== undefined,
       fileCount: files.length,
     });
 

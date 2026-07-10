@@ -209,7 +209,17 @@ export class Registry<T extends Registerable> {
   }
 
   getAll(): readonly T[] {
-    return [...this.byId.values()];
+    return [...this.values()];
+  }
+
+  /** Iterate registered items in insertion order without allocating a snapshot array. */
+  values(): IterableIterator<T> {
+    return this.byId.values();
+  }
+
+  /** Iterate registered items in insertion order without allocating a snapshot array. */
+  [Symbol.iterator](): IterableIterator<T> {
+    return this.values();
   }
 
   getByTag(tag: string): readonly T[] {

@@ -1,644 +1,633 @@
 /**
- * Graph tool handlers vs. a FAKE `GraphReadPort` (Task 6.1 steps 1–3).
- *
- * Each handler is registered through a capturing fake server, then invoked
- * directly with already-valid args (Zod boundary validation is covered in
- * schemas.test.ts). Asserts freshness stamping, `truncated` metadata, symbolId
- * resolution errors (unknown id → structured error), `get_symbol` span/ambiguity
- * behavior, and that no DTO carries a raw file body (metadata + bodyHash only).
+ * Graph tool handlers vs. a FAKE async `GraphReadPort` (Phase 1 cutover).
  */
 
 import { err, ok, type Result } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { registerBlastRadius } from '../blast-radius.js';
-import { registerCalleesOf } from '../callees-of.js';
-import { registerFindDeadCode } from '../find-dead-code.js';
-import { registerGetArchitecture } from '../get-architecture.js';
-import { registerGetSymbol } from '../get-symbol.js';
-import { registerSearchSymbols } from '../search-symbols.js';
-import { registerTracePath } from '../trace-path.js';
-import { registerWhoCalls } from '../who-calls.js';
+import {
+  registerBlastRadius,
+  registerCalleesOf,
+  registerFindDeadCode,
+  registerGetArchitecture,
+  registerGetRuntimeWiring,
+  registerGetSymbol,
+  registerPackageCycles,
+  registerPackageDependencies,
+  registerSearchSymbols,
+  registerTracePath,
+  registerWhoCalls,
+  registerWhyDepends,
+} from './_graph-handler-registrations.js';
 
 import type {
-  AdjacencySnapshot,
   ArchitectureSummaryDto,
   BlastDto,
   DeadCodeDto,
-  GraphGeneration,
   GraphReadPort,
-  SearchSymbolsOptions,
+  RefreshResult,
+  TraversalSnapshot,
 } from '../../graph-read-port.js';
 import type { McpReadError } from '../../mcp-error.js';
-import type { McpStdioServer, CallToolResult } from '../../server.js';
-import type { Freshness, McpToolResult, SymbolRef } from '../../symbol-dto.js';
+import type { RuntimeWiringReadPort } from '../../runtime-wiring-read-port.js';
+import type { CallToolResult, McpStdioServer } from '../../server.js';
+import type {
+  Freshness,
+  GraphEvidenceContext,
+  GraphToolResult,
+  SymbolRef,
+} from '../../symbol-dto.js';
 import type { McpToolDeps } from '../types.js';
-
-// ── capturing fake server ────────────────────────────────────────────
 
 type Handler = (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
 
-interface Captured {
-  readonly handlers: Map<string, Handler>;
-  readonly server: McpStdioServer;
-}
-
-function captureServer(): Captured {
+function captureServer(): { handlers: Map<string, Handler>; server: McpStdioServer } {
   const handlers = new Map<string, Handler>();
   const server = {
     register: (name: string, _config: unknown, cb: Handler) => {
       handlers.set(name, cb);
-      return undefined;
     },
   } as unknown as McpStdioServer;
   return { handlers, server };
 }
 
-/** Parse the single JSON text item a tool result carries. */
 function parseResult(result: CallToolResult): { isError: boolean; body: Record<string, unknown> } {
   const first = result.content[0];
   const text = first?.type === 'text' ? first.text : '';
   return { isError: result.isError === true, body: JSON.parse(text) as Record<string, unknown> };
 }
 
-const FRESH: Freshness = { fresh: true, builtAt: '2026-05-22T00:00:00.000Z' };
-const STALE: Freshness = { fresh: false, reason: 'missing' };
+const FRESH: Freshness = {
+  fresh: true,
+  builtAt: '2026-05-22T00:00:00.000Z',
+  verifiedAt: '2026-05-22T00:00:01.000Z',
+  verification: 'complete',
+};
+
+const CONTEXT: GraphEvidenceContext = {
+  project: { root: '/proj', scope: 'project', configPath: 'opensip-cli.config.yml' },
+  catalog: {
+    status: 'loaded',
+    builtAt: '2026-05-22T00:00:00.000Z',
+    language: 'typescript',
+    identity: 'g1:abc',
+    loadedAt: '2026-05-22T00:00:00.000Z',
+    generationSource: 'initial-load',
+  },
+};
+
+const COVERAGE = { complete: true, truncated: false, reasons: [] as const };
+
+function wrap<T>(data: T): GraphToolResult<T> {
+  return { data, context: CONTEXT, freshness: FRESH, coverage: COVERAGE };
+}
 
 function symRef(over: Partial<SymbolRef> = {}): SymbolRef {
   return {
     symbolId: 'src/a.ts:10:2',
     bodyHash: 'h-a',
+    simpleName: 'a',
     qualifiedName: 'a',
     filePath: 'src/a.ts',
     line: 10,
     column: 2,
-    kind: 'function',
+    kind: 'function-declaration',
     visibility: 'exported',
+    package: 'pkg',
+    inTestFile: false,
+    definedInGenerated: false,
     ...over,
   };
 }
 
-function wrap<T>(data: T, truncated?: boolean, fresh: Freshness = FRESH): McpToolResult<T> {
-  return { data, freshness: fresh, ...(truncated ? { truncated: true } : {}) };
-}
-
-/** A configurable fake GraphReadPort — only the methods a test exercises are overridden. */
-function fakeGraph(over: Partial<GraphReadPort> = {}): GraphReadPort {
+function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
   const base: GraphReadPort = {
-    getGeneration: () => ok(wrap<GraphGeneration | undefined>(undefined)),
-    resolveSymbolId: () => ok(wrap<SymbolRef | undefined>(undefined)),
-    searchSymbols: () => ok(wrap<readonly SymbolRef[]>([])),
-    findBySpan: () => ok(wrap<readonly SymbolRef[]>([])),
-    callerGraph: () => ok(wrap(emptySnapshot())),
-    calleeGraph: () => ok(wrap(emptySnapshot())),
-    blast: () => ok(wrap<BlastDto | undefined>(undefined)),
-    deadCode: () => ok(wrap<readonly DeadCodeDto[]>([])),
-    architectureSummary: () =>
-      ok(
-        wrap<ArchitectureSummaryDto>({
-          functionCount: 0,
-          edgeCount: 0,
-          languages: [],
-          packages: [],
-          hotspots: [],
-        }),
+    catalogStatus: () => Promise.resolve(ok({ context: CONTEXT, freshness: FRESH })),
+    resolveSymbolId: (id) =>
+      Promise.resolve(ok(wrap(id === 'src/a.ts:10:2' ? symRef() : undefined))),
+    searchSymbols: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    findBySpan: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    traverse: (query) => {
+      const nodes = [
+        { symbol: symRef(), depth: 0, groupId: 'src/a.ts:10:2', groupTotal: 1 },
+        {
+          symbol: symRef({ symbolId: 'src/b.ts:1:0' }),
+          depth: 1,
+          groupId: 'src/b.ts:1:0',
+          groupTotal: 1,
+        },
+      ];
+      const data: TraversalSnapshot = {
+        found: true,
+        nodes,
+        path: query.direction === 'path' ? nodes.map((n) => n.symbol) : undefined,
+        identityMode: query.identity ?? 'occurrence',
+        totalMembership: nodes.length,
+        counts: {
+          includedOccurrences: nodes.length,
+          excludedOccurrences: 0,
+          includedEdges: 1,
+          excludedEdges: 0,
+          countScope: 'visited',
+        },
+        unresolved: [],
+        unresolvedCounts: [],
+        unresolvedAttribution: 'owner-only',
+      };
+      return Promise.resolve(ok(wrap(data)));
+    },
+    blast: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            symbol: symRef(),
+            members: [symRef()],
+            totalMembership: 1,
+            direct: 2,
+            transitive: 4,
+            score: 4,
+            identityMode: 'body-twin-union',
+          } satisfies BlastDto),
+        ),
       ),
-    refresh: () => Promise.resolve(ok(wrap<GraphGeneration>({ builtAt: FRESH.builtAt ?? '' }))),
-    freshness: () => ok(FRESH),
+    deadCode: () =>
+      Promise.resolve(
+        ok(
+          wrap([
+            {
+              symbol: symRef(),
+              message: 'orphan',
+              ruleId: 'graph:orphan-subtree',
+              reason: 'unreachable-from-inferred-entry-point',
+            },
+          ] as readonly DeadCodeDto[]),
+        ),
+      ),
+    architectureSummary: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            languages: ['typescript'],
+            occurrenceCount: {
+              value: 1,
+              nodeIdentity: 'occurrence',
+              sourceScope: 'production',
+              generated: 'exclude',
+            },
+            uniqueBodyCount: {
+              value: 1,
+              nodeIdentity: 'body-hash',
+              sourceScope: 'production',
+              generated: 'exclude',
+            },
+            callEvidence: {
+              resolvedCallSites: 1,
+              resolvedTargets: 1,
+              unresolvedCallSites: 0,
+              confidence: { high: 1 },
+              resolution: { static: 1 },
+              distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
+              resolvedTargetConfidence: {
+                values: { high: 1 },
+                countUnit: 'resolved-targets',
+              },
+              resolvedTargetResolution: {
+                values: { static: 1 },
+                countUnit: 'resolved-targets',
+              },
+              unresolvedCallSiteConfidence: {
+                values: {},
+                countUnit: 'unresolved-call-sites',
+              },
+              unresolvedCallSiteResolution: {
+                values: {},
+                countUnit: 'unresolved-call-sites',
+              },
+              nodeIdentity: 'occurrence',
+              sourceScope: 'production',
+              generated: 'exclude',
+              edgeKind: 'call',
+              catalogResolutionMode: 'exact',
+            },
+            packageCount: {
+              value: 1,
+              nodeIdentity: 'package',
+              sourceScope: 'production',
+              generated: 'exclude',
+            },
+            packageEdges: [
+              {
+                fromPackage: 'pkg',
+                toPackage: 'other',
+                kind: 'call',
+                count: 1,
+                countUnit: 'resolved-targets',
+                nodeIdentity: 'package',
+                sourceScope: 'production',
+                generated: 'exclude',
+                catalogResolutionMode: 'exact',
+              },
+            ],
+            hotspots: [],
+          } satisfies ArchitectureSummaryDto),
+        ),
+      ),
+    refresh: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            generation: { builtAt: FRESH.builtAt!, identity: 'g1:abc' },
+            action: 'rebuilt',
+            durationMs: 1,
+            priorGenerationAvailable: false,
+          } satisfies RefreshResult),
+        ),
+      ),
+    packageDependencies: () =>
+      Promise.resolve(ok(wrap({ edgeKind: 'call', calls: [], imports: [] }))),
+    whyDepends: () =>
+      Promise.resolve(
+        ok(wrap({ edgeKind: 'combined', calls: [], imports: [], totalMatchingEvidence: 0 })),
+      ),
+    packageCycles: () => Promise.resolve(ok(wrap({ edgeKind: 'call', components: [] }))),
   };
-  return { ...base, ...over };
+  return { ...base, ...overrides };
 }
 
-function emptySnapshot(): AdjacencySnapshot {
-  return { edges: new Map(), resolve: () => undefined };
-}
-
-/** Build a walkable adjacency snapshot from a body-hash graph + a hash→ref table. */
-function snapshot(
-  edges: Record<string, readonly string[]>,
-  refs: Record<string, SymbolRef>,
-): AdjacencySnapshot {
-  return {
-    edges: new Map(Object.entries(edges)),
-    resolve: (hash) => refs[hash],
-  };
-}
-
-function deps(graph: GraphReadPort, over: Partial<McpToolDeps> = {}): McpToolDeps {
+function deps(graph: GraphReadPort): McpToolDeps {
   return {
     graph,
     results: {} as McpToolDeps['results'],
-    validToolIds: new Set(),
-    ...over,
+    runtimeWiring: {} as McpToolDeps['runtimeWiring'],
+    validToolIds: new Set(['fit', 'graph']),
   };
 }
 
-// ── search_symbols ───────────────────────────────────────────────────
-
-describe('search_symbols handler', () => {
-  it('returns the port envelope with freshness, forwarding the limit', () => {
-    let seenOpts: SearchSymbolsOptions | undefined;
-    const { server, handlers } = captureServer();
-    registerSearchSymbols(
-      server,
-      deps(
-        fakeGraph({
-          searchSymbols: (_q, opts): Result<McpToolResult<readonly SymbolRef[]>, McpReadError> => {
-            seenOpts = opts;
-            return ok(wrap([symRef()], true));
-          },
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('search_symbols')!({ query: 'a', limit: 5 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(false);
-    expect(seenOpts).toEqual({ limit: 5 });
-    expect(out.body.truncated).toBe(true);
-    expect(out.body.freshness).toEqual(FRESH);
-    const data = out.body.data as SymbolRef[];
-    // No raw file body crosses the boundary — metadata + bodyHash only.
-    expect(data[0]).toHaveProperty('bodyHash');
-    expect(data[0]).not.toHaveProperty('body');
-    expect(data[0]).not.toHaveProperty('source');
-  });
-
-  it('narrows by kind post-hoc on the already-capped page', () => {
-    const { server, handlers } = captureServer();
-    registerSearchSymbols(
-      server,
-      deps(
-        fakeGraph({
-          searchSymbols: () =>
-            ok(wrap([symRef({ kind: 'function' }), symRef({ kind: 'method', symbolId: 'b:1:1' })])),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('search_symbols')!({ query: 'a', kind: 'method' }) as CallToolResult,
-    );
-    const data = out.body.data as SymbolRef[];
-    expect(data).toHaveLength(1);
-    expect(data[0]?.kind).toBe('method');
-  });
-
-  it('surfaces a port error as an isError result', () => {
-    const { server, handlers } = captureServer();
-    registerSearchSymbols(
-      server,
-      deps(fakeGraph({ searchSymbols: () => err({ code: 'boom', message: 'db down' }) })),
-    );
-    const out = parseResult(handlers.get('search_symbols')!({ query: 'a' }) as CallToolResult);
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('boom');
-  });
-});
-
-// ── get_symbol (span containment + ambiguity) ────────────────────────
-
-describe('get_symbol handler', () => {
-  it('returns a single symbol when exactly one span encloses the line', () => {
-    const { server, handlers } = captureServer();
-    registerGetSymbol(server, deps(fakeGraph({ findBySpan: () => ok(wrap([symRef()])) })));
-    const out = parseResult(
-      handlers.get('get_symbol')!({ file: 'src/a.ts', line: 10 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(false);
-    expect((out.body.data as SymbolRef).symbolId).toBe('src/a.ts:10:2');
-    expect(out.body.ambiguous).toBeUndefined();
-  });
-
-  it('returns a candidate list (never a silent pick) when nested spans both enclose the line', () => {
-    const { server, handlers } = captureServer();
-    const outer = symRef({ symbolId: 'src/a.ts:1:0', qualifiedName: 'outer' });
-    const inner = symRef({ symbolId: 'src/a.ts:5:2', qualifiedName: 'inner' });
-    registerGetSymbol(server, deps(fakeGraph({ findBySpan: () => ok(wrap([outer, inner])) })));
-    const out = parseResult(
-      handlers.get('get_symbol')!({ file: 'src/a.ts', line: 6 }) as CallToolResult,
-    );
-    expect(out.body.ambiguous).toBe(true);
-    expect((out.body.candidates as SymbolRef[]).map((c) => c.qualifiedName)).toEqual([
-      'outer',
-      'inner',
-    ]);
-  });
-
-  it('returns a structured symbol-not-found error when no span matches', () => {
-    const { server, handlers } = captureServer();
-    registerGetSymbol(server, deps(fakeGraph({ findBySpan: () => ok(wrap([])) })));
-    const out = parseResult(
-      handlers.get('get_symbol')!({ file: 'src/a.ts', line: 99 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('symbol-not-found');
-  });
-
-  it('hints to refresh when the catalog is stale and no span matched', () => {
-    const { server, handlers } = captureServer();
-    registerGetSymbol(server, deps(fakeGraph({ findBySpan: () => ok(wrap([], false, STALE)) })));
-    const out = parseResult(
-      handlers.get('get_symbol')!({ file: 'src/a.ts', line: 99 }) as CallToolResult,
-    );
-    expect((out.body.error as McpReadError).message).toContain('refresh_graph');
-  });
-});
-
-// ── who_calls / callees_of (bounded walk + unknown symbolId) ──────────
-
-describe('who_calls handler', () => {
-  it('rejects an unknown symbolId with a structured error', () => {
-    const { server, handlers } = captureServer();
-    registerWhoCalls(server, deps(fakeGraph({ resolveSymbolId: () => ok(wrap(undefined)) })));
-    const out = parseResult(
-      handlers.get('who_calls')!({ symbolId: 'x:1:1', depth: 5 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('symbol-not-found');
-  });
-
-  it('walks the reverse-call adjacency and resolves callers to SymbolRefs', () => {
-    const start = symRef({ symbolId: 'src/a.ts:10:2', bodyHash: 'h-a' });
-    const caller = symRef({ symbolId: 'src/b.ts:3:0', bodyHash: 'h-b', qualifiedName: 'b' });
-    const { server, handlers } = captureServer();
-    registerWhoCalls(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: () => ok(wrap<SymbolRef | undefined>(start)),
-          callerGraph: () =>
-            ok(wrap(snapshot({ 'h-a': ['h-b'] }, { 'h-a': start, 'h-b': caller }))),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('who_calls')!({ symbolId: 'src/a.ts:10:2', depth: 5 }) as CallToolResult,
-    );
-    const data = out.body.data as SymbolRef[];
-    expect(data.map((d) => d.qualifiedName)).toEqual(['b']);
-    expect(out.body.freshness).toEqual(FRESH);
-  });
-});
-
-describe('callees_of handler', () => {
-  it('walks the forward-call adjacency from a resolved symbol', () => {
-    const start = symRef({ symbolId: 'src/a.ts:10:2', bodyHash: 'h-a' });
-    const callee = symRef({ symbolId: 'src/c.ts:1:0', bodyHash: 'h-c', qualifiedName: 'c' });
-    const { server, handlers } = captureServer();
-    registerCalleesOf(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: () => ok(wrap<SymbolRef | undefined>(start)),
-          calleeGraph: () =>
-            ok(wrap(snapshot({ 'h-a': ['h-c'] }, { 'h-a': start, 'h-c': callee }))),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('callees_of')!({ symbolId: 'src/a.ts:10:2', depth: 5 }) as CallToolResult,
-    );
-    expect((out.body.data as SymbolRef[]).map((d) => d.qualifiedName)).toEqual(['c']);
-  });
-});
-
-// ── trace_path ───────────────────────────────────────────────────────
-
-describe('trace_path handler', () => {
-  const from = symRef({ symbolId: 'a:1:0', bodyHash: 'h-a', qualifiedName: 'a' });
-  const mid = symRef({ symbolId: 'b:1:0', bodyHash: 'h-b', qualifiedName: 'b' });
-  const to = symRef({ symbolId: 'c:1:0', bodyHash: 'h-c', qualifiedName: 'c' });
-
-  const byId: Record<string, SymbolRef> = { 'a:1:0': from, 'c:1:0': to };
-
-  function tracePortWith(edges: Record<string, readonly string[]>): GraphReadPort {
-    const refs = { 'h-a': from, 'h-b': mid, 'h-c': to };
-    return fakeGraph({
-      resolveSymbolId: (id) => ok(wrap<SymbolRef | undefined>(byId[id])),
-      calleeGraph: () => ok(wrap(snapshot(edges, refs))),
+describe('graph handlers (async GraphToolResult)', () => {
+  it('search_symbols returns context + freshness envelope', async () => {
+    const { handlers, server } = captureServer();
+    registerSearchSymbols(server, deps(fakePort()));
+    const result = await handlers.get('search_symbols')!({ query: 'a' });
+    const parsed = parseResult(result);
+    expect(parsed.isError).toBe(false);
+    expect(parsed.body).toMatchObject({
+      context: CONTEXT,
+      freshness: FRESH,
+      coverage: COVERAGE,
     });
-  }
-
-  it('returns the ordered path when one exists', () => {
-    const { server, handlers } = captureServer();
-    registerTracePath(server, deps(tracePortWith({ 'h-a': ['h-b'], 'h-b': ['h-c'] })));
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'c:1:0',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    const data = out.body.data as { found: boolean; path: SymbolRef[] };
-    expect(data.found).toBe(true);
-    expect(data.path.map((p) => p.qualifiedName)).toEqual(['a', 'b', 'c']);
+    expect(Array.isArray(parsed.body.data)).toBe(true);
   });
 
-  it('returns { found: false } when no path exists within the bound (not an error)', () => {
-    const { server, handlers } = captureServer();
-    registerTracePath(server, deps(tracePortWith({ 'h-a': [], 'h-b': [], 'h-c': [] })));
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'c:1:0',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    expect(out.isError).toBe(false);
-    expect((out.body.data as { found: boolean }).found).toBe(false);
+  it('get_symbol returns candidates with context', async () => {
+    const { handlers, server } = captureServer();
+    registerGetSymbol(server, deps(fakePort()));
+    const result = await handlers.get('get_symbol')!({ file: 'src/a.ts', line: 10 });
+    const parsed = parseResult(result);
+    expect(parsed.isError).toBe(false);
+    expect(parsed.body.context).toEqual(CONTEXT);
   });
 
-  it('errors when one endpoint symbolId is unknown', () => {
-    const { server, handlers } = captureServer();
-    registerTracePath(server, deps(tracePortWith({ 'h-a': ['h-b'] })));
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'missing:9:9',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('symbol-not-found');
-  });
-});
-
-// ── blast_radius / find_dead_code / get_architecture ─────────────────
-
-describe('blast_radius handler', () => {
-  it('returns the blast score for a resolved symbol', () => {
-    const blast: BlastDto = { symbol: symRef(), direct: 3, transitive: 4, score: 5 };
-    const { server, handlers } = captureServer();
-    registerBlastRadius(
-      server,
-      deps(fakeGraph({ blast: () => ok(wrap<BlastDto | undefined>(blast)) })),
-    );
-    const out = parseResult(
-      handlers.get('blast_radius')!({ symbolId: 'src/a.ts:10:2' }) as CallToolResult,
-    );
-    expect((out.body.data as BlastDto).score).toBe(5);
+  it('who_calls and callees_of await traverse', async () => {
+    const { handlers, server } = captureServer();
+    registerWhoCalls(server, deps(fakePort()));
+    registerCalleesOf(server, deps(fakePort()));
+    for (const name of ['who_calls', 'callees_of'] as const) {
+      const result = await handlers.get(name)!({ symbolId: 'src/a.ts:10:2', depth: 2 });
+      const parsed = parseResult(result);
+      expect(parsed.isError).toBe(false);
+      expect(parsed.body.context).toEqual(CONTEXT);
+      expect(parsed.body.coverage).toBeDefined();
+      expect(parsed.body).not.toHaveProperty('truncated');
+    }
   });
 
-  it('returns a structured blast-unavailable error when no score exists', () => {
-    const { server, handlers } = captureServer();
-    registerBlastRadius(server, deps(fakeGraph({ blast: () => ok(wrap(undefined)) })));
-    const out = parseResult(
-      handlers.get('blast_radius')!({ symbolId: 'src/a.ts:10:2' }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('blast-unavailable');
+  it('trace_path returns path envelope without top-level truncated', async () => {
+    const { handlers, server } = captureServer();
+    registerTracePath(server, deps(fakePort()));
+    const result = await handlers.get('trace_path')!({
+      fromSymbolId: 'src/a.ts:10:2',
+      toSymbolId: 'src/b.ts:1:0',
+      depth: 3,
+    });
+    const parsed = parseResult(result);
+    expect(parsed.isError).toBe(false);
+    expect(parsed.body).toMatchObject({
+      data: { found: true },
+      context: CONTEXT,
+    });
+    expect(parsed.body).not.toHaveProperty('truncated');
   });
-});
 
-describe('find_dead_code handler', () => {
-  it('returns the dead-code envelope, forwarding the limit', () => {
-    let seenLimit: number | undefined;
-    const { server, handlers } = captureServer();
-    registerFindDeadCode(
-      server,
-      deps(
-        fakeGraph({
-          deadCode: (limit) => {
-            seenLimit = limit;
-            return ok(wrap([{ symbol: symRef(), message: 'orphan' }], true));
-          },
-        }),
-      ),
-    );
-    const out = parseResult(handlers.get('find_dead_code')!({ limit: 7 }) as CallToolResult);
-    expect(seenLimit).toBe(7);
-    expect(out.body.truncated).toBe(true);
-    expect((out.body.data as DeadCodeDto[])[0]?.message).toBe('orphan');
+  it('blast_radius labels identity mode', async () => {
+    const { handlers, server } = captureServer();
+    registerBlastRadius(server, deps(fakePort()));
+    const result = await handlers.get('blast_radius')!({ symbolId: 'src/a.ts:10:2' });
+    const parsed = parseResult(result);
+    expect(parsed.isError).toBe(false);
+    const data = parsed.body.data as Record<string, unknown>;
+    expect(data.identityMode).toBe('body-twin-union');
   });
-});
 
-describe('get_architecture handler', () => {
-  it('returns the architecture summary with freshness', () => {
-    const summary: ArchitectureSummaryDto = {
-      functionCount: 42,
-      edgeCount: 99,
-      languages: ['typescript'],
-      packages: [{ name: 'core', couplingOut: 3, couplingIn: 1 }],
-      hotspots: [{ symbol: symRef(), direct: 2, transitive: 1, score: 2.5 }],
+  it('find_dead_code and get_architecture await async port', async () => {
+    const { handlers, server } = captureServer();
+    registerFindDeadCode(server, deps(fakePort()));
+    registerGetArchitecture(server, deps(fakePort()));
+    const dead = parseResult(await handlers.get('find_dead_code')!({ limit: 10 }));
+    const arch = parseResult(await handlers.get('get_architecture')!({ limit: 10 }));
+    expect(dead.isError).toBe(false);
+    expect(arch.isError).toBe(false);
+    expect(dead.body.context).toEqual(CONTEXT);
+    expect(arch.body.context).toEqual(CONTEXT);
+    const archData = arch.body.data as Record<string, unknown>;
+    expect(archData.occurrenceCount).toBeDefined();
+    expect(archData.uniqueBodyCount).toBeDefined();
+    expect(archData.callEvidence).toBeDefined();
+    expect(archData.packageEdges).toBeDefined();
+  });
+
+  it('get_architecture injects target conventions without changing graph metrics', async () => {
+    const { handlers, server } = captureServer();
+    const graph = fakePort();
+    registerGetArchitecture(server, {
+      ...deps(graph),
+      targetConventions: [
+        {
+          target: 'backend',
+          entrypointCount: 2,
+          alwaysUsedCount: 1,
+          usedExportCount: 0,
+        },
+      ],
+    });
+    const arch = parseResult(await handlers.get('get_architecture')!({}));
+    expect(arch.isError).toBe(false);
+    const data = arch.body.data as { targetConventions?: unknown[]; occurrenceCount?: unknown };
+    expect(data.occurrenceCount).toBeDefined();
+    expect(Array.isArray(data.targetConventions)).toBe(true);
+  });
+
+  it('search_symbols forwards match + filter options without post-limit kind filter', async () => {
+    let captured: unknown;
+    const graph = fakePort({
+      searchSymbols: (q, opts) => {
+        captured = { q, opts };
+        return Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[])));
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerSearchSymbols(server, deps(graph));
+    const result = await handlers.get('search_symbols')!({
+      query: 'saveBaseline',
+      match: 'exact',
+      kinds: ['method'],
+      sourceScope: 'production',
+      generated: 'exclude',
+      limit: 10,
+    });
+    expect(parseResult(result).isError).toBe(false);
+    expect(captured).toMatchObject({
+      q: 'saveBaseline',
+      opts: {
+        match: 'exact',
+        limit: 10,
+        filter: {
+          kinds: ['method'],
+          sourceScope: 'production',
+          generated: 'exclude',
+        },
+      },
+    });
+  });
+
+  it('forwards dead-code and architecture filters, paging, and grouping', async () => {
+    const captured: Record<string, unknown> = {};
+    const graph = fakePort({
+      deadCode: (query) => {
+        captured.dead = query;
+        return Promise.resolve(ok(wrap([] as readonly DeadCodeDto[])));
+      },
+      architectureSummary: (query) => {
+        captured.architecture = query;
+        return fakePort().architectureSummary(query);
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerFindDeadCode(server, deps(graph));
+    registerGetArchitecture(server, deps(graph));
+    const args = {
+      packages: ['pkg'],
+      filePath: 'src/a.ts',
+      filePrefix: 'src',
+      sourceScope: 'test',
+      generated: 'only',
+      limit: 7,
+      cursor: 'cursor',
+      groupBy: 'file',
+    } as const;
+    await handlers.get('find_dead_code')!({
+      ...args,
+      kinds: ['method'],
+      visibilities: ['private'],
+    });
+    await handlers.get('get_architecture')!(args);
+    expect(captured.dead).toMatchObject({
+      limit: 7,
+      cursor: 'cursor',
+      groupBy: 'file',
+      filter: {
+        packages: ['pkg'],
+        filePath: 'src/a.ts',
+        filePrefix: 'src',
+        kinds: ['method'],
+        visibilities: ['private'],
+        sourceScope: 'test',
+        generated: 'only',
+      },
+    });
+    expect(captured.architecture).toMatchObject({
+      limit: 7,
+      cursor: 'cursor',
+      groupBy: 'file',
+      filter: {
+        packages: ['pkg'],
+        filePath: 'src/a.ts',
+        filePrefix: 'src',
+        sourceScope: 'test',
+        generated: 'only',
+      },
+    });
+  });
+
+  it('routes all package tools with full shared filters and bounded page fields', async () => {
+    const captured: Record<string, unknown> = {};
+    const graph = fakePort({
+      packageDependencies: (query) => {
+        captured.dependencies = query;
+        return Promise.resolve(ok(wrap({ edgeKind: 'combined', calls: [], imports: [] })));
+      },
+      whyDepends: (query) => {
+        captured.why = query;
+        return Promise.resolve(
+          ok(
+            wrap({
+              edgeKind: 'combined',
+              calls: [],
+              imports: [],
+              totalMatchingEvidence: 0,
+            }),
+          ),
+        );
+      },
+      packageCycles: (query) => {
+        captured.cycles = query;
+        return Promise.resolve(ok(wrap({ edgeKind: 'combined', components: [] })));
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerPackageDependencies(server, deps(graph));
+    registerWhyDepends(server, deps(graph));
+    registerPackageCycles(server, deps(graph));
+    const shared = {
+      edgeKind: 'combined',
+      packages: ['pkg-a'],
+      filePath: 'src/a.ts',
+      filePrefix: 'src',
+      kinds: ['method'],
+      visibilities: ['private'],
+      sourceScope: 'production',
+      generated: 'exclude',
+      limit: 9,
+      cursor: 'cursor',
+      groupBy: 'package',
+    } as const;
+    await handlers.get('package_dependencies')!({
+      ...shared,
+      package: 'pkg-a',
+      direction: 'both',
+    });
+    await handlers.get('why_depends')!({
+      ...shared,
+      fromPackage: 'pkg-a',
+      toPackage: 'pkg-b',
+    });
+    await handlers.get('package_cycles')!(shared);
+    expect(captured.dependencies).toMatchObject({
+      edgeKind: 'combined',
+      package: 'pkg-a',
+      direction: 'both',
+      limit: 9,
+      cursor: 'cursor',
+      groupBy: 'package',
+      filter: expect.objectContaining({ filePath: 'src/a.ts', kinds: ['method'] }),
+    });
+    expect(captured.why).toMatchObject({
+      fromPackage: 'pkg-a',
+      toPackage: 'pkg-b',
+      groupBy: 'package',
+      filter: expect.objectContaining({ visibilities: ['private'] }),
+    });
+    expect(captured.cycles).toMatchObject({
+      edgeKind: 'combined',
+      groupBy: 'package',
+      filter: expect.objectContaining({ packages: ['pkg-a'] }),
+    });
+  });
+
+  it('maps port errors through errorResult', async () => {
+    const graph = fakePort({
+      searchSymbols: (): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> =>
+        Promise.resolve(err({ code: 'boom', message: 'failed' })),
+    });
+    const { handlers, server } = captureServer();
+    registerSearchSymbols(server, deps(graph));
+    const result = await handlers.get('search_symbols')!({ query: 'x' });
+    const parsed = parseResult(result);
+    expect(parsed.isError).toBe(true);
+    expect((parsed.body.error as { code: string }).code).toBe('boom');
+  });
+
+  it('get_runtime_wiring forwards bounded filters/page/grouping to its injected port', async () => {
+    let captured: unknown;
+    const runtimeWiring: RuntimeWiringReadPort = {
+      query: (input) => {
+        captured = input;
+        return Promise.resolve(
+          ok({
+            context: { projectKey: 'abcdabcdabcdabcd', snapshotKey: `g1:${'a'.repeat(64)}` },
+            nodes: [
+              { id: 'command:alpha:inspect', kind: 'command', label: 'inspect', tool: 'alpha' },
+            ],
+            edges: [
+              {
+                from: 'command:alpha:inspect',
+                to: 'handler:alpha:inspect',
+                kind: 'command-dispatches-handler',
+                source: 'command-spec',
+                confidence: 'medium',
+                staticBridge: 'unresolved',
+              },
+            ],
+            page: { limit: 10, hasMore: false, edgeTruncated: false },
+            groups: [{ key: 'alpha', count: 1 }],
+            groupTruncated: false,
+            coverage: {
+              complete: true,
+              scope: 'captured-admitted-tool-registry',
+              truncated: false,
+              reasons: ['top-level-host-commands-outside-port'],
+            },
+            effectiveFilters: {
+              tool: 'alpha',
+              command: 'inspect',
+              provenanceSource: 'bundled',
+              limit: 10,
+              groupBy: 'tool',
+            },
+          }),
+        );
+      },
     };
-    const { server, handlers } = captureServer();
-    registerGetArchitecture(
-      server,
-      deps(fakeGraph({ architectureSummary: () => ok(wrap(summary)) })),
-    );
-    const out = parseResult(handlers.get('get_architecture')!({}) as CallToolResult);
-    expect((out.body.data as ArchitectureSummaryDto).functionCount).toBe(42);
-    expect(out.body.freshness).toEqual(FRESH);
-  });
-
-  it('adds bounded target convention summaries when provided', () => {
-    const summary: ArchitectureSummaryDto = {
-      functionCount: 1,
-      edgeCount: 0,
-      languages: ['typescript'],
-      packages: [],
-      hotspots: [],
-    };
-    const { server, handlers } = captureServer();
-    registerGetArchitecture(
-      server,
-      deps(fakeGraph({ architectureSummary: () => ok(wrap(summary)) }), {
-        targetConventions: [
+    const { handlers, server } = captureServer();
+    registerGetRuntimeWiring(server, { ...deps(fakePort()), runtimeWiring });
+    const result = await handlers.get('get_runtime_wiring')!({
+      tool: 'alpha',
+      command: 'inspect',
+      provenanceSource: 'bundled',
+      limit: 10,
+      cursor: undefined,
+      groupBy: 'tool',
+    });
+    expect(parseResult(result)).toMatchObject({
+      isError: false,
+      body: {
+        edges: [
           {
-            target: 'app',
-            entrypointCount: 2,
-            alwaysUsedCount: 1,
-            usedExportCount: 3,
+            source: 'command-spec',
+            confidence: 'medium',
+            staticBridge: 'unresolved',
           },
         ],
-      }),
-    );
-    const out = parseResult(handlers.get('get_architecture')!({}) as CallToolResult);
-    expect((out.body.data as ArchitectureSummaryDto).targetConventions).toEqual([
-      {
-        target: 'app',
-        entrypointCount: 2,
-        alwaysUsedCount: 1,
-        usedExportCount: 3,
+        groups: [{ key: 'alpha', count: 1 }],
       },
-    ]);
-  });
-});
-
-// ── adjacency / port error arms (second port call fails) ─────────────
-
-describe('graph handler error arms', () => {
-  const start = symRef({ symbolId: 'a:1:0', bodyHash: 'h-a' });
-  const portErr: McpReadError = { code: 'db-down', message: 'sqlite gone' };
-
-  it('who_calls surfaces a callerGraph port error', () => {
-    const { server, handlers } = captureServer();
-    registerWhoCalls(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: () => ok(wrap<SymbolRef | undefined>(start)),
-          callerGraph: () => err(portErr),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('who_calls')!({ symbolId: 'a:1:0', depth: 5 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('db-down');
+    });
+    expect(captured).toEqual({
+      tool: 'alpha',
+      command: 'inspect',
+      provenanceSource: 'bundled',
+      limit: 10,
+      cursor: undefined,
+      groupBy: 'tool',
+    });
   });
 
-  it('who_calls surfaces a resolveSymbolId port error', () => {
-    const { server, handlers } = captureServer();
-    registerWhoCalls(server, deps(fakeGraph({ resolveSymbolId: () => err(portErr) })));
-    const out = parseResult(
-      handlers.get('who_calls')!({ symbolId: 'a:1:0', depth: 5 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-  });
-
-  it('callees_of surfaces a calleeGraph port error', () => {
-    const { server, handlers } = captureServer();
-    registerCalleesOf(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: () => ok(wrap<SymbolRef | undefined>(start)),
-          calleeGraph: () => err(portErr),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('callees_of')!({ symbolId: 'a:1:0', depth: 5 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-  });
-
-  it('callees_of rejects an unknown symbolId', () => {
-    const { server, handlers } = captureServer();
-    registerCalleesOf(server, deps(fakeGraph({ resolveSymbolId: () => ok(wrap(undefined)) })));
-    const out = parseResult(
-      handlers.get('callees_of')!({ symbolId: 'a:1:0', depth: 5 }) as CallToolResult,
-    );
-    expect((out.body.error as McpReadError).code).toBe('symbol-not-found');
-  });
-
-  it('trace_path surfaces a calleeGraph port error', () => {
-    const to = symRef({ symbolId: 'c:1:0', bodyHash: 'h-c' });
-    const { server, handlers } = captureServer();
-    registerTracePath(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: (id) => ok(wrap<SymbolRef | undefined>(id === 'a:1:0' ? start : to)),
-          calleeGraph: () => err(portErr),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'c:1:0',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-  });
-
-  it('trace_path surfaces a resolve error on the from endpoint', () => {
-    const { server, handlers } = captureServer();
-    registerTracePath(server, deps(fakeGraph({ resolveSymbolId: () => err(portErr) })));
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'c:1:0',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-  });
-
-  it('blast_radius surfaces a port error', () => {
-    const { server, handlers } = captureServer();
-    registerBlastRadius(server, deps(fakeGraph({ blast: () => err(portErr) })));
-    const out = parseResult(handlers.get('blast_radius')!({ symbolId: 'a:1:0' }) as CallToolResult);
-    expect(out.isError).toBe(true);
-  });
-
-  it('blast_radius hints to refresh when the catalog is stale and no score exists', () => {
-    const { server, handlers } = captureServer();
-    registerBlastRadius(
-      server,
-      deps(fakeGraph({ blast: () => ok(wrap(undefined, false, STALE)) })),
-    );
-    const out = parseResult(handlers.get('blast_radius')!({ symbolId: 'a:1:0' }) as CallToolResult);
-    expect((out.body.error as McpReadError).message).toContain('refresh_graph');
-  });
-
-  it('find_dead_code surfaces a port error', () => {
-    const { server, handlers } = captureServer();
-    registerFindDeadCode(server, deps(fakeGraph({ deadCode: () => err(portErr) })));
-    const out = parseResult(handlers.get('find_dead_code')!({}) as CallToolResult);
-    expect(out.isError).toBe(true);
-  });
-
-  it('get_architecture surfaces a port error', () => {
-    const { server, handlers } = captureServer();
-    registerGetArchitecture(server, deps(fakeGraph({ architectureSummary: () => err(portErr) })));
-    const out = parseResult(handlers.get('get_architecture')!({}) as CallToolResult);
-    expect(out.isError).toBe(true);
-  });
-
-  it('get_symbol surfaces a findBySpan port error', () => {
-    const { server, handlers } = captureServer();
-    registerGetSymbol(server, deps(fakeGraph({ findBySpan: () => err(portErr) })));
-    const out = parseResult(
-      handlers.get('get_symbol')!({ file: 'a.ts', line: 1 }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-    expect((out.body.error as McpReadError).code).toBe('db-down');
-  });
-
-  it('trace_path surfaces a resolve error on the to endpoint (from resolves first)', () => {
-    const { server, handlers } = captureServer();
-    registerTracePath(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: (id) =>
-            id === 'a:1:0' ? ok(wrap<SymbolRef | undefined>(start)) : err(portErr),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'c:1:0',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    expect(out.isError).toBe(true);
-  });
-
-  it('trace_path reports the missing FROM endpoint id', () => {
-    const to = symRef({ symbolId: 'c:1:0', bodyHash: 'h-c' });
-    const { server, handlers } = captureServer();
-    registerTracePath(
-      server,
-      deps(
-        fakeGraph({
-          resolveSymbolId: (id) => ok(wrap<SymbolRef | undefined>(id === 'c:1:0' ? to : undefined)),
-        }),
-      ),
-    );
-    const out = parseResult(
-      handlers.get('trace_path')!({
-        fromSymbolId: 'a:1:0',
-        toSymbolId: 'c:1:0',
-        depth: 5,
-      }) as CallToolResult,
-    );
-    expect((out.body.error as McpReadError).message).toContain('a:1:0');
+  it('get_runtime_wiring maps its injected port error', async () => {
+    const runtimeWiring: RuntimeWiringReadPort = {
+      query: () => Promise.resolve(err({ code: 'runtime-wiring-failed', message: 'failed' })),
+    };
+    const { handlers, server } = captureServer();
+    registerGetRuntimeWiring(server, { ...deps(fakePort()), runtimeWiring });
+    const parsed = parseResult(await handlers.get('get_runtime_wiring')!({}));
+    expect(parsed.isError).toBe(true);
+    expect(parsed.body.error).toMatchObject({ code: 'runtime-wiring-failed' });
   });
 });

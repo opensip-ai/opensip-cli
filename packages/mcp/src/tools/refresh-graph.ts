@@ -1,26 +1,16 @@
 /**
- * `refresh_graph` — the single state-changing op (ADR-0084, Task 4.4).
+ * `refresh_graph` — the single state-changing graph op.
  *
- * Rebuilds the call-graph catalog through the graph engine's programmatic build
- * (`runGraph`, wired by the host into `graphPort.refresh()`), persists it to the
- * shared datastore, and atomically swaps the in-memory generation. Concurrent
- * calls are serialized to ONE rebuild inside the port. v1 uses the exact
- * single-program build (no cloud egress, no live render).
- *
- * COST WARNING (also in the tool description): a rebuild parses the whole
- * project — agents must NOT loop it per query. Call it once when the catalog is
- * missing/stale (other tools report `freshness.fresh === false`), then read.
- *
- * Observability: emits `mcp.refresh.run[.ok|.error]` to the stderr logger and
- * (fire-and-forget, no-op when telemetry is disabled) records rebuild latency on
- * the `opensip-cli` meter with bounded labels `{ command, op, outcome }` — never
- * a path/id/symbol.
+ * Syncs any externally persisted generation first; rebuilds only when missing/
+ * stale or `forceRebuild` is true. Concurrent calls join one single-flight op.
  */
 
 import { getMeter, logger } from '@opensip-cli/core';
+import { z } from 'zod';
 
 import { unexpectedRefreshError } from '../mcp-error.js';
 
+import { strictInput } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -28,14 +18,18 @@ import type { McpStdioServer } from '../server.js';
 
 const LOG_MODULE = 'mcp:refresh';
 
-/** Record rebuild latency on the shared meter (no-op until an OTel SDK is registered). */
-function recordRefreshLatency(durationMs: number, outcome: 'ok' | 'error'): void {
+function recordRefreshLatency(durationMs: number, action: string, outcome: 'ok' | 'error'): void {
   try {
     getMeter('opensip-cli')
       .createHistogram('opensip_cli.mcp.refresh.duration_ms')
-      .record(durationMs, { command: 'mcp', op: 'refresh', outcome });
+      .record(durationMs, {
+        command: 'mcp',
+        op: 'refresh_graph',
+        action,
+        outcome,
+      });
   } catch {
-    // Telemetry is best-effort; a meter failure must never fail a refresh.
+    // Telemetry is best-effort.
   }
 }
 
@@ -45,43 +39,55 @@ export function registerRefreshGraph(server: McpStdioServer, deps: McpToolDeps):
     {
       title: 'Rebuild the call graph',
       description:
-        'Rebuild the OpenSIP call-graph catalog from the current working tree (the only ' +
-        'state-changing tool). EXPENSIVE — it parses the whole project; do NOT loop it per ' +
-        'query. Call it once when other tools report a stale or missing catalog ' +
-        '(freshness.fresh === false), then read. Returns { builtAt, durationMs, freshness }.',
+        'Ensure the MCP server is serving a fresh graph catalog. Auto-loads a newer catalog ' +
+        'already persisted by `opensip graph` without rebuilding. Rebuilds only when the ' +
+        'catalog is missing/stale, or when forceRebuild is true. EXPENSIVE when it rebuilds — ' +
+        'do NOT loop it per query. Returns action (no-op|reloaded|rebuilt), generation, and freshness.',
+      inputSchema: strictInput({
+        forceRebuild: z.boolean().optional(),
+      }),
     },
-    async () => {
+    async ({ forceRebuild }) => {
       const startedAt = Date.now();
       try {
-        const outcome = await deps.graph.refresh();
+        const outcome = await deps.graph.refresh({
+          forceRebuild: forceRebuild === true,
+        });
         const durationMs = Date.now() - startedAt;
         if (!outcome.ok) {
           logger.error({
-            evt: 'mcp.refresh.run.error',
+            evt: 'mcp.graph.refresh.failed',
             module: LOG_MODULE,
-            code: outcome.error.code,
+            outcome: 'failed',
             durationMs,
+            failedPhase: outcome.error.details?.failedPhase,
+            priorGenerationAvailable: outcome.error.details?.priorGenerationAvailable,
           });
-          recordRefreshLatency(durationMs, 'error');
+          recordRefreshLatency(durationMs, 'failed', 'error');
           return errorResult(outcome.error);
         }
-        logger.info({ evt: 'mcp.refresh.run.ok', module: LOG_MODULE, durationMs });
-        recordRefreshLatency(durationMs, 'ok');
-        return jsonResult({
-          builtAt: outcome.value.data.builtAt,
+        const action = outcome.value.data.action;
+        logger.info({
+          evt: 'mcp.graph.refresh.completed',
+          module: LOG_MODULE,
+          action,
           durationMs,
-          freshness: outcome.value.freshness,
+          outcome: 'ok',
+          priorGenerationAvailable: outcome.value.data.priorGenerationAvailable,
         });
+        recordRefreshLatency(durationMs, action, 'ok');
+        return jsonResult(outcome.value);
       } catch {
         const durationMs = Date.now() - startedAt;
-        const failure = unexpectedRefreshError();
+        const failure = unexpectedRefreshError(durationMs);
         logger.error({
-          evt: 'mcp.refresh.run.error',
+          evt: 'mcp.graph.refresh.failed',
           module: LOG_MODULE,
-          code: failure.code,
+          outcome: 'failed',
+          failedPhase: 'handler',
           durationMs,
         });
-        recordRefreshLatency(durationMs, 'error');
+        recordRefreshLatency(durationMs, 'failed', 'error');
         return errorResult(failure);
       }
     },

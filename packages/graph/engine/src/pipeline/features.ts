@@ -19,8 +19,11 @@
 
 import { logger } from '@opensip-cli/core';
 
-import { occId, pkgOf, resolveCallee } from '../resolve-callee.js';
+import { pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
+
+import { occurrenceCallGraphFor } from './occurrence-call-graph.js';
+import { stronglyConnectedComponents } from './strongly-connected-components.js';
 
 import type {
   BlastScore,
@@ -238,7 +241,7 @@ function computeProdReachable(catalog: Catalog, indexes: Indexes): Set<string> {
     const occ = indexes.byBodyHash.get(ep.bodyHash);
     /* v8 ignore next */
     if (!occ) continue;
-    if (occ.inTestFile) continue;
+    if (occ.inTestFile || occ.definedInGenerated) continue;
     seeds.add(ep.bodyHash);
   }
   return bfsForward(seeds, indexes);
@@ -277,134 +280,16 @@ function bfsForward(seeds: ReadonlySet<string>, indexes: Indexes): Set<string> {
   return visited;
 }
 
-// ── Tarjan SCC over an OCCURRENCE-level graph ──────────────────────
-
-interface TarjanFrame {
-  readonly v: string;
-  ai: number;
-}
+// ── SCC over an OCCURRENCE-level graph (shared primitive) ───────────
 
 /**
- * The occurrence-level node graph the SCC Tarjan runs over.
- *  - `nodes` — every occurrence's occId (package-unique node identity).
- *  - `byOccId` — occId → its occurrence (for package + member resolution).
- *  - `adj` — occId → deduped neighbor occIds, each call edge's target
- *    `resolveCallee`-disambiguated to the occurrence the caller can reach.
- *
- * Keying nodes by occId (NOT bodyHash) is the whole point of this stage: a
- * CONTENT hash collapses two functions with identical bodies in different
- * packages into one node, manufacturing a false cross-package SCC (the
- * `canonicalize` phantom). occId is per-occurrence, so they stay distinct.
- * The adjacency mirrors `computePackageCoupling`'s occurrence-level
- * `resolveCallee` pass; it does NOT reuse the twin-aware `indexes.callees`
- * (ADR-0003), which is intentionally body-hash-keyed for reachability rules.
+ * Occurrence-level SCCs via the shared Tarjan primitive + occurrence call graph.
+ * Singletons included; members sorted; package-crossing labels preserved.
  */
-interface OccGraph {
-  readonly nodes: readonly string[];
-  readonly byOccId: ReadonlyMap<string, FunctionOccurrence>;
-  readonly adj: ReadonlyMap<string, readonly string[]>;
-}
-
-/**
- * Build the occurrence-level node graph: every occurrence is a node keyed by
- * occId; each call edge's targets are resolved via `resolveCallee` to the
- * occurrence the caller actually reaches, then mapped to that callee's occId.
- * Neighbors are deduped (a Set per node) so the Tarjan adjacency stays tight.
- */
-function buildOccGraph(indexes: Indexes): OccGraph {
-  const byOccId = new Map<string, FunctionOccurrence>();
-  const adj = new Map<string, readonly string[]>();
-  for (const occs of indexes.occurrencesByHash.values()) {
-    for (const occ of occs) {
-      const id = occId(occ);
-      byOccId.set(id, occ);
-      const neighbors = new Set<string>();
-      for (const callEdge of occ.calls) {
-        for (const target of callEdge.to) {
-          const callee = resolveCallee(target, occ, indexes);
-          if (callee) neighbors.add(occId(callee));
-        }
-      }
-      adj.set(id, [...neighbors]);
-    }
-  }
-  return { nodes: [...byOccId.keys()], byOccId, adj };
-}
-
-/**
- * Iterative Tarjan over the occurrence-level graph (`buildOccGraph`). Singletons
- * included by the algorithm; each component's members sorted; result ordering
- * preserved (push-on-root-close). Each component is mapped to an `SccFeatures`
- * whose members are occIds, with a stable member-derived id and
- * `crossesPackages` over the members' resolved packages. Irreducible iterative
- * Tarjan (no recursion, to survive deep call graphs) — splitting it would
- * obscure the well-known algorithm.
- *
- * Exported so the equivalence diff (`cross-shard-resolve.diffCatalogs`) can run
- * the SAME occId-keyed SCC computation over both the exact and the sharded
- * catalog and diff component membership — the Phase-4 cycle-finding gate. There
- * is exactly one SCC implementation; the diff reuses it rather than reimplement.
- */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- iterative Tarjan, see above
 export function computeSccs(indexes: Indexes): SccFeatures[] {
-  const graph = buildOccGraph(indexes);
-  const result: SccFeatures[] = [];
-  const index = new Map<string, number>();
-  const lowlink = new Map<string, number>();
-  const onStack = new Set<string>();
-  const stack: string[] = [];
-  let nextIndex = 0;
-
-  const adj = (v: string): readonly string[] => graph.adj.get(v) ?? [];
-
-  for (const start of graph.nodes) {
-    if (index.has(start)) continue;
-    const work: TarjanFrame[] = [{ v: start, ai: 0 }];
-    while (work.length > 0) {
-      const frame = work.at(-1)!;
-      const v = frame.v;
-      if (frame.ai === 0) {
-        index.set(v, nextIndex);
-        lowlink.set(v, nextIndex);
-        nextIndex++;
-        stack.push(v);
-        onStack.add(v);
-      }
-      const adjV = adj(v);
-      let descended = false;
-      while (frame.ai < adjV.length) {
-        const w = adjV[frame.ai++];
-        if (!index.has(w)) {
-          work.push({ v: w, ai: 0 });
-          descended = true;
-          break;
-        } else if (onStack.has(w)) {
-          const iw = index.get(w)!;
-          if (iw < lowlink.get(v)!) lowlink.set(v, iw);
-        }
-      }
-      if (descended) continue;
-      if (lowlink.get(v) === index.get(v)) {
-        const members: string[] = [];
-        for (;;) {
-          const w = stack.pop()!;
-          onStack.delete(w);
-          members.push(w);
-          if (w === v) break;
-        }
-        members.sort();
-        result.push(toSccFeatures(members, graph.byOccId));
-      }
-      work.pop();
-      if (work.length > 0) {
-        const parent = work.at(-1)!.v;
-        if (lowlink.get(v)! < lowlink.get(parent)!) {
-          lowlink.set(parent, lowlink.get(v)!);
-        }
-      }
-    }
-  }
-  return result;
+  const graph = occurrenceCallGraphFor(indexes);
+  const components = stronglyConnectedComponents(graph.nodes, (v) => graph.forward.get(v) ?? []);
+  return components.map((members) => toSccFeatures(members, graph.byOccId));
 }
 
 /** Build an `SccFeatures` row from sorted member occIds. */
@@ -451,12 +336,12 @@ function computePackageCoupling(indexes: Indexes): {
     // phantom cross-package edges (and phantom cycles). Skip test occurrences on
     // BOTH ends, mirroring how every other production-gating rule skips
     // `occ.inTestFile`.
-    if (occ.inTestFile) continue;
+    if (occ.inTestFile || occ.definedInGenerated) continue;
     const callerPkg = pkgOf(occ);
     for (const callEdge of occ.calls) {
       for (const target of callEdge.to) {
         const callee = resolveCallee(target, occ, indexes);
-        if (!callee || callee.inTestFile) continue;
+        if (!callee || callee.inTestFile || callee.definedInGenerated) continue;
         const calleePkg = pkgOf(callee);
         let row = counts.get(callerPkg);
         if (!row) {

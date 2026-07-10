@@ -134,6 +134,22 @@ describe('isolatedGraphAdapterBridge', () => {
     ]);
   });
 
+  it('rejects unsafe worker descriptor metadata before creating a host proxy', async () => {
+    await expect(
+      isolatedGraphAdapterBridge.createHostContributions(
+        hostContext(() =>
+          Promise.resolve({
+            adapter: {
+              id: 'fixture',
+              displayName: 'Fixture Graph',
+              fileExtensions: ['**/*'],
+            },
+          }),
+        ),
+      ),
+    ).rejects.toThrow('unsafe graph adapter descriptor');
+  });
+
   it('dispatches non-handle worker requests directly to the adapter', async () => {
     await expect(
       isolatedGraphAdapterBridge.runInWorker(

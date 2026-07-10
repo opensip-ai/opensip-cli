@@ -35,6 +35,16 @@ describe('boundedBfs', () => {
     const edges = adj({ a: ['b'], b: ['c'], c: ['d'], d: ['e'], e: [] });
     const shallow = boundedBfs(edges, 'a', { depth: 2, cap: MAX_WALK_NODES });
     expect(shallow.order).toEqual(['b', 'c']); // levels 1 + 2 only
+    expect(shallow.truncated).toBe(true);
+  });
+
+  it('does not mark an exactly exhausted leaf frontier as truncated', () => {
+    const walk = boundedBfs(adj({ a: ['b'], b: ['c'], c: [] }), 'a', {
+      depth: 2,
+      cap: MAX_WALK_NODES,
+    });
+    expect(walk.order).toEqual(['b', 'c']);
+    expect(walk.truncated).toBe(false);
   });
 
   it('clamps an out-of-range depth to the hard maximum (5)', () => {
@@ -55,8 +65,15 @@ describe('boundedBfs', () => {
   it('caps discovered nodes and reports `truncated`', () => {
     const edges = adj({ a: ['b', 'c', 'd', 'e'] });
     const walk = boundedBfs(edges, 'a', { depth: 5, cap: 2 });
-    expect(walk.order).toHaveLength(2);
+    // The visited-node ceiling includes the start node.
+    expect(walk.order).toEqual(['b']);
     expect(walk.truncated).toBe(true);
+  });
+
+  it('does not report truncation merely because the exact node cap is reached', () => {
+    const walk = boundedBfs(adj({ a: ['b'], b: [] }), 'a', { depth: 5, cap: 2 });
+    expect(walk.order).toEqual(['b']);
+    expect(walk.truncated).toBe(false);
   });
 
   it('falls back to MAX_WALK_NODES when cap <= 0', () => {

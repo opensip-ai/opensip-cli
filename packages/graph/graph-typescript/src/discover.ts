@@ -35,7 +35,7 @@ export function discoverFiles(input: DiscoveryInput): DiscoveryOutput {
   logger.info({
     evt: 'graph.discover.start',
     module: 'graph:discover',
-    projectDir: input.projectDir,
+    projectScope: 'project',
   });
 
   const projectDirAbs = normalizeProjectDir(input.projectDir);
@@ -46,8 +46,8 @@ export function discoverFiles(input: DiscoveryInput): DiscoveryOutput {
   logger.info({
     evt: 'graph.discover.complete',
     module: 'graph:discover',
-    projectDir: projectDirAbs,
-    tsConfig: tsConfigPathAbs,
+    projectScope: 'project',
+    configDetected: true,
     fileCount: files.length,
   });
 

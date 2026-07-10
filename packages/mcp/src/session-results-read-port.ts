@@ -24,7 +24,7 @@ import {
   type SessionReplayFn,
 } from '@opensip-cli/session-store';
 
-import { readError } from './mcp-error.js';
+import { readError, sanitizeMcpErrorMessage } from './mcp-error.js';
 import { buildPersistedReviewBrief, type PersistedReviewStep } from './persisted-review-brief.js';
 import {
   baselineComparisonReplay,
@@ -124,7 +124,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
-    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref, session);
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref);
     return ok({
       data: { fidelity: replay.fidelity, envelope: replay.envelope },
       session: this.withLedger(runSummaryFromReplay(session, replay.envelope), session.id),
@@ -148,7 +148,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
-    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound('latest', session);
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound('latest');
     const findings = replay.envelope.signals.map(toMcpFinding);
     return ok({
       data: findings,
@@ -186,7 +186,9 @@ export class SessionResultsReadPort implements ResultsReadPort {
       } catch (error) {
         return {
           session,
-          error: error instanceof Error ? error.message : String(error),
+          error: sanitizeMcpErrorMessage(error, {
+            projectRoot: this.projectRoot,
+          }),
           errorCode: 'decode-error',
         };
       }
@@ -240,8 +242,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay } = outcome;
-    if (!this.isSessionInScope(session))
-      return this.foreignSessionNotFound(opts.ref ?? 'latest', session);
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref ?? 'latest');
 
     try {
       const repo = new BaselineRepo(this.store);
@@ -258,7 +259,10 @@ export class SessionResultsReadPort implements ResultsReadPort {
       );
     } catch (error) {
       return err(
-        readError('baseline-error', error instanceof Error ? error.message : String(error)),
+        readError(
+          'baseline-error',
+          sanitizeMcpErrorMessage(error, { projectRoot: this.projectRoot }),
+        ),
       );
     }
   }
@@ -278,7 +282,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!resolved.ok) return err(readError(resolved.reason, resolved.detail));
     if (!this.isSessionInScope(resolved.session)) {
-      return this.foreignSessionNotFound(ref, resolved.session);
+      return this.foreignSessionNotFound(ref);
     }
     return ok(resolved.session);
   }
@@ -294,13 +298,11 @@ export class SessionResultsReadPort implements ResultsReadPort {
     return ledger === undefined ? summary : { ...summary, ledger };
   }
 
-  private foreignSessionNotFound<T>(ref: string, session: StoredSession): Result<T, McpReadError> {
+  private foreignSessionNotFound<T>(ref: string): Result<T, McpReadError> {
     logger.info({
       evt: 'mcp.results.scope.rejected',
       module: 'mcp:results-read-port',
-      ref,
-      sessionCwd: session.cwd,
-      projectRoot: this.projectRoot,
+      reason: 'outside-project',
     });
     return err(readError('not-found', `session ${ref} was not found`));
   }

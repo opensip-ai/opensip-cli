@@ -2,7 +2,15 @@
  * Public graph/read error and identity types (ADR-0147).
  */
 
+import type { GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type { DataStore } from '@opensip-cli/datastore';
+
+/** Narrow graph-adapter registry reader used by public read operations. */
+export interface GraphAdapterRegistryReader {
+  readonly size: number;
+  getAll(): readonly { readonly id: string; readonly adapter: GraphLanguageAdapter }[];
+  getById(id: string): { readonly adapter: GraphLanguageAdapter } | undefined;
+}
 
 /** Closed operation set for graph read failures. */
 export type GraphReadOperation = 'catalog-identity' | 'catalog-generation' | 'rebuild' | 'analysis';

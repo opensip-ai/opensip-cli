@@ -259,28 +259,26 @@ function readManifest(rootDirAbs: string, projectRoot: string): PackageManifest 
   let raw: string;
   try {
     raw = readFileSync(manifestPath, 'utf8');
-  } catch (error) {
+  } catch {
     // Best-effort: a shard without a readable package.json is simply not
     // specifier-resolvable. Note the skip so the swallow isn't silent.
     logger.debug({
       evt: 'graph.export_index.manifest_read_skipped',
       module: 'graph:export-index',
-      manifestPath,
-      err: error instanceof Error ? error.message : String(error),
+      reason: 'read-failed',
     });
     return undefined;
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch (error) {
+  } catch {
     // Best-effort: an unparseable package.json is not specifier-resolvable.
     // Note the skip so the swallow isn't silent.
     logger.debug({
       evt: 'graph.export_index.manifest_parse_skipped',
       module: 'graph:export-index',
-      manifestPath,
-      err: error instanceof Error ? error.message : String(error),
+      reason: 'parse-failed',
     });
     return undefined;
   }

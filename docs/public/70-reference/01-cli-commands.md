@@ -410,25 +410,46 @@ Tool-owned: [`packages/mcp/src/command.ts`](../../../packages/mcp/src/command.ts
 ```
 opensip mcp                      # serve over stdio from the current project
 opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
+opensip mcp --allow-mutations    # opt in to repair_apply_verify
 ```
 
-`mcp` takes **only `--cwd`** — there are no tool-specific CLI flags. Every per-query argument (a `symbolId`, a `depth`, a `tool` filter) is an **MCP JSON-RPC tool parameter**, not a command-line flag. The server reads the project's persisted catalog and sessions from `<project>/opensip-cli/.runtime/datastore.sqlite`, so it must be run from inside an initialized project (run `opensip init` and at least one `opensip graph` first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
+`mcp` accepts `--cwd` plus the explicit `--allow-mutations` opt-in. Every
+per-query argument (a `symbolId`, a `depth`, a `tool` filter) is an **MCP
+JSON-RPC tool parameter**, not a command-line flag. The equivalent mutation
+environment opt-in is `OPENSIP_MCP_ALLOW_MUTATIONS=1`; read-only remains the
+default. The server reads the project's persisted catalog and sessions from
+`<project>/opensip-cli/.runtime/datastore.sqlite`, so it must be run from inside
+an initialized project (run `opensip init` and at least one `opensip graph`
+first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
 
 **Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
 
-### Graph tools (9 — read-only, over the persisted call graph)
+The default protocol inventory is exactly **19 tools**: 12 graph tools, one
+separate live runtime-wiring tool, and six persisted result/review tools.
+Starting with `--allow-mutations` adds only `repair_apply_verify` for 20.
+
+### Graph tools (12 — 11 reads plus the explicit refresh mutation)
 
 | Tool | Purpose |
 |------|---------|
-| `search_symbols` | Find functions/methods by name (case-insensitive substring). Returns a `symbolId` + `bodyHash` per match to feed the other tools. |
+| `search_symbols` | Find functions/methods by name. `match: "substring"` (default) is case-insensitive on `simpleName`; `"exact"` is case-sensitive on `simpleName`; `"qualified"` is case-sensitive on `qualifiedName`. Returns a `symbolId` + `bodyHash` per match to feed the other tools. |
 | `get_symbol` | Resolve the function/method declared at a file + line into a stable `symbolId` + `bodyHash`; ambiguity returns a candidate list, never a silent pick. |
-| `who_calls` | Callers of a symbol (reverse call graph), out to `depth` (default 5, max 5). Large fan-in is node-capped with `truncated: true`. |
-| `callees_of` | Symbols a symbol calls (forward call graph), out to `depth`. Large fan-out is node-capped with `truncated: true`. |
+| `who_calls` | Callers of a symbol (reverse call graph), out to `depth` (default 5, max 5). Occurrence-precise by default; large fan-in is node-capped with coverage reasons. |
+| `callees_of` | Symbols a symbol calls (forward call graph), out to `depth`. |
 | `trace_path` | A forward call path from one symbol to another within `depth`; returns the ordered path or `{ found: false }`. |
-| `blast_radius` | Change-impact score for a symbol: direct callers, transitive callers, and a composite blast score — the same scoring `opensip graph` uses. |
+| `blast_radius` | Change-impact score for a symbol (body-twin-union identity, labelled): direct callers, transitive callers, and composite score. |
 | `find_dead_code` | Symbols unreachable from any entry point (the graph orphan-subtree rule); each finding carries a `symbolId` + reason. |
-| `get_architecture` | High-level shape: function/edge counts, languages, the most-coupled packages, and the highest blast-radius hotspots. A cheap first call to orient. |
-| `refresh_graph` | Rebuild the catalog from the working tree — the **only** state-changing tool. EXPENSIVE; see freshness below. |
+| `get_architecture` | High-level shape: function/edge counts, languages, top-coupled packages, and blast hotspots. |
+| `package_dependencies` | Labelled package call and/or import edges (production defaults). |
+| `why_depends` | Bounded evidence for why package A depends on package B. |
+| `package_cycles` | Package SCCs/cycles for call, import, or combined edges. |
+| `refresh_graph` | Ensure a fresh catalog: auto-loads a newer persisted generation, rebuilds only when missing/stale or `forceRebuild` — the **only** state-changing graph tool. |
+
+### Live runtime evidence (1 — read-only, not a call graph)
+
+| Tool | Purpose |
+|------|---------|
+| `get_runtime_wiring` | Project admitted manifest, provenance, registry, parent/child CommandSpec, host-mount, handler-dispatch, and external-worker posture. Every edge carries source/confidence and unresolved static bridges remain explicit. |
 
 ### Result and review tools (6 — replay stored runs, never re-run)
 
@@ -457,11 +478,32 @@ unscoped over the selected datastore.
 
 ### The `symbolId` contract
 
-`search_symbols` and `get_symbol` return a stable `symbolId = "<filePath>:<line>:<column>"` plus a `bodyHash`. Every downstream graph tool (`who_calls`, `callees_of`, `trace_path`, `blast_radius`) accepts that **`symbolId`, not a bare name** — so an agent resolves a name once, then traverses. A query that names an ambiguous symbol returns a **structured candidate list or error**, never a silent pick.
+`search_symbols` and `get_symbol` return a stable `symbolId = "<filePath>:<line>:<column>"` plus a `bodyHash`. Use `search_symbols.match: "exact"` for a case-sensitive simple-name match or `"qualified"` for a case-sensitive qualified-name match; the default `"substring"` searches simple names case-insensitively. Every downstream graph tool (`who_calls`, `callees_of`, `trace_path`, `blast_radius`) accepts that **`symbolId`, not a bare name** — so an agent resolves a name once, then traverses. A query that names an ambiguous symbol returns a **structured candidate list or error**, never a silent pick.
 
-### Freshness and `refresh_graph`
+### Freshness, auto-swap, and `refresh_graph`
 
-Every graph result carries a `freshness` verdict. A **stale or missing catalog is served with a warning** (`freshness.fresh === false`) — it is never silently rebuilt. There is **no auto-build** on a missing catalog or on startup: rebuilding is the agent's explicit, cost-warned decision. `refresh_graph` is the only way to rebuild — it parses the whole project, so it is **expensive**; call it once when a tool reports `freshness.fresh === false`, then read, and **do not loop it per query**. It returns `{ builtAt, durationMs, freshness }`.
+Every graph result carries **project/catalog context**, a **freshness** verdict with verification coverage (`complete` / `partial` / `missing`), and independent **page** vs **coverage** fields ([ADR-0148](../../decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md), [ADR-0149](../../decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md)).
+
+Check the canonical configured root, opaque `g1:` generation identity/source,
+freshness reasons, effective filters, evidence kind/confidence, page cursor,
+coverage counts, `truncated`, and hard-cap reasons before claiming complete
+evidence. The cursor's project key is distinct from its generation key and is
+invalid after project, generation, or query changes. Filters apply before
+paging. Exact paths and segment-prefix paths never use raw string prefixes.
+Unknown keys, hostile paths/enums, and malformed/stale/tampered cursors return
+typed bounded failures. No JSON tool result exceeds 4 MiB.
+Production MCP graph access crosses only the public `@opensip-cli/graph/read`
+boundary ([ADR-0147](../../decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)).
+
+Occurrence traversal is the default. Explicit body-twin reachability filters
+both occurrence-edge endpoints before grouping twins, so excluded test or
+generated owners/targets cannot fabricate production reachability. Package
+responses keep call and import evidence labelled; runtime-wiring evidence is a
+third, separate kind rather than a synthetic static edge.
+
+A long-lived MCP process **auto-loads** a newer catalog already written by an external `opensip graph` (cheap identity probe + atomic swap). That is a read, not a rebuild. There is still **no auto-build** on a missing catalog or on startup.
+
+`refresh_graph` is the only mutation: it first syncs any externally persisted generation, returns `no-op`/`reloaded` when the generation is completely verified fresh, and rebuilds only when missing/stale or `forceRebuild` is true. Rebuilding parses the whole project — **expensive**; do not loop it per query. Prefer cursors/filters/limits on high-volume tools.
 
 ### Result-first guidance
 
@@ -482,7 +524,7 @@ Setup is **client-specific** (JSON vs TOML, config paths, approval flows). See
 **[Connect MCP clients (Cursor, Claude Code, Codex)](../60-guides/08-connect-mcp-clients.md)**
 for copy-paste configuration for each client.
 
-**Limitations (v1):** no cloud egress / no `SignalEnvelope` delivery; no live render; `refresh_graph` builds the single project program (no `--workspace` fan-out). `impact_of_diff` is not in the v1 tool surface.
+**Limitations (v1):** no cloud egress / no `SignalEnvelope` delivery; no live render; `refresh_graph` rebuilds one configured project through the canonical exact-or-default-sharded engine policy (no `--workspace` fan-out). `impact_of_diff` is not in the v1 tool surface.
 
 ---
 

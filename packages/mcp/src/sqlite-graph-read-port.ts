@@ -1,413 +1,416 @@
 /**
- * SQLite-backed {@link GraphReadPort} (ADR-0084).
+ * SQLite-backed {@link GraphReadPort} (ADR-0084 + MCP Graph Audit Phase 1).
  *
- * Reads and derives graph data through `@opensip-cli/graph/read`; it never
- * imports graph repositories/rules or raw-queries `DataStore.db`. The generic
- * bounded adjacency walks for callers/callees/trace remain MCP-local.
- *
- * Constructed from an injected `DataStore` (+ optional freshness-context and
- * rebuild providers, wired in Phases 3/4) — it NEVER reads `currentScope()`.
- * Reads return `Result<McpToolResult<T>, McpReadError>`; a missing catalog is
- * NOT an error — it surfaces as `freshness.fresh === false` with empty data and
- * no auto-build. Storage and rebuild failures stay in the Result error arm.
+ * Composes {@link GraphGenerationController} for lifecycle and owns query
+ * projection + evidence-envelope assembly. Passes the injected datastore only
+ * to public graph/read functions — never accesses `.db` or graph persistence.
  */
 
-import { err, ok } from '@opensip-cli/core';
+import { err, ok, type LanguageAdapter, type Result } from '@opensip-cli/core';
 import {
+  buildArchitectureView,
+  continuationToken,
   deriveGraphReadFeatures,
-  evaluateGraphOrphans,
   loadCatalogGeneration,
+  readCatalogIdentity,
+  verifyCatalogInputs,
+  type Catalog,
+  type FeatureColumn,
+  type GraphAdapterRegistryReader,
   type GraphConfig,
-  type ValidationContext,
 } from '@opensip-cli/graph/read';
 
-import { createGeneration } from './catalog-generation.js';
-import { classifyFreshness, missingFreshness, unverifiedFreshness } from './freshness.js';
-import { clampLimit, edgeCount, toDeadCodeDto, toSymbolRef } from './graph-read-projection.js';
-import { fromGraphReadError, readError, unexpectedRefreshError } from './mcp-error.js';
+import {
+  decodeArchitectureCursorState,
+  nextArchitectureAfterKey,
+} from './architecture-query-page.js';
+import { GraphGenerationController, type CatalogGeneration } from './catalog-generation.js';
+import { deadCodeStableKey, pageDeadCode } from './dead-code-page.js';
+import { unavailableGraphStatus } from './freshness.js';
+import { blastQueryDigest, projectBlastMembers } from './graph-blast-projection.js';
+import {
+  digestNormalizedQuery,
+  rejectCursorWithoutGeneration,
+  validateCursorBinding,
+} from './graph-query-page.js';
+import { clampLimit } from './graph-read-projection.js';
+import { projectTraversal } from './graph-traversal-projection.js';
+import { fromGraphReadError, readError } from './mcp-error.js';
+import { SqliteGraphPackageQueries } from './sqlite-graph-package-queries.js';
+import { emptyArchitecture, SqliteGraphQueryContext } from './sqlite-graph-query-context.js';
+import { SqliteGraphSymbolQueries } from './sqlite-graph-symbol-queries.js';
 
-import type { CatalogGeneration } from './catalog-generation.js';
 import type {
-  AdjacencySnapshot,
-  ArchitecturePackageDto,
+  ArchitectureQuery,
   ArchitectureSummaryDto,
   BlastDto,
+  CatalogStatus,
   DeadCodeDto,
-  GraphGeneration,
+  DeadCodeQuery,
   GraphReadPort,
+  PackageCyclesDto,
+  PackageCyclesQuery,
+  PackageDependenciesDto,
+  PackageDependenciesQuery,
+  RefreshResult,
   SearchSymbolsOptions,
+  TraversalQuery,
+  TraversalSnapshot,
+  WhyDependsDto,
+  WhyDependsQuery,
 } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
-import type { Freshness, McpToolResult, SymbolRef } from './symbol-dto.js';
-import type { Result } from '@opensip-cli/core';
+import type { GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { DataStore } from '@opensip-cli/datastore';
-import type { Catalog, FeatureColumn } from '@opensip-cli/graph';
+import type { FeatureTable } from '@opensip-cli/graph';
 
-/** Default search-result cap. */
-const DEFAULT_SEARCH_LIMIT = 50;
-/** Shared empty adjacency for the no-catalog case (avoids per-call allocation). */
-const EMPTY_EDGES: ReadonlyMap<string, readonly string[]> = new Map();
-/** Default architecture package-row cap. */
+const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
-
-/** Construction deps — all captured once (no ambient scope reads). */
 export interface SqliteGraphReadPortDeps {
-  /** The datastore handle the long-lived server captured at construction. */
   readonly store: DataStore;
-  /**
-   * Build the working-tree {@link ValidationContext} for freshness, given the
-   * served generation's catalog (file set + language + adapter cache key). Wired
-   * in Phase 4 (`workingTreeContextFromCatalog`); absent ⇒ a loaded catalog is
-   * reported `fresh: true` (unverified, matching `graph lookup`).
-   */
-  readonly freshnessContext?: (catalog: Catalog) => ValidationContext | undefined;
-  /**
-   * Rebuild the catalog (the `refresh` op). Typed failures and unexpected
-   * throws leave the currently served generation untouched.
-   */
-  readonly rebuild?: () => Promise<Result<Catalog, McpReadError>>;
-  /** Graph config used by dead-code / feature evaluation (defaults to `{}`). */
+  readonly projectRoot: string;
+  readonly configPath?: string;
+  readonly adapters: GraphAdapterRegistryReader;
+  readonly languageAdapters: readonly LanguageAdapter[];
+  readonly rebuild: () => Promise<Result<Catalog, McpReadError>>;
   readonly config?: GraphConfig;
+  readonly log?: (
+    evt: string,
+    fields: Record<string, string | number | boolean | undefined>,
+  ) => void;
 }
 
 export class SqliteGraphReadPort implements GraphReadPort {
-  private readonly store: DataStore;
+  private readonly controller: GraphGenerationController;
+  private readonly queryContext: SqliteGraphQueryContext;
+  private readonly packageQueries: SqliteGraphPackageQueries;
+  private readonly symbolQueries: SqliteGraphSymbolQueries;
   private readonly config: GraphConfig;
-  private generation: CatalogGeneration | undefined;
-  private loaded = false;
-  /** Bounded load error when public graph/read fails (not a missing catalog). */
-  private loadError: McpReadError | undefined;
-  // Per-generation memoized derivations (reset on (re)load / refresh). Freshness
-  // is deliberately NOT memoized: a long-lived server must re-verify the working
-  // tree on each read so a mid-session file mutation flips `fresh` to false.
-  private blastCache:
-    ReadonlyMap<string, { direct: number; transitive: number; score: number }> | undefined;
-  /** In-flight rebuild — serializes concurrent `refresh()` to a single build. */
-  private inFlightRefresh:
-    Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> | undefined;
-
-  constructor(private readonly deps: SqliteGraphReadPortDeps) {
-    this.store = deps.store;
+  constructor(deps: SqliteGraphReadPortDeps) {
     this.config = deps.config ?? {};
+    this.controller = new GraphGenerationController({
+      store: deps.store,
+      projectRoot: deps.projectRoot,
+      adapters: deps.adapters,
+      readIdentity: (store) => readCatalogIdentity(store),
+      loadCatalog: (store) => loadCatalogGeneration(store),
+      verify: (input) =>
+        verifyCatalogInputs({
+          ...input,
+          languageAdapters: deps.languageAdapters,
+          graphConfig: deps.config ?? {},
+        }),
+      rebuild: deps.rebuild,
+      log: deps.log,
+    });
+    this.queryContext = new SqliteGraphQueryContext(this.controller, {
+      projectRoot: deps.projectRoot,
+      ...(deps.configPath === undefined ? {} : { configPath: deps.configPath }),
+      ...(deps.log === undefined ? {} : { log: deps.log }),
+    });
+    this.packageQueries = new SqliteGraphPackageQueries({
+      context: this.queryContext,
+      features: (generation) => this.generationFeatures(generation),
+    });
+    this.symbolQueries = new SqliteGraphSymbolQueries(this.queryContext);
   }
 
-  // ── generation lifecycle ──────────────────────────────────────────
-
-  /** Lazily load + pin the current generation from the persisted catalog. */
-  private current(): Result<CatalogGeneration | undefined, McpReadError> {
-    if (!this.loaded) {
-      try {
-        // Public graph/read Result facade — missing catalog is ok(null); storage
-        // failures surface as err (mapped via fromGraphReadError). Generation
-        // derivation is part of the same boundary because persisted JSON can be
-        // parseable while structurally incompatible with the graph indexes.
-        const loaded = loadCatalogGeneration(this.store);
-        if (loaded.ok) {
-          this.loadError = undefined;
-          this.generation = loaded.value === null ? undefined : createGeneration(loaded.value);
-        } else {
-          this.loadError = fromGraphReadError(loaded.error);
-          this.generation = undefined;
-        }
-      } catch {
-        this.loadError = readError(
-          'GRAPH.READ.CATALOG_GENERATION',
-          'Failed to load graph catalog generation',
-        );
-        this.generation = undefined;
-      }
-      this.loaded = true;
-      this.invalidateDerived();
-    }
-    if (this.loadError !== undefined) return err(this.loadError);
-    return ok(this.generation);
+  async catalogStatus(): Promise<Result<CatalogStatus, McpReadError>> {
+    return this.queryContext.catalogStatus();
   }
 
-  private invalidateDerived(): void {
-    this.blastCache = undefined;
+  async resolveSymbolId(
+    symbolId: string,
+  ): Promise<Result<GraphToolResult<SymbolRef | undefined>, McpReadError>> {
+    return this.symbolQueries.resolveSymbolId(symbolId);
   }
 
-  freshness(): Result<Freshness, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    return ok(this.freshnessFor(current.value));
-  }
-
-  private freshnessFor(gen: CatalogGeneration | undefined): Freshness {
-    return gen === undefined ? missingFreshness() : this.classify(gen);
-  }
-
-  private classify(gen: CatalogGeneration): Freshness {
-    const ctx = this.deps.freshnessContext?.(gen.catalog);
-    if (ctx === undefined) return unverifiedFreshness(gen.builtAt);
-    return classifyFreshness(gen.catalog, ctx);
-  }
-
-  /** Wrap data in the shared `{ data, freshness, truncated? }` envelope. */
-  private wrap<T>(
-    data: T,
-    gen: CatalogGeneration | undefined,
-    truncated?: boolean,
-  ): McpToolResult<T> {
-    return {
-      data,
-      freshness: this.freshnessFor(gen),
-      ...(truncated ? { truncated: true } : {}),
-    };
-  }
-
-  /** The empty (no-data) envelope for an absent catalog / unresolved symbol. */
-  private empty<T>(gen: CatalogGeneration | undefined): McpToolResult<T | undefined> {
-    return { data: undefined, freshness: this.freshnessFor(gen) };
-  }
-
-  // ── reads ─────────────────────────────────────────────────────────
-
-  getGeneration(): Result<McpToolResult<GraphGeneration | undefined>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    return ok(this.wrap(gen === undefined ? undefined : { builtAt: gen.builtAt }, gen));
-  }
-
-  resolveSymbolId(symbolId: string): Result<McpToolResult<SymbolRef | undefined>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    if (gen === undefined) return ok(this.empty<SymbolRef>(gen));
-    const occ = gen.indexes.byOccId.get(symbolId);
-    return ok(this.wrap(occ === undefined ? undefined : toSymbolRef(occ), gen));
-  }
-
-  searchSymbols(
+  async searchSymbols(
     query: string,
     opts?: SearchSymbolsOptions,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    if (gen === undefined) return ok(this.wrap([] as readonly SymbolRef[], gen));
-    const limit = clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT);
-    const needle = query.toLowerCase();
-    const matches: SymbolRef[] = [];
-    let truncated = false;
-    for (const occ of gen.indexes.byOccId.values()) {
-      if (occ.kind === 'module-init') continue;
-      if (!occ.simpleName.toLowerCase().includes(needle)) continue;
-      if (matches.length >= limit) {
-        truncated = true;
-        break;
-      }
-      matches.push(toSymbolRef(occ));
-    }
-    return ok(this.wrap(matches, gen, truncated));
+  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
+    return this.symbolQueries.searchSymbols(query, opts);
   }
 
-  findBySpan(
+  async findBySpan(
     file: string,
     line: number,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    if (gen === undefined) return ok(this.wrap([] as readonly SymbolRef[], gen));
-    const out: SymbolRef[] = [];
-    for (const occ of gen.indexes.byOccId.values()) {
-      if (occ.filePath === file && occ.line <= line && line <= occ.endLine) {
-        out.push(toSymbolRef(occ));
-      }
-    }
-    return ok(this.wrap(out, gen));
+  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
+    return this.symbolQueries.findBySpan(file, line);
   }
 
-  callerGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError> {
-    return this.adjacencyGraph('callers');
-  }
-
-  calleeGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError> {
-    return this.adjacencyGraph('callees');
-  }
-
-  /** Read one direction's adjacency through the shared generation boundary. */
-  private adjacencyGraph(
-    direction: 'callers' | 'callees',
-  ): Result<McpToolResult<AdjacencySnapshot>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    return ok(this.wrap(this.adjacency(current.value, direction), current.value));
-  }
-
-  /**
-   * Project one direction's body-hash adjacency into a walkable
-   * {@link AdjacencySnapshot}. The map IS the engine's `Indexes.callers`/
-   * `callees` (no copy); the resolver closes over `byBodyHash`. The bounded
-   * walk itself lives in MCP's `boundedBfs` (rule of three) — the port never
-   * re-implements a BFS.
-   */
-  private adjacency(
-    gen: CatalogGeneration | undefined,
-    direction: 'callers' | 'callees',
-  ): AdjacencySnapshot {
-    const edges = gen === undefined ? EMPTY_EDGES : gen.indexes[direction];
-    const byBodyHash = gen?.indexes.byBodyHash;
-    return {
-      edges,
-      resolve: (bodyHash) => {
-        const occ = byBodyHash?.get(bodyHash);
-        return occ === undefined ? undefined : toSymbolRef(occ);
-      },
-    };
-  }
-
-  blast(symbolId: string): Result<McpToolResult<BlastDto | undefined>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    if (gen === undefined) return ok(this.empty<BlastDto>(gen));
-    const occ = gen.indexes.byOccId.get(symbolId);
-    if (occ === undefined) return ok(this.empty<BlastDto>(gen));
-    const score = this.blastScores(gen).get(occ.bodyHash);
-    if (score === undefined) return ok(this.empty<BlastDto>(gen));
-    return ok(this.wrap({ symbol: toSymbolRef(occ), ...score }, gen));
-  }
-
-  /** Memoized blast table — the canonical `buildFeatures(['blast'])` scoring. */
-  private blastScores(
-    gen: CatalogGeneration,
-  ): ReadonlyMap<string, { direct: number; transitive: number; score: number }> {
-    if (this.blastCache !== undefined) return this.blastCache;
-    const columns: readonly FeatureColumn[] = ['blast'];
-    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
-    const out = new Map<string, { direct: number; transitive: number; score: number }>();
-    for (const [hash, row] of features.function) {
-      if (row.blast !== undefined) {
-        out.set(hash, {
-          direct: row.blast.direct,
-          transitive: row.blast.transitive,
-          score: row.blast.score,
-        });
-      }
-    }
-    this.blastCache = out;
-    return out;
-  }
-
-  deadCode(limit?: number): Result<McpToolResult<readonly DeadCodeDto[]>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    if (gen === undefined) return ok(this.wrap([] as readonly DeadCodeDto[], gen));
-    const columns: readonly FeatureColumn[] = ['reachableFromEntry'];
-    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
-    const signals = evaluateGraphOrphans(gen.catalog, gen.indexes, this.config, features);
-    const entries: DeadCodeDto[] = [];
-    let truncated = false;
-    for (const signal of signals) {
-      if (limit !== undefined && entries.length >= limit) {
-        truncated = true;
-        break;
-      }
-      const dto = toDeadCodeDto(signal, gen.indexes);
-      if (dto !== undefined) entries.push(dto);
-    }
-    return ok(this.wrap(entries, gen, truncated));
-  }
-
-  architectureSummary(limit?: number): Result<McpToolResult<ArchitectureSummaryDto>, McpReadError> {
-    const current = this.current();
-    if (!current.ok) return current;
-    const gen = current.value;
-    if (gen === undefined) {
-      return ok(
-        this.wrap(
-          {
-            functionCount: 0,
-            edgeCount: 0,
-            languages: [],
-            packages: [],
-            hotspots: [],
-          },
+  async traverse(
+    query: TraversalQuery,
+  ): Promise<Result<GraphToolResult<TraversalSnapshot>, McpReadError>> {
+    const identity = query.identity ?? 'occurrence';
+    const filter = this.queryContext.resolveFilter(query.filter, 'discover');
+    return this.queryContext.runQuery(
+      'traverse',
+      { identityMode: identity, sourceScope: filter.sourceScope },
+      (gen, freshness) => {
+        const projected = projectTraversal(gen, query, filter, this.queryContext.projectKey);
+        if (!projected.ok) return projected;
+        return this.queryContext.envelope(
+          projected.value.data,
           gen,
-        ),
-      );
-    }
-    const columns: readonly FeatureColumn[] = ['packageCoupling'];
-    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
-    const cap = clampLimit(limit, DEFAULT_ARCH_LIMIT);
-    const rows: ArchitecturePackageDto[] = [];
-    for (const [name, row] of features.package) {
-      rows.push({
-        name,
-        couplingOut: row.couplingOut,
-        couplingIn: row.couplingIn,
-      });
-    }
-    rows.sort((a, b) => b.couplingOut + b.couplingIn - (a.couplingOut + a.couplingIn));
-    const packages = rows.slice(0, cap);
-    const hotspots = this.topHotspots(gen, cap);
-    return ok(
-      this.wrap(
-        {
-          functionCount: gen.indexes.byBodyHash.size,
-          edgeCount: edgeCount(gen.indexes),
-          languages: [gen.catalog.language],
-          packages,
-          hotspots,
-        },
-        gen,
-        packages.length < rows.length,
-      ),
+          freshness,
+          projected.value.options,
+        );
+      },
     );
   }
 
-  /** The `cap` highest-blast symbols (graph's canonical scoring; reused, not reinvented). */
-  private topHotspots(gen: CatalogGeneration, cap: number): BlastDto[] {
-    const scores = this.blastScores(gen);
-    const ranked: BlastDto[] = [];
-    for (const [hash, score] of scores) {
-      const occ = gen.indexes.byBodyHash.get(hash);
-      if (occ !== undefined) ranked.push({ symbol: toSymbolRef(occ), ...score });
-    }
-    ranked.sort((a, b) => b.score - a.score);
-    return ranked.slice(0, cap);
+  async blast(
+    symbolId: string,
+    opts?: Parameters<GraphReadPort['blast']>[1],
+  ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>> {
+    const filter = this.queryContext.resolveFilter(opts?.filter, 'discover');
+    const queryDigest = blastQueryDigest(symbolId, filter, opts?.groupBy ?? 'none');
+    return this.queryContext.runQuery(
+      'blast',
+      { identityMode: 'body-twin-union', sourceScope: filter.sourceScope },
+      (gen, freshness) => {
+        if (gen === undefined) {
+          const cursor = rejectCursorWithoutGeneration(opts?.cursor, {
+            projectKey: this.queryContext.projectKey,
+            queryDigest,
+          });
+          if (!cursor.ok) return cursor;
+          return this.queryContext.envelope(undefined, gen, freshness);
+        }
+        const cursor = validateCursorBinding({
+          projectKey: this.queryContext.projectKey,
+          generationKey: gen.key,
+          queryDigest,
+          limit: clampLimit(opts?.limit, DEFAULT_SEARCH_LIMIT),
+          ...(opts?.cursor === undefined ? {} : { cursor: opts.cursor }),
+        });
+        if (!cursor.ok) return cursor;
+        const occ = gen.indexes.byOccId.get(symbolId);
+        if (occ === undefined) return this.queryContext.envelope(undefined, gen, freshness);
+        const score = this.generationFeatures(gen).function.get(occ.bodyHash)?.blast;
+        if (score === undefined) return this.queryContext.envelope(undefined, gen, freshness);
+        const projected = projectBlastMembers({
+          generation: gen,
+          bodyHash: occ.bodyHash,
+          symbolId,
+          filter,
+          options: opts,
+          projectKey: this.queryContext.projectKey,
+        });
+        if (!projected.ok) return projected;
+        const symbol = projected.value.requested;
+        if (symbol === undefined)
+          return this.queryContext.envelope(undefined, gen, freshness, projected.value.options);
+        return this.queryContext.envelope(
+          {
+            symbol,
+            members: projected.value.members,
+            totalMembership: projected.value.totalMembership,
+            ...score,
+            identityMode: 'body-twin-union',
+            twinCount: projected.value.twinCount,
+            ...(projected.value.filteringLimitations.length === 0
+              ? {}
+              : { filteringLimitations: projected.value.filteringLimitations }),
+          },
+          gen,
+          freshness,
+          projected.value.options,
+        );
+      },
+    );
   }
 
-  async refresh(): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> {
-    const rebuild = this.deps.rebuild;
-    if (rebuild === undefined) {
-      return err(
-        readError(
-          'refresh-unavailable',
-          'graph refresh is not wired (the rebuild provider is supplied by the host command).',
-        ),
-      );
-    }
-    // Serialize concurrent refreshes to ONE rebuild: a second caller awaits the
-    // in-flight build rather than launching a duplicate. In-flight reads keep the
-    // prior generation until the swap completes (TOCTOU-safe; catalog-generation.ts).
-    this.inFlightRefresh ??= this.runRebuild(rebuild);
-    try {
-      return await this.inFlightRefresh;
-    } finally {
-      this.inFlightRefresh = undefined;
-    }
+  private generationFeatures(gen: CatalogGeneration): FeatureTable {
+    if (gen.derived.features !== undefined) return gen.derived.features;
+    const columns: readonly FeatureColumn[] = ['blast', 'packageCoupling', 'reachableFromEntry'];
+    const features = deriveGraphReadFeatures(gen.catalog, gen.indexes, this.config, columns);
+    gen.derived.features = features;
+    return features;
   }
 
-  /** One rebuild: runs the provider, then swaps the generation atomically on success. */
-  private async runRebuild(
-    rebuild: () => Promise<Result<Catalog, McpReadError>>,
-  ): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>> {
-    try {
-      const rebuilt = await rebuild();
-      if (!rebuilt.ok) return rebuilt;
-      const next = createGeneration(rebuilt.value);
-      this.generation = next;
-      this.loadError = undefined;
-      this.loaded = true;
-      this.invalidateDerived();
-      return ok(this.wrap({ builtAt: next.builtAt }, next));
-    } catch {
-      return err(unexpectedRefreshError());
-    }
+  async deadCode(
+    query?: DeadCodeQuery,
+  ): Promise<Result<GraphToolResult<readonly DeadCodeDto[]>, McpReadError>> {
+    const limit = clampLimit(query?.limit, DEFAULT_SEARCH_LIMIT);
+    const filter = this.queryContext.resolveFilter(query?.filter, 'discover');
+    const groupBy = query?.groupBy ?? 'none';
+    const queryDigest = digestNormalizedQuery({
+      op: 'deadCode',
+      filter,
+      groupBy,
+    });
+    return this.queryContext.runQuery(
+      'deadCode',
+      { identityMode: 'occurrence', sourceScope: filter.sourceScope },
+      (gen, freshness) => {
+        if (gen === undefined) {
+          const cursor = rejectCursorWithoutGeneration(query?.cursor, {
+            projectKey: this.queryContext.projectKey,
+            queryDigest,
+          });
+          if (!cursor.ok) return cursor;
+          return this.queryContext.envelope([] as readonly DeadCodeDto[], gen, freshness, {
+            coverage: { complete: true, truncated: false, reasons: [] },
+            page: { limit },
+            filter,
+          });
+        }
+        const binding = {
+          projectKey: this.queryContext.projectKey,
+          generationKey: gen.key,
+          queryDigest,
+        };
+        const after = this.queryContext.resolveAfterKey(query?.cursor, binding);
+        if (!after.ok) return after;
+        const page = pageDeadCode({
+          generation: gen,
+          config: this.config,
+          filter,
+          limit,
+          afterKey: after.value,
+          groupBy,
+          cachedFeatures: this.generationFeatures(gen),
+        });
+        if (!page.anchorFound) {
+          return err(readError('cursor-invalid', 'Cursor continuation anchor is invalid.'));
+        }
+        const last = page.rows.at(-1);
+        const nextCursor =
+          page.hasMore && last !== undefined
+            ? this.queryContext.nextCursorFor(binding, continuationToken(deadCodeStableKey(last)))
+            : undefined;
+        return this.queryContext.envelope(page.rows, gen, freshness, {
+          coverage: page.coverage,
+          page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
+          filter,
+          ...(page.groups === undefined ? {} : { groups: page.groups }),
+        });
+      },
+    );
+  }
+
+  async architectureSummary(
+    query?: ArchitectureQuery,
+  ): Promise<Result<GraphToolResult<ArchitectureSummaryDto>, McpReadError>> {
+    const limit = clampLimit(query?.limit, DEFAULT_ARCH_LIMIT);
+    const filter = this.queryContext.resolveFilter(query?.filter, 'production');
+    const groupBy = query?.groupBy ?? 'none';
+    const queryDigest = digestNormalizedQuery({
+      op: 'architectureSummary',
+      filter,
+      groupBy,
+    });
+    return this.queryContext.runQuery(
+      'architectureSummary',
+      { identityMode: 'mixed', sourceScope: filter.sourceScope },
+      (gen, freshness) => {
+        if (gen === undefined) {
+          const cursor = rejectCursorWithoutGeneration(query?.cursor, {
+            projectKey: this.queryContext.projectKey,
+            queryDigest,
+          });
+          if (!cursor.ok) return cursor;
+          return this.queryContext.envelope(emptyArchitecture(filter), gen, freshness, {
+            coverage: { complete: true, truncated: false, reasons: [] },
+            page: { limit },
+            filter,
+          });
+        }
+        const binding = {
+          projectKey: this.queryContext.projectKey,
+          generationKey: gen.key,
+          queryDigest,
+        };
+        const after = this.queryContext.resolveAfterKey(query?.cursor, binding);
+        if (!after.ok) return after;
+        const cursorState = decodeArchitectureCursorState(after.value);
+        if (!cursorState.ok) return cursorState;
+        const view = buildArchitectureView(
+          gen.catalog,
+          gen.indexes,
+          {
+            filter,
+            limit,
+            groupBy,
+            ...(cursorState.value.packageEdgeKey === undefined
+              ? {}
+              : { afterPackageEdgeKey: cursorState.value.packageEdgeKey }),
+            ...(cursorState.value.hotspotKey === undefined
+              ? {}
+              : { afterHotspotKey: cursorState.value.hotspotKey }),
+            packageEdgesDone: cursorState.value.packageEdgesDone,
+            hotspotsDone: cursorState.value.hotspotsDone,
+          },
+          this.generationFeatures(gen),
+        );
+        if (!view.ok) return err(fromGraphReadError(view.error));
+        const nextAfterKey = nextArchitectureAfterKey(cursorState.value, view.value);
+        const nextCursor =
+          nextAfterKey === undefined
+            ? undefined
+            : this.queryContext.nextCursorFor(binding, nextAfterKey);
+        const data: ArchitectureSummaryDto = {
+          languages: view.value.languages,
+          occurrenceCount: view.value.occurrenceCount,
+          uniqueBodyCount: view.value.uniqueBodyCount,
+          callEvidence: view.value.callEvidence,
+          packageCount: view.value.packageCount,
+          packageEdges: view.value.packageEdges,
+          hotspots: view.value.hotspots,
+        };
+        return this.queryContext.envelope(data, gen, freshness, {
+          coverage: view.value.coverage,
+          page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
+          filter: view.value.effectiveFilter,
+          ...(view.value.groups === undefined ? {} : { groups: view.value.groups }),
+        });
+      },
+    );
+  }
+
+  async packageDependencies(
+    query: PackageDependenciesQuery,
+  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>> {
+    return this.packageQueries.packageDependencies(query);
+  }
+
+  async whyDepends(
+    query: WhyDependsQuery,
+  ): Promise<Result<GraphToolResult<WhyDependsDto>, McpReadError>> {
+    return this.packageQueries.whyDepends(query);
+  }
+
+  async packageCycles(
+    query: PackageCyclesQuery,
+  ): Promise<Result<GraphToolResult<PackageCyclesDto>, McpReadError>> {
+    return this.packageQueries.packageCycles(query);
+  }
+
+  async refresh(opts?: {
+    forceRebuild?: boolean;
+  }): Promise<Result<GraphToolResult<RefreshResult>, McpReadError>> {
+    const outcome = await this.controller.refresh(opts?.forceRebuild === true);
+    if (!outcome.ok) return outcome;
+    const gen = outcome.value.generation;
+    const verifiedFreshness = await this.queryContext.freshnessFor(gen);
+    if (!verifiedFreshness.ok && outcome.value.action !== 'rebuilt') return verifiedFreshness;
+    const freshness = verifiedFreshness.ok
+      ? verifiedFreshness.value
+      : { ...unavailableGraphStatus(), builtAt: gen.builtAt };
+    const data: RefreshResult = {
+      generation: {
+        builtAt: gen.builtAt,
+        identity: gen.key,
+        source: gen.source,
+      },
+      action: outcome.value.action,
+      durationMs: outcome.value.durationMs,
+      priorGenerationAvailable: outcome.value.priorGenerationAvailable,
+    };
+    return ok(this.queryContext.envelope(data, gen, freshness));
   }
 }
+
+export { type GraphGeneration } from './graph-read-port.js';

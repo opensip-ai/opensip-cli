@@ -9,7 +9,7 @@ import {
   type Result,
 } from '@opensip-cli/core';
 
-import { readError, type McpReadError } from './mcp-error.js';
+import { readError, sanitizeMcpErrorMessage, type McpReadError } from './mcp-error.js';
 
 import type { RepairApplyVerifyResult } from '@opensip-cli/contracts';
 
@@ -163,7 +163,14 @@ export class CliRepairWritePort implements RepairWritePort {
       });
       child.on('error', (error) => {
         clearTimeout(timer);
-        resolve(err(readError('repair-spawn-failed', error.message)));
+        resolve(
+          err(
+            readError(
+              'repair-spawn-failed',
+              sanitizeMcpErrorMessage(error, { projectRoot: this.projectRoot }),
+            ),
+          ),
+        );
       });
       child.on('close', () => {
         clearTimeout(timer);
@@ -183,7 +190,9 @@ export class CliRepairWritePort implements RepairWritePort {
             err(
               readError(
                 parsed.error.code,
-                `${parsed.error.message}; stderr: ${stderr.trim().slice(0, 500)}`,
+                sanitizeMcpErrorMessage(`${parsed.error.message}; stderr: ${stderr}`, {
+                  projectRoot: this.projectRoot,
+                }),
               ),
             ),
           );

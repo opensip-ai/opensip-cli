@@ -13,9 +13,11 @@
  * under the mcp-owned run — i.e. the real `loadOwningToolCapabilities` path).
  */
 
+import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -28,10 +30,13 @@ import {
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
-import { runGraph } from '@opensip-cli/graph/internal';
+import { CatalogRepo, runGraph } from '@opensip-cli/graph/internal';
 import { typescriptGraphAdapter } from '@opensip-cli/graph-typescript';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { BASE_PROJECT_SOURCE, highFanInProjectSource } from './fixtures/high-fan-in-project.js';
+import { PACKAGE_EVIDENCE_FILES } from './fixtures/package-evidence-project.js';
 
 import type { StoredSession } from '@opensip-cli/contracts';
 import type { Catalog } from '@opensip-cli/graph';
@@ -62,18 +67,46 @@ const CONFIG_YML = [
   '  failOnErrors: 0',
   '  failOnWarnings: 0',
   '  disabledChecks: []',
+  'graph:',
+  '  failOnErrors: 0',
+  '  failOnWarnings: 0',
   '',
 ].join('\n');
-const SOURCE = [
-  'export function main(): number { return helper(); }',
-  'function helper(): number { return 1; }',
-  'function unused(): number { return 7; }',
-  '',
-].join('\n');
+const SOURCE = BASE_PROJECT_SOURCE;
+const OVERSIZED_SESSION_ID = 'graph-e2e-oversized';
 
 const SAFE_ENV: Record<string, string> = Object.fromEntries(
   Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
 );
+
+async function runBuiltCli(root: string, args: readonly string[]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(process.execPath, [CLI_DIST, ...args], {
+      cwd: root,
+      env: SAFE_ENV,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) resolve();
+      else {
+        reject(
+          new Error(
+            `built CLI exited ${String(code)}: stdout=${stdout.slice(0, 2000)} stderr=${stderr.slice(0, 2000)}`,
+          ),
+        );
+      }
+    });
+  });
+}
 
 /** Materialize a fixture project layout; returns the project root. */
 function scaffold(): string {
@@ -82,13 +115,65 @@ function scaffold(): string {
   writeFileSync(join(root, 'opensip-cli.config.yml'), CONFIG_YML, 'utf8');
   writeFileSync(join(root, 'tsconfig.json'), TSCONFIG, 'utf8');
   writeFileSync(join(root, 'index.ts'), SOURCE, 'utf8');
+  for (const file of PACKAGE_EVIDENCE_FILES) {
+    const path = join(root, file.path);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, file.content, 'utf8');
+  }
+  return root;
+}
+
+function scaffoldIsolated(
+  files: readonly { readonly path: string; readonly content: string }[],
+): string {
+  const root = mkdtempSync(join(tmpdir(), 'mcp-e2e-isolated-'));
+  mkdirSync(join(root, 'opensip-cli', '.runtime'), { recursive: true });
+  writeFileSync(join(root, 'opensip-cli.config.yml'), CONFIG_YML, 'utf8');
+  writeFileSync(join(root, 'tsconfig.json'), TSCONFIG, 'utf8');
+  for (const file of files) {
+    const path = join(root, file.path);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, file.content, 'utf8');
+  }
   return root;
 }
 
 /** Open the project datastore at its canonical path. */
 function openProjectStore(root: string): DataStore {
-  const path = `${resolveProjectPaths(root).runtimeDir}/datastore.sqlite`;
-  return DataStoreFactory.open({ backend: 'sqlite', path });
+  return DataStoreFactory.open({
+    backend: 'sqlite',
+    path: projectDatabasePath(root),
+  });
+}
+
+function projectDatabasePath(root: string): string {
+  return `${resolveProjectPaths(root).runtimeDir}/datastore.sqlite`;
+}
+
+function withRawProjectDatabase<T>(root: string, use: (database: DatabaseSync) => T): T {
+  const database = new DatabaseSync(projectDatabasePath(root));
+  try {
+    return use(database);
+  } finally {
+    database.close();
+  }
+}
+
+function countLogEvent(stderr: string, event: string): number {
+  return stderr.split(event).length - 1;
+}
+
+function concurrentRefreshSource(epoch: 'old' | 'new', count = 500): string {
+  const marker = `${epoch}Epoch`;
+  return [
+    `export function ${marker}(): number { return 1; }`,
+    ...Array.from(
+      { length: count },
+      (_, index) =>
+        `export function ${epoch}Caller${String(index)}(): number { return ${marker}(); }`,
+    ),
+    '',
+  ].join('\n');
 }
 
 interface Connected {
@@ -139,8 +224,22 @@ async function call(
   return JSON.parse(first?.text ?? '{}') as Record<string, unknown>;
 }
 
+async function expectValidationError(
+  conn: Connected,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<void> {
+  const result = await conn.client.callTool({ name, arguments: args });
+  expect(result.isError).toBe(true);
+  const content = result.content as { type: string; text?: string }[];
+  expect(content[0]?.text).toMatch(/input validation.*unrecognized/is);
+  expect(content[0]?.text).toContain('unexpected');
+}
+
 let fixtureA: string;
 let fixtureB: string;
+let lifecycleFixture: string;
+let entrySymbolId: string;
 let helperSymbolId: string;
 let helperFile: string;
 let helperLine: number;
@@ -158,6 +257,8 @@ function graphSession(root: string): StoredSession {
     startedAt: '2026-05-21T12:00:00.000Z',
     completedAt: '2026-05-21T12:00:30.000Z',
     cwd: root,
+    suiteRunId: 'suite-e2e-1',
+    suiteName: 'audit',
     recipe: 'default',
     score: 90,
     passed: true,
@@ -186,6 +287,122 @@ function graphSession(root: string): StoredSession {
   };
 }
 
+function oversizedGraphSession(root: string): StoredSession {
+  const count = 8500;
+  return {
+    ...graphSession(root),
+    id: OVERSIZED_SESSION_ID,
+    startedAt: '2026-05-20T12:00:00.000Z',
+    completedAt: '2026-05-20T12:00:30.000Z',
+    suiteRunId: 'suite-oversized',
+    suiteName: 'oversized',
+    payload: {
+      summary: {
+        total: count,
+        passed: 0,
+        failed: count,
+        errors: 0,
+        warnings: count,
+      },
+      checks: [
+        {
+          checkSlug: 'graph:large-function',
+          passed: false,
+          violationCount: count,
+          durationMs: 5,
+          findings: Array.from({ length: count }, (_, index) => ({
+            ruleId: 'graph:large-function',
+            message: 'x'.repeat(512),
+            severity: 'warning',
+            filePath: `oversized-${String(index)}.ts`,
+            line: 1,
+            violationCount: 1,
+          })),
+        },
+      ],
+    },
+  };
+}
+
+function withTraversalEvidenceFixture(catalog: Catalog): Catalog {
+  return {
+    ...catalog,
+    functions: Object.fromEntries(
+      Object.entries(catalog.functions).map(([name, occurrences]) => [
+        name,
+        occurrences.map((occurrence) => {
+          if (occurrence.simpleName === 'main') {
+            return {
+              ...occurrence,
+              calls: occurrence.calls.map((edge) => ({
+                ...edge,
+                resolution: 'semantic' as const,
+                confidence: 'high' as const,
+                crossShard: true,
+              })),
+            };
+          }
+          if (occurrence.simpleName === 'entry') {
+            return {
+              ...occurrence,
+              calls: occurrence.calls.map((edge) => ({
+                ...edge,
+                confidence: 'medium' as const,
+              })),
+            };
+          }
+          return occurrence;
+        }),
+      ]),
+    ),
+  };
+}
+
+function expectUnavailableStoredReview(
+  review: Record<string, unknown>,
+  suiteRunId = 'suite-e2e-1',
+): void {
+  expect(review.data).toMatchObject({
+    reviewBrief: { version: 1 },
+    source: { suiteRunId, sessionIds: ['graph-e2e-1'] },
+    freshness: {
+      graph: {
+        fresh: false,
+        verification: 'partial',
+        reasonCode: 'verification-unavailable',
+        reason: 'Graph status unavailable',
+      },
+    },
+  });
+  const serialized = JSON.stringify(review);
+  expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThan(64 * 1024);
+  expect(serialized).not.toMatch(/GRAPH\.READ|catalog-(?:identity|generation|sync)-failed/i);
+}
+
+function expectScrubbedDiagnostics(conn: Connected, root: string): void {
+  expect(conn.stderr).not.toContain(root);
+  expect(conn.stderr).not.toMatch(/\s+at\s+.*:\d+/u);
+  expect(Buffer.byteLength(conn.stderr, 'utf8')).toBeLessThan(64 * 1024);
+}
+
+async function seedLifecycleFixture(root: string): Promise<void> {
+  const store = openProjectStore(root);
+  try {
+    const scope = new RunScope();
+    applyToolContributeScope(scope, graphTool);
+    const outcome = await runWithScope(scope, () => {
+      currentAdapterRegistry().register(typescriptGraphAdapter);
+      return runGraph({ cwd: root, datastore: store });
+    });
+    if (outcome.catalog === null) {
+      throw new Error('lifecycle e2e seeding failed: runGraph produced no catalog');
+    }
+    new SessionRepo(store).save(graphSession(root));
+  } finally {
+    store.close();
+  }
+}
+
 beforeAll(async () => {
   if (!existsSync(CLI_DIST)) {
     throw new Error(
@@ -202,8 +419,12 @@ beforeAll(async () => {
     currentAdapterRegistry().register(typescriptGraphAdapter);
     return runGraph({ cwd: fixtureA, datastore: store });
   });
-  const catalog: Catalog | null = outcome.catalog;
-  if (catalog === null) throw new Error('e2e seeding failed: runGraph produced no catalog');
+  const builtCatalog: Catalog | null = outcome.catalog;
+  if (builtCatalog === null) throw new Error('e2e seeding failed: runGraph produced no catalog');
+  // Keep the stdio projection proof deterministic: the catalog still comes
+  // from the real adapter, with two edge labels varied to exercise transport.
+  const catalog = withTraversalEvidenceFixture(builtCatalog);
+  new CatalogRepo(store).replaceAll(catalog);
   // Recover helper's symbolId from the seeded catalog.
   for (const occs of Object.values(catalog.functions)) {
     for (const occ of occs) {
@@ -212,34 +433,129 @@ beforeAll(async () => {
         helperFile = occ.filePath;
         helperLine = occ.line;
       }
+      if (occ.simpleName === 'entry') {
+        entrySymbolId = `${occ.filePath}:${String(occ.line)}:${String(occ.column)}`;
+      }
     }
   }
-  new SessionRepo(store).save(graphSession(fixtureA));
+  const sessions = new SessionRepo(store);
+  sessions.save(oversizedGraphSession(fixtureA));
+  sessions.save(graphSession(fixtureA));
   store.close();
   if (!helperSymbolId) throw new Error('e2e seeding failed: helper symbol not found in catalog');
+  if (!entrySymbolId) throw new Error('e2e seeding failed: entry symbol not found in catalog');
 
   // Fixture B: a project with NO catalog (refresh_graph must build it).
   fixtureB = scaffold();
+
+  // Dedicated fixture for destructive/transient catalog lifecycle faults.
+  lifecycleFixture = scaffold();
+  await seedLifecycleFixture(lifecycleFixture);
 }, 120_000);
 
 afterAll(() => {
   if (fixtureA) rmSync(fixtureA, { recursive: true, force: true });
   if (fixtureB) rmSync(fixtureB, { recursive: true, force: true });
+  if (lifecycleFixture) rmSync(lifecycleFixture, { recursive: true, force: true });
 });
 
 describe('MCP e2e over real stdio', () => {
-  it('handshakes and lists all 15 tools', async () => {
+  it('handshakes and lists all 19 tools', async () => {
     const conn = await connect(fixtureA);
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(15);
+      expect(tools.tools).toHaveLength(19);
       const names = tools.tools.map((t) => t.name).sort();
-      expect(names).toContain('get_symbol');
-      expect(names).toContain('who_calls');
-      expect(names).toContain('get_latest_findings');
-      expect(names).toContain('review_change');
-      expect(names).toContain('compare_to_baseline');
-      expect(names).toContain('refresh_graph');
+      expect(names).toEqual(
+        [
+          'blast_radius',
+          'callees_of',
+          'compare_to_baseline',
+          'find_dead_code',
+          'get_agent_catalog',
+          'get_architecture',
+          'get_latest_findings',
+          'get_runtime_wiring',
+          'get_symbol',
+          'list_runs',
+          'package_cycles',
+          'package_dependencies',
+          'refresh_graph',
+          'review_change',
+          'search_symbols',
+          'show_run',
+          'trace_path',
+          'who_calls',
+          'why_depends',
+        ].sort(),
+      );
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
+
+  it('rejects unknown arguments for every default tool at the real SDK boundary', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const calls: readonly [string, Record<string, unknown>][] = [
+        ['blast_radius', { symbolId: 'src/a.ts:1:0' }],
+        ['callees_of', { symbolId: 'src/a.ts:1:0' }],
+        ['compare_to_baseline', { tool: 'fit' }],
+        ['find_dead_code', {}],
+        ['get_agent_catalog', {}],
+        ['get_architecture', {}],
+        ['get_latest_findings', { tool: 'fit' }],
+        ['get_runtime_wiring', {}],
+        ['get_symbol', { file: 'src/a.ts', line: 1 }],
+        ['list_runs', {}],
+        ['package_cycles', {}],
+        ['package_dependencies', {}],
+        ['refresh_graph', {}],
+        ['review_change', {}],
+        ['search_symbols', { query: 'a' }],
+        ['show_run', { ref: 'latest', tool: 'fit' }],
+        ['trace_path', { fromSymbolId: 'src/a.ts:1:0', toSymbolId: 'src/b.ts:1:0' }],
+        ['who_calls', { symbolId: 'src/a.ts:1:0' }],
+        ['why_depends', { fromPackage: 'a', toPackage: 'b' }],
+      ];
+      for (const [name, args] of calls) {
+        await expectValidationError(conn, name, { ...args, unexpected: true });
+      }
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
+
+  it('rejects hostile enum, path, array, and limit inputs at the real SDK boundary', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const hostileCalls: readonly [string, Record<string, unknown>, RegExp][] = [
+        ['search_symbols', { query: 'helper', match: 'regex' }, /match|enum|option/i],
+        ['search_symbols', { query: 'helper', filePath: '../private.ts' }, /filePath|traversal/i],
+        [
+          'search_symbols',
+          { query: 'helper', filePrefix: '\\\\server\\share\\private.ts' },
+          /filePrefix|traversal/i,
+        ],
+        [
+          'search_symbols',
+          {
+            query: 'helper',
+            packages: Array.from({ length: 51 }, (_, index) => `@fixture/pkg-${String(index)}`),
+          },
+          /packages|array|50/i,
+        ],
+        ['search_symbols', { query: 'helper', limit: 501 }, /limit|500|number/i],
+      ];
+
+      for (const [name, args, expected] of hostileCalls) {
+        const result = await conn.client.callTool({ name, arguments: args });
+        expect(result.isError).toBe(true);
+        const serialized = JSON.stringify(result.content);
+        expect(serialized).toMatch(/input validation/i);
+        expect(serialized).toMatch(expected);
+        expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThan(4 * 1024 * 1024);
+      }
     } finally {
       await conn.client.close();
     }
@@ -249,8 +565,39 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(fixtureA, { allowMutations: true });
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(16);
-      expect(tools.tools.map((t) => t.name)).toContain('repair_apply_verify');
+      expect(tools.tools).toHaveLength(20);
+      const names = tools.tools.map((tool) => tool.name);
+      expect(new Set(names)).toEqual(
+        new Set([
+          'blast_radius',
+          'callees_of',
+          'compare_to_baseline',
+          'find_dead_code',
+          'get_agent_catalog',
+          'get_architecture',
+          'get_latest_findings',
+          'get_runtime_wiring',
+          'get_symbol',
+          'list_runs',
+          'package_cycles',
+          'package_dependencies',
+          'refresh_graph',
+          'repair_apply_verify',
+          'review_change',
+          'search_symbols',
+          'show_run',
+          'trace_path',
+          'who_calls',
+          'why_depends',
+        ]),
+      );
+      await expectValidationError(conn, 'repair_apply_verify', {
+        ref: 'latest',
+        tool: 'fit',
+        signal: 'index:0',
+        action: 'fixture',
+        unexpected: true,
+      });
     } finally {
       await conn.client.close();
     }
@@ -261,59 +608,999 @@ describe('MCP e2e over real stdio', () => {
     try {
       // who_calls: proves the captured RunScope (datastore + graph port) reached
       // an EventEmitter-dispatched handler — not just `initialize`.
-      const who = await call(conn, 'who_calls', { symbolId: helperSymbolId, depth: 5 });
-      const callers = who.data as { qualifiedName: string }[];
-      expect(callers.some((c) => c.qualifiedName.includes('main'))).toBe(true);
+      const who = await call(conn, 'who_calls', {
+        symbolId: helperSymbolId,
+        depth: 5,
+      });
+      const traversal = who.data as
+        | { symbol: { qualifiedName: string } }[]
+        | { nodes?: { symbol: { qualifiedName: string } }[] };
+      const callers = Array.isArray(traversal) ? traversal : (traversal.nodes ?? []);
+      expect(callers.some((caller) => caller.symbol.qualifiedName.includes('main'))).toBe(true);
 
       // get_symbol over file+line resolves to a stable symbolId.
-      const sym = await call(conn, 'get_symbol', { file: helperFile, line: helperLine });
-      const resolved = (sym.data ?? (sym.candidates as unknown[])?.[0]) as { symbolId: string };
+      const sym = await call(conn, 'get_symbol', {
+        file: helperFile,
+        line: helperLine,
+      });
+      const resolved = (sym.data ?? (sym.candidates as unknown[])?.[0]) as {
+        symbolId: string;
+      };
       expect(resolved.symbolId).toBe(helperSymbolId);
     } finally {
       await conn.client.close();
     }
   }, 60_000);
 
-  it('serves the result-first path: get_latest_findings replays a seeded run (never re-runs)', async () => {
+  it('preserves mixed-confidence and cross-shard evidence through a built stdio trace', async () => {
     const conn = await connect(fixtureA);
     try {
-      const out = await call(conn, 'get_latest_findings', { tool: 'graph' });
-      const findings = out.data as { ruleId: string; message: string }[];
-      expect(findings.some((f) => f.ruleId === 'graph:large-function')).toBe(true);
-      expect(out.session).toMatchObject({ tool: 'graph' });
+      const trace = await call(conn, 'trace_path', {
+        fromSymbolId: entrySymbolId,
+        toSymbolId: helperSymbolId,
+        depth: 5,
+      });
+      const data = trace.data as {
+        found: boolean;
+        weakestConfidence?: string;
+        hops?: {
+          evidence: { confidence: string; crossShard: boolean }[];
+        }[];
+      };
+      expect(data.found).toBe(true);
+      const evidence = (data.hops ?? []).flatMap((hop) => hop.evidence);
+      expect(evidence.map((edge) => edge.confidence)).toEqual(
+        expect.arrayContaining(['high', 'medium']),
+      );
+      expect(evidence.some((edge) => edge.crossShard)).toBe(true);
+      expect(data.weakestConfidence).toBe('medium');
     } finally {
       await conn.client.close();
     }
   }, 60_000);
 
-  it('reports freshness.fresh === false after a tracked file is mutated (stale catalog)', async () => {
-    // Mutate a tracked source file → the persisted fingerprint no longer matches.
+  it('auto-swaps an externally written generation and serves all four audit additions', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const before = await call(conn, 'get_architecture', {});
+      const beforeCatalog = (before.context as { catalog: { identity?: string } }).catalog;
+      expect(beforeCatalog.identity).toMatch(/^g1:[a-f0-9]{64}$/);
+
+      writeFileSync(join(fixtureA, 'index.ts'), highFanInProjectSource(), 'utf8');
+      await runBuiltCli(fixtureA, ['graph', '--cwd', fixtureA]);
+
+      const after = await call(conn, 'get_architecture', {});
+      const afterCatalog = (
+        after.context as {
+          catalog: { identity?: string; generationSource?: string };
+        }
+      ).catalog;
+      expect(afterCatalog.identity).toMatch(/^g1:[a-f0-9]{64}$/);
+      expect(afterCatalog.identity).not.toBe(beforeCatalog.identity);
+      expect(afterCatalog.generationSource).toBe('persisted-auto-swap');
+      expect((after.context as { project: { root: string } }).project.root).toBe(fixtureA);
+      expect(conn.stderr).not.toContain('mcp.graph.refresh.completed');
+
+      const packageDeps = await call(conn, 'package_dependencies', {
+        edgeKind: 'combined',
+        sourceScope: 'all',
+        generated: 'include',
+        limit: 100,
+      });
+      const packageData = packageDeps.data as {
+        edgeKind: string;
+        calls: { fromPackage: string; toPackage: string }[];
+        imports: { fromPackage: string; target: string }[];
+      };
+      expect(packageData.edgeKind).toBe('combined');
+      expect(packageData.calls).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            fromPackage: '@fixture/a',
+            toPackage: '@fixture/b',
+          }),
+          expect.objectContaining({
+            fromPackage: '@fixture/b',
+            toPackage: '@fixture/a',
+          }),
+        ]),
+      );
+      expect(packageData.imports).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            fromPackage: '@fixture/a',
+            target: '@fixture/b',
+          }),
+          expect.objectContaining({
+            fromPackage: '@fixture/b',
+            target: '@fixture/a',
+          }),
+        ]),
+      );
+      const why = await call(conn, 'why_depends', {
+        fromPackage: '@fixture/a',
+        toPackage: '@fixture/b',
+        edgeKind: 'combined',
+        sourceScope: 'all',
+        generated: 'include',
+      });
+      const whyData = why.data as {
+        edgeKind: string;
+        calls: { from: { package: string }; to: { package: string } }[];
+        imports: { fromPackage: string; toPackage: string | null }[];
+        totalMatchingEvidence: number;
+      };
+      expect(whyData.edgeKind).toBe('combined');
+      expect(whyData.totalMatchingEvidence).toBeGreaterThanOrEqual(2);
+      expect(whyData.calls).toContainEqual(
+        expect.objectContaining({
+          from: expect.objectContaining({ package: '@fixture/a' }),
+          to: expect.objectContaining({ package: '@fixture/b' }),
+        }),
+      );
+      expect(whyData.imports).toContainEqual(
+        expect.objectContaining({
+          fromPackage: '@fixture/a',
+          toPackage: '@fixture/b',
+        }),
+      );
+      const cycles = await call(conn, 'package_cycles', {
+        edgeKind: 'combined',
+        sourceScope: 'all',
+        generated: 'include',
+      });
+      const cycleData = cycles.data as {
+        edgeKind: string;
+        components: { packages: string[]; proofEdges: { kind: string }[] }[];
+      };
+      expect(cycleData.edgeKind).toBe('combined');
+      expect(cycleData.components).toContainEqual(
+        expect.objectContaining({
+          packages: ['@fixture/a', '@fixture/b'],
+          proofEdges: expect.arrayContaining([
+            expect.objectContaining({ kind: 'call' }),
+            expect.objectContaining({ kind: 'import' }),
+          ]),
+        }),
+      );
+
+      const wiring = await call(conn, 'get_runtime_wiring', {
+        tool: 'graph',
+        groupBy: 'tool',
+        limit: 100,
+      });
+      expect(wiring.context).toMatchObject({
+        projectKey: expect.any(String),
+        snapshotKey: expect.stringMatching(/^g1:[a-f0-9]{64}$/),
+      });
+      expect(Array.isArray(wiring.nodes)).toBe(true);
+      expect(wiring.coverage).toMatchObject({
+        scope: 'captured-admitted-tool-registry',
+      });
+      expect((wiring.coverage as { reasons: string[] }).reasons).toContain(
+        'top-level-host-commands-outside-port',
+      );
+      const wiringEdges = wiring.edges as {
+        from: string;
+        to: string;
+        kind: string;
+        source: string;
+        confidence: string;
+        staticBridge: string;
+      }[];
+      expect(wiringEdges.map((edge) => edge.kind)).toEqual(
+        expect.arrayContaining([
+          'manifest-admits-tool',
+          'registry-owns-command',
+          'command-nests-under',
+          'host-mounts-command',
+          'command-dispatches-handler',
+        ]),
+      );
+      expect(
+        wiringEdges.every(
+          (edge) =>
+            edge.source.length > 0 && edge.confidence.length > 0 && edge.staticBridge.length > 0,
+        ),
+      ).toBe(true);
+      expect(wiringEdges).toContainEqual(
+        expect.objectContaining({
+          kind: 'command-dispatches-handler',
+          source: 'command-spec',
+          staticBridge: 'unresolved',
+        }),
+      );
+      const runtimeNodes = wiring.nodes as { id: string; kind: string }[];
+      const dispatchEdge = wiringEdges.find((edge) => edge.kind === 'command-dispatches-handler');
+      expect(runtimeNodes.find((node) => node.id === dispatchEdge?.from)?.kind).toBe('host-mount');
+      expect(runtimeNodes.find((node) => node.id === dispatchEdge?.to)?.kind).toBe('handler');
+
+      const firstSearch = await call(conn, 'search_symbols', {
+        query: 'caller',
+        match: 'substring',
+        filePath: 'index.ts',
+        filePrefix: 'index.ts',
+        sourceScope: 'production',
+        generated: 'exclude',
+        groupBy: 'file',
+        limit: 5,
+      });
+      const firstSymbols = firstSearch.data as {
+        symbolId: string;
+        simpleName: string;
+      }[];
+      const searchCursor = (firstSearch.page as { nextCursor?: string }).nextCursor;
+      expect(firstSymbols).toHaveLength(5);
+      expect(firstSymbols.every((symbol) => symbol.simpleName.startsWith('caller'))).toBe(true);
+      expect(searchCursor).toBeTypeOf('string');
+      expect(firstSearch.groups).toContainEqual({
+        key: 'index.ts',
+        count: 2100,
+      });
+      if (searchCursor === undefined) throw new Error('high-fan-in search did not page');
+
+      const cursorPayload = JSON.parse(Buffer.from(searchCursor, 'base64url').toString('utf8')) as {
+        projectKey: string;
+        generationKey: string;
+        integrity: string;
+      };
+      expect(cursorPayload.projectKey).not.toBe(cursorPayload.generationKey);
+      expect(cursorPayload.generationKey).toBe(afterCatalog.identity);
+
+      const secondSearch = await call(conn, 'search_symbols', {
+        query: 'caller',
+        match: 'substring',
+        filePath: 'index.ts',
+        filePrefix: 'index.ts',
+        sourceScope: 'production',
+        generated: 'exclude',
+        groupBy: 'file',
+        limit: 5,
+        cursor: searchCursor,
+      });
+      const secondSymbols = secondSearch.data as { symbolId: string }[];
+      const firstIds = new Set(firstSymbols.map((symbol) => symbol.symbolId));
+      expect(secondSymbols).toHaveLength(5);
+      expect(secondSymbols.every((symbol) => !firstIds.has(symbol.symbolId))).toBe(true);
+
+      const exactHelper = await call(conn, 'search_symbols', {
+        query: 'helper',
+        match: 'exact',
+        filePath: 'index.ts',
+      });
+      const helper = (exactHelper.data as { symbolId: string; qualifiedName: string }[])[0];
+      expect(helper).toBeDefined();
+      if (helper === undefined) throw new Error('exact helper search returned no symbol');
+      const qualifiedHelper = await call(conn, 'search_symbols', {
+        query: helper.qualifiedName,
+        match: 'qualified',
+        filePath: 'index.ts',
+      });
+      expect(qualifiedHelper.data).toEqual(
+        expect.arrayContaining([expect.objectContaining({ symbolId: helper.symbolId })]),
+      );
+
+      const fanIn = await call(conn, 'who_calls', {
+        symbolId: helper.symbolId,
+        depth: 1,
+        limit: 10,
+        groupBy: 'file',
+      });
+      const fanInNodes = (fanIn.data as { nodes: { symbol: { symbolId: string } }[] }).nodes;
+      const fanInCursor = (fanIn.page as { nextCursor?: string }).nextCursor;
+      expect(fanInNodes).toHaveLength(10);
+      expect(fanInCursor).toBeTypeOf('string');
+      expect(fanIn.coverage).toMatchObject({
+        complete: false,
+        truncated: true,
+      });
+      if (fanInCursor === undefined) throw new Error('high-fan-in traversal did not page');
+      const fanInNext = await call(conn, 'who_calls', {
+        symbolId: helper.symbolId,
+        depth: 1,
+        limit: 10,
+        groupBy: 'file',
+        cursor: fanInCursor,
+      });
+      const firstFanInIds = new Set(fanInNodes.map((node) => node.symbol.symbolId));
+      const nextFanInNodes = (fanInNext.data as { nodes: { symbol: { symbolId: string } }[] })
+        .nodes;
+      expect(nextFanInNodes.every((node) => !firstFanInIds.has(node.symbol.symbolId))).toBe(true);
+
+      const unused = await call(conn, 'search_symbols', {
+        query: 'unused',
+        match: 'exact',
+      });
+      const unusedSymbol = (unused.data as { symbolId: string }[])[0];
+      expect(unusedSymbol).toBeDefined();
+      if (unusedSymbol === undefined) throw new Error('unused symbol not found');
+      const noPath = await call(conn, 'trace_path', {
+        fromSymbolId: helper.symbolId,
+        toSymbolId: unusedSymbol.symbolId,
+        depth: 5,
+      });
+      expect(noPath.data).toMatchObject({ found: false });
+      expect(noPath.coverage).toMatchObject({
+        complete: true,
+        truncated: false,
+      });
+
+      const twinSearch = await call(conn, 'search_symbols', {
+        query: 'sharedTwin',
+        match: 'exact',
+        sourceScope: 'all',
+      });
+      const twins = twinSearch.data as {
+        symbolId: string;
+        bodyHash: string;
+        filePath: string;
+      }[];
+      const productionTwin = twins.find((symbol) => symbol.filePath.endsWith('/twin.ts'));
+      const testTwin = twins.find((symbol) => symbol.filePath.endsWith('/twin.test.ts'));
+      expect(productionTwin?.bodyHash).toBe(testTwin?.bodyHash);
+      if (productionTwin === undefined) throw new Error('production twin not found');
+      const productionTwinWalk = await call(conn, 'callees_of', {
+        symbolId: productionTwin.symbolId,
+        identity: 'body-twin-union',
+        depth: 2,
+        sourceScope: 'production',
+        generated: 'exclude',
+      });
+      const productionTwinNames = (
+        productionTwinWalk.data as {
+          nodes: { symbol: { simpleName: string } }[];
+        }
+      ).nodes.map((node) => node.symbol.simpleName);
+      expect(productionTwinNames).toContain('fromA');
+      expect(productionTwinNames).not.toContain('fromB');
+      const allTwinWalk = await call(conn, 'callees_of', {
+        symbolId: productionTwin.symbolId,
+        identity: 'body-twin-union',
+        depth: 2,
+        sourceScope: 'all',
+        generated: 'include',
+      });
+      const allTwinNames = (
+        allTwinWalk.data as { nodes: { symbol: { simpleName: string } }[] }
+      ).nodes.map((node) => node.symbol.simpleName);
+      expect(allTwinNames).toEqual(expect.arrayContaining(['fromA', 'fromB']));
+
+      const tamperedPayload = { ...cursorPayload, integrity: '0'.repeat(32) };
+      const tampered = Buffer.from(JSON.stringify(tamperedPayload), 'utf8').toString('base64url');
+      const badCursor = await conn.client.callTool({
+        name: 'search_symbols',
+        arguments: { query: 'caller', limit: 5, cursor: tampered },
+      });
+      expect(badCursor.isError).toBe(true);
+      expect(JSON.stringify(badCursor.content)).toContain('cursor-invalid');
+
+      const runtimePage = await call(conn, 'get_runtime_wiring', { limit: 1 });
+      const runtimeCursor = (runtimePage.page as { nextCursor?: string }).nextCursor;
+      expect(runtimeCursor).toBeTypeOf('string');
+      if (runtimeCursor === undefined) throw new Error('runtime wiring did not page');
+      const otherProject = await connect(fixtureB);
+      try {
+        const wrongProject = await otherProject.client.callTool({
+          name: 'get_runtime_wiring',
+          arguments: { limit: 1, cursor: runtimeCursor },
+        });
+        expect(wrongProject.isError).toBe(true);
+        expect(JSON.stringify(wrongProject.content)).toContain('cursor-project-mismatch');
+      } finally {
+        await otherProject.client.close();
+      }
+
+      const badGraphCall = await conn.client.callTool({
+        name: 'who_calls',
+        arguments: { symbolId: helperSymbolId, depth: 99 },
+      });
+      expect(badGraphCall.isError).toBe(true);
+      expect(JSON.stringify(badGraphCall.content)).toMatch(/depth|expected number to be <=5/i);
+      const runs = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(Array.isArray(runs.runs)).toBe(true);
+    } finally {
+      writeFileSync(join(fixtureA, 'index.ts'), SOURCE, 'utf8');
+      await conn.client.close();
+    }
+  }, 120_000);
+
+  it('tracks forced and auto adapter selection as multi-language dominance changes', async () => {
+    const root = scaffoldIsolated([
+      {
+        path: 'index.ts',
+        content: 'export function typescriptOnly(): number { return 1; }\n',
+      },
+      { path: 'python_one.py', content: 'def python_one():\n    return 1\n' },
+      { path: 'python_two.py', content: 'def python_two():\n    return 2\n' },
+      {
+        path: 'python_three.py',
+        content: 'def python_three():\n    return 3\n',
+      },
+    ]);
+    let conn: Connected | undefined;
+    try {
+      await runBuiltCli(root, [
+        'graph',
+        '--cwd',
+        root,
+        '--language',
+        'typescript',
+        '--exact',
+        '--no-cache',
+      ]);
+      conn = await connect(root);
+
+      const forced = await call(conn, 'get_architecture', {});
+      const forcedCatalog = (
+        forced.context as {
+          catalog: {
+            identity?: string;
+            language?: string;
+            engineMode?: string;
+          };
+        }
+      ).catalog;
+      expect(forcedCatalog).toMatchObject({
+        language: 'typescript',
+        engineMode: 'exact',
+      });
+      expect(forcedCatalog.identity).toMatch(/^g1:[a-f0-9]{64}$/);
+      expect(forced.freshness).toMatchObject({
+        fresh: true,
+        verification: 'complete',
+      });
+
+      await runBuiltCli(root, ['graph', '--cwd', root, '--exact', '--no-cache']);
+      const autoPython = await call(conn, 'get_architecture', {});
+      const pythonCatalog = (
+        autoPython.context as {
+          catalog: {
+            identity?: string;
+            language?: string;
+            generationSource?: string;
+          };
+        }
+      ).catalog;
+      expect(pythonCatalog).toMatchObject({
+        language: 'python',
+        generationSource: 'persisted-auto-swap',
+      });
+      expect(pythonCatalog.identity).not.toBe(forcedCatalog.identity);
+      expect(autoPython.freshness).toMatchObject({
+        fresh: true,
+        verification: 'complete',
+      });
+
+      rmSync(join(root, 'python_two.py'));
+      rmSync(join(root, 'python_three.py'));
+      for (let index = 0; index < 3; index++) {
+        writeFileSync(
+          join(root, `typescript_${String(index)}.ts`),
+          `export function typescript${String(index)}(): number { return ${String(index)}; }\n`,
+          'utf8',
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2200));
+
+      const dominanceDrift = await call(conn, 'get_architecture', {});
+      expect(dominanceDrift.freshness).toMatchObject({
+        fresh: false,
+        verification: 'complete',
+        reasonCode: 'selection-changed',
+      });
+      expect((dominanceDrift.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        pythonCatalog.identity,
+      );
+
+      await runBuiltCli(root, ['graph', '--cwd', root, '--exact', '--no-cache']);
+      const autoTypescript = await call(conn, 'get_architecture', {});
+      const finalCatalog = (
+        autoTypescript.context as {
+          catalog: {
+            identity?: string;
+            language?: string;
+            generationSource?: string;
+          };
+        }
+      ).catalog;
+      expect(finalCatalog).toMatchObject({
+        language: 'typescript',
+        generationSource: 'persisted-auto-swap',
+      });
+      expect(finalCatalog.identity).not.toBe(pythonCatalog.identity);
+      expect(autoTypescript.freshness).toMatchObject({
+        fresh: true,
+        verification: 'complete',
+      });
+      expect(conn.stderr).not.toContain('mcp.graph.refresh.completed');
+    } finally {
+      await conn?.client.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 180_000);
+
+  it('keeps a pre-feature catalog queryable with partial verification until external replacement', async () => {
+    const root = scaffoldIsolated([
+      {
+        path: 'index.ts',
+        content: [
+          'export function legacyEntry(): number { return legacyHelper(); }',
+          'function legacyHelper(): number { return 1; }',
+          '',
+        ].join('\n'),
+      },
+    ]);
+    let conn: Connected | undefined;
+    try {
+      await runBuiltCli(root, [
+        'graph',
+        '--cwd',
+        root,
+        '--language',
+        'typescript',
+        '--exact',
+        '--no-cache',
+      ]);
+      withRawProjectDatabase(root, (database) => {
+        const row = database.prepare('SELECT payload FROM graph_catalog WHERE id = 1').get() as
+          { payload?: unknown } | undefined;
+        if (typeof row?.payload !== 'string') throw new Error('legacy catalog payload is missing');
+        const payload = JSON.parse(row.payload) as Record<string, unknown>;
+        delete payload.adapterSelection;
+        delete payload.engineMode;
+        delete payload.shardCacheInputs;
+        database
+          .prepare('UPDATE graph_catalog SET payload = ? WHERE id = 1')
+          .run(JSON.stringify(payload));
+      });
+
+      conn = await connect(root);
+      const legacy = await call(conn, 'search_symbols', {
+        query: 'legacyHelper',
+        match: 'exact',
+      });
+      expect(legacy.data as unknown[]).toHaveLength(1);
+      expect(legacy.freshness).toMatchObject({
+        fresh: false,
+        verification: 'partial',
+        reasonCode: 'verification-unavailable',
+      });
+      const legacyIdentity = (legacy.context as { catalog: { identity?: string } }).catalog
+        .identity;
+      expect(legacyIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
+
+      await runBuiltCli(root, [
+        'graph',
+        '--cwd',
+        root,
+        '--language',
+        'typescript',
+        '--exact',
+        '--no-cache',
+      ]);
+      const replaced = await call(conn, 'search_symbols', {
+        query: 'legacyHelper',
+        match: 'exact',
+      });
+      expect(replaced.data as unknown[]).toHaveLength(1);
+      expect(replaced.freshness).toMatchObject({
+        fresh: true,
+        verification: 'complete',
+      });
+      expect(replaced.context).toMatchObject({
+        catalog: {
+          language: 'typescript',
+          engineMode: 'exact',
+          generationSource: 'persisted-auto-swap',
+        },
+      });
+      expect((replaced.context as { catalog: { identity?: string } }).catalog.identity).not.toBe(
+        legacyIdentity,
+      );
+      expect(conn.stderr).not.toContain('mcp.graph.refresh.completed');
+    } finally {
+      await conn?.client.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it('serves the result-first path: get_latest_findings replays a seeded run (never re-runs)', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const out = await call(conn, 'get_latest_findings', { tool: 'graph' });
+      expect(Array.isArray(out.data)).toBe(true);
+      expect(out.session).toMatchObject({ tool: 'graph' });
+      const seeded = await call(conn, 'show_run', { ref: 'graph-e2e-1' });
+      expect(JSON.stringify(seeded)).toContain('a seeded finding');
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
+
+  it('enforces the final 4 MiB result ceiling without emitting partial content', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const result = await conn.client.callTool({
+        name: 'show_run',
+        arguments: { ref: OVERSIZED_SESSION_ID },
+      });
+      expect(result.isError).toBe(true);
+      const serialized = JSON.stringify(result.content);
+      expect(serialized).toContain('response-too-large');
+      expect(serialized).toContain('Lower limit or narrow filters');
+      expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThan(4096);
+      expect(serialized).not.toContain('oversized-8499.ts');
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
+
+  it('reports exact add/modify/delete drift and forced-selection config drift', async () => {
+    const deletedFixture = PACKAGE_EVIDENCE_FILES.find(
+      (file) => file.path === 'packages/a/src/twin.ts',
+    );
+    if (deletedFixture === undefined) throw new Error('deleted-file fixture is missing');
+    const addedPath = join(fixtureA, 'added.ts');
+    const deletedPath = join(fixtureA, deletedFixture.path);
+
     writeFileSync(
       join(fixtureA, 'index.ts'),
       SOURCE + '\nexport function added(): number { return 2; }\n',
       'utf8',
     );
+    writeFileSync(addedPath, 'export function newlyAdded(): number { return 3; }\n', 'utf8');
+    rmSync(deletedPath);
     const conn = await connect(fixtureA);
     try {
       const arch = await call(conn, 'get_architecture', {});
-      expect((arch.freshness as { fresh: boolean }).fresh).toBe(false);
+      expect(arch.freshness).toMatchObject({
+        fresh: false,
+        verification: 'complete',
+        reasonCode: 'files-changed',
+        changes: { added: 1, modified: 1, deleted: 1 },
+      });
     } finally {
       await conn.client.close();
     }
-    // Restore so the fixture is reusable / idempotent.
+
     writeFileSync(join(fixtureA, 'index.ts'), SOURCE, 'utf8');
-  }, 60_000);
+    rmSync(addedPath);
+    writeFileSync(deletedPath, deletedFixture.content, 'utf8');
+
+    await runBuiltCli(fixtureA, [
+      'graph',
+      '--cwd',
+      fixtureA,
+      '--language',
+      'typescript',
+      '--exact',
+    ]);
+    const forcedConn = await connect(fixtureA);
+    try {
+      const fresh = await call(forcedConn, 'get_architecture', {});
+      expect(fresh.freshness).toMatchObject({
+        fresh: true,
+        verification: 'complete',
+      });
+    } finally {
+      await forcedConn.client.close();
+    }
+
+    writeFileSync(join(fixtureA, 'tsconfig.json'), TSCONFIG.replace('ES2022', 'ES2021'), 'utf8');
+    const driftConn = await connect(fixtureA);
+    try {
+      const configDrift = await call(driftConn, 'get_architecture', {});
+      expect(configDrift.freshness).toMatchObject({
+        fresh: false,
+        verification: 'complete',
+        reasonCode: 'cache-key-changed',
+      });
+    } finally {
+      writeFileSync(join(fixtureA, 'tsconfig.json'), TSCONFIG, 'utf8');
+      await driftConn.client.close();
+    }
+  }, 180_000);
 
   it('refresh_graph builds a catalog on a project that has none (adapters load under the mcp run)', async () => {
     const conn = await connect(fixtureB);
     try {
+      const beforeRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(beforeRuns.runs).toEqual([]);
       const refreshed = await call(conn, 'refresh_graph', {});
-      expect(typeof refreshed.builtAt).toBe('string');
-      expect(typeof refreshed.durationMs).toBe('number');
+      const refreshData = refreshed.data as {
+        generation: { builtAt: string };
+        durationMs: number;
+        action: string;
+      };
+      expect(typeof refreshData.generation.builtAt).toBe('string');
+      expect(typeof refreshData.durationMs).toBe('number');
+      expect(refreshData.action).toBe('rebuilt');
+      expect(refreshed.context).toBeDefined();
+
+      const noOp = await call(conn, 'refresh_graph', {});
+      expect((noOp.data as { action: string }).action).toBe('no-op');
+
+      writeFileSync(
+        join(fixtureB, 'index.ts'),
+        `${SOURCE}export function externalReload(): number { return helper(); }\n`,
+        'utf8',
+      );
+      await runBuiltCli(fixtureB, ['graph', '--cwd', fixtureB, '--language', 'typescript']);
+      const afterExternalRun = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(afterExternalRun.runs).toHaveLength(1);
+      const reloaded = await call(conn, 'refresh_graph', {});
+      expect((reloaded.data as { action: string }).action).toBe('reloaded');
+
+      const forced = await call(conn, 'refresh_graph', { forceRebuild: true });
+      expect((forced.data as { action: string }).action).toBe('rebuilt');
       // After the rebuild, the catalog is fresh and queryable.
       const search = await call(conn, 'search_symbols', { query: 'helper' });
       expect((search.data as unknown[]).length).toBeGreaterThan(0);
+      const afterRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(afterRuns.runs).toEqual(afterExternalRun.runs);
     } finally {
+      await conn.client.close();
+    }
+  }, 120_000);
+
+  it('single-flights concurrent refreshes across an old-reader/new-reader boundary', async () => {
+    const root = scaffoldIsolated([{ path: 'index.ts', content: concurrentRefreshSource('old') }]);
+    let conn: Connected | undefined;
+    try {
+      await runBuiltCli(root, [
+        'graph',
+        '--cwd',
+        root,
+        '--language',
+        'typescript',
+        '--exact',
+        '--no-cache',
+      ]);
+      conn = await connect(root);
+      const before = await call(conn, 'search_symbols', {
+        query: 'oldEpoch',
+        match: 'exact',
+      });
+      const oldIdentity = (before.context as { catalog: { identity?: string } }).catalog.identity;
+      expect(oldIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
+      expect(before.data as unknown[]).toHaveLength(1);
+
+      writeFileSync(join(root, 'index.ts'), concurrentRefreshSource('new'), 'utf8');
+      await new Promise((resolve) => setTimeout(resolve, 2200));
+      const stderrOffset = conn.stderr.length;
+
+      // Keep these calls in one turn: the reader captures the immutable old
+      // generation while both forced mutations join the controller's flight.
+      const delayedOldReader = call(conn, 'get_architecture', { limit: 500 });
+      const firstRefresh = call(conn, 'refresh_graph', { forceRebuild: true });
+      const secondRefresh = call(conn, 'refresh_graph', { forceRebuild: true });
+      const [oldReader, first, second] = await Promise.all([
+        delayedOldReader,
+        firstRefresh,
+        secondRefresh,
+      ]);
+
+      expect((oldReader.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        oldIdentity,
+      );
+      expect(oldReader.freshness).toMatchObject({
+        fresh: false,
+        verification: 'complete',
+        reasonCode: 'files-changed',
+      });
+      const firstData = first.data as {
+        action: string;
+        generation: { identity: string };
+      };
+      const secondData = second.data as {
+        action: string;
+        generation: { identity: string };
+      };
+      expect(firstData.action).toBe('rebuilt');
+      expect(secondData.action).toBe('rebuilt');
+      expect(firstData.generation.identity).toBe(secondData.generation.identity);
+      expect(firstData.generation.identity).not.toBe(oldIdentity);
+      expect(countLogEvent(conn.stderr.slice(stderrOffset), 'graph.edges.start')).toBe(1);
+
+      const newReader = await call(conn, 'search_symbols', {
+        query: 'newEpoch',
+        match: 'exact',
+      });
+      expect(newReader.data as unknown[]).toHaveLength(1);
+      expect((newReader.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        firstData.generation.identity,
+      );
+      expect(newReader.freshness).toMatchObject({
+        fresh: true,
+        verification: 'complete',
+      });
+      const oldAfterSwap = await call(conn, 'search_symbols', {
+        query: 'oldEpoch',
+        match: 'exact',
+      });
+      expect(oldAfterSwap.data).toEqual([]);
+
+      const followUp = await call(conn, 'refresh_graph', {});
+      expect((followUp.data as { action: string }).action).toBe('no-op');
+    } finally {
+      await conn?.client.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 180_000);
+
+  it('retains the prior generation and persisted result tools after a forced refresh failure', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const before = await call(conn, 'get_architecture', {});
+      const priorIdentity = (before.context as { catalog: { identity?: string } }).catalog.identity;
+      expect(priorIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
+      const beforeRuns = await call(conn, 'list_runs', { tool: 'graph' });
+
+      writeFileSync(join(fixtureA, 'tsconfig.json'), '{"compilerOptions":', 'utf8');
+      const failedRefresh = await conn.client.callTool({
+        name: 'refresh_graph',
+        arguments: { forceRebuild: true },
+      });
+      expect(failedRefresh.isError).toBe(true);
+      const failedText = JSON.stringify(failedRefresh.content);
+      expect(failedText).toMatch(/refresh|rebuild/i);
+      expect(failedText).not.toContain(fixtureA);
+      expect(failedText).not.toMatch(/\s+at\s+.*:\d+/u);
+      expect(Buffer.byteLength(failedText, 'utf8')).toBeLessThan(4096);
+
+      const runs = await call(conn, 'list_runs', { tool: 'graph' });
+      const shown = await call(conn, 'show_run', { ref: 'graph-e2e-1' });
+      const latest = await call(conn, 'get_latest_findings', { tool: 'graph' });
+      const review = await call(conn, 'review_change', {
+        suiteRunId: 'suite-e2e-1',
+      });
+      expect(runs.runs).toEqual(beforeRuns.runs);
+      expect(JSON.stringify(shown)).toContain('a seeded finding');
+      expect(latest.session).toMatchObject({ tool: 'graph' });
+      expect(review.data).toMatchObject({
+        reviewBrief: { version: 1 },
+        source: { suiteRunId: 'suite-e2e-1', sessionIds: ['graph-e2e-1'] },
+        freshness: { graph: expect.any(Object) },
+      });
+
+      writeFileSync(join(fixtureA, 'tsconfig.json'), TSCONFIG, 'utf8');
+      const after = await call(conn, 'get_architecture', {});
+      expect((after.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        priorIdentity,
+      );
+    } finally {
+      writeFileSync(join(fixtureA, 'tsconfig.json'), TSCONFIG, 'utf8');
+      await conn.client.close();
+    }
+  }, 120_000);
+
+  it('degrades stored review replay on an identity-read fault and resumes the prior generation', async () => {
+    const conn = await connect(lifecycleFixture);
+    let catalogRenamed = false;
+    try {
+      const beforeRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      const before = await call(conn, 'get_architecture', {});
+      const priorIdentity = (before.context as { catalog: { identity?: string } }).catalog.identity;
+      expect(priorIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
+
+      withRawProjectDatabase(lifecycleFixture, (database) => {
+        database.exec('ALTER TABLE graph_catalog RENAME TO graph_catalog_identity_fault');
+      });
+      catalogRenamed = true;
+
+      const review = await call(conn, 'review_change', {
+        suiteRunId: 'suite-e2e-1',
+      });
+      expectUnavailableStoredReview(review);
+      const afterRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(afterRuns.runs).toEqual(beforeRuns.runs);
+      expectScrubbedDiagnostics(conn, lifecycleFixture);
+
+      withRawProjectDatabase(lifecycleFixture, (database) => {
+        database.exec('ALTER TABLE graph_catalog_identity_fault RENAME TO graph_catalog');
+      });
+      catalogRenamed = false;
+
+      const recovered = await call(conn, 'search_symbols', {
+        query: 'helper',
+        match: 'exact',
+      });
+      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect((recovered.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        priorIdentity,
+      );
+    } finally {
+      if (catalogRenamed) {
+        withRawProjectDatabase(lifecycleFixture, (database) => {
+          database.exec('ALTER TABLE graph_catalog_identity_fault RENAME TO graph_catalog');
+        });
+      }
+      await conn.client.close();
+    }
+  }, 120_000);
+
+  it('degrades stored review replay on initial generation-load failure and recovers in place', async () => {
+    let originalPayload = '';
+    withRawProjectDatabase(lifecycleFixture, (database) => {
+      const row = database.prepare('SELECT payload FROM graph_catalog WHERE id = 1').get() as
+        { payload?: unknown } | undefined;
+      if (typeof row?.payload !== 'string') throw new Error('lifecycle catalog payload is missing');
+      originalPayload = row.payload;
+      database
+        .prepare('UPDATE graph_catalog SET payload = ? WHERE id = 1')
+        .run('{"version":"3.0","functions":');
+    });
+
+    const conn = await connect(lifecycleFixture);
+    try {
+      // Result-only calls do not initialize a graph generation. The first graph
+      // touch is review_change, so this exercises load/sync with no prior snapshot.
+      const beforeRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      const review = await call(conn, 'review_change', {
+        suiteRunId: 'suite-e2e-1',
+      });
+      expectUnavailableStoredReview(review);
+      const afterRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(afterRuns.runs).toEqual(beforeRuns.runs);
+      expectScrubbedDiagnostics(conn, lifecycleFixture);
+
+      withRawProjectDatabase(lifecycleFixture, (database) => {
+        database.prepare('UPDATE graph_catalog SET payload = ? WHERE id = 1').run(originalPayload);
+      });
+      originalPayload = '';
+
+      const recovered = await call(conn, 'search_symbols', {
+        query: 'helper',
+        match: 'exact',
+      });
+      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(
+        (recovered.context as { catalog: { generationSource?: string } }).catalog.generationSource,
+      ).toBe('initial-load');
+    } finally {
+      if (originalPayload.length > 0) {
+        withRawProjectDatabase(lifecycleFixture, (database) => {
+          database
+            .prepare('UPDATE graph_catalog SET payload = ? WHERE id = 1')
+            .run(originalPayload);
+        });
+      }
+      await conn.client.close();
+    }
+  }, 120_000);
+
+  it('degrades stored review replay on verifier failure and keeps the generation queryable', async () => {
+    const conn = await connect(lifecycleFixture);
+    try {
+      const beforeRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      const before = await call(conn, 'get_architecture', {});
+      const priorIdentity = (before.context as { catalog: { identity?: string } }).catalog.identity;
+      expect(priorIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
+
+      writeFileSync(join(lifecycleFixture, 'tsconfig.json'), '{"compilerOptions":', 'utf8');
+      // Let the bounded successful-verification burst expire so review_change
+      // must execute the real verifier against the malformed config.
+      await new Promise((resolve) => setTimeout(resolve, 2200));
+
+      const review = await call(conn, 'review_change', {
+        suiteRunId: 'suite-e2e-1',
+      });
+      expectUnavailableStoredReview(review);
+      const afterRuns = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(afterRuns.runs).toEqual(beforeRuns.runs);
+      expectScrubbedDiagnostics(conn, lifecycleFixture);
+
+      writeFileSync(join(lifecycleFixture, 'tsconfig.json'), TSCONFIG, 'utf8');
+      const recovered = await call(conn, 'search_symbols', {
+        query: 'helper',
+        match: 'exact',
+      });
+      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect((recovered.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        priorIdentity,
+      );
+    } finally {
+      writeFileSync(join(lifecycleFixture, 'tsconfig.json'), TSCONFIG, 'utf8');
       await conn.client.close();
     }
   }, 120_000);
@@ -327,5 +1614,7 @@ describe('MCP e2e over real stdio', () => {
     await conn.client.close();
     // A graceful close resolves; the child process is torn down by the transport.
     expect(conn.stderr).toContain('mcp.server.start');
+    expect(conn.stderr).not.toContain(fixtureA);
+    expect(Buffer.byteLength(conn.stderr, 'utf8')).toBeLessThan(64 * 1024);
   }, 60_000);
 });

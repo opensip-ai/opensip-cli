@@ -1,22 +1,15 @@
 /** Pure DTO projections shared by the SQLite graph read operations. */
 
-import type { DeadCodeDto } from './graph-read-port.js';
-import type { SymbolRef } from './symbol-dto.js';
-import type { Signal } from '@opensip-cli/core';
-import type { FunctionOccurrence, Indexes } from '@opensip-cli/graph';
+import { toGraphSymbolRef, type GraphSymbolRef, type Indexes } from '@opensip-cli/graph/read';
 
-/** Project one graph occurrence into MCP's metadata-only symbol DTO. */
-export function toSymbolRef(occurrence: FunctionOccurrence): SymbolRef {
-  return {
-    symbolId: `${occurrence.filePath}:${String(occurrence.line)}:${String(occurrence.column)}`,
-    bodyHash: occurrence.bodyHash,
-    qualifiedName: occurrence.qualifiedName,
-    filePath: occurrence.filePath,
-    line: occurrence.line,
-    column: occurrence.column,
-    kind: occurrence.kind,
-    visibility: occurrence.visibility,
-  };
+import type { DeadCodeDto } from './graph-read-port.js';
+import type { Signal } from '@opensip-cli/core';
+
+/** Project one graph occurrence into the public symbol DTO (or undefined if malformed). */
+export function toSymbolRef(
+  occurrence: Parameters<typeof toGraphSymbolRef>[0],
+): GraphSymbolRef | undefined {
+  return toGraphSymbolRef(occurrence);
 }
 
 /** Map a `graph:orphan-subtree` signal to a {@link DeadCodeDto} without filesystem reads. */
@@ -29,18 +22,19 @@ export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | u
     `${code.file}:${String(code.line)}:${String(code.column)}`,
   );
   if (occurrence === undefined) return undefined;
-  return { symbol: toSymbolRef(occurrence), message: signal.message };
-}
-
-/** Total out-edge count across the callees adjacency. */
-export function edgeCount(indexes: Indexes): number {
-  let total = 0;
-  for (const targets of indexes.callees.values()) total += targets.length;
-  return total;
+  const symbol = toSymbolRef(occurrence);
+  if (symbol === undefined) return undefined;
+  return {
+    symbol,
+    message: signal.message,
+    ruleId: 'graph:orphan-subtree',
+    reason: 'unreachable-from-inferred-entry-point',
+    ...(signal.suggestion === undefined ? {} : { suggestion: signal.suggestion }),
+  };
 }
 
 /** Clamp a caller-supplied limit to a positive integer, defaulting when absent. */
 export function clampLimit(limit: number | undefined, fallback: number): number {
-  if (limit === undefined || !Number.isFinite(limit) || limit <= 0) return fallback;
-  return Math.trunc(limit);
+  const selected = limit === undefined || !Number.isFinite(limit) || limit <= 0 ? fallback : limit;
+  return Math.min(500, Math.max(1, Math.trunc(selected)));
 }

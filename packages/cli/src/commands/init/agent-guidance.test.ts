@@ -98,6 +98,27 @@ describe('upsertManagedBlock', () => {
   });
 });
 
+describe('buildManagedAgentGuidance', () => {
+  it('documents the auto-swap, bounded evidence, package, and live-wiring workflow', () => {
+    const guidance = buildManagedAgentGuidance();
+    expect(guidance).toContain('context.project.root');
+    expect(guidance).toContain('context.catalog.identity');
+    expect(guidance).toContain('opaque `g1:` catalog generation identity');
+    expect(guidance).toContain('project key is a separate cursor binding only');
+    expect(guidance).toContain('complete` versus `partial');
+    expect(guidance).toContain('effective filters');
+    expect(guidance).toContain('evidence kind/confidence');
+    expect(guidance).toContain('hard-cap reasons');
+    expect(guidance).toContain('returned cursor');
+    expect(guidance).toContain('auto-load a newer catalog');
+    expect(guidance).toContain('package_dependencies');
+    expect(guidance).toContain('why_depends');
+    expect(guidance).toContain('package_cycles');
+    expect(guidance).toContain('get_runtime_wiring');
+    expect(guidance).not.toMatch(/pinned in-memory generation|refresh_graph once so its pinned/i);
+  });
+});
+
 describe('ensureOpenSipAgentGuidance', () => {
   it('creates AGENTS.md with MCP-first guidance when absent', () => {
     const result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
@@ -127,6 +148,29 @@ describe('ensureOpenSipAgentGuidance', () => {
     expect(countBlocks(agents)).toBe(1);
   });
 
+  it('replaces stale managed text on repeat init while preserving custom content', () => {
+    writeFileSync(
+      join(testDir, 'AGENTS.md'),
+      [
+        '# Custom',
+        '',
+        AGENT_GUIDANCE_START,
+        'Call refresh_graph once so its pinned in-memory generation changes.',
+        AGENT_GUIDANCE_END,
+        '',
+        'Keep this custom tail.',
+      ].join('\n'),
+      'utf8',
+    );
+    ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
+    expect(countBlocks(agents)).toBe(1);
+    expect(agents).toContain('Keep this custom tail.');
+    expect(agents).toContain('auto-load a newer catalog');
+    expect(agents).not.toContain('pinned in-memory generation');
+  });
+
   it('updates existing CLAUDE.md but skips it when absent', () => {
     let result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
     expect(result.targets.find((target) => target.path.endsWith('CLAUDE.md'))?.action).toBe(
@@ -141,6 +185,41 @@ describe('ensureOpenSipAgentGuidance', () => {
     );
     expect(claude).toContain('Custom.');
     expect(claude).toContain('datastore.sqlite');
+  });
+
+  it('keeps existing AGENTS.md and CLAUDE.md managed blocks byte-identical and idempotent', () => {
+    writeFileSync(join(testDir, 'AGENTS.md'), '# Agents\n\nCustom agents.\n', 'utf8');
+    writeFileSync(
+      join(testDir, 'CLAUDE.md'),
+      [
+        '# Claude',
+        '',
+        AGENT_GUIDANCE_START,
+        'stale',
+        AGENT_GUIDANCE_END,
+        '',
+        'Custom claude.',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const first = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
+    const claude = readFileSync(join(testDir, 'CLAUDE.md'), 'utf8');
+    const expected = buildManagedAgentGuidance();
+    expect(agents).toContain(expected);
+    expect(claude).toContain(expected);
+    expect(first.targets.find((target) => target.path.endsWith('AGENTS.md'))?.action).toBe(
+      'updated',
+    );
+    expect(first.targets.find((target) => target.path.endsWith('CLAUDE.md'))?.action).toBe(
+      'updated',
+    );
+
+    const second = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    expect(second.changed).toBe(false);
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe(agents);
+    expect(readFileSync(join(testDir, 'CLAUDE.md'), 'utf8')).toBe(claude);
   });
 
   it('creates Cursor rule only when the parent directory already exists', () => {

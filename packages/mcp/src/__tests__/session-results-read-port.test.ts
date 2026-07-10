@@ -375,7 +375,12 @@ describe('SessionResultsReadPort — reviewChange', () => {
     }).reviewChange({
       suiteRunId: 'suite-1',
       files: ['src/a.ts'],
-      graphFreshness: { fresh: true, builtAt: '2026-05-21T12:00:00.000Z' },
+      graphFreshness: {
+        fresh: true,
+        builtAt: '2026-05-21T12:00:00.000Z',
+        verifiedAt: '2026-05-21T12:00:01.000Z',
+        verification: 'complete',
+      },
     });
     expect(out.ok).toBe(true);
     if (out.ok) {

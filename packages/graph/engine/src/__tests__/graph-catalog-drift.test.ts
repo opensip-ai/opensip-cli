@@ -31,9 +31,18 @@ import type { GraphCatalog } from '@opensip-cli/contracts';
 // `Catalog` shape diverges from contracts' `GraphCatalog`.
 const _engineToContract: GraphCatalog = {} as Catalog;
 void _engineToContract;
+type CatalogWithProvenance = Catalog &
+  Required<Pick<Catalog, 'adapterSelection' | 'engineMode' | 'shardCacheInputs'>>;
+const _evolvedEngineToContract: GraphCatalog = {} as CatalogWithProvenance;
+void _evolvedEngineToContract;
 
 describe('graph-catalog drift detector', () => {
   it('engine Catalog is structurally assignable to contracts GraphCatalog (compile-time)', () => {
     expect(true).toBe(true);
+  });
+
+  it('keeps payload-only provenance within catalog version 3.0', () => {
+    const version: Catalog['version'] = '3.0';
+    expect(version).toBe('3.0');
   });
 });

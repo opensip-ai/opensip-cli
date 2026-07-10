@@ -93,12 +93,11 @@ function readManifestName(pkgJsonPath: string): string | null {
       name?: unknown;
     };
     return typeof parsed.name === 'string' && parsed.name.length > 0 ? parsed.name : null;
-  } catch (error) {
+  } catch {
     logger.debug({
       evt: 'graph.assign_packages.manifest_unreadable',
       module: 'graph:assign-packages',
-      path: pkgJsonPath,
-      err: error instanceof Error ? error.message : String(error),
+      reason: 'read-or-parse-failed',
     });
     return null;
   }
