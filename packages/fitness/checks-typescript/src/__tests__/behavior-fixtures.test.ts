@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -30,7 +30,7 @@ const testScope = new RunScope({ languages: langRegistry });
 // check.run resolves the per-run cache from currentScope()?.fitness?.fileCache
 // (no module-singleton fallback — parallel-tool-invocations Phase 1). Bind the
 // scope cache to the test-only singleton these tests prewarm below.
-Object.assign(testScope, { fitness: { fileCache } });
+Object.assign(testScope, { fitness: { fileCache: fitnessTestFileCache } });
 
 let cwd: string;
 let written: string[] = [];
@@ -51,7 +51,7 @@ function findCheck(slug: string) {
 
 async function runCheck(slug: string) {
   const check = findCheck(slug);
-  await fileCache.prewarm(cwd, ['**/*']);
+  await fitnessTestFileCache.prewarm(cwd, ['**/*']);
   return runWithScope(testScope, () => check.run(cwd, { targetFiles: written }));
 }
 
@@ -61,7 +61,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   rmSync(cwd, { recursive: true, force: true });
 });
 
@@ -1153,7 +1153,7 @@ describe('typescript-frontend — branch coverage', () => {
   it('returns no violations when files list is empty', async () => {
     // No fixture is recorded — written stays empty
     const check = findCheck('typescript-frontend');
-    await fileCache.prewarm(cwd, ['**/*']);
+    await fitnessTestFileCache.prewarm(cwd, ['**/*']);
     const result = await check.run(cwd, { targetFiles: [] });
     expect(result.signals).toHaveLength(0);
   });

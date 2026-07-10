@@ -134,19 +134,36 @@ module.exports = {
         'Use the package public barrel, or promote the symbol into it. ' +
         'Sanctioned owner exceptions: session-store + graph persistence → ' +
         'datastore/internal (ADR-0107); packages/mcp/ → graph/internal (ADR-0084, ' +
-        'temporary until graph/read lands). Owner exceptions are scoped rules below.',
+        'temporary until graph/read lands); packages/test-support/ → fitness/internal ' +
+        '(private test facade). Owner exceptions are scoped rules below.',
       from: {
-        // MCP, session-store, and graph catalog-repo owners are exempt from the
-        // generic rule; each has a scoped allowlist rule below.
+        // MCP, session-store, graph catalog-repo, and private test-support are
+        // exempt from the generic rule; each has a scoped allowlist rule below.
         pathNot: [
           '/__tests__/',
           String.raw`\.test\.(ts|tsx)$`,
           '^packages/mcp/',
           '^packages/session-store/',
           String.raw`^packages/graph/engine/src/persistence/`,
+          '^packages/test-support/',
         ],
       },
       to: { path: String.raw`/src/internal\.ts$` },
+    },
+    {
+      name: 'test-support-fitness-internal-only',
+      severity: 'error',
+      comment:
+        'Private @opensip-cli/test-support may import @opensip-cli/fitness/internal for ' +
+        'the test-only fitnessTestFileCache seam. No other package internal barrels.',
+      from: {
+        path: '^packages/test-support/',
+        pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: String.raw`/src/internal\.ts$`,
+        pathNot: String.raw`^packages/fitness/engine/src/internal\.ts$`,
+      },
     },
     {
       name: 'session-store-datastore-internal-only',

@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
@@ -33,7 +33,7 @@ function writeFixture(cwd: string, rel: string, content: string): string {
   return abs;
 }
 
-afterEach(() => fileCache.clear());
+afterEach(() => fitnessTestFileCache.clear());
 
 describe('exit-code-correctness — numeric setExitCode FP regression', () => {
   it('does NOT flag a catch that calls cli.setExitCode(1)', async () => {

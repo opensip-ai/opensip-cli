@@ -47,16 +47,16 @@ import { executeFit } from '@opensip-cli/fitness/internal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FitOptions } from '@opensip-cli/contracts';
-import type * as CheckLoaderModule from '@opensip-cli/fitness/cli/fit/check-loader.js';
+import type * as CheckLoaderModule from '../check-loader.js';
 
 // Seed a stub check so executeFit reaches the recipe path (ADR-0060 fail-closed
 // when the registry is empty). Check packs are intentionally not loaded — only
 // scope isolation is under test.
-vi.mock('@opensip-cli/fitness/cli/fit/check-loader.js', async (importOriginal) => {
+vi.mock('../check-loader.js', async (importOriginal) => {
   const actual = await importOriginal<typeof CheckLoaderModule>();
   const { currentCheckRegistry, currentFitnessLoadState } =
-    await import('@opensip-cli/fitness/framework/scope-registry.js');
-  const { defineCheck } = await import('@opensip-cli/fitness/framework/define-check.js');
+    await import('../../../framework/scope-registry.js');
+  const { defineCheck } = await import('../../../framework/define-check.js');
   return {
     ...actual,
     ensureChecksLoaded: vi.fn((projectDir = '') => {

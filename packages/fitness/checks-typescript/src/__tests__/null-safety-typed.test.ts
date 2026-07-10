@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { RunScope, runWithScope } from '@opensip-cli/core';
-import { fileCache, setCurrentRecipeCheckConfig } from '@opensip-cli/fitness';
+import { setCurrentRecipeCheckConfig } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { createTypeCheckedProgram } from '@opensip-cli/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -18,7 +19,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'opensip-nstyped-'));
 });
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -29,11 +30,11 @@ function write(rel: string, content: string): string {
   return abs;
 }
 
-/** A scope carrying the fitness fileCache + a fresh shared-Program cell. */
+/** A scope carrying the fitness fitnessTestFileCache + a fresh shared-Program cell. */
 function scopeWithFitness(): RunScope {
   const scope = new RunScope();
   Object.assign(scope, {
-    fitness: { fileCache, tsProgram: { value: undefined } },
+    fitness: { fitnessTestFileCache, tsProgram: { value: undefined } },
   });
   return scope;
 }
@@ -111,7 +112,7 @@ describe('null-safety check — analyzeAll mode selection', () => {
     const scope = scopeWithFitness();
     await runWithScope(scope, async () => {
       // No typeAware config → default on.
-      await fileCache.prewarm(dir, ['**/*']);
+      await fitnessTestFileCache.prewarm(dir, ['**/*']);
       const result = await nullSafety.run(dir, { targetFiles: [file] });
       expect(result.signals.length).toBeGreaterThanOrEqual(3);
       expect(result.signals.every((s) => s.message.includes('unsafe property access'))).toBe(true);
@@ -127,7 +128,7 @@ describe('null-safety check — analyzeAll mode selection', () => {
       setCurrentRecipeCheckConfig(scope, {
         'null-safety': { typeAware: false },
       });
-      await fileCache.prewarm(dir, ['**/*']);
+      await fitnessTestFileCache.prewarm(dir, ['**/*']);
       const result = await nullSafety.run(dir, { targetFiles: [file] });
       // Convention trusts `get*` calls as non-null (its false-negative), so the
       // nullable-return accesses are missed; the unknown element-access receiver

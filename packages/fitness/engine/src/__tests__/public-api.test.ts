@@ -32,7 +32,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'defineRegexListCheck',
   'execAbortable',
   'extractSnippet',
-  'fileCache',
+
   'findStronglyConnectedComponents',
   'fitnessTool',
   'getCheckConfig',
@@ -92,6 +92,8 @@ describe('@opensip-cli/fitness public barrel', () => {
       'saveBaseline',
       'compareToBaseline',
       'ensureChecksLoaded',
+      'fileCache',
+      'fitnessTestFileCache',
     ]) {
       expect(barrel).not.toHaveProperty(leak);
     }

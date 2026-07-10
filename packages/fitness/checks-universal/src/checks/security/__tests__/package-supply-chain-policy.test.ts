@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { packageSupplyChainPolicy } from '../package-supply-chain-policy.js';
@@ -20,13 +20,13 @@ function writeFixture(cwd: string, relPath: string, content: string): string {
 
 async function runPolicy(cwd: string) {
   return packageSupplyChainPolicy.run(cwd, {
-    fileCache,
+    fitnessTestFileCache,
     targetFiles: [join(cwd, 'package.json')],
   });
 }
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
 });
 
 describe('package-supply-chain-policy', () => {

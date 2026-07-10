@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 import { RunScope, runWithScope } from '@opensip-cli/core';
 import {
-  fileCache,
+  fitnessTestFileCache,
   setCurrentRecipeCheckConfig,
   clearCurrentRecipeCheckConfig,
 } from '@opensip-cli/fitness';
@@ -38,7 +38,7 @@ function findCheck(slug: string) {
 
 async function runCheck(slug: string) {
   const check = findCheck(slug);
-  await fileCache.prewarm(cwd, ['**/*']);
+  await fitnessTestFileCache.prewarm(cwd, ['**/*']);
   return check.run(cwd, { targetFiles: written });
 }
 
@@ -48,11 +48,11 @@ beforeEach(() => {
   testScope = new RunScope();
   // check.run resolves currentScope()?.fitness?.fileCache now (Phase 1); bind it
   // to the test-only singleton this suite prewarms.
-  Object.assign(testScope, { fitness: { fileCache } });
+  Object.assign(testScope, { fitness: { fileCache: fitnessTestFileCache } });
 });
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   clearCurrentRecipeCheckConfig(testScope);
   rmSync(cwd, { recursive: true, force: true });
 });

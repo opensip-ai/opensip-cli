@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -40,7 +40,7 @@ langRegistry.register(typescriptAdapter);
 const testScope = new RunScope({ languages: langRegistry });
 // Bind the scope cache to the test-only singleton these tests prewarm:
 // check.run resolves currentScope()?.fitness?.fileCache now (Phase 1).
-Object.assign(testScope, { fitness: { fileCache } });
+Object.assign(testScope, { fitness: { fileCache: fitnessTestFileCache } });
 
 // The vitest process cwd is the checks-typescript package dir; captured at
 // module load so the tsc fixture can locate the monorepo root reliably even
@@ -88,14 +88,14 @@ function importLines(prefix: string, count: number): string {
  */
 async function runRelative(slug: string, relPaths: string[]): Promise<CheckResult> {
   const check = findCheck(slug);
-  await fileCache.prewarm(root, ['**/*']);
+  await fitnessTestFileCache.prewarm(root, ['**/*']);
   return runWithScope(testScope, () => check.run(root, { targetFiles: relPaths }));
 }
 
 /** Run a check with absolute target paths (analyze-mode checks). */
 async function runAbsolute(slug: string, absPaths: string[]): Promise<CheckResult> {
   const check = findCheck(slug);
-  await fileCache.prewarm(root, ['**/*']);
+  await fitnessTestFileCache.prewarm(root, ['**/*']);
   return runWithScope(testScope, () => check.run(root, { targetFiles: absPaths }));
 }
 
@@ -105,7 +105,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   process.chdir(originalCwd);
   rmSync(root, { recursive: true, force: true });
 });
